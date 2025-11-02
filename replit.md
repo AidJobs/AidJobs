@@ -20,6 +20,9 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Capabilities endpoint (`/api/capabilities`) reporting enabled modules
 - Admin config endpoint (`/admin/config/env`) showing environment variable presence
 - Search endpoints with graceful degradation (`/api/search/query`, `/api/search/facets`)
+- **Smart Search UI** with debounced input, inline filters, results list, and inspector drawer
+- Keyboard shortcuts: `/` to focus search, `Esc` to close inspector
+- Accessibility with visible focus states and keyboard navigation
 - Frontend capabilities integration with search status banner
 - Environment template with all 24 required variables
 - Development workflow running both frontend and backend concurrently
@@ -31,7 +34,7 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
 - CV upload functionality
-- Job listing pages
+- Shortlist/Save functionality (UI stub present)
 - Authentication
 - Find & Earn features
 
@@ -186,8 +189,53 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 └── env.example         # Environment template
 ```
 
+## Smart Search UI Features
+
+### Search Input
+- Command-style input with placeholder "Search roles, orgs, or skills…"
+- 250ms debounce to reduce API calls
+- Keyboard shortcut: Press `/` to focus search input from anywhere
+
+### Quick Filters
+- **Country**: Dropdown with pre-populated options (Kenya, Uganda, Tanzania, Ethiopia, South Africa)
+- **Level**: Dropdown for job level (Entry, Mid, Senior)
+- **International**: Toggle checkbox for international-eligible positions
+- **Mission Tags**: Multi-select chips (health, education, environment, human-rights, development)
+- All filters trigger immediate search on change
+
+### Results List
+- Compact row-cards displaying:
+  - Job title
+  - Organization name
+  - Location/Country
+  - Deadline (if present)
+  - "Save" button (UI stub, no backend yet)
+- Click or press Enter/Space on any result to open inspector drawer
+- Empty state message when no results or filters
+
+### Inspector Drawer
+- Right-side panel showing full job details:
+  - Title and organization
+  - Location and job level
+  - Application deadline
+  - "Apply Now" button (links to apply_url)
+- Click backdrop, press `Esc`, or click X to close
+- Keyboard accessible with visible focus states
+
+### Pagination
+- "Load more" button appends additional results
+- Maintains scroll position when loading more
+- Shows total count of jobs found
+
+### Status Banner
+- Displays at top when search is disabled or in fallback mode
+- Non-blocking, minimal design
+- Adaptive messaging based on capability state
+
 ## Notes
 - No hardcoded secrets or API keys
 - Missing environment variables do not crash the application
 - Cross-origin warnings in development are expected (Next.js framework notice)
 - Frontend proxies API requests to backend via Next.js rewrites
+- Search UI gracefully handles empty results (no demo data)
+- All interactive elements are keyboard-accessible with visible focus states
