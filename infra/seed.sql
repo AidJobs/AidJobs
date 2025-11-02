@@ -1,0 +1,2 @@
+-- Seed data placeholder
+-- Initial data will be defined here

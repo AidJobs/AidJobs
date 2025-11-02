@@ -1,0 +1,2 @@
+-- Supabase schema placeholder
+-- Database schema will be defined here
