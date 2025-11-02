@@ -49,8 +49,6 @@ class Capabilities:
         
         if db and search and ai and payments:
             status = "green"
-        elif not db and not search and not ai and not payments:
-            status = "red"
         else:
             status = "amber"
         
