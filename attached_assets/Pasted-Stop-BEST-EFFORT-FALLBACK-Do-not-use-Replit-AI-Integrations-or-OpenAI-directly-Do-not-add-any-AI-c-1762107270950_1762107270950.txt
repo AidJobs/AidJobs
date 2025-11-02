@@ -1,0 +1,70 @@
+Stop BEST_EFFORT_FALLBACK. Do not use Replit AI Integrations or OpenAI directly. Do not add any AI code or sample features. No CRUD pages. No organization profiles. No “job matching” yet.
+
+Goal: strict scaffolding only, with capability stubs. Never assume secrets.
+
+1) Clean up anything you added that is not part of minimal scaffolding:
+- Remove any dependencies or files for Replit AI, OpenAI, LangChain, or vector DBs.
+- Remove sample pages, demo routes, CRUD endpoints, and example data.
+- Keep only the monorepo skeleton described below.
+
+2) Create/ensure this exact monorepo layout:
+/
+  /apps
+    /frontend        # Next.js (TypeScript, App Router) + Tailwind + shadcn/ui
+    /backend         # FastAPI (Python 3.11)
+  /packages
+    /ui              # shared components/tokens (empty ok)
+    /lib             # shared types/helpers (empty ok)
+  /infra
+    supabase.sql     # placeholder only (no data yet)
+    seed.sql         # placeholder only
+  /tests
+    /unit            # empty ok
+    /integration     # empty ok
+  /scripts           # empty ok
+  README.md
+
+3) Root scripts:
+- npm run dev  -> concurrently run FE on 3000 and BE on 8000
+- npm run lint -> ESLint (FE) + Ruff (BE)
+- npm run test -> FE + BE unit tests (can be empty stubs)
+
+4) Backend (FastAPI) minimal endpoints only:
+- GET /api/healthz -> returns {status: "amber", components: {db:false, search:false, ai:false, payments:false}}
+- GET /admin/config/env -> returns a presence map of required env var NAMES only (never values)
+- Add a small capability service so any later routes can return {enabled:false} with 200 when envs are missing.
+No other endpoints yet.
+
+5) Frontend minimal shell only:
+- Next.js App Router page at “/” with a small status dot that fetches /api/healthz and shows green/amber/red.
+- No sample content, no CRUD, no listings.
+
+6) Create /env.example at repo root with ONLY names (no values):
+AIDJOBS_ENV=dev
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
+MEILI_HOST=
+MEILI_MASTER_KEY=
+MEILI_JOBS_INDEX=jobs_index
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=gpt-4o-mini
+CV_MAX_FILE_MB=6
+CV_TRANSIENT_HOURS=48
+PAYMENT_PROVIDER=auto
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_MODE=sandbox
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+ADMIN_PASSWORD=
+AIDJOBS_ENABLE_SEARCH=true
+AIDJOBS_ENABLE_CV=false
+AIDJOBS_ENABLE_FINDEARN=true
+AIDJOBS_ENABLE_PAYMENTS=false
+NEXT_PUBLIC_AIDJOBS_ENV=dev
+NEXT_PUBLIC_MEILI_FALLBACK=true
+
+7) Do not try to connect to any provider. Do not run any migrations. No hardcoded secrets. Missing envs must NOT crash anything.
+
+8) When done, print a concise file tree of what you created/kept.
