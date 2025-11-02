@@ -1,0 +1,23 @@
+{
+  "name": "aidjobs",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd apps/frontend && npm run dev",
+    "dev:backend": "cd apps/backend && uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd apps/frontend && npm run lint",
+    "lint:backend": "cd apps/backend && ruff check .",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd apps/frontend && npm run test",
+    "test:backend": "cd apps/backend && python -m pytest"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
