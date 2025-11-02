@@ -1,0 +1,88 @@
+# AidJobs - Project Documentation
+
+## Overview
+AidJobs is an AI-powered job search platform designed specifically for NGOs and INGOs. This is a clean scaffolding setup ready for environment configuration and feature implementation.
+
+## Architecture
+- **Monorepo Structure**: Clean separation of concerns with apps, packages, infrastructure, and tests
+- **Frontend**: Next.js 14+ with TypeScript, App Router, Tailwind CSS (port 5000)
+- **Backend**: FastAPI with Python 3.11 (port 8000)
+- **Database**: Supabase (PostgreSQL) - not yet connected
+- **Search**: Meilisearch - not yet connected
+- **AI**: OpenRouter - not yet connected
+
+## Current State
+✅ **Completed**:
+- Monorepo scaffolding with proper directory structure
+- Next.js frontend with App Router and Tailwind CSS
+- FastAPI backend with capability service
+- Health check endpoint (`/api/healthz`) showing system status
+- Admin config endpoint (`/admin/config/env`) showing environment variable presence
+- Environment template with all 24 required variables
+- Development workflow running both frontend and backend concurrently
+
+🔨 **Not Yet Implemented**:
+- Database schema and connections
+- Meilisearch integration
+- AI/LLM features via OpenRouter
+- Payment processing (PayPal/Razorpay)
+- CV upload functionality
+- Job listing pages
+- Authentication
+- Find & Earn features
+
+## Environment Variables
+See `env.example` for the complete list of 24 environment variables. The application gracefully handles missing variables without crashing.
+
+### Feature Flags
+- `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch
+- `AIDJOBS_ENABLE_CV` - Enable/disable CV upload
+- `AIDJOBS_ENABLE_FINDEARN` - Enable/disable Find & Earn
+- `AIDJOBS_ENABLE_PAYMENTS` - Enable/disable payment processing
+
+## Development Scripts
+- `npm run dev` - Start both frontend and backend servers
+- `npm run lint` - Lint frontend (ESLint) and backend (Ruff)
+- `npm run test` - Run tests (stubs currently in place)
+
+## Health Check System
+The capability service in the backend monitors:
+- **db**: Supabase connection availability
+- **search**: Meilisearch availability
+- **ai**: OpenRouter API availability
+- **payments**: Payment provider configuration
+
+Status levels:
+- **green**: All components enabled and configured
+- **amber**: Partial configuration (current state with no env vars)
+- **red**: System failure (not used in current implementation)
+
+## Next Steps
+1. Configure environment variables in `.env` file
+2. Set up Supabase database schema (`infra/supabase.sql`)
+3. Configure Meilisearch for job search
+4. Implement job listing and search features
+5. Add AI-powered job matching via OpenRouter
+6. Implement CV upload with processing
+7. Add payment integration for premium features
+
+## Project Structure
+```
+/
+├── apps/
+│   ├── frontend/        # Next.js application
+│   └── backend/         # FastAPI application
+├── packages/
+│   ├── ui/             # Shared UI components
+│   └── lib/            # Shared utilities
+├── infra/              # Database schemas and seeds
+├── tests/              # Test suites
+├── scripts/            # Utility scripts
+└── env.example         # Environment template
+```
+
+## Notes
+- No hardcoded secrets or API keys
+- Missing environment variables do not crash the application
+- Cross-origin warnings in development are expected (Next.js framework notice)
+- Frontend proxies API requests to backend via Next.js rewrites
