@@ -19,9 +19,11 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Health check endpoint (`/api/healthz`) showing system status
 - Capabilities endpoint (`/api/capabilities`) reporting enabled modules
 - Admin config endpoint (`/admin/config/env`) showing environment variable presence
+- Search endpoints with graceful degradation (`/api/search/query`, `/api/search/facets`)
+- Frontend capabilities integration with search status banner
 - Environment template with all 24 required variables
 - Development workflow running both frontend and backend concurrently
-- Pytest test suite for capabilities endpoint
+- Pytest test suite for capabilities and search endpoints
 
 🔨 **Not Yet Implemented**:
 - Database schema and connections
@@ -81,6 +83,66 @@ Returns presence map of environment variable names (never values):
   "SUPABASE_URL": false,
   "MEILI_HOST": false,
   ...
+}
+```
+
+### GET /api/search/query
+Search endpoint with graceful degradation across Meilisearch, Supabase SQL, and fallback mode.
+
+**Query Parameters**:
+- `q` (string, optional): Search query text
+- `page` (integer, default=1): Page number (clamped to ≥1)
+- `size` (integer, default=20): Page size (clamped to 1-100)
+- `country` (string, optional): Filter by country code
+- `level_norm` (string, optional): Filter by job level (entry, mid, senior)
+- `international_eligible` (boolean, optional): Filter by international eligibility
+- `mission_tags[]` (array, optional): Filter by mission tags
+
+**Response**:
+```json
+{
+  "status": "ok",
+  "data": {
+    "items": [],
+    "total": 0,
+    "page": 1,
+    "size": 20,
+    "fallback": true
+  },
+  "error": null,
+  "request_id": "uuid"
+}
+```
+
+**Degradation Behavior**:
+- **Meilisearch enabled**: Full search with facets from `jobs_index`
+- **Meilisearch disabled, DB enabled**: Supabase SQL fallback (ILIKE on title/org_name/description)
+- **Both disabled**: Returns empty results with `fallback: true`
+- Always enforces `jobs.status='active'` filter
+- Never returns 500 on missing environment variables
+
+**Timeouts**: Meilisearch 2000ms, Database 1500ms
+
+### GET /api/search/facets
+Returns facet counts for search filters.
+
+**Response when enabled**:
+```json
+{
+  "enabled": true,
+  "facets": {
+    "country": {},
+    "level_norm": {},
+    "mission_tags": {},
+    "international_eligible": {}
+  }
+}
+```
+
+**Response when disabled**:
+```json
+{
+  "enabled": false
 }
 ```
 
