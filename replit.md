@@ -17,9 +17,11 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Next.js frontend with App Router and Tailwind CSS
 - FastAPI backend with capability service
 - Health check endpoint (`/api/healthz`) showing system status
+- Capabilities endpoint (`/api/capabilities`) reporting enabled modules
 - Admin config endpoint (`/admin/config/env`) showing environment variable presence
 - Environment template with all 24 required variables
 - Development workflow running both frontend and backend concurrently
+- Pytest test suite for capabilities endpoint
 
 🔨 **Not Yet Implemented**:
 - Database schema and connections
@@ -45,17 +47,58 @@ See `env.example` for the complete list of 24 environment variables. The applica
 - `npm run lint` - Lint frontend (ESLint) and backend (Ruff)
 - `npm run test` - Run tests (stubs currently in place)
 
+## API Endpoints
+
+### GET /api/healthz
+Returns overall system health status with component flags:
+```json
+{
+  "status": "amber",
+  "components": {
+    "db": false,
+    "search": false,
+    "ai": false,
+    "payments": false
+  }
+}
+```
+
+### GET /api/capabilities
+Reports which feature modules are enabled based on environment variables and feature flags:
+```json
+{
+  "search": false,
+  "cv": false,
+  "payments": false,
+  "findearn": true
+}
+```
+
+### GET /admin/config/env
+Returns presence map of environment variable names (never values):
+```json
+{
+  "SUPABASE_URL": false,
+  "MEILI_HOST": false,
+  ...
+}
+```
+
 ## Health Check System
 The capability service in the backend monitors:
 - **db**: Supabase connection availability
-- **search**: Meilisearch availability
+- **search**: Meilisearch availability (requires AIDJOBS_ENABLE_SEARCH=true + config)
 - **ai**: OpenRouter API availability
-- **payments**: Payment provider configuration
+- **payments**: Payment provider configuration (requires AIDJOBS_ENABLE_PAYMENTS=true + config)
+- **cv**: CV upload capability (requires AIDJOBS_ENABLE_CV=true + config)
+- **findearn**: Find & Earn feature (enabled by default via AIDJOBS_ENABLE_FINDEARN)
 
 Status levels:
 - **green**: All components enabled and configured
 - **amber**: Partial configuration (current state with no env vars)
 - **red**: System failure (not used in current implementation)
+
+All endpoints return HTTP 200 even when integrations are missing keys - the application never crashes on missing environment variables.
 
 ## Next Steps
 1. Configure environment variables in `.env` file

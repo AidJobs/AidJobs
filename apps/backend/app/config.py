@@ -40,6 +40,19 @@ class Capabilities:
         
         return enabled and has_config
 
+    @staticmethod
+    def is_cv_enabled() -> bool:
+        enabled = os.getenv("AIDJOBS_ENABLE_CV", "false").lower() == "true"
+        has_config = bool(
+            os.getenv("CV_MAX_FILE_MB") and os.getenv("CV_TRANSIENT_HOURS")
+        )
+        return enabled and has_config
+
+    @staticmethod
+    def is_findearn_enabled() -> bool:
+        enabled = os.getenv("AIDJOBS_ENABLE_FINDEARN", "true").lower() == "true"
+        return enabled
+
     @classmethod
     def get_status(cls) -> dict:
         db = cls.is_db_enabled()
@@ -60,6 +73,15 @@ class Capabilities:
                 "ai": ai,
                 "payments": payments,
             },
+        }
+
+    @classmethod
+    def get_capabilities(cls) -> dict:
+        return {
+            "search": cls.is_search_enabled(),
+            "cv": cls.is_cv_enabled(),
+            "payments": cls.is_payments_enabled(),
+            "findearn": cls.is_findearn_enabled(),
         }
 
 

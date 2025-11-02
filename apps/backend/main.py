@@ -22,6 +22,11 @@ async def healthz():
     return Capabilities.get_status()
 
 
+@app.get("/api/capabilities")
+async def capabilities():
+    return Capabilities.get_capabilities()
+
+
 @app.get("/admin/config/env")
 async def config_env():
     return get_env_presence()
