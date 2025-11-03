@@ -22,14 +22,30 @@ END
 $$;
 
 -- Create auth schema and uid() function if they don't exist (for non-Supabase PostgreSQL)
-CREATE SCHEMA IF NOT EXISTS auth;
-
-CREATE OR REPLACE FUNCTION auth.uid()
-RETURNS UUID AS $$
+-- Note: On Supabase-hosted databases, the auth schema already exists and is managed by Supabase.
+-- We only create it for standalone PostgreSQL installations.
+DO $$
 BEGIN
-    RETURN NULL::UUID;  -- Stub function for non-Supabase PostgreSQL
-END;
-$$ LANGUAGE plpgsql STABLE;
+    -- Check if we're on Supabase by looking for the 'extensions' schema
+    -- On Supabase, skip auth schema creation to avoid permission errors
+    IF NOT EXISTS (SELECT FROM information_schema.schemata WHERE schema_name = 'extensions') THEN
+        -- Not on Supabase, create auth schema if needed
+        IF NOT EXISTS (SELECT FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+            CREATE SCHEMA auth;
+        END IF;
+        
+        -- Create stub uid() function for standalone PostgreSQL
+        EXECUTE '
+        CREATE OR REPLACE FUNCTION auth.uid()
+        RETURNS UUID AS $FUNC$
+        BEGIN
+            RETURN NULL::UUID;
+        END;
+        $FUNC$ LANGUAGE plpgsql STABLE;
+        ';
+    END IF;
+END
+$$;
 
 -- Sources table: job board URLs to crawl
 CREATE TABLE IF NOT EXISTS sources (

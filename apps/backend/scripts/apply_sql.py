@@ -61,20 +61,22 @@ def main():
     )
     args = parser.parse_args()
 
-    # Prefer SUPABASE_URL over DATABASE_URL (by design)
+    # Prefer SUPABASE_DB_URL over SUPABASE_URL over DATABASE_URL (by design)
+    supabase_db_url = os.getenv("SUPABASE_DB_URL")
     supabase_url = os.getenv("SUPABASE_URL")
     service_key = os.getenv("SUPABASE_SERVICE_KEY")
     database_url = os.getenv("DATABASE_URL")
 
-    if not supabase_url and not database_url:
-        print("Error: Neither SUPABASE_URL nor DATABASE_URL environment variable is set")
-        print("Please set:")
-        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY (preferred)")
-        print("  - Or DATABASE_URL: postgresql://user:password@host:port/database")
+    if not supabase_db_url and not supabase_url and not database_url:
+        print("Error: No database connection configured")
+        print("Please set one of:")
+        print("  - SUPABASE_DB_URL: postgresql://postgres.[project]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres (preferred)")
+        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY")
+        print("  - DATABASE_URL: postgresql://user:password@host:port/database")
         sys.exit(1)
     
     # Log if DATABASE_URL is set but ignored
-    if database_url and supabase_url:
+    if database_url and (supabase_db_url or supabase_url):
         print("ℹ DATABASE_URL is set but ignored by design. Using Supabase for migrations.")
         print()
 
@@ -92,8 +94,29 @@ def main():
     
     # Connect to database
     try:
-        if supabase_url:
-            # Prefer Supabase
+        if supabase_db_url:
+            # Prefer SUPABASE_DB_URL (connection pooler)
+            cleaned_url = supabase_db_url.replace('[', '').replace(']', '')
+            parsed = urlparse(cleaned_url)
+            print(f"Database: {parsed.hostname}")
+            print()
+            
+            # Parse URL and connect with individual parameters (more reliable than URL string)
+            from urllib.parse import unquote
+            conn_params = {
+                "host": parsed.hostname,
+                "port": parsed.port or 5432,
+                "database": parsed.path.lstrip('/') or 'postgres',
+                "user": parsed.username or 'postgres',
+            }
+            if parsed.password:
+                conn_params["password"] = unquote(parsed.password)
+            
+            conn = psycopg2.connect(**conn_params)
+            conn.autocommit = False
+            cursor = conn.cursor()
+        elif supabase_url:
+            # Fallback to SUPABASE_URL
             print(f"Database: {urlparse(supabase_url).hostname}")
             print()
             
@@ -102,7 +125,7 @@ def main():
             conn.autocommit = False
             cursor = conn.cursor()
         else:
-            # Fallback to DATABASE_URL only if Supabase is not configured
+            # Final fallback to DATABASE_URL
             parsed = urlparse(database_url)
             print(f"Database: {parsed.hostname}")
             print()
