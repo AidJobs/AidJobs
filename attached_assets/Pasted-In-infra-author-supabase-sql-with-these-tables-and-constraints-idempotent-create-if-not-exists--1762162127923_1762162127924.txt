@@ -1,0 +1,26 @@
+In /infra, author supabase.sql with these tables and constraints (idempotent, create-if-not-exists):
+
+- sources(id uuid pk default gen_random_uuid(), org_name text, careers_url text not null, source_type text default 'html', parser_hint text, status text default 'pending_validation', crawl_frequency_days int default 3, last_crawled_at timestamptz, last_crawl_status text, created_at timestamptz default now(), updated_at timestamptz default now());
+
+- jobs(id uuid pk default gen_random_uuid(), source_id uuid references sources(id) on delete set null, org_name text, title text not null, location_raw text, country text, country_iso text, city text, level_norm text, mission_tags text[], international_eligible boolean, deadline date, apply_url text, description_snippet text, canonical_hash text not null unique, fetched_at timestamptz default now(), last_seen_at timestamptz default now(), status text default 'active', created_at timestamptz default now(), updated_at timestamptz default now(), search_tsv tsvector);
+
+Indexes: GIN on jobs(search_tsv); BTREE on (status, deadline), (country), (level_norm), (international_eligible).
+
+Trigger to maintain search_tsv from (title, org_name, description_snippet, mission_tags::text):
+- add function jobs_tsv_update()
+- add trigger on insert/update
+
+- users(id uuid pk default gen_random_uuid(), email text unique, is_pro boolean default false, created_at timestamptz default now());
+- shortlists(id uuid pk default gen_random_uuid(), user_id uuid, job_id uuid references jobs(id) on delete cascade, created_at timestamptz default now(), unique(user_id, job_id));
+- findearn_submissions(id uuid pk default gen_random_uuid(), user_id uuid, url text not null, domain text, status text default 'queued', jobs_found int default 0, created_at timestamptz default now());
+- rewards(id uuid pk default gen_random_uuid(), user_id uuid, kind text, days int, issued_at timestamptz default now());
+- payments(id uuid pk default gen_random_uuid(), user_id uuid, provider text, provider_ref text, amount_cents int, currency text default 'USD', status text, created_at timestamptz default now());
+
+RLS:
+- enable RLS on jobs; policy read_active for anon/authenticated: SELECT where status='active'.
+- enable RLS on shortlists; owner-only by user_id (assume future auth).
+- admin-only (service role) for sources, rewards, payments.
+
+Also create /infra/seed.sql with a few anonymized rows in sources and jobs (2-3 orgs like UN-type, INGO, CSR; 8–12 jobs with varied country, level_norm, mission_tags, deadlines, international_eligible).
+
+Add /apps/backend/scripts/apply_sql.py that uses SUPABASE_URL + SUPABASE_SERVICE_KEY to apply supabase.sql and then seed.sql (optional flag). It must be idempotent and print a concise summary. Exit non-zero on failure.
