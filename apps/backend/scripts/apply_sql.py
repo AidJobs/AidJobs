@@ -61,16 +61,16 @@ def main():
     )
     args = parser.parse_args()
 
-    # Check required environment variables
+    # Check for DATABASE_URL first, then fall back to SUPABASE_URL
+    database_url = os.getenv("DATABASE_URL")
     supabase_url = os.getenv("SUPABASE_URL")
     service_key = os.getenv("SUPABASE_SERVICE_KEY")
 
-    if not supabase_url:
-        print("Error: SUPABASE_URL environment variable not set")
-        sys.exit(1)
-
-    if not service_key:
-        print("Error: SUPABASE_SERVICE_KEY environment variable not set")
+    if not database_url and not supabase_url:
+        print("Error: Neither DATABASE_URL nor SUPABASE_URL environment variable is set")
+        print("Please set one of:")
+        print("  - DATABASE_URL: postgresql://user:password@host:port/database")
+        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY")
         sys.exit(1)
 
     # Locate SQL files
@@ -84,20 +84,34 @@ def main():
 
     print("AidJobs Database Setup")
     print("=" * 50)
-    print(f"Database: {urlparse(supabase_url).hostname}")
-    print()
-
+    
     # Connect to database
     try:
-        conn_params = get_connection_params(supabase_url, service_key)
-        
-        conn = psycopg2.connect(**conn_params)
-        conn.autocommit = False
-        cursor = conn.cursor()
+        if database_url:
+            # Use DATABASE_URL directly
+            parsed = urlparse(database_url)
+            print(f"Database: {parsed.hostname}")
+            print()
+            
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = False
+            cursor = conn.cursor()
+        else:
+            # Use SUPABASE_URL with service key
+            print(f"Database: {urlparse(supabase_url).hostname}")
+            print()
+            
+            conn_params = get_connection_params(supabase_url, service_key)
+            conn = psycopg2.connect(**conn_params)
+            conn.autocommit = False
+            cursor = conn.cursor()
         
         print("✓ Connected to database")
     except Exception as e:
         print(f"✗ Connection failed: {e}")
+        print("\nPlease verify your database credentials:")
+        print("  - Check DATABASE_URL or SUPABASE_URL is correct")
+        print("  - Ensure SUPABASE_SERVICE_KEY has sufficient permissions")
         sys.exit(1)
 
     results = []
