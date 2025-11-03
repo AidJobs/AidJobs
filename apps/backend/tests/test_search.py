@@ -213,3 +213,82 @@ class TestSearchFacets:
     def test_facets_never_500_on_missing_env(self):
         response = client.get("/api/search/facets")
         assert response.status_code == 200
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_facets_returns_counts(self):
+        """Test database facets returns count data after seed is loaded"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            response = client.get("/api/search/facets")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["enabled"] is True
+            assert "facets" in data
+            
+            facets = data["facets"]
+            assert "country" in facets
+            assert "level_norm" in facets
+            assert "mission_tags" in facets
+            assert "international_eligible" in facets
+            
+            # Each facet should be a dict
+            assert isinstance(facets["country"], dict)
+            assert isinstance(facets["level_norm"], dict)
+            assert isinstance(facets["mission_tags"], dict)
+            assert isinstance(facets["international_eligible"], dict)
+            
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_facets_mission_tags_limited_to_10(self):
+        """Test mission_tags facet is limited to top 10"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            response = client.get("/api/search/facets")
+            data = response.json()
+            
+            # Mission tags should have at most 10 entries
+            assert len(data["facets"]["mission_tags"]) <= 10
+            
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_facets_country_limited_to_50(self):
+        """Test country facet is limited to 50 buckets"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            response = client.get("/api/search/facets")
+            data = response.json()
+            
+            # Country should have at most 50 entries
+            assert len(data["facets"]["country"]) <= 50
+            
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)

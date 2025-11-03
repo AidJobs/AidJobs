@@ -100,18 +100,20 @@ class SearchService:
                 "fallback": True,
             }
 
-        try:
-            database_url = os.getenv("DATABASE_URL")
-            
-            if not database_url:
-                return {
-                    "items": [],
-                    "total": 0,
-                    "page": page,
-                    "size": size,
-                    "fallback": True,
-                }
+        database_url = os.getenv("DATABASE_URL")
+        
+        if not database_url:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "fallback": True,
+            }
 
+        conn = None
+        cursor = None
+        try:
             # Connect to database with timeout using connection string
             conn = psycopg2.connect(database_url, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -185,9 +187,6 @@ class SearchService:
                     item['id'] = str(item['id'])
                 items.append(item)
 
-            cursor.close()
-            conn.close()
-
             return {
                 "items": items,
                 "total": total,
@@ -206,6 +205,12 @@ class SearchService:
                 "size": size,
                 "fallback": True,
             }
+        finally:
+            # Always close cursor and connection
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     async def _get_database_facets(self) -> dict[str, dict[str, int]]:
         """Get facet counts from database using GROUP BY queries"""
@@ -217,16 +222,18 @@ class SearchService:
                 "international_eligible": {},
             }
 
-        try:
-            database_url = os.getenv("DATABASE_URL")
-            if not database_url:
-                return {
-                    "country": {},
-                    "level_norm": {},
-                    "mission_tags": {},
-                    "international_eligible": {},
-                }
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return {
+                "country": {},
+                "level_norm": {},
+                "mission_tags": {},
+                "international_eligible": {},
+            }
 
+        conn = None
+        cursor = None
+        try:
             conn = psycopg2.connect(database_url, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -276,9 +283,6 @@ class SearchService:
             """)
             tags_facets = {row["tag"]: row["count"] for row in cursor.fetchall()}
 
-            cursor.close()
-            conn.close()
-
             return {
                 "country": country_facets,
                 "level_norm": level_facets,
@@ -294,6 +298,12 @@ class SearchService:
                 "mission_tags": {},
                 "international_eligible": {},
             }
+        finally:
+            # Always close cursor and connection
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     async def get_facets(self) -> dict[str, Any]:
         if self.meili_enabled:
