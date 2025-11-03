@@ -8,6 +8,10 @@ import logging
 
 from app.config import Capabilities, get_env_presence
 from app.search import search_service
+from app.normalizer import normalize_job_data
+from app.validator import validator
+import psycopg2
+from app.db_config import db_config
 
 load_dotenv()
 
@@ -107,3 +111,139 @@ async def admin_search_reindex():
     if env != "dev":
         raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
     return await search_service.reindex_jobs()
+
+
+@app.get("/admin/normalize/preview")
+async def admin_normalize_preview(
+    source_id: Optional[str] = Query(None, description="Filter by source ID"),
+    limit: int = Query(5, description="Number of records to preview"),
+):
+    """
+    Preview normalization for job records (dev-only).
+    
+    Shows raw data, normalized data, and validation results.
+    
+    Args:
+        source_id: Optional source ID to filter jobs
+        limit: Number of records to preview (default: 5, max: 20)
+    
+    Returns:
+        {
+            "total": int,
+            "previews": [
+                {
+                    "job_id": str,
+                    "raw": dict,
+                    "normalized": dict,
+                    "validation": {
+                        "valid": bool,
+                        "errors": List[str],
+                        "warnings": List[str]
+                    }
+                }
+            ]
+        }
+    """
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    
+    if not Capabilities.is_db_enabled():
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    limit = min(limit, 20)
+    
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=503, detail="Database connection not configured")
+    
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor()
+        
+        if source_id:
+            cursor.execute("""
+                SELECT id, org_name, title, location_raw, country, country_iso, 
+                       level_norm, mission_tags, international_eligible
+                FROM jobs
+                WHERE source_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (source_id, limit))
+        else:
+            cursor.execute("""
+                SELECT id, org_name, title, location_raw, country, country_iso, 
+                       level_norm, mission_tags, international_eligible
+                FROM jobs
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (limit,))
+        
+        rows = cursor.fetchall()
+        
+        cursor.execute("SELECT COUNT(*) FROM jobs" + (" WHERE source_id = %s" if source_id else ""), 
+                      (source_id,) if source_id else ())
+        total = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        previews = []
+        for row in rows:
+            job_id, org_name, title, location_raw, country, country_iso, level_norm, mission_tags, international_eligible = row
+            
+            raw_data = {
+                "org_name": org_name,
+                "title": title,
+                "location_raw": location_raw,
+                "country": country,
+                "country_iso": country_iso,
+                "level_norm": level_norm,
+                "mission_tags": mission_tags,
+                "international_eligible": international_eligible
+            }
+            
+            normalized_data = normalize_job_data({
+                "country": country,
+                "level_norm": level_norm,
+                "mission_tags": mission_tags,
+                "international_eligible": international_eligible
+            })
+            
+            merged_data = {
+                "country_iso": normalized_data["country_iso"] if "country_iso" in normalized_data else country_iso,
+                "level_norm": normalized_data["level_norm"] if "level_norm" in normalized_data else level_norm,
+                "mission_tags": normalized_data["mission_tags"] if "mission_tags" in normalized_data else mission_tags,
+                "international_eligible": normalized_data["international_eligible"] if "international_eligible" in normalized_data else international_eligible
+            }
+            
+            validation_result = validator.validate_job(merged_data)
+            
+            dropped_fields = []
+            if country and not normalized_data.get("country_iso"):
+                dropped_fields.append(f"country: '{country}' (not recognized)")
+            if level_norm and not normalized_data.get("level_norm"):
+                dropped_fields.append(f"level_norm: '{level_norm}' (not recognized)")
+            if mission_tags:
+                original_tags = set(mission_tags or [])
+                normalized_tags = set(normalized_data.get("mission_tags", []))
+                dropped_tags = original_tags - normalized_tags
+                if dropped_tags:
+                    dropped_fields.append(f"mission_tags: {list(dropped_tags)} (not recognized)")
+            
+            previews.append({
+                "job_id": str(job_id),
+                "raw": raw_data,
+                "normalized": normalized_data,
+                "dropped_fields": dropped_fields,
+                "validation": validation_result
+            })
+        
+        return {
+            "total": total,
+            "previews": previews
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to preview normalization: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to preview normalization: {str(e)}")

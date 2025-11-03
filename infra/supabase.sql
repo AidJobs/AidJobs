@@ -47,6 +47,63 @@ BEGIN
 END
 $$;
 
+-- Lookup tables for normalization
+-- Countries table: ISO2 country codes and names
+CREATE TABLE IF NOT EXISTS countries (
+    code_iso2 TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+-- Levels table: job seniority levels
+CREATE TABLE IF NOT EXISTS levels (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Tags table: mission tags
+CREATE TABLE IF NOT EXISTS tags (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Seed lookup tables (idempotent)
+INSERT INTO countries (code_iso2, name) VALUES
+    ('AF', 'Afghanistan'),
+    ('BD', 'Bangladesh'),
+    ('CD', 'Congo (DRC)'),
+    ('ET', 'Ethiopia'),
+    ('IN', 'India'),
+    ('KE', 'Kenya'),
+    ('NG', 'Nigeria'),
+    ('PK', 'Pakistan'),
+    ('SD', 'Sudan'),
+    ('SO', 'Somalia'),
+    ('SY', 'Syria'),
+    ('US', 'United States'),
+    ('YE', 'Yemen')
+ON CONFLICT (code_iso2) DO NOTHING;
+
+INSERT INTO levels (key, label) VALUES
+    ('Intern', 'Intern'),
+    ('Junior', 'Junior'),
+    ('Mid', 'Mid'),
+    ('Senior', 'Senior'),
+    ('Lead', 'Lead')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO tags (key, label) VALUES
+    ('health', 'Health'),
+    ('education', 'Education'),
+    ('wash', 'WASH'),
+    ('climate', 'Climate'),
+    ('gender', 'Gender'),
+    ('protection', 'Protection'),
+    ('nutrition', 'Nutrition'),
+    ('livelihoods', 'Livelihoods'),
+    ('shelter', 'Shelter'),
+    ('food-security', 'Food Security')
+ON CONFLICT (key) DO NOTHING;
+
 -- Sources table: job board URLs to crawl
 CREATE TABLE IF NOT EXISTS sources (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
