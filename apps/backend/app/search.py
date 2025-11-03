@@ -4,6 +4,8 @@ from typing import Any, Optional
 from datetime import datetime
 from urllib.parse import urlparse
 
+from app.db_config import db_config
+
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
@@ -22,7 +24,7 @@ class SearchService:
         return enabled and has_config
 
     def _is_db_enabled(self) -> bool:
-        return bool(os.getenv("DATABASE_URL"))
+        return db_config.is_db_enabled
 
     async def search_query(
         self,
@@ -100,9 +102,9 @@ class SearchService:
                 "fallback": True,
             }
 
-        database_url = os.getenv("DATABASE_URL")
+        conn_params = db_config.get_connection_params()
         
-        if not database_url:
+        if not conn_params:
             return {
                 "items": [],
                 "total": 0,
@@ -114,8 +116,8 @@ class SearchService:
         conn = None
         cursor = None
         try:
-            # Connect to database with timeout using connection string
-            conn = psycopg2.connect(database_url, connect_timeout=1)
+            # Connect to database with timeout
+            conn = psycopg2.connect(**conn_params, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Build WHERE clause
@@ -222,8 +224,8 @@ class SearchService:
                 "international_eligible": {},
             }
 
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
             return {
                 "country": {},
                 "level_norm": {},
@@ -234,7 +236,7 @@ class SearchService:
         conn = None
         cursor = None
         try:
-            conn = psycopg2.connect(database_url, connect_timeout=1)
+            conn = psycopg2.connect(**conn_params, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Get country facets (limit 50)

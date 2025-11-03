@@ -61,17 +61,22 @@ def main():
     )
     args = parser.parse_args()
 
-    # Check for DATABASE_URL first, then fall back to SUPABASE_URL
-    database_url = os.getenv("DATABASE_URL")
+    # Prefer SUPABASE_URL over DATABASE_URL (by design)
     supabase_url = os.getenv("SUPABASE_URL")
     service_key = os.getenv("SUPABASE_SERVICE_KEY")
+    database_url = os.getenv("DATABASE_URL")
 
-    if not database_url and not supabase_url:
-        print("Error: Neither DATABASE_URL nor SUPABASE_URL environment variable is set")
-        print("Please set one of:")
-        print("  - DATABASE_URL: postgresql://user:password@host:port/database")
-        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY")
+    if not supabase_url and not database_url:
+        print("Error: Neither SUPABASE_URL nor DATABASE_URL environment variable is set")
+        print("Please set:")
+        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY (preferred)")
+        print("  - Or DATABASE_URL: postgresql://user:password@host:port/database")
         sys.exit(1)
+    
+    # Log if DATABASE_URL is set but ignored
+    if database_url and supabase_url:
+        print("ℹ DATABASE_URL is set but ignored by design. Using Supabase for migrations.")
+        print()
 
     # Locate SQL files
     project_root = Path(__file__).parent.parent.parent.parent
@@ -87,22 +92,22 @@ def main():
     
     # Connect to database
     try:
-        if database_url:
-            # Use DATABASE_URL directly
-            parsed = urlparse(database_url)
-            print(f"Database: {parsed.hostname}")
-            print()
-            
-            conn = psycopg2.connect(database_url)
-            conn.autocommit = False
-            cursor = conn.cursor()
-        else:
-            # Use SUPABASE_URL with service key
+        if supabase_url:
+            # Prefer Supabase
             print(f"Database: {urlparse(supabase_url).hostname}")
             print()
             
             conn_params = get_connection_params(supabase_url, service_key)
             conn = psycopg2.connect(**conn_params)
+            conn.autocommit = False
+            cursor = conn.cursor()
+        else:
+            # Fallback to DATABASE_URL only if Supabase is not configured
+            parsed = urlparse(database_url)
+            print(f"Database: {parsed.hostname}")
+            print()
+            
+            conn = psycopg2.connect(database_url)
             conn.autocommit = False
             cursor = conn.cursor()
         

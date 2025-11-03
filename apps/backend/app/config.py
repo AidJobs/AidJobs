@@ -1,11 +1,43 @@
 import os
 from typing import Optional
 
+from app.db_config import db_config
+
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 
 class Capabilities:
     @staticmethod
     def is_db_enabled() -> bool:
-        return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_ANON_KEY"))
+        """Check if database is available via Supabase"""
+        return db_config.is_db_enabled
+    
+    @staticmethod
+    def check_db_connection() -> bool:
+        """Verify database connection with a trivial query"""
+        if not Capabilities.is_db_enabled():
+            return False
+        
+        if not psycopg2:
+            return False
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return False
+        
+        try:
+            conn = psycopg2.connect(**conn_params, connect_timeout=2)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception:
+            return False
 
     @staticmethod
     def is_search_enabled() -> bool:
@@ -55,7 +87,8 @@ class Capabilities:
 
     @classmethod
     def get_status(cls) -> dict:
-        db = cls.is_db_enabled()
+        # db=true only if SUPABASE_URL is configured and trivial query succeeds
+        db = cls.check_db_connection()
         search = cls.is_search_enabled()
         ai = cls.is_ai_enabled()
         payments = cls.is_payments_enabled()
