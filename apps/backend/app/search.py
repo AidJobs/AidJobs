@@ -2,22 +2,28 @@ import os
 import uuid
 import logging
 import time
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from urllib.parse import urlparse
 
 from app.db_config import db_config
 
-try:
+if TYPE_CHECKING:
     import psycopg2
     from psycopg2.extras import RealDictCursor
-except ImportError:
-    psycopg2 = None
-
-try:
     import meilisearch
-except ImportError:
-    meilisearch = None
+else:
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+    except ImportError:
+        psycopg2 = None  # type: ignore[assignment]
+        RealDictCursor = None  # type: ignore[assignment,misc]
+
+    try:
+        import meilisearch
+    except ImportError:
+        meilisearch = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +35,7 @@ class SearchService:
         self.meili_enabled = self._is_meili_enabled()
         self.db_enabled = self._is_db_enabled()
         self.meili_error = None
+        self.last_reindexed_at: Optional[str] = None
         
         if self.meili_enabled:
             self._init_meilisearch()
@@ -522,7 +529,7 @@ class SearchService:
             index = self.meili_client.index(self.meili_index_name)
             stats = index.get_stats()
             
-            return {
+            result = {
                 "enabled": True,
                 "index": {
                     "name": self.meili_index_name,
@@ -532,6 +539,11 @@ class SearchService:
                     }
                 }
             }
+            
+            if self.last_reindexed_at:
+                result["index"]["lastReindexedAt"] = self.last_reindexed_at
+            
+            return result
         except Exception as e:
             logger.error(f"Failed to get Meilisearch status: {e}")
             return {
@@ -616,6 +628,9 @@ class SearchService:
                 indexed_count += len(batch)
             
             duration_ms = int((time.time() - start_time) * 1000)
+            
+            # Update last reindexed timestamp
+            self.last_reindexed_at = datetime.utcnow().isoformat() + 'Z'
             
             return {
                 "indexed": indexed_count,

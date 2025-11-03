@@ -99,9 +99,10 @@ async def admin_search_status():
     return await search_service.get_search_status()
 
 
+@app.get("/admin/search/reindex")
 @app.post("/admin/search/reindex")
 async def admin_search_reindex():
-    """Reindex jobs to search engine (dev-only)"""
+    """Reindex jobs to search engine (dev-only, supports GET and POST)"""
     env = os.getenv("AIDJOBS_ENV", "").lower()
     if env != "dev":
         raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
