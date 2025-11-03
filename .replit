@@ -42,10 +42,6 @@ externalPort = 8000
 localPort = 39567
 externalPort = 3002
 
-[[ports]]
-localPort = 44041
-externalPort = 3001
-
 [nix]
 channel = "stable-25_05"
 packages = ["openssl", "postgresql"]
