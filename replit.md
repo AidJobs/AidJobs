@@ -149,28 +149,36 @@ Search endpoint with graceful degradation across Meilisearch, Supabase SQL, and 
 
 **Degradation Behavior**:
 - **Meilisearch enabled**: Full search with facets from `jobs_index`
-- **Meilisearch disabled, DB enabled**: Supabase SQL fallback (ILIKE on title/org_name/description)
+- **Meilisearch disabled, DB enabled**: Supabase SQL fallback (ILIKE on title/org_name/description) with database-computed facets
 - **Both disabled**: Returns empty results with `fallback: true`
 - Always enforces `jobs.status='active'` filter
 - Never returns 500 on missing environment variables
+- Database connections are properly closed on all code paths (including errors)
 
 **Timeouts**: Meilisearch 2000ms, Database 1500ms
 
 ### GET /api/search/facets
 Returns facet counts for search filters.
 
-**Response when enabled**:
+**Response when enabled (Meilisearch or Database)**:
 ```json
 {
   "enabled": true,
   "facets": {
-    "country": {},
-    "level_norm": {},
-    "mission_tags": {},
-    "international_eligible": {}
+    "country": {"KE": 5, "UG": 3, "TZ": 2},
+    "level_norm": {"mid": 6, "senior": 4, "entry": 2},
+    "mission_tags": {"health": 8, "education": 5, "development": 4},
+    "international_eligible": {"true": 7, "false": 5}
   }
 }
 ```
+
+**Database Facets Behavior** (when Meilisearch is disabled but DATABASE_URL is set):
+- Uses GROUP BY queries for `country`, `level_norm`, and `international_eligible`
+- Uses UNNEST for `mission_tags` array to count individual tags
+- Limits: 50 buckets for country/level, 10 for mission_tags
+- Only counts jobs with `status='active'`
+- Response shape matches Meilisearch format for compatibility
 
 **Response when disabled**:
 ```json
