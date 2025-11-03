@@ -24,12 +24,15 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Keyboard shortcuts: `/` to focus search, `Esc` to close inspector
 - Accessibility with visible focus states and keyboard navigation
 - Frontend capabilities integration with search status banner
+- **Database schema** (infra/supabase.sql) with full-text search, indexes, and RLS policies
+- **Seed data** (infra/seed.sql) with 3 sample organizations and 12 sample jobs
+- **Database migration script** (apps/backend/scripts/apply_sql.py) for idempotent schema application
 - Environment template with all 24 required variables
 - Development workflow running both frontend and backend concurrently
 - Pytest test suite for capabilities and search endpoints
 
 🔨 **Not Yet Implemented**:
-- Database schema and connections
+- Database connection to live Supabase instance
 - Meilisearch integration
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
@@ -51,6 +54,25 @@ See `env.example` for the complete list of 24 environment variables. The applica
 - `npm run dev` - Start both frontend and backend servers
 - `npm run lint` - Lint frontend (ESLint) and backend (Ruff)
 - `npm run test` - Run tests (stubs currently in place)
+
+## Database Setup
+
+### Schema Application
+Apply the database schema to your Supabase instance:
+
+```bash
+# Set environment variables first
+export SUPABASE_URL="postgresql://user:password@host:port/database"
+export SUPABASE_SERVICE_KEY="your-service-key"  # Optional if password in URL
+
+# Apply schema only
+python apps/backend/scripts/apply_sql.py
+
+# Apply schema and seed data
+python apps/backend/scripts/apply_sql.py --seed
+```
+
+The script is idempotent and safe to run multiple times.
 
 ## API Endpoints
 
@@ -232,6 +254,35 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - Non-blocking, minimal design
 - Adaptive messaging based on capability state
 
+## Database Schema
+
+The database schema (`infra/supabase.sql`) includes the following tables:
+
+### Core Tables
+- **sources**: Job board URLs to crawl (org_name, careers_url, crawl_frequency_days, status)
+- **jobs**: Parsed job postings with full-text search (title, org_name, location, country, level_norm, mission_tags, deadline, apply_url, search_tsv)
+- **users**: User accounts (email, is_pro, created_at)
+- **shortlists**: Saved jobs per user (user_id, job_id)
+
+### Features
+- **findearn_submissions**: User-submitted job board URLs (url, domain, status, jobs_found)
+- **rewards**: Pro membership rewards (user_id, kind, days)
+- **payments**: Payment transactions (user_id, provider, amount_cents, status)
+
+### Key Features
+- **Full-text search**: PostgreSQL tsvector on jobs table with weighted search (title > org_name > description > mission_tags)
+- **Indexes**: GIN on search_tsv, BTREE on status/deadline, country, level_norm, international_eligible
+- **Triggers**: Automatic maintenance of search_tsv on insert/update
+- **RLS Policies**:
+  - Jobs: Public read access for active jobs
+  - Shortlists: Owner-only access (user_id-based)
+  - Sources, Rewards, Payments: Admin-only (service role)
+
+### Sample Data
+The seed file (`infra/seed.sql`) includes:
+- 3 sample organizations (UNDP, MSF, GPE)
+- 12 sample jobs with varied countries, levels, mission tags, and deadlines
+
 ## Notes
 - No hardcoded secrets or API keys
 - Missing environment variables do not crash the application
@@ -239,3 +290,4 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - Frontend proxies API requests to backend via Next.js rewrites
 - Search UI gracefully handles empty results (no demo data)
 - All interactive elements are keyboard-accessible with visible focus states
+- Database schema is idempotent and safe to apply multiple times
