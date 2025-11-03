@@ -15,9 +15,9 @@ class DBConfig:
     """Database configuration with Supabase-first logic"""
     
     def __init__(self):
-        self.supabase_url = os.getenv("SUPABASE_URL")
+        self.supabase_url = os.getenv("SUPABASE_URL")  # REST API endpoint
         self.supabase_service_key = os.getenv("SUPABASE_SERVICE_KEY")
-        self.supabase_db_url = os.getenv("SUPABASE_DB_URL")  # For direct SQL migrations only
+        self.supabase_db_url = os.getenv("SUPABASE_DB_URL")  # Direct PostgreSQL connection string
         self.database_url = os.getenv("DATABASE_URL")
         
         # Log if DATABASE_URL is set but will be ignored
@@ -31,38 +31,36 @@ class DBConfig:
                 "Database queries will not work. Please configure SUPABASE_URL and SUPABASE_SERVICE_KEY."
             )
         
+        # Warn if SUPABASE_URL is set but SUPABASE_DB_URL is missing
+        if self.supabase_url and not self.supabase_db_url:
+            logger.warning(
+                "SUPABASE_URL is set but SUPABASE_DB_URL is missing. "
+                "Direct database queries will not work. "
+                "Please provide SUPABASE_DB_URL for PostgreSQL connection pooler access."
+            )
+        
         # Set DB driver
-        if self.supabase_url:
+        if self.supabase_db_url or (self.supabase_url and self.supabase_service_key):
             self.db_driver = "supabase"
         else:
             self.db_driver = None
     
     @property
     def is_db_enabled(self) -> bool:
-        """Check if database is available via Supabase"""
-        return bool(self.supabase_url and self.supabase_service_key)
+        """Check if database is available via Supabase (requires SUPABASE_DB_URL for direct connections)"""
+        return bool(self.supabase_db_url)
     
     def get_connection_params(self) -> dict | None:
         """
         Get database connection parameters for Supabase.
         Returns dict with host, port, database, user, password.
+        Requires SUPABASE_DB_URL (PostgreSQL connection string).
         """
-        if not self.is_db_enabled:
+        if not self.supabase_db_url:
             return None
         
-        # If SUPABASE_DB_URL is provided, parse it
-        if self.supabase_db_url:
-            parsed = urlparse(self.supabase_db_url)
-            return {
-                "host": parsed.hostname,
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip('/') or 'postgres',
-                "user": parsed.username or 'postgres',
-                "password": parsed.password or self.supabase_service_key,
-            }
-        
-        # Otherwise, parse SUPABASE_URL
-        parsed = urlparse(self.supabase_url)
+        # Parse the database connection URL
+        parsed = urlparse(self.supabase_db_url)
         
         if not parsed.hostname:
             return None
@@ -72,7 +70,7 @@ class DBConfig:
             "port": parsed.port or 5432,
             "database": parsed.path.lstrip('/') or 'postgres',
             "user": parsed.username or 'postgres',
-            "password": parsed.password or self.supabase_service_key,
+            "password": parsed.password,
         }
     
     def get_migration_connection_params(self) -> dict | None:
