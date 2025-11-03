@@ -79,3 +79,13 @@ async def search_query(
 @app.get("/api/search/facets")
 async def search_facets():
     return await search_service.get_facets()
+
+
+@app.get("/admin/search/status")
+async def admin_search_status():
+    return await search_service.get_search_status()
+
+
+@app.post("/admin/search/reindex")
+async def admin_search_reindex():
+    return await search_service.reindex_jobs()

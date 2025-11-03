@@ -1,5 +1,7 @@
 import os
 import uuid
+import logging
+import time
 from typing import Any, Optional
 from datetime import datetime
 from urllib.parse import urlparse
@@ -12,19 +14,76 @@ try:
 except ImportError:
     psycopg2 = None
 
+try:
+    import meilisearch
+except ImportError:
+    meilisearch = None
+
+logger = logging.getLogger(__name__)
+
 
 class SearchService:
     def __init__(self):
+        self.meili_client = None
+        self.meili_index_name = os.getenv("MEILI_JOBS_INDEX", "jobs_index")
         self.meili_enabled = self._is_meili_enabled()
         self.db_enabled = self._is_db_enabled()
+        self.meili_error = None
+        
+        if self.meili_enabled:
+            self._init_meilisearch()
 
     def _is_meili_enabled(self) -> bool:
+        if not meilisearch:
+            return False
         enabled = os.getenv("AIDJOBS_ENABLE_SEARCH", "true").lower() == "true"
         has_config = bool(os.getenv("MEILI_HOST") and os.getenv("MEILI_MASTER_KEY"))
         return enabled and has_config
 
     def _is_db_enabled(self) -> bool:
         return db_config.is_db_enabled
+    
+    def _init_meilisearch(self) -> None:
+        """Initialize Meilisearch client and configure index. Never crashes."""
+        try:
+            meili_host = os.getenv("MEILI_HOST")
+            meili_key = os.getenv("MEILI_MASTER_KEY")
+            
+            self.meili_client = meilisearch.Client(meili_host, meili_key)
+            
+            try:
+                index = self.meili_client.index(self.meili_index_name)
+                
+                index.update_filterable_attributes([
+                    'country',
+                    'level_norm',
+                    'mission_tags',
+                    'international_eligible',
+                    'status'
+                ])
+                
+                index.update_sortable_attributes([
+                    'deadline',
+                    'last_seen_at'
+                ])
+                
+                index.update_searchable_attributes([
+                    'title',
+                    'org_name',
+                    'description_snippet',
+                    'mission_tags'
+                ])
+                
+                logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' configured successfully")
+            except Exception as e:
+                logger.warning(f"[aidjobs] Failed to configure Meilisearch index: {e}")
+                self.meili_error = str(e)
+                
+        except Exception as e:
+            logger.error(f"[aidjobs] Failed to initialize Meilisearch client: {e}")
+            self.meili_enabled = False
+            self.meili_client = None
+            self.meili_error = str(e)
 
     async def search_query(
         self,
@@ -75,13 +134,63 @@ class SearchService:
         international_eligible: Optional[bool],
         mission_tags: Optional[list[str]],
     ) -> dict[str, Any]:
-        return {
-            "items": [],
-            "total": 0,
-            "page": page,
-            "size": size,
-            "facets": {},
-        }
+        """Search using Meilisearch with filters and pagination"""
+        if not self.meili_client:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "facets": {},
+            }
+        
+        try:
+            index = self.meili_client.index(self.meili_index_name)
+            
+            filters = ["status = 'active'"]
+            
+            if country:
+                filters.append(f"country = '{country}'")
+            
+            if level_norm:
+                filters.append(f"level_norm = '{level_norm}'")
+            
+            if international_eligible is not None:
+                filters.append(f"international_eligible = {str(international_eligible).lower()}")
+            
+            if mission_tags and len(mission_tags) > 0:
+                tag_filters = " OR ".join([f"mission_tags = '{tag}'" for tag in mission_tags])
+                filters.append(f"({tag_filters})")
+            
+            filter_str = " AND ".join(filters)
+            
+            offset = (page - 1) * size
+            
+            search_params = {
+                "filter": filter_str,
+                "limit": size,
+                "offset": offset,
+            }
+            
+            results = index.search(q or "", search_params)
+            
+            return {
+                "items": results.get("hits", []),
+                "total": results.get("estimatedTotalHits", 0),
+                "page": page,
+                "size": size,
+                "facets": {},
+            }
+            
+        except Exception as e:
+            logger.error(f"Meilisearch search error: {e}")
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "size": size,
+                "facets": {},
+            }
 
     async def _search_database(
         self,
@@ -308,16 +417,30 @@ class SearchService:
                 conn.close()
 
     async def get_facets(self) -> dict[str, Any]:
-        if self.meili_enabled:
-            return {
-                "enabled": True,
-                "facets": {
-                    "country": {},
-                    "level_norm": {},
-                    "mission_tags": {},
-                    "international_eligible": {},
-                },
-            }
+        if self.meili_enabled and self.meili_client:
+            try:
+                index = self.meili_client.index(self.meili_index_name)
+                
+                search_result = index.search("", {
+                    "facets": ["country", "level_norm", "mission_tags", "international_eligible"],
+                    "limit": 0,
+                    "filter": "status = 'active'"
+                })
+                
+                facet_distribution = search_result.get("facetDistribution", {})
+                
+                return {
+                    "enabled": True,
+                    "facets": {
+                        "country": facet_distribution.get("country", {}),
+                        "level_norm": facet_distribution.get("level_norm", {}),
+                        "mission_tags": facet_distribution.get("mission_tags", {}),
+                        "international_eligible": facet_distribution.get("international_eligible", {}),
+                    },
+                }
+            except Exception as e:
+                logger.error(f"Meilisearch facets error: {e}")
+                return {"enabled": False}
         
         if self.db_enabled:
             facets = await self._get_database_facets()
@@ -327,6 +450,140 @@ class SearchService:
             }
 
         return {"enabled": False}
+    
+    async def get_search_status(self) -> dict[str, Any]:
+        """Get search engine status"""
+        if not self.meili_enabled:
+            return {
+                "enabled": False,
+                "error": self.meili_error if self.meili_error else "Meilisearch not configured"
+            }
+        
+        if not self.meili_client:
+            return {
+                "enabled": False,
+                "error": "Meilisearch client not initialized"
+            }
+        
+        try:
+            index = self.meili_client.index(self.meili_index_name)
+            stats = index.get_stats()
+            
+            return {
+                "enabled": True,
+                "index": {
+                    "name": self.meili_index_name,
+                    "stats": {
+                        "numberOfDocuments": stats.get("numberOfDocuments", 0),
+                        "isIndexing": stats.get("isIndexing", False),
+                    }
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to get Meilisearch status: {e}")
+            return {
+                "enabled": False,
+                "error": str(e)
+            }
+    
+    async def reindex_jobs(self) -> dict[str, Any]:
+        """Reindex all active jobs from database to Meilisearch"""
+        if not self.meili_enabled or not self.meili_client:
+            return {
+                "indexed": 0,
+                "skipped": 0,
+                "duration_ms": 0,
+                "error": "Meilisearch not enabled or configured"
+            }
+        
+        if not psycopg2:
+            return {
+                "indexed": 0,
+                "skipped": 0,
+                "duration_ms": 0,
+                "error": "Database driver not available"
+            }
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return {
+                "indexed": 0,
+                "skipped": 0,
+                "duration_ms": 0,
+                "error": "Database not configured"
+            }
+        
+        start_time = time.time()
+        conn = None
+        cursor = None
+        
+        try:
+            conn = psycopg2.connect(**conn_params, connect_timeout=5)
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            cursor.execute("""
+                SELECT 
+                    id, org_name, title, location_raw, country, 
+                    level_norm, deadline, apply_url, last_seen_at, 
+                    mission_tags, international_eligible, status
+                FROM jobs
+                WHERE status = 'active'
+                ORDER BY created_at DESC
+            """)
+            
+            rows = cursor.fetchall()
+            
+            if not rows:
+                duration_ms = int((time.time() - start_time) * 1000)
+                return {
+                    "indexed": 0,
+                    "skipped": 0,
+                    "duration_ms": duration_ms
+                }
+            
+            documents = []
+            for row in rows:
+                doc = dict(row)
+                if doc.get('id'):
+                    doc['id'] = str(doc['id'])
+                if doc.get('deadline'):
+                    doc['deadline'] = doc['deadline'].isoformat()
+                if doc.get('last_seen_at'):
+                    doc['last_seen_at'] = doc['last_seen_at'].isoformat()
+                documents.append(doc)
+            
+            index = self.meili_client.index(self.meili_index_name)
+            
+            batch_size = 500
+            indexed_count = 0
+            
+            for i in range(0, len(documents), batch_size):
+                batch = documents[i:i + batch_size]
+                index.add_documents(batch, primary_key='id')
+                indexed_count += len(batch)
+            
+            duration_ms = int((time.time() - start_time) * 1000)
+            
+            return {
+                "indexed": indexed_count,
+                "skipped": 0,
+                "duration_ms": duration_ms
+            }
+            
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(f"Failed to reindex jobs: {e}")
+            return {
+                "indexed": 0,
+                "skipped": 0,
+                "duration_ms": duration_ms,
+                "error": str(e)
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
 
 search_service = SearchService()
