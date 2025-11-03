@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 type Capabilities = {
   search: boolean;
@@ -19,6 +20,8 @@ type Job = {
   deadline?: string;
   apply_url?: string;
   last_seen_at?: string;
+  mission_tags?: string[];
+  international_eligible?: boolean;
 };
 
 type SearchResponse = {
@@ -28,29 +31,50 @@ type SearchResponse = {
     total: number;
     page: number;
     size: number;
-    fallback?: boolean;
+    source?: string;
   };
   error: null | string;
   request_id: string;
 };
 
+type FacetsResponse = {
+  enabled: boolean;
+  facets: {
+    country: Record<string, number>;
+    level_norm: Record<string, number>;
+    mission_tags: Record<string, number>;
+    international_eligible: Record<string, number>;
+  };
+};
+
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [country, setCountry] = useState('');
-  const [level, setLevel] = useState('');
-  const [international, setInternational] = useState(false);
-  const [missionTags, setMissionTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [country, setCountry] = useState(searchParams.get('country') || '');
+  const [level, setLevel] = useState(searchParams.get('level_norm') || '');
+  const [international, setInternational] = useState(searchParams.get('international_eligible') === 'true');
+  const [missionTags, setMissionTags] = useState<string[]>(
+    searchParams.getAll('mission_tags') || []
+  );
   const [results, setResults] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [searching, setSearching] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [fallbackMode, setFallbackMode] = useState(false);
+  const [searchSource, setSearchSource] = useState<string>('');
+  
+  const [facets, setFacets] = useState<FacetsResponse['facets'] | null>(null);
+  const [facetsLoading, setFacetsLoading] = useState(false);
+  const [showAllCountries, setShowAllCountries] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
 
   useEffect(() => {
     fetch('/api/capabilities')
@@ -64,6 +88,59 @@ export default function Home() {
         setLoading(false);
       });
   }, []);
+
+  const fetchFacets = useCallback(async () => {
+    const now = Date.now();
+    if (facetsCacheRef.current && now - facetsCacheRef.current.timestamp < 30000) {
+      setFacets(facetsCacheRef.current.data);
+      setFacetsLoading(false);
+      return;
+    }
+
+    setFacetsLoading(true);
+    try {
+      const response = await fetch('/api/search/facets');
+      const data: FacetsResponse = await response.json();
+      
+      if (data.enabled && data.facets) {
+        setFacets(data.facets);
+        facetsCacheRef.current = { data: data.facets, timestamp: now };
+      } else {
+        setFacets({
+          country: {},
+          level_norm: {},
+          mission_tags: {},
+          international_eligible: {},
+        });
+      }
+    } catch (error) {
+      console.error('Facets error:', error);
+      setFacets({
+        country: {},
+        level_norm: {},
+        mission_tags: {},
+        international_eligible: {},
+      });
+    } finally {
+      setFacetsLoading(false);
+    }
+  }, []);
+
+  const updateURLParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
+    if (country) params.set('country', country);
+    if (level) params.set('level_norm', level);
+    if (international) params.set('international_eligible', 'true');
+    missionTags.forEach(tag => params.append('mission_tags', tag));
+    
+    const newQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    
+    if (newQuery !== currentQuery) {
+      router.replace(newQuery ? `?${newQuery}` : '/', { scroll: false });
+    }
+  }, [searchQuery, country, level, international, missionTags, router, searchParams]);
 
   const performSearch = useCallback(async (searchPage: number = 1, append: boolean = false) => {
     setSearching(true);
@@ -89,7 +166,11 @@ export default function Home() {
       
       setTotal(data.data.total);
       setPage(searchPage);
-      setFallbackMode(data.data.fallback || false);
+      setSearchSource(data.data.source || '');
+      
+      if (searchPage === 1) {
+        fetchFacets();
+      }
     } catch (error) {
       console.error('Search error:', error);
       setResults([]);
@@ -97,7 +178,7 @@ export default function Home() {
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, country, level, international, missionTags]);
+  }, [searchQuery, country, level, international, missionTags, fetchFacets]);
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -114,12 +195,18 @@ export default function Home() {
 
   const handleFilterChange = useCallback(() => {
     setPage(1);
+    updateURLParams();
     performSearch(1, false);
-  }, [performSearch]);
+  }, [performSearch, updateURLParams]);
 
   useEffect(() => {
     handleFilterChange();
   }, [country, level, international, missionTags, handleFilterChange]);
+
+  useEffect(() => {
+    fetchFacets();
+    performSearch(1, false);
+  }, []);
 
   const handleLoadMore = () => {
     performSearch(page + 1, true);
@@ -149,12 +236,20 @@ export default function Home() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedJob]);
 
-  const showSearchBanner = !loading && capabilities && (!capabilities.search || fallbackMode);
-  const searchBannerText = fallbackMode
-    ? 'Search running in fallback mode'
+  const showSearchBanner = !loading && capabilities && (!capabilities.search || searchSource === 'db');
+  const searchBannerText = searchSource === 'db'
+    ? 'Search running in fallback mode (database)'
     : 'Search temporarily unavailable';
 
-  const availableMissionTags = ['health', 'education', 'environment', 'human-rights', 'development'];
+  const countryEntries = facets ? Object.entries(facets.country).sort((a, b) => b[1] - a[1]) : [];
+  const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
+  
+  const levelEntries = facets ? Object.entries(facets.level_norm) : [];
+  
+  const missionTagEntries = facets ? Object.entries(facets.mission_tags).sort((a, b) => b[1] - a[1]) : [];
+  const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
+  
+  const internationalCount = facets ? (facets.international_eligible?.['true'] || 0) : 0;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -174,60 +269,145 @@ export default function Home() {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search roles, orgs, or skills…"
+              placeholder="Search roles, orgs, or skills… (Press / to focus)"
               className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-6">
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">All Countries</option>
-              <option value="Kenya">Kenya</option>
-              <option value="Uganda">Uganda</option>
-              <option value="Tanzania">Tanzania</option>
-              <option value="Ethiopia">Ethiopia</option>
-              <option value="South Africa">South Africa</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Country</h3>
+              {facetsLoading ? (
+                <div className="text-sm text-gray-500">Loading...</div>
+              ) : visibleCountries.length > 0 ? (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setCountry('')}
+                    className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
+                      country === ''
+                        ? 'bg-blue-100 text-blue-700 font-medium'
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <span>All Countries</span>
+                    <span className="ml-2 text-xs text-gray-500">{total}</span>
+                  </button>
+                  {visibleCountries.map(([countryName, count]) => (
+                    <button
+                      key={countryName}
+                      onClick={() => setCountry(countryName)}
+                      className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors flex justify-between items-center ${
+                        country === countryName
+                          ? 'bg-blue-100 text-blue-700 font-medium'
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <span className="truncate">{countryName}</span>
+                      <span className="ml-2 text-xs text-gray-500">{count}</span>
+                    </button>
+                  ))}
+                  {countryEntries.length > 10 && (
+                    <button
+                      onClick={() => setShowAllCountries(!showAllCountries)}
+                      className="w-full text-left px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      {showAllCountries ? 'Show less...' : `More... (${countryEntries.length - 10} more)`}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No data</div>
+              )}
+            </div>
 
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">All Levels</option>
-              <option value="entry">Entry</option>
-              <option value="mid">Mid</option>
-              <option value="senior">Senior</option>
-            </select>
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Level</h3>
+              {facetsLoading ? (
+                <div className="text-sm text-gray-500">Loading...</div>
+              ) : levelEntries.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setLevel('')}
+                    className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                      level === ''
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {levelEntries.map(([levelName, count]) => (
+                    <button
+                      key={levelName}
+                      onClick={() => setLevel(levelName)}
+                      className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        level === levelName
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      <span className="capitalize">{levelName}</span>
+                      <span className="ml-1.5 text-xs opacity-75">({count})</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No data</div>
+              )}
+            </div>
 
-            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50">
-              <input
-                type="checkbox"
-                checked={international}
-                onChange={(e) => setInternational(e.target.checked)}
-                className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-sm">International</span>
-            </label>
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">International</h3>
+              <label className="flex items-center gap-3 px-3 py-2 rounded cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={international}
+                  onChange={(e) => setInternational(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500 rounded"
+                />
+                <span className="text-sm text-gray-700">International eligible</span>
+                {internationalCount > 0 && (
+                  <span className="ml-auto px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                    {internationalCount}
+                  </span>
+                )}
+              </label>
+            </div>
 
-            <div className="flex flex-wrap gap-2">
-              {availableMissionTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleMissionTag(tag)}
-                  className={`px-3 py-1 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    missionTags.includes(tag)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Mission Tags</h3>
+              {facetsLoading ? (
+                <div className="text-sm text-gray-500">Loading...</div>
+              ) : visibleMissionTags.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {visibleMissionTags.map(([tag, count]) => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleMissionTag(tag)}
+                        className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                          missionTags.includes(tag)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        <span>{tag}</span>
+                        <span className="ml-1.5 opacity-75">({count})</span>
+                      </button>
+                    ))}
+                  </div>
+                  {missionTagEntries.length > 12 && (
+                    <button
+                      onClick={() => setShowAllTags(!showAllTags)}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      {showAllTags ? 'Show less...' : `More... (${missionTagEntries.length - 12} more)`}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No data</div>
+              )}
             </div>
           </div>
         </div>
@@ -240,12 +420,12 @@ export default function Home() {
               <div className="text-center py-12 text-gray-500">
                 {searchQuery || country || level || missionTags.length > 0
                   ? 'No jobs found matching your criteria'
-                  : 'Enter search terms or select filters to find jobs'}
+                  : 'Loading jobs...'}
               </div>
             ) : (
               <>
-                <div className="mb-4 text-sm text-gray-600">
-                  {total} job{total !== 1 ? 's' : ''} found
+                <div className="mb-4 text-sm font-medium text-gray-700">
+                  {total} role{total !== 1 ? 's' : ''}
                 </div>
                 
                 <div className="space-y-2 mb-6">
@@ -271,6 +451,9 @@ export default function Home() {
                           <div className="flex gap-3 text-xs text-gray-500">
                             {(job.location_raw || job.country) && (
                               <span>{job.location_raw || job.country}</span>
+                            )}
+                            {job.level_norm && (
+                              <span className="capitalize">{job.level_norm}</span>
                             )}
                             {job.deadline && (
                               <span>Deadline: {new Date(job.deadline).toLocaleDateString()}</span>
@@ -338,6 +521,30 @@ export default function Home() {
                     <div>
                       <dt className="text-sm font-medium text-gray-500 mb-1">Level</dt>
                       <dd className="text-gray-900 capitalize">{selectedJob.level_norm}</dd>
+                    </div>
+                  )}
+
+                  {selectedJob.mission_tags && selectedJob.mission_tags.length > 0 && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500 mb-1">Mission Tags</dt>
+                      <dd className="flex flex-wrap gap-2">
+                        {selectedJob.mission_tags.map(tag => (
+                          <span key={tag} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                            {tag}
+                          </span>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
+
+                  {selectedJob.international_eligible && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500 mb-1">International</dt>
+                      <dd className="text-gray-900">
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                          International eligible
+                        </span>
+                      </dd>
                     </div>
                   )}
 

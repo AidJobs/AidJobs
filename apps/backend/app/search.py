@@ -445,8 +445,7 @@ class SearchService:
                     },
                 }
             except Exception as e:
-                logger.error(f"Meilisearch facets error: {e}")
-                return {"enabled": False}
+                logger.error(f"Meilisearch facets error: {e}, falling back to database")
         
         if self.db_enabled:
             facets = await self._get_database_facets()
