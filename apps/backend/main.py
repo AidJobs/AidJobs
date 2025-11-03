@@ -2,13 +2,32 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from typing import Optional
+from contextlib import asynccontextmanager
+import os
+import logging
 
 from app.config import Capabilities, get_env_presence
 from app.search import search_service
 
 load_dotenv()
 
-app = FastAPI(title="AidJobs API", version="0.1.0")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application lifecycle events."""
+    database_url = os.getenv("DATABASE_URL")
+    supabase_url = os.getenv("SUPABASE_URL")
+    
+    if database_url and supabase_url:
+        logger.info("[aidjobs] Ignoring DATABASE_URL; using Supabase as primary DB.")
+    
+    yield
+
+
+app = FastAPI(title="AidJobs API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
