@@ -22,7 +22,7 @@ class SearchService:
         return enabled and has_config
 
     def _is_db_enabled(self) -> bool:
-        return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_ANON_KEY"))
+        return bool(os.getenv("DATABASE_URL"))
 
     async def search_query(
         self,
@@ -101,10 +101,9 @@ class SearchService:
             }
 
         try:
-            supabase_url = os.getenv("SUPABASE_URL")
-            anon_key = os.getenv("SUPABASE_ANON_KEY")
+            database_url = os.getenv("DATABASE_URL")
             
-            if not supabase_url or not anon_key:
+            if not database_url:
                 return {
                     "items": [],
                     "total": 0,
@@ -113,19 +112,8 @@ class SearchService:
                     "fallback": True,
                 }
 
-            # Parse connection parameters
-            parsed = urlparse(supabase_url)
-            conn_params = {
-                "host": parsed.hostname,
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip('/') or 'postgres',
-                "user": parsed.username or 'postgres',
-                "password": parsed.password or anon_key,
-                "connect_timeout": 1,
-            }
-
-            # Connect to database with timeout
-            conn = psycopg2.connect(**conn_params)
+            # Connect to database with timeout using connection string
+            conn = psycopg2.connect(database_url, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Build WHERE clause

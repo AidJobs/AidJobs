@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from main import app
@@ -80,6 +81,123 @@ class TestSearchQuery:
     def test_query_never_500_on_missing_env(self):
         response = client.get("/api/search/query?q=test")
         assert response.status_code == 200
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_fallback_returns_seeded_data(self):
+        """Test database fallback returns at least one item after seed data is loaded"""
+        # Disable search to force database fallback
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            # Search for something that should match seed data (e.g., 'health')
+            response = client.get("/api/search/query?q=health")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["status"] == "ok"
+            assert "data" in data
+            assert "items" in data["data"]
+            assert data["data"]["fallback"] is True
+            
+            # Should have at least one result from seed data
+            assert len(data["data"]["items"]) >= 1
+            assert data["data"]["total"] >= 1
+            
+            # Verify item structure
+            if len(data["data"]["items"]) > 0:
+                item = data["data"]["items"][0]
+                assert "id" in item
+                assert "org_name" in item
+                assert "title" in item
+                assert "location_raw" in item
+                assert "country" in item
+                assert "level_norm" in item
+                assert "apply_url" in item
+                assert "last_seen_at" in item
+        finally:
+            # Restore original setting
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_fallback_filters_by_country(self):
+        """Test database fallback applies country filter correctly"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            response = client.get("/api/search/query?country=KE")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["status"] == "ok"
+            
+            # If results exist, all should be from Kenya
+            for item in data["data"]["items"]:
+                assert item["country"] == "KE"
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_fallback_filters_by_level(self):
+        """Test database fallback applies level filter correctly"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            response = client.get("/api/search/query?level_norm=mid")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["status"] == "ok"
+            
+            # If results exist, all should be mid-level
+            for item in data["data"]["items"]:
+                assert item["level_norm"] == "mid"
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
+
+    @pytest.mark.skipif(
+        not os.getenv("DATABASE_URL"),
+        reason="Requires DATABASE_URL to be set"
+    )
+    def test_db_fallback_pagination(self):
+        """Test database fallback pagination works correctly"""
+        original_search = os.getenv("AIDJOBS_ENABLE_SEARCH")
+        os.environ["AIDJOBS_ENABLE_SEARCH"] = "false"
+        
+        try:
+            # Get first page
+            response = client.get("/api/search/query?page=1&size=5")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["data"]["page"] == 1
+            assert data["data"]["size"] == 5
+            assert len(data["data"]["items"]) <= 5
+        finally:
+            if original_search is not None:
+                os.environ["AIDJOBS_ENABLE_SEARCH"] = original_search
+            else:
+                os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
 
 class TestSearchFacets:

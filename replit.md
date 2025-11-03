@@ -42,7 +42,15 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Find & Earn features
 
 ## Environment Variables
-See `env.example` for the complete list of 24 environment variables. The application gracefully handles missing variables without crashing.
+See `env.example` for the complete list of 25 environment variables. The application gracefully handles missing variables without crashing.
+
+### Database Configuration
+- **SUPABASE_URL**: REST API endpoint (https://<project-ref>.supabase.co)
+- **SUPABASE_ANON_KEY**: Anonymous key for client-side access
+- **SUPABASE_SERVICE_KEY**: Service role key for server-side operations
+- **DATABASE_URL**: PostgreSQL connection string (postgresql://user:password@host:port/database)
+  - Used by the search fallback to query the jobs table directly
+  - Used by the migration script to apply schema and seed data
 
 ### Feature Flags
 - `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch
