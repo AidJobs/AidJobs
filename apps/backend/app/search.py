@@ -100,6 +100,64 @@ class SearchService:
             self.meili_client = None
             self.meili_error = str(e)
 
+    def _normalize_filters(
+        self,
+        country: Optional[str],
+        level_norm: Optional[str],
+        international_eligible: Optional[bool],
+        mission_tags: Optional[list[str]],
+    ) -> dict[str, Any]:
+        """
+        Normalize user-friendly filter inputs to canonical form.
+        
+        Returns:
+            dict with normalized filters and original inputs for debugging
+        """
+        normalized = {}
+        
+        if country:
+            if len(country) == 2 and country.isupper():
+                normalized['country'] = country
+            else:
+                country_iso = Normalizer.to_iso_country(country)
+                if not country_iso and psycopg2:
+                    country_iso = self._lookup_country_from_db(country)
+                normalized['country'] = country_iso
+        
+        if level_norm:
+            normalized['level_norm'] = Normalizer.norm_level(level_norm)
+        
+        if international_eligible is not None:
+            normalized['international_eligible'] = Normalizer.to_bool(international_eligible)
+        
+        if mission_tags:
+            normalized['mission_tags'] = Normalizer.norm_tags(mission_tags)
+        
+        return normalized
+    
+    def _lookup_country_from_db(self, country_name: str) -> Optional[str]:
+        """Lookup country ISO code from database by name."""
+        if not psycopg2:
+            return None
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return None
+        
+        try:
+            conn = psycopg2.connect(**conn_params, connect_timeout=1)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT code_iso2 FROM countries WHERE LOWER(name) = LOWER(%s)",
+                (country_name,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return result[0] if result else None
+        except Exception:
+            return None
+
     async def search_query(
         self,
         q: Optional[str] = None,
@@ -115,18 +173,37 @@ class SearchService:
         page = max(1, page)
         size = max(1, min(100, size))
 
+        original_filters = {
+            "country": country,
+            "level_norm": level_norm,
+            "international_eligible": international_eligible,
+            "mission_tags": mission_tags,
+        }
+        
+        normalized_filters = self._normalize_filters(
+            country, level_norm, international_eligible, mission_tags
+        )
+
         result = None
         
         if self.meili_enabled:
             result = await self._search_meilisearch(
-                q, page, size, country, level_norm, international_eligible, mission_tags
+                q, page, size,
+                normalized_filters.get('country'),
+                normalized_filters.get('level_norm'),
+                normalized_filters.get('international_eligible'),
+                normalized_filters.get('mission_tags'),
             )
             if result is not None:
                 result["source"] = "meili"
         
         if result is None and self.db_enabled:
             result = await self._search_database(
-                q, page, size, country, level_norm, international_eligible, mission_tags
+                q, page, size,
+                normalized_filters.get('country'),
+                normalized_filters.get('level_norm'),
+                normalized_filters.get('international_eligible'),
+                normalized_filters.get('mission_tags'),
             )
             result["source"] = "db"
         
@@ -138,6 +215,12 @@ class SearchService:
                 "size": size,
                 "source": "none",
             }
+        
+        env = os.getenv("AIDJOBS_ENV", "").lower()
+        if env == "dev":
+            if "debug" not in result:
+                result["debug"] = {}
+            result["debug"]["normalized_filters"] = normalized_filters
 
         return {
             "status": "ok",
