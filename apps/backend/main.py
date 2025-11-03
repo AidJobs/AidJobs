@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from typing import Optional
@@ -81,11 +81,28 @@ async def search_facets():
     return await search_service.get_facets()
 
 
+@app.get("/admin/db/status")
+async def admin_db_status():
+    """Get database status (dev-only)"""
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    return await search_service.get_db_status()
+
+
 @app.get("/admin/search/status")
 async def admin_search_status():
+    """Get search engine status (dev-only)"""
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
     return await search_service.get_search_status()
 
 
 @app.post("/admin/search/reindex")
 async def admin_search_reindex():
+    """Reindex jobs to search engine (dev-only)"""
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
     return await search_service.reindex_jobs()

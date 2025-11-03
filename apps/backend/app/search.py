@@ -450,6 +450,60 @@ class SearchService:
 
         return {"enabled": False}
     
+    async def get_db_status(self) -> dict[str, Any]:
+        """Get database status with row counts"""
+        if not self.db_enabled:
+            return {
+                "ok": False,
+                "error": "Database not configured"
+            }
+        
+        if not psycopg2:
+            return {
+                "ok": False,
+                "error": "psycopg2 not installed"
+            }
+        
+        conn = None
+        cursor = None
+        
+        try:
+            conn_params = db_config.get_connection_params()
+            if not conn_params:
+                return {
+                    "ok": False,
+                    "error": "Database connection params missing"
+                }
+            
+            conn = psycopg2.connect(**conn_params)
+            cursor = conn.cursor()
+            
+            # Get row counts for jobs and sources tables
+            cursor.execute("SELECT COUNT(*) as count FROM jobs")
+            jobs_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) as count FROM sources")
+            sources_count = cursor.fetchone()[0]
+            
+            return {
+                "ok": True,
+                "row_counts": {
+                    "jobs": jobs_count,
+                    "sources": sources_count
+                }
+            }
+        except Exception as e:
+            logger.error(f"Database status check failed: {e}")
+            return {
+                "ok": False,
+                "error": str(e)
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    
     async def get_search_status(self) -> dict[str, Any]:
         """Get search engine status"""
         if not self.meili_enabled:
