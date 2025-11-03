@@ -7,78 +7,68 @@ import os
 import sys
 import argparse
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 try:
     import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 except ImportError:
     print("Error: psycopg2 not installed. Run: pip install psycopg2-binary")
     sys.exit(1)
 
 
-def get_connection_params(supabase_url: str, service_key: str) -> dict:
-    """Extract connection parameters from Supabase URL."""
-    parsed = urlparse(supabase_url)
+def get_table_summary(cursor) -> dict:
+    """Get summary of tables and their row counts."""
+    cursor.execute("""
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        ORDER BY table_name
+    """)
+    tables = [row[0] for row in cursor.fetchall()]
     
-    if not parsed.hostname:
-        raise ValueError(f"Invalid SUPABASE_URL: {supabase_url}")
+    summary = {}
+    for table in tables:
+        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+        count = cursor.fetchone()[0]
+        summary[table] = count
     
-    # Use password from URL if present, otherwise fall back to service key
-    password = parsed.password if parsed.password else service_key
-    
-    return {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "database": parsed.path.lstrip('/') or 'postgres',
-        "user": parsed.username or 'postgres',
-        "password": password,
-    }
-
-
-def execute_sql_file(cursor, filepath: Path, filename: str) -> tuple[bool, str]:
-    """Execute a SQL file and return success status and message."""
-    try:
-        with open(filepath, 'r') as f:
-            sql = f.read()
-        
-        cursor.execute(sql)
-        return True, f"✓ Applied {filename}"
-    except Exception as e:
-        return False, f"✗ Failed to apply {filename}: {str(e)}"
+    return summary
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Apply SQL schema to Supabase")
+    parser = argparse.ArgumentParser(
+        description="Apply SQL schema and seed data to Supabase",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python apply_sql.py              # Apply schema only
+  python apply_sql.py --seed       # Apply schema and seed data
+        """
+    )
     parser.add_argument(
         "--seed",
         action="store_true",
-        help="Also apply seed data (seed.sql)",
-    )
-    parser.add_argument(
-        "--schema-only",
-        action="store_true",
-        help="Only apply schema, skip seed data even if --seed is specified",
+        help="Also apply seed data after schema",
     )
     args = parser.parse_args()
 
-    # Prefer SUPABASE_DB_URL over SUPABASE_URL over DATABASE_URL (by design)
+    # Check for SUPABASE_DB_URL
     supabase_db_url = os.getenv("SUPABASE_DB_URL")
-    supabase_url = os.getenv("SUPABASE_URL")
-    service_key = os.getenv("SUPABASE_SERVICE_KEY")
-    database_url = os.getenv("DATABASE_URL")
-
-    if not supabase_db_url and not supabase_url and not database_url:
-        print("Error: No database connection configured")
-        print("Please set one of:")
-        print("  - SUPABASE_DB_URL: postgresql://postgres.[project]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres (preferred)")
-        print("  - SUPABASE_URL + SUPABASE_SERVICE_KEY")
-        print("  - DATABASE_URL: postgresql://user:password@host:port/database")
-        sys.exit(1)
     
-    # Log if DATABASE_URL is set but ignored
-    if database_url and (supabase_db_url or supabase_url):
-        print("ℹ DATABASE_URL is set but ignored by design. Using Supabase for migrations.")
+    if not supabase_db_url:
+        print("Error: SUPABASE_DB_URL environment variable is not set")
         print()
+        print("To get your connection string:")
+        print("  1. Go to Supabase Dashboard → Settings → Database")
+        print("  2. Under 'Connection string', select 'Connection pooling'")
+        print("  3. Choose 'Transaction' mode")
+        print("  4. Copy the connection string")
+        print()
+        print("Then add it to your Replit Secrets:")
+        print("  Key: SUPABASE_DB_URL")
+        print("  Value: postgresql://postgres.[project]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres")
+        sys.exit(1)
 
     # Locate SQL files
     project_root = Path(__file__).parent.parent.parent.parent
@@ -90,113 +80,106 @@ def main():
         sys.exit(1)
 
     print("AidJobs Database Setup")
-    print("=" * 50)
+    print("=" * 60)
+    
+    # Parse and clean URL
+    cleaned_url = supabase_db_url.replace('[', '').replace(']', '')
+    parsed = urlparse(cleaned_url)
+    
+    print(f"Connecting to: {parsed.hostname}:{parsed.port}")
     
     # Connect to database
     try:
-        if supabase_db_url:
-            # Prefer SUPABASE_DB_URL (connection pooler)
-            cleaned_url = supabase_db_url.replace('[', '').replace(']', '')
-            parsed = urlparse(cleaned_url)
-            print(f"Database: {parsed.hostname}")
-            print()
-            
-            # Parse URL and connect with individual parameters (more reliable than URL string)
-            from urllib.parse import unquote
-            conn_params = {
-                "host": parsed.hostname,
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip('/') or 'postgres',
-                "user": parsed.username or 'postgres',
-            }
-            if parsed.password:
-                conn_params["password"] = unquote(parsed.password)
-            
-            conn = psycopg2.connect(**conn_params)
-            conn.autocommit = False
-            cursor = conn.cursor()
-        elif supabase_url:
-            # Fallback to SUPABASE_URL
-            print(f"Database: {urlparse(supabase_url).hostname}")
-            print()
-            
-            conn_params = get_connection_params(supabase_url, service_key)
-            conn = psycopg2.connect(**conn_params)
-            conn.autocommit = False
-            cursor = conn.cursor()
-        else:
-            # Final fallback to DATABASE_URL
-            parsed = urlparse(database_url)
-            print(f"Database: {parsed.hostname}")
-            print()
-            
-            conn = psycopg2.connect(database_url)
-            conn.autocommit = False
-            cursor = conn.cursor()
+        conn_params = {
+            "host": parsed.hostname,
+            "port": parsed.port or 6543,
+            "database": parsed.path.lstrip('/') or 'postgres',
+            "user": parsed.username or 'postgres',
+        }
+        if parsed.password:
+            conn_params["password"] = unquote(parsed.password)
         
-        print("✓ Connected to database")
+        conn = psycopg2.connect(**conn_params, connect_timeout=10)
+        cursor = conn.cursor()
+        print("✓ Connected successfully\n")
     except Exception as e:
-        print(f"✗ Connection failed: {e}")
-        print("\nPlease verify your database credentials:")
-        print("  - Check DATABASE_URL or SUPABASE_URL is correct")
-        print("  - Ensure SUPABASE_SERVICE_KEY has sufficient permissions")
+        print(f"✗ Connection failed: {e}\n")
+        print("Please verify:")
+        print("  - SUPABASE_DB_URL is correct")
+        print("  - Password is URL-encoded if it contains special characters")
+        print("  - Your Supabase project is active")
         sys.exit(1)
 
-    results = []
-    overall_success = True
-
-    # Apply schema
     try:
-        success, message = execute_sql_file(cursor, schema_file, "supabase.sql")
-        results.append(message)
+        # Get initial state
+        print("Checking current database state...")
+        initial_tables = get_table_summary(cursor)
+        initial_count = len(initial_tables)
+        print(f"  Found {initial_count} existing table(s)\n")
+
+        # Apply schema
+        print("Applying schema (infra/supabase.sql)...")
+        with open(schema_file, 'r') as f:
+            schema_sql = f.read()
         
-        if success:
-            conn.commit()
+        cursor.execute(schema_sql)
+        conn.commit()
+        
+        # Get state after schema
+        after_schema_tables = get_table_summary(cursor)
+        new_tables = set(after_schema_tables.keys()) - set(initial_tables.keys())
+        
+        if new_tables:
+            print(f"✓ Created {len(new_tables)} new table(s): {', '.join(sorted(new_tables))}")
         else:
-            conn.rollback()
-            overall_success = False
+            print(f"✓ All tables already exist (idempotent)")
+        
+        # Apply seed data if requested
+        if args.seed:
+            if not seed_file.exists():
+                print(f"\n⚠ Warning: Seed file not found: {seed_file}")
+            else:
+                print(f"\nApplying seed data (infra/seed.sql)...")
+                with open(seed_file, 'r') as f:
+                    seed_sql = f.read()
+                
+                cursor.execute(seed_sql)
+                conn.commit()
+                
+                # Get final state
+                final_tables = get_table_summary(cursor)
+                
+                print("✓ Seed data applied")
+                
+                # Show row counts
+                print("\nDatabase Summary:")
+                print("-" * 60)
+                for table, count in sorted(final_tables.items()):
+                    before = initial_tables.get(table, 0)
+                    after = count
+                    added = after - before
+                    
+                    status = f"{count} row(s)"
+                    if added > 0:
+                        status += f" (+{added} new)"
+                    
+                    print(f"  {table:30} {status}")
+        else:
+            print("\nDatabase Summary:")
+            print("-" * 60)
+            for table, count in sorted(after_schema_tables.items()):
+                print(f"  {table:30} {count} row(s)")
+        
+        print("\n" + "=" * 60)
+        print("✓ Database setup completed successfully")
+        
     except Exception as e:
         conn.rollback()
-        results.append(f"✗ Schema application failed: {e}")
-        overall_success = False
-
-    # Apply seed data if requested and not schema-only
-    if args.seed and not args.schema_only and overall_success:
-        if seed_file.exists():
-            try:
-                success, message = execute_sql_file(cursor, seed_file, "seed.sql")
-                results.append(message)
-                
-                if success:
-                    conn.commit()
-                else:
-                    conn.rollback()
-                    overall_success = False
-            except Exception as e:
-                conn.rollback()
-                results.append(f"✗ Seed data failed: {e}")
-                overall_success = False
-        else:
-            results.append(f"⚠ Seed file not found: {seed_file}")
-
-    # Close connection
-    cursor.close()
-    conn.close()
-
-    # Print summary
-    print()
-    print("Summary:")
-    print("-" * 50)
-    for result in results:
-        print(result)
-    
-    print()
-    if overall_success:
-        print("✓ Database setup completed successfully")
-        sys.exit(0)
-    else:
-        print("✗ Database setup failed")
+        print(f"\n✗ Error: {e}")
         sys.exit(1)
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == "__main__":
