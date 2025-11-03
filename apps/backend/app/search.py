@@ -7,6 +7,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from app.db_config import db_config
+from app.normalizer import Normalizer
 
 if TYPE_CHECKING:
     import psycopg2
@@ -587,7 +588,7 @@ class SearchService:
             
             cursor.execute("""
                 SELECT 
-                    id, org_name, title, location_raw, country, 
+                    id, org_name, title, location_raw, country, country_iso,
                     level_norm, deadline, apply_url, last_seen_at, 
                     mission_tags, international_eligible, status
                 FROM jobs
@@ -606,15 +607,44 @@ class SearchService:
                 }
             
             documents = []
+            skipped_count = 0
+            
             for row in rows:
-                doc = dict(row)
-                if doc.get('id'):
-                    doc['id'] = str(doc['id'])
-                if doc.get('deadline'):
-                    doc['deadline'] = doc['deadline'].isoformat()
-                if doc.get('last_seen_at'):
-                    doc['last_seen_at'] = doc['last_seen_at'].isoformat()
-                documents.append(doc)
+                raw_doc = dict(row)
+                
+                country_iso = Normalizer.to_iso_country(raw_doc.get('country'))
+                if not country_iso:
+                    country_iso = raw_doc.get('country_iso')
+                
+                level_norm = Normalizer.norm_level(raw_doc.get('level_norm'))
+                
+                mission_tags = Normalizer.norm_tags(raw_doc.get('mission_tags'))
+                
+                international_eligible = Normalizer.to_bool(raw_doc.get('international_eligible'))
+                
+                deadline = raw_doc.get('deadline')
+                last_seen_at = raw_doc.get('last_seen_at')
+                
+                normalized_doc = {
+                    'id': str(raw_doc['id']) if raw_doc.get('id') else None,
+                    'org_name': raw_doc.get('org_name'),
+                    'title': raw_doc.get('title'),
+                    'location_raw': raw_doc.get('location_raw'),
+                    'country': country_iso,
+                    'level_norm': level_norm,
+                    'deadline': deadline.isoformat() if deadline else None,
+                    'apply_url': raw_doc.get('apply_url'),
+                    'last_seen_at': last_seen_at.isoformat() if last_seen_at else None,
+                    'mission_tags': mission_tags if mission_tags else [],
+                    'international_eligible': international_eligible,
+                    'status': raw_doc.get('status', 'active')
+                }
+                
+                if not normalized_doc.get('id') or not normalized_doc.get('title'):
+                    skipped_count += 1
+                    continue
+                
+                documents.append(normalized_doc)
             
             index = self.meili_client.index(self.meili_index_name)
             
@@ -633,7 +663,7 @@ class SearchService:
             
             return {
                 "indexed": indexed_count,
-                "skipped": 0,
+                "skipped": skipped_count,
                 "duration_ms": duration_ms
             }
             
