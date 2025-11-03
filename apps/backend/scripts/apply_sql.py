@@ -16,19 +16,22 @@ except ImportError:
     sys.exit(1)
 
 
-def get_connection_params(supabase_url: str) -> dict:
+def get_connection_params(supabase_url: str, service_key: str) -> dict:
     """Extract connection parameters from Supabase URL."""
     parsed = urlparse(supabase_url)
     
     if not parsed.hostname:
         raise ValueError(f"Invalid SUPABASE_URL: {supabase_url}")
     
+    # Use password from URL if present, otherwise fall back to service key
+    password = parsed.password if parsed.password else service_key
+    
     return {
         "host": parsed.hostname,
         "port": parsed.port or 5432,
         "database": parsed.path.lstrip('/') or 'postgres',
         "user": parsed.username or 'postgres',
-        "password": os.getenv("SUPABASE_SERVICE_KEY", ""),
+        "password": password,
     }
 
 
@@ -86,8 +89,7 @@ def main():
 
     # Connect to database
     try:
-        conn_params = get_connection_params(supabase_url)
-        conn_params['password'] = service_key
+        conn_params = get_connection_params(supabase_url, service_key)
         
         conn = psycopg2.connect(**conn_params)
         conn.autocommit = False
