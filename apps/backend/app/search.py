@@ -107,21 +107,28 @@ class SearchService:
         page = max(1, page)
         size = max(1, min(100, size))
 
+        result = None
+        
         if self.meili_enabled:
             result = await self._search_meilisearch(
                 q, page, size, country, level_norm, international_eligible, mission_tags
             )
-        elif self.db_enabled:
+            if result is not None:
+                result["source"] = "meili"
+        
+        if result is None and self.db_enabled:
             result = await self._search_database(
                 q, page, size, country, level_norm, international_eligible, mission_tags
             )
-        else:
+            result["source"] = "db"
+        
+        if result is None:
             result = {
                 "items": [],
                 "total": 0,
                 "page": page,
                 "size": size,
-                "fallback": True,
+                "source": "none",
             }
 
         return {
@@ -140,16 +147,11 @@ class SearchService:
         level_norm: Optional[str],
         international_eligible: Optional[bool],
         mission_tags: Optional[list[str]],
-    ) -> dict[str, Any]:
-        """Search using Meilisearch with filters and pagination"""
+    ) -> Optional[dict[str, Any]]:
+        """Search using Meilisearch with filters and pagination. Returns None on failure."""
         if not self.meili_client:
-            return {
-                "items": [],
-                "total": 0,
-                "page": page,
-                "size": size,
-                "facets": {},
-            }
+            logger.warning("Meilisearch client not available")
+            return None
         
         try:
             index = self.meili_client.index(self.meili_index_name)
@@ -190,14 +192,8 @@ class SearchService:
             }
             
         except Exception as e:
-            logger.error(f"Meilisearch search error: {e}")
-            return {
-                "items": [],
-                "total": 0,
-                "page": page,
-                "size": size,
-                "facets": {},
-            }
+            logger.error(f"Meilisearch search error: {e}, falling back to database")
+            return None
 
     async def _search_database(
         self,
@@ -215,7 +211,6 @@ class SearchService:
                 "total": 0,
                 "page": page,
                 "size": size,
-                "fallback": True,
             }
 
         conn_params = db_config.get_connection_params()
@@ -226,7 +221,6 @@ class SearchService:
                 "total": 0,
                 "page": page,
                 "size": size,
-                "fallback": True,
             }
 
         conn = None
@@ -310,18 +304,16 @@ class SearchService:
                 "total": total,
                 "page": page,
                 "size": size,
-                "fallback": True,
             }
 
         except Exception as e:
             # Log error but don't crash - return empty results
-            print(f"Database search error: {e}")
+            logger.error(f"Database search error: {e}")
             return {
                 "items": [],
                 "total": 0,
                 "page": page,
                 "size": size,
-                "fallback": True,
             }
         finally:
             # Always close cursor and connection
