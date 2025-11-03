@@ -59,19 +59,33 @@ class DBConfig:
         if not self.supabase_db_url:
             return None
         
+        # Clean up the URL by removing any square brackets around hostname
+        # This handles URLs like: postgresql://user:pass@[hostname]:port/db
+        cleaned_url = self.supabase_db_url.replace('[', '').replace(']', '')
+        
         # Parse the database connection URL
-        parsed = urlparse(self.supabase_db_url)
+        try:
+            parsed = urlparse(cleaned_url)
+        except Exception as e:
+            logger.error(f"Failed to parse SUPABASE_DB_URL: {e}")
+            return None
         
         if not parsed.hostname:
             return None
         
-        return {
+        # Extract all parameters from the parsed URL
+        params = {
             "host": parsed.hostname,
             "port": parsed.port or 5432,
             "database": parsed.path.lstrip('/') or 'postgres',
             "user": parsed.username or 'postgres',
-            "password": parsed.password,
         }
+        
+        # Add password if present
+        if parsed.password:
+            params["password"] = parsed.password
+        
+        return params
     
     def get_migration_connection_params(self) -> dict | None:
         """Get database connection parameters for migrations (direct SQL)"""
