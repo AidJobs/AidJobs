@@ -207,19 +207,114 @@ class SearchService:
                 "fallback": True,
             }
 
-    async def get_facets(self) -> dict[str, Any]:
-        if not self.meili_enabled:
-            return {"enabled": False}
-
-        return {
-            "enabled": True,
-            "facets": {
+    async def _get_database_facets(self) -> dict[str, dict[str, int]]:
+        """Get facet counts from database using GROUP BY queries"""
+        if not psycopg2:
+            return {
                 "country": {},
                 "level_norm": {},
                 "mission_tags": {},
                 "international_eligible": {},
-            },
-        }
+            }
+
+        try:
+            database_url = os.getenv("DATABASE_URL")
+            if not database_url:
+                return {
+                    "country": {},
+                    "level_norm": {},
+                    "mission_tags": {},
+                    "international_eligible": {},
+                }
+
+            conn = psycopg2.connect(database_url, connect_timeout=1)
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            # Get country facets (limit 50)
+            cursor.execute("""
+                SELECT country, COUNT(*) as count
+                FROM jobs
+                WHERE status = 'active' AND country IS NOT NULL
+                GROUP BY country
+                ORDER BY count DESC
+                LIMIT 50
+            """)
+            country_facets = {row["country"]: row["count"] for row in cursor.fetchall()}
+
+            # Get level_norm facets (limit 50)
+            cursor.execute("""
+                SELECT level_norm, COUNT(*) as count
+                FROM jobs
+                WHERE status = 'active' AND level_norm IS NOT NULL
+                GROUP BY level_norm
+                ORDER BY count DESC
+                LIMIT 50
+            """)
+            level_facets = {row["level_norm"]: row["count"] for row in cursor.fetchall()}
+
+            # Get international_eligible facets
+            cursor.execute("""
+                SELECT international_eligible, COUNT(*) as count
+                FROM jobs
+                WHERE status = 'active' AND international_eligible IS NOT NULL
+                GROUP BY international_eligible
+                ORDER BY count DESC
+            """)
+            international_facets = {
+                str(row["international_eligible"]).lower(): row["count"] 
+                for row in cursor.fetchall()
+            }
+
+            # Get mission_tags facets using UNNEST (top 10)
+            cursor.execute("""
+                SELECT tag, COUNT(*) as count
+                FROM jobs, UNNEST(mission_tags) as tag
+                WHERE status = 'active'
+                GROUP BY tag
+                ORDER BY count DESC
+                LIMIT 10
+            """)
+            tags_facets = {row["tag"]: row["count"] for row in cursor.fetchall()}
+
+            cursor.close()
+            conn.close()
+
+            return {
+                "country": country_facets,
+                "level_norm": level_facets,
+                "mission_tags": tags_facets,
+                "international_eligible": international_facets,
+            }
+
+        except Exception as e:
+            print(f"Database facets error: {e}")
+            return {
+                "country": {},
+                "level_norm": {},
+                "mission_tags": {},
+                "international_eligible": {},
+            }
+
+    async def get_facets(self) -> dict[str, Any]:
+        if self.meili_enabled:
+            return {
+                "enabled": True,
+                "facets": {
+                    "country": {},
+                    "level_norm": {},
+                    "mission_tags": {},
+                    "international_eligible": {},
+                },
+            }
+        
+        if self.db_enabled:
+            facets = await self._get_database_facets()
+            return {
+                "enabled": True,
+                "facets": facets,
+            }
+
+        return {"enabled": False}
 
 
 search_service = SearchService()
