@@ -6,7 +6,7 @@ DATABASE_URL is ignored for application queries by design.
 
 import os
 import logging
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +81,9 @@ class DBConfig:
             "user": parsed.username or 'postgres',
         }
         
-        # Add password if present
+        # Add password if present (URL-decode it to handle special characters)
         if parsed.password:
-            params["password"] = parsed.password
+            params["password"] = unquote(parsed.password)
         
         return params
     
