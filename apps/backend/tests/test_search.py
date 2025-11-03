@@ -83,8 +83,8 @@ class TestSearchQuery:
         assert response.status_code == 200
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_fallback_returns_seeded_data(self):
         """Test database fallback returns at least one item after seed data is loaded"""
@@ -126,8 +126,8 @@ class TestSearchQuery:
                 os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_fallback_filters_by_country(self):
         """Test database fallback applies country filter correctly"""
@@ -151,8 +151,8 @@ class TestSearchQuery:
                 os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_fallback_filters_by_level(self):
         """Test database fallback applies level filter correctly"""
@@ -176,8 +176,8 @@ class TestSearchQuery:
                 os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_fallback_pagination(self):
         """Test database fallback pagination works correctly"""
@@ -215,8 +215,8 @@ class TestSearchFacets:
         assert response.status_code == 200
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_facets_returns_counts(self):
         """Test database facets returns count data after seed is loaded"""
@@ -250,8 +250,8 @@ class TestSearchFacets:
                 os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_facets_mission_tags_limited_to_10(self):
         """Test mission_tags facet is limited to top 10"""
@@ -272,8 +272,8 @@ class TestSearchFacets:
                 os.environ.pop("AIDJOBS_ENABLE_SEARCH", None)
 
     @pytest.mark.skipif(
-        not os.getenv("DATABASE_URL"),
-        reason="Requires DATABASE_URL to be set"
+        not os.getenv("SUPABASE_DB_URL"),
+        reason="Requires SUPABASE_DB_URL to be set"
     )
     def test_db_facets_country_limited_to_50(self):
         """Test country facet is limited to 50 buckets"""
