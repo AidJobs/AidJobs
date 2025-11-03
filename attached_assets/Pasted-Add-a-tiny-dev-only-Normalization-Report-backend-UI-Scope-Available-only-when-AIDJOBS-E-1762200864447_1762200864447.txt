@@ -1,0 +1,76 @@
+Add a tiny, dev-only Normalization Report (backend + UI).
+
+Scope:
+- Available only when AIDJOBS_ENV='dev'.
+- No auth for now (dev only). Never expose secrets.
+
+Backend (FastAPI):
+1) GET /admin/normalize/report
+   Returns JSON with normalization stats computed from the DB (NOT Meili):
+   {
+     ok: true,
+     totals: { jobs:int, sources:int },
+     country: {
+       normalized: int,
+       unknown: int,
+       top_unknown: [{ value:string, count:int }... up to 10]
+     },
+     level_norm: {
+       normalized: int,
+       unknown: int,
+       top_unknown: [{ value:string, count:int }... up to 10]
+     },
+     international_eligible: {
+       true_count:int, false_count:int, null_count:int
+     },
+     mission_tags: {
+       normalized:int,
+       unknown:int,
+       top_unknown: [{ value:string, count:int }... up to 10]
+     },
+     mapping_tables: {
+       countries:int, levels:int, tags:int
+     },
+     notes: { fallback_used:boolean }
+   }
+
+   Implementation notes:
+   - Use jobs table fields as they exist (seeded data). “Unknown” means values that fail the normalizer (e.g., non-ISO country or level not in the 5-level set).
+   - For mission_tags, treat any tag not present in tags lookup as unknown (UNNEST::text).
+   - Count mapping tables from countries/levels/tags.
+   - If lookup tables don’t exist yet, set mapping_tables.* = 0 and proceed (ok:true, notes.fallback_used=true).
+
+2) GET /admin/normalize/preview?limit=10
+   Returns a small sample: [{ id, org_name, raw:{ country, level, tags, international_eligible }, normalized:{ country_iso, level_norm, mission_tags, international_eligible }, dropped_fields:[...] }]
+   - Reuse the normalizer functions; do not write to DB.
+
+3) POST /admin/normalize/reindex
+   - Re-runs /admin/search/reindex but guarantees normalization first (country_iso to ISO2, level_norm to one of Intern|Junior|Mid|Senior|Lead, mission_tags slugs lowercase, international_eligible boolean).
+   - Returns { indexed, skipped, duration_ms }.
+   - Keep GET /admin/search/reindex working for convenience.
+
+Frontend (Next.js):
+4) Add a minimal dev-only Admin page at /admin/normalize (render only when NEXT_PUBLIC_AIDJOBS_ENV='dev' OR fetched capability says dev=true):
+   - “Normalization Report” section:
+     • Fetch GET /admin/normalize/report and render:
+       - Totals (jobs, sources)
+       - Country: normalized vs unknown + top_unknown list
+       - Level: normalized vs unknown + top_unknown list
+       - International: T/F/null counts
+       - Mission tags: normalized vs unknown + top_unknown list
+       - Mapping tables counts (countries/levels/tags)
+   - “Preview” section:
+     • Button “Preview 10 Samples” → calls GET /admin/normalize/preview?limit=10
+       Renders a small table of raw → normalized values and dropped_fields.
+   - “Actions” section:
+     • Button “Normalize & Reindex” → POST /admin/normalize/reindex
+       Shows a toast with {indexed, skipped, duration_ms}.
+     • Button “Reindex Only” → GET /admin/search/reindex
+   - Small, clean UI, no fancy styling. Keyboard accessible. No secrets in the UI.
+
+Quality:
+- All admin endpoints must return 200 with ok:false and error message on failure (no 500s).
+- Timeouts: expensive aggregations capped to 2s; if exceeded, set a note warning in the response and partial results where possible.
+- Add tiny pytest covering: report shape keys exist, preview returns <=limit items, reindex returns numeric indexed/skipped.
+
+Do not modify any prod routes or public UI. Keep this dev-only.

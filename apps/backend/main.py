@@ -113,6 +113,199 @@ async def admin_search_reindex():
     return await search_service.reindex_jobs()
 
 
+@app.post("/admin/normalize/reindex")
+async def admin_normalize_reindex():
+    """
+    Normalize and reindex all jobs (dev-only).
+    
+    Guarantees normalization before indexing to Meilisearch.
+    This is an explicit wrapper around the reindex functionality.
+    """
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    
+    return await search_service.reindex_jobs()
+
+
+@app.get("/admin/normalize/report")
+async def admin_normalize_report():
+    """
+    Get comprehensive normalization statistics (dev-only).
+    
+    Returns stats about normalized vs unknown values for all normalizable fields.
+    """
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    
+    if not Capabilities.is_db_enabled():
+        return {
+            "ok": False,
+            "error": "Database not available"
+        }
+    
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        return {
+            "ok": False,
+            "error": "Database connection not configured"
+        }
+    
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=2)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM jobs")
+        total_jobs = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM sources")
+        total_sources = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM countries")
+        countries_count = cursor.fetchone()[0] if cursor.rowcount > 0 else 0
+        
+        cursor.execute("SELECT COUNT(*) FROM levels")
+        levels_count = cursor.fetchone()[0] if cursor.rowcount > 0 else 0
+        
+        cursor.execute("SELECT COUNT(*) FROM tags")
+        tags_count = cursor.fetchone()[0] if cursor.rowcount > 0 else 0
+        
+        fallback_used = countries_count == 0 or levels_count == 0 or tags_count == 0
+        
+        cursor.execute("""
+            SELECT country, COUNT(*) as count
+            FROM jobs
+            WHERE country IS NOT NULL AND country_iso IS NULL
+            GROUP BY country
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        top_unknown_countries = [{"value": row[0], "count": row[1]} for row in cursor.fetchall()]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE country_iso IS NOT NULL
+        """)
+        normalized_countries = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE country IS NOT NULL AND country_iso IS NULL
+        """)
+        unknown_countries = cursor.fetchone()[0]
+        
+        valid_levels = {'Intern', 'Junior', 'Mid', 'Senior', 'Lead'}
+        cursor.execute(f"""
+            SELECT level_norm, COUNT(*) as count
+            FROM jobs
+            WHERE level_norm IS NOT NULL AND level_norm NOT IN {tuple(valid_levels)}
+            GROUP BY level_norm
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        top_unknown_levels = [{"value": row[0], "count": row[1]} for row in cursor.fetchall()]
+        
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM jobs WHERE level_norm IN {tuple(valid_levels)}
+        """)
+        normalized_levels = cursor.fetchone()[0]
+        
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM jobs WHERE level_norm IS NOT NULL AND level_norm NOT IN {tuple(valid_levels)}
+        """)
+        unknown_levels = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE international_eligible = TRUE
+        """)
+        true_count = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE international_eligible = FALSE
+        """)
+        false_count = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE international_eligible IS NULL
+        """)
+        null_count = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT tag, COUNT(*) as count
+            FROM jobs, UNNEST(mission_tags) as tag
+            WHERE tag NOT IN (SELECT key FROM tags)
+            GROUP BY tag
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        top_unknown_tags = [{"value": row[0], "count": row[1]} for row in cursor.fetchall()]
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(mission_tags) as tag
+                WHERE tag IN (SELECT key FROM tags)
+            )
+        """)
+        normalized_tags_result = cursor.fetchone()
+        normalized_tags = normalized_tags_result[0] if normalized_tags_result else 0
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(mission_tags) as tag
+                WHERE tag NOT IN (SELECT key FROM tags)
+            ) AND array_length(mission_tags, 1) > 0
+        """)
+        unknown_tags_result = cursor.fetchone()
+        unknown_tags = unknown_tags_result[0] if unknown_tags_result else 0
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "ok": True,
+            "totals": {
+                "jobs": total_jobs,
+                "sources": total_sources
+            },
+            "country": {
+                "normalized": normalized_countries,
+                "unknown": unknown_countries,
+                "top_unknown": top_unknown_countries
+            },
+            "level_norm": {
+                "normalized": normalized_levels,
+                "unknown": unknown_levels,
+                "top_unknown": top_unknown_levels
+            },
+            "international_eligible": {
+                "true_count": true_count,
+                "false_count": false_count,
+                "null_count": null_count
+            },
+            "mission_tags": {
+                "normalized": normalized_tags,
+                "unknown": unknown_tags,
+                "top_unknown": top_unknown_tags
+            },
+            "mapping_tables": {
+                "countries": countries_count,
+                "levels": levels_count,
+                "tags": tags_count
+            },
+            "notes": {
+                "fallback_used": fallback_used
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate normalization report: {e}")
+        return {
+            "ok": False,
+            "error": str(e)
+        }
+
+
 @app.get("/admin/normalize/preview")
 async def admin_normalize_preview(
     source_id: Optional[str] = Query(None, description="Filter by source ID"),
