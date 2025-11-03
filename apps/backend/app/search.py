@@ -52,7 +52,14 @@ class SearchService:
             self.meili_client = meilisearch.Client(meili_host, meili_key)
             
             try:
-                index = self.meili_client.index(self.meili_index_name)
+                try:
+                    index = self.meili_client.get_index(self.meili_index_name)
+                except Exception:
+                    task = self.meili_client.create_index(
+                        self.meili_index_name,
+                        {'primaryKey': 'id'}
+                    )
+                    index = self.meili_client.get_index(self.meili_index_name)
                 
                 index.update_filterable_attributes([
                     'country',
@@ -474,8 +481,8 @@ class SearchService:
                 "index": {
                     "name": self.meili_index_name,
                     "stats": {
-                        "numberOfDocuments": stats.get("numberOfDocuments", 0),
-                        "isIndexing": stats.get("isIndexing", False),
+                        "numberOfDocuments": stats.number_of_documents,
+                        "isIndexing": stats.is_indexing,
                     }
                 }
             }
