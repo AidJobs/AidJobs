@@ -42,6 +42,14 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
   - Reindex logging: "[analytics] reindex complete: indexed=N skipped=N duration=Nms"
   - /admin/metrics endpoint returns: last_20_queries, avg_latency_ms, meili_hit_rate, db_fallback_rate, source_breakdown
   - Only enabled when AIDJOBS_ENV=dev, zero overhead in production
+- **Design Tokens & Theme System**:
+  - CSS variables-based design tokens (packages/ui/tokens/tailwind-theme.css)
+  - Light and dark theme support with jade green primary color
+  - Tailwind CSS wired to consume CSS variables via hsl()
+  - SSR-safe theme switching with localStorage persistence and prefers-color-scheme detection
+  - ThemeProvider, useTheme hook, and ThemeToggle component (Sun/Moon icon button)
+  - shadcn/ui-compatible color system with full token palette (background, foreground, muted, surface, accent, primary, warning, danger, border, input, ring)
+  - BorderRadius tokens (lg/md/sm) calculated from --radius variable
 - **Client-side Shortlist System** with localStorage persistence:
   - Star/bookmark toggle on job rows and inspector
   - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
@@ -460,6 +468,59 @@ Collection pages combine preset filters with user-selected filters:
 /collections/un-jobs?country=KE&level_norm=senior
 → Searches for: org_type=un AND country=KE AND level_norm=senior
 ```
+
+## Design System
+
+### Design Tokens
+The platform uses a CSS variables-based design token system for consistent theming across light and dark modes.
+
+**Token Structure** (`packages/ui/tokens/tailwind-theme.css`):
+- **Color Palette**: bg, fg, muted, surface, accent, primary, warning, danger, border, input, ring
+- **Primary Color**: Jade green (#1C8E79) for NGO/INGO sector alignment
+- **Light Theme**: Near-white backgrounds, deep neutral text, soft mint green accents
+- **Dark Theme**: Deep gray backgrounds, light gray text, darker accent tones
+- **Format**: HSL space-separated values (e.g., `--bg: 255 255 254`)
+
+**Tailwind Integration** (`apps/frontend/tailwind.config.js`):
+- Colors wired to CSS variables: `background: 'hsl(var(--bg))'`
+- BorderRadius tokens: lg/md/sm calculated from `--radius` (16px base)
+- Content paths include packages/ui for shared components
+
+### Theme Switching
+
+**Components** (all in `packages/ui/`):
+- `useTheme` hook: SSR-safe theme management with localStorage persistence
+- `ThemeProvider`: Context-based theme state distribution
+- `ThemeToggle`: Icon-only button (Sun/Moon) for theme switching
+
+**Features**:
+- Respects `prefers-color-scheme` as default
+- Persists user preference in localStorage (`aidjobs-theme`)
+- Applies `.dark` class to `<html>` element
+- SSR-safe mounting to prevent hydration mismatches
+- Accessible with proper ARIA labels and focus ring
+
+**Usage**:
+```tsx
+import { ThemeProvider, ThemeToggle, useThemeContext } from '@aidjobs/ui';
+
+// In app layout
+<ThemeProvider>
+  {children}
+</ThemeProvider>
+
+// In navigation
+<ThemeToggle />
+
+// In components
+const { theme, setTheme, toggleTheme } = useThemeContext();
+```
+
+### shadcn/ui Compatibility
+The design token system follows shadcn/ui conventions for seamless integration of future UI components:
+- All color tokens match shadcn/ui naming (background, foreground, muted, primary, accent, etc.)
+- Dependencies: `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`
+- Ready for Button, Card, Dialog, and other shadcn/ui primitives
 
 ## Database Schema
 
