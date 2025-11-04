@@ -114,8 +114,11 @@ async def search_facets():
 
 @app.get("/api/jobs/{job_id}")
 async def get_job_by_id(job_id: str):
-    """Get a single job by ID from database or Meilisearch."""
-    return await search_service.get_job_by_id(job_id)
+    """Get a single job by ID from database (preferred) or Meilisearch fallback."""
+    result = await search_service.get_job_by_id(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return result
 
 
 @app.get("/admin/db/status")

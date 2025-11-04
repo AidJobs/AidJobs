@@ -736,20 +736,11 @@ class SearchService:
         return base
     
     async def get_job_by_id(self, job_id: str) -> dict[str, Any]:
-        """Get a single job by ID from Meilisearch or database."""
-        if self.meili_enabled and self.meili_client:
-            try:
-                index = self.meili_client.index(self.meili_index_name)
-                doc = index.get_document(job_id)
-                if doc:
-                    return {
-                        "status": "ok",
-                        "data": doc,
-                        "source": "meili",
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to get job from Meilisearch: {e}")
+        """Get a single job by ID, preferring database over Meilisearch."""
+        aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
+        is_dev = aidjobs_env == "dev"
         
+        # Prefer database even if Meilisearch is enabled
         if self.db_enabled and psycopg2:
             conn_params = db_config.get_connection_params()
             if conn_params:
@@ -757,19 +748,38 @@ class SearchService:
                     conn = psycopg2.connect(**conn_params, connect_timeout=1)
                     cursor = conn.cursor(cursor_factory=RealDictCursor)
                     
-                    cursor.execute(
-                        """
-                        SELECT 
-                            id, org_name, title, location_raw, country_iso, 
-                            level_norm, career_type, work_modality, 
-                            international_eligible, deadline, apply_url, 
-                            last_seen_at, mission_tags, benefits, policy_flags,
-                            description_snippet
-                        FROM jobs 
-                        WHERE id = %s
-                        """,
-                        (job_id,)
-                    )
+                    # Select all normalized fields
+                    if is_dev:
+                        # In dev mode, include raw_metadata
+                        cursor.execute(
+                            """
+                            SELECT 
+                                id, org_name, title, location_raw, country_iso, 
+                                level_norm, career_type, work_modality, org_type,
+                                international_eligible, deadline, apply_url, 
+                                last_seen_at, mission_tags, benefits, policy_flags,
+                                description_snippet, raw_metadata
+                            FROM jobs 
+                            WHERE id = %s
+                            """,
+                            (job_id,)
+                        )
+                    else:
+                        # In production, exclude raw_metadata and internal keys
+                        cursor.execute(
+                            """
+                            SELECT 
+                                id, org_name, title, location_raw, country_iso, 
+                                level_norm, career_type, work_modality, org_type,
+                                international_eligible, deadline, apply_url, 
+                                last_seen_at, mission_tags, benefits, policy_flags,
+                                description_snippet
+                            FROM jobs 
+                            WHERE id = %s
+                            """,
+                            (job_id,)
+                        )
+                    
                     row = cursor.fetchone()
                     
                     cursor.close()
@@ -777,6 +787,7 @@ class SearchService:
                     
                     if row:
                         job = dict(row)
+                        # Convert dates to ISO format
                         if job.get('deadline'):
                             job['deadline'] = job['deadline'].isoformat()
                         if job.get('last_seen_at'):
@@ -789,14 +800,32 @@ class SearchService:
                             "data": job,
                             "source": "db",
                         }
+                    else:
+                        # Return None if not found (will be handled as 404)
+                        return None
                 except Exception as e:
                     logger.error(f"Database job lookup error: {e}")
         
-        return {
-            "status": "ok",
-            "data": None,
-            "error": "Job not found",
-        }
+        # Fallback to Meilisearch if database fails
+        if self.meili_enabled and self.meili_client:
+            try:
+                index = self.meili_client.index(self.meili_index_name)
+                doc = index.get_document(job_id)
+                if doc:
+                    # Filter out internal keys in production
+                    if not is_dev and isinstance(doc, dict):
+                        doc = {k: v for k, v in doc.items() if not k.startswith('_')}
+                    
+                    return {
+                        "status": "ok",
+                        "data": doc,
+                        "source": "meili",
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to get job from Meilisearch: {e}")
+        
+        # Return None if not found anywhere
+        return None
     
     async def get_db_status(self) -> dict[str, Any]:
         """Get database status with row counts"""
