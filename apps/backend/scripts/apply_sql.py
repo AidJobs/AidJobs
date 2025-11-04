@@ -73,6 +73,7 @@ Examples:
     # Locate SQL files
     project_root = Path(__file__).parent.parent.parent.parent
     schema_file = project_root / "infra" / "supabase.sql"
+    taxonomy_file = project_root / "infra" / "seed_taxonomy.sql"
     seed_file = project_root / "infra" / "seed.sql"
 
     if not schema_file.exists():
@@ -133,6 +134,39 @@ Examples:
             print(f"✓ Created {len(new_tables)} new table(s): {', '.join(sorted(new_tables))}")
         else:
             print(f"✓ All tables already exist (idempotent)")
+        
+        # Apply taxonomy seed data (always run - idempotent)
+        if taxonomy_file.exists():
+            print(f"\nApplying taxonomy data (infra/seed_taxonomy.sql)...")
+            before_taxonomy = get_table_summary(cursor)
+            
+            with open(taxonomy_file, 'r') as f:
+                taxonomy_sql = f.read()
+            
+            cursor.execute(taxonomy_sql)
+            conn.commit()
+            
+            after_taxonomy = get_table_summary(cursor)
+            
+            # Show lookup table summary
+            lookup_tables = ['countries', 'levels', 'missions', 'functional', 'work_modalities', 
+                           'contracts', 'org_types', 'crisis_types', 'clusters', 'response_phases',
+                           'benefits', 'policy_flags', 'donors', 'synonyms']
+            
+            print("✓ Taxonomy data applied")
+            print("\nLookup Table Summary:")
+            print("-" * 60)
+            for table in lookup_tables:
+                if table in after_taxonomy:
+                    before = before_taxonomy.get(table, 0)
+                    after = after_taxonomy[table]
+                    added = after - before
+                    
+                    status = f"{after:3d} row(s)"
+                    if added > 0:
+                        status += f" (+{added} new)"
+                    
+                    print(f"  {table:30} {status}")
         
         # Apply seed data if requested
         if args.seed:
