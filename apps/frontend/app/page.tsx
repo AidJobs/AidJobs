@@ -2,21 +2,23 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Briefcase, Search } from 'lucide-react';
+import { Briefcase, Star, Bookmark } from 'lucide-react';
 import JobInspector from '@/components/JobInspector';
 import SavedJobsPanel from '@/components/SavedJobsPanel';
-import Toast from '@/components/Toast';
 import CollectionsNav from '@/components/CollectionsNav';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
-import { SearchShell, StatusRail } from '@aidjobs/ui';
-import { ThemeToggle } from '@aidjobs/ui';
-
-type Capabilities = {
-  search: boolean;
-  cv: boolean;
-  payments: boolean;
-  findearn: boolean;
-};
+import { 
+  SearchShell, 
+  StatusRail, 
+  ThemeToggle, 
+  Input, 
+  Button, 
+  FilterChip, 
+  Skeleton,
+  Badge,
+  IconButton,
+  toast
+} from '@aidjobs/ui';
 
 type Job = {
   id: string;
@@ -59,8 +61,6 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [country, setCountry] = useState(searchParams.get('country') || '');
   const [level, setLevel] = useState(searchParams.get('level_norm') || '');
@@ -77,8 +77,6 @@ export default function Home() {
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
   const [shortlistedIds, setShortlistedIds] = useState<string[]>([]);
   const [showSavedPanel, setShowSavedPanel] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   
   const [facets, setFacets] = useState<Record<string, any>>({});
   const [facetsLoading, setFacetsLoading] = useState(false);
@@ -100,25 +98,10 @@ export default function Home() {
     setShortlistedIds(getShortlist());
     
     if (isNowShortlisted) {
-      setToastMessage('Added to saved jobs');
-      setToastType('success');
+      toast.success('Added to saved jobs');
     } else {
-      setToastMessage('Removed from saved jobs');
-      setToastType('info');
+      toast.info('Removed from saved jobs');
     }
-  }, []);
-
-  useEffect(() => {
-    fetch('/api/capabilities')
-      .then((res) => res.json())
-      .then((data) => {
-        setCapabilities(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setCapabilities({ search: false, cv: false, payments: false, findearn: false });
-        setLoading(false);
-      });
   }, []);
 
   const fetchFacets = useCallback(async () => {
@@ -271,8 +254,7 @@ export default function Home() {
   };
 
   const retrySearch = async () => {
-    setToastMessage('Retrying search...');
-    setToastType('info');
+    toast.info('Retrying search...');
     await new Promise(resolve => setTimeout(resolve, 2000));
     performSearch(1, false);
   };
@@ -295,7 +277,7 @@ export default function Home() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedJob]);
 
-  const showFallbackBanner = !loading && searchSource === 'db';
+  const showFallbackBanner = searchSource === 'db';
   const hasAnyFilters = searchQuery || country || level || international || missionTags.length > 0;
 
   const f = facets ?? {};
@@ -307,10 +289,8 @@ export default function Home() {
   const countryEntries = Object.entries(countryMap).sort((a, b) => (b[1] as number) - (a[1] as number));
   const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
   const levelEntries = Object.entries(levelMap);
-  const tagEntries = Object.entries(tagsMap);
-  const intlEntries = Object.entries(intlMap);
   
-  const missionTagEntries = tagEntries.sort((a, b) => (b[1] as number) - (a[1] as number));
+  const missionTagEntries = Object.entries(tagsMap).sort((a, b) => (b[1] as number) - (a[1] as number));
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
   
   const internationalCount = intlMap?.['true'] || 0;
@@ -320,41 +300,39 @@ export default function Home() {
       <div className="bg-surface rounded-lg border border-border p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">Country</h3>
         {facetsLoading ? (
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <Skeleton className="h-8" />
         ) : visibleCountries.length > 0 ? (
           <div className="space-y-1.5">
-            <button
+            <Button
               onClick={() => setCountry('')}
-              className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors ${
-                country === ''
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'hover:bg-muted text-foreground'
-              }`}
+              variant={country === '' ? 'default' : 'ghost'}
+              size="sm"
+              className="w-full justify-between"
             >
               <span>All Countries</span>
-              <span className="ml-2 text-xs text-muted-foreground">{total}</span>
-            </button>
+              <span className="text-xs text-muted-foreground">{total}</span>
+            </Button>
             {visibleCountries.map(([countryName, count]) => (
-              <button
+              <Button
                 key={countryName}
                 onClick={() => setCountry(countryName)}
-                className={`w-full text-left px-3 py-1.5 rounded text-sm transition-colors flex justify-between items-center ${
-                  country === countryName
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'hover:bg-muted text-foreground'
-                }`}
+                variant={country === countryName ? 'default' : 'ghost'}
+                size="sm"
+                className="w-full justify-between"
               >
                 <span className="truncate">{countryName}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{count}</span>
-              </button>
+                <span className="text-xs text-muted-foreground">{count}</span>
+              </Button>
             ))}
             {countryEntries.length > 10 && (
-              <button
+              <Button
                 onClick={() => setShowAllCountries(!showAllCountries)}
-                className="w-full text-left px-3 py-1.5 text-sm text-primary hover:text-primary/80"
+                variant="link"
+                size="sm"
+                className="w-full"
               >
                 {showAllCountries ? 'Show less...' : `More... (${countryEntries.length - 10} more)`}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -365,32 +343,24 @@ export default function Home() {
       <div className="bg-surface rounded-lg border border-border p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">Level</h3>
         {facetsLoading ? (
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <Skeleton className="h-8" />
         ) : levelEntries.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            <button
+            <FilterChip
+              selected={level === ''}
               onClick={() => setLevel('')}
-              className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                level === ''
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
             >
               All
-            </button>
+            </FilterChip>
             {levelEntries.map(([levelName, count]) => (
-              <button
+              <FilterChip
                 key={levelName}
+                selected={level === levelName}
                 onClick={() => setLevel(levelName)}
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                  level === levelName
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-foreground hover:bg-muted/80'
-                }`}
               >
                 <span className="capitalize">{levelName}</span>
                 <span className="ml-1.5 text-xs opacity-75">({count})</span>
-              </button>
+              </FilterChip>
             ))}
           </div>
         ) : (
@@ -405,13 +375,13 @@ export default function Home() {
             type="checkbox"
             checked={international}
             onChange={(e) => setInternational(e.target.checked)}
-            className="w-4 h-4 text-primary focus:ring-2 focus:ring-ring rounded"
+            className="w-4 h-4 text-primary focus-visible:ring-2 focus-visible:ring-ring rounded"
           />
           <span className="text-sm text-foreground">International eligible</span>
           {internationalCount > 0 && (
-            <span className="ml-auto px-2 py-0.5 bg-accent text-accent-foreground text-xs rounded-full font-medium">
+            <Badge variant="default" className="ml-auto">
               {internationalCount}
-            </span>
+            </Badge>
           )}
         </label>
       </div>
@@ -419,32 +389,29 @@ export default function Home() {
       <div className="bg-surface rounded-lg border border-border p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">Mission Tags</h3>
         {facetsLoading ? (
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <Skeleton className="h-8" />
         ) : visibleMissionTags.length > 0 ? (
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               {visibleMissionTags.map(([tag, count]) => (
-                <button
+                <FilterChip
                   key={tag}
+                  selected={missionTags.includes(tag)}
                   onClick={() => toggleMissionTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                    missionTags.includes(tag)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-foreground hover:bg-muted/80'
-                  }`}
                 >
                   <span>{tag}</span>
                   <span className="ml-1.5 opacity-75">({count})</span>
-                </button>
+                </FilterChip>
               ))}
             </div>
             {missionTagEntries.length > 12 && (
-              <button
+              <Button
                 onClick={() => setShowAllTags(!showAllTags)}
-                className="text-sm text-primary hover:text-primary/80"
+                variant="link"
+                size="sm"
               >
                 {showAllTags ? 'Show less...' : `More... (${missionTagEntries.length - 12} more)`}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -460,12 +427,13 @@ export default function Home() {
         <div className="bg-warning/20 border border-warning rounded-lg px-4 py-3 mb-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-foreground">Running on backup search (temporarily)</p>
-            <button
+            <Button
               onClick={retrySearch}
-              className="text-sm text-foreground hover:text-foreground/80 font-medium underline"
+              variant="link"
+              size="sm"
             >
               Try again
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -473,18 +441,18 @@ export default function Home() {
       {searching && page === 1 ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-surface border border-border rounded-lg p-4 animate-pulse">
+            <div key={i} className="bg-surface border border-border rounded-lg p-4">
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                  <div className="h-5 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
+                  <Skeleton className="h-5 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-1/2 mb-2" />
                   <div className="flex gap-3">
-                    <div className="h-3 bg-muted rounded w-20"></div>
-                    <div className="h-3 bg-muted rounded w-16"></div>
-                    <div className="h-3 bg-muted rounded w-24"></div>
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-24" />
                   </div>
                 </div>
-                <div className="w-5 h-5 bg-muted rounded"></div>
+                <Skeleton className="w-5 h-5" />
               </div>
             </div>
           ))}
@@ -499,46 +467,30 @@ export default function Home() {
               <p className="text-xl font-semibold text-foreground mb-2">No jobs found</p>
               <p className="text-muted-foreground mb-6">Try adjusting your filters to see more results</p>
               <div className="flex flex-wrap gap-2 justify-center">
-                <button
+                <Button
                   onClick={clearFilters}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                  variant="primary"
+                  size="md"
                 >
                   Clear all filters
-                </button>
+                </Button>
                 {country && (
-                  <button
+                  <Button
                     onClick={() => setCountry('')}
-                    className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                    variant="secondary"
+                    size="md"
                   >
                     Remove country
-                  </button>
+                  </Button>
                 )}
                 {level && (
-                  <button
+                  <Button
                     onClick={() => setLevel('')}
-                    className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                    variant="secondary"
+                    size="md"
                   >
                     Remove level
-                  </button>
-                )}
-                {missionTags.length === 0 && !searchQuery.toLowerCase().includes('remote') && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('remote');
-                      performSearch(1, false);
-                    }}
-                    className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
-                  >
-                    Try "remote"
-                  </button>
-                )}
-                {missionTags.length > 0 && (
-                  <button
-                    onClick={() => setMissionTags([])}
-                    className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
-                  >
-                    Clear mission tags
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -586,7 +538,7 @@ export default function Home() {
                   setPreviouslyFocusedElement(e.currentTarget);
                   setSelectedJob(job);
                 }}
-                className="bg-surface border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer focus-within:ring-2 focus-within:ring-ring"
+                className="bg-surface border border-border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer focus-visible:ring-2 focus-visible:ring-ring"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -603,9 +555,7 @@ export default function Home() {
                         {job.title}
                       </h3>
                       {isClosingSoon && (
-                        <span className="px-2 py-0.5 text-xs font-medium text-warning bg-warning/20 rounded flex-shrink-0">
-                          Closing soon
-                        </span>
+                        <Badge variant="warning">Closing soon</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-1">{job.org_name}</p>
@@ -621,24 +571,18 @@ export default function Home() {
                       )}
                     </div>
                   </div>
-                  <button
+                  <IconButton
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggleShortlist(job.id);
                     }}
-                    className="p-2 hover:bg-muted rounded transition-colors flex-shrink-0"
+                    variant="ghost"
+                    size="sm"
+                    icon={Star}
+                    className={jobIsShortlisted ? 'text-warning fill-warning' : ''}
                     aria-label={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
-                    aria-pressed={jobIsShortlisted}
                     title={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
-                  >
-                    <svg 
-                      className={`w-5 h-5 ${jobIsShortlisted ? 'fill-warning stroke-warning' : 'fill-none stroke-muted-foreground'}`}
-                      viewBox="0 0 24 24" 
-                      strokeWidth="2"
-                    >
-                      <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                    </svg>
-                  </button>
+                  />
                 </div>
               </div>
             );
@@ -646,13 +590,15 @@ export default function Home() {
           </div>
 
           {results.length < total && (
-            <button
+            <Button
               onClick={handleLoadMore}
               disabled={searching}
-              className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-foreground hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              variant="secondary"
+              size="lg"
+              className="w-full"
             >
               {searching ? 'Loading...' : 'Load more'}
-            </button>
+            </Button>
           )}
         </>
       )}
@@ -668,32 +614,32 @@ export default function Home() {
         </div>
       }
       search={
-        <input
+        <Input
           ref={searchInputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Search roles, orgs, or skills… (Press / to focus)"
-          className="w-full px-4 py-2 text-sm border border-input bg-background rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+          className="w-full"
         />
       }
       actions={
         <>
           <div className="relative">
-            <button
+            <Button
               onClick={() => setShowSavedPanel(!showSavedPanel)}
-              className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-lg hover:bg-surface-2 transition-colors text-sm font-medium"
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              <span className="text-foreground">Saved</span>
+              <Bookmark className="w-4 h-4" />
+              <span>Saved</span>
               {shortlistedIds.length > 0 && (
-                <span className="px-1.5 py-0.5 text-xs font-semibold text-primary-foreground bg-primary rounded-full">
+                <Badge variant="default">
                   {shortlistedIds.length}
-                </span>
+                </Badge>
               )}
-            </button>
+            </Button>
             <SavedJobsPanel
               isOpen={showSavedPanel}
               onClose={() => setShowSavedPanel(false)}
@@ -734,14 +680,6 @@ export default function Home() {
           inspector={inspectorSlot}
         />
       </div>
-
-      {toastMessage && (
-        <Toast
-          message={toastMessage}
-          type={toastType}
-          onClose={() => setToastMessage(null)}
-        />
-      )}
     </>
   );
 }

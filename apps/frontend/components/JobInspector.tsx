@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { Sheet, Button, IconButton, Badge, Skeleton } from "@aidjobs/ui";
+import { X, ExternalLink, Star } from "lucide-react";
 
 type Job = {
   id: string;
@@ -40,13 +42,10 @@ export default function JobInspector({
   isShortlisted = false,
   previouslyFocusedElement = null,
 }: JobInspectorProps) {
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [fullJob, setFullJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isNotFound, setIsNotFound] = useState(false);
 
-  // Fetch full job details if missing normalized fields
   useEffect(() => {
     if (!isOpen || !job) {
       setFullJob(null);
@@ -55,7 +54,6 @@ export default function JobInspector({
       return;
     }
 
-    // Check if we need to fetch full details (missing any normalized fields)
     const needsFullDetails =
       !job.benefits ||
       !job.policy_flags ||
@@ -71,7 +69,6 @@ export default function JobInspector({
           if (res.status === 404) {
             setIsNotFound(true);
             setIsLoading(false);
-            // Auto-close after 3 seconds
             setTimeout(() => {
               onClose();
             }, 3000);
@@ -93,56 +90,6 @@ export default function JobInspector({
     }
   }, [isOpen, job, onClose]);
 
-  // Focus management
-  useEffect(() => {
-    if (isOpen) {
-      closeButtonRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  // Restore focus on close
-  useEffect(() => {
-    if (!isOpen && previouslyFocusedElement) {
-      previouslyFocusedElement.focus();
-    }
-  }, [isOpen, previouslyFocusedElement]);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    const handleTab = (e: KeyboardEvent) => {
-      if (!isOpen || !drawerRef.current || e.key !== "Tab") return;
-
-      const focusableElements = drawerRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      const firstElement = focusableElements[0] as HTMLElement;
-      const lastElement = focusableElements[
-        focusableElements.length - 1
-      ] as HTMLElement;
-
-      if (e.shiftKey && document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement?.focus();
-      } else if (!e.shiftKey && document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement?.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-    document.addEventListener("keydown", handleTab);
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.removeEventListener("keydown", handleTab);
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen || !job) return null;
 
   const displayJob = fullJob || job;
@@ -152,311 +99,251 @@ export default function JobInspector({
     : false;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black bg-opacity-30 z-40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        ref={drawerRef}
-        className="fixed right-0 top-0 h-full w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl z-50 overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="inspector-title"
-        aria-describedby="inspector-description"
-      >
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2
-            id="inspector-title"
-            className="text-lg font-semibold text-gray-900"
+    <Sheet
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Job Details"
+      previouslyFocusedElement={previouslyFocusedElement}
+      actions={
+        <>
+          {onToggleShortlist && !isNotFound && (
+            <IconButton
+              onClick={() => onToggleShortlist(job.id)}
+              variant="ghost"
+              size="md"
+              icon={Star}
+              className={isShortlisted ? "text-warning fill-warning" : ""}
+              aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+              title={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+              disabled={isLoading}
+            />
+          )}
+          <IconButton
+            onClick={onClose}
+            variant="ghost"
+            size="md"
+            icon={X}
+            aria-label="Close inspector"
+          />
+        </>
+      }
+    >
+      {isNotFound ? (
+        <div className="flex flex-col items-center justify-center h-96">
+          <svg
+            className="w-16 h-16 text-muted-foreground mb-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            Job Details
-          </h2>
-          <div className="flex items-center gap-2">
-            {onToggleShortlist && !isNotFound && (
-              <button
-                onClick={() => onToggleShortlist(job.id)}
-                className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-                aria-label={
-                  isShortlisted ? "Remove from shortlist" : "Add to shortlist"
-                }
-                aria-pressed={isShortlisted}
-                title={
-                  isShortlisted ? "Remove from shortlist" : "Add to shortlist"
-                }
-                disabled={isLoading}
-              >
-                <svg
-                  className={`w-5 h-5 ${isShortlisted ? "fill-yellow-500 stroke-yellow-600" : "fill-none stroke-gray-400"}`}
-                  viewBox="0 0 24 24"
-                  strokeWidth="2"
-                >
-                  <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                </svg>
-              </button>
-            )}
-            <button
-              ref={closeButtonRef}
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-              aria-label="Close inspector"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            This role is no longer available
+          </h3>
+          <p className="text-sm text-muted-foreground">Closing automatically...</p>
+        </div>
+      ) : isLoading ? (
+        <div className="space-y-6">
+          <div>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-6 w-1/2" />
+          </div>
+          <div>
+            <Skeleton className="h-4 w-1/4 mb-2" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
           </div>
         </div>
-
-        {isNotFound ? (
-          <div className="p-6 flex flex-col items-center justify-center h-96">
-            <svg
-              className="w-16 h-16 text-gray-300 mb-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              This role is no longer available
+      ) : (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-bold text-foreground mb-2">
+              {displayJob.title}
             </h3>
-            <p className="text-sm text-gray-500">Closing automatically...</p>
+            <p className="text-lg text-muted-foreground">{displayJob.org_name}</p>
           </div>
-        ) : isLoading ? (
-          <div className="p-6 space-y-6 animate-pulse">
-            <div>
-              <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-            </div>
-            <div>
-              <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-full mb-1"></div>
-              <div className="h-4 bg-gray-200 rounded w-full mb-1"></div>
-              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-16 bg-gray-200 rounded"></div>
-              <div className="h-16 bg-gray-200 rounded"></div>
-              <div className="h-16 bg-gray-200 rounded"></div>
-              <div className="h-16 bg-gray-200 rounded"></div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6 space-y-6">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {displayJob.title}
-              </h3>
-              <p id="inspector-description" className="text-lg text-gray-700">{displayJob.org_name}</p>
-            </div>
 
-            {displayJob.description_snippet && (
+          {displayJob.description_snippet && (
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">
+                Description
+              </h4>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {displayJob.description_snippet}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {displayJob.location_raw && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                  Description
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Location
                 </h4>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {displayJob.description_snippet}
+                <p className="text-sm text-foreground">
+                  {displayJob.location_raw}
                 </p>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              {displayJob.location_raw && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Location
-                  </h4>
-                  <p className="text-sm text-gray-900">
-                    {displayJob.location_raw}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.country_iso && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Country
-                  </h4>
-                  <p className="text-sm text-gray-900">
-                    {displayJob.country_iso}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.level_norm && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Level
-                  </h4>
-                  <p className="text-sm text-gray-900 capitalize">
-                    {displayJob.level_norm.replace("_", " ")}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.career_type && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Career Type
-                  </h4>
-                  <p className="text-sm text-gray-900 capitalize">
-                    {displayJob.career_type.replace("_", " ")}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.work_modality && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Work Modality
-                  </h4>
-                  <p className="text-sm text-gray-900 capitalize">
-                    {displayJob.work_modality.replace("_", " ")}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.org_type && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Organization Type
-                  </h4>
-                  <p className="text-sm text-gray-900 capitalize">
-                    {displayJob.org_type.replace("_", " ")}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.international_eligible !== undefined && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    International Eligible
-                  </h4>
-                  <p className="text-sm text-gray-900">
-                    {displayJob.international_eligible ? "Yes" : "No"}
-                  </p>
-                </div>
-              )}
-
-              {displayJob.deadline && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
-                    Deadline
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-900">
-                      {new Date(displayJob.deadline).toLocaleDateString()}
-                    </p>
-                    {isClosingSoon && (
-                      <span className="px-2 py-0.5 text-xs font-medium text-orange-700 bg-orange-100 rounded">
-                        Closing soon
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {displayJob.mission_tags && displayJob.mission_tags.length > 0 && (
+            {displayJob.country_iso && (
               <div>
-                <h4 className="text-xs font-semibold text-gray-500 mb-2">
-                  Mission Tags
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Country
                 </h4>
-                <div className="flex flex-wrap gap-2">
-                  {displayJob.mission_tags.map((tag, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded border border-blue-200"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                <p className="text-sm text-foreground">
+                  {displayJob.country_iso}
+                </p>
               </div>
             )}
 
-            {displayJob.benefits && displayJob.benefits.length > 0 && (
+            {displayJob.level_norm && (
               <div>
-                <h4 className="text-xs font-semibold text-gray-500 mb-2">
-                  Benefits
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Level
                 </h4>
-                <div className="flex flex-wrap gap-2">
-                  {displayJob.benefits.map((benefit, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded border border-green-200"
-                    >
-                      {benefit}
-                    </span>
-                  ))}
-                </div>
+                <p className="text-sm text-foreground capitalize">
+                  {displayJob.level_norm.replace("_", " ")}
+                </p>
               </div>
             )}
 
-            {displayJob.policy_flags && displayJob.policy_flags.length > 0 && (
+            {displayJob.career_type && (
               <div>
-                <h4 className="text-xs font-semibold text-gray-500 mb-2">
-                  Policy Flags
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Career Type
                 </h4>
-                <div className="flex flex-wrap gap-2">
-                  {displayJob.policy_flags.map((flag, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 text-xs font-medium text-purple-700 bg-purple-50 rounded border border-purple-200"
-                    >
-                      {flag}
-                    </span>
-                  ))}
-                </div>
+                <p className="text-sm text-foreground capitalize">
+                  {displayJob.career_type.replace("_", " ")}
+                </p>
               </div>
             )}
 
-            {displayJob.apply_url && (
-              <div className="pt-4 border-t border-gray-200">
-                <a
-                  href={displayJob.apply_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Apply Now
-                  <svg
-                    className="ml-2 w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
+            {displayJob.work_modality && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Work Modality
+                </h4>
+                <p className="text-sm text-foreground capitalize">
+                  {displayJob.work_modality.replace("_", " ")}
+                </p>
+              </div>
+            )}
+
+            {displayJob.org_type && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Organization Type
+                </h4>
+                <p className="text-sm text-foreground capitalize">
+                  {displayJob.org_type.replace("_", " ")}
+                </p>
+              </div>
+            )}
+
+            {displayJob.international_eligible !== undefined && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  International Eligible
+                </h4>
+                <p className="text-sm text-foreground">
+                  {displayJob.international_eligible ? "Yes" : "No"}
+                </p>
+              </div>
+            )}
+
+            {displayJob.deadline && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Deadline
+                </h4>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-foreground">
+                    {new Date(displayJob.deadline).toLocaleDateString()}
+                  </p>
+                  {isClosingSoon && (
+                    <Badge variant="warning">Closing soon</Badge>
+                  )}
+                </div>
               </div>
             )}
           </div>
-        )}
-      </div>
-    </>
+
+          {displayJob.mission_tags && displayJob.mission_tags.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                Mission Tags
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {displayJob.mission_tags.map((tag, idx) => (
+                  <Badge key={idx} variant="info">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {displayJob.benefits && displayJob.benefits.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                Benefits
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {displayJob.benefits.map((benefit, idx) => (
+                  <Badge key={idx} variant="success">
+                    {benefit}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {displayJob.policy_flags && displayJob.policy_flags.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                Policy Flags
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {displayJob.policy_flags.map((flag, idx) => (
+                  <Badge key={idx} variant="secondary">
+                    {flag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {displayJob.apply_url && (
+            <div className="pt-4 border-t border-border">
+              <Button
+                as="a"
+                href={displayJob.apply_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="primary"
+                size="md"
+                className="inline-flex items-center gap-2"
+              >
+                Apply Now
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </Sheet>
   );
 }
