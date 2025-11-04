@@ -50,6 +50,25 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
   - ThemeProvider, useTheme hook, and ThemeToggle component (Sun/Moon icon button)
   - shadcn/ui-compatible color system with full token palette (background, foreground, muted, surface, accent, primary, warning, danger, border, input, ring)
   - BorderRadius tokens (lg/md/sm) calculated from --radius variable
+- **UI Component Library** (packages/ui):
+  - **Button**: 4 variants (solid, subtle, ghost, link) × 3 sizes (sm, md, lg) with focus-visible rings
+  - **IconButton**: Square button with rounded-2xl corners, same 4 variants
+  - **Input**: Text input with optional leading icon slot
+  - **Select**: Radix Select with keyboard navigation, check indicators, scroll buttons
+  - **Chip**: Static label pill with variants (default, primary, accent)
+  - **FilterChip**: Toggleable chip with aria-pressed and optional count badge
+  - **Badge**: Status badges (closing-soon, urgent, pay-transparency, default)
+  - **Tooltip**: Radix Tooltip with Portal, animations, and configurable placement
+  - **Popover**: Radix Popover with Portal, z-index layering, and animations
+  - **Sheet**: Right-side drawer for Inspector (responsive width: sm:max-w-sm md:max-w-md lg:max-w-lg)
+  - **Separator**: Horizontal/vertical separator with semantic markup
+  - **Skeleton**: Pulse animation loader with configurable height
+  - **Toast**: react-hot-toast with CSS variable theming, success/error/info variants
+  - All components use CSS variables exclusively (no hardcoded colors)
+  - Keyboard accessible with focus-visible rings (focus-visible:ring-2 focus-visible:ring-ring)
+  - TypeScript types exported for all components
+  - Snapshot tests for Button and FilterChip variants
+  - Exported via barrel file (packages/ui/index.ts)
 - **Client-side Shortlist System** with localStorage persistence:
   - Star/bookmark toggle on job rows and inspector
   - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
@@ -516,11 +535,108 @@ import { ThemeProvider, ThemeToggle, useThemeContext } from '@aidjobs/ui';
 const { theme, setTheme, toggleTheme } = useThemeContext();
 ```
 
+### UI Component Library
+
+The platform includes a complete UI component library in `packages/ui` built with Radix UI primitives and following shadcn/ui patterns. All components use CSS variables exclusively and support keyboard navigation with focus-visible rings.
+
+**Button Variants**:
+```tsx
+import { Button } from '@aidjobs/ui';
+
+<Button variant="solid" size="md">Primary Action</Button>
+<Button variant="subtle" size="sm">Secondary</Button>
+<Button variant="ghost">Tertiary</Button>
+<Button variant="link">Link Style</Button>
+```
+
+**Form Components**:
+```tsx
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@aidjobs/ui';
+import { Search } from 'lucide-react';
+
+<Input placeholder="Search..." leadingIcon={<Search className="h-4 w-4" />} />
+
+<Select>
+  <SelectTrigger>
+    <SelectValue placeholder="Select level" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="entry">Entry</SelectItem>
+    <SelectItem value="mid">Mid</SelectItem>
+    <SelectItem value="senior">Senior</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**Filter & Status Components**:
+```tsx
+import { FilterChip, Chip, Badge } from '@aidjobs/ui';
+
+<FilterChip pressed={isActive} count={5} onClick={toggle}>
+  Health
+</FilterChip>
+
+<Chip variant="primary">Featured</Chip>
+
+<Badge status="closing-soon">Closes in 3 days</Badge>
+<Badge status="pay-transparency">Salary disclosed</Badge>
+```
+
+**Overlays & Dialogs**:
+```tsx
+import { Sheet, SheetContent, SheetHeader, SheetTitle, Tooltip, Popover } from '@aidjobs/ui';
+
+// Sheet (drawer)
+<Sheet open={open} onOpenChange={setOpen} side="right">
+  <SheetContent>
+    <SheetHeader>
+      <SheetTitle>Job Details</SheetTitle>
+    </SheetHeader>
+    {/* Content */}
+  </SheetContent>
+</Sheet>
+
+// Tooltip
+<Tooltip content="Apply now" side="top">
+  <Button>Apply</Button>
+</Tooltip>
+
+// Popover
+<Popover content={<div>Filter options</div>}>
+  <Button>Filters</Button>
+</Popover>
+```
+
+**Loading States**:
+```tsx
+import { Skeleton } from '@aidjobs/ui';
+
+<Skeleton className="w-full" height={64} />
+<Skeleton className="w-32" height={20} />
+```
+
+**Notifications**:
+```tsx
+import { showToast, ToastProvider } from '@aidjobs/ui';
+
+// In layout
+<ToastProvider />
+
+// In components
+showToast({ message: 'Job saved!', type: 'success' });
+showToast({ message: 'Error saving job', type: 'error' });
+```
+
+**Testing**:
+- Snapshot tests for Button and FilterChip variants in `packages/ui/__tests__`
+- Tests verify all variant combinations, aria attributes, and state changes
+- Run with `npm test`
+
 ### shadcn/ui Compatibility
-The design token system follows shadcn/ui conventions for seamless integration of future UI components:
+The design token system follows shadcn/ui conventions for seamless integration:
 - All color tokens match shadcn/ui naming (background, foreground, muted, primary, accent, etc.)
-- Dependencies: `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`
-- Ready for Button, Card, Dialog, and other shadcn/ui primitives
+- Dependencies: `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, Radix UI
+- Components use the same variant system and class-variance-authority patterns
 
 ## Database Schema
 
