@@ -1,0 +1,82 @@
+Create a reusable design-tokens layer and wire Tailwind to CSS variables.
+
+1) Add /packages/ui/tokens/tailwind-theme.css with :root and .dark variables:
+:root {
+  --bg: 255 255 254;         /* near-white */
+  --fg: 19 22 26;            /* deep neutral */
+  --muted: 244 246 248;      /* soft gray */
+  --muted-foreground: 98 106 115;
+
+  --surface: 248 249 250;    /* cards/surfaces */
+  --surface-2: 240 242 244;
+
+  --accent: 198 232 216;     /* soft mint green */
+  --accent-foreground: 17 68 55;
+
+  --primary: 28 142 121;     /* jade green */
+  --primary-foreground: 255 255 255;
+
+  --warning: 246 211 101;
+  --danger: 224 84 84;
+
+  --ring: 28 142 121;
+  --border: 226 230 235;
+  --input: 226 230 235;
+  --radius: 16px;
+}
+
+.dark {
+  --bg: 14 17 20;
+  --fg: 231 235 239;
+  --muted: 28 32 36;
+  --muted-foreground: 156 163 175;
+
+  --surface: 20 24 28;
+  --surface-2: 26 31 36;
+
+  --accent: 36 66 58;
+  --accent-foreground: 210 240 230;
+
+  --primary: 28 142 121;
+  --primary-foreground: 233 251 246;
+
+  --warning: 246 211 101;
+  --danger: 224 84 84;
+
+  --ring: 28 142 121;
+  --border: 45 51 58;
+  --input: 45 51 58;
+  --radius: 16px;
+}
+
+2) Update apps/frontend/tailwind.config.ts:
+- Use CSS variable driven colors via HSL: e.g.
+  colors: {
+    background: 'hsl(var(--bg))',
+    foreground: 'hsl(var(--fg))',
+    muted: 'hsl(var(--muted))',
+    'muted-foreground': 'hsl(var(--muted-foreground))',
+    surface: 'hsl(var(--surface))',
+    'surface-2': 'hsl(var(--surface-2))',
+    primary: 'hsl(var(--primary))',
+    'primary-foreground': 'hsl(var(--primary-foreground))',
+    accent: 'hsl(var(--accent))',
+    'accent-foreground': 'hsl(var(--accent-foreground))',
+    warning: 'hsl(var(--warning))',
+    danger: 'hsl(var(--danger))',
+    border: 'hsl(var(--border))',
+    input: 'hsl(var(--input))',
+  }
+- theme.extend.borderRadius = { lg: 'var(--radius)', md: 'calc(var(--radius) - 4px)', sm: 'calc(var(--radius) - 8px)' }
+
+3) Ensure global CSS imports in apps/frontend/app/globals.css:
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "packages/ui/tokens/tailwind-theme.css";
+html { color-scheme: light dark; }
+body { @apply bg-background text-foreground antialiased; }
+
+4) Install shadcn/ui primitives in /packages/ui and configure to consume Tailwind variables. Create an index barrel file at /packages/ui/index.ts that re-exports components we add next.
+
+5) Add a theme switcher hook in /packages/ui/hooks/useTheme.ts using prefers-color-scheme, and a <ThemeProvider> that toggles .dark on <html>. Provide a <ThemeToggle/> button (icon-only, minimal).
