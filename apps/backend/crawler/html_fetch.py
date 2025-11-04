@@ -1,290 +1,407 @@
 """
-HTML crawler for job listings.
+HTML crawler: fetch, extract, normalize, and upsert jobs
 """
 import hashlib
 import logging
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-from urllib.parse import urljoin, urlparse
-import requests
+import re
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime, timedelta
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from dateutil import parser as date_parser
 
-try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-except ImportError:
-    psycopg2 = None
-
-from app.db_config import db_config
+from core.net import HTTPClient
+from core.robots import RobotsChecker
+from core.domain_limits import DomainLimiter
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "AidJobs/1.0 (+https://aidjobs.org; job crawler)"
-REQUEST_TIMEOUT = 15
+# Common job listing selectors (heuristics)
+JOB_SELECTORS = [
+    '.job-listing', '.job-item', '.career-item', '.position',
+    'article.job', 'div.vacancy', 'tr.job-row', 'li.job'
+]
+
+# Location patterns for parsing
+LOCATION_PATTERNS = [
+    r'(?P<city>[A-Z][a-zA-Z\s]+),\s*(?P<country>[A-Z][a-zA-Z\s]+)',
+    r'(?P<country>[A-Z][a-zA-Z\s]+)'
+]
+
+# Seniority level keywords
+LEVEL_KEYWORDS = {
+    'intern': ['intern', 'internship', 'trainee', 'graduate'],
+    'junior': ['junior', 'entry', 'assistant', 'associate', 'coordinator'],
+    'mid': ['mid', 'specialist', 'analyst', 'officer'],
+    'senior': ['senior', 'lead', 'principal', 'manager', 'chief', 'head', 'director'],
+}
 
 
-def fetch_html(url: str) -> Optional[str]:
-    """
-    Fetch HTML from a URL with timeout and user agent.
+class HTMLCrawler:
+    """HTML job page crawler"""
     
-    Args:
-        url: The URL to fetch
-        
-    Returns:
-        HTML content as string, or None if fetch failed
-    """
-    try:
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-        }
-        
-        response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        
-        return response.text
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch {url}: {e}")
-        return None
-
-
-def extract_jobs(html: str, base_url: str) -> List[Dict[str, Any]]:
-    """
-    Extract job listings from HTML.
+    def __init__(self, db_url: str):
+        self.db_url = db_url
+        self.http_client = HTTPClient()
+        self.robots_checker = RobotsChecker(db_url)
+        self.domain_limiter = DomainLimiter(db_url)
     
-    This is a minimal generic extractor that looks for common job listing patterns.
-    For production use, implement source-specific extractors.
+    def _get_db_conn(self):
+        """Get database connection"""
+        return psycopg2.connect(self.db_url)
     
-    Args:
-        html: HTML content
-        base_url: Base URL for resolving relative links
+    async def fetch_html(
+        self,
+        url: str,
+        max_size_kb: int = 1024,
+        etag: Optional[str] = None,
+        last_modified: Optional[str] = None
+    ) -> Tuple[int, Dict[str, str], str, int]:
+        """
+        Fetch HTML page.
         
-    Returns:
-        List of job dictionaries with keys: title, org_name, location_raw, 
-        apply_url, description_snippet, deadline
-    """
-    jobs = []
+        Returns:
+            (status_code, headers, html_content, size_bytes)
+        """
+        parsed = urlparse(url)
+        host = parsed.netloc
+        
+        # Check robots.txt
+        robots_info = await self.robots_checker.get_robots_info(url)
+        if not robots_info['allowed']:
+            logger.warning(f"[html_fetch] Robots.txt disallows {url}")
+            return (403, {}, "", 0)
+        
+        # Wait for rate limit
+        await self.domain_limiter.wait_for_slot(host, robots_info.get('crawl_delay_ms'))
+        
+        # Fetch page
+        status, headers, body, size = await self.http_client.fetch(
+            url,
+            etag=etag,
+            last_modified=last_modified,
+            max_size_kb=max_size_kb
+        )
+        
+        html = body.decode('utf-8', errors='ignore')
+        return (status, headers, html, size)
     
-    try:
-        soup = BeautifulSoup(html, 'html.parser')
+    def extract_jobs(
+        self,
+        html: str,
+        base_url: str,
+        parser_hint: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Extract job listings from HTML.
         
-        # Generic job listing extraction
-        # Look for common patterns: job cards, listings, etc.
-        # This is a simple heuristic - customize per source for better results
+        Returns:
+            List of raw job dicts with keys:
+                title, org_name, location_raw, apply_url, description_snippet, deadline
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        jobs = []
         
+        # Try to find job containers
         job_elements = []
         
-        # Try common selectors
-        selectors = [
-            'article[class*="job"]',
-            'div[class*="job-listing"]',
-            'div[class*="job-item"]',
-            'li[class*="job"]',
-            'tr[class*="job"]',
-            '.job-card',
-            '.position',
-            '.vacancy',
-        ]
+        # Use parser hint if provided (CSS selector)
+        if parser_hint:
+            job_elements = soup.select(parser_hint)
         
-        for selector in selectors:
-            elements = soup.select(selector)
-            if elements:
-                job_elements = elements
-                break
+        # Fallback to common selectors
+        if not job_elements:
+            for selector in JOB_SELECTORS:
+                job_elements = soup.select(selector)
+                if job_elements:
+                    logger.debug(f"[html_fetch] Found {len(job_elements)} jobs using selector: {selector}")
+                    break
         
-        # If no specific job elements found, look for links with job-related text
+        # If still no elements, try finding links with job-related keywords
         if not job_elements:
             all_links = soup.find_all('a', href=True)
-            for link in all_links:
-                text = link.get_text(strip=True).lower()
-                href = link.get('href', '')
-                
-                # Basic heuristic: link text contains job-related keywords
-                if any(keyword in text for keyword in ['apply', 'position', 'vacancy', 'opportunity', 'career']):
-                    job_elements.append(link.parent or link)
+            job_links = [
+                link for link in all_links
+                if any(keyword in link.get_text().lower() for keyword in ['position', 'job', 'vacancy', 'career', 'opening'])
+            ]
+            if job_links:
+                logger.debug(f"[html_fetch] Found {len(job_links)} job links")
+                job_elements = job_links[:50]  # Limit to first 50
         
-        # Extract job data from elements
-        for element in job_elements[:50]:  # Limit to first 50
+        # Extract data from each element
+        for elem in job_elements:
+            job = self._extract_job_from_element(elem, base_url)
+            if job and job.get('title'):
+                jobs.append(job)
+        
+        logger.info(f"[html_fetch] Extracted {len(jobs)} jobs from {base_url}")
+        return jobs
+    
+    def _extract_job_from_element(self, elem, base_url: str) -> Optional[Dict]:
+        """Extract job data from a single HTML element"""
+        job = {}
+        
+        # Title
+        title_elem = elem.find(['h1', 'h2', 'h3', 'h4', 'a'])
+        if title_elem:
+            job['title'] = title_elem.get_text().strip()
+        else:
+            job['title'] = elem.get_text().strip()[:200]
+        
+        if not job['title']:
+            return None
+        
+        # Apply URL
+        link = elem.find('a', href=True)
+        if link:
+            job['apply_url'] = urljoin(base_url, link['href'])
+        else:
+            job['apply_url'] = base_url
+        
+        # Location
+        location_elem = elem.find(class_=re.compile(r'location|place|city'))
+        if location_elem:
+            job['location_raw'] = location_elem.get_text().strip()
+        else:
+            # Try to find location in text
+            text = elem.get_text()
+            for pattern in LOCATION_PATTERNS:
+                match = re.search(pattern, text)
+                if match:
+                    job['location_raw'] = match.group(0)
+                    break
+        
+        # Description snippet
+        desc_elem = elem.find(['p', 'div'], class_=re.compile(r'description|summary|excerpt'))
+        if desc_elem:
+            job['description_snippet'] = desc_elem.get_text().strip()[:500]
+        else:
+            job['description_snippet'] = elem.get_text().strip()[:500]
+        
+        # Deadline
+        deadline_elem = elem.find(class_=re.compile(r'deadline|closing|expire'))
+        if deadline_elem:
             try:
-                job_data = _extract_job_from_element(element, base_url)
-                if job_data and job_data.get('title'):
-                    jobs.append(job_data)
-            except Exception as e:
-                logger.debug(f"Failed to extract job from element: {e}")
-                continue
+                job['deadline'] = date_parser.parse(deadline_elem.get_text(), fuzzy=True).date()
+            except:
+                pass
         
-        logger.info(f"Extracted {len(jobs)} jobs from HTML")
+        # Org name (try to extract from page)
+        job['org_name'] = None
         
-    except Exception as e:
-        logger.error(f"Failed to parse HTML: {e}")
+        return job
     
-    return jobs
-
-
-def _extract_job_from_element(element, base_url: str) -> Optional[Dict[str, Any]]:
-    """Extract job data from a single HTML element."""
-    job = {}
+    def normalize_job(self, raw_job: Dict, source_org_name: Optional[str] = None) -> Dict:
+        """
+        Normalize a raw job dict to canonical fields.
+        
+        Returns job dict with:
+            - All raw fields
+            - normalized fields (level_norm, career_type, work_modality, etc.)
+            - canonical_hash
+        """
+        job = raw_job.copy()
+        
+        # Use source org_name if not present
+        if not job.get('org_name') and source_org_name:
+            job['org_name'] = source_org_name
+        
+        # Normalize title
+        title_lower = job.get('title', '').lower()
+        
+        # Determine level_norm
+        job['level_norm'] = None
+        for level, keywords in LEVEL_KEYWORDS.items():
+            if any(kw in title_lower for kw in keywords):
+                job['level_norm'] = level.capitalize()
+                break
+        
+        # Determine career_type (consultancy, fellowship, staff, internship)
+        job['career_type'] = None
+        if any(kw in title_lower for kw in ['consult', 'consultant']):
+            job['career_type'] = 'consultancy'
+        elif any(kw in title_lower for kw in ['fellow', 'fellowship']):
+            job['career_type'] = 'fellowship'
+        elif any(kw in title_lower for kw in ['intern', 'internship']):
+            job['career_type'] = 'internship'
+        else:
+            job['career_type'] = 'staff'
+        
+        # Determine work_modality (remote, hybrid, onsite)
+        job['work_modality'] = 'onsite'  # default
+        if any(kw in title_lower for kw in ['remote', 'telework', 'work from home']):
+            job['work_modality'] = 'remote'
+        elif any(kw in title_lower for kw in ['hybrid']):
+            job['work_modality'] = 'hybrid'
+        
+        # Parse location -> country_iso
+        location_raw = job.get('location_raw', '')
+        job['country_iso'] = self._parse_country_iso(location_raw)
+        job['country_name'] = None
+        
+        # Mission tags (basic keyword extraction)
+        job['mission_tags'] = self._extract_mission_tags(job.get('description_snippet', ''))
+        
+        # International eligible (heuristic: remote or multiple countries)
+        job['international_eligible'] = (
+            job['work_modality'] == 'remote' or
+            'international' in title_lower or
+            'global' in title_lower
+        )
+        
+        # Generate canonical hash
+        job['canonical_hash'] = self._generate_canonical_hash(job)
+        
+        return job
     
-    # Extract title
-    title_elem = element.find(['h1', 'h2', 'h3', 'h4', 'a'])
-    if title_elem:
-        job['title'] = title_elem.get_text(strip=True)
-    else:
+    def _parse_country_iso(self, location: str) -> Optional[str]:
+        """Parse country ISO code from location string"""
+        # Simple mapping for common countries
+        country_map = {
+            'afghanistan': 'AF', 'bangladesh': 'BD', 'congo': 'CD',
+            'ethiopia': 'ET', 'india': 'IN', 'kenya': 'KE',
+            'nigeria': 'NG', 'pakistan': 'PK', 'sudan': 'SD',
+            'somalia': 'SO', 'syria': 'SY', 'united states': 'US',
+            'yemen': 'YE', 'switzerland': 'CH', 'france': 'FR',
+            'uk': 'GB', 'united kingdom': 'GB'
+        }
+        
+        location_lower = location.lower()
+        for country, iso in country_map.items():
+            if country in location_lower:
+                return iso
+        
         return None
     
-    # Extract apply URL
-    link = element.find('a', href=True)
-    if link:
-        job['apply_url'] = urljoin(base_url, link.get('href'))
-    else:
-        job['apply_url'] = base_url
+    def _extract_mission_tags(self, text: str) -> List[str]:
+        """Extract mission tags from text using keyword matching"""
+        text_lower = text.lower()
+        tags = []
+        
+        keywords_map = {
+            'health': ['health', 'medical', 'healthcare', 'clinic'],
+            'education': ['education', 'school', 'learning', 'training'],
+            'wash': ['wash', 'water', 'sanitation', 'hygiene'],
+            'climate': ['climate', 'environment', 'sustainability'],
+            'gender': ['gender', 'women', 'equality', 'empowerment'],
+            'protection': ['protection', 'safeguarding', 'child protection'],
+            'nutrition': ['nutrition', 'food security', 'hunger'],
+            'livelihoods': ['livelihood', 'economic', 'employment'],
+            'shelter': ['shelter', 'housing', 'settlement'],
+        }
+        
+        for tag, keywords in keywords_map.items():
+            if any(kw in text_lower for kw in keywords):
+                tags.append(tag)
+        
+        return tags[:3]  # Limit to 3 tags
     
-    # Extract organization name (if available)
-    org_elem = element.find(['span', 'div'], class_=lambda c: c and ('org' in c.lower() or 'company' in c.lower()))
-    job['org_name'] = org_elem.get_text(strip=True) if org_elem else None
+    def _generate_canonical_hash(self, job: Dict) -> str:
+        """Generate canonical hash for deduplication"""
+        # Combine key fields for hash
+        canonical_str = f"{job.get('title', '')}|{job.get('org_name', '')}|{job.get('location_raw', '')}"
+        return hashlib.sha256(canonical_str.encode('utf-8')).hexdigest()[:16]
     
-    # Extract location
-    location_elem = element.find(['span', 'div'], class_=lambda c: c and 'location' in c.lower())
-    if not location_elem:
-        location_elem = element.find(string=lambda t: t and any(word in t.lower() for word in ['location:', 'based in']))
-    
-    if location_elem:
-        # Handle both Tag and NavigableString types
+    async def upsert_jobs(
+        self,
+        jobs: List[Dict],
+        source_id: str
+    ) -> Dict[str, int]:
+        """
+        Upsert jobs to database.
+        
+        Returns:
+            {'found': n, 'inserted': n, 'updated': n, 'skipped': n}
+        """
+        counts = {'found': len(jobs), 'inserted': 0, 'updated': 0, 'skipped': 0}
+        
+        if not jobs:
+            return counts
+        
+        conn = self._get_db_conn()
         try:
-            job['location_raw'] = location_elem.get_text(strip=True)
-        except AttributeError:
-            # location_elem is a NavigableString (text node)
-            job['location_raw'] = str(location_elem).strip()
-    else:
-        job['location_raw'] = None
-    
-    # Extract description snippet
-    desc_elem = element.find(['p', 'div'], class_=lambda c: c and ('desc' in c.lower() or 'summary' in c.lower()))
-    if desc_elem:
-        job['description_snippet'] = desc_elem.get_text(strip=True)[:500]
-    else:
-        # Fallback: use element text
-        job['description_snippet'] = element.get_text(strip=True)[:500]
-    
-    # Extract deadline (if available)
-    deadline_elem = element.find(string=lambda t: t and any(word in t.lower() for word in ['deadline', 'closing date', 'apply by']))
-    job['deadline'] = None  # Would need date parsing here
-    
-    return job
-
-
-def compute_canonical_hash(job: Dict[str, Any]) -> str:
-    """
-    Compute a canonical hash for a job to detect duplicates.
-    
-    Args:
-        job: Job dictionary
-        
-    Returns:
-        SHA256 hash as hex string
-    """
-    # Create a stable canonical representation
-    canonical_parts = [
-        job.get('title', '').strip().lower(),
-        job.get('org_name', '').strip().lower(),
-        job.get('apply_url', '').strip().lower(),
-    ]
-    
-    canonical_string = '|'.join(canonical_parts)
-    return hashlib.sha256(canonical_string.encode('utf-8')).hexdigest()
-
-
-def upsert_jobs(items: List[Dict[str, Any]], source_id: str) -> Dict[str, int]:
-    """
-    Insert or update jobs in the database.
-    
-    Args:
-        items: List of job dictionaries
-        source_id: UUID of the source
-        
-    Returns:
-        Dictionary with keys: found, inserted, updated, skipped
-    """
-    if not psycopg2:
-        raise RuntimeError("Database driver not available")
-    
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise RuntimeError("Database not configured")
-    
-    stats = {
-        'found': len(items),
-        'inserted': 0,
-        'updated': 0,
-        'skipped': 0,
-    }
-    
-    conn = None
-    try:
-        conn = psycopg2.connect(**conn_params)
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        for job in items:
-            try:
-                # Normalize and compute hash
-                canonical_hash = compute_canonical_hash(job)
+            with conn.cursor() as cur:
+                for job in jobs:
+                    # Check if exists
+                    cur.execute("""
+                        SELECT id, last_seen_at FROM jobs WHERE canonical_hash = %s
+                    """, (job['canonical_hash'],))
+                    
+                    existing = cur.fetchone()
+                    
+                    if existing:
+                        # Update last_seen_at
+                        cur.execute("""
+                            UPDATE jobs SET last_seen_at = NOW()
+                            WHERE canonical_hash = %s
+                        """, (job['canonical_hash'],))
+                        counts['updated'] += 1
+                    else:
+                        # Insert new job
+                        cur.execute("""
+                            INSERT INTO jobs (
+                                source_id, org_name, title, location_raw, country_iso,
+                                level_norm, career_type, work_modality, mission_tags,
+                                international_eligible, deadline, apply_url,
+                                description_snippet, canonical_hash, status
+                            ) VALUES (
+                                %s, %s, %s, %s, %s,
+                                %s, %s, %s, %s,
+                                %s, %s, %s,
+                                %s, %s, 'active'
+                            )
+                        """, (
+                            source_id, job.get('org_name'), job.get('title'),
+                            job.get('location_raw'), job.get('country_iso'),
+                            job.get('level_norm'), job.get('career_type'),
+                            job.get('work_modality'), job.get('mission_tags', []),
+                            job.get('international_eligible', False),
+                            job.get('deadline'), job.get('apply_url'),
+                            job.get('description_snippet'), job['canonical_hash']
+                        ))
+                        counts['inserted'] += 1
                 
-                # Check if job exists
-                cursor.execute(
-                    "SELECT id, updated_at FROM jobs WHERE canonical_hash = %s",
-                    (canonical_hash,)
-                )
-                existing = cursor.fetchone()
-                
-                if existing:
-                    # Update last_seen_at
-                    cursor.execute(
-                        """
-                        UPDATE jobs 
-                        SET last_seen_at = NOW(), updated_at = NOW()
-                        WHERE canonical_hash = %s
-                        """,
-                        (canonical_hash,)
-                    )
-                    stats['updated'] += 1
-                else:
-                    # Insert new job
-                    cursor.execute(
-                        """
-                        INSERT INTO jobs (
-                            source_id, org_name, title, location_raw, apply_url,
-                            description_snippet, canonical_hash, fetched_at, last_seen_at
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        """,
-                        (
-                            source_id,
-                            job.get('org_name'),
-                            job.get('title'),
-                            job.get('location_raw'),
-                            job.get('apply_url'),
-                            job.get('description_snippet'),
-                            canonical_hash,
-                        )
-                    )
-                    stats['inserted'] += 1
-                
-            except Exception as e:
-                logger.error(f"Failed to upsert job {job.get('title')}: {e}")
-                stats['skipped'] += 1
-                continue
+                conn.commit()
         
-        conn.commit()
-        
-    except Exception as e:
-        if conn:
+        except Exception as e:
+            logger.error(f"[html_fetch] Error upserting jobs: {e}")
             conn.rollback()
-        logger.error(f"Database error during upsert: {e}")
-        raise
-    finally:
-        if conn:
-            cursor.close()
+            raise
+        finally:
             conn.close()
+        
+        logger.info(f"[html_fetch] Upsert complete: {counts}")
+        return counts
+
+
+# Backwards-compatible function wrappers for old code
+def fetch_html(url: str) -> Optional[str]:
+    """Backwards-compatible sync wrapper (stub - use HTMLCrawler for full functionality)"""
+    logger.warning("fetch_html() is deprecated - use HTMLCrawler class")
+    return None
+
+
+def extract_jobs(html: str, base_url: str, parser_hint: Optional[str] = None) -> List[Dict]:
+    """Backwards-compatible extraction function"""
+    import os
+    # Only use PostgreSQL connection strings
+    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+    if not db_url:
+        return []
     
-    return stats
+    crawler = HTMLCrawler(db_url)
+    return crawler.extract_jobs(html, base_url, parser_hint)
+
+
+async def upsert_jobs(jobs: List[Dict], source_id: str) -> Dict[str, int]:
+    """Backwards-compatible upsert function"""
+    import os
+    # Only use PostgreSQL connection strings
+    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+    if not db_url:
+        return {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
+    
+    crawler = HTMLCrawler(db_url)
+    return await crawler.upsert_jobs(jobs, source_id)

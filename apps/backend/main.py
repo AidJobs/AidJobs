@@ -52,7 +52,25 @@ async def lifespan(app: FastAPI):
     else:
         logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env} (admin routes disabled)")
     
+    # Start crawler orchestrator
+    try:
+        from orchestrator import start_scheduler, stop_scheduler
+        # Only use PostgreSQL connection strings (not SUPABASE_URL which is HTTPS)
+        db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+        if db_url:
+            await start_scheduler(db_url)
+        else:
+            logger.warning("[orchestrator] No PostgreSQL database URL configured (need SUPABASE_DB_URL or DATABASE_URL), scheduler not started")
+    except Exception as e:
+        logger.error(f"[orchestrator] Failed to start scheduler: {e}")
+    
     yield
+    
+    # Shutdown
+    try:
+        await stop_scheduler()
+    except:
+        pass
 
 
 app = FastAPI(title="AidJobs API", version="0.1.0", lifespan=lifespan)
@@ -118,6 +136,15 @@ app.include_router(sources_router)
 app.include_router(crawl_router)
 app.include_router(shortlist_router)
 app.include_router(find_earn_router)
+
+# Add new crawler admin routes
+try:
+    from app.crawler_admin import router as crawler_admin_router, robots_router, policies_router
+    app.include_router(crawler_admin_router)
+    app.include_router(robots_router)
+    app.include_router(policies_router)
+except ImportError as e:
+    logger.warning(f"[main] Could not import crawler_admin routes: {e}")
 
 
 # Auth endpoints

@@ -188,38 +188,89 @@ CREATE TABLE IF NOT EXISTS sources (
     org_name TEXT,
     careers_url TEXT NOT NULL UNIQUE,
     source_type TEXT DEFAULT 'html',
-    parser_hint TEXT,
+    org_type TEXT,
     status TEXT DEFAULT 'active',
     crawl_frequency_days INT DEFAULT 3,
+    next_run_at TIMESTAMPTZ,
     last_crawled_at TIMESTAMPTZ,
     last_crawl_status TEXT,
-    notes TEXT,
+    last_crawl_message TEXT,
+    consecutive_failures INT DEFAULT 0,
+    consecutive_nochange INT DEFAULT 0,
+    parser_hint TEXT,
+    time_window TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add notes column if missing (idempotent)
-ALTER TABLE sources ADD COLUMN IF NOT EXISTS notes TEXT;
+-- Add columns to sources if missing (idempotent)
+ALTER TABLE sources 
+    ADD COLUMN IF NOT EXISTS org_type TEXT,
+    ADD COLUMN IF NOT EXISTS next_run_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_crawl_message TEXT,
+    ADD COLUMN IF NOT EXISTS consecutive_failures INT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS consecutive_nochange INT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS time_window TEXT;
 
 -- Create indexes for sources table
 CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
+CREATE INDEX IF NOT EXISTS idx_sources_next_run_at ON sources(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_sources_org_type ON sources(org_type);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_careers_url ON sources(careers_url);
 
 -- Crawl logs table: track crawl execution history
 CREATE TABLE IF NOT EXISTS crawl_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id UUID REFERENCES sources(id) ON DELETE CASCADE,
+    ran_at TIMESTAMPTZ DEFAULT NOW(),
+    duration_ms INT,
     found INT DEFAULT 0,
     inserted INT DEFAULT 0,
     updated INT DEFAULT 0,
     skipped INT DEFAULT 0,
     status TEXT NOT NULL,
-    message TEXT,
-    ran_at TIMESTAMPTZ DEFAULT NOW()
+    message TEXT
 );
+
+-- Add duration_ms column if missing (idempotent)
+ALTER TABLE crawl_logs ADD COLUMN IF NOT EXISTS duration_ms INT;
 
 -- Create index for crawl_logs table
 CREATE INDEX IF NOT EXISTS idx_crawl_logs_source_id ON crawl_logs(source_id, ran_at DESC);
+
+-- Crawl locks table: advisory locks for concurrent crawling
+CREATE TABLE IF NOT EXISTS crawl_locks (
+    source_id UUID PRIMARY KEY,
+    locked_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Domain policies table: per-domain safety and rate limiting
+CREATE TABLE IF NOT EXISTS domain_policies (
+    host TEXT PRIMARY KEY,
+    max_concurrency INT DEFAULT 1,
+    min_request_interval_ms INT DEFAULT 3000,
+    max_pages INT DEFAULT 10,
+    max_kb_per_page INT DEFAULT 1024,
+    allow_js BOOLEAN DEFAULT FALSE,
+    last_seen_status TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Robots cache table: cached robots.txt data
+CREATE TABLE IF NOT EXISTS robots_cache (
+    host TEXT PRIMARY KEY,
+    robots_txt TEXT,
+    fetched_at TIMESTAMPTZ,
+    crawl_delay_ms INT,
+    disallow JSONB
+);
+
+-- Takedowns table: domains/URLs to exclude from crawling
+CREATE TABLE IF NOT EXISTS takedowns (
+    domain_or_url TEXT PRIMARY KEY,
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- Jobs table: parsed job postings
 CREATE TABLE IF NOT EXISTS jobs (

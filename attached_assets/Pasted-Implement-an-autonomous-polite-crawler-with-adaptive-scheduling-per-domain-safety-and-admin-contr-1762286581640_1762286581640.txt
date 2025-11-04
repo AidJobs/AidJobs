@@ -1,0 +1,162 @@
+Implement an autonomous, polite crawler with adaptive scheduling, per-domain safety, and admin controls. Keep everything idempotent.
+
+SCOPE
+- DB migrations (sources, crawl_logs, crawl_locks, domain_policies, robots_cache)
+- Crawler pipeline (fetch → extract → normalize → upsert → index)
+- Orchestrator (scheduler, worker pool, adaptive next_run_at)
+- Safety (robots.txt, per-domain rate, retries/backoff, circuit breaker, ETag/IMS)
+- Admin pages (Sources, Crawl, Settings) — dev first, auth-gated when admin login is enabled
+- Public API untouched; no UI redesign
+
+ENV/FLAGS
+- Respect AIDJOBS_ENV (dev/prod)
+- Feature flag: AIDJOBS_DISABLE_SCHEDULER (default false)
+- UA: AIDJOBS_CRAWLER_UA (default "AidJobsBot/1.0 (+contact@aidjobs.app)")
+- CONTACT: AIDJOBS_CONTACT_EMAIL
+
+DB — apply in /infra/supabase.sql (idempotent)
+1) SOURCES (alter if exists; else create)
+   - id uuid pk default gen_random_uuid()
+   - org_name text
+   - careers_url text unique not null
+   - source_type text default 'html' -- html|rss|api
+   - org_type text null
+   - status text default 'active' -- active|paused|blocked|deleted
+   - crawl_frequency_days int default 3
+   - next_run_at timestamptz
+   - last_crawled_at timestamptz
+   - last_crawl_status text
+   - last_crawl_message text
+   - consecutive_failures int default 0
+   - consecutive_nochange int default 0
+   - parser_hint text
+   - time_window text null -- e.g. "22:00-05:00"
+   - created_at timestamptz default now()
+   - updated_at timestamptz default now()
+
+   Indexes: unique(careers_url), btree(status), btree(next_run_at), btree(org_type)
+
+2) CRAWL_LOGS (create if not exists)
+   - id uuid pk default gen_random_uuid()
+   - source_id uuid references sources(id) on delete cascade
+   - ran_at timestamptz default now()
+   - duration_ms int
+   - found int
+   - inserted int
+   - updated int
+   - skipped int
+   - status text -- ok|warn|fail
+   - message text
+   Index: btree(source_id, ran_at desc)
+
+3) CRAWL_LOCKS (create if not exists) — lightweight advisory lock
+   - source_id uuid primary key
+   - locked_at timestamptz default now()
+
+4) DOMAIN_POLICIES (create if not exists) — per-domain safety profile
+   - host text primary key
+   - max_concurrency int default 1
+   - min_request_interval_ms int default 3000 -- per host politeness
+   - max_pages int default 10
+   - max_kb_per_page int default 1024
+   - allow_js boolean default false
+   - last_seen_status text
+   - updated_at timestamptz default now()
+
+5) ROBOTS_CACHE (create if not exists)
+   - host text primary key
+   - robots_txt text
+   - fetched_at timestamptz
+   - crawl_delay_ms int
+   - disallow jsonb
+
+6) Ensure JOBS has canonical_hash unique, and columns used by normalizer already exist.
+
+BACKEND — add modules under apps/backend:
+- core/net.py: HTTP client with UA, ETag/If-Modified-Since support, timeouts, retries (2), backoff
+- core/robots.py: fetch/cache robots.txt, parse Disallow + Crawl-delay
+- core/domain_limits.py: per-host token bucket using DOMAIN_POLICIES + robots crawl-delay; ensure min interval respected
+- crawler/html_fetch.py: 
+   fetch_html(url) -> (status, headers, body, bytes)
+   paginate if simple "next" link or ?page=
+   extract_jobs(html, base_url, parser_hint) -> [{title, org_name, location_raw, apply_url, description_snippet, deadline?}]
+   normalize(job) -> canonical fields (country_iso, mission_tags, level_norm, work_modality, career_type, international_eligible, etc.) and canonical_hash
+   upsert_jobs(items, source_id) -> counts {found, inserted, updated, skipped}
+- crawler/rss_fetch.py (simple): parse RSS/Atom, map to same structure
+- crawler/api_fetch.py (stub hooks): accept JSON mappings from parser_hint if provided
+
+ORCHESTRATOR — apps/backend/orchestrator.py
+- start_scheduler(app):
+   If AIDJOBS_DISABLE_SCHEDULER=true → skip.
+   Background task every 5 min:
+     1) SELECT due sources: status='active' AND (next_run_at IS NULL OR next_run_at <= now()) ORDER BY next_run_at NULLS FIRST LIMIT 20
+     2) For each, try to acquire lock: INSERT INTO crawl_locks(source_id) ON CONFLICT DO NOTHING; if conflict, skip
+     3) Submit to a bounded pool (max_concurrency_global=3). Per-host concurrency via DOMAIN_POLICIES.
+     4) After run, delete lock and update:
+        - last_crawl_status/message, last_crawled_at, consecutive_failures/nochange
+        - next_run_at = compute_next_run(prev_freq_days, counts, failures, nochange) * jitter(±15%)
+     5) Write crawl_logs with counts + status + duration
+
+- compute_next_run rules:
+   base = sources.crawl_frequency_days (default by org_type: un=1, ingo=2, ngo=3, academic=7)
+   if (inserted + updated) >= 10: freq = max(0.5, base - 1)
+   elif (inserted + updated) == 0: consecutive_nochange += 1; if consecutive_nochange >= 3: freq = min(14, base + 1)
+   on failure: exponential backoff = min(7 days, 6h * 2^consecutive_failures)
+   apply jitter ±15%
+   honor time_window (if set, schedule to next window start local to org’s region when possible; otherwise ignore)
+
+- politeness:
+   * Always respect robots.txt: if disallowed → set status='blocked', last_crawl_message='robots disallow'
+   * Per-host rate limiting via DOMAIN_POLICIES and robots crawl-delay
+   * Don’t fetch assets; HTML/JSON only
+   * Cap pages and page size per DOMAIN_POLICIES
+
+ROUTES (FastAPI)
+- POST /admin/crawl/run {source_id}: manual run (uses lock)
+- POST /admin/crawl/run_due: run due once (no loop), returns {queued: n}
+- GET  /admin/crawl/status: {running:true, pool:{global:3}, due_count, locked, in_flight}
+- GET  /admin/crawl/logs?source_id&limit=20: latest logs
+- GET  /admin/robots/:host: current robots cache entry
+- GET  /admin/domain_policies/:host: show policy
+- POST /admin/domain_policies/:host: upsert {max_concurrency, min_request_interval_ms, max_pages, max_kb_per_page, allow_js}
+
+SOURCES ADMIN (dev-only page, or auth-gated when admin login enabled)
+- /admin/sources: table (org_name, careers_url, source_type, status, crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status, last_crawl_message, actions: Run now, Pause, Resume, Edit)
+- Form to create/update sources (org_name, url, type, org_type, parser_hint, crawl_frequency_days, time_window)
+- Show live robots status for the domain + policy editor drawer
+- “Test fetch” button: fetch headers only, show status/size/etag/last-modified
+- “Simulate extract” button: run extractor and show first 3 jobs (no DB writes)
+
+AUTOMATIONS
+- On source create/approve: set next_run_at = now() (auto-queue first crawl)
+- Circuit breaker: if consecutive_failures >= 5 → status='paused' and last_crawl_message='auto-paused after failures'
+- Unstale: when admin clicks Resume, reset consecutive_failures to 0
+
+SAFETY/LEGAL
+- Set HTTP User-Agent from env AIDJOBS_CRAWLER_UA, include From header with AIDJOBS_CONTACT_EMAIL
+- Respect robots.txt and crawl-delay; cache robots for 12h
+- Implement ETag/If-Modified-Since for HTML/RSS/API; treat 304 as no-change
+- Never run crawling on public search requests
+- Honor takedown list (add table takedowns(domain_or_url text primary key); skip matches)
+
+MEILI INDEX
+- After upsert, enqueue index update; if Meili unavailable, mark pending and retry next run
+
+LOGGING
+- Log per-run summary: source_id, host, counts, duration, next_run_at
+- Log rate-limit waits (debug) and robots disallow (warn)
+- Error masking for public; detailed logs only in dev
+
+TESTING (basic)
+- Unit: compute_next_run adjustments (busy → lower freq; quiet → higher freq; failures → backoff)
+- Unit: robots cache parse (crawl-delay, disallow)
+- Smoke: POST /admin/crawl/run on a test source → crawl_logs row appears
+
+ACCEPTANCE (manual checks)
+- Add a source, save → next_run_at set to now; logs appear after run; jobs upserted; Meili count increases
+- /admin/crawl/status shows due_count decrease while running
+- /admin/domain_policies/:host edits take effect (min interval enforced)
+- Robots disallow leads to status='blocked' with message
+- Manual “Run due” endpoint triggers due sources without waiting 5 min
+
+Keep all admin pages dev-only unless admin auth is enabled. Do not expose secrets or raw headers in UI responses.

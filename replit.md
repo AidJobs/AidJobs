@@ -101,24 +101,38 @@ curl http://localhost:8000/admin/find-earn/list
   - Auth endpoints: `/auth/login`, `/auth/logout`, `/auth/status`
   - Protected admin write endpoints require authentication in production
 
+- **Autonomous Web Crawler System**:
+  - Production-grade HTML/RSS/API job crawler with adaptive scheduling
+  - Polite crawling with robots.txt compliance and per-domain rate limiting
+  - Background orchestrator with worker pool (max 3 concurrent sources)
+  - Adaptive frequency: increases on activity, decreases on inactivity, exponential backoff on failures
+  - Circuit breaker auto-pauses sources after 5 consecutive failures
+  - Safety features: ETag/If-Modified-Since caching, crawl-delay enforcement, domain policies
+  - Database tables: sources, crawl_logs, crawl_locks, domain_policies, robots_cache, takedowns
+  - Admin API routes: `/admin/crawl/*`, `/admin/robots/*`, `/admin/domain_policies/*`
+  - Core modules: net.py (HTTP client), robots.py (parser), domain_limits.py (token bucket rate limiter)
+  - Crawler modules: html_fetch.py (HTML parser), rss_fetch.py (RSS/Atom), api_fetch.py (JSON APIs)
+  - Orchestrator: automatic 5-minute scheduler, manual triggers, adaptive next_run_at calculation
+
 🔨 **Not Yet Implemented**:
-- Database connection to live Supabase instance
-- Meilisearch integration
+- Frontend admin pages for crawler management (Sources, Crawl Status, Settings)
+- Backend shortlist persistence (currently client-side only)
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
 - CV upload functionality
-- Backend shortlist persistence (currently client-side only)
 
 ## Environment Variables
 See `env.example` for the complete list of 25 environment variables. The application gracefully handles missing variables without crashing.
 
 ### Database Configuration
 - **SUPABASE_URL**: REST API endpoint (https://<project-ref>.supabase.co)
+- **SUPABASE_DB_URL**: PostgreSQL connection string for direct database access (postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres)
+  - **Required for web crawler** to access database directly via psycopg2
+  - Get this from Supabase dashboard → Project Settings → Database → Connection String (URI, Session mode)
 - **SUPABASE_ANON_KEY**: Anonymous key for client-side access
 - **SUPABASE_SERVICE_KEY**: Service role key for server-side operations
-- **DATABASE_URL**: PostgreSQL connection string (postgresql://user:password@host:port/database)
-  - Used by the search fallback to query the jobs table directly
-  - Used by the migration script to apply schema and seed data
+- **DATABASE_URL**: PostgreSQL connection string (legacy fallback)
+  - Used by search fallback and migration script if SUPABASE_DB_URL not set
 
 ### Security Configuration
 
@@ -143,11 +157,97 @@ See `env.example` for the complete list of 25 environment variables. The applica
 - **Development mode** (`AIDJOBS_ENV=dev`): Full error details and stack traces returned in responses
 - **Production mode**: Generic error messages only; detailed logs written to server logs
 
+### Crawler Configuration
+
+#### Scheduler Control
+- **AIDJOBS_DISABLE_SCHEDULER**: Set to "true" to disable the autonomous scheduler (default: false)
+  - Useful for testing or when running multiple instances
+  - Manual crawling still works via `/admin/crawl/run` and `/admin/crawl/run_due` endpoints
+
+#### Crawler Identity
+- **AIDJOBS_CRAWLER_UA**: User-Agent string for crawler requests
+  - Default: "AidJobsBot/1.0 (+contact@aidjobs.app)"
+  - Identifies the bot to website administrators
+- **AIDJOBS_CONTACT_EMAIL**: Contact email included in request headers
+  - Default: "contact@aidjobs.app"
+  - For site administrators to reach out if needed
+
 ### Feature Flags
 - `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch
 - `AIDJOBS_ENABLE_CV` - Enable/disable CV upload
 - `AIDJOBS_ENABLE_FINDEARN` - Enable/disable Find & Earn
 - `AIDJOBS_ENABLE_PAYMENTS` - Enable/disable payment processing
+
+## Web Crawler
+
+### Overview
+The autonomous web crawler system automatically fetches job listings from configured sources (HTML pages, RSS feeds, JSON APIs). It features:
+
+- **Adaptive scheduling**: Crawl frequency adjusts based on activity (more frequently if jobs are changing, less frequently if stale)
+- **Polite crawling**: Respects robots.txt, enforces crawl-delays, limits concurrent requests per domain
+- **Automatic retry & backoff**: Exponential backoff on failures, circuit breaker after 5 consecutive failures
+- **Safety**: ETag/If-Modified-Since caching, per-domain rate limits, size limits
+
+### Database Tables
+
+1. **sources**: Job board URLs to crawl
+   - Tracks: URL, org_type, status (active/paused/blocked), crawl frequency, next run time
+   - Adaptive scheduling fields: consecutive_failures, consecutive_nochange
+
+2. **crawl_logs**: Historical crawl results
+   - Records: duration, counts (found/inserted/updated/skipped), status, message
+
+3. **crawl_locks**: Advisory locks to prevent concurrent crawls of same source
+
+4. **domain_policies**: Per-domain rate limiting and safety rules
+   - Configurable: max_concurrency, min_request_interval_ms, max_pages, max_kb_per_page
+
+5. **robots_cache**: Cached robots.txt data (12-hour TTL)
+   - Stores: robots.txt content, crawl_delay, disallow paths
+
+6. **takedowns**: Domains/URLs to exclude from crawling
+
+### Crawler Modules
+
+- **core/net.py**: HTTP client with retries, backoff, ETag/If-Modified-Since support
+- **core/robots.py**: Robots.txt fetching, caching, and parsing
+- **core/domain_limits.py**: Token bucket rate limiter per domain
+- **crawler/html_fetch.py**: HTML page fetching, job extraction, normalization
+- **crawler/rss_fetch.py**: RSS/Atom feed parsing
+- **crawler/api_fetch.py**: JSON API crawling with JSONPath hints
+- **orchestrator.py**: Background scheduler and worker pool
+
+### Adaptive Scheduling Rules
+
+Base frequency defaults by org type:
+- UN: 1 day
+- INGO: 2 days  
+- NGO: 3 days
+- Academic: 7 days
+
+Adjustments:
+- **High activity** (10+ jobs inserted/updated): Decrease frequency by 1 day (min 0.5 days)
+- **No changes for 3+ runs**: Increase frequency by 1 day (max 14 days)
+- **Failures**: Exponential backoff (6h × 2^failures, max 7 days)
+- **5 consecutive failures**: Auto-pause source with circuit breaker
+- **All schedules**: ±15% jitter to avoid thundering herd
+
+### Admin API Endpoints
+
+**Crawl Management:**
+- `POST /admin/crawl/run` - Manually trigger crawl for specific source
+- `POST /admin/crawl/run_due` - Run all due sources once (no loop)
+- `GET /admin/crawl/status` - Scheduler status, due count, in-flight count
+- `GET /admin/crawl/logs?source_id&limit=20` - View crawl logs
+
+**Robots.txt:**
+- `GET /admin/robots/:host` - View cached robots.txt for a domain
+
+**Domain Policies:**
+- `GET /admin/domain_policies/:host` - View or get default policy
+- `POST /admin/domain_policies/:host` - Update domain policy
+
+All admin endpoints require authentication in production (dev bypass in dev mode).
 
 ## Development Scripts
 - `npm run dev` - Start both frontend and backend servers
