@@ -11,7 +11,12 @@ Normalizes raw job data to match taxonomy lookup tables with:
 
 from typing import Optional, List, Any, Dict, Tuple
 import re
-from app.db_config import get_db_connection
+from app.db_config import db_config
+
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 
 
 # Static currency conversion rates (simplified)
@@ -43,28 +48,41 @@ class LookupCache:
         self._donors: Optional[set] = None
         self._synonyms: Optional[Dict[str, Dict[str, str]]] = None  # type -> {raw: canonical}
     
+    def _get_connection(self):
+        """Get database connection or None."""
+        if not psycopg2:
+            return None
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return None
+        
+        try:
+            return psycopg2.connect(**conn_params, connect_timeout=5)
+        except Exception:
+            return None
+    
     def load_countries(self) -> Dict[str, str]:
         """Load country name -> ISO2 mapping."""
         if self._countries is not None:
             return self._countries
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._countries = {}
             return self._countries
         
-        cursor = conn.cursor()
         try:
+            cursor = conn.cursor()
             cursor.execute("SELECT code_iso2, name FROM countries")
             self._countries = {
                 row[1].lower(): row[0] 
                 for row in cursor.fetchall()
             }
-        except Exception:
-            self._countries = {}
-        finally:
             cursor.close()
             conn.close()
+        except Exception:
+            self._countries = {}
         
         return self._countries
     
@@ -73,20 +91,19 @@ class LookupCache:
         if self._levels is not None:
             return self._levels
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._levels = {'intern', 'junior', 'mid', 'senior', 'lead', 'executive'}
             return self._levels
         
-        cursor = conn.cursor()
         try:
+            cursor = conn.cursor()
             cursor.execute("SELECT key FROM levels")
             self._levels = {row[0] for row in cursor.fetchall()}
-        except Exception:
-            self._levels = {'intern', 'junior', 'mid', 'senior', 'lead', 'executive'}
-        finally:
             cursor.close()
             conn.close()
+        except Exception:
+            self._levels = {'intern', 'junior', 'mid', 'senior', 'lead', 'executive'}
         
         return self._levels
     
@@ -95,7 +112,7 @@ class LookupCache:
         if self._missions is not None:
             return self._missions
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._missions = set()
             return self._missions
@@ -117,7 +134,7 @@ class LookupCache:
         if self._modalities is not None:
             return self._modalities
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._modalities = {'remote', 'home_based', 'hybrid', 'onsite', 'field', 'flexible'}
             return self._modalities
@@ -139,7 +156,7 @@ class LookupCache:
         if self._benefits is not None:
             return self._benefits
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._benefits = set()
             return self._benefits
@@ -161,7 +178,7 @@ class LookupCache:
         if self._policy_flags is not None:
             return self._policy_flags
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._policy_flags = set()
             return self._policy_flags
@@ -183,7 +200,7 @@ class LookupCache:
         if self._donors is not None:
             return self._donors
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._donors = set()
             return self._donors
@@ -205,7 +222,7 @@ class LookupCache:
         if self._synonyms is not None:
             return self._synonyms
         
-        conn = get_db_connection()
+        conn = self._get_connection()
         if not conn:
             self._synonyms = self._get_hardcoded_synonyms()
             return self._synonyms
