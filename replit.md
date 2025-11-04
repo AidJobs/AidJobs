@@ -21,9 +21,18 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Admin config endpoint (`/admin/config/env`) showing environment variable presence
 - Search endpoints with graceful degradation (`/api/search/query`, `/api/search/facets`)
 - **Smart Search UI** with debounced input, inline filters, results list, and inspector drawer
-- Keyboard shortcuts: `/` to focus search, `Esc` to close inspector
+- Keyboard shortcuts: `/` to focus search, `Enter` to open inspector, `Esc` to close inspector
 - Accessibility with visible focus states and keyboard navigation
 - Frontend capabilities integration with search status banner
+- **Client-side Shortlist System** with localStorage persistence:
+  - Star/bookmark toggle on job rows and inspector
+  - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
+  - Toast notifications for add/remove actions with 3-second auto-dismiss
+  - localStorage key: `aidjobs.shortlist`
+  - Utility functions: `addToShortlist()`, `removeFromShortlist()`, `isInShortlist()`, `getShortlist()`
+- **Job Inspector Drawer** with full job details and keyboard navigation
+- **"Closing soon" badges** for jobs with deadline < 7 days
+- **Backend job fetch endpoint** (`GET /api/jobs/:id`) for single job retrieval
 - **Database schema** (infra/supabase.sql) with full-text search, indexes, and RLS policies
 - **Seed data** (infra/seed.sql) with 3 sample organizations and 12 sample jobs
 - **Database migration script** (apps/backend/scripts/apply_sql.py) for idempotent schema application
@@ -37,7 +46,7 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
 - CV upload functionality
-- Shortlist/Save functionality (UI stub present)
+- Backend shortlist persistence (currently client-side only)
 - Authentication
 - Find & Earn features
 
@@ -243,22 +252,34 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 
 ### Results List
 - Compact row-cards displaying:
-  - Job title
+  - Job title with "Closing soon" badge (if deadline < 7 days)
   - Organization name
   - Location/Country
+  - Job level (entry, mid, senior)
   - Deadline (if present)
-  - "Save" button (UI stub, no backend yet)
+  - Star/bookmark button for shortlisting
 - Click or press Enter/Space on any result to open inspector drawer
 - Empty state message when no results or filters
 
 ### Inspector Drawer
 - Right-side panel showing full job details:
   - Title and organization
+  - Star/bookmark toggle for shortlisting
   - Location and job level
+  - Mission tags (if present)
+  - International eligibility status
   - Application deadline
   - "Apply Now" button (links to apply_url)
 - Click backdrop, press `Esc`, or click X to close
 - Keyboard accessible with visible focus states
+
+### Shortlist System
+- **Client-side persistence**: Jobs saved to `localStorage` under key `aidjobs.shortlist`
+- **"Saved" panel**: Header chip showing count, click to view shortlisted jobs
+- **Star toggles**: Available on both job rows and inspector drawer
+- **Toast notifications**: Success/info messages for add/remove actions
+- **SSR-safe**: Gracefully handles server-side rendering without crashes
+- **Future enhancement**: Backend persistence with user accounts
 
 ### Pagination
 - "Load more" button appends additional results
