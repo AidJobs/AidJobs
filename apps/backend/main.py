@@ -10,6 +10,7 @@ from app.config import Capabilities, get_env_presence
 from app.search import search_service
 from app.normalizer import normalize_job_data
 from app.validator import validator
+from app.admin import router as admin_router
 import psycopg2
 from app.db_config import db_config
 
@@ -40,6 +41,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+app.include_router(admin_router)
 
 
 @app.get("/api/healthz")
