@@ -148,7 +148,7 @@ See `env.example` for the complete list of 25 environment variables. The applica
   - Falls back to `SESSION_SECRET` for backwards compatibility
   - Session duration: 8 hours
 
-#### Admin Endpoints
+#### Admin Endpoints (Backend)
 - `POST /api/admin/login` - Authenticate with password, sets httpOnly cookie
   - Rate limited: 10 requests/minute per IP
   - Returns 503 if ADMIN_PASSWORD not configured
@@ -159,6 +159,19 @@ See `env.example` for the complete list of 25 environment variables. The applica
 
 - `GET /api/admin/session` - Check authentication status
   - Returns `{authenticated: true|false}`
+
+#### Admin Pages (Frontend)
+- `/admin/login` - Login form with password input
+  - Redirects to `/admin` on successful authentication
+  - Shows generic error message on invalid credentials
+  - Link to return to main site
+
+- `/admin` - Admin dashboard (requires authentication)
+  - Checks session on load, redirects to `/admin/login` if unauthenticated
+  - Quick links to Sources, Crawl, Find & Earn, Setup
+  - Database and search status cards
+  - Reindex action button
+  - Logout button in header
 
 #### Protected Routes
 All `/admin/*` write endpoints (POST/PUT/DELETE) require authentication via the `admin_required` dependency:
