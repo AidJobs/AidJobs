@@ -306,8 +306,18 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 
 ### Shortlist System
 - **Client-side persistence**: Jobs saved to `localStorage` under key `aidjobs.shortlist`
-- **"Saved" panel**: Header chip showing count, click to view shortlisted jobs
-- **Star toggles**: Available on both job rows and inspector drawer
+- **Dedicated /saved route**: Full-page view for managing saved jobs
+  - Fetches complete job details via `/api/jobs/:id` for each saved ID
+  - Loading skeleton states while fetching job data
+  - Empty state with "Go to search" CTA when no saved jobs
+  - Remove jobs with star button (updates badge count in real-time)
+  - Scroll position persistence when opening/closing Inspector
+  - Focus restoration returns to clicked job card after Inspector closes
+- **Navigation badge**: "Saved (N)" in sidebar navigation
+  - Real-time count updates via localStorage events and polling
+  - Badge highlights when on /saved route
+  - Badge disappears when count reaches zero
+- **Star toggles**: Available on job rows, inspector drawer, and /saved page
 - **Toast notifications**: Success/info messages for add/remove actions
 - **SSR-safe**: Gracefully handles server-side rendering without crashes
 - **Future enhancement**: Backend persistence with user accounts
