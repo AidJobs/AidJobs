@@ -19,7 +19,7 @@ from app.crawl import router as crawl_router
 from app.shortlist import router as shortlist_router
 from app.find_earn import router as find_earn_router
 from app.analytics import analytics_tracker
-from app.auth import verify_admin_password, set_session_cookie, clear_session_cookie, get_current_admin
+from app.admin_auth_routes import router as admin_auth_router
 from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -131,6 +131,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin_auth_router)
 app.include_router(admin_router)
 app.include_router(sources_router)
 app.include_router(crawl_router)
@@ -147,33 +148,6 @@ except ImportError as e:
     logger.warning(f"[main] Could not import crawler_admin routes: {e}")
 
 
-# Auth endpoints
-@app.post("/auth/login")
-async def login(request: LoginRequest, response: Response):
-    """Admin login with password."""
-    if not verify_admin_password(request.password):
-        raise HTTPException(status_code=401, detail="Invalid password")
-    
-    set_session_cookie(response, "admin")
-    return {"status": "ok", "message": "Logged in successfully"}
-
-
-@app.post("/auth/logout")
-async def logout(response: Response):
-    """Admin logout."""
-    clear_session_cookie(response)
-    return {"status": "ok", "message": "Logged out successfully"}
-
-
-@app.get("/auth/status")
-async def auth_status(request: Request):
-    """Check authentication status."""
-    admin = get_current_admin(request)
-    return {
-        "authenticated": admin is not None,
-        "username": admin,
-        "dev_mode": os.getenv("AIDJOBS_ENV", "").lower() == "dev"
-    }
 
 
 @app.get("/api/healthz")
