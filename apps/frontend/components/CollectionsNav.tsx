@@ -1,15 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { collections } from '@/lib/collections';
+import { getShortlist } from '@/lib/shortlist';
 
 export default function CollectionsNav() {
   const [isExpanded, setIsExpanded] = useState(true);
   const pathname = usePathname();
+  const [savedCount, setSavedCount] = useState(0);
   
   const collectionList = Object.values(collections);
+  
+  useEffect(() => {
+    const updateCount = () => {
+      setSavedCount(getShortlist().length);
+    };
+    
+    updateCount();
+    
+    window.addEventListener('storage', updateCount);
+    const interval = setInterval(updateCount, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', updateCount);
+      clearInterval(interval);
+    };
+  }, []);
   
   if (!isExpanded) {
     return (
@@ -46,7 +64,7 @@ export default function CollectionsNav() {
           </button>
         </div>
         
-        <div className="mb-4">
+        <div className="mb-4 space-y-1">
           <Link
             href="/"
             className={`block px-3 py-2 rounded text-sm transition-colors ${
@@ -56,6 +74,25 @@ export default function CollectionsNav() {
             }`}
           >
             All Jobs
+          </Link>
+          <Link
+            href="/saved"
+            className={`flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
+              pathname === '/saved'
+                ? 'bg-blue-50 text-blue-700 font-medium'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span>Saved</span>
+            {savedCount > 0 && (
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                pathname === '/saved'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}>
+                {savedCount}
+              </span>
+            )}
           </Link>
         </div>
         
