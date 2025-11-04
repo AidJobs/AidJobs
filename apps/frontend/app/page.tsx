@@ -515,26 +515,76 @@ export default function Home() {
         <div className="flex gap-6">
           <div className="flex-1">
             {searching && page === 1 ? (
-              <div className="text-center py-12 text-gray-500">Searching...</div>
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                        <div className="flex gap-3">
+                          <div className="h-3 bg-gray-200 rounded w-20"></div>
+                          <div className="h-3 bg-gray-200 rounded w-16"></div>
+                          <div className="h-3 bg-gray-200 rounded w-24"></div>
+                        </div>
+                      </div>
+                      <div className="w-5 h-5 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : results.length === 0 ? (
               <div className="text-center py-12">
                 {hasAnyFilters ? (
                   <div className="max-w-md mx-auto">
-                    <p className="text-lg font-medium text-gray-900 mb-4">No jobs found</p>
-                    <div className="text-sm text-gray-600 space-y-2 mb-6">
-                      <p>Try these tips:</p>
-                      <ul className="list-disc list-inside space-y-1 text-left">
-                        <li>Broaden your mission or country filters</li>
-                        <li>Remove the level filter</li>
-                        <li>Try searching for "remote" positions</li>
-                      </ul>
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <p className="text-xl font-semibold text-gray-900 mb-2">No jobs found</p>
+                    <p className="text-gray-600 mb-6">Try adjusting your filters to see more results</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <button
+                        onClick={clearFilters}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        Clear all filters
+                      </button>
+                      {country && (
+                        <button
+                          onClick={() => setCountry('')}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Remove country
+                        </button>
+                      )}
+                      {level && (
+                        <button
+                          onClick={() => setLevel('')}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Remove level
+                        </button>
+                      )}
+                      {missionTags.length === 0 && !searchQuery.toLowerCase().includes('remote') && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('remote');
+                            performSearch(1, false);
+                          }}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Try "remote"
+                        </button>
+                      )}
+                      {missionTags.length > 0 && (
+                        <button
+                          onClick={() => setMissionTags([])}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Clear mission tags
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={clearFilters}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Clear all filters
-                    </button>
                   </div>
                 ) : (
                   <p className="text-gray-500">Loading jobs...</p>
