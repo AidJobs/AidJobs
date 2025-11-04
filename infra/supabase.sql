@@ -330,14 +330,16 @@ CREATE TABLE IF NOT EXISTS shortlists (
 );
 
 -- Find & Earn submissions
-CREATE TABLE IF NOT EXISTS findearn_submissions (
+CREATE TABLE IF NOT EXISTS find_earn_submissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID,
     url TEXT NOT NULL,
-    domain TEXT,
-    status TEXT DEFAULT 'queued',
-    jobs_found INT DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    source_type TEXT,
+    status TEXT DEFAULT 'pending',
+    detected_jobs INT DEFAULT 0,
+    notes TEXT,
+    submitted_by TEXT,
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (url)
 );
 
 -- Rewards table
@@ -405,6 +407,21 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS admin_only_payments ON payments;
 CREATE POLICY admin_only_payments ON payments
+    FOR ALL
+    TO service_role
+    USING (true);
+
+-- Find & Earn submissions: public insert, admin read/update
+ALTER TABLE find_earn_submissions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS public_insert_find_earn ON find_earn_submissions;
+CREATE POLICY public_insert_find_earn ON find_earn_submissions
+    FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS admin_manage_find_earn ON find_earn_submissions;
+CREATE POLICY admin_manage_find_earn ON find_earn_submissions
     FOR ALL
     TO service_role
     USING (true);

@@ -14,6 +14,7 @@ from app.admin import router as admin_router
 from app.sources import router as sources_router
 from app.crawl import router as crawl_router
 from app.shortlist import router as shortlist_router
+from app.find_earn import router as find_earn_router
 from app.analytics import analytics_tracker
 import psycopg2
 from app.db_config import db_config
@@ -47,7 +48,10 @@ app = FastAPI(title="AidJobs API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5000"],
+    allow_origins=[
+        "http://localhost:5000",
+        "https://ece7b4ba-3a82-477c-a281-2adcc8be6f96-00-1j1pwa2ohhygd.spock.replit.dev"
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -57,6 +61,7 @@ app.include_router(admin_router)
 app.include_router(sources_router)
 app.include_router(crawl_router)
 app.include_router(shortlist_router)
+app.include_router(find_earn_router)
 
 
 @app.get("/api/healthz")

@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { collections } from '@/lib/collections';
 import { getShortlist } from '@/lib/shortlist';
+import SubmitCareerPageModal from './SubmitCareerPageModal';
 
 export default function CollectionsNav() {
   const [isExpanded, setIsExpanded] = useState(true);
   const pathname = usePathname();
   const [savedCount, setSavedCount] = useState(0);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
   
   const collectionList = Object.values(collections);
   
@@ -119,7 +121,21 @@ export default function CollectionsNav() {
             );
           })}
         </nav>
+        
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <button
+            onClick={() => setShowSubmitModal(true)}
+            className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors text-left"
+          >
+            + Submit a careers page
+          </button>
+        </div>
       </div>
+      
+      <SubmitCareerPageModal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+      />
     </div>
   );
 }
