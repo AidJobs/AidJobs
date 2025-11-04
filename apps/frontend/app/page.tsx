@@ -67,7 +67,7 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchSource, setSearchSource] = useState<string>('');
   
-  const [facets, setFacets] = useState<FacetsResponse['facets'] | null>(null);
+  const [facets, setFacets] = useState<Record<string, any>>({});
   const [facetsLoading, setFacetsLoading] = useState(false);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
@@ -102,16 +102,16 @@ export default function Home() {
       const response = await fetch('/api/search/facets');
       const data: FacetsResponse = await response.json();
       
+      const facetsData = data?.facets ?? {
+        country: {},
+        level_norm: {},
+        mission_tags: {},
+        international_eligible: {},
+      };
+      
+      setFacets(facetsData);
       if (data.enabled && data.facets) {
-        setFacets(data.facets);
-        facetsCacheRef.current = { data: data.facets, timestamp: now };
-      } else {
-        setFacets({
-          country: {},
-          level_norm: {},
-          mission_tags: {},
-          international_eligible: {},
-        });
+        facetsCacheRef.current = { data: facetsData, timestamp: now };
       }
     } catch (error) {
       console.error('Facets error:', error);
@@ -241,15 +241,22 @@ export default function Home() {
     ? 'Search running in fallback mode (database)'
     : 'Search temporarily unavailable';
 
-  const countryEntries = facets ? Object.entries(facets.country).sort((a, b) => b[1] - a[1]) : [];
+  const f = facets ?? {};
+  const countryMap = (f as any).country ?? {};
+  const levelMap = (f as any).level_norm ?? {};
+  const tagsMap = (f as any).mission_tags ?? {};
+  const intlMap = (f as any).international_eligible ?? {};
+
+  const countryEntries = Object.entries(countryMap).sort((a, b) => (b[1] as number) - (a[1] as number));
   const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
+  const levelEntries = Object.entries(levelMap);
+  const tagEntries = Object.entries(tagsMap);
+  const intlEntries = Object.entries(intlMap);
   
-  const levelEntries = facets ? Object.entries(facets.level_norm) : [];
-  
-  const missionTagEntries = facets ? Object.entries(facets.mission_tags).sort((a, b) => b[1] - a[1]) : [];
+  const missionTagEntries = tagEntries.sort((a, b) => (b[1] as number) - (a[1] as number));
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
   
-  const internationalCount = facets ? (facets.international_eligible?.['true'] || 0) : 0;
+  const internationalCount = intlMap?.['true'] || 0;
 
   return (
     <main className="min-h-screen bg-gray-50">

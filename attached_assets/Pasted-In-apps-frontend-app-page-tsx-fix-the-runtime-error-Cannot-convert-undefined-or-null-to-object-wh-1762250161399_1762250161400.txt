@@ -1,0 +1,45 @@
+In apps/frontend/app/page.tsx, fix the runtime error "Cannot convert undefined or null to object" when facets are missing.
+
+Steps:
+1. Wherever facets are used (around line 240+), define safe defaults before Object.entries is called.
+
+Replace the current lines:
+-------------------------------------------------------
+const countryEntries = facets ? Object.entries(facets.country).sort((a, b) => b[1] - a[1]) : [];
+const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
+const levelEntries = facets ? Object.entries(facets.level_norm) : [];
+-------------------------------------------------------
+
+With:
+-------------------------------------------------------
+const f = facets ?? {};
+const countryMap = (f as any).country ?? {};
+const levelMap = (f as any).level_norm ?? {};
+const tagsMap = (f as any).mission_tags ?? {};
+const intlMap = (f as any).international_eligible ?? {};
+
+const countryEntries = Object.entries(countryMap).sort((a, b) => (b[1] as number) - (a[1] as number));
+const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
+const levelEntries = Object.entries(levelMap);
+const tagEntries = Object.entries(tagsMap);
+const intlEntries = Object.entries(intlMap);
+-------------------------------------------------------
+
+2. Also ensure facets state is initialized as an empty object:
+   Find the line where useState is defined, e.g.:
+   -------------------------------------------------------
+   const [facets, setFacets] = useState(null);
+   -------------------------------------------------------
+   Replace with:
+   -------------------------------------------------------
+   const [facets, setFacets] = useState<Record<string, any>>({});
+   -------------------------------------------------------
+
+3. In the code where facets are fetched (the fetch call to /api/search/facets),
+   ensure to safely set the value:
+   -------------------------------------------------------
+   const data = await res.json();
+   setFacets(data?.facets ?? {});
+   -------------------------------------------------------
+
+Save and rerun npm run dev. The UI should now load even if facets are missing or empty.
