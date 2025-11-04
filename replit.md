@@ -36,6 +36,12 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
   - Shortlist toggles: aria-pressed state on all star/bookmark buttons
   - Keyboard navigation: Enter/Space opens Inspector, Esc closes, focus restoration
   - Saved page: aria-labels on job buttons, aria-pressed on remove buttons
+- **Dev-only analytics tracking**:
+  - In-memory tracking of last 100 search queries (query, filters, source, total_results, latency_ms, page, size)
+  - Lightweight console logging: "[analytics] search: q=X filters=Y source=Z total=N latency=Nms"
+  - Reindex logging: "[analytics] reindex complete: indexed=N skipped=N duration=Nms"
+  - /admin/metrics endpoint returns: last_20_queries, avg_latency_ms, meili_hit_rate, db_fallback_rate, source_breakdown
+  - Only enabled when AIDJOBS_ENV=dev, zero overhead in production
 - **Client-side Shortlist System** with localStorage persistence:
   - Star/bookmark toggle on job rows and inspector
   - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
@@ -151,6 +157,56 @@ Returns presence map of environment variable names (never values):
   ...
 }
 ```
+
+### GET /admin/metrics
+**Dev-only endpoint** - Returns search analytics metrics when `AIDJOBS_ENV=dev`. Tracks last 100 searches in-memory (deque) with comprehensive statistics.
+
+**Response**:
+```json
+{
+  "status": "ok",
+  "data": {
+    "enabled": true,
+    "last_20_queries": [
+      {
+        "timestamp": "2025-11-04T14:18:29.817332",
+        "query": "health",
+        "filters": {
+          "country": "Kenya",
+          "level_norm": "senior",
+          "international_eligible": null,
+          "mission_tags": null,
+          "work_modality": null,
+          ...
+        },
+        "source": "meilisearch",
+        "total_results": 0,
+        "latency_ms": 273.45,
+        "page": 1,
+        "size": 20
+      }
+    ],
+    "avg_latency_ms": 318.25,
+    "meili_hit_rate": 100.0,
+    "db_fallback_rate": 0.0,
+    "total_tracked": 3,
+    "source_breakdown": {
+      "meilisearch": 3,
+      "database": 0,
+      "fallback": 0
+    }
+  },
+  "error": null
+}
+```
+
+**Behavior**:
+- Only accessible when `AIDJOBS_ENV=dev` (returns 403 in other environments)
+- Tracks query parameters, filters, source (meilisearch/database/fallback), total results, latency, page, size
+- In-memory storage (deque with max 100 queries)
+- Calculates aggregate metrics: avg latency, hit rates, source breakdown
+- Console logging: `[analytics] search: q=X filters=Y source=Z total=N latency=Nms`
+- Reindex logging: `[analytics] reindex complete: indexed=N skipped=N duration=Nms`
 
 ### GET /api/search/query
 Search endpoint with graceful degradation across Meilisearch, Supabase SQL, and fallback mode.
