@@ -28,9 +28,10 @@ export function useTheme() {
     const handleChange = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem('aidjobs-theme')) {
         const newTheme = e.matches ? 'dark' : 'light';
+        const currentPalette = localStorage.getItem('aidjobs.theme.palette') as PaletteKey || 'mint';
         setThemeState(newTheme);
         applyTheme(newTheme);
-        applyPalette(initialPalette, newTheme);
+        applyPalette(currentPalette, newTheme);
       }
     };
 
