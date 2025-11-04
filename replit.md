@@ -36,9 +36,21 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - **Database schema** (infra/supabase.sql) with full-text search, indexes, and RLS policies
 - **Seed data** (infra/seed.sql) with 3 sample organizations and 12 sample jobs
 - **Database migration script** (apps/backend/scripts/apply_sql.py) for idempotent schema application
+- **Curated Collection Pages** with preset filters and SEO:
+  - UN Jobs (org_type=un)
+  - Remote Jobs (work_modality=remote)
+  - Consultancies (career_type=consultancy)
+  - Fellowships (career_type=fellowship)
+  - Surge & Emergency (surge_required=true)
+  - Collapsible left sidebar navigation (CollectionsNav)
+  - Clean URLs (/collections/un-jobs, /collections/remote, etc.)
+  - Preset filters combine with user query params for refinement
+  - Next.js 14 App Router with generateStaticParams for SEO
+  - Centralized metadata in lib/collections.ts
 - Environment template with all 24 required variables
 - Development workflow running both frontend and backend concurrently
 - Pytest test suite for capabilities and search endpoints
+- Jest test suite for collections metadata and presets
 
 🔨 **Not Yet Implemented**:
 - Database connection to live Supabase instance
@@ -290,6 +302,47 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - Displays at top when search is disabled or in fallback mode
 - Non-blocking, minimal design
 - Adaptive messaging based on capability state
+
+## Curated Collections
+
+### Overview
+Curated collections provide pre-filtered views of jobs with preset filters, SEO metadata, and clean URLs. Each collection combines its preset filters with any additional user-selected filters via query params.
+
+### Available Collections
+1. **UN Jobs** (`/collections/un-jobs`) - United Nations agencies and programs
+   - Preset: `org_type=un`
+   - Description: Opportunities with United Nations agencies and programs
+
+2. **Remote Jobs** (`/collections/remote`) - Fully remote positions
+   - Preset: `work_modality=remote`
+   - Description: Fully remote opportunities from anywhere
+
+3. **Consultancies** (`/collections/consultancies`) - Short-term consulting roles
+   - Preset: `career_type=consultancy`
+   - Description: Short-term consulting and advisory roles
+
+4. **Fellowships** (`/collections/fellowships`) - Fellowship programs
+   - Preset: `career_type=fellowship`
+   - Description: Fellowship and professional development programs
+
+5. **Surge & Emergency** (`/collections/surge`) - Rapid deployment roles
+   - Preset: `surge_required=true`
+   - Description: Surge capacity and emergency response positions
+
+### Architecture
+- **Metadata**: Centralized in `apps/frontend/lib/collections.ts` with `getCollection()`, `getAllCollectionSlugs()` helpers
+- **Dynamic Route**: `/collections/[slug]/page.tsx` applies preset filters and combines with query params
+- **SEO**: `layout.tsx` uses `generateMetadata()` and `generateStaticParams()` for pre-rendering
+- **Navigation**: `CollectionsNav` component provides collapsible left sidebar with all collections
+- **Integration**: Sidebar integrated into both home page and collection pages for consistent navigation
+- **Testing**: Jest tests verify slug resolution, metadata completeness, and filter presets
+
+### Filter Combination
+Collection pages combine preset filters with user-selected filters:
+```
+/collections/un-jobs?country=KE&level_norm=senior
+→ Searches for: org_type=un AND country=KE AND level_norm=senior
+```
 
 ## Database Schema
 
