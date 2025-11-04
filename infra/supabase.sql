@@ -186,16 +186,24 @@ ON CONFLICT (key) DO NOTHING;
 CREATE TABLE IF NOT EXISTS sources (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_name TEXT,
-    careers_url TEXT NOT NULL,
+    careers_url TEXT NOT NULL UNIQUE,
     source_type TEXT DEFAULT 'html',
     parser_hint TEXT,
-    status TEXT DEFAULT 'pending_validation',
+    status TEXT DEFAULT 'active',
     crawl_frequency_days INT DEFAULT 3,
     last_crawled_at TIMESTAMPTZ,
     last_crawl_status TEXT,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add notes column if missing (idempotent)
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- Create indexes for sources table
+CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_careers_url ON sources(careers_url);
 
 -- Jobs table: parsed job postings
 CREATE TABLE IF NOT EXISTS jobs (
