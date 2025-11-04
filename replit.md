@@ -285,16 +285,24 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
   - "Clear all filters" button to reset search
 
 ### Inspector Drawer
-- Right-side panel showing full job details:
+- **Resilient data loading**: Automatically fetches full job details from `/api/jobs/:id` if normalized fields are missing
+- **Loading states**: Shows animated skeleton while fetching additional details
+- **Error handling**: Displays graceful "This role is no longer available" message for 404s with auto-close after 3 seconds
+- **Full job details panel**:
   - Title and organization
   - Star/bookmark toggle for shortlisting
   - Location and job level
-  - Mission tags (if present)
+  - Career type, work modality, organization type (fetched on demand)
+  - Mission tags, benefits, policy flags (fetched on demand)
   - International eligibility status
   - Application deadline
   - "Apply Now" button (links to apply_url)
-- Click backdrop, press `Esc`, or click X to close
-- Keyboard accessible with visible focus states
+- **Accessibility features**:
+  - Focus trap inside drawer (Tab cycles through focusable elements)
+  - `Esc` key to close
+  - Restores focus to previously focused result row on close
+  - Keyboard accessible with visible focus states
+- Click backdrop or X button to close
 
 ### Shortlist System
 - **Client-side persistence**: Jobs saved to `localStorage` under key `aidjobs.shortlist`
