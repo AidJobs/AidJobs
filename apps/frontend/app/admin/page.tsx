@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type DbStatus = {
   ok: boolean;
@@ -38,6 +40,8 @@ type Toast = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,40 @@ export default function AdminPage() {
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
+  };
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/admin/session', {
+        credentials: 'include',
+      });
+      const data = await response.json();
+      
+      if (!data.authenticated) {
+        router.push('/admin/login');
+        return false;
+      }
+      
+      setAuthenticated(true);
+      return true;
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      router.push('/admin/login');
+      return false;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      router.push('/admin/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      addToast('Logout failed', 'error');
+    }
   };
 
   const fetchStatus = async () => {
@@ -97,10 +135,16 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchStatus();
+    const init = async () => {
+      const isAuth = await checkAuth();
+      if (isAuth) {
+        await fetchStatus();
+      }
+    };
+    init();
   }, []);
 
-  if (loading) {
+  if (authenticated === null || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-600">Loading admin panel...</div>
@@ -111,9 +155,47 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-          <p className="text-sm text-gray-500">Development environment only</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
+            <p className="text-sm text-gray-500">Development environment only</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Links</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link
+              href="/admin/sources"
+              className="px-4 py-3 text-center text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors"
+            >
+              Sources
+            </Link>
+            <Link
+              href="/admin/crawl"
+              className="px-4 py-3 text-center text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors"
+            >
+              Crawl
+            </Link>
+            <Link
+              href="/admin/find-earn"
+              className="px-4 py-3 text-center text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors"
+            >
+              Find & Earn
+            </Link>
+            <Link
+              href="/admin/setup"
+              className="px-4 py-3 text-center text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors"
+            >
+              Setup
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
