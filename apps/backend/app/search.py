@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from app.db_config import db_config
 from app.normalizer import Normalizer
+from core import normalize
 
 if TYPE_CHECKING:
     import psycopg2
@@ -673,7 +674,14 @@ class SearchService:
                 SELECT 
                     id, org_name, title, location_raw, country, country_iso,
                     level_norm, deadline, apply_url, last_seen_at, 
-                    mission_tags, international_eligible, status
+                    mission_tags, international_eligible, status,
+                    work_modality, benefits, policy_flags, donor_context,
+                    crisis_type, response_phase, humanitarian_cluster,
+                    contract_urgency, contract_duration_months,
+                    compensation_visible, compensation_type, 
+                    compensation_min_usd, compensation_max_usd,
+                    compensation_currency, compensation_confidence,
+                    raw_metadata
                 FROM jobs
                 WHERE status = 'active'
                 ORDER BY created_at DESC
@@ -695,15 +703,67 @@ class SearchService:
             for row in rows:
                 raw_doc = dict(row)
                 
-                country_iso = Normalizer.to_iso_country(raw_doc.get('country'))
+                # Normalize using comprehensive normalizer
+                country_iso = normalize.to_iso_country(raw_doc.get('country'))
                 if not country_iso:
                     country_iso = raw_doc.get('country_iso')
                 
-                level_norm = Normalizer.norm_level(raw_doc.get('level_norm'))
+                level_norm = normalize.norm_level(raw_doc.get('level_norm'))
                 
-                mission_tags = Normalizer.norm_tags(raw_doc.get('mission_tags'))
+                mission_tags = normalize.norm_tags(raw_doc.get('mission_tags'))
                 
-                international_eligible = Normalizer.to_bool(raw_doc.get('international_eligible'))
+                international_eligible = normalize.to_bool(raw_doc.get('international_eligible'))
+                
+                work_modality = normalize.norm_modality(raw_doc.get('work_modality'))
+                
+                benefits = normalize.norm_benefits(raw_doc.get('benefits'))
+                
+                policy_flags = normalize.norm_policy(raw_doc.get('policy_flags'))
+                
+                donor_context = normalize.norm_donors(raw_doc.get('donor_context'))
+                
+                # Parse contract duration if string
+                contract_duration = raw_doc.get('contract_duration_months')
+                if contract_duration is None and raw_doc.get('contract_urgency'):
+                    contract_duration = normalize.parse_contract_duration(raw_doc.get('contract_urgency'))
+                
+                # Track unknowns
+                unknowns = []
+                
+                # Capture unknown mission tags
+                raw_tags = raw_doc.get('mission_tags', [])
+                if raw_tags and isinstance(raw_tags, list):
+                    for tag in raw_tags:
+                        if tag and tag not in mission_tags:
+                            unknowns.append({'field': 'mission_tags', 'value': tag})
+                
+                # Capture unknown benefits
+                raw_benefits = raw_doc.get('benefits', [])
+                if raw_benefits and isinstance(raw_benefits, list):
+                    for benefit in raw_benefits:
+                        if benefit and benefit not in benefits:
+                            unknowns.append({'field': 'benefits', 'value': benefit})
+                
+                # Capture unknown policy flags
+                raw_policies = raw_doc.get('policy_flags', [])
+                if raw_policies and isinstance(raw_policies, list):
+                    for policy in raw_policies:
+                        if policy and policy not in policy_flags:
+                            unknowns.append({'field': 'policy_flags', 'value': policy})
+                
+                # Capture unknown donors
+                raw_donors = raw_doc.get('donor_context', [])
+                if raw_donors and isinstance(raw_donors, list):
+                    for donor in raw_donors:
+                        if donor and donor not in donor_context:
+                            unknowns.append({'field': 'donor_context', 'value': donor})
+                
+                # Merge with existing raw_metadata.unknown
+                existing_metadata = raw_doc.get('raw_metadata', {})
+                if isinstance(existing_metadata, dict):
+                    existing_unknowns = existing_metadata.get('unknown', [])
+                    if isinstance(existing_unknowns, list):
+                        unknowns.extend(existing_unknowns)
                 
                 deadline = raw_doc.get('deadline')
                 last_seen_at = raw_doc.get('last_seen_at')
@@ -720,7 +780,24 @@ class SearchService:
                     'last_seen_at': last_seen_at.isoformat() if last_seen_at else None,
                     'mission_tags': mission_tags if mission_tags else [],
                     'international_eligible': international_eligible,
-                    'status': raw_doc.get('status', 'active')
+                    'work_modality': work_modality,
+                    'benefits': benefits if benefits else [],
+                    'policy_flags': policy_flags if policy_flags else [],
+                    'donor_context': donor_context if donor_context else [],
+                    'crisis_type': raw_doc.get('crisis_type', []),
+                    'response_phase': raw_doc.get('response_phase'),
+                    'humanitarian_cluster': raw_doc.get('humanitarian_cluster', []),
+                    'contract_urgency': raw_doc.get('contract_urgency'),
+                    'contract_duration_months': contract_duration,
+                    'compensation_visible': raw_doc.get('compensation_visible', False),
+                    'compensation_type': raw_doc.get('compensation_type'),
+                    'compensation_min_usd': raw_doc.get('compensation_min_usd'),
+                    'compensation_max_usd': raw_doc.get('compensation_max_usd'),
+                    'compensation_currency': raw_doc.get('compensation_currency'),
+                    'status': raw_doc.get('status', 'active'),
+                    'raw_metadata': {
+                        'unknown': unknowns
+                    }
                 }
                 
                 if not normalized_doc.get('id') or not normalized_doc.get('title'):
