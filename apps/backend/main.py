@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI):
     if database_url and supabase_url:
         logger.info("[aidjobs] Ignoring DATABASE_URL; using Supabase as primary DB.")
     
+    aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
+    if aidjobs_env == "dev":
+        logger.info("[aidjobs] env: AIDJOBS_ENV=dev (dev-only admin routes enabled)")
+    else:
+        logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env} (admin routes disabled)")
+    
     yield
 
 

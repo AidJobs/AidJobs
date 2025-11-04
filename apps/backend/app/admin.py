@@ -45,6 +45,15 @@ LOOKUP_TABLES = [
 ]
 
 
+@router.get("/dev/status")
+async def dev_status() -> dict[str, Any]:
+    """Dev mode status endpoint."""
+    return {
+        "env": os.getenv("AIDJOBS_ENV", "production"),
+        "dev_enabled": True
+    }
+
+
 def _get_db_connection():
     """Get database connection or None."""
     if not psycopg2:
