@@ -70,24 +70,39 @@ class SearchService:
                     )
                     index = self.meili_client.get_index(self.meili_index_name)
                 
+                index.update_searchable_attributes([
+                    'title',
+                    'org_name',
+                    'description_snippet',
+                    'mission_tags',
+                    'functional_tags'
+                ])
+                
                 index.update_filterable_attributes([
-                    'country',
+                    'career_type',
+                    'work_modality',
+                    'country_iso',
+                    'region_code',
                     'level_norm',
                     'mission_tags',
                     'international_eligible',
+                    'org_type',
+                    'crisis_type',
+                    'response_phase',
+                    'humanitarian_cluster',
+                    'benefits',
+                    'policy_flags',
+                    'donor_context',
+                    'project_modality',
+                    'application_window.rolling',
                     'status'
                 ])
                 
                 index.update_sortable_attributes([
                     'deadline',
-                    'last_seen_at'
-                ])
-                
-                index.update_searchable_attributes([
-                    'title',
-                    'org_name',
-                    'description_snippet',
-                    'mission_tags'
+                    'last_seen_at',
+                    'compensation_min_usd',
+                    'compensation_max_usd'
                 ])
                 
                 logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' configured successfully")
@@ -630,6 +645,47 @@ class SearchService:
             return result
         except Exception as e:
             logger.error(f"Failed to get Meilisearch status: {e}")
+            return {
+                "enabled": False,
+                "error": str(e)
+            }
+    
+    async def get_search_settings(self) -> dict[str, Any]:
+        """Get current Meilisearch index settings for verification"""
+        if not self.meili_enabled:
+            return {
+                "enabled": False,
+                "error": self.meili_error if self.meili_error else "Meilisearch not configured"
+            }
+        
+        if not self.meili_client:
+            return {
+                "enabled": False,
+                "error": "Meilisearch client not initialized"
+            }
+        
+        try:
+            index = self.meili_client.index(self.meili_index_name)
+            
+            settings = index.get_settings()
+            
+            return {
+                "enabled": True,
+                "index": self.meili_index_name,
+                "settings": {
+                    "searchableAttributes": settings.get("searchableAttributes", []),
+                    "filterableAttributes": settings.get("filterableAttributes", []),
+                    "sortableAttributes": settings.get("sortableAttributes", []),
+                    "rankingRules": settings.get("rankingRules", []),
+                    "stopWords": settings.get("stopWords", []),
+                    "synonyms": settings.get("synonyms", {}),
+                    "distinctAttribute": settings.get("distinctAttribute"),
+                    "typoTolerance": settings.get("typoTolerance", {}),
+                    "faceting": settings.get("faceting", {})
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to get Meilisearch settings: {e}")
             return {
                 "enabled": False,
                 "error": str(e)

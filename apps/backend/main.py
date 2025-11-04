@@ -103,6 +103,15 @@ async def admin_search_status():
     return await search_service.get_search_status()
 
 
+@app.get("/admin/search/settings")
+async def admin_search_settings():
+    """Get Meilisearch index settings for verification (dev-only)"""
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    return await search_service.get_search_settings()
+
+
 @app.get("/admin/search/reindex")
 @app.post("/admin/search/reindex")
 async def admin_search_reindex():
