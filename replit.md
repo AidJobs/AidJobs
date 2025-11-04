@@ -136,17 +136,40 @@ See `env.example` for the complete list of 25 environment variables. The applica
 
 ### Security Configuration
 
-#### Admin Password
-- **ADMIN_PASSWORD**: Password for accessing admin write endpoints (optional in dev mode)
-  - In dev mode (`AIDJOBS_ENV=dev`): Admin endpoints work without authentication (dev bypass)
-  - In production: All `/admin/*` write operations require authentication via `/auth/login`
+#### Admin Authentication
+- **ADMIN_PASSWORD**: Password for admin login (required in production)
+  - Used for `/api/admin/login` authentication
   - Generate a secure password: `openssl rand -hex 32`
-  - Authenticated via httpOnly cookie sessions (24-hour expiration)
+  - Must be set for production deployments
 
-#### Session Management
-- **SESSION_SECRET**: Secret key for signing session cookies (auto-generated if not set)
-  - Used to sign httpOnly session cookies
+- **COOKIE_SECRET**: Secret key for signing session cookies (required)
+  - Used to sign HMAC-based session tokens
   - Generate a secure secret: `openssl rand -hex 32`
+  - Falls back to `SESSION_SECRET` for backwards compatibility
+  - Session duration: 8 hours
+
+#### Admin Endpoints
+- `POST /api/admin/login` - Authenticate with password, sets httpOnly cookie
+  - Rate limited: 10 requests/minute per IP
+  - Returns 503 if ADMIN_PASSWORD not configured
+  - Returns 401 on invalid password
+  - Cookie: `aidjobs_admin_session`, httpOnly, SameSite=Lax, Secure (in production)
+
+- `POST /api/admin/logout` - Clear session cookie
+
+- `GET /api/admin/session` - Check authentication status
+  - Returns `{authenticated: true|false}`
+
+#### Protected Routes
+All `/admin/*` write endpoints (POST/PUT/DELETE) require authentication via the `admin_required` dependency:
+- Crawler management: `/admin/crawl/*`
+- Find & Earn moderation: `/admin/find-earn/*`
+- Domain policies: `/admin/domain_policies/*`
+
+#### Dev Mode Bypass
+In development (`AIDJOBS_ENV=dev`):
+- Header `X-Dev-Bypass: 1` allows access without authentication
+- Useful for local testing
 
 #### Rate Limiting
 - **Search endpoint** (`/api/search/query`): 60 requests/minute in dev, 120/minute in production
