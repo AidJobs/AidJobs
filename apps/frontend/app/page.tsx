@@ -618,9 +618,14 @@ export default function Home() {
                       ? new Date(job.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 
                       : false;
                     
+                    const location = job.location_raw || job.country || 'Location not specified';
+                    const ariaLabel = `${job.title} at ${job.org_name}, ${location}`;
+                    
                     return (
                     <div
                       key={job.id}
+                      role="button"
+                      aria-label={ariaLabel}
                       onClick={(e) => {
                         setPreviouslyFocusedElement(e.currentTarget);
                         setSelectedJob(job);
@@ -667,6 +672,7 @@ export default function Home() {
                           }}
                           className="p-2 hover:bg-gray-50 rounded transition-colors flex-shrink-0"
                           aria-label={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+                          aria-pressed={jobIsShortlisted}
                           title={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
                         >
                           <svg 
