@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import Head from 'next/head';
 import JobInspector from '@/components/JobInspector';
 import SavedJobsPanel from '@/components/SavedJobsPanel';
 import Toast from '@/components/Toast';
+import CollectionsNav from '@/components/CollectionsNav';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 import { getCollection } from '@/lib/collections';
 import Link from 'next/link';
@@ -256,22 +256,15 @@ export default function CollectionPage() {
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Link 
-                href="/"
-                className="text-2xl font-bold text-gray-900 hover:text-gray-700"
-              >
-                AidJobs
-              </Link>
-              <span className="text-gray-400">/</span>
-              <h1 className="text-xl font-semibold text-gray-700">{collection.title}</h1>
+    <>
+      <CollectionsNav />
+      <main className="min-h-screen bg-gray-50 pl-56">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">{collection.title}</h1>
+              <p className="text-sm text-gray-600">{collection.description}</p>
             </div>
-            <p className="text-sm text-gray-600">{collection.description}</p>
-          </div>
           
           <SavedJobsPanel
             shortlistedIds={shortlistedIds}
@@ -509,21 +502,22 @@ export default function CollectionPage() {
         </div>
       </div>
 
-      <JobInspector
-        job={selectedJob}
-        isOpen={!!selectedJob}
-        onClose={() => setSelectedJob(null)}
-        onToggleShortlist={handleToggleShortlist}
-        isShortlisted={selectedJob ? isInShortlist(selectedJob.id) : false}
-      />
-
-      {toastMessage && (
-        <Toast
-          message={toastMessage}
-          type={toastType}
-          onClose={() => setToastMessage(null)}
+        <JobInspector
+          job={selectedJob}
+          isOpen={!!selectedJob}
+          onClose={() => setSelectedJob(null)}
+          onToggleShortlist={handleToggleShortlist}
+          isShortlisted={selectedJob ? isInShortlist(selectedJob.id) : false}
         />
-      )}
-    </main>
+
+        {toastMessage && (
+          <Toast
+            message={toastMessage}
+            type={toastType}
+            onClose={() => setToastMessage(null)}
+          />
+        )}
+      </main>
+    </>
   );
 }

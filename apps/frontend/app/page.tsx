@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import JobInspector from '@/components/JobInspector';
 import SavedJobsPanel from '@/components/SavedJobsPanel';
 import Toast from '@/components/Toast';
+import CollectionsNav from '@/components/CollectionsNav';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 
 type Capabilities = {
@@ -284,17 +285,19 @@ export default function Home() {
   const internationalCount = intlMap?.['true'] || 0;
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      {showSearchBanner && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center">
-          <p className="text-sm text-amber-800">{searchBannerText}</p>
-        </div>
-      )}
+    <>
+      <CollectionsNav />
+      <main className="min-h-screen bg-gray-50 pl-56">
+        {showSearchBanner && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center">
+            <p className="text-sm text-amber-800">{searchBannerText}</p>
+          </div>
+        )}
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">AidJobs</h1>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-3xl font-bold">All Jobs</h1>
             <div className="relative">
               <button
                 onClick={() => setShowSavedPanel(!showSavedPanel)}
@@ -585,6 +588,7 @@ export default function Home() {
           onClose={() => setToastMessage(null)}
         />
       )}
-    </main>
+      </main>
+    </>
   );
 }
