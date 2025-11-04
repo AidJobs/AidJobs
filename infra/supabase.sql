@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 -- Add taxonomy columns to jobs table (idempotent)
 ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS org_type TEXT,
     ADD COLUMN IF NOT EXISTS career_type TEXT,
     ADD COLUMN IF NOT EXISTS contract_type TEXT,
     ADD COLUMN IF NOT EXISTS work_modality TEXT,

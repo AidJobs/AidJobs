@@ -93,6 +93,14 @@ curl http://localhost:8000/admin/find-earn/list
 - Pytest test suite for capabilities and search endpoints
 - Jest test suite for collections metadata and presets
 
+- **Production-Hardened Security**:
+  - Admin authentication with httpOnly cookie sessions (password-based, 24-hour expiration)
+  - Dev bypass mode when `AIDJOBS_ENV=dev` for local development
+  - IP-based rate limiting on search and submit endpoints (SlowAPI)
+  - Error masking middleware (generic messages in production, full details in dev)
+  - Auth endpoints: `/auth/login`, `/auth/logout`, `/auth/status`
+  - Protected admin write endpoints require authentication in production
+
 🔨 **Not Yet Implemented**:
 - Database connection to live Supabase instance
 - Meilisearch integration
@@ -100,8 +108,6 @@ curl http://localhost:8000/admin/find-earn/list
 - Payment processing (PayPal/Razorpay)
 - CV upload functionality
 - Backend shortlist persistence (currently client-side only)
-- Authentication
-- Find & Earn features
 
 ## Environment Variables
 See `env.example` for the complete list of 25 environment variables. The application gracefully handles missing variables without crashing.
