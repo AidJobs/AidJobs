@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import JobInspector from '@/components/JobInspector';
+import SavedJobsPanel from '@/components/SavedJobsPanel';
+import Toast from '@/components/Toast';
+import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 
 type Capabilities = {
   search: boolean;
@@ -66,6 +70,10 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchSource, setSearchSource] = useState<string>('');
+  const [shortlistedIds, setShortlistedIds] = useState<string[]>([]);
+  const [showSavedPanel, setShowSavedPanel] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   
   const [facets, setFacets] = useState<Record<string, any>>({});
   const [facetsLoading, setFacetsLoading] = useState(false);
@@ -75,6 +83,23 @@ export default function Home() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
+
+  useEffect(() => {
+    setShortlistedIds(getShortlist());
+  }, []);
+
+  const handleToggleShortlist = useCallback((jobId: string) => {
+    const isNowShortlisted = toggleShortlist(jobId);
+    setShortlistedIds(getShortlist());
+    
+    if (isNowShortlisted) {
+      setToastMessage('Added to saved jobs');
+      setToastType('success');
+    } else {
+      setToastMessage('Removed from saved jobs');
+      setToastType('info');
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/capabilities')
@@ -268,7 +293,33 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-6">AidJobs</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">AidJobs</h1>
+            <div className="relative">
+              <button
+                onClick={() => setShowSavedPanel(!showSavedPanel)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700">Saved</span>
+                {shortlistedIds.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs font-semibold text-white bg-blue-600 rounded-full">
+                    {shortlistedIds.length}
+                  </span>
+                )}
+              </button>
+              <SavedJobsPanel
+                isOpen={showSavedPanel}
+                onClose={() => setShowSavedPanel(false)}
+                shortlistedIds={shortlistedIds}
+                allJobs={results}
+                onOpenJob={(job) => setSelectedJob(job)}
+                onRemove={handleToggleShortlist}
+              />
+            </div>
+          </div>
           
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
             <input
@@ -436,7 +487,13 @@ export default function Home() {
                 </div>
                 
                 <div className="space-y-2 mb-6">
-                  {results.map((job) => (
+                  {results.map((job) => {
+                    const jobIsShortlisted = isInShortlist(job.id);
+                    const isClosingSoon = job.deadline 
+                      ? new Date(job.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 
+                      : false;
+                    
+                    return (
                     <div
                       key={job.id}
                       onClick={() => setSelectedJob(job)}
@@ -451,9 +508,16 @@ export default function Home() {
                     >
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 truncate mb-1">
-                            {job.title}
-                          </h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {job.title}
+                            </h3>
+                            {isClosingSoon && (
+                              <span className="px-2 py-0.5 text-xs font-medium text-orange-700 bg-orange-100 rounded flex-shrink-0">
+                                Closing soon
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600 mb-1">{job.org_name}</p>
                           <div className="flex gap-3 text-xs text-gray-500">
                             {(job.location_raw || job.country) && (
@@ -470,14 +534,24 @@ export default function Home() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            handleToggleShortlist(job.id);
                           }}
-                          className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="p-2 hover:bg-gray-50 rounded transition-colors flex-shrink-0"
+                          aria-label={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+                          title={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
                         >
-                          Save
+                          <svg 
+                            className={`w-5 h-5 ${jobIsShortlisted ? 'fill-yellow-500 stroke-yellow-600' : 'fill-none stroke-gray-400'}`}
+                            viewBox="0 0 24 24" 
+                            strokeWidth="2"
+                          >
+                            <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                          </svg>
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 {results.length < total && (
@@ -493,100 +567,22 @@ export default function Home() {
             )}
           </div>
 
-          {selectedJob && (
-            <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-gray-200 overflow-y-auto z-50">
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Job Details</h2>
-                  <button
-                    onClick={() => setSelectedJob(null)}
-                    className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
-                    aria-label="Close inspector"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-lg text-gray-900 mb-1">
-                      {selectedJob.title}
-                    </h3>
-                    <p className="text-gray-600">{selectedJob.org_name}</p>
-                  </div>
-
-                  {(selectedJob.location_raw || selectedJob.country) && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-1">Location</dt>
-                      <dd className="text-gray-900">{selectedJob.location_raw || selectedJob.country}</dd>
-                    </div>
-                  )}
-
-                  {selectedJob.level_norm && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-1">Level</dt>
-                      <dd className="text-gray-900 capitalize">{selectedJob.level_norm}</dd>
-                    </div>
-                  )}
-
-                  {selectedJob.mission_tags && selectedJob.mission_tags.length > 0 && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-1">Mission Tags</dt>
-                      <dd className="flex flex-wrap gap-2">
-                        {selectedJob.mission_tags.map(tag => (
-                          <span key={tag} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                            {tag}
-                          </span>
-                        ))}
-                      </dd>
-                    </div>
-                  )}
-
-                  {selectedJob.international_eligible && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-1">International</dt>
-                      <dd className="text-gray-900">
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                          International eligible
-                        </span>
-                      </dd>
-                    </div>
-                  )}
-
-                  {selectedJob.deadline && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-1">Deadline</dt>
-                      <dd className="text-gray-900">
-                        {new Date(selectedJob.deadline).toLocaleDateString()}
-                      </dd>
-                    </div>
-                  )}
-
-                  {selectedJob.apply_url && (
-                    <div className="pt-4">
-                      <a
-                        href={selectedJob.apply_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full px-4 py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                      >
-                        Apply Now
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {selectedJob && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-25 z-40"
-          onClick={() => setSelectedJob(null)}
+      <JobInspector
+        job={selectedJob}
+        isOpen={!!selectedJob}
+        onClose={() => setSelectedJob(null)}
+        onToggleShortlist={handleToggleShortlist}
+        isShortlisted={selectedJob ? isInShortlist(selectedJob.id) : false}
+      />
+
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setToastMessage(null)}
         />
       )}
     </main>
