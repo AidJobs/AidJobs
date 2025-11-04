@@ -86,6 +86,7 @@ export default function Home() {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [previouslyFocusedElement, setPreviouslyFocusedElement] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setShortlistedIds(getShortlist());
@@ -353,7 +354,10 @@ export default function Home() {
                 onClose={() => setShowSavedPanel(false)}
                 shortlistedIds={shortlistedIds}
                 allJobs={results}
-                onOpenJob={(job) => setSelectedJob(job)}
+                onOpenJob={(job) => {
+                  setPreviouslyFocusedElement(document.activeElement as HTMLElement);
+                  setSelectedJob(job);
+                }}
                 onRemove={handleToggleShortlist}
               />
             </div>
@@ -567,12 +571,16 @@ export default function Home() {
                     return (
                     <div
                       key={job.id}
-                      onClick={() => setSelectedJob(job)}
+                      onClick={(e) => {
+                        setPreviouslyFocusedElement(e.currentTarget);
+                        setSelectedJob(job);
+                      }}
                       className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer focus-within:ring-2 focus-within:ring-blue-500"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
+                          setPreviouslyFocusedElement(e.currentTarget);
                           setSelectedJob(job);
                         }
                       }}
@@ -647,6 +655,7 @@ export default function Home() {
         onClose={() => setSelectedJob(null)}
         onToggleShortlist={handleToggleShortlist}
         isShortlisted={selectedJob ? isInShortlist(selectedJob.id) : false}
+        previouslyFocusedElement={previouslyFocusedElement}
       />
 
       {toastMessage && (

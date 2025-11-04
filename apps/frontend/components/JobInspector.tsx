@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Job = {
   id: string;
@@ -12,6 +12,7 @@ type Job = {
   level_norm?: string;
   career_type?: string;
   work_modality?: string;
+  org_type?: string;
   international_eligible?: boolean;
   deadline?: string;
   apply_url?: string;
@@ -28,6 +29,7 @@ type JobInspectorProps = {
   onClose: () => void;
   onToggleShortlist?: (jobId: string) => void;
   isShortlisted?: boolean;
+  previouslyFocusedElement?: HTMLElement | null;
 };
 
 export default function JobInspector({ 
@@ -35,16 +37,69 @@ export default function JobInspector({
   isOpen, 
   onClose, 
   onToggleShortlist,
-  isShortlisted = false 
+  isShortlisted = false,
+  previouslyFocusedElement = null
 }: JobInspectorProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [fullJob, setFullJob] = useState<Job | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
 
+  // Fetch full job details if missing normalized fields
+  useEffect(() => {
+    if (!isOpen || !job) {
+      setFullJob(null);
+      setIsLoading(false);
+      setIsNotFound(false);
+      return;
+    }
+
+    // Check if we need to fetch full details (missing normalized fields)
+    const needsFullDetails = !job.benefits || !job.policy_flags || !job.career_type;
+    
+    if (needsFullDetails) {
+      setIsLoading(true);
+      fetch(`/api/jobs/${job.id}`)
+        .then(async (res) => {
+          if (res.status === 404) {
+            setIsNotFound(true);
+            setIsLoading(false);
+            // Auto-close after 3 seconds
+            setTimeout(() => {
+              onClose();
+            }, 3000);
+            return;
+          }
+          if (!res.ok) throw new Error('Failed to fetch job details');
+          const data = await res.json();
+          setFullJob(data.data || job);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          console.error('Error fetching job details:', error);
+          setFullJob(job);
+          setIsLoading(false);
+        });
+    } else {
+      setFullJob(job);
+      setIsLoading(false);
+    }
+  }, [isOpen, job, onClose]);
+
+  // Focus management
   useEffect(() => {
     if (isOpen) {
       closeButtonRef.current?.focus();
     }
   }, [isOpen]);
+
+  // Restore focus on close
+  useEffect(() => {
+    if (!isOpen && previouslyFocusedElement) {
+      previouslyFocusedElement.focus();
+    }
+  }, [isOpen, previouslyFocusedElement]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -82,8 +137,9 @@ export default function JobInspector({
 
   if (!isOpen || !job) return null;
 
-  const isClosingSoon = job.deadline 
-    ? new Date(job.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 
+  const displayJob = fullJob || job;
+  const isClosingSoon = displayJob.deadline 
+    ? new Date(displayJob.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 
     : false;
 
   return (
@@ -105,12 +161,13 @@ export default function JobInspector({
             Job Details
           </h2>
           <div className="flex items-center gap-2">
-            {onToggleShortlist && (
+            {onToggleShortlist && !isNotFound && (
               <button
                 onClick={() => onToggleShortlist(job.id)}
                 className="p-2 hover:bg-gray-100 rounded-md transition-colors"
                 aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
                 title={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+                disabled={isLoading}
               >
                 <svg 
                   className={`w-5 h-5 ${isShortlisted ? 'fill-yellow-500 stroke-yellow-600' : 'fill-none stroke-gray-400'}`}
@@ -134,68 +191,103 @@ export default function JobInspector({
           </div>
         </div>
 
+        {isNotFound ? (
+          <div className="p-6 flex flex-col items-center justify-center h-96">
+            <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">This role is no longer available</h3>
+            <p className="text-sm text-gray-500">Closing automatically...</p>
+          </div>
+        ) : isLoading ? (
+          <div className="p-6 space-y-6 animate-pulse">
+            <div>
+              <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+            </div>
+            <div>
+              <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-full mb-1"></div>
+              <div className="h-4 bg-gray-200 rounded w-full mb-1"></div>
+              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-16 bg-gray-200 rounded"></div>
+              <div className="h-16 bg-gray-200 rounded"></div>
+              <div className="h-16 bg-gray-200 rounded"></div>
+              <div className="h-16 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        ) : (
         <div className="p-6 space-y-6">
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">{job.title}</h3>
-            <p className="text-lg text-gray-700">{job.org_name}</p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{displayJob.title}</h3>
+            <p className="text-lg text-gray-700">{displayJob.org_name}</p>
           </div>
 
-          {job.description_snippet && (
+          {displayJob.description_snippet && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">Description</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">{job.description_snippet}</p>
+              <p className="text-gray-600 text-sm leading-relaxed">{displayJob.description_snippet}</p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            {job.location_raw && (
+            {displayJob.location_raw && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Location</h4>
-                <p className="text-sm text-gray-900">{job.location_raw}</p>
+                <p className="text-sm text-gray-900">{displayJob.location_raw}</p>
               </div>
             )}
 
-            {job.country_iso && (
+            {displayJob.country_iso && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Country</h4>
-                <p className="text-sm text-gray-900">{job.country_iso}</p>
+                <p className="text-sm text-gray-900">{displayJob.country_iso}</p>
               </div>
             )}
 
-            {job.level_norm && (
+            {displayJob.level_norm && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Level</h4>
-                <p className="text-sm text-gray-900 capitalize">{job.level_norm.replace('_', ' ')}</p>
+                <p className="text-sm text-gray-900 capitalize">{displayJob.level_norm.replace('_', ' ')}</p>
               </div>
             )}
 
-            {job.career_type && (
+            {displayJob.career_type && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Career Type</h4>
-                <p className="text-sm text-gray-900 capitalize">{job.career_type.replace('_', ' ')}</p>
+                <p className="text-sm text-gray-900 capitalize">{displayJob.career_type.replace('_', ' ')}</p>
               </div>
             )}
 
-            {job.work_modality && (
+            {displayJob.work_modality && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Work Modality</h4>
-                <p className="text-sm text-gray-900 capitalize">{job.work_modality.replace('_', ' ')}</p>
+                <p className="text-sm text-gray-900 capitalize">{displayJob.work_modality.replace('_', ' ')}</p>
               </div>
             )}
 
-            {job.international_eligible !== undefined && (
+            {displayJob.org_type && (
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 mb-1">Organization Type</h4>
+                <p className="text-sm text-gray-900 capitalize">{displayJob.org_type.replace('_', ' ')}</p>
+              </div>
+            )}
+
+            {displayJob.international_eligible !== undefined && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">International Eligible</h4>
-                <p className="text-sm text-gray-900">{job.international_eligible ? 'Yes' : 'No'}</p>
+                <p className="text-sm text-gray-900">{displayJob.international_eligible ? 'Yes' : 'No'}</p>
               </div>
             )}
 
-            {job.deadline && (
+            {displayJob.deadline && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 mb-1">Deadline</h4>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-gray-900">
-                    {new Date(job.deadline).toLocaleDateString()}
+                    {new Date(displayJob.deadline).toLocaleDateString()}
                   </p>
                   {isClosingSoon && (
                     <span className="px-2 py-0.5 text-xs font-medium text-orange-700 bg-orange-100 rounded">
@@ -207,11 +299,11 @@ export default function JobInspector({
             )}
           </div>
 
-          {job.mission_tags && job.mission_tags.length > 0 && (
+          {displayJob.mission_tags && displayJob.mission_tags.length > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-gray-500 mb-2">Mission Tags</h4>
               <div className="flex flex-wrap gap-2">
-                {job.mission_tags.map((tag, idx) => (
+                {displayJob.mission_tags.map((tag, idx) => (
                   <span 
                     key={idx} 
                     className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded border border-blue-200"
@@ -223,11 +315,11 @@ export default function JobInspector({
             </div>
           )}
 
-          {job.benefits && job.benefits.length > 0 && (
+          {displayJob.benefits && displayJob.benefits.length > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-gray-500 mb-2">Benefits</h4>
               <div className="flex flex-wrap gap-2">
-                {job.benefits.map((benefit, idx) => (
+                {displayJob.benefits.map((benefit, idx) => (
                   <span 
                     key={idx} 
                     className="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded border border-green-200"
@@ -239,11 +331,11 @@ export default function JobInspector({
             </div>
           )}
 
-          {job.policy_flags && job.policy_flags.length > 0 && (
+          {displayJob.policy_flags && displayJob.policy_flags.length > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-gray-500 mb-2">Policy Flags</h4>
               <div className="flex flex-wrap gap-2">
-                {job.policy_flags.map((flag, idx) => (
+                {displayJob.policy_flags.map((flag, idx) => (
                   <span 
                     key={idx} 
                     className="px-2 py-1 text-xs font-medium text-purple-700 bg-purple-50 rounded border border-purple-200"
@@ -255,10 +347,10 @@ export default function JobInspector({
             </div>
           )}
 
-          {job.apply_url && (
+          {displayJob.apply_url && (
             <div className="pt-4 border-t border-gray-200">
               <a
-                href={job.apply_url}
+                href={displayJob.apply_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
@@ -271,6 +363,7 @@ export default function JobInspector({
             </div>
           )}
         </div>
+        )}
       </div>
     </>
   );
