@@ -262,6 +262,14 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - **Mission Tags**: Multi-select chips (health, education, environment, human-rights, development)
 - All filters trigger immediate search on change
 
+### Results Header
+- **Total count**: Shows "X roles" at the top of results
+- **Sort dropdown**: Sort by:
+  - Relevance (default)
+  - Newest (last_seen_at desc)
+  - Closing soon (deadline asc)
+- Sort option persists in URL params for sharing
+
 ### Results List
 - Compact row-cards displaying:
   - Job title with "Closing soon" badge (if deadline < 7 days)
@@ -271,7 +279,10 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
   - Deadline (if present)
   - Star/bookmark button for shortlisting
 - Click or press Enter/Space on any result to open inspector drawer
-- Empty state message when no results or filters
+- **Improved empty state**:
+  - Helpful tips when no results found with filters applied
+  - Suggestions to broaden mission/country, remove level filter, or try "remote"
+  - "Clear all filters" button to reset search
 
 ### Inspector Drawer
 - Right-side panel showing full job details:
@@ -298,10 +309,16 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - Maintains scroll position when loading more
 - Shows total count of jobs found
 
-### Status Banner
-- Displays at top when search is disabled or in fallback mode
-- Non-blocking, minimal design
-- Adaptive messaging based on capability state
+### Fallback Banner
+- Displays at top when search falls back to database mode (`source === 'db'`)
+- Shows message: "Running on backup search (temporarily)"
+- Includes "Try again" button that retries search after 2 seconds
+- Non-blocking, minimal amber design
+
+### Performance Optimizations
+- **Debounce**: 250ms delay on typing to reduce API calls
+- **Request cancellation**: AbortController cancels in-flight requests when params change
+- **Facet caching**: 30-second cache for facet counts to reduce backend load
 
 ## Curated Collections
 
