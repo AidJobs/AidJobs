@@ -8,12 +8,14 @@ import logging
 from typing import Optional
 from urllib.parse import urlparse
 import requests
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from psycopg2.extras import RealDictCursor
 
 from app.admin import require_dev_mode
 from app.db_config import db_config
+from app.auth import require_admin
+from app.rate_limit import limiter, RATE_LIMIT_SUBMIT
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +66,8 @@ def detect_jobs_count(url: str) -> int:
 
 
 @router.post("/api/find-earn/submit")
-async def submit_url(request: SubmitRequest) -> dict:
+@limiter.limit(RATE_LIMIT_SUBMIT)
+async def submit_url(http_request: Request, request: SubmitRequest) -> dict:
     """
     Public endpoint to submit a careers page URL.
     
@@ -233,8 +236,9 @@ async def list_submissions(
 
 @router.post("/admin/find-earn/approve/{submission_id}")
 async def approve_submission(
+    request: Request,
     submission_id: str,
-    _: None = Depends(require_dev_mode)
+    admin: str = Depends(require_admin)
 ) -> dict:
     """
     Admin endpoint to approve a submission.
@@ -341,9 +345,10 @@ async def approve_submission(
 
 @router.post("/admin/find-earn/reject/{submission_id}")
 async def reject_submission(
+    http_request: Request,
     submission_id: str,
     request: RejectRequest,
-    _: None = Depends(require_dev_mode)
+    admin: str = Depends(require_admin)
 ) -> dict:
     """
     Admin endpoint to reject a submission with notes.

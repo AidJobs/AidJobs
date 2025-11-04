@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from typing import Optional
 from contextlib import asynccontextmanager
 import os
 import logging
+import traceback
+from pydantic import BaseModel
 
 from app.config import Capabilities, get_env_presence
 from app.search import search_service
@@ -16,6 +19,10 @@ from app.crawl import router as crawl_router
 from app.shortlist import router as shortlist_router
 from app.find_earn import router as find_earn_router
 from app.analytics import analytics_tracker
+from app.auth import verify_admin_password, set_session_cookie, clear_session_cookie, get_current_admin
+from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 import psycopg2
 from app.db_config import db_config
 
@@ -23,6 +30,10 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class LoginRequest(BaseModel):
+    password: str
 
 
 @asynccontextmanager
@@ -46,6 +57,51 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AidJobs API", version="0.1.0", lifespan=lifespan)
 
+# Add rate limiter state
+app.state.limiter = limiter
+
+# Rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# Error masking middleware
+@app.middleware("http")
+async def error_masking_middleware(request: Request, call_next):
+    """Mask detailed errors in production; show full errors in dev."""
+    try:
+        response = await call_next(request)
+        return response
+    except HTTPException:
+        # Let HTTPException propagate untouched (proper status codes like 404, 400, 401, etc.)
+        raise
+    except Exception as e:
+        is_dev = os.getenv("AIDJOBS_ENV", "").lower() == "dev"
+        
+        # Log the full error
+        logger.error(f"Unhandled error: {str(e)}")
+        if is_dev:
+            logger.error(traceback.format_exc())
+        
+        # Return masked or detailed error based on environment
+        if is_dev:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "error": "An internal error occurred. Please try again later."
+                }
+            )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -64,6 +120,35 @@ app.include_router(shortlist_router)
 app.include_router(find_earn_router)
 
 
+# Auth endpoints
+@app.post("/auth/login")
+async def login(request: LoginRequest, response: Response):
+    """Admin login with password."""
+    if not verify_admin_password(request.password):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    set_session_cookie(response, "admin")
+    return {"status": "ok", "message": "Logged in successfully"}
+
+
+@app.post("/auth/logout")
+async def logout(response: Response):
+    """Admin logout."""
+    clear_session_cookie(response)
+    return {"status": "ok", "message": "Logged out successfully"}
+
+
+@app.get("/auth/status")
+async def auth_status(request: Request):
+    """Check authentication status."""
+    admin = get_current_admin(request)
+    return {
+        "authenticated": admin is not None,
+        "username": admin,
+        "dev_mode": os.getenv("AIDJOBS_ENV", "").lower() == "dev"
+    }
+
+
 @app.get("/api/healthz")
 async def healthz():
     return Capabilities.get_status()
@@ -80,7 +165,9 @@ async def config_env():
 
 
 @app.get("/api/search/query")
+@limiter.limit(RATE_LIMIT_SEARCH)
 async def search_query(
+    request: Request,
     q: Optional[str] = Query(None, description="Search query"),
     page: int = Query(1, description="Page number", ge=1),
     size: int = Query(20, description="Page size", ge=1, le=100),

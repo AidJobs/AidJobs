@@ -114,6 +114,29 @@ See `env.example` for the complete list of 25 environment variables. The applica
   - Used by the search fallback to query the jobs table directly
   - Used by the migration script to apply schema and seed data
 
+### Security Configuration
+
+#### Admin Password
+- **ADMIN_PASSWORD**: Password for accessing admin write endpoints (optional in dev mode)
+  - In dev mode (`AIDJOBS_ENV=dev`): Admin endpoints work without authentication (dev bypass)
+  - In production: All `/admin/*` write operations require authentication via `/auth/login`
+  - Generate a secure password: `openssl rand -hex 32`
+  - Authenticated via httpOnly cookie sessions (24-hour expiration)
+
+#### Session Management
+- **SESSION_SECRET**: Secret key for signing session cookies (auto-generated if not set)
+  - Used to sign httpOnly session cookies
+  - Generate a secure secret: `openssl rand -hex 32`
+
+#### Rate Limiting
+- **Search endpoint** (`/api/search/query`): 60 requests/minute in dev, 120/minute in production
+- **Submit endpoint** (`/api/find-earn/submit`): 10 requests/minute in dev, 20/minute in production
+- IP-based rate limiting with automatic 429 responses when exceeded
+
+#### Error Masking
+- **Development mode** (`AIDJOBS_ENV=dev`): Full error details and stack traces returned in responses
+- **Production mode**: Generic error messages only; detailed logs written to server logs
+
 ### Feature Flags
 - `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch
 - `AIDJOBS_ENABLE_CV` - Enable/disable CV upload

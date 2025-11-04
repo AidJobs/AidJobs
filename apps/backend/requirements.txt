@@ -8,3 +8,5 @@ psycopg2-binary==2.9.9
 meilisearch==0.31.0
 beautifulsoup4==4.12.3
 requests==2.32.3
+slowapi==0.1.9
+itsdangerous==2.2.0
