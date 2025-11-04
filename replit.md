@@ -24,6 +24,12 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
 - Keyboard shortcuts: `/` to focus search, `Enter` to open inspector, `Esc` to close inspector
 - Accessibility with visible focus states and keyboard navigation
 - Frontend capabilities integration with search status banner
+- **Perceived performance improvements**:
+  - 5-card skeleton loading state for results list (250ms debounce)
+  - Inspector drawer skeleton while fetching job details
+  - AbortController cancels in-flight requests on parameter changes
+  - Contextual empty state with quick action buttons (Clear filters, Remove country/level, Try remote, Clear mission tags)
+  - Fallback banner with 2-second retry delay
 - **Client-side Shortlist System** with localStorage persistence:
   - Star/bookmark toggle on job rows and inspector
   - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
@@ -337,6 +343,16 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - **Debounce**: 250ms delay on typing to reduce API calls
 - **Request cancellation**: AbortController cancels in-flight requests when params change
 - **Facet caching**: 30-second cache for facet counts to reduce backend load
+- **Skeleton loading states**:
+  - 5-card pulse animation for results list during initial load
+  - Skeleton for Inspector drawer while fetching job details
+  - Smooth transitions between loading and content states
+- **Contextual empty state**: Quick action buttons based on active filters
+  - "Clear all filters" - shown when any filters are active
+  - "Remove country" - shown when country filter is applied
+  - "Remove level" - shown when level filter is applied
+  - "Try remote" - shown when no mission tags and search doesn't include "remote"
+  - "Clear mission tags" - shown when mission tags are active
 
 ## Curated Collections
 
