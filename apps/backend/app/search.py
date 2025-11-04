@@ -673,6 +673,16 @@ class SearchService:
                 conn.close()
 
     async def get_facets(self) -> dict[str, Any]:
+        base = {
+            "enabled": True,
+            "facets": {
+                "country": {},
+                "level_norm": {},
+                "mission_tags": {},
+                "international_eligible": {}
+            }
+        }
+        
         if self.meili_enabled and self.meili_client:
             try:
                 index = self.meili_client.index(self.meili_index_name)
@@ -685,26 +695,30 @@ class SearchService:
                 
                 facet_distribution = search_result.get("facetDistribution", {})
                 
-                return {
-                    "enabled": True,
-                    "facets": {
-                        "country_iso": facet_distribution.get("country_iso", {}),
-                        "level_norm": facet_distribution.get("level_norm", {}),
-                        "mission_tags": facet_distribution.get("mission_tags", {}),
-                        "international_eligible": facet_distribution.get("international_eligible", {}),
-                    },
-                }
+                base["facets"]["country"] = facet_distribution.get("country_iso", {}) or {}
+                base["facets"]["level_norm"] = facet_distribution.get("level_norm", {}) or {}
+                base["facets"]["mission_tags"] = facet_distribution.get("mission_tags", {}) or {}
+                base["facets"]["international_eligible"] = facet_distribution.get("international_eligible", {}) or {}
+                
+                return base
             except Exception as e:
                 logger.error(f"Meilisearch facets error: {e}, falling back to database")
         
         if self.db_enabled:
-            facets = await self._get_database_facets()
-            return {
-                "enabled": True,
-                "facets": facets,
-            }
+            try:
+                facets = await self._get_database_facets()
+                base["facets"]["country"] = facets.get("country_iso", {}) or {}
+                base["facets"]["level_norm"] = facets.get("level_norm", {}) or {}
+                base["facets"]["mission_tags"] = facets.get("mission_tags", {}) or {}
+                base["facets"]["international_eligible"] = facets.get("international_eligible", {}) or {}
+            except Exception as e:
+                logger.error(f"Database facets error: {e}")
+                base["enabled"] = False
+                base["error"] = str(e)
+        else:
+            base["enabled"] = False
 
-        return {"enabled": False}
+        return base
     
     async def get_db_status(self) -> dict[str, Any]:
         """Get database status with row counts"""
