@@ -71,6 +71,7 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchSource, setSearchSource] = useState<string>('');
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
   const [shortlistedIds, setShortlistedIds] = useState<string[]>([]);
   const [showSavedPanel, setShowSavedPanel] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export default function Home() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setShortlistedIds(getShortlist());
@@ -155,6 +157,7 @@ export default function Home() {
   const updateURLParams = useCallback(() => {
     const params = new URLSearchParams();
     if (searchQuery) params.set('q', searchQuery);
+    if (sortBy && sortBy !== 'relevance') params.set('sort', sortBy);
     if (country) params.set('country', country);
     if (level) params.set('level_norm', level);
     if (international) params.set('international_eligible', 'true');
@@ -166,22 +169,30 @@ export default function Home() {
     if (newQuery !== currentQuery) {
       router.replace(newQuery ? `?${newQuery}` : '/', { scroll: false });
     }
-  }, [searchQuery, country, level, international, missionTags, router, searchParams]);
+  }, [searchQuery, sortBy, country, level, international, missionTags, router, searchParams]);
 
   const performSearch = useCallback(async (searchPage: number = 1, append: boolean = false) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
     setSearching(true);
     
     const params = new URLSearchParams();
     if (searchQuery) params.append('q', searchQuery);
     params.append('page', searchPage.toString());
     params.append('size', '20');
+    if (sortBy && sortBy !== 'relevance') params.append('sort', sortBy);
     if (country) params.append('country', country);
     if (level) params.append('level_norm', level);
     if (international) params.append('international_eligible', 'true');
     missionTags.forEach(tag => params.append('mission_tags', tag));
 
     try {
-      const response = await fetch(`/api/search/query?${params.toString()}`);
+      const response = await fetch(`/api/search/query?${params.toString()}`, {
+        signal: abortControllerRef.current.signal,
+      });
       const data: SearchResponse = await response.json();
       
       if (append) {
@@ -197,14 +208,16 @@ export default function Home() {
       if (searchPage === 1) {
         fetchFacets();
       }
-    } catch (error) {
-      console.error('Search error:', error);
-      setResults([]);
-      setTotal(0);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Search error:', error);
+        setResults([]);
+        setTotal(0);
+      }
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, country, level, international, missionTags, fetchFacets]);
+  }, [searchQuery, sortBy, country, level, international, missionTags, fetchFacets]);
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -227,7 +240,7 @@ export default function Home() {
 
   useEffect(() => {
     handleFilterChange();
-  }, [country, level, international, missionTags, handleFilterChange]);
+  }, [country, level, international, missionTags, sortBy, handleFilterChange]);
 
   useEffect(() => {
     fetchFacets();
@@ -242,6 +255,22 @@ export default function Home() {
     setMissionTags(prev => 
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
+  };
+
+  const clearFilters = () => {
+    setCountry('');
+    setLevel('');
+    setInternational(false);
+    setMissionTags([]);
+    setSearchQuery('');
+    setSortBy('relevance');
+  };
+
+  const retrySearch = async () => {
+    setToastMessage('Retrying search...');
+    setToastType('info');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    performSearch(1, false);
   };
 
   useEffect(() => {
@@ -262,10 +291,8 @@ export default function Home() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedJob]);
 
-  const showSearchBanner = !loading && capabilities && (!capabilities.search || searchSource === 'db');
-  const searchBannerText = searchSource === 'db'
-    ? 'Search running in fallback mode (database)'
-    : 'Search temporarily unavailable';
+  const showFallbackBanner = !loading && searchSource === 'db';
+  const hasAnyFilters = searchQuery || country || level || international || missionTags.length > 0;
 
   const f = facets ?? {};
   const countryMap = (f as any).country ?? {};
@@ -288,9 +315,17 @@ export default function Home() {
     <>
       <CollectionsNav />
       <main className="min-h-screen bg-gray-50 pl-56">
-        {showSearchBanner && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center">
-            <p className="text-sm text-amber-800">{searchBannerText}</p>
+        {showFallbackBanner && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <p className="text-sm text-amber-800">Running on backup search (temporarily)</p>
+              <button
+                onClick={retrySearch}
+                className="text-sm text-amber-900 hover:text-amber-950 font-medium underline"
+              >
+                Try again
+              </button>
+            </div>
           </div>
         )}
 
@@ -478,15 +513,48 @@ export default function Home() {
             {searching && page === 1 ? (
               <div className="text-center py-12 text-gray-500">Searching...</div>
             ) : results.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                {searchQuery || country || level || missionTags.length > 0
-                  ? 'No jobs found matching your criteria'
-                  : 'Loading jobs...'}
+              <div className="text-center py-12">
+                {hasAnyFilters ? (
+                  <div className="max-w-md mx-auto">
+                    <p className="text-lg font-medium text-gray-900 mb-4">No jobs found</p>
+                    <div className="text-sm text-gray-600 space-y-2 mb-6">
+                      <p>Try these tips:</p>
+                      <ul className="list-disc list-inside space-y-1 text-left">
+                        <li>Broaden your mission or country filters</li>
+                        <li>Remove the level filter</li>
+                        <li>Try searching for "remote" positions</li>
+                      </ul>
+                    </div>
+                    <button
+                      onClick={clearFilters}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Loading jobs...</p>
+                )}
               </div>
             ) : (
               <>
-                <div className="mb-4 text-sm font-medium text-gray-700">
-                  {total} role{total !== 1 ? 's' : ''}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-sm font-medium text-gray-700">
+                    {total} role{total !== 1 ? 's' : ''}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="sort" className="text-sm text-gray-600">Sort:</label>
+                    <select
+                      id="sort"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="newest">Newest</option>
+                      <option value="closing_soon">Closing soon</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="space-y-2 mb-6">
