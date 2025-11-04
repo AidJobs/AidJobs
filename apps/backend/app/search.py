@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from app.db_config import db_config
 from app.normalizer import Normalizer
+from app.analytics import analytics_tracker
 from core import normalize
 
 if TYPE_CHECKING:
@@ -243,6 +244,7 @@ class SearchService:
         policy_flags: Optional[list[str]] = None,
         donor_context: Optional[list[str]] = None,
     ) -> dict[str, Any]:
+        start_time = time.time()
         request_id = str(uuid.uuid4())
 
         page = max(1, page)
@@ -305,6 +307,19 @@ class SearchService:
             if "debug" not in result:
                 result["debug"] = {}
             result["debug"]["normalized_filters"] = normalized_filters
+        
+        # Track analytics (dev-only)
+        latency_ms = (time.time() - start_time) * 1000
+        source_map = {"meili": "meilisearch", "db": "database", "none": "fallback"}
+        analytics_tracker.track_search(
+            query=q,
+            filters=original_filters,
+            source=source_map.get(result.get("source", "none"), "fallback"),
+            total_results=result.get("total", 0),
+            latency_ms=latency_ms,
+            page=page,
+            size=size,
+        )
 
         return {
             "status": "ok",
