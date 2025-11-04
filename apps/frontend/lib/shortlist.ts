@@ -5,6 +5,71 @@ export interface ShortlistItem {
   addedAt: number;
 }
 
+/**
+ * Check if server-side shortlist is available (requires auth).
+ * Returns false for now - will be true once auth is implemented.
+ */
+function isServerAvailable(): boolean {
+  // TODO: Check if user is authenticated
+  // For now, always use localStorage (guest mode)
+  return false;
+}
+
+/**
+ * Toggle job shortlist on server (when authenticated).
+ */
+async function toggleShortlistServer(jobId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/shortlist/${jobId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Include cookies for auth
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Not authenticated - fall back to localStorage
+        return false;
+      }
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.saved;
+  } catch (error) {
+    console.error('Failed to toggle shortlist on server:', error);
+    return false;
+  }
+}
+
+/**
+ * Get shortlist from server (when authenticated).
+ */
+async function getShortlistServer(): Promise<string[]> {
+  try {
+    const response = await fetch('/api/shortlist', {
+      method: 'GET',
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Not authenticated
+        return [];
+      }
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.job_ids || [];
+  } catch (error) {
+    console.error('Failed to get shortlist from server:', error);
+    return [];
+  }
+}
+
 export function getShortlist(): string[] {
   if (typeof window === 'undefined') return [];
   
@@ -64,12 +129,52 @@ export function isInShortlist(jobId: string): boolean {
 }
 
 export function toggleShortlist(jobId: string): boolean {
-  if (isInShortlist(jobId)) {
-    removeFromShortlist(jobId);
-    return false;
-  } else {
+  // Optimistically update localStorage immediately
+  const wasAdded = isInShortlist(jobId) ? false : true;
+  
+  if (wasAdded) {
     addToShortlist(jobId);
-    return true;
+  } else {
+    removeFromShortlist(jobId);
+  }
+  
+  // Sync with server in background (when auth is available)
+  if (isServerAvailable()) {
+    toggleShortlistServer(jobId).catch(err => {
+      console.error('Server sync failed:', err);
+      // Keep localStorage state since server failed
+    });
+  }
+  
+  return wasAdded;
+}
+
+/**
+ * Sync localStorage shortlist to server (call on login).
+ * This merges local saves with server-side saves.
+ */
+export async function syncShortlistToServer(): Promise<void> {
+  if (!isServerAvailable()) {
+    return;
+  }
+  
+  try {
+    // Get server shortlist
+    const serverIds = await getShortlistServer();
+    
+    // Get local shortlist
+    const localIds = getShortlist();
+    
+    // Merge: server is source of truth, but preserve local additions
+    const merged = new Set([...serverIds, ...localIds]);
+    
+    // Update localStorage with merged list
+    localStorage.setItem(SHORTLIST_KEY, JSON.stringify(Array.from(merged)));
+    
+    // TODO: Push any local-only items to server
+    // For now, server will be empty on first login anyway
+  } catch (error) {
+    console.error('Failed to sync shortlist:', error);
   }
 }
 

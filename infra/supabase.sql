@@ -379,7 +379,8 @@ DROP POLICY IF EXISTS manage_own_shortlists ON shortlists;
 CREATE POLICY manage_own_shortlists ON shortlists
     FOR ALL
     TO authenticated
-    USING (user_id::text = auth.uid()::text);
+    USING (user_id::text = auth.uid()::text)
+    WITH CHECK (user_id::text = auth.uid()::text);
 
 -- Sources table: admin-only (service role)
 ALTER TABLE sources ENABLE ROW LEVEL SECURITY;

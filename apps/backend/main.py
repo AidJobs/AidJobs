@@ -13,6 +13,7 @@ from app.validator import validator
 from app.admin import router as admin_router
 from app.sources import router as sources_router
 from app.crawl import router as crawl_router
+from app.shortlist import router as shortlist_router
 from app.analytics import analytics_tracker
 import psycopg2
 from app.db_config import db_config
@@ -55,6 +56,7 @@ app.add_middleware(
 app.include_router(admin_router)
 app.include_router(sources_router)
 app.include_router(crawl_router)
+app.include_router(shortlist_router)
 
 
 @app.get("/api/healthz")
