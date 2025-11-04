@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from app.auth import require_admin
+from security.admin_auth import admin_required
 from orchestrator import get_orchestrator
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class DomainPolicyUpdate(BaseModel):
 # Crawl management endpoints
 
 @router.post("/run")
-async def run_source(request: RunSourceRequest, admin=Depends(require_admin)):
+async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
     """Manually trigger crawl for a specific source"""
     db_url = get_db_url()
     orchestrator = get_orchestrator(db_url)
@@ -85,7 +85,7 @@ async def run_source(request: RunSourceRequest, admin=Depends(require_admin)):
 
 
 @router.post("/run_due")
-async def run_due(admin=Depends(require_admin)):
+async def run_due(admin=Depends(admin_required)):
     """Manually trigger crawl for all due sources"""
     db_url = get_db_url()
     orchestrator = get_orchestrator(db_url)
@@ -99,7 +99,7 @@ async def run_due(admin=Depends(require_admin)):
 
 
 @router.get("/status")
-async def get_status(admin=Depends(require_admin)):
+async def get_status(admin=Depends(admin_required)):
     """Get crawler status"""
     db_url = get_db_url()
     orchestrator = get_orchestrator(db_url)
@@ -141,7 +141,7 @@ async def get_status(admin=Depends(require_admin)):
 async def get_logs(
     source_id: Optional[str] = Query(None),
     limit: int = Query(20, le=100),
-    admin=Depends(require_admin)
+    admin=Depends(admin_required)
 ):
     """Get crawl logs"""
     conn = get_db_conn()
@@ -178,7 +178,7 @@ async def get_logs(
 # Robots endpoints
 
 @robots_router.get("/{host}")
-async def get_robots(host: str, admin=Depends(require_admin)):
+async def get_robots(host: str, admin=Depends(admin_required)):
     """Get robots.txt cache for a host"""
     conn = get_db_conn()
     try:
@@ -208,7 +208,7 @@ async def get_robots(host: str, admin=Depends(require_admin)):
 # Domain policies endpoints
 
 @policies_router.get("/{host}")
-async def get_policy(host: str, admin=Depends(require_admin)):
+async def get_policy(host: str, admin=Depends(admin_required)):
     """Get domain policy for a host"""
     conn = get_db_conn()
     try:
@@ -244,7 +244,7 @@ async def get_policy(host: str, admin=Depends(require_admin)):
 
 
 @policies_router.post("/{host}")
-async def upsert_policy(host: str, policy: DomainPolicyUpdate, admin=Depends(require_admin)):
+async def upsert_policy(host: str, policy: DomainPolicyUpdate, admin=Depends(admin_required)):
     """Create or update domain policy"""
     conn = get_db_conn()
     try:

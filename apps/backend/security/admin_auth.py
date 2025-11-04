@@ -25,7 +25,10 @@ def get_cookie_secret() -> str:
 
 def get_admin_password() -> Optional[str]:
     """Get ADMIN_PASSWORD from environment."""
-    return os.getenv("ADMIN_PASSWORD")
+    password = os.getenv("ADMIN_PASSWORD")
+    if password and password.strip():
+        return password.strip()
+    return None
 
 
 def is_dev_mode() -> bool:
@@ -155,4 +158,5 @@ def verify_admin_password(password: str) -> bool:
 
 def check_admin_configured() -> bool:
     """Check if admin authentication is properly configured."""
-    return get_admin_password() is not None
+    password = get_admin_password()
+    return password is not None and len(password) > 0

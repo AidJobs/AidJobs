@@ -14,7 +14,7 @@ from psycopg2.extras import RealDictCursor
 
 from app.admin import require_dev_mode
 from app.db_config import db_config
-from app.auth import require_admin
+from security.admin_auth import admin_required
 from app.rate_limit import limiter, RATE_LIMIT_SUBMIT
 
 logger = logging.getLogger(__name__)
@@ -238,7 +238,7 @@ async def list_submissions(
 async def approve_submission(
     request: Request,
     submission_id: str,
-    admin: str = Depends(require_admin)
+    admin: str = Depends(admin_required)
 ) -> dict:
     """
     Admin endpoint to approve a submission.
@@ -348,7 +348,7 @@ async def reject_submission(
     http_request: Request,
     submission_id: str,
     request: RejectRequest,
-    admin: str = Depends(require_admin)
+    admin: str = Depends(admin_required)
 ) -> dict:
     """
     Admin endpoint to reject a submission with notes.
