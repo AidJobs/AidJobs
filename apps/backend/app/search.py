@@ -228,6 +228,7 @@ class SearchService:
         q: Optional[str] = None,
         page: int = 1,
         size: int = 20,
+        sort: Optional[str] = None,
         country: Optional[str] = None,
         level_norm: Optional[str] = None,
         international_eligible: Optional[bool] = None,
@@ -282,12 +283,12 @@ class SearchService:
         result = None
         
         if self.meili_enabled:
-            result = await self._search_meilisearch(q, page, size, normalized_filters)
+            result = await self._search_meilisearch(q, page, size, normalized_filters, sort)
             if result is not None:
                 result["source"] = "meili"
         
         if result is None and self.db_enabled:
-            result = await self._search_database(q, page, size, normalized_filters)
+            result = await self._search_database(q, page, size, normalized_filters, sort)
             result["source"] = "db"
         
         if result is None:
@@ -318,6 +319,7 @@ class SearchService:
         page: int,
         size: int,
         filters: dict[str, Any],
+        sort: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
         """Search using Meilisearch with filters and pagination. Returns None on failure."""
         if not self.meili_client:
@@ -396,6 +398,11 @@ class SearchService:
                 "offset": offset,
             }
             
+            if sort == "newest":
+                search_params["sort"] = ["last_seen_at:desc"]
+            elif sort == "closing_soon":
+                search_params["sort"] = ["deadline:asc"]
+            
             results = index.search(q or "", search_params)
             
             return {
@@ -416,6 +423,7 @@ class SearchService:
         page: int,
         size: int,
         filters: dict[str, Any],
+        sort: Optional[str] = None,
     ) -> dict[str, Any]:
         if not psycopg2:
             return {
@@ -528,13 +536,20 @@ class SearchService:
 
             # Get paginated results
             offset = (page - 1) * size
+            
+            order_by = "last_seen_at DESC, created_at DESC"
+            if sort == "newest":
+                order_by = "last_seen_at DESC, created_at DESC"
+            elif sort == "closing_soon":
+                order_by = "deadline ASC NULLS LAST"
+            
             select_query = f"""
                 SELECT 
                     id, org_name, title, location_raw, country_iso, 
                     level_norm, deadline, apply_url, last_seen_at
                 FROM jobs 
                 WHERE {where_clause}
-                ORDER BY last_seen_at DESC, created_at DESC
+                ORDER BY {order_by}
                 LIMIT %s OFFSET %s
             """
             
