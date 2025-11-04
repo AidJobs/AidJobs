@@ -205,6 +205,22 @@ ALTER TABLE sources ADD COLUMN IF NOT EXISTS notes TEXT;
 CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_careers_url ON sources(careers_url);
 
+-- Crawl logs table: track crawl execution history
+CREATE TABLE IF NOT EXISTS crawl_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_id UUID REFERENCES sources(id) ON DELETE CASCADE,
+    found INT DEFAULT 0,
+    inserted INT DEFAULT 0,
+    updated INT DEFAULT 0,
+    skipped INT DEFAULT 0,
+    status TEXT NOT NULL,
+    message TEXT,
+    ran_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index for crawl_logs table
+CREATE INDEX IF NOT EXISTS idx_crawl_logs_source_id ON crawl_logs(source_id, ran_at DESC);
+
 -- Jobs table: parsed job postings
 CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
