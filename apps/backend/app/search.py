@@ -720,6 +720,69 @@ class SearchService:
 
         return base
     
+    async def get_job_by_id(self, job_id: str) -> dict[str, Any]:
+        """Get a single job by ID from Meilisearch or database."""
+        if self.meili_enabled and self.meili_client:
+            try:
+                index = self.meili_client.index(self.meili_index_name)
+                doc = index.get_document(job_id)
+                if doc:
+                    return {
+                        "status": "ok",
+                        "data": doc,
+                        "source": "meili",
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to get job from Meilisearch: {e}")
+        
+        if self.db_enabled and psycopg2:
+            conn_params = db_config.get_connection_params()
+            if conn_params:
+                try:
+                    conn = psycopg2.connect(**conn_params, connect_timeout=1)
+                    cursor = conn.cursor(cursor_factory=RealDictCursor)
+                    
+                    cursor.execute(
+                        """
+                        SELECT 
+                            id, org_name, title, location_raw, country_iso, 
+                            level_norm, career_type, work_modality, 
+                            international_eligible, deadline, apply_url, 
+                            last_seen_at, mission_tags, benefits, policy_flags,
+                            description_snippet
+                        FROM jobs 
+                        WHERE id = %s
+                        """,
+                        (job_id,)
+                    )
+                    row = cursor.fetchone()
+                    
+                    cursor.close()
+                    conn.close()
+                    
+                    if row:
+                        job = dict(row)
+                        if job.get('deadline'):
+                            job['deadline'] = job['deadline'].isoformat()
+                        if job.get('last_seen_at'):
+                            job['last_seen_at'] = job['last_seen_at'].isoformat()
+                        if job.get('id'):
+                            job['id'] = str(job['id'])
+                        
+                        return {
+                            "status": "ok",
+                            "data": job,
+                            "source": "db",
+                        }
+                except Exception as e:
+                    logger.error(f"Database job lookup error: {e}")
+        
+        return {
+            "status": "ok",
+            "data": None,
+            "error": "Job not found",
+        }
+    
     async def get_db_status(self) -> dict[str, Any]:
         """Get database status with row counts"""
         if not self.db_enabled:

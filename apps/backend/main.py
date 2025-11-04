@@ -110,6 +110,12 @@ async def search_facets():
     return await search_service.get_facets()
 
 
+@app.get("/api/jobs/{job_id}")
+async def get_job_by_id(job_id: str):
+    """Get a single job by ID from database or Meilisearch."""
+    return await search_service.get_job_by_id(job_id)
+
+
 @app.get("/admin/db/status")
 async def admin_db_status():
     """Get database status (dev-only)"""
