@@ -30,6 +30,12 @@ AidJobs is an AI-powered job search platform designed specifically for NGOs and 
   - AbortController cancels in-flight requests on parameter changes
   - Contextual empty state with quick action buttons (Clear filters, Remove country/level, Try remote, Clear mission tags)
   - Fallback banner with 2-second retry delay
+- **Accessibility polish**:
+  - Result rows: role="button" with descriptive aria-labels ("title at org, location")
+  - Inspector drawer: Full ARIA modal semantics (aria-modal, aria-labelledby, aria-describedby)
+  - Shortlist toggles: aria-pressed state on all star/bookmark buttons
+  - Keyboard navigation: Enter/Space opens Inspector, Esc closes, focus restoration
+  - Saved page: aria-labels on job buttons, aria-pressed on remove buttons
 - **Client-side Shortlist System** with localStorage persistence:
   - Star/bookmark toggle on job rows and inspector
   - "Saved" panel in header showing shortlisted jobs (up to 5, with count badge)
@@ -283,7 +289,8 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
   - Location/Country
   - Job level (entry, mid, senior)
   - Deadline (if present)
-  - Star/bookmark button for shortlisting
+  - Star/bookmark button for shortlisting with aria-pressed state
+- **Accessibility**: role="button" with descriptive aria-labels ("title at org, location")
 - Click or press Enter/Space on any result to open inspector drawer
 - **Improved empty state**:
   - Helpful tips when no results found with filters applied
@@ -296,7 +303,7 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
 - **Error handling**: Displays graceful "This role is no longer available" message for 404s with auto-close after 3 seconds
 - **Full job details panel**:
   - Title and organization
-  - Star/bookmark toggle for shortlisting
+  - Star/bookmark toggle for shortlisting with aria-pressed state
   - Location and job level
   - Career type, work modality, organization type (fetched on demand)
   - Mission tags, benefits, policy flags (fetched on demand)
@@ -304,10 +311,12 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
   - Application deadline
   - "Apply Now" button (links to apply_url)
 - **Accessibility features**:
+  - Full ARIA modal semantics (aria-modal, aria-labelledby, aria-describedby)
   - Focus trap inside drawer (Tab cycles through focusable elements)
   - `Esc` key to close
   - Restores focus to previously focused result row on close
   - Keyboard accessible with visible focus states
+  - aria-pressed on shortlist toggle button
 - Click backdrop or X button to close
 
 ### Shortlist System
@@ -323,9 +332,10 @@ All endpoints return HTTP 200 even when integrations are missing keys - the appl
   - Real-time count updates via localStorage events and polling
   - Badge highlights when on /saved route
   - Badge disappears when count reaches zero
-- **Star toggles**: Available on job rows, inspector drawer, and /saved page
+- **Star toggles**: Available on job rows, inspector drawer, and /saved page with aria-pressed state
 - **Toast notifications**: Success/info messages for add/remove actions
 - **SSR-safe**: Gracefully handles server-side rendering without crashes
+- **Accessibility**: Full ARIA semantics with descriptive labels and pressed states
 - **Future enhancement**: Backend persistence with user accounts
 
 ### Pagination
