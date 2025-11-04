@@ -71,5 +71,10 @@ export type { SkeletonProps } from './components/Skeleton';
 export { ToastProvider, showToast, toast } from './components/Toast';
 export type { ToastProps } from './components/Toast';
 
+export { ScrollArea, ScrollBar } from './components/ScrollArea';
+
+export { SearchShell, StatusRail } from './layouts/SearchShell';
+export type { SearchShellProps, StatusRailProps } from './layouts/SearchShell';
+
 export { cn } from './lib/utils';
 
