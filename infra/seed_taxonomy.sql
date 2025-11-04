@@ -144,3 +144,33 @@ INSERT INTO donors (key, label) VALUES
     ('world_bank', 'World Bank'),
     ('adb', 'Asian Development Bank')
 ON CONFLICT (key) DO NOTHING;
+
+-- Functional areas
+INSERT INTO functional (key, label) VALUES
+    ('program_management', 'Program Management'),
+    ('finance', 'Finance'),
+    ('hr', 'Human Resources'),
+    ('logistics', 'Logistics'),
+    ('communications', 'Communications'),
+    ('advocacy', 'Advocacy'),
+    ('research', 'Research'),
+    ('it', 'Information Technology'),
+    ('admin', 'Administration'),
+    ('legal', 'Legal')
+ON CONFLICT (key) DO NOTHING;
+
+-- Synonyms (common mappings)
+INSERT INTO synonyms (type, raw_value, canonical_key) VALUES
+    ('level', 'entry', 'junior'),
+    ('level', 'intermediate', 'mid'),
+    ('level', 'staff', 'mid'),
+    ('level', 'manager', 'senior'),
+    ('level', 'principal', 'lead'),
+    ('mission', 'healthcare', 'health'),
+    ('mission', 'medical', 'health'),
+    ('mission', 'sanitation', 'wash'),
+    ('mission', 'water', 'wash'),
+    ('modality', 'office', 'onsite'),
+    ('modality', 'wfh', 'remote'),
+    ('modality', 'work from home', 'remote')
+ON CONFLICT (type, raw_value) DO NOTHING;

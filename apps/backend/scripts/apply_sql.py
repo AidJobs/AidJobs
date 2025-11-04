@@ -199,9 +199,11 @@ Examples:
                     
                     print(f"  {table:30} {status}")
         else:
+            # Get final state after taxonomy
+            final_summary = get_table_summary(cursor)
             print("\nDatabase Summary:")
             print("-" * 60)
-            for table, count in sorted(after_schema_tables.items()):
+            for table, count in sorted(final_summary.items()):
                 print(f"  {table:30} {count} row(s)")
         
         print("\n" + "=" * 60)
