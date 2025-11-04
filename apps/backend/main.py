@@ -60,14 +60,21 @@ async def config_env():
 @app.get("/api/search/query")
 async def search_query(
     q: Optional[str] = Query(None, description="Search query"),
-    page: int = Query(1, description="Page number"),
-    size: int = Query(20, description="Page size"),
-    country: Optional[str] = Query(None, description="Filter by country"),
+    page: int = Query(1, description="Page number", ge=1),
+    size: int = Query(20, description="Page size", ge=1, le=100),
+    country: Optional[str] = Query(None, description="Filter by country (name or ISO-2)"),
     level_norm: Optional[str] = Query(None, description="Filter by job level"),
-    international_eligible: Optional[bool] = Query(
-        None, description="Filter by international eligibility"
-    ),
+    international_eligible: Optional[bool] = Query(None, description="Filter by international eligibility"),
     mission_tags: Optional[list[str]] = Query(None, description="Filter by mission tags"),
+    work_modality: Optional[str] = Query(None, description="Filter by work modality"),
+    career_type: Optional[str] = Query(None, description="Filter by career type"),
+    org_type: Optional[str] = Query(None, description="Filter by organization type"),
+    crisis_type: Optional[list[str]] = Query(None, description="Filter by crisis type"),
+    response_phase: Optional[str] = Query(None, description="Filter by response phase"),
+    humanitarian_cluster: Optional[list[str]] = Query(None, description="Filter by humanitarian cluster"),
+    benefits: Optional[list[str]] = Query(None, description="Filter by benefits"),
+    policy_flags: Optional[list[str]] = Query(None, description="Filter by policy flags"),
+    donor_context: Optional[list[str]] = Query(None, description="Filter by donor context"),
 ):
     return await search_service.search_query(
         q=q,
@@ -77,6 +84,15 @@ async def search_query(
         level_norm=level_norm,
         international_eligible=international_eligible,
         mission_tags=mission_tags,
+        work_modality=work_modality,
+        career_type=career_type,
+        org_type=org_type,
+        crisis_type=crisis_type,
+        response_phase=response_phase,
+        humanitarian_cluster=humanitarian_cluster,
+        benefits=benefits,
+        policy_flags=policy_flags,
+        donor_context=donor_context,
     )
 
 

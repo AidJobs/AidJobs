@@ -118,10 +118,19 @@ class SearchService:
 
     def _normalize_filters(
         self,
-        country: Optional[str],
-        level_norm: Optional[str],
-        international_eligible: Optional[bool],
-        mission_tags: Optional[list[str]],
+        country: Optional[str] = None,
+        level_norm: Optional[str] = None,
+        international_eligible: Optional[bool] = None,
+        mission_tags: Optional[list[str]] = None,
+        work_modality: Optional[str] = None,
+        career_type: Optional[str] = None,
+        org_type: Optional[str] = None,
+        crisis_type: Optional[list[str]] = None,
+        response_phase: Optional[str] = None,
+        humanitarian_cluster: Optional[list[str]] = None,
+        benefits: Optional[list[str]] = None,
+        policy_flags: Optional[list[str]] = None,
+        donor_context: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         """
         Normalize user-friendly filter inputs to canonical form.
@@ -133,21 +142,61 @@ class SearchService:
         
         if country:
             if len(country) == 2 and country.isupper():
-                normalized['country'] = country
+                normalized['country_iso'] = country
             else:
-                country_iso = Normalizer.to_iso_country(country)
+                country_iso = normalize.to_iso_country(country)
                 if not country_iso and psycopg2:
                     country_iso = self._lookup_country_from_db(country)
-                normalized['country'] = country_iso
+                if country_iso:
+                    normalized['country_iso'] = country_iso
         
         if level_norm:
-            normalized['level_norm'] = Normalizer.norm_level(level_norm)
+            normalized_level = normalize.norm_level(level_norm)
+            if normalized_level:
+                normalized['level_norm'] = normalized_level
         
         if international_eligible is not None:
-            normalized['international_eligible'] = Normalizer.to_bool(international_eligible)
+            normalized['international_eligible'] = normalize.to_bool(international_eligible)
         
         if mission_tags:
-            normalized['mission_tags'] = Normalizer.norm_tags(mission_tags)
+            normalized_tags = normalize.norm_tags(mission_tags)
+            if normalized_tags:
+                normalized['mission_tags'] = normalized_tags
+        
+        if work_modality:
+            normalized_modality = normalize.norm_modality(work_modality)
+            if normalized_modality:
+                normalized['work_modality'] = normalized_modality
+        
+        if career_type:
+            normalized['career_type'] = career_type.lower().strip()
+        
+        if org_type:
+            normalized['org_type'] = org_type.lower().strip()
+        
+        if crisis_type:
+            normalized['crisis_type'] = [ct.lower().strip() for ct in crisis_type if ct]
+        
+        if response_phase:
+            normalized['response_phase'] = response_phase.lower().strip()
+        
+        if humanitarian_cluster:
+            normalized['humanitarian_cluster'] = [hc.lower().strip() for hc in humanitarian_cluster if hc]
+        
+        if benefits:
+            normalized_benefits = normalize.norm_benefits(benefits)
+            if normalized_benefits:
+                normalized['benefits'] = normalized_benefits
+        
+        if policy_flags:
+            normalized_policy = normalize.norm_policy(policy_flags)
+            if normalized_policy:
+                normalized['policy_flags'] = normalized_policy
+        
+        if donor_context:
+            normalized_donors = normalize.norm_donors(donor_context)
+            if normalized_donors:
+                normalized['donor_context'] = normalized_donors
         
         return normalized
     
@@ -183,6 +232,15 @@ class SearchService:
         level_norm: Optional[str] = None,
         international_eligible: Optional[bool] = None,
         mission_tags: Optional[list[str]] = None,
+        work_modality: Optional[str] = None,
+        career_type: Optional[str] = None,
+        org_type: Optional[str] = None,
+        crisis_type: Optional[list[str]] = None,
+        response_phase: Optional[str] = None,
+        humanitarian_cluster: Optional[list[str]] = None,
+        benefits: Optional[list[str]] = None,
+        policy_flags: Optional[list[str]] = None,
+        donor_context: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         request_id = str(uuid.uuid4())
 
@@ -194,33 +252,42 @@ class SearchService:
             "level_norm": level_norm,
             "international_eligible": international_eligible,
             "mission_tags": mission_tags,
+            "work_modality": work_modality,
+            "career_type": career_type,
+            "org_type": org_type,
+            "crisis_type": crisis_type,
+            "response_phase": response_phase,
+            "humanitarian_cluster": humanitarian_cluster,
+            "benefits": benefits,
+            "policy_flags": policy_flags,
+            "donor_context": donor_context,
         }
         
         normalized_filters = self._normalize_filters(
-            country, level_norm, international_eligible, mission_tags
+            country=country,
+            level_norm=level_norm,
+            international_eligible=international_eligible,
+            mission_tags=mission_tags,
+            work_modality=work_modality,
+            career_type=career_type,
+            org_type=org_type,
+            crisis_type=crisis_type,
+            response_phase=response_phase,
+            humanitarian_cluster=humanitarian_cluster,
+            benefits=benefits,
+            policy_flags=policy_flags,
+            donor_context=donor_context,
         )
 
         result = None
         
         if self.meili_enabled:
-            result = await self._search_meilisearch(
-                q, page, size,
-                normalized_filters.get('country'),
-                normalized_filters.get('level_norm'),
-                normalized_filters.get('international_eligible'),
-                normalized_filters.get('mission_tags'),
-            )
+            result = await self._search_meilisearch(q, page, size, normalized_filters)
             if result is not None:
                 result["source"] = "meili"
         
         if result is None and self.db_enabled:
-            result = await self._search_database(
-                q, page, size,
-                normalized_filters.get('country'),
-                normalized_filters.get('level_norm'),
-                normalized_filters.get('international_eligible'),
-                normalized_filters.get('mission_tags'),
-            )
+            result = await self._search_database(q, page, size, normalized_filters)
             result["source"] = "db"
         
         if result is None:
@@ -250,10 +317,7 @@ class SearchService:
         q: Optional[str],
         page: int,
         size: int,
-        country: Optional[str],
-        level_norm: Optional[str],
-        international_eligible: Optional[bool],
-        mission_tags: Optional[list[str]],
+        filters: dict[str, Any],
     ) -> Optional[dict[str, Any]]:
         """Search using Meilisearch with filters and pagination. Returns None on failure."""
         if not self.meili_client:
@@ -263,22 +327,66 @@ class SearchService:
         try:
             index = self.meili_client.index(self.meili_index_name)
             
-            filters = ["status = 'active'"]
+            filter_conditions = ["status = 'active'"]
             
-            if country:
-                filters.append(f"country_iso = '{country}'")
+            if filters.get('country_iso'):
+                filter_conditions.append(f"country_iso = '{filters['country_iso']}'")
             
-            if level_norm:
-                filters.append(f"level_norm = '{level_norm}'")
+            if filters.get('level_norm'):
+                filter_conditions.append(f"level_norm = '{filters['level_norm']}'")
             
-            if international_eligible is not None:
-                filters.append(f"international_eligible = {str(international_eligible).lower()}")
+            if filters.get('international_eligible') is not None:
+                filter_conditions.append(f"international_eligible = {str(filters['international_eligible']).lower()}")
             
-            if mission_tags and len(mission_tags) > 0:
-                tag_filters = " OR ".join([f"mission_tags = '{tag}'" for tag in mission_tags])
-                filters.append(f"({tag_filters})")
+            if filters.get('mission_tags'):
+                tags = filters['mission_tags']
+                if tags:
+                    tag_filters = " OR ".join([f"mission_tags = '{tag}'" for tag in tags])
+                    filter_conditions.append(f"({tag_filters})")
             
-            filter_str = " AND ".join(filters)
+            if filters.get('work_modality'):
+                filter_conditions.append(f"work_modality = '{filters['work_modality']}'")
+            
+            if filters.get('career_type'):
+                filter_conditions.append(f"career_type = '{filters['career_type']}'")
+            
+            if filters.get('org_type'):
+                filter_conditions.append(f"org_type = '{filters['org_type']}'")
+            
+            if filters.get('crisis_type'):
+                crisis_types = filters['crisis_type']
+                if crisis_types:
+                    ct_filters = " OR ".join([f"crisis_type = '{ct}'" for ct in crisis_types])
+                    filter_conditions.append(f"({ct_filters})")
+            
+            if filters.get('response_phase'):
+                filter_conditions.append(f"response_phase = '{filters['response_phase']}'")
+            
+            if filters.get('humanitarian_cluster'):
+                clusters = filters['humanitarian_cluster']
+                if clusters:
+                    hc_filters = " OR ".join([f"humanitarian_cluster = '{hc}'" for hc in clusters])
+                    filter_conditions.append(f"({hc_filters})")
+            
+            if filters.get('benefits'):
+                benefits = filters['benefits']
+                if benefits:
+                    b_filters = " OR ".join([f"benefits = '{b}'" for b in benefits])
+                    filter_conditions.append(f"({b_filters})")
+            
+            if filters.get('policy_flags'):
+                policies = filters['policy_flags']
+                if policies:
+                    p_filters = " OR ".join([f"policy_flags = '{p}'" for p in policies])
+                    filter_conditions.append(f"({p_filters})")
+            
+            if filters.get('donor_context'):
+                donors = filters['donor_context']
+                if donors:
+                    d_filters = " OR ".join([f"donor_context = '{d}'" for d in donors])
+                    filter_conditions.append(f"({d_filters})")
+            
+            filter_str = " AND ".join(filter_conditions)
             
             offset = (page - 1) * size
             
@@ -307,10 +415,7 @@ class SearchService:
         q: Optional[str],
         page: int,
         size: int,
-        country: Optional[str],
-        level_norm: Optional[str],
-        international_eligible: Optional[bool],
-        mission_tags: Optional[list[str]],
+        filters: dict[str, Any],
     ) -> dict[str, Any]:
         if not psycopg2:
             return {
@@ -350,24 +455,69 @@ class SearchService:
                 params.extend([search_param, search_param, search_param])
 
             # Country filter (using country_iso)
-            if country:
+            if filters.get('country_iso'):
                 where_conditions.append("country_iso = %s")
-                params.append(country)
+                params.append(filters['country_iso'])
 
             # Level filter
-            if level_norm:
+            if filters.get('level_norm'):
                 where_conditions.append("level_norm = %s")
-                params.append(level_norm)
+                params.append(filters['level_norm'])
 
             # International eligible filter
-            if international_eligible is not None:
+            if filters.get('international_eligible') is not None:
                 where_conditions.append("international_eligible = %s")
-                params.append(international_eligible)
+                params.append(filters['international_eligible'])
 
             # Mission tags filter (using ANY for array)
-            if mission_tags and len(mission_tags) > 0:
+            if filters.get('mission_tags'):
                 where_conditions.append("mission_tags && %s")
-                params.append(mission_tags)
+                params.append(filters['mission_tags'])
+            
+            # Work modality filter
+            if filters.get('work_modality'):
+                where_conditions.append("work_modality = %s")
+                params.append(filters['work_modality'])
+            
+            # Career type filter
+            if filters.get('career_type'):
+                where_conditions.append("career_type = %s")
+                params.append(filters['career_type'])
+            
+            # Org type filter
+            if filters.get('org_type'):
+                where_conditions.append("org_type = %s")
+                params.append(filters['org_type'])
+            
+            # Crisis type filter (array)
+            if filters.get('crisis_type'):
+                where_conditions.append("crisis_type && %s")
+                params.append(filters['crisis_type'])
+            
+            # Response phase filter
+            if filters.get('response_phase'):
+                where_conditions.append("response_phase = %s")
+                params.append(filters['response_phase'])
+            
+            # Humanitarian cluster filter (array)
+            if filters.get('humanitarian_cluster'):
+                where_conditions.append("humanitarian_cluster && %s")
+                params.append(filters['humanitarian_cluster'])
+            
+            # Benefits filter (array)
+            if filters.get('benefits'):
+                where_conditions.append("benefits && %s")
+                params.append(filters['benefits'])
+            
+            # Policy flags filter (array)
+            if filters.get('policy_flags'):
+                where_conditions.append("policy_flags && %s")
+                params.append(filters['policy_flags'])
+            
+            # Donor context filter (array)
+            if filters.get('donor_context'):
+                where_conditions.append("donor_context && %s")
+                params.append(filters['donor_context'])
 
             where_clause = " AND ".join(where_conditions)
 
