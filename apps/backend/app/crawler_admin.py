@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from app.auth import require_admin, require_dev_mode
+from app.auth import require_admin
 from orchestrator import get_orchestrator
 
 logger = logging.getLogger(__name__)
