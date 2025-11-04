@@ -266,7 +266,7 @@ class SearchService:
             filters = ["status = 'active'"]
             
             if country:
-                filters.append(f"country = '{country}'")
+                filters.append(f"country_iso = '{country}'")
             
             if level_norm:
                 filters.append(f"level_norm = '{level_norm}'")
@@ -349,9 +349,9 @@ class SearchService:
                 search_param = f"%{q}%"
                 params.extend([search_param, search_param, search_param])
 
-            # Country filter
+            # Country filter (using country_iso)
             if country:
-                where_conditions.append("country = %s")
+                where_conditions.append("country_iso = %s")
                 params.append(country)
 
             # Level filter
@@ -380,7 +380,7 @@ class SearchService:
             offset = (page - 1) * size
             select_query = f"""
                 SELECT 
-                    id, org_name, title, location_raw, country, 
+                    id, org_name, title, location_raw, country_iso, 
                     level_norm, deadline, apply_url, last_seen_at
                 FROM jobs 
                 WHERE {where_clause}
@@ -433,7 +433,7 @@ class SearchService:
         """Get facet counts from database using GROUP BY queries"""
         if not psycopg2:
             return {
-                "country": {},
+                "country_iso": {},
                 "level_norm": {},
                 "mission_tags": {},
                 "international_eligible": {},
@@ -442,7 +442,7 @@ class SearchService:
         conn_params = db_config.get_connection_params()
         if not conn_params:
             return {
-                "country": {},
+                "country_iso": {},
                 "level_norm": {},
                 "mission_tags": {},
                 "international_eligible": {},
@@ -454,16 +454,16 @@ class SearchService:
             conn = psycopg2.connect(**conn_params, connect_timeout=1)
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-            # Get country facets (limit 50)
+            # Get country_iso facets (limit 50)
             cursor.execute("""
-                SELECT country, COUNT(*) as count
+                SELECT country_iso, COUNT(*) as count
                 FROM jobs
-                WHERE status = 'active' AND country IS NOT NULL
-                GROUP BY country
+                WHERE status = 'active' AND country_iso IS NOT NULL
+                GROUP BY country_iso
                 ORDER BY count DESC
                 LIMIT 50
             """)
-            country_facets = {row["country"]: row["count"] for row in cursor.fetchall()}
+            country_facets = {row["country_iso"]: row["count"] for row in cursor.fetchall()}
 
             # Get level_norm facets (limit 50)
             cursor.execute("""
@@ -501,7 +501,7 @@ class SearchService:
             tags_facets = {row["tag"]: row["count"] for row in cursor.fetchall()}
 
             return {
-                "country": country_facets,
+                "country_iso": country_facets,
                 "level_norm": level_facets,
                 "mission_tags": tags_facets,
                 "international_eligible": international_facets,
@@ -510,7 +510,7 @@ class SearchService:
         except Exception as e:
             print(f"Database facets error: {e}")
             return {
-                "country": {},
+                "country_iso": {},
                 "level_norm": {},
                 "mission_tags": {},
                 "international_eligible": {},
@@ -528,7 +528,7 @@ class SearchService:
                 index = self.meili_client.index(self.meili_index_name)
                 
                 search_result = index.search("", {
-                    "facets": ["country", "level_norm", "mission_tags", "international_eligible"],
+                    "facets": ["country_iso", "level_norm", "mission_tags", "international_eligible"],
                     "limit": 0,
                     "filter": "status = 'active'"
                 })
@@ -538,7 +538,7 @@ class SearchService:
                 return {
                     "enabled": True,
                     "facets": {
-                        "country": facet_distribution.get("country", {}),
+                        "country_iso": facet_distribution.get("country_iso", {}),
                         "level_norm": facet_distribution.get("level_norm", {}),
                         "mission_tags": facet_distribution.get("mission_tags", {}),
                         "international_eligible": facet_distribution.get("international_eligible", {}),
@@ -829,7 +829,7 @@ class SearchService:
                     'org_name': raw_doc.get('org_name'),
                     'title': raw_doc.get('title'),
                     'location_raw': raw_doc.get('location_raw'),
-                    'country': country_iso,
+                    'country_iso': country_iso,
                     'level_norm': level_norm,
                     'deadline': deadline.isoformat() if deadline else None,
                     'apply_url': raw_doc.get('apply_url'),
