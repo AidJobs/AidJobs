@@ -298,7 +298,7 @@ export default function Home() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">All Jobs</h1>
-            <div className="relative">
+              <div className="relative">
               <button
                 onClick={() => setShowSavedPanel(!showSavedPanel)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
