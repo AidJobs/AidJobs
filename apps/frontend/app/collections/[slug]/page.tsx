@@ -29,6 +29,7 @@ type Job = {
   last_seen_at?: string;
   mission_tags?: string[];
   international_eligible?: boolean;
+  reasons?: string[];
 };
 
 type SearchResponse = {
@@ -451,6 +452,18 @@ export default function CollectionPage() {
                             )}
                           </div>
                           <p className="text-sm text-gray-600 mb-1">{job.org_name}</p>
+                          {job.reasons && job.reasons.length > 0 && (
+                            <div className="flex gap-1.5 mb-1">
+                              {job.reasons.map((reason, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded"
+                                >
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex gap-3 text-xs text-gray-500">
                             {(job.location_raw || job.country) && (
                               <span>{job.location_raw || job.country}</span>

@@ -117,6 +117,51 @@ class SearchService:
             self.meili_client = None
             self.meili_error = str(e)
 
+    def _compute_reasons(
+        self,
+        item: dict[str, Any],
+        q: Optional[str],
+        filters: dict[str, Any],
+    ) -> list[str]:
+        """
+        Compute relevance reasons for a job result (max 3).
+        
+        Args:
+            item: Job result item
+            q: Search query
+            filters: Applied filters
+            
+        Returns:
+            List of reason strings (max 3)
+        """
+        reasons = []
+        
+        # Mission tag match
+        item_mission_tags = item.get('mission_tags', []) or []
+        filter_mission_tags = filters.get('mission_tags', []) or []
+        if filter_mission_tags and item_mission_tags:
+            matched_tags = set(item_mission_tags) & set(filter_mission_tags)
+            if matched_tags:
+                tag = list(matched_tags)[0]
+                reasons.append(f"Mission: {tag.capitalize()}")
+        
+        # Level match
+        if filters.get('level_norm') and item.get('level_norm'):
+            if item['level_norm'] == filters['level_norm']:
+                reasons.append(f"Level: {item['level_norm'].capitalize()}")
+        
+        # International eligible
+        if filters.get('international_eligible') is True and item.get('international_eligible') is True:
+            reasons.append("International")
+        
+        # Org type match
+        if filters.get('org_type') and item.get('org_type'):
+            if item['org_type'] == filters['org_type']:
+                reasons.append(f"Org: {item['org_type'].upper()}")
+        
+        # Limit to 3 reasons
+        return reasons[:3]
+    
     def _normalize_filters(
         self,
         country: Optional[str] = None,
@@ -420,8 +465,14 @@ class SearchService:
             
             results = index.search(q or "", search_params)
             
+            # Attach reasons to each result
+            items = []
+            for hit in results.get("hits", []):
+                hit['reasons'] = self._compute_reasons(hit, q, filters)
+                items.append(hit)
+            
             return {
-                "items": results.get("hits", []),
+                "items": items,
                 "total": results.get("estimatedTotalHits", 0),
                 "page": page,
                 "size": size,
@@ -561,7 +612,8 @@ class SearchService:
             select_query = f"""
                 SELECT 
                     id, org_name, title, location_raw, country_iso, 
-                    level_norm, deadline, apply_url, last_seen_at
+                    level_norm, deadline, apply_url, last_seen_at,
+                    mission_tags, international_eligible, org_type
                 FROM jobs 
                 WHERE {where_clause}
                 ORDER BY {order_by}
@@ -584,6 +636,10 @@ class SearchService:
                 # Convert UUID to string
                 if item.get('id'):
                     item['id'] = str(item['id'])
+                
+                # Compute and attach relevance reasons
+                item['reasons'] = self._compute_reasons(item, q, filters)
+                
                 items.append(item)
 
             return {
