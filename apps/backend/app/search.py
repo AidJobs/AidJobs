@@ -1163,6 +1163,14 @@ class SearchService:
             # Update last reindexed timestamp
             self.last_reindexed_at = datetime.utcnow().isoformat() + 'Z'
             
+            # Log reindex summary (dev-only)
+            env = os.getenv("AIDJOBS_ENV", "").lower()
+            if env == "dev":
+                logger.info(
+                    f"[analytics] reindex complete: indexed={indexed_count} "
+                    f"skipped={skipped_count} duration={duration_ms}ms"
+                )
+            
             return {
                 "indexed": indexed_count,
                 "skipped": skipped_count,

@@ -11,6 +11,7 @@ from app.search import search_service
 from app.normalizer import normalize_job_data
 from app.validator import validator
 from app.admin import router as admin_router
+from app.analytics import analytics_tracker
 import psycopg2
 from app.db_config import db_config
 
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
     aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
     if aidjobs_env == "dev":
         logger.info("[aidjobs] env: AIDJOBS_ENV=dev (dev-only admin routes enabled)")
+        analytics_tracker.enable()
     else:
         logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env} (admin routes disabled)")
     

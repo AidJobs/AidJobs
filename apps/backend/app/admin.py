@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.db_config import db_config
 from app.normalizer import normalize_job_data
 from app.search import search_service
+from app.analytics import analytics_tracker
 
 try:
     import psycopg2
@@ -51,6 +52,20 @@ async def dev_status() -> dict[str, Any]:
     return {
         "env": os.getenv("AIDJOBS_ENV", "production"),
         "dev_enabled": True
+    }
+
+
+@router.get("/metrics")
+async def get_metrics() -> dict[str, Any]:
+    """
+    Dev-only analytics metrics endpoint.
+    Returns last 20 queries, average latency, and hit rates.
+    """
+    metrics = analytics_tracker.get_metrics()
+    return {
+        "status": "ok",
+        "data": metrics,
+        "error": None,
     }
 
 
