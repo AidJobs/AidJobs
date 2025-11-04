@@ -1,8 +1,10 @@
 -- AidJobs Database Schema
 -- Idempotent schema for Supabase PostgreSQL
 
--- Enable UUID extension
+-- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- Create Supabase-specific roles if they don't exist (for non-Supabase PostgreSQL)
 DO $$
@@ -64,6 +66,82 @@ CREATE TABLE IF NOT EXISTS levels (
 CREATE TABLE IF NOT EXISTS tags (
     key TEXT PRIMARY KEY,
     label TEXT NOT NULL
+);
+
+-- Missions table: mission/thematic areas with SDG links
+CREATE TABLE IF NOT EXISTS missions (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    sdg_links TEXT[]
+);
+
+-- Functional table: functional/technical areas
+CREATE TABLE IF NOT EXISTS functional (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Work modalities table: work location types
+CREATE TABLE IF NOT EXISTS work_modalities (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Contracts table: contract types
+CREATE TABLE IF NOT EXISTS contracts (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Organization types table: hierarchical org types
+CREATE TABLE IF NOT EXISTS org_types (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    parent TEXT
+);
+
+-- Crisis types table: humanitarian crisis types
+CREATE TABLE IF NOT EXISTS crisis_types (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Clusters table: humanitarian clusters
+CREATE TABLE IF NOT EXISTS clusters (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Response phases table: humanitarian response phases
+CREATE TABLE IF NOT EXISTS response_phases (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Benefits table: job benefits
+CREATE TABLE IF NOT EXISTS benefits (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Policy flags table: policy/culture flags
+CREATE TABLE IF NOT EXISTS policy_flags (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Donors table: funding organizations
+CREATE TABLE IF NOT EXISTS donors (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL
+);
+
+-- Synonyms table: raw value to canonical key mappings
+CREATE TABLE IF NOT EXISTS synonyms (
+    type TEXT NOT NULL,              -- level | mission | modality | donor | tag
+    raw_value TEXT NOT NULL,
+    canonical_key TEXT NOT NULL,
+    PRIMARY KEY(type, raw_value)
 );
 
 -- Seed lookup tables (idempotent)
@@ -144,12 +222,51 @@ CREATE TABLE IF NOT EXISTS jobs (
     search_tsv TSVECTOR
 );
 
+-- Add taxonomy columns to jobs table (idempotent)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS career_type TEXT,
+    ADD COLUMN IF NOT EXISTS contract_type TEXT,
+    ADD COLUMN IF NOT EXISTS work_modality TEXT,
+    ADD COLUMN IF NOT EXISTS country_name TEXT,
+    ADD COLUMN IF NOT EXISTS region_code TEXT,
+    ADD COLUMN IF NOT EXISTS functional_tags TEXT[],
+    ADD COLUMN IF NOT EXISTS benefits TEXT[],
+    ADD COLUMN IF NOT EXISTS policy_flags TEXT[],
+    ADD COLUMN IF NOT EXISTS donor_context TEXT[],
+    ADD COLUMN IF NOT EXISTS project_modality TEXT,
+    ADD COLUMN IF NOT EXISTS procurement_vehicle TEXT,
+    ADD COLUMN IF NOT EXISTS crisis_type TEXT[],
+    ADD COLUMN IF NOT EXISTS response_phase TEXT,
+    ADD COLUMN IF NOT EXISTS humanitarian_cluster TEXT[],
+    ADD COLUMN IF NOT EXISTS surge_required BOOLEAN,
+    ADD COLUMN IF NOT EXISTS deployment_timeframe TEXT,
+    ADD COLUMN IF NOT EXISTS duty_station_hardship TEXT,
+    ADD COLUMN IF NOT EXISTS work_hours TEXT,
+    ADD COLUMN IF NOT EXISTS contract_duration_months INT,
+    ADD COLUMN IF NOT EXISTS contract_urgency TEXT,
+    ADD COLUMN IF NOT EXISTS application_window JSONB,
+    ADD COLUMN IF NOT EXISTS compensation_visible BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS compensation_type TEXT,
+    ADD COLUMN IF NOT EXISTS compensation_min_usd NUMERIC,
+    ADD COLUMN IF NOT EXISTS compensation_max_usd NUMERIC,
+    ADD COLUMN IF NOT EXISTS compensation_currency TEXT,
+    ADD COLUMN IF NOT EXISTS compensation_confidence NUMERIC,
+    ADD COLUMN IF NOT EXISTS data_provenance TEXT,
+    ADD COLUMN IF NOT EXISTS freshness_days INT,
+    ADD COLUMN IF NOT EXISTS duplicate_of UUID,
+    ADD COLUMN IF NOT EXISTS raw_metadata JSONB;
+
 -- Indexes for jobs table
 CREATE INDEX IF NOT EXISTS idx_jobs_search_tsv ON jobs USING GIN(search_tsv);
 CREATE INDEX IF NOT EXISTS idx_jobs_status_deadline ON jobs(status, deadline);
 CREATE INDEX IF NOT EXISTS idx_jobs_country ON jobs(country);
 CREATE INDEX IF NOT EXISTS idx_jobs_level_norm ON jobs(level_norm);
 CREATE INDEX IF NOT EXISTS idx_jobs_international_eligible ON jobs(international_eligible);
+CREATE INDEX IF NOT EXISTS idx_jobs_career_type ON jobs(career_type);
+CREATE INDEX IF NOT EXISTS idx_jobs_org_type ON jobs(org_name);
+CREATE INDEX IF NOT EXISTS idx_jobs_country_iso ON jobs(country_iso);
+CREATE INDEX IF NOT EXISTS idx_jobs_international ON jobs(international_eligible);
+CREATE INDEX IF NOT EXISTS idx_jobs_response_phase ON jobs(response_phase);
 
 -- Function to update search_tsv column
 CREATE OR REPLACE FUNCTION jobs_tsv_update()

@@ -1,0 +1,88 @@
+Extend Supabase schema (idempotent) with taxonomy fields and lookup tables.
+
+1) In /infra/supabase.sql add (create-if-not-exists):
+- Extensions: pgcrypto, pg_trgm
+- Lookup tables (pk on key/code):
+  countries(code_iso2 text primary key, name text);
+  levels(key text primary key, label text);
+  missions(key text primary key, label text, sdg_links text[]);
+  functional(key text primary key, label text);
+  work_modalities(key text primary key, label text);
+  contracts(key text primary key, label text);
+  org_types(key text primary key, label text, parent text);
+  crisis_types(key text primary key, label text);
+  clusters(key text primary key, label text);
+  response_phases(key text primary key, label text);
+  benefits(key text primary key, label text);
+  policy_flags(key text primary key, label text);
+  donors(key text primary key, label text);
+  synonyms(
+    type text,              -- level | mission | modality | donor | tag
+    raw_value text,
+    canonical_key text,
+    primary key(type, raw_value)
+  );
+
+- Alter jobs table (add columns if missing):
+  alter table jobs
+    add column if not exists career_type text,
+    add column if not exists contract_type text,
+    add column if not exists work_modality text,
+    add column if not exists level_norm text,
+    add column if not exists country_iso text,
+    add column if not exists country_name text,
+    add column if not exists region_code text,
+    add column if not exists international_eligible boolean,
+    add column if not exists mission_tags text[],
+    add column if not exists functional_tags text[],
+    add column if not exists benefits text[],
+    add column if not exists policy_flags text[],
+    add column if not exists donor_context text[],
+    add column if not exists project_modality text,
+    add column if not exists procurement_vehicle text,
+    add column if not exists crisis_type text[],
+    add column if not exists response_phase text,
+    add column if not exists humanitarian_cluster text[],
+    add column if not exists surge_required boolean,
+    add column if not exists deployment_timeframe text,
+    add column if not exists duty_station_hardship text,
+    add column if not exists work_hours text,
+    add column if not exists contract_duration_months int,
+    add column if not exists contract_urgency text,
+    add column if not exists application_window jsonb,
+    add column if not exists compensation_visible boolean default false,
+    add column if not exists compensation_type text,
+    add column if not exists compensation_min_usd numeric,
+    add column if not exists compensation_max_usd numeric,
+    add column if not exists compensation_currency text,
+    add column if not exists compensation_confidence numeric,
+    add column if not exists data_provenance text,
+    add column if not exists freshness_days int,
+    add column if not exists duplicate_of uuid,
+    add column if not exists raw_metadata jsonb;
+
+- Helpful indexes (create-if-not-exists):
+  create index if not exists idx_jobs_career_type on jobs(career_type);
+  create index if not exists idx_jobs_org_type on jobs(org_type);
+  create index if not exists idx_jobs_country_iso on jobs(country_iso);
+  create index if not exists idx_jobs_level_norm on jobs(level_norm);
+  create index if not exists idx_jobs_international on jobs(international_eligible);
+  create index if not exists idx_jobs_response_phase on jobs(response_phase);
+
+2) Create /infra/seed_taxonomy.sql with minimal seeds:
+- levels: intern,junior,mid,senior,lead,executive
+- missions: health, education, gender, climate, governance, human_rights, wash, livelihoods, economic_growth, peacebuilding, refugees, urban, infrastructure, energy, information_systems, communications, youth, culture, food_security, innovation, mel, cross_sector (include sdg_links arrays)
+- work_modalities: onsite, field, remote, hybrid, home_based, flexible
+- contracts: full_time, part_time, project_based, short_term, freelance, volunteer, fixed_term
+- org_types: un, ingo, ngo, gov, csr, foundation, academic, social_enterprise, network
+- crisis_types: conflict, earthquake, flood, drought, epidemic, cyclone, displacement
+- clusters: health, wash, shelter, protection, cccm, nutrition, education, food_security, logistics, early_recovery
+- response_phases: preparedness, response, recovery, resilience
+- benefits: health_insurance, pension, relocation, visa_sponsorship, housing, travel, hazard_pay
+- policy_flags: pay_transparent, disability_friendly, gender_friendly
+- donors: usaid, giz, eu, world_bank, adb
+- countries: add at least IN India, KE Kenya, US United States, GB United Kingdom, ZA South Africa
+
+3) Update apps/backend/scripts/apply_sql.py to also run seed_taxonomy.sql (idempotent) after supabase.sql and before seed.sql. Print concise summary of new/updated lookup counts.
+
+Run the script and show output.
