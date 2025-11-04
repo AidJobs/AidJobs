@@ -55,6 +55,77 @@ async def dev_status() -> dict[str, Any]:
     }
 
 
+@router.get("/setup/status")
+async def setup_status() -> dict[str, Any]:
+    """
+    Check status of all configured providers.
+    Returns: supabase, meilisearch, payments, ai statuses.
+    """
+    import time
+    from datetime import datetime
+    
+    status = {
+        "supabase": "fail",
+        "meili": "fail",
+        "payments": {
+            "paypal": False,
+            "razorpay": False
+        },
+        "ai": False,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "versions": {
+            "python": "3.11",
+            "fastapi": "0.115.0"
+        },
+        "env_vars": {
+            "supabase": ["SUPABASE_DB_URL", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"],
+            "meilisearch": ["MEILISEARCH_URL", "MEILISEARCH_KEY"],
+            "payments": {
+                "paypal": ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"],
+                "razorpay": ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"]
+            },
+            "ai": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
+        }
+    }
+    
+    # Check Supabase
+    try:
+        conn = _get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            conn.close()
+            status["supabase"] = "ok"
+        else:
+            status["supabase"] = "warn"
+    except Exception as e:
+        status["supabase"] = "fail"
+    
+    # Check Meilisearch
+    try:
+        if search_service and hasattr(search_service, 'client'):
+            health = search_service.client.health()
+            status["meili"] = "ok" if health.get("status") == "available" else "warn"
+        else:
+            status["meili"] = "warn"
+    except Exception:
+        status["meili"] = "fail"
+    
+    # Check payment providers
+    status["payments"]["paypal"] = bool(os.getenv("PAYPAL_CLIENT_ID") and os.getenv("PAYPAL_CLIENT_SECRET"))
+    status["payments"]["razorpay"] = bool(os.getenv("RAZORPAY_KEY_ID") and os.getenv("RAZORPAY_KEY_SECRET"))
+    
+    # Check AI providers
+    status["ai"] = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
+    
+    return {
+        "status": "ok",
+        "data": status
+    }
+
+
 @router.get("/metrics")
 async def get_metrics() -> dict[str, Any]:
     """

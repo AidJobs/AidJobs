@@ -3,6 +3,21 @@
 ## Overview
 AidJobs is an AI-powered job search platform designed specifically for NGOs and INGOs. This is a clean scaffolding setup ready for environment configuration and feature implementation.
 
+## Known Issues
+
+### Frontend Admin Pages (CORS/Mixed Content)
+**Affected Pages:** `/admin/find-earn`, `/admin/setup`
+
+**Issue:** When viewing the app via the Replit preview (HTTPS), the frontend cannot fetch from `http://localhost:8000` due to browser mixed-content policy.
+
+**Solution:** Set the `NEXT_PUBLIC_API_URL` secret to the backend's public HTTPS URL or use the format `https://<replit-domain>:8000`.
+
+**Workaround:** Backend APIs are fully functional and can be tested via curl or direct API calls. Example:
+```bash
+curl http://localhost:8000/admin/setup/status
+curl http://localhost:8000/admin/find-earn/list
+```
+
 ## Architecture
 - **Monorepo Structure**: Clean separation of concerns with apps, packages, infrastructure, and tests
 - **Frontend**: Next.js 14+ with TypeScript, App Router, Tailwind CSS (port 5000)
