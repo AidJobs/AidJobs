@@ -164,6 +164,7 @@ export default function JobInspector({
         role="dialog"
         aria-modal="true"
         aria-labelledby="inspector-title"
+        aria-describedby="inspector-description"
       >
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h2
@@ -180,6 +181,7 @@ export default function JobInspector({
                 aria-label={
                   isShortlisted ? "Remove from shortlist" : "Add to shortlist"
                 }
+                aria-pressed={isShortlisted}
                 title={
                   isShortlisted ? "Remove from shortlist" : "Add to shortlist"
                 }
@@ -262,7 +264,7 @@ export default function JobInspector({
               <h3 className="text-2xl font-bold text-gray-900 mb-2">
                 {displayJob.title}
               </h3>
-              <p className="text-lg text-gray-700">{displayJob.org_name}</p>
+              <p id="inspector-description" className="text-lg text-gray-700">{displayJob.org_name}</p>
             </div>
 
             {displayJob.description_snippet && (

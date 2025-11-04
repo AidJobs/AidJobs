@@ -165,6 +165,9 @@ export default function SavedPage() {
                   );
                 }
 
+                const location = job.country || job.location_raw || 'Location not specified';
+                const ariaLabel = `${job.title} at ${job.org_name}, ${location}`;
+                
                 return (
                   <div
                     key={job.id}
@@ -174,6 +177,7 @@ export default function SavedPage() {
                       <button
                         onClick={(e) => handleOpenJob(job, e.currentTarget)}
                         className="flex-1 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+                        aria-label={ariaLabel}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -217,6 +221,7 @@ export default function SavedPage() {
                         onClick={() => handleRemove(job.id)}
                         className="p-2 hover:bg-red-50 rounded-md transition-colors flex-shrink-0"
                         aria-label="Remove from saved"
+                        aria-pressed="true"
                         title="Remove from saved"
                       >
                         <svg
