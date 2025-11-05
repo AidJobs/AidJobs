@@ -1,0 +1,39 @@
+Add “AI & Model Registry” to Admin (providers, models, routing, diagnostics) without enabling AI features yet.
+
+DB (idempotent):
+- ai_providers(id uuid pk, name text, base_url text, auth_type text, auth_config_json jsonb, enabled bool default true, updated_at timestamptz default now())
+- ai_models(id uuid pk, provider_id uuid references ai_providers(id) on delete cascade, name text, external_name text, default_params_json jsonb, capabilities text[], enabled bool default true, updated_at timestamptz default now())
+- ai_routes(id uuid pk, feature text, model_id uuid references ai_models(id) on delete cascade, priority int default 1, enabled bool default true, updated_at timestamptz default now())
+- Indexes on feature, enabled, priority.
+
+Secrets:
+- Support placeholders like {{SECRET:OPENROUTER_KEY}} only in auth_config_json and headers; resolve from env at call time; never store real values in DB or logs.
+
+Backend (FastAPI, auth-guarded):
+- Providers:
+  GET/POST/PATCH/DELETE /admin/ai/providers
+- Models:
+  GET/POST/PATCH/DELETE /admin/ai/models
+- Routes:
+  GET/POST/PATCH/DELETE /admin/ai/routes
+- Diagnostics:
+  POST /admin/ai/test {model_id, prompt:"ping"} -> returns {ok, latency_ms, tokens?, error?}
+- ModelRouter helper:
+  resolve(feature) -> ordered models; call provider using base_url + headers built from auth_config_json + secrets; fallback on errors; return structured result.
+
+Frontend (Admin):
+- New menu: “AI & Model Registry” with tabs:
+  Providers (table + modal), Models (table + modal), Routing (feature→ordered models), Diagnostics (test form).
+- Preset button: “Add OpenRouter” pre-fills base_url=https://openrouter.ai/api/v1 and header Authorization: Bearer {{SECRET:OPENROUTER_KEY}}.
+- Capabilities multi-select on models: [cv_match, rerank, explanations].
+- Route features list (even if dormant): [rerank, explanations, cv_match].
+- All forms validate; show toasts; paginate lists.
+
+Safety:
+- If AIDJOBS_ENABLE_AI=false -> surfaces as “AI disabled” banner; everything editable but runtime calls are blocked.
+- Never display or log resolved secret values; only ‘present:true’.
+
+Acceptance:
+- Create provider “OpenRouter”, add model “openrouter/anthropic/claude-3.5”.
+- Create route feature=rerank → that model (priority 1).
+- Diagnostics “Test” returns ok (or disabled if AIDJOBS_ENABLE_AI=false).
