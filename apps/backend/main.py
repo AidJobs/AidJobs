@@ -249,6 +249,26 @@ async def admin_search_settings():
     return await search_service.get_search_settings()
 
 
+@app.post("/admin/search/init")
+async def admin_search_init():
+    """Initialize Meilisearch index (dev-only, idempotent)"""
+    env = os.getenv("AIDJOBS_ENV", "").lower()
+    if env != "dev":
+        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+    
+    try:
+        search_service._init_meilisearch()
+        return {
+            "success": True,
+            "message": "Meilisearch index initialized successfully"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @app.get("/admin/search/reindex")
 @app.post("/admin/search/reindex")
 async def admin_search_reindex():
