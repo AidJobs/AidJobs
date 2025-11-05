@@ -216,6 +216,14 @@ See `env.example` for the complete list of 25 environment variables. The applica
   - Returns `{authenticated: true|false}`
 
 #### Admin Pages (Frontend)
+- **Admin Layout** (`apps/frontend/app/admin/layout.tsx`):
+  - Dedicated layout for all `/admin/*` routes (separate from public theme)
+  - AdminTopBar component with navigation: Dashboard, Sources, Crawler, Find & Earn, Setup
+  - Dark slate header with active link highlighting (jade green underline)
+  - "View Site" and "Logout" buttons in header
+  - Sonner toast provider for notifications
+  - Plain Tailwind styling (no theme providers)
+
 - `/admin/login` - Login form with password input
   - Redirects to `/admin` on successful authentication
   - Shows generic error message on invalid credentials
