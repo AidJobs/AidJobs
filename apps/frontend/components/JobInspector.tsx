@@ -21,6 +21,7 @@ type Job = {
   benefits?: string[];
   policy_flags?: string[];
   description_snippet?: string;
+  reasons?: string[];
 };
 
 type JobInspectorProps = {
@@ -264,7 +265,19 @@ export default function JobInspector({
               <h3 className="text-2xl font-bold text-gray-900 mb-2">
                 {displayJob.title}
               </h3>
-              <p id="inspector-description" className="text-lg text-gray-700">{displayJob.org_name}</p>
+              <p id="inspector-description" className="text-lg text-gray-700 mb-2">{displayJob.org_name}</p>
+              {displayJob.reasons && displayJob.reasons.length > 0 && (
+                <div className="flex gap-2">
+                  {displayJob.reasons.map((reason, idx) => (
+                    <span 
+                      key={idx}
+                      className="px-2.5 py-1 text-sm font-medium text-blue-700 bg-blue-50 rounded-md"
+                    >
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {displayJob.description_snippet && (
