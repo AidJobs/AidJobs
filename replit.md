@@ -118,6 +118,13 @@ curl http://localhost:8000/admin/find-earn/list
   - Core modules: net.py (HTTP client), robots.py (parser), domain_limits.py (token bucket rate limiter)
   - Crawler modules: html_fetch.py (HTML parser), rss_fetch.py (RSS/Atom), api_fetch.py (JSON APIs)
   - Orchestrator: automatic 5-minute scheduler, manual triggers, adaptive next_run_at calculation
+  - **RSS Ingestion Path** with full normalization:
+    - RSSCrawler.fetch_feed() parses RSS/Atom feeds and extracts: title, apply_url, description_snippet, published date
+    - RSSCrawler.normalize_job() enriches raw jobs with: level_norm, career_type, work_modality, mission_tags, international_eligible, country_iso, canonical_hash
+    - Orchestrator routes RSS sources through RSSCrawler normalization (HTML/API sources use HTMLCrawler)
+    - fetch_rss_jobs() wrapper for simulate_extract with time_window filtering
+    - All normalized jobs upserted to database with deduplication via canonical_hash
+    - Admin UI supports RSS source type in dropdown with test/simulate functionality
 
 - **Admin Sources CRUD** with test/simulate and auto-queue:
   - Backend endpoints (auth-guarded):
