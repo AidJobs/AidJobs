@@ -114,8 +114,28 @@ curl http://localhost:8000/admin/find-earn/list
   - Crawler modules: html_fetch.py (HTML parser), rss_fetch.py (RSS/Atom), api_fetch.py (JSON APIs)
   - Orchestrator: automatic 5-minute scheduler, manual triggers, adaptive next_run_at calculation
 
+- **Admin Sources CRUD** with test/simulate and auto-queue:
+  - Backend endpoints (auth-guarded):
+    - `GET /admin/sources` - List with pagination, status filtering (active/paused/deleted/all), and search query
+    - `POST /admin/sources` - Create with auto-queue (sets next_run_at=now() for immediate crawl)
+    - `PATCH /admin/sources/:id` - Update source fields (org_name, careers_url, source_type, org_type, crawl_frequency_days, parser_hint, time_window, status)
+    - `DELETE /admin/sources/:id` - Soft delete (sets status='deleted')
+    - `POST /admin/sources/:id/test` - HEAD fetch for connectivity check (returns ok, status, size, etag, last_modified, host)
+    - `POST /admin/sources/:id/simulate_extract` - Fetch and parse without DB writes (returns first 3 normalized items)
+  - Frontend page at `/admin/sources`:
+    - Table with columns: Org, URL, Type, Status, Freq(d), Next run, Last crawl, Last status, Actions
+    - Status filter dropdown (Active/Paused/Deleted/All)
+    - Search input (filters by org name or URL)
+    - Action buttons: Run Now, Pause/Resume, Edit, Delete, Test, Simulate
+    - Add Source modal with all fields and validation
+    - Edit Source modal pre-filled with current values
+    - Toast notifications for all operations
+    - Pagination with page navigation
+  - Auto-queue: Creating a source automatically sets next_run_at=now() to trigger immediate crawl
+  - All endpoints use admin_required authentication dependency
+
 🔨 **Not Yet Implemented**:
-- Frontend admin pages for crawler management (Sources, Crawl Status, Settings)
+- Frontend admin pages for crawler status monitoring and settings
 - Backend shortlist persistence (currently client-side only)
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
