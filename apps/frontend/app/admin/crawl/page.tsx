@@ -285,24 +285,24 @@ export default function AdminCrawlPage() {
   const selectedSource = sources.find(s => s.id === selectedSourceId);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-surface">
+    <div>
+      <div className="border-b border-gray-200 bg-white">
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">Crawler Status</h1>
-              <p className="text-sm text-muted mt-1">Monitor and manage web crawler</p>
+              <h1 className="text-2xl font-semibold text-gray-900">Crawler Status</h1>
+              <p className="text-sm text-gray-600 mt-1">Monitor and manage web crawler</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleRunDue}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Run Due Sources
               </button>
               <button
                 onClick={handleRefreshStatus}
-                className="px-4 py-2 bg-surface border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Refresh Status
               </button>
@@ -311,9 +311,9 @@ export default function AdminCrawlPage() {
 
           {crawlStatus && (
             <div className="grid grid-cols-5 gap-4 text-sm">
-              <div className="bg-background border border-border rounded-lg p-3">
-                <div className="text-muted mb-1">Status</div>
-                <div className="text-lg font-semibold text-foreground">
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-gray-600 mb-1">Status</div>
+                <div className="text-lg font-semibold text-gray-900">
                   {crawlStatus.running ? (
                     <span className="text-green-600">Running</span>
                   ) : (
@@ -321,21 +321,21 @@ export default function AdminCrawlPage() {
                   )}
                 </div>
               </div>
-              <div className="bg-background border border-border rounded-lg p-3">
-                <div className="text-muted mb-1">Due Now</div>
-                <div className="text-lg font-semibold text-foreground">{crawlStatus.due_count}</div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-gray-600 mb-1">Due Now</div>
+                <div className="text-lg font-semibold text-gray-900">{crawlStatus.due_count}</div>
               </div>
-              <div className="bg-background border border-border rounded-lg p-3">
-                <div className="text-muted mb-1">In Flight</div>
-                <div className="text-lg font-semibold text-foreground">{crawlStatus.in_flight}</div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-gray-600 mb-1">In Flight</div>
+                <div className="text-lg font-semibold text-gray-900">{crawlStatus.in_flight}</div>
               </div>
-              <div className="bg-background border border-border rounded-lg p-3">
-                <div className="text-muted mb-1">Available Slots</div>
-                <div className="text-lg font-semibold text-foreground">{crawlStatus.pool.available}/{crawlStatus.pool.global_max}</div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-gray-600 mb-1">Available Slots</div>
+                <div className="text-lg font-semibold text-gray-900">{crawlStatus.pool.available}/{crawlStatus.pool.global_max}</div>
               </div>
-              <div className="bg-background border border-border rounded-lg p-3">
-                <div className="text-muted mb-1">Locked</div>
-                <div className="text-lg font-semibold text-foreground">{crawlStatus.locked}</div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="text-gray-600 mb-1">Locked</div>
+                <div className="text-lg font-semibold text-gray-900">{crawlStatus.locked}</div>
               </div>
             </div>
           )}
@@ -345,8 +345,8 @@ export default function AdminCrawlPage() {
       <div className="max-w-[1800px] mx-auto px-6 py-6">
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-1">
-            <div className="bg-surface border border-border rounded-lg p-4">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sources</h2>
               
               <div className="mb-4 space-y-2">
                 <input
@@ -354,12 +354,12 @@ export default function AdminCrawlPage() {
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                 />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                 >
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
@@ -368,9 +368,9 @@ export default function AdminCrawlPage() {
               </div>
 
               {loading ? (
-                <div className="text-center text-muted py-8">Loading...</div>
+                <div className="text-center text-gray-600 py-8">Loading...</div>
               ) : sources.length === 0 ? (
-                <div className="text-center text-muted py-8">No sources found</div>
+                <div className="text-center text-gray-600 py-8">No sources found</div>
               ) : (
                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {sources.map((source) => (
@@ -380,13 +380,13 @@ export default function AdminCrawlPage() {
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                         selectedSourceId === source.id
                           ? 'border-primary bg-primary/5'
-                          : 'border-border bg-background hover:bg-muted'
+                          : 'border-gray-200 bg-white hover:bg-gray-100'
                       }`}
                     >
-                      <div className="font-medium text-foreground mb-1">
+                      <div className="font-medium text-gray-900 mb-1">
                         {source.org_name || 'Unnamed'}
                       </div>
-                      <div className="text-xs text-muted mb-2 truncate">
+                      <div className="text-xs text-gray-600 mb-2 truncate">
                         {source.careers_url}
                       </div>
                       <div className="flex items-center justify-between text-xs">
@@ -407,7 +407,7 @@ export default function AdminCrawlPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-muted mt-2">
+                      <div className="text-xs text-gray-600 mt-2">
                         Next: {formatDate(source.next_run_at)}
                       </div>
                     </div>
@@ -419,24 +419,24 @@ export default function AdminCrawlPage() {
 
           <div className="col-span-2 space-y-6">
             {selectedSource && (
-              <div className="bg-surface border border-border rounded-lg p-4">
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground">
+                    <h2 className="text-lg font-semibold text-gray-900">
                       {selectedSource.org_name || 'Unnamed'}
                     </h2>
-                    <p className="text-sm text-muted">{selectedSource.careers_url}</p>
+                    <p className="text-sm text-gray-600">{selectedSource.careers_url}</p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleRunSource(selectedSource.id)}
-                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
                     >
                       Run Now
                     </button>
                     <button
                       onClick={() => handleOpenPolicyEditor(selectedSource.careers_url)}
-                      className="px-3 py-1.5 bg-surface border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm"
+                      className="px-3 py-1.5 bg-white border border-gray-200 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors text-sm"
                     >
                       Domain Policy
                     </button>
@@ -445,41 +445,41 @@ export default function AdminCrawlPage() {
               </div>
             )}
 
-            <div className="bg-surface border border-border rounded-lg p-4">
-              <h2 className="text-lg font-semibold text-foreground mb-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Crawl Logs {selectedSource && `(${selectedSource.org_name || 'Unnamed'})`}
               </h2>
 
               {logsLoading ? (
-                <div className="text-center text-muted py-8">Loading...</div>
+                <div className="text-center text-gray-600 py-8">Loading...</div>
               ) : logs.length === 0 ? (
-                <div className="text-center text-muted py-8">No logs found</div>
+                <div className="text-center text-gray-600 py-8">No logs found</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="pb-2 text-muted font-medium">Time</th>
-                        <th className="pb-2 text-muted font-medium">Org</th>
-                        <th className="pb-2 text-muted font-medium text-right">Found</th>
-                        <th className="pb-2 text-muted font-medium text-right">Inserted</th>
-                        <th className="pb-2 text-muted font-medium text-right">Updated</th>
-                        <th className="pb-2 text-muted font-medium text-right">Skipped</th>
-                        <th className="pb-2 text-muted font-medium text-right">Duration</th>
-                        <th className="pb-2 text-muted font-medium">Status</th>
-                        <th className="pb-2 text-muted font-medium">Message</th>
+                      <tr className="border-b border-gray-200 text-left">
+                        <th className="pb-2 text-gray-600 font-medium">Time</th>
+                        <th className="pb-2 text-gray-600 font-medium">Org</th>
+                        <th className="pb-2 text-gray-600 font-medium text-right">Found</th>
+                        <th className="pb-2 text-gray-600 font-medium text-right">Inserted</th>
+                        <th className="pb-2 text-gray-600 font-medium text-right">Updated</th>
+                        <th className="pb-2 text-gray-600 font-medium text-right">Skipped</th>
+                        <th className="pb-2 text-gray-600 font-medium text-right">Duration</th>
+                        <th className="pb-2 text-gray-600 font-medium">Status</th>
+                        <th className="pb-2 text-gray-600 font-medium">Message</th>
                       </tr>
                     </thead>
                     <tbody>
                       {logs.map((log) => (
-                        <tr key={log.id} className="border-b border-border">
-                          <td className="py-2 text-foreground">{formatDate(log.ran_at)}</td>
-                          <td className="py-2 text-foreground">{log.org_name || 'Unnamed'}</td>
-                          <td className="py-2 text-foreground text-right">{log.found}</td>
-                          <td className="py-2 text-foreground text-right">{log.inserted}</td>
-                          <td className="py-2 text-foreground text-right">{log.updated}</td>
-                          <td className="py-2 text-foreground text-right">{log.skipped}</td>
-                          <td className="py-2 text-foreground text-right">{formatDuration(log.duration_ms)}</td>
+                        <tr key={log.id} className="border-b border-gray-200">
+                          <td className="py-2 text-gray-900">{formatDate(log.ran_at)}</td>
+                          <td className="py-2 text-gray-900">{log.org_name || 'Unnamed'}</td>
+                          <td className="py-2 text-gray-900 text-right">{log.found}</td>
+                          <td className="py-2 text-gray-900 text-right">{log.inserted}</td>
+                          <td className="py-2 text-gray-900 text-right">{log.updated}</td>
+                          <td className="py-2 text-gray-900 text-right">{log.skipped}</td>
+                          <td className="py-2 text-gray-900 text-right">{formatDuration(log.duration_ms)}</td>
                           <td className="py-2">
                             <span className={`px-2 py-0.5 rounded text-xs ${
                               log.status === 'success' ? 'bg-green-100 text-green-700' :
@@ -489,7 +489,7 @@ export default function AdminCrawlPage() {
                               {log.status}
                             </span>
                           </td>
-                          <td className="py-2 text-muted text-xs max-w-xs truncate">
+                          <td className="py-2 text-gray-600 text-xs max-w-xs truncate">
                             {log.message || '-'}
                           </td>
                         </tr>
@@ -505,72 +505,72 @@ export default function AdminCrawlPage() {
 
       {showPolicyEditor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface border border-border rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Domain Policy: {policyHost}
             </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Max Concurrency
                 </label>
                 <input
                   type="number"
                   value={policy.max_concurrency}
                   onChange={(e) => setPolicy({ ...policy, max_concurrency: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                   min="1"
                   max="10"
                 />
-                <p className="text-xs text-muted mt-1">Simultaneous requests to this domain</p>
+                <p className="text-xs text-gray-600 mt-1">Simultaneous requests to this domain</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Min Request Interval (ms)
                 </label>
                 <input
                   type="number"
                   value={policy.min_request_interval_ms}
                   onChange={(e) => setPolicy({ ...policy, min_request_interval_ms: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                   min="100"
                   max="60000"
                   step="100"
                 />
-                <p className="text-xs text-muted mt-1">Delay between requests to this domain</p>
+                <p className="text-xs text-gray-600 mt-1">Delay between requests to this domain</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Max Pages
                 </label>
                 <input
                   type="number"
                   value={policy.max_pages}
                   onChange={(e) => setPolicy({ ...policy, max_pages: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                   min="1"
                   max="100"
                 />
-                <p className="text-xs text-muted mt-1">Maximum pages to crawl per session</p>
+                <p className="text-xs text-gray-600 mt-1">Maximum pages to crawl per session</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label className="block text-sm font-medium text-gray-900 mb-1">
                   Max KB per Page
                 </label>
                 <input
                   type="number"
                   value={policy.max_kb_per_page}
                   onChange={(e) => setPolicy({ ...policy, max_kb_per_page: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
                   min="100"
                   max="10240"
                   step="100"
                 />
-                <p className="text-xs text-muted mt-1">Maximum page size to download</p>
+                <p className="text-xs text-gray-600 mt-1">Maximum page size to download</p>
               </div>
 
               <div className="flex items-center">
@@ -581,7 +581,7 @@ export default function AdminCrawlPage() {
                   onChange={(e) => setPolicy({ ...policy, allow_js: e.target.checked })}
                   className="mr-2"
                 />
-                <label htmlFor="allow_js" className="text-sm font-medium text-foreground">
+                <label htmlFor="allow_js" className="text-sm font-medium text-gray-900">
                   Allow JavaScript
                 </label>
               </div>
@@ -590,13 +590,13 @@ export default function AdminCrawlPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSavePolicy}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Save Policy
               </button>
               <button
                 onClick={() => setShowPolicyEditor(false)}
-                className="flex-1 px-4 py-2 bg-surface border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+                className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 Cancel
               </button>

@@ -219,10 +219,11 @@ See `env.example` for the complete list of 25 environment variables. The applica
 - **Admin Layout** (`apps/frontend/app/admin/layout.tsx`):
   - Dedicated layout for all `/admin/*` routes (separate from public theme)
   - AdminTopBar component with navigation: Dashboard, Sources, Crawler, Find & Earn, Setup
-  - Dark slate header with active link highlighting (jade green underline)
+  - Dark slate header (bg-slate-800) with active link highlighting
   - "View Site" and "Logout" buttons in header
   - Sonner toast provider for notifications
-  - Plain Tailwind styling (no theme providers)
+  - Plain Tailwind styling (no theme CSS variables or providers)
+  - All admin pages use standard Tailwind colors (gray-*, blue-*, green-*, red-*) instead of theme tokens
 
 - `/admin/login` - Login form with password input
   - Redirects to `/admin` on successful authentication

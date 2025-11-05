@@ -333,32 +333,32 @@ export default function AdminSourcesPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Sources Management</h1>
-            <p className="text-muted-foreground mt-1">Manage job board crawl sources</p>
+            <h1 className="text-3xl font-bold text-gray-900">Sources Management</h1>
+            <p className="text-gray-600 mt-1">Manage job board crawl sources</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Add Source
           </button>
         </div>
 
-        <div className="bg-surface border border-border rounded-lg shadow mb-6 p-4">
+        <div className="bg-white border border-gray-200 rounded-lg shadow mb-6 p-4">
           <div className="flex gap-4 items-center">
             <div>
-              <label className="text-sm text-muted-foreground mr-2">Status:</label>
+              <label className="text-sm text-gray-600 mr-2">Status:</label>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
-                className="border border-border rounded px-3 py-1 bg-background text-foreground"
+                className="border border-gray-300 rounded px-3 py-1 bg-white text-gray-900"
               >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
@@ -375,60 +375,60 @@ export default function AdminSourcesPage() {
                   setSearchQuery(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-border rounded px-3 py-1 bg-background text-foreground"
+                className="w-full border border-gray-300 rounded px-3 py-1 bg-white text-gray-900"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-surface border border-border rounded-lg shadow overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg shadow overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-muted-foreground">Loading...</div>
+            <div className="p-8 text-center text-gray-600">Loading...</div>
           ) : sources.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No sources found</div>
+            <div className="p-8 text-center text-gray-600">No sources found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-surface-2 border-b border-border">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Org</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">URL</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Freq (d)</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Next run</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Last crawl</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Last status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Org</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">URL</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Freq (d)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next run</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last crawl</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-gray-200">
                   {sources.map((source) => (
-                    <tr key={source.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-3 text-sm text-foreground">{source.org_name || '-'}</td>
+                    <tr key={source.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{source.org_name || '-'}</td>
                       <td className="px-4 py-3 text-sm">
-                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                           {source.careers_url.substring(0, 40)}...
                         </a>
                       </td>
-                      <td className="px-4 py-3 text-sm text-foreground">{source.source_type}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{source.source_type}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          source.status === 'active' ? 'bg-accent text-accent-foreground' :
-                          source.status === 'paused' ? 'bg-muted text-muted-foreground' :
-                          'bg-danger/10 text-danger'
+                          source.status === 'active' ? 'bg-green-100 text-green-700' :
+                          source.status === 'paused' ? 'bg-gray-100 text-gray-700' :
+                          'bg-red-100 text-red-700'
                         }`}>
                           {source.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-foreground">{source.crawl_frequency_days || '-'}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(source.next_run_at)}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(source.last_crawled_at)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{source.crawl_frequency_days || '-'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{formatDate(source.next_run_at)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{formatDate(source.last_crawled_at)}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          source.last_crawl_status === 'success' ? 'bg-accent text-accent-foreground' :
-                          source.last_crawl_status === 'error' ? 'bg-danger/10 text-danger' :
-                          'bg-muted text-muted-foreground'
+                          source.last_crawl_status === 'success' ? 'bg-green-100 text-green-700' :
+                          source.last_crawl_status === 'error' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
                         }`}>
                           {source.last_crawl_status || '-'}
                         </span>
@@ -437,7 +437,7 @@ export default function AdminSourcesPage() {
                         <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => handleRunNow(source.id)}
-                            className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:opacity-90"
+                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
                           >
                             Run
                           </button>
@@ -445,33 +445,33 @@ export default function AdminSourcesPage() {
                             onClick={() => handleToggleStatus(source)}
                             className={`text-xs px-2 py-1 rounded ${
                               source.status === 'active'
-                                ? 'bg-muted text-muted-foreground hover:opacity-90'
-                                : 'bg-accent text-accent-foreground hover:opacity-90'
+                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                : 'bg-green-600 text-white hover:bg-green-700'
                             }`}
                           >
                             {source.status === 'active' ? 'Pause' : 'Resume'}
                           </button>
                           <button
                             onClick={() => openEditModal(source)}
-                            className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded hover:opacity-90"
+                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteSource(source.id)}
-                            className="text-xs px-2 py-1 bg-danger/10 text-danger rounded hover:bg-danger/20"
+                            className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
                           >
                             Delete
                           </button>
                           <button
                             onClick={() => handleTestSource(source.id)}
-                            className="text-xs px-2 py-1 bg-surface-2 text-foreground rounded hover:bg-muted"
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             Test
                           </button>
                           <button
                             onClick={() => handleSimulateExtract(source.id)}
-                            className="text-xs px-2 py-1 bg-surface-2 text-foreground rounded hover:bg-muted"
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             Simulate
                           </button>
@@ -485,25 +485,25 @@ export default function AdminSourcesPage() {
           )}
 
           {totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-border flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
+            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
                 Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-border rounded disabled:opacity-50 hover:bg-surface-2"
+                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
                 >
                   Previous
                 </button>
-                <span className="px-3 py-1 text-foreground">
+                <span className="px-3 py-1 text-gray-900">
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 border border-border rounded disabled:opacity-50 hover:bg-surface-2"
+                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
                 >
                   Next
                 </button>
@@ -515,48 +515,48 @@ export default function AdminSourcesPage() {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-surface border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {showAddModal ? 'Add Source' : 'Edit Source'}
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Organization Name
                   </label>
                   <input
                     type="text"
                     value={formData.org_name}
                     onChange={(e) => setFormData({ ...formData, org_name: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     placeholder="e.g., UNICEF"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Careers URL *
                   </label>
                   <input
                     type="url"
                     value={formData.careers_url}
                     onChange={(e) => setFormData({ ...formData, careers_url: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     placeholder="https://example.org/careers"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Source Type
                   </label>
                   <select
                     value={formData.source_type}
                     onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                   >
                     <option value="html">HTML</option>
                     <option value="rss">RSS</option>
@@ -565,53 +565,53 @@ export default function AdminSourcesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Organization Type
                   </label>
                   <input
                     type="text"
                     value={formData.org_type}
                     onChange={(e) => setFormData({ ...formData, org_type: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     placeholder="e.g., UN, NGO, INGO"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Crawl Frequency (days)
                   </label>
                   <input
                     type="number"
                     value={formData.crawl_frequency_days}
                     onChange={(e) => setFormData({ ...formData, crawl_frequency_days: parseInt(e.target.value) })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     min="1"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Parser Hint
                   </label>
                   <input
                     type="text"
                     value={formData.parser_hint}
                     onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     placeholder="Optional: parser-specific hints"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Time Window (days)
                   </label>
                   <input
                     type="text"
                     value={formData.time_window}
                     onChange={(e) => setFormData({ ...formData, time_window: e.target.value })}
-                    className="w-full border border-border rounded px-3 py-2 bg-background text-foreground"
+                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
                     placeholder="Optional: time window for RSS feeds"
                   />
                 </div>
@@ -625,13 +625,13 @@ export default function AdminSourcesPage() {
                     setEditingSource(null);
                     resetForm();
                   }}
-                  className="px-4 py-2 border border-border rounded hover:bg-surface-2"
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={showAddModal ? handleAddSource : handleEditSource}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   {showAddModal ? 'Create Source' : 'Save Changes'}
                 </button>
