@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [reindexing, setReindexing] = useState(false);
+  const [initializing, setInitializing] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (message: string, type: 'success' | 'error') => {
@@ -111,10 +112,34 @@ export default function AdminPage() {
     }
   };
 
+  const handleInitialize = async () => {
+    setInitializing(true);
+    try {
+      const response = await fetch('/admin/search/init', {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        addToast('Search index initialized successfully', 'success');
+        await fetchStatus();
+      } else {
+        addToast(`Initialization failed: ${data.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Initialize error:', error);
+      addToast('Initialization request failed', 'error');
+    } finally {
+      setInitializing(false);
+    }
+  };
+
   const handleReindex = async () => {
     setReindexing(true);
     try {
-      const response = await fetch('/admin/search/reindex');
+      const response = await fetch('/admin/search/reindex', {
+        method: 'POST',
+      });
       const data: ReindexResult = await response.json();
 
       if (data.error) {
@@ -124,7 +149,7 @@ export default function AdminPage() {
           `Reindexed ${data.indexed} jobs in ${data.duration_ms}ms`,
           'success'
         );
-        fetchStatus();
+        await fetchStatus();
       }
     } catch (error) {
       console.error('Reindex error:', error);
@@ -263,10 +288,28 @@ export default function AdminPage() {
                     </span>
                   </div>
                 </div>
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    onClick={handleReindex}
+                    disabled={reindexing}
+                    className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                  >
+                    {reindexing ? 'Reindexing...' : 'Reindex Now'}
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="text-sm text-red-600">
-                {searchStatus?.error || 'Search not enabled'}
+              <div className="space-y-3">
+                <div className="text-sm text-red-600 mb-3">
+                  {searchStatus?.error || 'Search not enabled'}
+                </div>
+                <button
+                  onClick={handleInitialize}
+                  disabled={initializing}
+                  className="w-full px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                >
+                  {initializing ? 'Initializing...' : 'Initialize Index'}
+                </button>
               </div>
             )}
           </div>
@@ -275,13 +318,6 @@ export default function AdminPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
           <div className="flex gap-4">
-            <button
-              onClick={handleReindex}
-              disabled={reindexing || !searchStatus?.enabled}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
-              {reindexing ? 'Reindexing...' : 'Reindex Search'}
-            </button>
             <button
               onClick={fetchStatus}
               disabled={loading}

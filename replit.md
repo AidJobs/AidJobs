@@ -209,10 +209,36 @@ In development (`AIDJOBS_ENV=dev`):
   - For site administrators to reach out if needed
 
 ### Feature Flags
-- `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch
+- `AIDJOBS_ENABLE_SEARCH` - Enable/disable Meilisearch (default: true)
 - `AIDJOBS_ENABLE_CV` - Enable/disable CV upload
 - `AIDJOBS_ENABLE_FINDEARN` - Enable/disable Find & Earn
 - `AIDJOBS_ENABLE_PAYMENTS` - Enable/disable payment processing
+
+### Meilisearch Configuration
+
+The platform supports dual environment variable sets for Meilisearch (checked in priority order):
+
+**Primary (recommended):**
+- **MEILISEARCH_URL**: Meilisearch host URL (e.g., http://localhost:7700)
+- **MEILISEARCH_KEY**: Meilisearch API key for admin access
+
+**Legacy fallback:**
+- **MEILI_HOST**: Meilisearch host URL
+- **MEILI_API_KEY**: Meilisearch API key (falls back to MEILI_MASTER_KEY)
+
+**Index configuration:**
+- **MEILI_JOBS_INDEX**: Index name (default: "jobs_index")
+
+**Index settings (auto-configured on bootstrap):**
+- **searchableAttributes**: ['title', 'org_name', 'description_snippet', 'mission_tags']
+- **filterableAttributes**: ['country', 'level_norm', 'mission_tags', 'international_eligible', 'org_type', 'work_modality', 'career_type', 'country_iso', 'region_code', 'crisis_type', 'response_phase', 'humanitarian_cluster', 'benefits', 'policy_flags', 'donor_context', 'project_modality', 'application_window.rolling', 'status']
+- **sortableAttributes**: ['fetched_at', 'deadline', 'last_seen_at', 'compensation_min_usd', 'compensation_max_usd']
+- **distinctAttribute**: 'canonical_hash'
+
+**Admin endpoints (dev-only):**
+- `GET /admin/search/status` - Get index status and document count
+- `POST /admin/search/init` - Initialize/reinitialize Meilisearch index (idempotent)
+- `POST /admin/search/reindex` - Reindex all active jobs from database
 
 ## Web Crawler
 
