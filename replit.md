@@ -36,6 +36,11 @@ curl http://localhost:8000/admin/find-earn/list
 - Admin config endpoint (`/admin/config/env`) showing environment variable presence
 - Search endpoints with graceful degradation (`/api/search/query`, `/api/search/facets`)
 - **Smart Search UI** with debounced input, inline filters, results list, and inspector drawer
+- **International Filter & Relevance Reasons**:
+  - Backend support for `international_eligible` filter parameter in search
+  - Reasons computation logic generates max 3 relevance reasons per job (mission match, international eligible, level match)
+  - Frontend displays reasons as blue chips on result cards and in inspector drawer
+  - International eligible checkbox filter in search UI with facet count
 - Keyboard shortcuts: `/` to focus search, `Enter` to open inspector, `Esc` to close inspector
 - Accessibility with visible focus states and keyboard navigation
 - Frontend capabilities integration with search status banner
