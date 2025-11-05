@@ -47,8 +47,18 @@ class SearchService:
         if not meilisearch:
             return False
         enabled = os.getenv("AIDJOBS_ENABLE_SEARCH", "true").lower() == "true"
-        has_config = bool(os.getenv("MEILI_HOST") and os.getenv("MEILI_MASTER_KEY"))
+        has_config = bool(self._get_meili_config()[0] and self._get_meili_config()[1])
         return enabled and has_config
+    
+    def _get_meili_config(self) -> tuple[Optional[str], Optional[str]]:
+        """Get Meilisearch host and key from environment variables.
+        
+        Checks MEILISEARCH_URL/MEILISEARCH_KEY first, then falls back to MEILI_HOST/MEILI_API_KEY.
+        Returns: (host, key) tuple
+        """
+        host = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_HOST")
+        key = os.getenv("MEILISEARCH_KEY") or os.getenv("MEILI_API_KEY") or os.getenv("MEILI_MASTER_KEY")
+        return (host, key)
 
     def _is_db_enabled(self) -> bool:
         return db_config.is_db_enabled
@@ -56,8 +66,10 @@ class SearchService:
     def _init_meilisearch(self) -> None:
         """Initialize Meilisearch client and configure index. Never crashes."""
         try:
-            meili_host = os.getenv("MEILI_HOST")
-            meili_key = os.getenv("MEILI_MASTER_KEY")
+            meili_host, meili_key = self._get_meili_config()
+            
+            if not meili_host or not meili_key:
+                raise ValueError("Meilisearch host and key must be configured")
             
             self.meili_client = meilisearch.Client(meili_host, meili_key)
             
@@ -75,19 +87,19 @@ class SearchService:
                     'title',
                     'org_name',
                     'description_snippet',
-                    'mission_tags',
-                    'functional_tags'
+                    'mission_tags'
                 ])
                 
                 index.update_filterable_attributes([
-                    'career_type',
-                    'work_modality',
-                    'country_iso',
-                    'region_code',
+                    'country',
                     'level_norm',
                     'mission_tags',
                     'international_eligible',
                     'org_type',
+                    'work_modality',
+                    'career_type',
+                    'country_iso',
+                    'region_code',
                     'crisis_type',
                     'response_phase',
                     'humanitarian_cluster',
@@ -100,11 +112,14 @@ class SearchService:
                 ])
                 
                 index.update_sortable_attributes([
+                    'fetched_at',
                     'deadline',
                     'last_seen_at',
                     'compensation_min_usd',
                     'compensation_max_usd'
                 ])
+                
+                index.update_distinct_attribute('canonical_hash')
                 
                 logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' configured successfully")
             except Exception as e:
