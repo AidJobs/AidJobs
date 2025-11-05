@@ -405,3 +405,49 @@ async def upsert_jobs(jobs: List[Dict], source_id: str) -> Dict[str, int]:
     
     crawler = HTMLCrawler(db_url)
     return await crawler.upsert_jobs(jobs, source_id)
+
+
+async def fetch_html_jobs(
+    url: str,
+    org_name: str,
+    org_type: Optional[str] = None,
+    parser_hint: Optional[str] = None,
+    conn_params: Optional[Dict] = None
+) -> List[Dict]:
+    """
+    Fetch and normalize HTML jobs (wrapper for simulate_extract).
+    
+    Returns:
+        List of normalized job dicts ready for display or upsert
+    """
+    import os
+    
+    # Get DB URL
+    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+    if not db_url:
+        logger.warning("[html_fetch] No database URL available")
+        return []
+    
+    # Create crawler
+    crawler = HTMLCrawler(db_url)
+    
+    # Fetch HTML
+    status, headers, html, size = await crawler.fetch_html(url)
+    
+    if status != 200:
+        logger.warning(f"[html_fetch] Non-200 status for {url}: {status}")
+        return []
+    
+    # Extract jobs
+    raw_jobs = crawler.extract_jobs(html, url, parser_hint)
+    
+    if not raw_jobs:
+        return []
+    
+    # Normalize jobs
+    normalized_jobs = [
+        crawler.normalize_job(job, org_name)
+        for job in raw_jobs
+    ]
+    
+    return normalized_jobs

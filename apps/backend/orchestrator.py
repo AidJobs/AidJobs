@@ -171,8 +171,18 @@ class CrawlerOrchestrator:
             # Fetch based on type
             if source_type == 'rss':
                 raw_jobs = await self.rss_crawler.fetch_feed(url)
+                # Normalize using RSS crawler
+                normalized_jobs = [
+                    self.rss_crawler.normalize_job(job, source.get('org_name'))
+                    for job in raw_jobs
+                ]
             elif source_type == 'api':
                 raw_jobs = await self.api_crawler.fetch_api(url, source.get('parser_hint'))
+                # Normalize using HTML crawler (API jobs are similar to HTML)
+                normalized_jobs = [
+                    self.html_crawler.normalize_job(job, source.get('org_name'))
+                    for job in raw_jobs
+                ]
             else:  # html (default)
                 status, headers, html, size = await self.html_crawler.fetch_html(url)
                 
@@ -203,12 +213,11 @@ class CrawlerOrchestrator:
                     }
                 
                 raw_jobs = self.html_crawler.extract_jobs(html, url, source.get('parser_hint'))
-            
-            # Normalize jobs
-            normalized_jobs = [
-                self.html_crawler.normalize_job(job, source.get('org_name'))
-                for job in raw_jobs
-            ]
+                # Normalize using HTML crawler
+                normalized_jobs = [
+                    self.html_crawler.normalize_job(job, source.get('org_name'))
+                    for job in raw_jobs
+                ]
             
             # Upsert to database
             counts = await self.html_crawler.upsert_jobs(normalized_jobs, source_id)
