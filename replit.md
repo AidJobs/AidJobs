@@ -134,8 +134,31 @@ curl http://localhost:8000/admin/find-earn/list
   - Auto-queue: Creating a source automatically sets next_run_at=now() to trigger immediate crawl
   - All endpoints use admin_required authentication dependency
 
+- **Admin Crawler UI** with real-time status monitoring:
+  - Backend endpoints (all auth-guarded):
+    - `POST /admin/crawl/run` - Trigger crawl for specific source
+    - `POST /admin/crawl/run_due` - Trigger all due sources
+    - `GET /admin/crawl/status` - Get crawler status (running, due_count, in_flight, locks, pool availability)
+    - `GET /admin/crawl/logs` - Get crawl logs with optional source_id and limit
+    - `GET /admin/domain_policies/:host` - Get domain policy (or defaults)
+    - `POST /admin/domain_policies/:host` - Create/update domain policy
+  - Frontend page at `/admin/crawl`:
+    - Top bar: "Run Due Sources" and "Refresh Status" buttons
+    - Status dashboard: Running status, Due count, In flight, Available slots, Locked count
+    - Left panel (1/3): Sources list with status filter (Active/Paused/All), search, and selection
+      - Shows: org name, URL, status badges, last crawl status, next run time
+      - Click to select and view logs
+    - Right panel (2/3):
+      - Selected source info with "Run Now" and "Domain Policy" buttons
+      - Logs table: Time, Org, Found/Inserted/Updated/Skipped, Duration, Status, Message
+      - Filters logs by selected source or shows all
+    - Domain Policy Editor modal:
+      - Fields: Max Concurrency, Min Request Interval (ms), Max Pages, Max KB per Page, Allow JS
+      - Save button to persist policy to database
+  - Next.js API route proxies for all crawler endpoints
+  - Toast notifications for all actions (sonner library)
+
 🔨 **Not Yet Implemented**:
-- Frontend admin pages for crawler status monitoring and settings
 - Backend shortlist persistence (currently client-side only)
 - AI/LLM features via OpenRouter
 - Payment processing (PayPal/Razorpay)
