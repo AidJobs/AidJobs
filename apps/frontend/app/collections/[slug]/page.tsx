@@ -61,13 +61,6 @@ export default function CollectionPage() {
   const searchParams = useSearchParams();
   const slug = params.slug as string;
   
-  const collection = getCollection(slug);
-  
-  if (!collection) {
-    router.push('/');
-    return null;
-  }
-
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -96,6 +89,15 @@ export default function CollectionPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
+
+  const collection = getCollection(slug);
+
+  useEffect(() => {
+    if (!collection) {
+      router.push('/');
+      return;
+    }
+  }, [collection, router]);
 
   useEffect(() => {
     setShortlistedIds(getShortlist());
@@ -139,17 +141,30 @@ export default function CollectionPage() {
     try {
       const res = await fetch('/api/search/facets');
       const data: FacetsResponse = await res.json();
-      const newFacets = data.enabled ? data.facets : {};
-      setFacets(newFacets || {});
-      facetsCacheRef.current = { data: newFacets || {}, timestamp: now };
+      const defaultFacets: FacetsResponse['facets'] = {
+        country: {},
+        level_norm: {},
+        mission_tags: {},
+        international_eligible: {},
+      };
+      const newFacets = data.enabled ? data.facets : defaultFacets;
+      setFacets(newFacets);
+      facetsCacheRef.current = { data: newFacets, timestamp: now };
     } catch (error) {
-      setFacets({});
+      setFacets({
+        country: {},
+        level_norm: {},
+        mission_tags: {},
+        international_eligible: {},
+      });
     } finally {
       setFacetsLoading(false);
     }
   }, []);
 
   const buildSearchQuery = useCallback((pageNum: number, additionalFilters: Record<string, any> = {}) => {
+    if (!collection) return '';
+    
     const params = new URLSearchParams();
     
     if (searchQuery.trim()) params.set('q', searchQuery.trim());
@@ -179,7 +194,7 @@ export default function CollectionPage() {
     params.set('size', '20');
     
     return params.toString();
-  }, [searchQuery, country, level, international, missionTags, collection.filters]);
+  }, [searchQuery, country, level, international, missionTags, collection]);
 
   const performSearch = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     setSearching(true);
@@ -207,10 +222,13 @@ export default function CollectionPage() {
   }, [buildSearchQuery]);
 
   useEffect(() => {
+    if (!collection) return;
     fetchFacets();
-  }, [fetchFacets]);
+  }, [fetchFacets, collection]);
 
   useEffect(() => {
+    if (!collection) return;
+    
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -224,7 +242,7 @@ export default function CollectionPage() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchQuery, country, level, international, missionTags, performSearch]);
+  }, [searchQuery, country, level, international, missionTags, performSearch, collection]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -248,13 +266,22 @@ export default function CollectionPage() {
     );
   };
 
-  const countryEntries = Object.entries(facets.country || {})
-    .sort(([, a], [, b]) => b - a);
+  const countryEntries: Array<[string, number]> = Object.entries(facets.country || {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
+    .sort((a, b) => b[1] - a[1]);
   const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 8);
 
-  const missionTagEntries = Object.entries(facets.mission_tags || {})
-    .sort(([, a], [, b]) => b - a);
+  const levelEntries: Array<[string, number]> = Object.entries(facets.level_norm || {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number");
+  
+  const missionTagEntries: Array<[string, number]> = Object.entries(facets.mission_tags || {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
+    .sort((a, b) => b[1] - a[1]);
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
+
+  if (!collection) {
+    return null;
+  }
 
   return (
     <>
@@ -270,14 +297,13 @@ export default function CollectionPage() {
           <SavedJobsPanel
             shortlistedIds={shortlistedIds}
             isOpen={showSavedPanel}
-            onToggle={() => setShowSavedPanel(!showSavedPanel)}
-            onJobClick={(jobId) => {
-              const job = results.find(j => j.id === jobId);
-              if (job) {
-                setSelectedJob(job);
-                setShowSavedPanel(false);
-              }
+            onClose={() => setShowSavedPanel(false)}
+            allJobs={results}
+            onOpenJob={(job) => {
+              setSelectedJob(job);
+              setShowSavedPanel(false);
             }}
+            onRemove={handleToggleShortlist}
           />
         </div>
 
@@ -336,14 +362,14 @@ export default function CollectionPage() {
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Level</h3>
               {facetsLoading ? (
                 <div className="text-sm text-gray-500">Loading...</div>
-              ) : Object.keys(facets.level_norm || {}).length > 0 ? (
+              ) : levelEntries.length > 0 ? (
                 <select
                   value={level}
                   onChange={(e) => setLevel(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All levels</option>
-                  {Object.entries(facets.level_norm).map(([lvl, count]) => (
+                  {levelEntries.map(([lvl, count]) => (
                     <option key={lvl} value={lvl}>
                       {lvl} ({count})
                     </option>
