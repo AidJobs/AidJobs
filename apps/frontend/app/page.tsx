@@ -302,13 +302,20 @@ export default function Home() {
   const tagsMap = (f as any).mission_tags ?? {};
   const intlMap = (f as any).international_eligible ?? {};
 
-  const countryEntries = Object.entries(countryMap).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const countryEntries: Array<[string, number]> = Object.entries(countryMap)
+    .filter((e): e is [string, number] => typeof e[1] === "number")
+    .sort((a, b) => b[1] - a[1]);
   const visibleCountries = showAllCountries ? countryEntries : countryEntries.slice(0, 10);
-  const levelEntries = Object.entries(levelMap);
-  const tagEntries = Object.entries(tagsMap);
+  
+  const levelEntries: Array<[string, number]> = Object.entries(levelMap)
+    .filter((e): e is [string, number] => typeof e[1] === "number")
+    .sort((a, b) => b[1] - a[1]);
+  
   const intlEntries = Object.entries(intlMap);
   
-  const missionTagEntries = tagEntries.sort((a, b) => (b[1] as number) - (a[1] as number));
+  const missionTagEntries: Array<[string, number]> = Object.entries(tagsMap)
+    .filter((e): e is [string, number] => typeof e[1] === "number")
+    .sort((a, b) => b[1] - a[1]);
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
   
   const internationalCount = intlMap?.['true'] || 0;
