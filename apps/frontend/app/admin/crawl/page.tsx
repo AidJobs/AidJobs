@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+export const dynamic = 'force-dynamic';
+
 type Source = {
   id: string;
   org_name: string | null;

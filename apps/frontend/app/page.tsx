@@ -8,6 +8,8 @@ import Toast from '@/components/Toast';
 import CollectionsNav from '@/components/CollectionsNav';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 
+export const dynamic = 'force-dynamic';
+
 type Capabilities = {
   search: boolean;
   cv: boolean;
@@ -78,7 +80,12 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   
-  const [facets, setFacets] = useState<Record<string, any>>({});
+  const [facets, setFacets] = useState<FacetsResponse['facets']>({
+    country: {},
+    level_norm: {},
+    mission_tags: {},
+    international_eligible: {},
+  });
   const [facetsLoading, setFacetsLoading] = useState(false);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
@@ -296,11 +303,10 @@ export default function Home() {
   const showFallbackBanner = !loading && searchSource === 'db';
   const hasAnyFilters = searchQuery || country || level || international || missionTags.length > 0;
 
-  const f = facets ?? {};
-  const countryMap = (f as any).country ?? {};
-  const levelMap = (f as any).level_norm ?? {};
-  const tagsMap = (f as any).mission_tags ?? {};
-  const intlMap = (f as any).international_eligible ?? {};
+  const countryMap: Record<string, number> = facets.country ?? {};
+  const levelMap: Record<string, number> = facets.level_norm ?? {};
+  const tagsMap: Record<string, number> = facets.mission_tags ?? {};
+  const intlMap: Record<string, number> = facets.international_eligible ?? {};
 
   const countryEntries: Array<[string, number]> = Object.entries(countryMap)
     .filter((e): e is [string, number] => typeof e[1] === "number")
@@ -311,14 +317,12 @@ export default function Home() {
     .filter((e): e is [string, number] => typeof e[1] === "number")
     .sort((a, b) => b[1] - a[1]);
   
-  const intlEntries = Object.entries(intlMap);
-  
   const missionTagEntries: Array<[string, number]> = Object.entries(tagsMap)
     .filter((e): e is [string, number] => typeof e[1] === "number")
     .sort((a, b) => b[1] - a[1]);
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
-  
-  const internationalCount = intlMap?.['true'] || 0;
+
+  const internationalCount = (typeof intlMap?.['true'] === 'number' ? intlMap['true'] : 0) || 0;
 
   return (
     <>

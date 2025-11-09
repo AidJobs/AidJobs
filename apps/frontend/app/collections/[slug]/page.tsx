@@ -10,6 +10,8 @@ import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 import { getCollection } from '@/lib/collections';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 type Capabilities = {
   search: boolean;
   cv: boolean;
@@ -81,7 +83,12 @@ export default function CollectionPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   
-  const [facets, setFacets] = useState<Record<string, any>>({});
+  const [facets, setFacets] = useState<FacetsResponse['facets']>({
+    country: {},
+    level_norm: {},
+    mission_tags: {},
+    international_eligible: {},
+  });
   const [facetsLoading, setFacetsLoading] = useState(false);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
