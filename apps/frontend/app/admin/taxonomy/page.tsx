@@ -244,12 +244,14 @@ export default function TaxonomyManager() {
 
           {status && (
             <div className="grid grid-cols-4 gap-4 mb-6">
-              {Object.entries(status).map(([key, count]) => (
-                <div key={key} className="p-3 bg-gray-50 rounded">
-                  <div className="text-sm text-gray-600">{key}</div>
-                  <div className="text-xl font-bold text-gray-900">{count}</div>
-                </div>
-              ))}
+              {Object.entries(status)
+                .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+                .map(([key, count]) => (
+                  <div key={key} className="p-3 bg-gray-50 rounded">
+                    <div className="text-sm text-gray-600">{key}</div>
+                    <div className="text-xl font-bold text-gray-900">{count}</div>
+                  </div>
+                ))}
             </div>
           )}
         </div>

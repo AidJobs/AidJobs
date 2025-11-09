@@ -13,21 +13,17 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd apps/frontend && npm run dev",
     "dev:backend": "cd apps/backend && uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd apps/frontend && npm run build",
     "lint": "npm run lint:frontend && npm run lint:backend",
     "lint:frontend": "cd apps/frontend && npm run lint",
     "lint:backend": "cd apps/backend && ruff check .",
     "test": "npm run test:frontend && npm run test:backend",
     "test:frontend": "cd apps/frontend && npm run test",
-    "test:backend": "cd apps/backend && python -m pytest"
+    "test:backend": "cd apps/backend && python -m pytest",
+    "pre-deploy": "node scripts/pre-deploy-check.js || bash scripts/pre-deploy-check.sh || powershell -ExecutionPolicy Bypass -File scripts/pre-deploy-check.ps1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.552.0",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.3.1"
   }
 }

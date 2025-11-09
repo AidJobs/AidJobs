@@ -113,7 +113,7 @@ export default function AdminSourcesPage() {
       });
 
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json() as { detail?: string };
         throw new Error(error.detail || 'Failed to create source');
       }
 
@@ -163,7 +163,7 @@ export default function AdminSourcesPage() {
       });
 
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json() as { detail?: string };
         throw new Error(error.detail || 'Failed to update source');
       }
 
@@ -229,12 +229,12 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
-      const result = await res.json();
+      const result = await res.json() as { ok?: boolean; status?: string; host?: string; error?: string };
 
       if (result.ok) {
-        toast.success(`Test passed: ${result.status} (${result.host})`);
+        toast.success(`Test passed: ${String(result.status ?? 'OK')} (${String(result.host ?? 'unknown')})`);
       } else {
-        toast.error(`Test failed: ${result.error || 'Unknown error'}`);
+        toast.error(`Test failed: ${String(result.error ?? 'Unknown error')}`);
       }
     } catch (error) {
       console.error('Failed to test source:', error);
@@ -251,13 +251,13 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
-      const result = await res.json();
+      const result = await res.json() as { ok?: boolean; count?: number; error?: string; sample?: unknown };
 
       if (result.ok) {
         console.log('Simulation results:', result.sample);
-        toast.success(`Found ${result.count} jobs. Check console for first 3.`);
+        toast.success(`Found ${String(result.count ?? 0)} jobs. Check console for first 3.`);
       } else {
-        toast.error(`Simulation failed: ${result.error}`);
+        toast.error(`Simulation failed: ${String(result.error ?? 'Unknown error')}`);
       }
     } catch (error) {
       console.error('Failed to simulate extract:', error);

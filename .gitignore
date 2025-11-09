@@ -1,25 +1,25 @@
-.env
-.env.local
-.env.*.local
-node_modules/
-.next/
-dist/
-build/
-.turbo/
-*.log
+# OS junk
 .DS_Store
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
+Thumbs.db
+
+# Node
+node_modules/
+.next
+*.tsbuildinfo
+
+# Python
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.ruff_cache/
+__pycache__/
+
+# Env & local config
+.env
+.env.*
+!.env.sample
+backend/.env
+frontend/.env.local
+
+# Meilisearch data
+_meili_data/
+
+apps/backend/.env
+apps/frontend/.env.local
