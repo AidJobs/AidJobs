@@ -162,6 +162,12 @@ async def capabilities():
     return Capabilities.get_capabilities()
 
 
+@app.get("/api/search/status")
+async def search_status():
+    """Get Meilisearch status (public endpoint, production-safe)"""
+    return await search_service.get_search_status()
+
+
 @app.get("/admin/config/env")
 async def config_env():
     return get_env_presence()

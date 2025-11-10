@@ -42,8 +42,20 @@ class Capabilities:
     @staticmethod
     def is_search_enabled() -> bool:
         enabled = os.getenv("AIDJOBS_ENABLE_SEARCH", "true").lower() == "true"
-        has_config = bool(os.getenv("MEILI_HOST") and os.getenv("MEILI_MASTER_KEY"))
-        return enabled and has_config
+        if not enabled:
+            return False
+        
+        # Check for both new and legacy env var formats
+        has_new_config = bool(
+            os.getenv("MEILISEARCH_URL") and os.getenv("MEILISEARCH_KEY")
+        )
+        has_legacy_config = bool(
+            os.getenv("MEILI_HOST") and (
+                os.getenv("MEILI_MASTER_KEY") or os.getenv("MEILI_API_KEY")
+            )
+        )
+        
+        return has_new_config or has_legacy_config
 
     @staticmethod
     def is_ai_enabled() -> bool:
