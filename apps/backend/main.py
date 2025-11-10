@@ -168,6 +168,12 @@ async def search_status():
     return await search_service.get_search_status()
 
 
+@app.get("/api/db/status")
+async def db_status():
+    """Get database status with job count (public endpoint, production-safe)"""
+    return await search_service.get_db_status()
+
+
 @app.get("/admin/config/env")
 async def config_env():
     return get_env_presence()
