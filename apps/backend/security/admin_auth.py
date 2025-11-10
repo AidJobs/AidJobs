@@ -148,7 +148,15 @@ def verify_admin_password(password: str) -> bool:
     """
     Verify password against ADMIN_PASSWORD.
     Uses constant-time comparison to prevent timing attacks.
+    In dev mode, allows any password if ADMIN_PASSWORD is not set.
     """
+    # Dev mode bypass: if no password is set, allow any password
+    if is_dev_mode():
+        admin_password = get_admin_password()
+        if not admin_password:
+            # Dev mode + no password = allow any password (even empty)
+            return True
+    
     admin_password = get_admin_password()
     if not admin_password:
         return False
@@ -158,5 +166,16 @@ def verify_admin_password(password: str) -> bool:
 
 def check_admin_configured() -> bool:
     """Check if admin authentication is properly configured."""
+    # In dev mode, always allow (even if no password set)
+    # But still require COOKIE_SECRET for session cookies
+    if is_dev_mode():
+        # Check if COOKIE_SECRET is set (required for cookies)
+        try:
+            get_cookie_secret()
+            return True
+        except ValueError:
+            # No COOKIE_SECRET - can't create cookies
+            return False
+    
     password = get_admin_password()
     return password is not None and len(password) > 0
