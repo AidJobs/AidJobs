@@ -15,3 +15,13 @@ ignore = []
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.pyright]
+include = ["**/*.py"]
+exclude = ["**/__pycache__", "**/.venv", "**/node_modules"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+typeCheckingMode = "off"
+reportMissingImports = "none"
+reportMissingTypeStubs = false

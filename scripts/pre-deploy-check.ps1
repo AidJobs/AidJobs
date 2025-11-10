@@ -1,4 +1,4 @@
-# Pre-deployment check script for Netlify (PowerShell)
+# Pre-deployment check script (Vercel/any platform) - PowerShell
 # This script runs all checks that should pass before deploying
 
 $ErrorActionPreference = "Stop"
@@ -54,20 +54,11 @@ if (-not (Test-Path ".env.sample")) {
     Success ".env.sample exists"
 }
 
-# Check if netlify.toml exists
-if (-not (Test-Path "netlify.toml")) {
-    Error "netlify.toml is missing"
-    exit 1
-}
-Success "netlify.toml exists"
-
-# Check netlify.toml configuration
-$netlifyContent = Get-Content "netlify.toml" -Raw
-if ($netlifyContent -match 'publish = "apps/frontend"') {
-    Success "netlify.toml publish directory is correct"
+# Check if vercel.json exists (optional - Vercel can auto-detect)
+if (Test-Path "vercel.json") {
+    Success "vercel.json exists (optional)"
 } else {
-    Error "netlify.toml publish directory is incorrect. Should be 'apps/frontend'"
-    exit 1
+    Warning "vercel.json not found (optional - Vercel can auto-detect Next.js)"
 }
 
 # Check if frontend directory exists
@@ -156,4 +147,4 @@ Write-Host "  - TypeScript: ✅"
 Write-Host "  - ESLint: ✅"
 Write-Host "  - Build: ✅"
 Write-Host ""
-Write-Host "🚀 Ready to deploy to Netlify!" -ForegroundColor Green
+Write-Host "🚀 Ready to deploy!" -ForegroundColor Green

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 type Submission = {
   id: string;
@@ -22,18 +22,11 @@ export default function AdminFindEarnPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const pageSize = 20;
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [page, statusFilter]);
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  }, []);
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -74,11 +67,19 @@ export default function AdminFindEarnPage() {
       console.log('[Find&Earn] Finally block - setting loading to false');
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, showToast]);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-  };
+  useEffect(() => {
+    fetchSubmissions();
+  }, [page, statusFilter, fetchSubmissions]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
 
   const handleApprove = async (submissionId: string) => {
     if (!confirm('Approve this submission and create a new source?')) {

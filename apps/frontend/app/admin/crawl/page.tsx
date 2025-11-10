@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -72,21 +72,7 @@ export default function AdminCrawlPage() {
     allow_js: false,
   });
 
-  useEffect(() => {
-    fetchSources();
-    fetchCrawlStatus();
-    fetchLogs();
-  }, [statusFilter, searchQuery]);
-
-  useEffect(() => {
-    if (selectedSourceId) {
-      fetchLogs(selectedSourceId);
-    } else {
-      fetchLogs();
-    }
-  }, [selectedSourceId]);
-
-  const fetchSources = async () => {
+  const fetchSources = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -120,9 +106,9 @@ export default function AdminCrawlPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchQuery, router]);
 
-  const fetchCrawlStatus = async () => {
+  const fetchCrawlStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/crawl/status', {
         credentials: 'include',
@@ -137,9 +123,9 @@ export default function AdminCrawlPage() {
     } catch (error) {
       console.error('Failed to fetch crawl status:', error);
     }
-  };
+  }, []);
 
-  const fetchLogs = async (sourceId?: string) => {
+  const fetchLogs = useCallback(async (sourceId?: string) => {
     setLogsLoading(true);
     try {
       const params = new URLSearchParams({ limit: '50' });
@@ -163,7 +149,21 @@ export default function AdminCrawlPage() {
     } finally {
       setLogsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSources();
+    fetchCrawlStatus();
+    fetchLogs();
+  }, [statusFilter, searchQuery, fetchSources, fetchCrawlStatus, fetchLogs]);
+
+  useEffect(() => {
+    if (selectedSourceId) {
+      fetchLogs(selectedSourceId);
+    } else {
+      fetchLogs();
+    }
+  }, [selectedSourceId, fetchLogs]);
 
   const handleRunSource = async (sourceId: string) => {
     try {

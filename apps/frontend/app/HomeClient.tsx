@@ -252,7 +252,7 @@ export default function HomeClient() {
   useEffect(() => {
     fetchFacets();
     performSearch(1, false);
-  }, []);
+  }, [fetchFacets, performSearch]);
 
   const handleLoadMore = () => {
     performSearch(page + 1, true);

@@ -29,6 +29,7 @@ AI-powered job search platform for NGOs/INGOs.
 - **Database**: Supabase (PostgreSQL)
 - **Search**: Meilisearch
 - **AI**: OpenRouter
+- **Deployment**: Vercel (Frontend), Render (Backend)
 
 ## Getting Started
 

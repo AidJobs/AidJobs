@@ -1,0 +1,25 @@
+{
+  "include": [
+    "**/*.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": false,
+  "executionEnvironments": [
+    {
+      "root": "apps/backend",
+      "pythonVersion": "3.11",
+      "extraPaths": []
+    }
+  ]
+}
+

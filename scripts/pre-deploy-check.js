@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Pre-deployment checklist script for Netlify
- * Runs comprehensive checks before deployment
+ * Pre-deployment checklist script
+ * Runs comprehensive checks before deployment (Vercel/any platform)
  */
 
 const { execSync } = require('child_process');
@@ -69,18 +69,11 @@ check('package-lock.json exists', () => {
   return true;
 });
 
-// Check 3: Verify netlify.toml exists and is valid
-check('netlify.toml exists', () => {
-  const netlifyToml = path.join(process.cwd(), 'netlify.toml');
-  if (!fs.existsSync(netlifyToml)) {
-    return false;
-  }
-  const content = fs.readFileSync(netlifyToml, 'utf-8');
-  if (!content.includes('[build]')) {
-    return 'netlify.toml missing [build] section';
-  }
-  if (!content.includes('@netlify/plugin-nextjs')) {
-    return 'netlify.toml missing Next.js plugin';
+// Check 3: Verify vercel.json exists (optional, Vercel can auto-detect)
+check('Vercel configuration (optional)', () => {
+  const vercelJson = path.join(process.cwd(), 'vercel.json');
+  if (!fs.existsSync(vercelJson)) {
+    return 'vercel.json not found (optional - Vercel can auto-detect Next.js)';
   }
   return true;
 });
@@ -136,7 +129,7 @@ check('Required frontend files exist', () => {
 check('.nvmrc exists', () => {
   const nvmrc = path.join(process.cwd(), '.nvmrc');
   if (!fs.existsSync(nvmrc)) {
-    return '.nvmrc file not found (recommended for Netlify)';
+    return '.nvmrc file not found (recommended for consistent Node version)';
   }
   return true;
 });

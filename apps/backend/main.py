@@ -124,7 +124,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5000",
-        "https://ece7b4ba-3a82-477c-a281-2adcc8be6f96-00-1j1pwa2ohhygd.spock.replit.dev"
+        "https://ece7b4ba-3a82-477c-a281-2adcc8be6f96-00-1j1pwa2ohhygd.spock.replit.dev",
+        # Vercel deployments (production and preview)
+        "https://*.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],

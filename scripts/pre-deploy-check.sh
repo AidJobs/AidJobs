@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-deployment check script for Netlify
+# Pre-deployment check script (Vercel/any platform)
 # This script runs all checks that should pass before deploying
 
 set -e  # Exit on any error
@@ -58,19 +58,11 @@ else
     success ".env.sample exists"
 fi
 
-# Check if netlify.toml exists
-if [ ! -f "netlify.toml" ]; then
-    error "netlify.toml is missing"
-    exit 1
-fi
-success "netlify.toml exists"
-
-# Check netlify.toml configuration
-if grep -q "publish = \"apps/frontend\"" netlify.toml; then
-    success "netlify.toml publish directory is correct"
+# Check if vercel.json exists (optional - Vercel can auto-detect)
+if [ -f "vercel.json" ]; then
+    success "vercel.json exists (optional)"
 else
-    error "netlify.toml publish directory is incorrect. Should be 'apps/frontend'"
-    exit 1
+    warning "vercel.json not found (optional - Vercel can auto-detect Next.js)"
 fi
 
 # Check if frontend directory exists
@@ -153,4 +145,4 @@ echo "  - TypeScript: ✅"
 echo "  - ESLint: ✅"
 echo "  - Build: ✅"
 echo ""
-echo "🚀 Ready to deploy to Netlify!"
+echo "🚀 Ready to deploy!"

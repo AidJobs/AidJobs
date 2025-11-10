@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const TABS = [
   { key: 'missions', label: 'Missions' },
@@ -46,21 +46,12 @@ export default function TaxonomyManager() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [synonymFilter, setSynonymFilter] = useState<string>('');
 
-  useEffect(() => {
-    if (!isDev) return;
-    fetchStatus();
-  }, [isDev]);
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  }, []);
 
-  useEffect(() => {
-    if (!isDev) return;
-    if (activeTab === 'synonyms') {
-      fetchSynonyms();
-    } else {
-      fetchLookupItems(activeTab);
-    }
-  }, [activeTab, isDev, synonymFilter]);
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch('/admin/lookups/status');
       if (res.status === 403) {
@@ -74,9 +65,9 @@ export default function TaxonomyManager() {
     } catch (err) {
       console.error('Failed to fetch status:', err);
     }
-  };
+  }, [showToast]);
 
-  const fetchLookupItems = async (table: string) => {
+  const fetchLookupItems = useCallback(async (table: string) => {
     setLoading(true);
     try {
       const res = await fetch(`/admin/lookups/${table}?size=200`);
@@ -93,9 +84,9 @@ export default function TaxonomyManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const fetchSynonyms = async () => {
+  const fetchSynonyms = useCallback(async () => {
     setLoading(true);
     try {
       const url = synonymFilter
@@ -115,7 +106,21 @@ export default function TaxonomyManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [synonymFilter, showToast]);
+
+  useEffect(() => {
+    if (!isDev) return;
+    fetchStatus();
+  }, [isDev, fetchStatus]);
+
+  useEffect(() => {
+    if (!isDev) return;
+    if (activeTab === 'synonyms') {
+      fetchSynonyms();
+    } else {
+      fetchLookupItems(activeTab);
+    }
+  }, [activeTab, isDev, synonymFilter, fetchSynonyms, fetchLookupItems]);
 
   const handleSave = async () => {
     if (activeTab === 'synonyms') {
@@ -205,10 +210,6 @@ export default function TaxonomyManager() {
     }
   };
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
 
   if (!isDev) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 type NormalizationReport = {
   ok: boolean;
@@ -92,7 +92,7 @@ export default function AdminNormalizePage() {
     }, 5000);
   };
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/admin/normalize/report');
@@ -104,7 +104,7 @@ export default function AdminNormalizePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchPreview = async () => {
     setPreviewLoading(true);
@@ -167,7 +167,7 @@ export default function AdminNormalizePage() {
 
   useEffect(() => {
     fetchReport();
-  }, []);
+  }, [fetchReport]);
 
   if (loading) {
     return (

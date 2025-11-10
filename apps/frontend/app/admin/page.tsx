@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -57,7 +57,7 @@ export default function AdminPage() {
     }, 5000);
   };
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/session', {
         credentials: 'include',
@@ -76,7 +76,7 @@ export default function AdminPage() {
       router.push('/admin/login');
       return false;
     }
-  };
+  }, [router]);
 
   const handleLogout = async () => {
     try {
@@ -91,7 +91,7 @@ export default function AdminPage() {
     }
   };
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
       const [dbRes, searchRes] = await Promise.all([
@@ -110,7 +110,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleInitialize = async () => {
     setInitializing(true);
@@ -167,7 +167,7 @@ export default function AdminPage() {
       }
     };
     init();
-  }, []);
+  }, [checkAuth, fetchStatus]);
 
   if (authenticated === null || loading) {
     return (

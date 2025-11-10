@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -54,11 +54,7 @@ export default function AdminSourcesPage() {
 
   const pageSize = 20;
 
-  useEffect(() => {
-    fetchSources();
-  }, [page, statusFilter, searchQuery]);
-
-  const fetchSources = async () => {
+  const fetchSources = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -93,7 +89,11 @@ export default function AdminSourcesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, searchQuery, router]);
+
+  useEffect(() => {
+    fetchSources();
+  }, [page, statusFilter, searchQuery, fetchSources]);
 
   const handleAddSource = async () => {
     try {
