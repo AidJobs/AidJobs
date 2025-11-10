@@ -113,24 +113,40 @@ async def admin_config_check():
     
     admin_password = get_admin_password()
     
+    is_dev = is_dev_mode()
+    admin_configured = check_admin_configured()
+    
+    # Determine status
+    if cookie_secret_set and admin_configured:
+        if is_dev and not admin_password:
+            status = "ok_dev_mode"  # Dev mode without password is OK
+        elif admin_password:
+            status = "ok_production"  # Production mode with password
+        else:
+            status = "ok_dev_mode"  # Dev mode (shouldn't happen, but safe)
+    else:
+        status = "missing_config"
+    
     config = {
         "admin_password_set": bool(admin_password),
         "admin_password_length": len(admin_password) if admin_password else 0,
         "cookie_secret_set": cookie_secret_set,
         "cookie_secret_length": cookie_secret_length,
         "aidjobs_env": os.getenv("AIDJOBS_ENV", "not set"),
-        "is_dev_mode": is_dev_mode(),
-        "admin_configured": check_admin_configured(),
-        "status": "ok" if (admin_password and cookie_secret_set) else "missing_config",
+        "is_dev_mode": is_dev,
+        "admin_configured": admin_configured,
+        "status": status,
         "recommendations": []
     }
     
-    # Add recommendations
-    if not admin_password:
-        config["recommendations"].append("Set ADMIN_PASSWORD environment variable")
+    # Add recommendations (only for production or if something is missing)
     if not cookie_secret_set:
         config["recommendations"].append("Set COOKIE_SECRET environment variable")
-    if not is_dev_mode() and not admin_password:
-        config["recommendations"].append("Set AIDJOBS_ENV=dev for dev mode bypass (temporary)")
+    if not is_dev and not admin_password:
+        config["recommendations"].append("Set ADMIN_PASSWORD environment variable (required in production)")
+    elif is_dev and not admin_password:
+        config["recommendations"].append("Optional: Set ADMIN_PASSWORD for password protection in dev mode")
+    elif is_dev and admin_password:
+        config["recommendations"].append("Consider setting AIDJOBS_ENV=production for production deployment")
     
     return config
