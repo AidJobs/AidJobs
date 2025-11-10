@@ -42,9 +42,64 @@ class CrawlerOrchestrator:
         self.running = False
         self.semaphore = asyncio.Semaphore(GLOBAL_MAX_CONCURRENCY)
     
-    def _get_db_conn(self):
-        """Get database connection"""
-        return psycopg2.connect(self.db_url)
+    def _get_db_conn(self, retries=3, timeout=5):
+        """Get database connection with retry logic and IPv4 preference"""
+        import socket
+        
+        # Try to force IPv4 if the connection string contains a hostname
+        # Parse the connection URL to check if we need to resolve hostname
+        from urllib.parse import urlparse
+        parsed = urlparse(self.db_url)
+        
+        # If hostname is present, try to resolve to IPv4 first
+        if parsed.hostname and not parsed.hostname.startswith('['):
+            try:
+                # Try to get IPv4 address
+                hostname = parsed.hostname
+                # Get all IP addresses for the hostname
+                addr_info = socket.getaddrinfo(hostname, parsed.port or 5432, socket.AF_INET, socket.SOCK_STREAM)
+                if addr_info:
+                    # Use the first IPv4 address
+                    ipv4_addr = addr_info[0][4][0]
+                    # Replace hostname with IPv4 in connection string
+                    modified_url = self.db_url.replace(hostname, ipv4_addr)
+                    logger.debug(f"[orchestrator] Resolved {hostname} to IPv4: {ipv4_addr}")
+                else:
+                    modified_url = self.db_url
+            except (socket.gaierror, ValueError) as e:
+                logger.warning(f"[orchestrator] Could not resolve hostname to IPv4, using original URL: {e}")
+                modified_url = self.db_url
+        else:
+            modified_url = self.db_url
+        
+        # Try connection with retries
+        last_error = None
+        for attempt in range(retries):
+            try:
+                conn = psycopg2.connect(modified_url, connect_timeout=timeout)
+                return conn
+            except psycopg2.OperationalError as e:
+                last_error = e
+                if attempt < retries - 1:
+                    wait_time = (attempt + 1) * 2  # Exponential backoff: 2s, 4s, 6s
+                    logger.warning(f"[orchestrator] Database connection attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"[orchestrator] Database connection failed after {retries} attempts: {e}")
+            except Exception as e:
+                last_error = e
+                logger.error(f"[orchestrator] Unexpected database connection error: {e}")
+                break
+        
+        # If all retries failed, try original URL as fallback
+        if modified_url != self.db_url:
+            try:
+                logger.info("[orchestrator] Trying original connection URL as fallback...")
+                return psycopg2.connect(self.db_url, connect_timeout=timeout)
+            except Exception as e:
+                logger.error(f"[orchestrator] Fallback connection also failed: {e}")
+        
+        raise last_error or Exception("Database connection failed")
     
     def compute_next_run(
         self,
@@ -390,14 +445,39 @@ class CrawlerOrchestrator:
         return {'queued': len(sources)}
     
     async def scheduler_loop(self):
-        """Background scheduler loop"""
+        """Background scheduler loop with resilient error handling"""
         logger.info("[orchestrator] Scheduler started")
+        
+        consecutive_errors = 0
+        max_consecutive_errors = 5
         
         while self.running:
             try:
                 await self.run_due_sources_once()
+                consecutive_errors = 0  # Reset error counter on success
+            except psycopg2.OperationalError as e:
+                consecutive_errors += 1
+                error_msg = str(e)
+                if "Network is unreachable" in error_msg or "connection" in error_msg.lower():
+                    logger.error(f"[orchestrator] Database connection error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
+                    if consecutive_errors >= max_consecutive_errors:
+                        logger.error(f"[orchestrator] Too many consecutive database errors. Scheduler will continue but may not function properly.")
+                        logger.error(f"[orchestrator] Check SUPABASE_DB_URL environment variable and network connectivity.")
+                        # Reset counter to prevent log spam, but continue trying
+                        consecutive_errors = 0
+                        # Wait longer before retrying after many errors
+                        await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)
+                        continue
+                else:
+                    logger.error(f"[orchestrator] Database operational error: {e}")
             except Exception as e:
-                logger.error(f"[orchestrator] Scheduler error: {e}")
+                consecutive_errors += 1
+                logger.error(f"[orchestrator] Scheduler error: {e}", exc_info=True)
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(f"[orchestrator] Too many consecutive errors. Scheduler will continue but may not function properly.")
+                    consecutive_errors = 0
+                    await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)
+                    continue
             
             # Wait for next interval
             await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS)
