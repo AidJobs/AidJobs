@@ -42,64 +42,118 @@ class CrawlerOrchestrator:
         self.running = False
         self.semaphore = asyncio.Semaphore(GLOBAL_MAX_CONCURRENCY)
     
-    def _get_db_conn(self, retries=3, timeout=5):
+    def _get_db_conn(self, retries=3, timeout=10):
         """Get database connection with retry logic and IPv4 preference"""
         import socket
+        from urllib.parse import urlparse, urlunparse
         
-        # Try to force IPv4 if the connection string contains a hostname
-        # Parse the connection URL to check if we need to resolve hostname
-        from urllib.parse import urlparse
+        # Parse the connection URL
         parsed = urlparse(self.db_url)
+        hostname = parsed.hostname
         
-        # If hostname is present, try to resolve to IPv4 first
-        if parsed.hostname and not parsed.hostname.startswith('['):
-            try:
-                # Try to get IPv4 address
-                hostname = parsed.hostname
-                # Get all IP addresses for the hostname
-                addr_info = socket.getaddrinfo(hostname, parsed.port or 5432, socket.AF_INET, socket.SOCK_STREAM)
-                if addr_info:
-                    # Use the first IPv4 address
-                    ipv4_addr = addr_info[0][4][0]
-                    # Replace hostname with IPv4 in connection string
-                    modified_url = self.db_url.replace(hostname, ipv4_addr)
-                    logger.debug(f"[orchestrator] Resolved {hostname} to IPv4: {ipv4_addr}")
-                else:
-                    modified_url = self.db_url
-            except (socket.gaierror, ValueError) as e:
-                logger.warning(f"[orchestrator] Could not resolve hostname to IPv4, using original URL: {e}")
-                modified_url = self.db_url
+        # Skip IPv6 resolution if hostname is already an IP address or in brackets
+        if not hostname or hostname.startswith('[') or (hostname.replace('.', '').replace(':', '').isdigit() and ':' not in hostname.split('@')[-1]):
+            # Already an IPv4 address or IPv6 in brackets, use as-is
+            connection_urls = [self.db_url]
         else:
-            modified_url = self.db_url
+            # Try to resolve to IPv4
+            connection_urls = []
+            
+            # First, try to get IPv4 address
+            try:
+                # Force IPv4 resolution
+                addr_info = socket.getaddrinfo(
+                    hostname, 
+                    parsed.port or 5432, 
+                    socket.AF_INET,  # Force IPv4
+                    socket.SOCK_STREAM
+                )
+                
+                if addr_info:
+                    ipv4_addr = addr_info[0][4][0]
+                    # Build new URL with IPv4 address
+                    # Build netloc with IPv4 address
+                    if parsed.username and parsed.password:
+                        from urllib.parse import quote_plus
+                        # URL-encode password to handle special characters
+                        encoded_password = quote_plus(parsed.password)
+                        new_netloc = f"{parsed.username}:{encoded_password}@{ipv4_addr}"
+                    elif parsed.username:
+                        new_netloc = f"{parsed.username}@{ipv4_addr}"
+                    else:
+                        new_netloc = ipv4_addr
+                    
+                    # Add port if specified
+                    if parsed.port:
+                        new_netloc += f":{parsed.port}"
+                    
+                    ipv4_url = urlunparse((
+                        parsed.scheme,
+                        new_netloc,
+                        parsed.path,
+                        parsed.params,
+                        parsed.query,
+                        parsed.fragment
+                    ))
+                    connection_urls.append(ipv4_url)
+                    logger.info(f"[orchestrator] Resolved {hostname} to IPv4: {ipv4_addr}")
+            except (socket.gaierror, ValueError, OSError) as e:
+                logger.warning(f"[orchestrator] Could not resolve {hostname} to IPv4: {e}")
+            
+            # Always try original URL as fallback
+            connection_urls.append(self.db_url)
         
-        # Try connection with retries
+        # Try each connection URL with retries
         last_error = None
-        for attempt in range(retries):
-            try:
-                conn = psycopg2.connect(modified_url, connect_timeout=timeout)
-                return conn
-            except psycopg2.OperationalError as e:
-                last_error = e
-                if attempt < retries - 1:
-                    wait_time = (attempt + 1) * 2  # Exponential backoff: 2s, 4s, 6s
-                    logger.warning(f"[orchestrator] Database connection attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error(f"[orchestrator] Database connection failed after {retries} attempts: {e}")
-            except Exception as e:
-                last_error = e
-                logger.error(f"[orchestrator] Unexpected database connection error: {e}")
-                break
+        for url in connection_urls:
+            for attempt in range(retries):
+                try:
+                    # Use psycopg2 connection parameters to force IPv4
+                    conn_params = {
+                        'dsn': url,
+                        'connect_timeout': timeout,
+                    }
+                    conn = psycopg2.connect(**conn_params)
+                    logger.debug(f"[orchestrator] Successfully connected to database (attempt {attempt + 1})")
+                    return conn
+                except psycopg2.OperationalError as e:
+                    last_error = e
+                    error_msg = str(e)
+                    
+                    # Check if it's an IPv6/unreachable error
+                    if "Network is unreachable" in error_msg or "2406:" in error_msg or "::" in error_msg:
+                        if url == connection_urls[-1] and attempt == retries - 1:
+                            # Last URL and last attempt - this is the final failure
+                            logger.error(f"[orchestrator] Database connection failed (IPv6 unreachable). Tried {len(connection_urls)} URL(s) with {retries} attempt(s) each.")
+                            logger.error(f"[orchestrator] Error: {e}")
+                            logger.error(f"[orchestrator] Suggestion: Use Supabase connection pooler URL or ensure IPv4 connectivity.")
+                        elif attempt < retries - 1:
+                            wait_time = (attempt + 1) * 2
+                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed (IPv6 issue): {e}. Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                        continue
+                    else:
+                        # Different error, log and continue
+                        if attempt < retries - 1:
+                            wait_time = (attempt + 1) * 2
+                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed: {e}. Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                        else:
+                            logger.error(f"[orchestrator] Database connection failed after {retries} attempts: {e}")
+                except Exception as e:
+                    last_error = e
+                    logger.error(f"[orchestrator] Unexpected database connection error: {e}")
+                    break
+            
+            # If we successfully connected, break out of URL loop
+            if last_error and "Network is unreachable" not in str(last_error):
+                continue
         
-        # If all retries failed, try original URL as fallback
-        if modified_url != self.db_url:
-            try:
-                logger.info("[orchestrator] Trying original connection URL as fallback...")
-                return psycopg2.connect(self.db_url, connect_timeout=timeout)
-            except Exception as e:
-                logger.error(f"[orchestrator] Fallback connection also failed: {e}")
-        
-        raise last_error or Exception("Database connection failed")
+        # If we get here, all connection attempts failed
+        if last_error:
+            raise last_error
+        else:
+            raise Exception("Database connection failed: Unknown error")
     
     def compute_next_run(
         self,
