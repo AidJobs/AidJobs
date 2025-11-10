@@ -97,6 +97,20 @@ export default function AdminSourcesPage() {
 
   const handleAddSource = async () => {
     try {
+      // Validate JSON for API sources
+      if (formData.source_type === 'api' && formData.parser_hint) {
+        try {
+          const parsed = JSON.parse(formData.parser_hint);
+          if (parsed.v !== 1) {
+            toast.error('API sources must use v1 schema ({"v": 1, ...})');
+            return;
+          }
+        } catch (e) {
+          toast.error('Invalid JSON in parser_hint. Please check the syntax.');
+          return;
+        }
+      }
+
       const res = await fetch('/api/admin/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,6 +145,20 @@ export default function AdminSourcesPage() {
     if (!editingSource) return;
 
     try {
+      // Validate JSON for API sources
+      if (formData.source_type === 'api' && formData.parser_hint) {
+        try {
+          const parsed = JSON.parse(formData.parser_hint);
+          if (parsed.v !== 1) {
+            toast.error('API sources must use v1 schema ({"v": 1, ...})');
+            return;
+          }
+        } catch (e) {
+          toast.error('Invalid JSON in parser_hint. Please check the syntax.');
+          return;
+        }
+      }
+
       const updates: any = {};
       
       if (formData.org_name !== editingSource.org_name) {
@@ -592,15 +620,30 @@ export default function AdminSourcesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Parser Hint
+                    Parser Hint {formData.source_type === 'api' && '(JSON v1 schema)'}
                   </label>
-                  <input
-                    type="text"
-                    value={formData.parser_hint}
-                    onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
-                    placeholder="Optional: parser-specific hints"
-                  />
+                  {formData.source_type === 'api' ? (
+                    <textarea
+                      value={formData.parser_hint}
+                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-mono text-sm"
+                      placeholder='{"v": 1, "base_url": "https://example.com", "path": "/jobs", ...}'
+                      rows={12}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.parser_hint}
+                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                      placeholder="Optional: parser-specific hints"
+                    />
+                  )}
+                  {formData.source_type === 'api' && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter v1 JSON schema. Must include {"{"}"v": 1{"}"}. Use {"{"}{"{"}SECRET:NAME{"}"}{"}"} for secrets.
+                    </p>
+                  )}
                 </div>
 
                 <div>

@@ -110,7 +110,7 @@ class CrawlerOrchestrator:
                 cur.execute("""
                     SELECT id, org_name, careers_url, source_type, org_type,
                            parser_hint, crawl_frequency_days, consecutive_failures,
-                           consecutive_nochange
+                           consecutive_nochange, last_crawled_at
                     FROM sources
                     WHERE status = 'active'
                     AND (next_run_at IS NULL OR next_run_at <= NOW())
@@ -177,7 +177,22 @@ class CrawlerOrchestrator:
                     for job in raw_jobs
                 ]
             elif source_type == 'api':
-                raw_jobs = await self.api_crawler.fetch_api(url, source.get('parser_hint'))
+                # Get last_success_at for incremental fetching
+                last_success_at = None
+                if source.get('last_crawled_at'):
+                    try:
+                        last_success_at = source['last_crawled_at']
+                        if isinstance(last_success_at, str):
+                            from dateutil import parser as date_parser
+                            last_success_at = date_parser.parse(last_success_at)
+                    except Exception as e:
+                        logger.warning(f"[orchestrator] Failed to parse last_crawled_at: {e}")
+                
+                raw_jobs = await self.api_crawler.fetch_api(
+                    url,
+                    source.get('parser_hint'),
+                    last_success_at
+                )
                 # Normalize using HTML crawler (API jobs are similar to HTML)
                 normalized_jobs = [
                     self.html_crawler.normalize_job(job, source.get('org_name'))

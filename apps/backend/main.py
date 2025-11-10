@@ -20,6 +20,7 @@ from app.shortlist import router as shortlist_router
 from app.find_earn import router as find_earn_router
 from app.analytics import analytics_tracker
 from app.admin_auth_routes import router as admin_auth_router
+from app.presets import router as presets_router
 from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -136,6 +137,7 @@ app.add_middleware(
 app.include_router(admin_auth_router)
 app.include_router(admin_router)
 app.include_router(sources_router)
+app.include_router(presets_router)
 app.include_router(crawl_router)
 app.include_router(shortlist_router)
 app.include_router(find_earn_router)
