@@ -327,12 +327,12 @@ export default function HomeClient() {
       <CollectionsNav />
       <main className="min-h-screen bg-gray-50 pl-56">
         {showFallbackBanner && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
-              <p className="text-sm text-amber-800">Running on backup search (temporarily)</p>
+              <p className="text-sm text-blue-800">Running on backup search (temporarily)</p>
               <button
                 onClick={retrySearch}
-                className="text-sm text-amber-900 hover:text-amber-950 font-medium underline"
+                className="text-sm text-blue-900 hover:text-blue-950 font-medium underline"
               >
                 Try again
               </button>
@@ -698,7 +698,7 @@ export default function HomeClient() {
                           title={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
                         >
                           <svg 
-                            className={`w-5 h-5 ${jobIsShortlisted ? 'fill-yellow-500 stroke-yellow-600' : 'fill-none stroke-gray-400'}`}
+                            className={`w-5 h-5 ${jobIsShortlisted ? 'fill-orange-accent stroke-orange-dark' : 'fill-none stroke-gray-400'}`}
                             viewBox="0 0 24 24" 
                             strokeWidth="2"
                           >

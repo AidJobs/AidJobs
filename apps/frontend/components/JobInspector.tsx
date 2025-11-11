@@ -189,7 +189,7 @@ export default function JobInspector({
                 disabled={isLoading}
               >
                 <svg
-                  className={`w-5 h-5 ${isShortlisted ? "fill-yellow-500 stroke-yellow-600" : "fill-none stroke-gray-400"}`}
+                  className={`w-5 h-5 ${isShortlisted ? "fill-orange-accent stroke-orange-dark" : "fill-none stroke-gray-400"}`}
                   viewBox="0 0 24 24"
                   strokeWidth="2"
                 >

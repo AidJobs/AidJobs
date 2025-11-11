@@ -297,7 +297,7 @@ export default function AdminPage() {
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
-                      searchStatus.index?.stats.isIndexing ? 'bg-yellow-500' : 'bg-green-500'
+                      searchStatus.index?.stats.isIndexing ? 'bg-orange-500' : 'bg-green-500'
                     }`}></div>
                     <span className="text-xs text-gray-500">
                       {searchStatus.index?.stats.isIndexing ? 'Indexing...' : 'Ready'}

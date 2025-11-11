@@ -394,7 +394,7 @@ export default function AdminCrawlPage() {
                       <div className="flex items-center justify-between text-xs">
                         <span className={`px-2 py-0.5 rounded ${
                           source.status === 'active' ? 'bg-green-100 text-green-700' :
-                          source.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                          source.status === 'paused' ? 'bg-gray-100 text-gray-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {source.status}

@@ -323,7 +323,7 @@ export default function CollectionClient() {
         </div>
 
         {!capabilities?.search && searchSource !== 'meili' && (
-          <div className="mb-4 px-4 py-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
             Search is running in {searchSource === 'db' ? 'database fallback' : 'limited'} mode
           </div>
         )}
@@ -516,7 +516,7 @@ export default function CollectionClient() {
                           title={jobIsShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
                         >
                           <svg 
-                            className={`w-5 h-5 ${jobIsShortlisted ? 'fill-yellow-500 stroke-yellow-600' : 'fill-none stroke-gray-400'}`}
+                            className={`w-5 h-5 ${jobIsShortlisted ? 'fill-orange-accent stroke-orange-dark' : 'fill-none stroke-gray-400'}`}
                             viewBox="0 0 24 24" 
                             strokeWidth="2"
                           >

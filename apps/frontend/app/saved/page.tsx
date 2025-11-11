@@ -192,7 +192,7 @@ export default function SavedPage() {
                                 {job.title}
                               </h3>
                               {isClosingSoon(job.deadline) && (
-                                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">
+                                <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-medium rounded">
                                   Closing soon
                                 </span>
                               )}
@@ -225,7 +225,7 @@ export default function SavedPage() {
                         title="Remove from saved"
                       >
                         <svg
-                          className="w-5 h-5 fill-yellow-500 stroke-yellow-600 hover:fill-gray-200 hover:stroke-gray-400"
+                          className="w-5 h-5 fill-orange-accent stroke-orange-dark hover:fill-gray-200 hover:stroke-gray-400"
                           viewBox="0 0 24 24"
                           strokeWidth="2"
                         >

@@ -73,7 +73,7 @@ export default function AdminSetupPage() {
     if (status === 'ok' || status === true) {
       return <CheckCircle className="w-5 h-5 text-green-600" />;
     } else if (status === 'warn') {
-      return <AlertCircle className="w-5 h-5 text-yellow-600" />;
+      return <AlertCircle className="w-5 h-5 text-orange-600" />;
     } else {
       return <XCircle className="w-5 h-5 text-red-600" />;
     }
@@ -87,7 +87,7 @@ export default function AdminSetupPage() {
 
   const getStatusColor = (status: ProviderStatus | boolean) => {
     if (status === 'ok' || status === true) return 'border-green-200 bg-green-50';
-    if (status === 'warn') return 'border-yellow-200 bg-yellow-50';
+    if (status === 'warn') return 'border-orange-200 bg-orange-50';
     return 'border-gray-200 bg-gray-50';
   };
 
@@ -181,7 +181,7 @@ export default function AdminSetupPage() {
 
         <div className={`border rounded-lg p-6 ${
           (status.payments.paypal && status.payments.razorpay) ? 'border-green-200 bg-green-50' :
-          (status.payments.paypal || status.payments.razorpay) ? 'border-yellow-200 bg-yellow-50' :
+          (status.payments.paypal || status.payments.razorpay) ? 'border-orange-200 bg-orange-50' :
           'border-gray-200 bg-gray-50'
         }`}>
           <div className="flex items-center justify-between mb-4">
