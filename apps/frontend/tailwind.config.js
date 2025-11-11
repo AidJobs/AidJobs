@@ -22,6 +22,12 @@ module.exports = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        // Brand colors for login page
+        'peach-light': '#FEECE4',
+        'peach-lighter': '#FFF5F0',
+        'orange-accent': '#E85D3D',
+        'orange-dark': '#D04A2A',
+        'orange-darker': '#C0391F',
       },
       borderRadius: {
         lg: 'var(--radius)',

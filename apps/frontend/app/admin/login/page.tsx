@@ -43,11 +43,11 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-gradient-to-br from-[#FEECE4] via-[#FFF5F0] to-[#FEECE4] relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-gradient-to-br from-peach-light via-peach-lighter to-peach-light relative overflow-hidden">
       {/* Subtle background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#E85D3D] opacity-5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#E85D3D] opacity-5 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-accent opacity-5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-accent opacity-5 rounded-full blur-3xl"></div>
       </div>
 
       {/* Main Content */}
@@ -57,10 +57,10 @@ export default function AdminLoginPage() {
           <div className="flex justify-center mb-6">
             <AidJobsLogo size="lg" className="drop-shadow-sm" />
           </div>
-          <p className="text-lg text-[#6B7280] font-medium mt-4 tracking-wide">
+          <p className="text-lg text-gray-600 font-medium mt-4 tracking-wide">
             Become a changemaker
           </p>
-          <p className="text-sm text-[#9CA3AF] mt-2 font-normal">
+          <p className="text-sm text-gray-400 mt-2 font-normal">
             Admin Portal
           </p>
         </div>
@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-[#6B7280] mb-2.5"
+                className="block text-sm font-medium text-gray-600 mb-2.5"
               >
                 Password
               </label>
@@ -84,11 +84,11 @@ export default function AdminLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="w-full px-4 py-3.5 text-base border border-[#E5E7EB] rounded-xl 
-                           bg-white text-[#1A1D21] 
-                           placeholder:text-[#9CA3AF]
-                           focus:outline-none focus:ring-2 focus:ring-[#E85D3D] focus:ring-opacity-20 
-                           focus:border-[#E85D3D]
+                  className="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl 
+                           bg-white text-gray-900 
+                           placeholder:text-gray-400
+                           focus:outline-none focus:ring-2 focus:ring-orange-accent focus:ring-opacity-20 
+                           focus:border-orange-accent
                            disabled:opacity-50 disabled:cursor-not-allowed
                            transition-all duration-200
                            pr-12"
@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -118,8 +118,8 @@ export default function AdminLoginPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl px-4 py-3 animate-shake">
-                <p className="text-sm text-[#DC2626] flex items-center gap-2">
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
+                <p className="text-sm text-red-600 flex items-center gap-2">
                   <svg
                     className="w-4 h-4 flex-shrink-0"
                     fill="none"
@@ -142,12 +142,12 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={loading || !password}
-              className="w-full px-6 py-3.5 bg-gradient-to-r from-[#E85D3D] to-[#D04A2A] text-white font-medium rounded-xl
-                       hover:from-[#D04A2A] hover:to-[#C0391F]
-                       focus:outline-none focus:ring-2 focus:ring-[#E85D3D] focus:ring-opacity-50 focus:ring-offset-2
+              className="w-full px-6 py-3.5 bg-gradient-to-r from-orange-accent to-orange-dark text-white font-medium rounded-xl
+                       hover:from-orange-dark hover:to-orange-darker
+                       focus:outline-none focus:ring-2 focus:ring-orange-accent focus:ring-opacity-50 focus:ring-offset-2
                        disabled:opacity-50 disabled:cursor-not-allowed
                        transition-all duration-200 
-                       shadow-md hover:shadow-lg hover:shadow-[#E85D3D]/20
+                       shadow-md hover:shadow-lg hover:shadow-orange-accent/20
                        transform hover:-translate-y-0.5 active:translate-y-0"
             >
               {loading ? (
@@ -192,7 +192,7 @@ export default function AdminLoginPage() {
             href="https://aidjobs.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#9CA3AF] hover:text-[#E85D3D] transition-all duration-200 group font-medium"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-orange-accent transition-all duration-200 group font-medium"
           >
             <svg
               className="w-4 h-4 transition-transform group-hover:translate-x-0.5"
@@ -218,7 +218,7 @@ export default function AdminLoginPage() {
           {/* Back to Site Link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-[#9CA3AF] hover:text-[#6B7280] transition-all duration-200 group"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-all duration-200 group"
           >
             <svg
               className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5"
@@ -237,7 +237,7 @@ export default function AdminLoginPage() {
           </Link>
           
           {/* Copyright Notice - Very small, at the very bottom */}
-          <p className="text-[9px] text-[#9CA3AF] opacity-60 tracking-wide">
+          <p className="text-[9px] text-gray-400 opacity-60 tracking-wide">
             © {new Date().getFullYear()} AidJobs. All rights reserved.
           </p>
         </div>
