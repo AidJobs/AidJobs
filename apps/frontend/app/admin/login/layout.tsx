@@ -3,9 +3,6 @@ export default function LoginLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen bg-[#FEECE4] antialiased">
-      {children}
-    </div>
-  );
+  // Login page handles its own styling, so we just pass through
+  return <>{children}</>;
 }

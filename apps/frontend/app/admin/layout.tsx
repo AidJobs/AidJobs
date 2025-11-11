@@ -1,5 +1,5 @@
 import { Toaster } from 'sonner';
-import AdminTopBar from '@/components/AdminTopBar';
+import AdminLayoutClient from '@/components/AdminLayoutClient';
 
 export default function AdminLayout({
   children,
@@ -7,10 +7,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-white text-slate-900 antialiased">
-      <AdminTopBar />
+    <AdminLayoutClient>
       {children}
       <Toaster position="top-right" />
-    </div>
+    </AdminLayoutClient>
   );
 }
