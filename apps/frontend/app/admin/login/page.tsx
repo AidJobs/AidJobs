@@ -42,28 +42,28 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-900">
-      {/* Left Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 lg:px-16 xl:px-24 bg-gray-900 relative">
-        {/* Vertical white line on the right */}
-        <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-px bg-white/10"></div>
+    <div className="min-h-screen flex">
+      {/* Left Side - Login Form (35%) */}
+      <div className="w-full lg:w-[35%] flex flex-col justify-center px-8 lg:px-12 xl:px-16 bg-white relative">
+        {/* Vertical line separator */}
+        <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-px bg-gray-200"></div>
         
-        <div className="max-w-md mx-auto w-full">
+        <div className="max-w-sm mx-auto w-full">
           {/* AidJobs Logo */}
-          <div className="mb-12">
-            <h1 className="text-4xl font-thin text-white tracking-tight">
+          <div className="mb-10">
+            <h1 className="text-3xl font-thin text-gray-900 tracking-tight">
               AidJobs
             </h1>
           </div>
 
           {/* Login Form */}
           <div>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Password Input */}
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-sm font-light text-gray-300 mb-2"
+                  className="block text-sm font-light text-gray-700 mb-2"
                 >
                   Password
                 </label>
@@ -75,14 +75,14 @@ export default function AdminLoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="w-full px-4 py-3 text-sm border border-white/20 rounded-lg 
-                             bg-gray-800/50 text-white font-light
-                             placeholder:text-gray-500
-                             focus:outline-none focus:ring-1 focus:ring-white/30 
-                             focus:border-white/40
+                    className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg 
+                             bg-white text-gray-900 font-light
+                             placeholder:text-gray-400
+                             focus:outline-none focus:ring-2 focus:ring-orange-accent focus:ring-opacity-20 
+                             focus:border-orange-accent
                              disabled:opacity-50 disabled:cursor-not-allowed
                              transition-all duration-200
-                             pr-12 backdrop-blur-sm"
+                             pr-12"
                     placeholder="Enter your password"
                     autoFocus
                     autoComplete="current-password"
@@ -90,7 +90,7 @@ export default function AdminLoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
                     tabIndex={-1}
                   >
                     {showPassword ? (
@@ -109,8 +109,8 @@ export default function AdminLoginPage() {
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-900/30 border border-red-500/30 rounded-lg px-4 py-3">
-                  <p className="text-sm text-red-300 flex items-center gap-2 font-light">
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+                  <p className="text-sm text-red-600 flex items-center gap-2 font-light">
                     <svg
                       className="w-4 h-4 flex-shrink-0"
                       fill="none"
@@ -133,12 +133,12 @@ export default function AdminLoginPage() {
               <button
                 type="submit"
                 disabled={loading || !password}
-                className="w-full px-6 py-3 bg-gradient-to-r from-orange-accent to-orange-dark text-white font-light rounded-lg text-sm
+                className="w-full px-6 py-2.5 bg-gradient-to-r from-orange-accent to-orange-dark text-white font-light rounded-lg text-sm
                          hover:from-orange-dark hover:to-orange-darker
                          focus:outline-none focus:ring-2 focus:ring-orange-accent focus:ring-opacity-50
                          disabled:opacity-50 disabled:cursor-not-allowed
                          transition-all duration-200 
-                         shadow-lg hover:shadow-xl"
+                         shadow-md hover:shadow-lg"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -172,12 +172,12 @@ export default function AdminLoginPage() {
           </div>
 
           {/* Visit AidJobs Link */}
-          <div className="mt-8">
+          <div className="mt-6">
             <Link
               href="https://aidjobs.app"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors font-light"
+              className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 transition-colors font-light"
             >
               <svg
                 className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
@@ -198,35 +198,26 @@ export default function AdminLoginPage() {
         </div>
       </div>
 
-      {/* Right Side - Tagline */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center px-16 xl:px-24 bg-gray-900 relative">
-        {/* Gradient overlay for text */}
-        <div className="absolute inset-0 bg-gradient-to-br from-peach-light/10 via-peach-lighter/10 to-orange-accent/10"></div>
-        
-        {/* Large Tagline Text */}
-        <div className="relative z-10 text-center">
-          <h2 className="text-6xl xl:text-7xl 2xl:text-8xl font-thin leading-tight tracking-tight">
-            <span className="bg-gradient-to-r from-peach-light via-peach-lighter to-orange-accent bg-clip-text text-transparent">
+      {/* Right Side - Tagline (65%) */}
+      <div className="hidden lg:flex lg:w-[65%] items-center justify-center px-8 xl:px-12 2xl:px-16 bg-gray-900 relative min-h-screen">
+        {/* Large Tagline Text - Full Height Coverage */}
+        <div className="relative z-10 w-full">
+          <h2 className="text-8xl xl:text-9xl 2xl:text-[10rem] font-bold leading-[0.85] tracking-tight">
+            <span className="text-white block">
               Become a
             </span>
-            <br />
-            <span className="bg-gradient-to-r from-orange-accent via-orange-dark to-orange-darker bg-clip-text text-transparent">
+            <span className="text-green-400 block mt-1">
               Changemaker
             </span>
           </h2>
         </div>
-
-        {/* Decorative white lines */}
-        <div className="absolute top-1/4 left-0 w-full h-px bg-white/5"></div>
-        <div className="absolute bottom-1/4 left-0 w-full h-px bg-white/5"></div>
       </div>
 
       {/* Mobile: Show tagline below login */}
-      <div className="lg:hidden w-full absolute bottom-8 left-0 right-0 px-8 text-center">
-        <p className="text-2xl font-thin text-gray-400">
-          <span className="bg-gradient-to-r from-peach-light to-orange-accent bg-clip-text text-transparent">
-            Become a Changemaker
-          </span>
+      <div className="lg:hidden w-full bg-gray-900 py-12 px-8">
+        <p className="text-3xl font-bold text-center">
+          <span className="text-white block">Become a</span>
+          <span className="text-green-400 block mt-2">Changemaker</span>
         </p>
       </div>
     </div>
