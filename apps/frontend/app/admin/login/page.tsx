@@ -46,7 +46,7 @@ export default function AdminLoginPage() {
       {/* Left Side - Login Form (35%) */}
       <div className="w-full lg:w-[35%] flex flex-col justify-between px-8 lg:px-12 xl:px-16 bg-white relative py-8">
         {/* Vertical line separator */}
-        <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-px bg-[#aaaaaa]"></div>
+        <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-px bg-[#aaaaaa] opacity-25"></div>
         
         <div className="max-w-sm mx-auto w-full flex flex-col h-full justify-center">
           {/* AidJobs Logo */}
