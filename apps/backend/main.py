@@ -128,6 +128,9 @@ app.add_middleware(
         "https://ece7b4ba-3a82-477c-a281-2adcc8be6f96-00-1j1pwa2ohhygd.spock.replit.dev",
         # Vercel deployments (production and preview)
         "https://*.vercel.app",
+        # Custom domain
+        "https://aidjobs.app",
+        "https://www.aidjobs.app",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
