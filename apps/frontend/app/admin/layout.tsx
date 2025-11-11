@@ -7,9 +7,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AdminLayoutClient>
-      {children}
+    <>
+      <AdminLayoutClient>
+        {children}
+      </AdminLayoutClient>
       <Toaster position="top-right" />
-    </AdminLayoutClient>
+    </>
   );
 }
