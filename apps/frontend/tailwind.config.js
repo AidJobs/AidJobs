@@ -28,6 +28,9 @@ module.exports = {
         'orange-accent': '#E85D3D',
         'orange-dark': '#D04A2A',
         'orange-darker': '#C0391F',
+        // Admin login colors
+        'admin-gray': '#aaaaaa',
+        'admin-gray-light': '#bbbbbb',
       },
       borderRadius: {
         lg: 'var(--radius)',
