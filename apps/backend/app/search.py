@@ -939,13 +939,10 @@ class SearchService:
                 }
             
             # Log connection attempt for debugging
-            logger.debug(f"[search] Attempting database connection to {conn_params.get('host', 'unknown')}:{conn_params.get('port', 'unknown')}")
+            logger.info(f"[search] Attempting database connection to {conn_params.get('host', 'unknown')}:{conn_params.get('port', 'unknown')}")
             
-            # Extract connect_timeout if present (will be passed separately to avoid duplicate)
-            connect_timeout = conn_params.pop('connect_timeout', 10)
-            
-            # Connect with timeout
-            conn = psycopg2.connect(**conn_params, connect_timeout=connect_timeout)
+            # Connect with timeout (10 seconds)
+            conn = psycopg2.connect(**conn_params, connect_timeout=10)
             
             cursor = conn.cursor()
             

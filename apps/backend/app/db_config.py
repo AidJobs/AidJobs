@@ -39,6 +39,21 @@ class DBConfig:
                 "Please provide SUPABASE_DB_URL for PostgreSQL connection pooler access."
             )
         
+        # Log the configured database URL (mask password for security)
+        if self.supabase_db_url:
+            # Mask password in log for security
+            try:
+                parsed = urlparse(self.supabase_db_url.replace('[', '').replace(']', ''))
+                if parsed.password:
+                    masked_url = self.supabase_db_url.replace(parsed.password, '***')
+                else:
+                    masked_url = self.supabase_db_url
+                logger.info(f"[db_config] SUPABASE_DB_URL configured: {parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}")
+            except Exception as e:
+                logger.info(f"[db_config] SUPABASE_DB_URL configured (unable to parse for logging: {e})")
+        else:
+            logger.warning("[db_config] SUPABASE_DB_URL not set - database connections will fail")
+        
         # Set DB driver
         if self.supabase_db_url or (self.supabase_url and self.supabase_service_key):
             self.db_driver = "supabase"
@@ -109,12 +124,14 @@ class DBConfig:
             "port": parsed.port or 5432,
             "database": parsed.path.lstrip('/') or 'postgres',
             "user": parsed.username or 'postgres',
-            "connect_timeout": 10,  # Add connection timeout
         }
         
         # Add password if present (URL-decode it to handle special characters)
         if parsed.password:
             params["password"] = unquote(parsed.password)
+        
+        # Log the connection parameters (mask password)
+        logger.info(f"[db_config] Database connection params: host={resolved_host}, port={params['port']}, database={params['database']}, user={params['user']}")
         
         return params
     
