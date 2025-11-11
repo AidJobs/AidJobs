@@ -95,18 +95,34 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const [dbRes, searchRes] = await Promise.all([
-        fetch('/admin/db/status'),
-        fetch('/admin/search/status'),
+        fetch('/api/db/status'),
+        fetch('/api/search/status'),
       ]);
 
-      const dbData = await dbRes.json();
-      const searchData = await searchRes.json();
+      // Check if responses are OK and have JSON content
+      if (!dbRes.ok) {
+        const errorText = await dbRes.text();
+        console.error('DB status error:', dbRes.status, errorText);
+        setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${errorText}` });
+      } else {
+        const dbData = await dbRes.json();
+        setDbStatus(dbData);
+      }
 
-      setDbStatus(dbData);
-      setSearchStatus(searchData);
+      if (!searchRes.ok) {
+        const errorText = await searchRes.text();
+        console.error('Search status error:', searchRes.status, errorText);
+        setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText}` });
+      } else {
+        const searchData = await searchRes.json();
+        setSearchStatus(searchData);
+      }
     } catch (error) {
       console.error('Failed to fetch status:', error);
       addToast('Failed to fetch status', 'error');
+      // Set error states
+      setDbStatus({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' });
+      setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       setLoading(false);
     }
