@@ -10,10 +10,8 @@ const nextConfig = {
         source: '/api/:path*',
         destination: `${api}/api/:path*`,
       },
-      {
-        source: '/admin/:path*',
-        destination: `${api}/admin/:path*`,
-      },
+      // Note: Admin pages (like /admin/login) are served by Next.js pages
+      // Admin API calls are proxied via /api/admin/* routes, not rewrites
     ];
   },
 };
