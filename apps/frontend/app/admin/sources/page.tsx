@@ -641,7 +641,7 @@ export default function AdminSourcesPage() {
                   )}
                   {formData.source_type === 'api' && (
                     <p className="mt-1 text-xs text-gray-500">
-                      Enter v1 JSON schema. Must include {"{"}"v": 1{"}"}. Use {"{"}{"{"}SECRET:NAME{"}"}{"}"} for secrets.
+                      Enter v1 JSON schema. Must include {`{"v": 1}`}. Use {`{{SECRET:NAME}}`} for secrets.
                     </p>
                   )}
                 </div>
