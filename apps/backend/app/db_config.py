@@ -55,6 +55,7 @@ class DBConfig:
         Get database connection parameters for Supabase.
         Returns dict with host, port, database, user, password.
         Requires SUPABASE_DB_URL (PostgreSQL connection string).
+        Automatically resolves hostname to IPv4 if needed.
         """
         if not self.supabase_db_url:
             return None
@@ -73,12 +74,42 @@ class DBConfig:
         if not parsed.hostname:
             return None
         
+        # Try to resolve hostname to IPv4 (for IPv6 compatibility issues)
+        hostname = parsed.hostname
+        resolved_host = hostname
+        
+        # Only try IPv4 resolution if hostname is not already an IP address and not a pooler hostname
+        # Pooler hostnames (like *.pooler.supabase.com) are already IPv4 compatible
+        is_pooler = '.pooler.supabase.com' in hostname or 'pooler' in hostname.lower()
+        is_ip_address = hostname.replace('.', '').isdigit()  # Simple check for IPv4
+        
+        if not is_ip_address and not is_pooler:
+            # Try to resolve to IPv4 for direct connections
+            try:
+                import socket
+                # Force IPv4 resolution
+                addr_info = socket.getaddrinfo(
+                    hostname, 
+                    parsed.port or 5432, 
+                    socket.AF_INET,  # Force IPv4
+                    socket.SOCK_STREAM
+                )
+                if addr_info:
+                    resolved_host = addr_info[0][4][0]  # Get IPv4 address
+                    logger.info(f"[db_config] Resolved {hostname} to IPv4: {resolved_host}")
+            except (socket.gaierror, ValueError, OSError) as e:
+                logger.warning(f"[db_config] Could not resolve {hostname} to IPv4, using original hostname: {e}")
+                # Continue with original hostname (pooler should work anyway)
+        elif is_pooler:
+            logger.debug(f"[db_config] Using pooler hostname (IPv4 compatible): {hostname}")
+        
         # Extract all parameters from the parsed URL
         params = {
-            "host": parsed.hostname,
+            "host": resolved_host,  # Use resolved IPv4 address or original hostname
             "port": parsed.port or 5432,
             "database": parsed.path.lstrip('/') or 'postgres',
             "user": parsed.username or 'postgres',
+            "connect_timeout": 10,  # Add connection timeout
         }
         
         # Add password if present (URL-decode it to handle special characters)
