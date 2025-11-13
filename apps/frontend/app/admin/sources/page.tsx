@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X } from 'lucide-react';
+import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 type Source = {
   id: string;
@@ -64,6 +64,7 @@ export default function AdminSourcesPage() {
   const [simulateResult, setSimulateResult] = useState<any>(null);
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [simulateLoading, setSimulateLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -509,6 +510,7 @@ export default function AdminSourcesPage() {
       time_window: '',
     });
     setSelectedPreset('');
+    setShowAdvanced(false);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -781,17 +783,24 @@ export default function AdminSourcesPage() {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-title font-semibold text-[#1D1D1F]">
-                  {showAddModal ? 'Add Source' : 'Edit Source'}
-                </h2>
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-title font-semibold text-[#1D1D1F]">
+                    {showAddModal ? 'Add Source' : 'Edit Source'}
+                  </h2>
+                  <p className="text-caption text-[#86868B] mt-1">
+                    {showAddModal ? 'Add a new job board source' : 'Update source configuration'}
+                  </p>
+                </div>
                 <button
                   onClick={() => {
                     setShowAddModal(false);
                     setShowEditModal(false);
                     setEditingSource(null);
+                    setShowAdvanced(false);
                     resetForm();
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
@@ -800,173 +809,194 @@ export default function AdminSourcesPage() {
                 </button>
               </div>
 
+              {/* Preset Selection - Simplified */}
               {showAddModal && presets.length > 0 && (
-                <div className="mb-4 p-4 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-2">
-                    Use Preset (Optional)
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedPreset}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handlePresetSelect(e.target.value);
-                        } else {
-                          handleClearPreset();
-                        }
-                      }}
-                      className="flex-1 border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                    >
-                      <option value="">-- Select a preset --</option>
-                      {presets.map((preset) => (
-                        <option key={preset.name} value={preset.name}>
-                          {preset.name} - {preset.description}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedPreset && (
-                      <button
-                        onClick={handleClearPreset}
-                        className="px-3 py-2 text-caption border border-[#D2D2D7] rounded hover:bg-[#E5E5E7] text-[#1D1D1F] transition-colors"
-                      >
-                        Clear
-                      </button>
-                    )}
+                <div className="mb-4 p-3 bg-gradient-to-r from-[#F5F5F7] to-white border border-[#D2D2D7] rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-[#0071E3]" />
+                    <label className="text-caption font-medium text-[#1D1D1F]">
+                      Quick Start (Optional)
+                    </label>
                   </div>
-                  {selectedPreset && (
-                    <p className="mt-2 text-caption-sm text-[#86868B]">
-                      Preset &quot;{selectedPreset}&quot; loaded. Please enter the Careers URL below.
-                    </p>
-                  )}
+                  <select
+                    value={selectedPreset}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handlePresetSelect(e.target.value);
+                      } else {
+                        handleClearPreset();
+                      }
+                    }}
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                  >
+                    <option value="">Start from scratch</option>
+                    {presets.map((preset) => (
+                      <option key={preset.name} value={preset.name}>
+                        {preset.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
+              {/* Essential Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Organization Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.org_name}
-                    onChange={(e) => setFormData({ ...formData, org_name: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                    placeholder="e.g., UNICEF"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Careers URL *
+                  <label className="block text-body-sm font-medium text-[#1D1D1F] mb-1.5">
+                    Careers URL <span className="text-[#FF3B30]">*</span>
                   </label>
                   <input
                     type="url"
                     value={formData.careers_url}
                     onChange={(e) => setFormData({ ...formData, careers_url: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                    className="w-full border border-[#D2D2D7] rounded-lg px-4 py-3 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
                     placeholder="https://example.org/careers"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
+                  <label className="block text-body-sm font-medium text-[#1D1D1F] mb-1.5">
+                    Organization Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.org_name}
+                    onChange={(e) => setFormData({ ...formData, org_name: e.target.value })}
+                    className="w-full border border-[#D2D2D7] rounded-lg px-4 py-3 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
+                    placeholder="e.g., UNICEF"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-body-sm font-medium text-[#1D1D1F] mb-1.5">
                     Source Type
                   </label>
                   <select
                     value={formData.source_type}
                     onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                    className="w-full border border-[#D2D2D7] rounded-lg px-4 py-3 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
                   >
-                    <option value="html">HTML</option>
-                    <option value="rss">RSS</option>
+                    <option value="html">HTML (Web Page)</option>
+                    <option value="rss">RSS Feed</option>
                     <option value="api">API</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Organization Type
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.org_type}
-                    onChange={(e) => setFormData({ ...formData, org_type: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                    placeholder="e.g., UN, NGO, INGO"
-                  />
-                </div>
+                {/* Advanced Options - Collapsible */}
+                <div className="border-t border-[#D2D2D7] pt-4">
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between text-body-sm font-medium text-[#1D1D1F] hover:text-[#0071E3] transition-colors"
+                  >
+                    <span>Advanced Options</span>
+                    {showAdvanced ? (
+                      <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-[#86868B]" />
+                    )}
+                  </button>
 
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Crawl Frequency (days)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.crawl_frequency_days}
-                    onChange={(e) => setFormData({ ...formData, crawl_frequency_days: parseInt(e.target.value) })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                    min="1"
-                  />
-                </div>
+                  {showAdvanced && (
+                    <div className="mt-4 space-y-4 animate-fade-in">
+                      <div>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1.5">
+                          Organization Type
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.org_type}
+                          onChange={(e) => setFormData({ ...formData, org_type: e.target.value })}
+                          className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                          placeholder="e.g., UN, NGO, INGO"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Parser Hint {formData.source_type === 'api' && '(JSON v1 schema)'}
-                  </label>
-                  {formData.source_type === 'api' ? (
-                    <textarea
-                      value={formData.parser_hint}
-                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                      className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] font-mono text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                      placeholder='{"v": 1, "base_url": "https://example.com", "path": "/jobs", ...}'
-                      rows={12}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData.parser_hint}
-                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                      className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                      placeholder="Optional: parser-specific hints"
-                    />
+                      <div>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1.5">
+                          Crawl Frequency
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formData.crawl_frequency_days}
+                            onChange={(e) => setFormData({ ...formData, crawl_frequency_days: parseInt(e.target.value) || 3 })}
+                            className="w-24 border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                            min="1"
+                          />
+                          <span className="text-caption text-[#86868B]">days</span>
+                        </div>
+                      </div>
+
+                      {formData.source_type === 'api' && (
+                        <div>
+                          <label className="block text-caption font-medium text-[#86868B] mb-1.5">
+                            API Configuration (JSON v1 schema)
+                          </label>
+                          <textarea
+                            value={formData.parser_hint}
+                            onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                            className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] font-mono text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                            placeholder='{"v": 1, "base_url": "https://example.com", "path": "/jobs", ...}'
+                            rows={8}
+                          />
+                          <p className="mt-1.5 text-caption-sm text-[#86868B]">
+                            Must include version field (v: 1). Use SECRET:NAME for secrets.
+                          </p>
+                        </div>
+                      )}
+
+                      {formData.source_type !== 'api' && (
+                        <div>
+                          <label className="block text-caption font-medium text-[#86868B] mb-1.5">
+                            Parser Hint
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.parser_hint}
+                            onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                            className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                            placeholder="Optional: parser-specific hints"
+                          />
+                        </div>
+                      )}
+
+                      {formData.source_type === 'rss' && (
+                        <div>
+                          <label className="block text-caption font-medium text-[#86868B] mb-1.5">
+                            Time Window
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.time_window}
+                            onChange={(e) => setFormData({ ...formData, time_window: e.target.value })}
+                            className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                            placeholder="e.g., 22:00-05:00"
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {formData.source_type === 'api' && (
-                    <p className="mt-1 text-caption-sm text-[#86868B]">
-                      Enter v1 JSON schema. Must include version field (v: 1). Use SECRET:NAME pattern for secrets.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Time Window (days)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.time_window}
-                    onChange={(e) => setFormData({ ...formData, time_window: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                    placeholder="Optional: time window for RSS feeds"
-                  />
                 </div>
               </div>
 
-              <div className="mt-6 flex gap-3 justify-end">
+              {/* Actions */}
+              <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-[#D2D2D7]">
                 <button
                   onClick={() => {
                     setShowAddModal(false);
                     setShowEditModal(false);
                     setEditingSource(null);
+                    setShowAdvanced(false);
                     resetForm();
                   }}
-                  className="px-4 py-2 border border-[#D2D2D7] rounded text-body text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
+                  className="px-6 py-2.5 border border-[#D2D2D7] rounded-lg text-body text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={showAddModal ? handleAddSource : handleEditSource}
-                  className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
+                  className="px-6 py-2.5 bg-[#0071E3] text-white rounded-lg text-body font-medium hover:bg-[#0077ED] transition-colors shadow-sm"
                 >
                   {showAddModal ? 'Create Source' : 'Save Changes'}
                 </button>
