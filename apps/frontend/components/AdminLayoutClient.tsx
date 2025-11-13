@@ -126,7 +126,7 @@ function ExpandCollapseButton({
           <ChevronLeft className="w-5 h-5" />
         )}
       </button>
-      {sidebarCollapsed && showTooltip && (
+      {showTooltip && (
         <span 
           className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-nowrap z-[9999]"
           style={{
@@ -135,7 +135,7 @@ function ExpandCollapseButton({
             transform: 'translateY(-50%)',
           }}
         >
-          Expand sidebar
+          {sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         </span>
       )}
     </>
