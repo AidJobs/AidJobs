@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X } from 'lucide-react';
 
 type Source = {
   id: string;
@@ -518,43 +519,49 @@ export default function AdminSourcesPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="p-8">
+    <div className="h-full p-4 overflow-y-auto">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sources Management</h1>
-            <p className="text-gray-600 mt-1">Manage job board crawl sources</p>
+            <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Sources</h1>
+            <p className="text-caption text-[#86868B]">Manage job board crawl sources</p>
           </div>
           <div className="flex gap-2">
-            <label className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 cursor-pointer">
-              Import
+            <label className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] cursor-pointer transition-colors relative group">
+              <Upload className="w-4 h-4 text-[#86868B]" />
               <input
                 type="file"
                 accept=".json"
                 onChange={handleImportSource}
                 className="hidden"
               />
+              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Import source
+              </span>
             </label>
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
             >
-              Add Source
+              <Plus className="w-4 h-4 text-[#86868B]" />
+              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Add source
+              </span>
             </button>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg shadow mb-6 p-4">
+        <div className="bg-white border border-[#D2D2D7] rounded-lg mb-4 p-4">
           <div className="flex gap-4 items-center">
             <div>
-              <label className="text-sm text-gray-600 mr-2">Status:</label>
+              <label className="text-caption text-[#86868B] mr-2">Status:</label>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
-                className="border border-gray-300 rounded px-3 py-1 bg-white text-gray-900"
+                className="border border-[#D2D2D7] rounded px-3 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
               >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
@@ -571,135 +578,168 @@ export default function AdminSourcesPage() {
                   setSearchQuery(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-gray-300 rounded px-3 py-1 bg-white text-gray-900"
+                className="w-full border border-[#D2D2D7] rounded px-3 py-1.5 bg-white text-[#1D1D1F] text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg shadow overflow-hidden">
+        <div className="bg-white border border-[#D2D2D7] rounded-lg overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-600">Loading...</div>
+            <div className="p-8 text-center text-[#86868B] text-caption">Loading...</div>
           ) : sources.length === 0 ? (
-            <div className="p-8 text-center text-gray-600">No sources found</div>
+            <div className="p-8 text-center text-[#86868B] text-caption">No sources found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[#F5F5F7] border-b border-[#D2D2D7]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Org</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">URL</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Freq (d)</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next run</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last crawl</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Failures</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Org</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">URL</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Type</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Freq</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Next run</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Last crawl</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Failures</th>
+                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-[#D2D2D7]">
                   {sources.map((source) => (
-                    <tr key={source.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900">{source.org_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <tr key={source.id} className="hover:bg-[#F5F5F7] transition-colors">
+                      <td className="px-4 py-3 text-body text-[#1D1D1F]">{source.org_name || '-'}</td>
+                      <td className="px-4 py-3 text-body">
+                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] hover:underline text-caption">
                           {source.careers_url.substring(0, 40)}...
                         </a>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{source.source_type}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          source.status === 'active' ? 'bg-green-100 text-green-700' :
-                          source.status === 'paused' ? 'bg-gray-100 text-gray-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {source.status}
-                        </span>
+                      <td className="px-4 py-3 text-caption text-[#1D1D1F] font-mono">{source.source_type}</td>
+                      <td className="px-4 py-3 text-caption">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            source.status === 'active' ? 'bg-[#30D158]' :
+                            source.status === 'paused' ? 'bg-[#86868B]' :
+                            'bg-[#FF3B30]'
+                          }`}></div>
+                          <span className="text-[#1D1D1F]">{source.status}</span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{source.crawl_frequency_days || '-'}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{formatDate(source.next_run_at)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{formatDate(source.last_crawled_at)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          source.last_crawl_status === 'success' ? 'bg-green-100 text-green-700' :
-                          source.last_crawl_status === 'error' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {source.last_crawl_status || '-'}
-                        </span>
+                      <td className="px-4 py-3 text-caption text-[#1D1D1F]">{source.crawl_frequency_days || '-'}</td>
+                      <td className="px-4 py-3 text-caption text-[#86868B]">{formatDate(source.next_run_at)}</td>
+                      <td className="px-4 py-3 text-caption text-[#86868B]">{formatDate(source.last_crawled_at)}</td>
+                      <td className="px-4 py-3 text-caption">
+                        <div className="flex items-center gap-2">
+                          {source.last_crawl_status === 'success' && (
+                            <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                          )}
+                          {source.last_crawl_status === 'error' && (
+                            <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                          )}
+                          {source.last_crawl_status && source.last_crawl_status !== 'success' && source.last_crawl_status !== 'error' && (
+                            <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                          )}
+                          <span className="text-[#1D1D1F]">{source.last_crawl_status || '-'}</span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-caption">
                         <div className="flex items-center gap-2">
                           {(source.consecutive_failures ?? 0) > 0 && (
-                            <span className={`px-2 py-1 rounded text-xs ${
+                            <span className={`px-2 py-0.5 rounded text-caption ${
                               (source.consecutive_failures ?? 0) >= 5 
-                                ? 'bg-red-100 text-red-700 font-semibold' 
-                                : 'bg-yellow-100 text-yellow-700'
+                                ? 'bg-[#FF3B30] text-white font-semibold' 
+                                : 'bg-[#FF9500] text-white'
                             }`} title={`Consecutive failures: ${source.consecutive_failures ?? 0}`}>
                               {source.consecutive_failures ?? 0}
                             </span>
                           )}
                           {(source.consecutive_nochange ?? 0) > 0 && (
-                            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600" title={`Consecutive no-change: ${source.consecutive_nochange ?? 0}`}>
+                            <span className="px-2 py-0.5 rounded text-caption bg-[#F5F5F7] text-[#86868B]" title={`Consecutive no-change: ${source.consecutive_nochange ?? 0}`}>
                               NC: {source.consecutive_nochange ?? 0}
                             </span>
                           )}
                           {(!source.consecutive_failures || source.consecutive_failures === 0) && 
                            (!source.consecutive_nochange || source.consecutive_nochange === 0) && (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-[#86868B]">-</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex gap-2 flex-wrap">
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 flex-wrap">
                           <button
                             onClick={() => handleRunNow(source.id)}
-                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Run now"
                           >
-                            Run
+                            <Play className="w-4 h-4 text-[#86868B]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Run now
+                            </span>
                           </button>
                           <button
                             onClick={() => handleToggleStatus(source)}
-                            className={`text-xs px-2 py-1 rounded ${
-                              source.status === 'active'
-                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title={source.status === 'active' ? 'Pause' : 'Resume'}
                           >
-                            {source.status === 'active' ? 'Pause' : 'Resume'}
+                            {source.status === 'active' ? (
+                              <Pause className="w-4 h-4 text-[#86868B]" />
+                            ) : (
+                              <Play className="w-4 h-4 text-[#30D158]" />
+                            )}
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              {source.status === 'active' ? 'Pause' : 'Resume'}
+                            </span>
                           </button>
                           <button
                             onClick={() => openEditModal(source)}
-                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Edit"
                           >
-                            Edit
+                            <Edit className="w-4 h-4 text-[#86868B]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Edit
+                            </span>
                           </button>
                           <button
                             onClick={() => handleDeleteSource(source.id)}
-                            className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Delete"
                           >
-                            Delete
+                            <Trash2 className="w-4 h-4 text-[#FF3B30]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Delete
+                            </span>
                           </button>
                           <button
                             onClick={() => handleTestSource(source.id)}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Test source"
                           >
-                            Test
+                            <TestTube className="w-4 h-4 text-[#86868B]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Test source
+                            </span>
                           </button>
                           <button
                             onClick={() => handleSimulateExtract(source.id)}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Simulate extraction"
                           >
-                            Simulate
+                            <FileCode className="w-4 h-4 text-[#86868B]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Simulate extraction
+                            </span>
                           </button>
                           <button
                             onClick={() => handleExportSource(source.id)}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                            title="Export source configuration"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="Export source"
                           >
-                            Export
+                            <Download className="w-4 h-4 text-[#86868B]" />
+                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                              Export source
+                            </span>
                           </button>
                         </div>
                       </td>
@@ -711,25 +751,25 @@ export default function AdminSourcesPage() {
           )}
 
           {totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
+            <div className="px-4 py-3 border-t border-[#D2D2D7] flex items-center justify-between">
+              <div className="text-caption text-[#86868B]">
                 Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 border border-[#D2D2D7] rounded text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
                 >
                   Previous
                 </button>
-                <span className="px-3 py-1 text-gray-900">
+                <span className="px-3 py-1.5 text-caption text-[#1D1D1F]">
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 border border-[#D2D2D7] rounded text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
                 >
                   Next
                 </button>
@@ -741,15 +781,28 @@ export default function AdminSourcesPage() {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {showAddModal ? 'Add Source' : 'Edit Source'}
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-title font-semibold text-[#1D1D1F]">
+                  {showAddModal ? 'Add Source' : 'Edit Source'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setShowEditModal(false);
+                    setEditingSource(null);
+                    resetForm();
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
+                >
+                  <X className="w-4 h-4 text-[#86868B]" />
+                </button>
+              </div>
 
               {showAddModal && presets.length > 0 && (
-                <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="mb-4 p-4 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-2">
                     Use Preset (Optional)
                   </label>
                   <div className="flex gap-2">
@@ -762,7 +815,7 @@ export default function AdminSourcesPage() {
                           handleClearPreset();
                         }
                       }}
-                      className="flex-1 border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                      className="flex-1 border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     >
                       <option value="">-- Select a preset --</option>
                       {presets.map((preset) => (
@@ -774,14 +827,14 @@ export default function AdminSourcesPage() {
                     {selectedPreset && (
                       <button
                         onClick={handleClearPreset}
-                        className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100 text-gray-700"
+                        className="px-3 py-2 text-caption border border-[#D2D2D7] rounded hover:bg-[#E5E5E7] text-[#1D1D1F] transition-colors"
                       >
                         Clear
                       </button>
                     )}
                   </div>
                   {selectedPreset && (
-                    <p className="mt-2 text-xs text-gray-600">
+                    <p className="mt-2 text-caption-sm text-[#86868B]">
                       Preset "{selectedPreset}" loaded. Please enter the Careers URL below.
                     </p>
                   )}
@@ -790,40 +843,40 @@ export default function AdminSourcesPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Organization Name
                   </label>
                   <input
                     type="text"
                     value={formData.org_name}
                     onChange={(e) => setFormData({ ...formData, org_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     placeholder="e.g., UNICEF"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Careers URL *
                   </label>
                   <input
                     type="url"
                     value={formData.careers_url}
                     onChange={(e) => setFormData({ ...formData, careers_url: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     placeholder="https://example.org/careers"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Source Type
                   </label>
                   <select
                     value={formData.source_type}
                     onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                   >
                     <option value="html">HTML</option>
                     <option value="rss">RSS</option>
@@ -832,40 +885,40 @@ export default function AdminSourcesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Organization Type
                   </label>
                   <input
                     type="text"
                     value={formData.org_type}
                     onChange={(e) => setFormData({ ...formData, org_type: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     placeholder="e.g., UN, NGO, INGO"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Crawl Frequency (days)
                   </label>
                   <input
                     type="number"
                     value={formData.crawl_frequency_days}
                     onChange={(e) => setFormData({ ...formData, crawl_frequency_days: parseInt(e.target.value) })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     min="1"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Parser Hint {formData.source_type === 'api' && '(JSON v1 schema)'}
                   </label>
                   {formData.source_type === 'api' ? (
                     <textarea
                       value={formData.parser_hint}
                       onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                      className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-mono text-sm"
+                      className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] font-mono text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                       placeholder='{"v": 1, "base_url": "https://example.com", "path": "/jobs", ...}'
                       rows={12}
                     />
@@ -874,26 +927,26 @@ export default function AdminSourcesPage() {
                       type="text"
                       value={formData.parser_hint}
                       onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                      className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                      className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                       placeholder="Optional: parser-specific hints"
                     />
                   )}
                   {formData.source_type === 'api' && (
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-caption-sm text-[#86868B]">
                       Enter v1 JSON schema. Must include version field (v: 1). Use SECRET:NAME pattern for secrets.
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
                     Time Window (days)
                   </label>
                   <input
                     type="text"
                     value={formData.time_window}
                     onChange={(e) => setFormData({ ...formData, time_window: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    className="w-full border border-[#D2D2D7] rounded px-3 py-2 bg-white text-[#1D1D1F] text-body placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
                     placeholder="Optional: time window for RSS feeds"
                   />
                 </div>
@@ -907,13 +960,13 @@ export default function AdminSourcesPage() {
                     setEditingSource(null);
                     resetForm();
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-4 py-2 border border-[#D2D2D7] rounded text-body text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={showAddModal ? handleAddSource : handleEditSource}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
                 >
                   {showAddModal ? 'Create Source' : 'Save Changes'}
                 </button>
@@ -926,82 +979,83 @@ export default function AdminSourcesPage() {
       {/* Test Results Modal */}
       {showTestModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Test Results</h2>
+                <h2 className="text-title font-semibold text-[#1D1D1F]">Test Results</h2>
                 <button
                   onClick={() => {
                     setShowTestModal(false);
                     setTestResult(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
-                  ✕
+                  <X className="w-4 h-4 text-[#86868B]" />
                 </button>
               </div>
 
               {testLoading ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  <p className="mt-4 text-gray-600">Testing source...</p>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D1D1F]"></div>
+                  <p className="mt-4 text-caption text-[#86868B]">Testing source...</p>
                 </div>
               ) : testResult ? (
                 <div className="space-y-4">
-                  <div className={`p-4 rounded-lg ${testResult.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className={`p-4 rounded-lg ${testResult.ok ? 'bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30' : 'bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30'}`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-lg font-semibold ${testResult.ok ? 'text-green-800' : 'text-red-800'}`}>
-                        {testResult.ok ? '✓ Test Passed' : '✗ Test Failed'}
+                      <div className={`w-2 h-2 rounded-full ${testResult.ok ? 'bg-[#30D158]' : 'bg-[#FF3B30]'}`}></div>
+                      <span className={`text-body-lg font-semibold ${testResult.ok ? 'text-[#30D158]' : 'text-[#FF3B30]'}`}>
+                        {testResult.ok ? 'Test Passed' : 'Test Failed'}
                       </span>
                     </div>
                     {testResult.error && (
-                      <p className="text-sm text-red-700">{testResult.error}</p>
+                      <p className="text-caption text-[#FF3B30]">{testResult.error}</p>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Status Code</label>
-                      <p className="text-sm text-gray-900">{testResult.status ?? 'N/A'}</p>
+                      <label className="block text-caption font-medium text-[#86868B] mb-1">Status Code</label>
+                      <p className="text-body text-[#1D1D1F]">{testResult.status ?? 'N/A'}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Host</label>
-                      <p className="text-sm text-gray-900">{testResult.host ?? 'N/A'}</p>
+                      <label className="block text-caption font-medium text-[#86868B] mb-1">Host</label>
+                      <p className="text-body text-[#1D1D1F]">{testResult.host ?? 'N/A'}</p>
                     </div>
                     {testResult.count !== undefined && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Jobs Found</label>
-                        <p className="text-sm text-gray-900">{testResult.count}</p>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">Jobs Found</label>
+                        <p className="text-body text-[#1D1D1F]">{testResult.count}</p>
                       </div>
                     )}
                     {testResult.message && (
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                        <p className="text-sm text-gray-900">{testResult.message}</p>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">Message</label>
+                        <p className="text-body text-[#1D1D1F]">{testResult.message}</p>
                       </div>
                     )}
                     {testResult.size && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Content Size</label>
-                        <p className="text-sm text-gray-900">{testResult.size} bytes</p>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">Content Size</label>
+                        <p className="text-body text-[#1D1D1F]">{testResult.size} bytes</p>
                       </div>
                     )}
                     {testResult.etag && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ETag</label>
-                        <p className="text-sm text-gray-900 font-mono text-xs">{testResult.etag}</p>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">ETag</label>
+                        <p className="text-caption text-[#1D1D1F] font-mono">{testResult.etag}</p>
                       </div>
                     )}
                     {testResult.last_modified && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Modified</label>
-                        <p className="text-sm text-gray-900">{testResult.last_modified}</p>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">Last Modified</label>
+                        <p className="text-body text-[#1D1D1F]">{testResult.last_modified}</p>
                       </div>
                     )}
                     {testResult.missing_secrets && (
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-red-700 mb-1">Missing Secrets</label>
-                        <ul className="list-disc list-inside text-sm text-red-700">
+                        <label className="block text-caption font-medium text-[#FF3B30] mb-1">Missing Secrets</label>
+                        <ul className="list-disc list-inside text-caption text-[#FF3B30]">
                           {testResult.missing_secrets.map((secret: string, idx: number) => (
                             <li key={idx}>{secret}</li>
                           ))}
@@ -1010,18 +1064,18 @@ export default function AdminSourcesPage() {
                     )}
                     {testResult.first_ids && testResult.first_ids.length > 0 && (
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">First 5 Job IDs</label>
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">First 5 Job IDs</label>
                         <div className="space-y-1">
                           {testResult.first_ids.map((id: string, idx: number) => (
-                            <p key={idx} className="text-sm text-gray-900 font-mono text-xs">{id}</p>
+                            <p key={idx} className="text-caption text-[#1D1D1F] font-mono">{id}</p>
                           ))}
                         </div>
                       </div>
                     )}
                     {testResult.headers_sanitized && (
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Headers (Sanitized)</label>
-                        <pre className="text-xs bg-gray-50 p-3 rounded border border-gray-200 overflow-x-auto">
+                        <label className="block text-caption font-medium text-[#86868B] mb-1">Headers (Sanitized)</label>
+                        <pre className="text-caption-sm bg-[#F5F5F7] p-3 rounded border border-[#D2D2D7] overflow-x-auto font-mono text-[#1D1D1F]">
                           {JSON.stringify(testResult.headers_sanitized, null, 2)}
                         </pre>
                       </div>
@@ -1034,7 +1088,7 @@ export default function AdminSourcesPage() {
                         setShowTestModal(false);
                         setTestResult(null);
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
                     >
                       Close
                     </button>
@@ -1049,48 +1103,49 @@ export default function AdminSourcesPage() {
       {/* Simulate Results Modal */}
       {showSimulateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Simulation Results</h2>
+                <h2 className="text-title font-semibold text-[#1D1D1F]">Simulation Results</h2>
                 <button
                   onClick={() => {
                     setShowSimulateModal(false);
                     setSimulateResult(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
-                  ✕
+                  <X className="w-4 h-4 text-[#86868B]" />
                 </button>
               </div>
 
               {simulateLoading ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  <p className="mt-4 text-gray-600">Simulating extraction...</p>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D1D1F]"></div>
+                  <p className="mt-4 text-caption text-[#86868B]">Simulating extraction...</p>
                 </div>
               ) : simulateResult ? (
                 <div className="space-y-4">
                   {simulateResult.ok ? (
                     <>
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="p-4 bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg font-semibold text-green-800">✓ Simulation Successful</span>
+                          <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                          <span className="text-body-lg font-semibold text-[#30D158]">Simulation Successful</span>
                         </div>
-                        <p className="text-sm text-green-700">Found {simulateResult.count ?? 0} jobs</p>
+                        <p className="text-caption text-[#30D158]">Found {simulateResult.count ?? 0} jobs</p>
                       </div>
 
                       {simulateResult.sample && Array.isArray(simulateResult.sample) && simulateResult.sample.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-3">Sample Jobs (First 3)</h3>
+                          <h3 className="text-body-lg font-semibold text-[#1D1D1F] mb-3">Sample Jobs (First 3)</h3>
                           <div className="space-y-4">
                             {simulateResult.sample.map((job: any, idx: number) => (
-                              <div key={idx} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                              <div key={idx} className="p-4 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
                                 <div className="grid grid-cols-1 gap-2">
                                   {Object.entries(job).map(([key, value]) => (
                                     <div key={key}>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">{key}</label>
-                                      <p className="text-sm text-gray-900 break-words">
+                                      <label className="block text-caption-sm font-medium text-[#86868B] mb-1">{key}</label>
+                                      <p className="text-body text-[#1D1D1F] break-words">
                                         {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
                                       </p>
                                     </div>
@@ -1103,13 +1158,14 @@ export default function AdminSourcesPage() {
                       )}
                     </>
                   ) : (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="p-4 bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg font-semibold text-red-800">✗ Simulation Failed</span>
+                        <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                        <span className="text-body-lg font-semibold text-[#FF3B30]">Simulation Failed</span>
                       </div>
-                      <p className="text-sm text-red-700">{simulateResult.error ?? 'Unknown error'}</p>
+                      <p className="text-caption text-[#FF3B30]">{simulateResult.error ?? 'Unknown error'}</p>
                       {simulateResult.error_category && (
-                        <p className="text-xs text-red-600 mt-1">Category: {simulateResult.error_category}</p>
+                        <p className="text-caption-sm text-[#FF3B30] mt-1 opacity-80">Category: {simulateResult.error_category}</p>
                       )}
                     </div>
                   )}
@@ -1120,7 +1176,7 @@ export default function AdminSourcesPage() {
                         setShowSimulateModal(false);
                         setSimulateResult(null);
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
                     >
                       Close
                     </button>
