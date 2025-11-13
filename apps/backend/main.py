@@ -171,13 +171,29 @@ async def capabilities():
 @app.get("/api/search/status")
 async def search_status():
     """Get Meilisearch status (public endpoint, production-safe)"""
-    return await search_service.get_search_status()
+    try:
+        result = await search_service.get_search_status()
+        return result
+    except Exception as e:
+        logger.error(f"[api/search/status] Error: {e}", exc_info=True)
+        return {
+            "enabled": False,
+            "error": "Failed to get search status"
+        }
 
 
 @app.get("/api/db/status")
 async def db_status():
     """Get database status with job count (public endpoint, production-safe)"""
-    return await search_service.get_db_status()
+    try:
+        result = await search_service.get_db_status()
+        return result
+    except Exception as e:
+        logger.error(f"[api/db/status] Error: {e}", exc_info=True)
+        return {
+            "ok": False,
+            "error": "Failed to get database status"
+        }
 
 
 @app.get("/admin/config/env")

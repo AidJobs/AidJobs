@@ -973,43 +973,74 @@ class SearchService:
                 conn.close()
     
     async def get_search_status(self) -> dict[str, Any]:
-        """Get search engine status"""
-        if not self.meili_enabled:
-            return {
-                "enabled": False,
-                "error": self.meili_error if self.meili_error else "Meilisearch not configured"
-            }
-        
-        if not self.meili_client:
-            return {
-                "enabled": False,
-                "error": "Meilisearch client not initialized"
-            }
-        
+        """Get search engine status - always returns valid JSON"""
         try:
-            index = self.meili_client.index(self.meili_index_name)
-            stats = index.get_stats()
+            if not self.meili_enabled:
+                logger.debug(f"[search_status] Meilisearch not enabled. Error: {self.meili_error}")
+                return {
+                    "enabled": False,
+                    "error": self.meili_error if self.meili_error else "Meilisearch not configured"
+                }
             
-            result = {
-                "enabled": True,
-                "index": {
-                    "name": self.meili_index_name,
-                    "stats": {
-                        "numberOfDocuments": stats.number_of_documents,
-                        "isIndexing": stats.is_indexing,
+            if not self.meili_client:
+                logger.warning("[search_status] Meilisearch client is None despite being enabled")
+                return {
+                    "enabled": False,
+                    "error": "Meilisearch client not initialized"
+                }
+            
+            # Try to get index stats
+            try:
+                index = self.meili_client.index(self.meili_index_name)
+                stats = index.get_stats()
+                
+                result = {
+                    "enabled": True,
+                    "index": {
+                        "name": self.meili_index_name,
+                        "stats": {
+                            "numberOfDocuments": stats.number_of_documents,
+                            "isIndexing": stats.is_indexing,
+                        }
                     }
                 }
-            }
-            
-            if self.last_reindexed_at:
-                result["index"]["lastReindexedAt"] = self.last_reindexed_at
-            
-            return result
+                
+                if self.last_reindexed_at:
+                    result["index"]["lastReindexedAt"] = self.last_reindexed_at
+                
+                logger.debug(f"[search_status] Success: {stats.number_of_documents} documents, indexing={stats.is_indexing}")
+                return result
+                
+            except Exception as index_error:
+                logger.error(f"[search_status] Failed to get index stats: {index_error}", exc_info=True)
+                # Try to reconnect or reinitialize
+                try:
+                    self._init_meilisearch()
+                    # Retry once
+                    index = self.meili_client.index(self.meili_index_name)
+                    stats = index.get_stats()
+                    return {
+                        "enabled": True,
+                        "index": {
+                            "name": self.meili_index_name,
+                            "stats": {
+                                "numberOfDocuments": stats.number_of_documents,
+                                "isIndexing": stats.is_indexing,
+                            }
+                        }
+                    }
+                except Exception as retry_error:
+                    logger.error(f"[search_status] Retry also failed: {retry_error}")
+                    return {
+                        "enabled": False,
+                        "error": f"Failed to connect to Meilisearch: {str(index_error)}"
+                    }
+                    
         except Exception as e:
-            logger.error(f"Failed to get Meilisearch status: {e}")
+            logger.error(f"[search_status] Unexpected error in get_search_status: {e}", exc_info=True)
             return {
                 "enabled": False,
-                "error": str(e)
+                "error": f"Unexpected error: {str(e)}"
             }
     
     async def get_search_settings(self) -> dict[str, Any]:

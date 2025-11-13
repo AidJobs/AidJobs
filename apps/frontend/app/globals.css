@@ -3,59 +3,73 @@
 @tailwind utilities;
 
 :root {
-  --bg: 255 255 254;
-  --fg: 19 22 26;
-  --muted: 244 246 248;
-  --muted-foreground: 98 106 115;
+  /* Apple-style monochromatic palette */
+  --bg: 255 255 255;              /* Pure White */
+  --fg: 29 29 31;                 /* Dark Gray (#1D1D1F) */
+  --muted: 245 245 247;           /* Light Gray (#F5F5F7) */
+  --muted-foreground: 134 134 139; /* Medium Gray (#86868B) */
 
-  --surface: 248 249 250;
-  --surface-2: 240 242 244;
+  --surface: 251 251 253;         /* Off-White (#FBFBFD) */
+  --surface-2: 245 245 247;       /* Light Gray */
 
-  --accent: 198 232 216;
-  --accent-foreground: 17 68 55;
+  /* Minimal accent colors */
+  --accent: 0 113 227;            /* Primary Blue (#0071E3) */
+  --accent-foreground: 255 255 255;
 
-  --primary: 28 142 121;
+  --primary: 0 113 227;           /* Primary Blue (#0071E3) */
   --primary-foreground: 255 255 255;
+  --primary-hover: 0 119 237;     /* Primary Blue Hover (#0077ED) */
 
-  --warning: 232 93 61;
-  --danger: 224 84 84;
+  --success: 48 209 88;           /* Success Green (#30D158) */
+  --warning: 255 149 0;           /* Warning Orange (#FF9500) */
+  --danger: 255 59 48;            /* Error Red (#FF3B30) */
 
-  --ring: 28 142 121;
-  --border: 226 230 235;
-  --input: 226 230 235;
-  --radius: 16px;
+  --ring: 0 113 227;              /* Focus ring */
+  --border: 210 210 215;          /* Border Gray (#D2D2D7) */
+  --input: 245 245 247;           /* Input background */
+  --radius: 8px;                  /* Subtle rounded corners */
 }
 
 .dark {
-  --bg: 14 17 20;
-  --fg: 231 235 239;
-  --muted: 28 32 36;
-  --muted-foreground: 156 163 175;
+  /* Dark mode - Apple style */
+  --bg: 0 0 0;                    /* Pure Black */
+  --fg: 245 245 247;              /* Light Gray */
+  --muted: 29 29 31;              /* Dark Gray */
+  --muted-foreground: 134 134 139; /* Medium Gray */
 
-  --surface: 20 24 28;
-  --surface-2: 26 31 36;
+  --surface: 18 18 18;            /* Dark surface */
+  --surface-2: 29 29 31;          /* Darker surface */
 
-  --accent: 36 66 58;
-  --accent-foreground: 210 240 230;
+  --accent: 0 122 255;            /* Bright Blue */
+  --accent-foreground: 255 255 255;
 
-  --primary: 28 142 121;
-  --primary-foreground: 233 251 246;
+  --primary: 0 122 255;           /* Bright Blue */
+  --primary-foreground: 255 255 255;
+  --primary-hover: 10 132 255;    /* Brighter Blue */
 
-  --warning: 232 93 61;
-  --danger: 224 84 84;
+  --success: 48 209 88;
+  --warning: 255 149 0;
+  --danger: 255 59 48;
 
-  --ring: 28 142 121;
-  --border: 45 51 58;
-  --input: 45 51 58;
-  --radius: 16px;
+  --ring: 0 122 255;
+  --border: 58 58 60;             /* Dark border */
+  --input: 29 29 31;              /* Dark input */
+  --radius: 8px;
 }
 
 html {
   color-scheme: light dark;
+  /* Apple-style system fonts */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
+  font-size: 17px;
+  line-height: 1.41;
+  letter-spacing: -0.01em;
 }
 
 @keyframes slide-in {
