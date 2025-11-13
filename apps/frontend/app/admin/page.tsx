@@ -84,7 +84,10 @@ export default function AdminPage() {
     try {
       const [dbRes, searchRes, crawlRes] = await Promise.all([
         fetch('/api/db/status'),
-        fetch('/api/search/status'),
+        fetch('/api/search/status').catch((err) => {
+          console.error('Search status fetch failed:', err);
+          return { ok: false, status: 0, text: async () => err.message } as Response;
+        }),
         fetch('/api/admin/crawl/status').catch(() => null), // May fail if not authenticated
       ]);
 
@@ -93,29 +96,48 @@ export default function AdminPage() {
         console.error('DB status error:', dbRes.status, errorText);
         setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${errorText}` });
       } else {
-        const dbData = await dbRes.json();
-        setDbStatus(dbData);
+        try {
+          const dbData = await dbRes.json();
+          setDbStatus(dbData);
+        } catch (err) {
+          console.error('Failed to parse DB status:', err);
+          setDbStatus({ ok: false, error: 'Invalid response from database status endpoint' });
+        }
       }
 
-      // Handle search status response
+      // Handle search status response with comprehensive error handling
       try {
-        if (!searchRes.ok) {
-          const errorText = await searchRes.text();
-          console.error('Search status error:', searchRes.status, errorText);
-          setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText || 'Unknown error'}` });
+        if (!searchRes || !searchRes.ok) {
+          const statusCode = searchRes?.status || 0;
+          let errorText = 'Unknown error';
+          try {
+            errorText = await searchRes?.text() || 'No response from server';
+          } catch (e) {
+            errorText = searchRes instanceof Error ? searchRes.message : 'Network error';
+          }
+          console.error('Search status error:', statusCode, errorText);
+          setSearchStatus({ enabled: false, error: `HTTP ${statusCode}: ${errorText}` });
         } else {
           // Read response as text first to check if it's empty
-          const text = await searchRes.text();
+          let text = '';
+          try {
+            text = await searchRes.text();
+          } catch (readError) {
+            console.error('Failed to read search status response:', readError);
+            setSearchStatus({ enabled: false, error: 'Failed to read response from search status endpoint' });
+            return;
+          }
           
           if (!text || text.trim() === '') {
-            console.error('Search status returned empty response');
+            console.error('Search status returned empty response. Status:', searchRes.status);
             setSearchStatus({ enabled: false, error: 'Empty response from search status endpoint' });
           } else {
             try {
               const searchData = JSON.parse(text);
               setSearchStatus(searchData);
             } catch (parseError) {
-              console.error('Failed to parse search status JSON. Response:', text.substring(0, 200));
+              console.error('Failed to parse search status JSON. Status:', searchRes.status);
+              console.error('Response content:', text.substring(0, 200));
               console.error('Parse error:', parseError);
               // Provide user-friendly error message
               const errorMsg = parseError instanceof Error && parseError.message.includes('Expecting value') 
@@ -127,7 +149,12 @@ export default function AdminPage() {
         }
       } catch (error) {
         console.error('Failed to process search status response:', error);
-        setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Failed to fetch search status' });
+        const errorMsg = error instanceof Error 
+          ? (error.message.includes('Expecting value') 
+              ? 'Empty or invalid response from search status endpoint'
+              : error.message)
+          : 'Failed to fetch search status';
+        setSearchStatus({ enabled: false, error: errorMsg });
       }
 
       if (crawlRes && crawlRes.ok) {
@@ -483,7 +510,11 @@ export default function AdminPage() {
               ) : (
                 <div className="space-y-2">
                   <div className="text-caption text-[#FF3B30]">
-                    {searchStatus?.error || 'Search not enabled'}
+                    {searchStatus?.error 
+                      ? (searchStatus.error.includes('Expecting value') 
+                          ? 'Empty or invalid response from search endpoint. Check console for details.'
+                          : searchStatus.error)
+                      : 'Search not enabled'}
                   </div>
                   <button
                     onClick={handleInitialize}
