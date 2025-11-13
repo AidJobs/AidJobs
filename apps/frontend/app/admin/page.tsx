@@ -215,8 +215,8 @@ export default function AdminPage() {
         };
 
         const healthScore = calculateHealthScore();
-        // Standard status colors: green (80-100%), yellow (50-79%), red (0-49%)
-        const healthColor = healthScore >= 80 ? '#30D158' : healthScore >= 50 ? '#FF9500' : '#FF3B30';
+        // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
+        const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
 
   return (
           <div className="h-full p-4 overflow-y-auto">
@@ -232,31 +232,31 @@ export default function AdminPage() {
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
           >
                   <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                  <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
                     Refresh status
                   </span>
           </button>
         </div>
 
-              {/* System Health Score - Compact Horizontal Bar */}
+              {/* System Health Score - Elegant Circle */}
               <div className="bg-white border border-[#D2D2D7] rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-[#86868B]" />
                     <h2 className="text-body-lg font-semibold text-[#1D1D1F]">System Health</h2>
                   </div>
-                  <div className="flex items-center gap-3 flex-1 ml-4">
-                    <div className="flex-1 h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${healthScore}%`,
-                          backgroundColor: healthColor
-                        }}
-                      />
-                    </div>
-                    <div className="text-right min-w-[60px]">
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
                       <div className="text-2xl font-semibold text-[#1D1D1F]">{healthScore}%</div>
+                      <div className="text-caption text-[#86868B]">Overall</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-full border-4 border-[#F5F5F7] flex items-center justify-center relative" style={{
+                      borderTopColor: healthColor,
+                      borderRightColor: healthColor,
+                      transform: `rotate(${(healthScore / 100) * 360 - 90}deg)`,
+                      transition: 'transform 0.3s ease-apple'
+                    }}>
+                      <div className="w-8 h-8 rounded-full bg-white"></div>
                     </div>
                   </div>
           </div>
