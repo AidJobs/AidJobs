@@ -53,12 +53,13 @@ export default function AdminLayoutClient({
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-white">
+    <div className="h-screen flex bg-white" style={{ overflowY: 'hidden', overflowX: 'visible' }}>
       {/* Collapsible Sidebar */}
       <aside
-        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col ${
+        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
           sidebarCollapsed ? 'w-16' : 'w-64'
         }`}
+        style={{ overflowY: 'auto', overflowX: 'visible' }}
       >
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7] flex-shrink-0">
@@ -82,7 +83,7 @@ export default function AdminLayoutClient({
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
+        <nav className="flex-1 overflow-y-auto py-4" style={{ overflowX: 'visible' }}>
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
               <button
@@ -100,8 +101,16 @@ export default function AdminLayoutClient({
                 {!sidebarCollapsed && (
                   <span className="text-sm font-medium">{item.label}</span>
                 )}
+                {/* Tooltip for collapsed sidebar - show on hover when collapsed */}
                 {sidebarCollapsed && (
-                  <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                  <span 
+                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[100]"
+                    style={{ 
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      marginLeft: '8px'
+                    }}
+                  >
                     {item.label}
                   </span>
                 )}
@@ -130,7 +139,7 @@ export default function AdminLayoutClient({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden" style={{ overflow: 'hidden' }}>
         {children}
       </main>
     </div>
