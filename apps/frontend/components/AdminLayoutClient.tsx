@@ -3,21 +3,21 @@
 import { useState, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft } from 'lucide-react';
-import { useAdminView, type AdminView } from './AdminViewContext';
 
 type MenuItem = {
-  id: AdminView;
+  id: string;
   label: string;
   icon: React.ReactNode;
+  path: string;
 };
 
 const menuItems: MenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'sources', label: 'Sources', icon: <Database className="w-5 h-5" /> },
-  { id: 'crawl', label: 'Crawler', icon: <Network className="w-5 h-5" /> },
-  { id: 'find-earn', label: 'Find & Earn', icon: <DollarSign className="w-5 h-5" /> },
-  { id: 'taxonomy', label: 'Taxonomy', icon: <FileText className="w-5 h-5" /> },
-  { id: 'setup', label: 'Setup', icon: <Settings className="w-5 h-5" /> },
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/admin' },
+  { id: 'sources', label: 'Sources', icon: <Database className="w-5 h-5" />, path: '/admin/sources' },
+  { id: 'crawl', label: 'Crawler', icon: <Network className="w-5 h-5" />, path: '/admin/crawl' },
+  { id: 'find-earn', label: 'Find & Earn', icon: <DollarSign className="w-5 h-5" />, path: '/admin/find-earn' },
+  { id: 'taxonomy', label: 'Taxonomy', icon: <FileText className="w-5 h-5" />, path: '/admin/taxonomy' },
+  { id: 'setup', label: 'Setup', icon: <Settings className="w-5 h-5" />, path: '/admin/setup' },
 ];
 
 function MenuItemWithTooltip({ 
@@ -200,7 +200,6 @@ export default function AdminLayoutClient({
   const router = useRouter();
   const isLoginPage = pathname === '/admin/login';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { currentView, setCurrentView } = useAdminView();
 
   // Don't render sidebar on login page
   if (isLoginPage) {
@@ -219,8 +218,16 @@ export default function AdminLayoutClient({
     }
   };
 
-  const handleMenuClick = (itemId: AdminView) => {
-    setCurrentView(itemId);
+  const handleMenuClick = (path: string) => {
+    router.push(path);
+  };
+
+  // Determine active menu item based on pathname
+  const isActive = (itemPath: string) => {
+    if (itemPath === '/admin') {
+      return pathname === '/admin';
+    }
+    return pathname.startsWith(itemPath);
   };
 
   return (
@@ -250,9 +257,9 @@ export default function AdminLayoutClient({
               <MenuItemWithTooltip
                 key={item.id}
                 item={item}
-                isActive={currentView === item.id}
+                isActive={isActive(item.path)}
                 sidebarCollapsed={sidebarCollapsed}
-                onClick={() => handleMenuClick(item.id)}
+                onClick={() => handleMenuClick(item.path)}
               />
             ))}
           </div>

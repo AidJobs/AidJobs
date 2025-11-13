@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
-import { useAdminView } from '@/components/AdminViewContext';
 
 type DbStatus = {
   ok: boolean;
@@ -42,7 +41,6 @@ type Toast = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const { currentView } = useAdminView();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
@@ -187,413 +185,333 @@ export default function AdminPage() {
     );
   }
 
-  // Render different views based on currentView state
-  const renderView = () => {
-    switch (currentView) {
-      case 'dashboard':
-        // Calculate system health score (0-100)
-        const calculateHealthScore = () => {
-          let score = 0;
-          let total = 0;
-          
-          if (dbStatus) {
-            total += 1;
-            if (dbStatus.ok) score += 1;
-          }
-          
-          if (searchStatus) {
-            total += 1;
-            if (searchStatus.enabled) score += 1;
-          }
-          
-          if (crawlerStatus) {
-            total += 1;
-            if (crawlerStatus.running) score += 1;
-          }
-          
-          return total > 0 ? Math.round((score / total) * 100) : 0;
-        };
-
-        const healthScore = calculateHealthScore();
-        // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
-        const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
-
-  return (
-          <div className="h-full p-4 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <div className="mb-4 flex items-center justify-between">
-          <div>
-                  <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Dashboard</h1>
-                  <p className="text-caption text-[#86868B]">System overview and status</p>
-          </div>
-          <button
-                  onClick={fetchStatus}
-                  disabled={loading}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-          >
-                  <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
-                  <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                    Refresh status
-                  </span>
-          </button>
-        </div>
-
-              {/* System Health Score - Elegant Circle */}
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-[#86868B]" />
-                    <h2 className="text-body-lg font-semibold text-[#1D1D1F]">System Health</h2>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-2xl font-semibold text-[#1D1D1F]">{healthScore}%</div>
-                      <div className="text-caption text-[#86868B]">Overall</div>
-                    </div>
-                    <div className="w-12 h-12 rounded-full border-4 border-[#F5F5F7] flex items-center justify-center relative" style={{
-                      borderTopColor: healthColor,
-                      borderRightColor: healthColor,
-                      transform: `rotate(${(healthScore / 100) * 360 - 90}deg)`,
-                      transition: 'transform 0.3s ease-apple'
-                    }}>
-                      <div className="w-8 h-8 rounded-full bg-white"></div>
-                    </div>
-                  </div>
-          </div>
-        </div>
-
-              {/* Quick Stats and Recent Activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                {/* Quick Stats */}
-                <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-4 h-4 text-[#86868B]" />
-                    <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Quick Stats</h2>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-caption text-[#86868B]">Total Jobs</span>
-                      <span className="text-body font-semibold text-[#1D1D1F]">
-                        {dbStatus?.row_counts?.jobs || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-caption text-[#86868B]">Active Sources</span>
-                      <span className="text-body font-semibold text-[#1D1D1F]">
-                        {dbStatus?.row_counts?.sources || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-caption text-[#86868B]">Indexed Documents</span>
-                      <span className="text-body font-semibold text-[#1D1D1F]">
-                        {searchStatus?.index?.stats.numberOfDocuments || 0}
-                      </span>
-                    </div>
-                    {searchStatus?.index?.lastReindexedAt && (
-                      <div className="pt-2 border-t border-[#D2D2D7]">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3.5 h-3.5 text-[#86868B]" />
-                          <span className="text-caption text-[#86868B]">
-                            Last reindex: {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-                {/* Recent Activity */}
-                <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Activity className="w-4 h-4 text-[#86868B]" />
-                    <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Recent Activity</h2>
-                  </div>
-                  <div className="space-y-2">
-                    {searchStatus?.index?.lastReindexedAt ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
-                        <div className="flex-1">
-                          <div className="text-caption text-[#1D1D1F]">Search index reindexed</div>
-                          <div className="text-caption text-[#86868B]">
-                            {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-caption text-[#86868B]">No recent activity</div>
-                    )}
-                    {dbStatus?.ok && (
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                        <div className="flex-1">
-                          <div className="text-caption text-[#1D1D1F]">Database connected</div>
-                          <div className="text-caption text-[#86868B]">System operational</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Database Status */}
-                <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <DatabaseIcon className="w-4 h-4 text-[#86868B]" />
-                      <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Database</h2>
-                    </div>
-                    {dbStatus?.ok ? (
-                      <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Connected">
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Connected
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="relative group">
-                        <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Disconnected
-                        </span>
-                      </div>
-                    )}
-                  </div>
-            {dbStatus?.ok ? (
-                    <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Jobs</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                    {dbStatus.row_counts?.jobs || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Sources</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                    {dbStatus.row_counts?.sources || 0}
-                  </span>
-                </div>
-              </div>
-            ) : (
-                    <div className="text-caption text-[#FF3B30]">
-                {dbStatus?.error || 'Database not available'}
-              </div>
-            )}
-          </div>
-
-                {/* Search Status */}
-                <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <SearchIcon className="w-4 h-4 text-[#86868B]" />
-                      <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Search</h2>
-                    </div>
-                    {searchStatus?.enabled ? (
-                      <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Enabled
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="relative group">
-                        <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Disabled
-                        </span>
-                      </div>
-                    )}
-                  </div>
-            {searchStatus?.enabled ? (
-                    <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Index</span>
-                        <span className="text-caption font-mono text-[#1D1D1F]">
-                    {searchStatus.index?.name || 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Documents</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                    {searchStatus.index?.stats.numberOfDocuments || 0}
-                  </span>
-                </div>
-                {searchStatus.index?.stats.isIndexing && (
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#FF9500] animate-pulse"></div>
-                          <span className="text-caption text-[#FF9500]">Indexing...</span>
-                        </div>
-                )}
-                {searchStatus.index?.lastReindexedAt && (
-                        <div className="flex justify-between items-center text-caption">
-                          <span className="text-[#86868B]">Last reindexed</span>
-                          <span className="text-[#1D1D1F]">
-                      {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                        <div className="flex items-center gap-2 pt-2">
-                  <button
-                    onClick={handleReindex}
-                    disabled={reindexing}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                  >
-                            <RotateCw className={`w-4 h-4 text-[#86868B] ${reindexing ? 'animate-spin' : ''}`} />
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                    {reindexing ? 'Reindexing...' : 'Reindex Now'}
-                            </span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-                    <div className="space-y-2">
-                      <div className="text-caption text-[#FF3B30]">
-                  {searchStatus?.error || 'Search not enabled'}
-                </div>
-                <button
-                  onClick={handleInitialize}
-                  disabled={initializing}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                      >
-                        {initializing ? (
-                          <RotateCw className="w-4 h-4 text-[#86868B] animate-spin" />
-                        ) : (
-                          <Play className="w-4 h-4 text-[#86868B]" />
-                        )}
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                  {initializing ? 'Initializing...' : 'Initialize Index'}
-                        </span>
-                </button>
-              </div>
-            )}
-                </div>
-
-                {/* Crawler Status */}
-                <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Network className="w-4 h-4 text-[#86868B]" />
-                      <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Crawler</h2>
-                    </div>
-                    {crawlerStatus?.running ? (
-                      <div className="w-2 h-2 bg-[#30D158] rounded-full relative group">
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Running
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-2 h-2 bg-[#D2D2D7] rounded-full relative group">
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                          Stopped
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {crawlerStatus ? (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Active</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                          {crawlerStatus.in_flight || 0}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Queued</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                          {crawlerStatus.due_count || 0}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-caption text-[#86868B]">Locked</span>
-                        <span className="text-2xl font-semibold text-[#1D1D1F]">
-                          {crawlerStatus.locked || 0}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-caption text-[#86868B]">
-                      Crawler status unavailable
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'sources':
-        return (
-          <div className="h-full p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Sources</h1>
-              <p className="text-body-sm text-[#86868B] mb-8">Manage job sources</p>
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
-                <p className="text-body text-[#86868B]">Sources management coming soon</p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'crawl':
-        return (
-          <div className="h-full p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Crawler</h1>
-              <p className="text-body-sm text-[#86868B] mb-8">Monitor and manage crawls</p>
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
-                <p className="text-body text-[#86868B]">Crawler management coming soon</p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'find-earn':
-        return (
-          <div className="h-full p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Find & Earn</h1>
-              <p className="text-body-sm text-[#86868B] mb-8">Manage Find & Earn submissions</p>
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
-                <p className="text-body text-[#86868B]">Find & Earn management coming soon</p>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'taxonomy':
-        return (
-          <div className="h-full p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Taxonomy</h1>
-              <p className="text-body-sm text-[#86868B] mb-8">Manage taxonomy and normalization</p>
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
-                <p className="text-body text-[#86868B]">Taxonomy management coming soon</p>
-              </div>
-          </div>
-        </div>
-        );
-
-      case 'setup':
-        return (
-          <div className="h-full p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Setup</h1>
-              <p className="text-body-sm text-[#86868B] mb-8">System configuration and status</p>
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
-                <p className="text-body text-[#86868B]">Setup management coming soon</p>
-              </div>
-          </div>
-        </div>
-        );
-
-      default:
-        return null;
+  // Calculate system health score (0-100)
+  const calculateHealthScore = () => {
+    let score = 0;
+    let total = 0;
+    
+    if (dbStatus) {
+      total += 1;
+      if (dbStatus.ok) score += 1;
     }
+    
+    if (searchStatus) {
+      total += 1;
+      if (searchStatus.enabled) score += 1;
+    }
+    
+    if (crawlerStatus) {
+      total += 1;
+      if (crawlerStatus.running) score += 1;
+    }
+    
+    return total > 0 ? Math.round((score / total) * 100) : 0;
   };
+
+  const healthScore = calculateHealthScore();
+  // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
+  const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
 
   return (
     <>
-      <div className="h-full">
-        {renderView()}
+      <div className="h-full p-4 overflow-y-auto">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-4 flex items-center justify-between">
+          <div>
+              <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Dashboard</h1>
+              <p className="text-caption text-[#86868B]">System overview and status</p>
+          </div>
+          <button
+              onClick={fetchStatus}
+              disabled={loading}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+          >
+              <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
+              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Refresh status
+              </span>
+          </button>
+        </div>
+
+          {/* System Health Score - Elegant Circle */}
+          <div className="bg-white border border-[#D2D2D7] rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">System Health</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="text-2xl font-semibold text-[#1D1D1F]">{healthScore}%</div>
+                  <div className="text-caption text-[#86868B]">Overall</div>
+                </div>
+                <div className="w-12 h-12 rounded-full border-4 border-[#F5F5F7] flex items-center justify-center relative" style={{
+                  borderTopColor: healthColor,
+                  borderRightColor: healthColor,
+                  transform: `rotate(${(healthScore / 100) * 360 - 90}deg)`,
+                  transition: 'transform 0.3s ease-apple'
+                }}>
+                  <div className="w-8 h-8 rounded-full bg-white"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats and Recent Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            {/* Quick Stats */}
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Quick Stats</h2>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-caption text-[#86868B]">Total Jobs</span>
+                  <span className="text-body font-semibold text-[#1D1D1F]">
+                    {dbStatus?.row_counts?.jobs || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-caption text-[#86868B]">Active Sources</span>
+                  <span className="text-body font-semibold text-[#1D1D1F]">
+                    {dbStatus?.row_counts?.sources || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-caption text-[#86868B]">Indexed Documents</span>
+                  <span className="text-body font-semibold text-[#1D1D1F]">
+                    {searchStatus?.index?.stats.numberOfDocuments || 0}
+                  </span>
+                </div>
+                {searchStatus?.index?.lastReindexedAt && (
+                  <div className="pt-2 border-t border-[#D2D2D7]">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-[#86868B]" />
+                      <span className="text-caption text-[#86868B]">
+                        Last reindex: {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Recent Activity</h2>
+              </div>
+              <div className="space-y-2">
+                {searchStatus?.index?.lastReindexedAt ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="text-caption text-[#1D1D1F]">Search index reindexed</div>
+                      <div className="text-caption text-[#86868B]">
+                        {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-caption text-[#86868B]">No recent activity</div>
+                )}
+                {dbStatus?.ok && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="text-caption text-[#1D1D1F]">Database connected</div>
+                      <div className="text-caption text-[#86868B]">System operational</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+          </div>
+        </div>
+
+          {/* Status Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Database Status */}
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <DatabaseIcon className="w-4 h-4 text-[#86868B]" />
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Database</h2>
+                </div>
+                {dbStatus?.ok ? (
+                  <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Connected">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Connected
+                    </span>
+                  </div>
+                ) : (
+                  <div className="relative group">
+                    <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Disconnected
+                    </span>
+                  </div>
+                )}
+              </div>
+              {dbStatus?.ok ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Jobs</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {dbStatus.row_counts?.jobs || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Sources</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {dbStatus.row_counts?.sources || 0}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-caption text-[#FF3B30]">
+                  {dbStatus?.error || 'Database not available'}
+                </div>
+              )}
+            </div>
+
+            {/* Search Status */}
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <SearchIcon className="w-4 h-4 text-[#86868B]" />
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Search</h2>
+                </div>
+                {searchStatus?.enabled ? (
+                  <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Enabled
+                    </span>
+                  </div>
+                ) : (
+                  <div className="relative group">
+                    <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Disabled
+                    </span>
+                  </div>
+                )}
+              </div>
+              {searchStatus?.enabled ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Index</span>
+                    <span className="text-caption font-mono text-[#1D1D1F]">
+                      {searchStatus.index?.name || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Documents</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {searchStatus.index?.stats.numberOfDocuments || 0}
+                    </span>
+                  </div>
+                  {searchStatus.index?.stats.isIndexing && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#FF9500] animate-pulse"></div>
+                      <span className="text-caption text-[#FF9500]">Indexing...</span>
+                    </div>
+                  )}
+                  {searchStatus.index?.lastReindexedAt && (
+                    <div className="flex justify-between items-center text-caption">
+                      <span className="text-[#86868B]">Last reindexed</span>
+                      <span className="text-[#1D1D1F]">
+                        {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={handleReindex}
+                      disabled={reindexing}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                    >
+                      <RotateCw className={`w-4 h-4 text-[#86868B] ${reindexing ? 'animate-spin' : ''}`} />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                        {reindexing ? 'Reindexing...' : 'Reindex Now'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-caption text-[#FF3B30]">
+                    {searchStatus?.error || 'Search not enabled'}
+                  </div>
+                  <button
+                    onClick={handleInitialize}
+                    disabled={initializing}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                  >
+                    {initializing ? (
+                      <RotateCw className="w-4 h-4 text-[#86868B] animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 text-[#86868B]" />
+                    )}
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      {initializing ? 'Initializing...' : 'Initialize Index'}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Crawler Status */}
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Network className="w-4 h-4 text-[#86868B]" />
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Crawler</h2>
+                </div>
+                {crawlerStatus?.running ? (
+                  <div className="w-2 h-2 bg-[#30D158] rounded-full relative group">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Running
+                    </span>
+                  </div>
+                ) : (
+                  <div className="w-2 h-2 bg-[#D2D2D7] rounded-full relative group">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Stopped
+                    </span>
+                  </div>
+                )}
+              </div>
+              {crawlerStatus ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Active</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {crawlerStatus.in_flight || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Queued</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {crawlerStatus.due_count || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Locked</span>
+                    <span className="text-2xl font-semibold text-[#1D1D1F]">
+                      {crawlerStatus.locked || 0}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-caption text-[#86868B]">
+                  Crawler status unavailable
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Toasts */}
