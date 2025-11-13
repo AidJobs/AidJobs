@@ -466,32 +466,41 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
-              {searchStatus?.enabled ? (
+              {searchStatus?.enabled || searchStatus?.index ? (
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-caption text-[#86868B]">Index</span>
-                    <span className="text-caption font-mono text-[#1D1D1F]">
-                      {searchStatus.index?.name || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-caption text-[#86868B]">Documents</span>
-                    <span className="text-2xl font-semibold text-[#1D1D1F]">
-                      {searchStatus.index?.stats.numberOfDocuments || 0}
-                    </span>
-                  </div>
-                  {searchStatus.index?.stats.isIndexing && (
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-[#FF9500] animate-pulse"></div>
-                      <span className="text-caption text-[#FF9500]">Indexing...</span>
-                    </div>
+                  {searchStatus.index && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-caption text-[#86868B]">Index</span>
+                        <span className="text-caption font-mono text-[#1D1D1F]">
+                          {searchStatus.index.name || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-caption text-[#86868B]">Documents</span>
+                        <span className="text-2xl font-semibold text-[#1D1D1F]">
+                          {searchStatus.index.stats?.numberOfDocuments || 0}
+                        </span>
+                      </div>
+                      {searchStatus.index.stats?.isIndexing && (
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#FF9500] animate-pulse"></div>
+                          <span className="text-caption text-[#FF9500]">Indexing...</span>
+                        </div>
+                      )}
+                      {searchStatus.index.lastReindexedAt && (
+                        <div className="flex justify-between items-center text-caption">
+                          <span className="text-[#86868B]">Last reindexed</span>
+                          <span className="text-[#1D1D1F]">
+                            {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
-                  {searchStatus.index?.lastReindexedAt && (
-                    <div className="flex justify-between items-center text-caption">
-                      <span className="text-[#86868B]">Last reindexed</span>
-                      <span className="text-[#1D1D1F]">
-                        {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
-                      </span>
+                  {!searchStatus?.enabled && searchStatus?.error && (
+                    <div className="text-caption text-[#FF9500] bg-[#FFF4E6] border border-[#FF9500] rounded px-2 py-1">
+                      {searchStatus.error}
                     </div>
                   )}
                   <div className="flex items-center gap-2 pt-2">
