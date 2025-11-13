@@ -17,6 +17,8 @@ type Source = {
   last_crawl_status: string | null;
   parser_hint: string | null;
   time_window: string | null;
+  consecutive_failures?: number | null;
+  consecutive_nochange?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -55,6 +57,12 @@ export default function AdminSourcesPage() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [loadingPresets, setLoadingPresets] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [testResult, setTestResult] = useState<any>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [simulateResult, setSimulateResult] = useState<any>(null);
+  const [showSimulateModal, setShowSimulateModal] = useState(false);
+  const [simulateLoading, setSimulateLoading] = useState(false);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -162,6 +170,74 @@ export default function AdminSourcesPage() {
   const handleClearPreset = () => {
     setSelectedPreset('');
     resetForm();
+  };
+
+  const handleExportSource = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/sources/${id}/export`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to export source');
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok' && json.data) {
+        const dataStr = JSON.stringify(json.data, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `source-${id}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success('Source exported successfully');
+      }
+    } catch (error) {
+      console.error('Failed to export source:', error);
+      toast.error('Failed to export source');
+    }
+  };
+
+  const handleImportSource = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const sourceData = JSON.parse(text);
+
+      // Validate required fields
+      if (!sourceData.careers_url) {
+        toast.error('Invalid source file: missing careers_url');
+        return;
+      }
+
+      // Pre-fill form with imported data
+      setFormData({
+        org_name: sourceData.org_name || '',
+        careers_url: sourceData.careers_url,
+        source_type: sourceData.source_type || 'html',
+        org_type: sourceData.org_type || '',
+        crawl_frequency_days: sourceData.crawl_frequency_days || 3,
+        parser_hint: sourceData.parser_hint || '',
+        time_window: sourceData.time_window || '',
+      });
+
+      // Open add modal
+      setShowAddModal(true);
+      toast.success('Source configuration loaded. Review and click Create Source.');
+    } catch (error) {
+      console.error('Failed to import source:', error);
+      toast.error('Failed to import source: Invalid JSON file');
+    }
+
+    // Reset file input
+    event.target.value = '';
   };
 
   const handleAddSource = async () => {
@@ -320,14 +396,17 @@ export default function AdminSourcesPage() {
   };
 
   const handleTestSource = async (id: string) => {
+    setTestLoading(true);
+    setShowTestModal(true);
     try {
       const res = await fetch(`/api/admin/sources/${id}/test`, {
         method: 'POST',
         credentials: 'include',
       });
 
-      const result = await res.json() as { ok?: boolean; status?: string; host?: string; error?: string };
-
+      const result = await res.json();
+      setTestResult(result);
+      
       if (result.ok) {
         toast.success(`Test passed: ${String(result.status ?? 'OK')} (${String(result.host ?? 'unknown')})`);
       } else {
@@ -336,10 +415,15 @@ export default function AdminSourcesPage() {
     } catch (error) {
       console.error('Failed to test source:', error);
       toast.error('Failed to test source');
+      setTestResult({ ok: false, error: 'Failed to test source' });
+    } finally {
+      setTestLoading(false);
     }
   };
 
   const handleSimulateExtract = async (id: string) => {
+    setSimulateLoading(true);
+    setShowSimulateModal(true);
     toast.info('Simulating extraction...');
     
     try {
@@ -348,17 +432,20 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
-      const result = await res.json() as { ok?: boolean; count?: number; error?: string; sample?: unknown };
+      const result = await res.json();
+      setSimulateResult(result);
 
       if (result.ok) {
-        console.log('Simulation results:', result.sample);
-        toast.success(`Found ${String(result.count ?? 0)} jobs. Check console for first 3.`);
+        toast.success(`Found ${String(result.count ?? 0)} jobs`);
       } else {
         toast.error(`Simulation failed: ${String(result.error ?? 'Unknown error')}`);
       }
     } catch (error) {
       console.error('Failed to simulate extract:', error);
       toast.error('Failed to simulate extract');
+      setSimulateResult({ ok: false, error: 'Failed to simulate extract' });
+    } finally {
+      setSimulateLoading(false);
     }
   };
 
@@ -438,12 +525,23 @@ export default function AdminSourcesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Sources Management</h1>
             <p className="text-gray-600 mt-1">Manage job board crawl sources</p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Add Source
-          </button>
+          <div className="flex gap-2">
+            <label className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 cursor-pointer">
+              Import
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportSource}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Add Source
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg shadow mb-6 p-4">
@@ -497,6 +595,7 @@ export default function AdminSourcesPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next run</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last crawl</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Failures</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -530,6 +629,28 @@ export default function AdminSourcesPage() {
                         }`}>
                           {source.last_crawl_status || '-'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          {(source.consecutive_failures ?? 0) > 0 && (
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              (source.consecutive_failures ?? 0) >= 5 
+                                ? 'bg-red-100 text-red-700 font-semibold' 
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`} title={`Consecutive failures: ${source.consecutive_failures ?? 0}`}>
+                              {source.consecutive_failures ?? 0}
+                            </span>
+                          )}
+                          {(source.consecutive_nochange ?? 0) > 0 && (
+                            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600" title={`Consecutive no-change: ${source.consecutive_nochange ?? 0}`}>
+                              NC: {source.consecutive_nochange ?? 0}
+                            </span>
+                          )}
+                          {(!source.consecutive_failures || source.consecutive_failures === 0) && 
+                           (!source.consecutive_nochange || source.consecutive_nochange === 0) && (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <div className="flex gap-2 flex-wrap">
@@ -572,6 +693,13 @@ export default function AdminSourcesPage() {
                             className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             Simulate
+                          </button>
+                          <button
+                            onClick={() => handleExportSource(source.id)}
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                            title="Export source configuration"
+                          >
+                            Export
                           </button>
                         </div>
                       </td>
@@ -790,6 +918,215 @@ export default function AdminSourcesPage() {
                   {showAddModal ? 'Create Source' : 'Save Changes'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test Results Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Test Results</h2>
+                <button
+                  onClick={() => {
+                    setShowTestModal(false);
+                    setTestResult(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {testLoading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <p className="mt-4 text-gray-600">Testing source...</p>
+                </div>
+              ) : testResult ? (
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-lg ${testResult.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-lg font-semibold ${testResult.ok ? 'text-green-800' : 'text-red-800'}`}>
+                        {testResult.ok ? '✓ Test Passed' : '✗ Test Failed'}
+                      </span>
+                    </div>
+                    {testResult.error && (
+                      <p className="text-sm text-red-700">{testResult.error}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status Code</label>
+                      <p className="text-sm text-gray-900">{testResult.status ?? 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Host</label>
+                      <p className="text-sm text-gray-900">{testResult.host ?? 'N/A'}</p>
+                    </div>
+                    {testResult.count !== undefined && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Jobs Found</label>
+                        <p className="text-sm text-gray-900">{testResult.count}</p>
+                      </div>
+                    )}
+                    {testResult.message && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                        <p className="text-sm text-gray-900">{testResult.message}</p>
+                      </div>
+                    )}
+                    {testResult.size && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Content Size</label>
+                        <p className="text-sm text-gray-900">{testResult.size} bytes</p>
+                      </div>
+                    )}
+                    {testResult.etag && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ETag</label>
+                        <p className="text-sm text-gray-900 font-mono text-xs">{testResult.etag}</p>
+                      </div>
+                    )}
+                    {testResult.last_modified && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Modified</label>
+                        <p className="text-sm text-gray-900">{testResult.last_modified}</p>
+                      </div>
+                    )}
+                    {testResult.missing_secrets && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-red-700 mb-1">Missing Secrets</label>
+                        <ul className="list-disc list-inside text-sm text-red-700">
+                          {testResult.missing_secrets.map((secret: string, idx: number) => (
+                            <li key={idx}>{secret}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {testResult.first_ids && testResult.first_ids.length > 0 && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">First 5 Job IDs</label>
+                        <div className="space-y-1">
+                          {testResult.first_ids.map((id: string, idx: number) => (
+                            <p key={idx} className="text-sm text-gray-900 font-mono text-xs">{id}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {testResult.headers_sanitized && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Headers (Sanitized)</label>
+                        <pre className="text-xs bg-gray-50 p-3 rounded border border-gray-200 overflow-x-auto">
+                          {JSON.stringify(testResult.headers_sanitized, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setShowTestModal(false);
+                        setTestResult(null);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Simulate Results Modal */}
+      {showSimulateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Simulation Results</h2>
+                <button
+                  onClick={() => {
+                    setShowSimulateModal(false);
+                    setSimulateResult(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {simulateLoading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <p className="mt-4 text-gray-600">Simulating extraction...</p>
+                </div>
+              ) : simulateResult ? (
+                <div className="space-y-4">
+                  {simulateResult.ok ? (
+                    <>
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg font-semibold text-green-800">✓ Simulation Successful</span>
+                        </div>
+                        <p className="text-sm text-green-700">Found {simulateResult.count ?? 0} jobs</p>
+                      </div>
+
+                      {simulateResult.sample && Array.isArray(simulateResult.sample) && simulateResult.sample.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-3">Sample Jobs (First 3)</h3>
+                          <div className="space-y-4">
+                            {simulateResult.sample.map((job: any, idx: number) => (
+                              <div key={idx} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                <div className="grid grid-cols-1 gap-2">
+                                  {Object.entries(job).map(([key, value]) => (
+                                    <div key={key}>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">{key}</label>
+                                      <p className="text-sm text-gray-900 break-words">
+                                        {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg font-semibold text-red-800">✗ Simulation Failed</span>
+                      </div>
+                      <p className="text-sm text-red-700">{simulateResult.error ?? 'Unknown error'}</p>
+                      {simulateResult.error_category && (
+                        <p className="text-xs text-red-600 mt-1">Category: {simulateResult.error_category}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setShowSimulateModal(false);
+                        setSimulateResult(null);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
