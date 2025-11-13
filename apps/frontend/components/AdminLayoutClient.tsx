@@ -54,13 +54,12 @@ export default function AdminLayoutClient({
 
   return (
     <div className="h-screen flex overflow-hidden bg-white">
-      {/* Collapsible Sidebar Wrapper - allows tooltip overflow */}
-      <div className="relative" style={{ overflow: 'visible' }}>
-        <aside
-          className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
-            sidebarCollapsed ? 'w-16' : 'w-64'
-          }`}
-        >
+      {/* Collapsible Sidebar */}
+      <aside
+        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
+          sidebarCollapsed ? 'w-16' : 'w-64'
+        }`}
+      >
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7] flex-shrink-0">
           {!sidebarCollapsed && (
@@ -90,7 +89,7 @@ export default function AdminLayoutClient({
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
+        <nav className="flex-1 overflow-y-auto py-4">
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
               <button
@@ -125,8 +124,8 @@ export default function AdminLayoutClient({
           </div>
         </nav>
 
-        {/* Logout Button */}
-        <div className="border-t border-[#D2D2D7] p-2 flex-shrink-0">
+        {/* Logout Button - mt-auto pushes it to bottom */}
+        <div className="border-t border-[#D2D2D7] p-2 flex-shrink-0 mt-auto">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors relative group"
@@ -148,7 +147,6 @@ export default function AdminLayoutClient({
           </button>
         </div>
       </aside>
-      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden">
