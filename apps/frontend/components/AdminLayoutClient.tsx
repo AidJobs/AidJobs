@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft } from 'lucide-react';
 import { useAdminView, type AdminView } from './AdminViewContext';
@@ -19,6 +19,177 @@ const menuItems: MenuItem[] = [
   { id: 'taxonomy', label: 'Taxonomy', icon: <FileText className="w-5 h-5" /> },
   { id: 'setup', label: 'Setup', icon: <Settings className="w-5 h-5" /> },
 ];
+
+function MenuItemWithTooltip({ 
+  item, 
+  isActive, 
+  sidebarCollapsed, 
+  onClick 
+}: { 
+  item: MenuItem; 
+  isActive: boolean; 
+  sidebarCollapsed: boolean; 
+  onClick: () => void;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleMouseEnter = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setTooltipPosition({
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2,
+      });
+    }
+    setShowTooltip(true);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+        className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
+          isActive
+            ? 'bg-[#E5E5E7] text-[#1D1D1F]'
+            : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+        } ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
+      >
+        <span className={`flex-shrink-0 ${isActive ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>
+          {item.icon}
+        </span>
+        {!sidebarCollapsed && (
+          <span className="text-sm font-medium">{item.label}</span>
+        )}
+      </button>
+      {/* Tooltip for collapsed sidebar - show on hover when collapsed */}
+      {sidebarCollapsed && showTooltip && (
+        <span 
+          className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-nowrap z-[9999]"
+          style={{ 
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {item.label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ExpandCollapseButton({
+  sidebarCollapsed,
+  onToggle
+}: {
+  sidebarCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleMouseEnter = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setTooltipPosition({
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2,
+      });
+    }
+    setShowTooltip(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={onToggle}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+        className="p-2 rounded-lg hover:bg-[#F5F5F7] transition-colors text-[#86868B] hover:text-[#1D1D1F]"
+        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {sidebarCollapsed ? (
+          <Menu className="w-5 h-5" />
+        ) : (
+          <ChevronLeft className="w-5 h-5" />
+        )}
+      </button>
+      {sidebarCollapsed && showTooltip && (
+        <span 
+          className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-nowrap z-[9999]"
+          style={{
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          Expand sidebar
+        </span>
+      )}
+    </>
+  );
+}
+
+function LogoutButtonWithTooltip({ 
+  sidebarCollapsed, 
+  onLogout 
+}: { 
+  sidebarCollapsed: boolean; 
+  onLogout: () => void;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleMouseEnter = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setTooltipPosition({
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2,
+      });
+    }
+    setShowTooltip(true);
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={onLogout}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+        className={`w-full flex items-center px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors ${
+          sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'
+        }`}
+      >
+        <LogOut className="w-5 h-5 text-[#86868B] flex-shrink-0" />
+        {!sidebarCollapsed && (
+          <span className="text-sm font-medium">Logout</span>
+        )}
+      </button>
+      {sidebarCollapsed && showTooltip && (
+        <span 
+          className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-nowrap z-[9999]"
+          style={{
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          Logout
+        </span>
+      )}
+    </>
+  );
+}
 
 export default function AdminLayoutClient({
   children,
@@ -66,89 +237,33 @@ export default function AdminLayoutClient({
           {!sidebarCollapsed && (
             <h1 className="text-lg font-semibold text-[#1D1D1F]">AidJobs</h1>
           )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 rounded-lg hover:bg-[#F5F5F7] transition-colors text-[#86868B] hover:text-[#1D1D1F] relative group"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <Menu className="w-5 h-5" />
-            ) : (
-              <ChevronLeft className="w-5 h-5" />
-            )}
-            {sidebarCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
-                style={{
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                }}
-              >
-                {sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              </span>
-            )}
-          </button>
+          <ExpandCollapseButton 
+            sidebarCollapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
         </div>
 
         {/* Menu Items */}
         <nav className="flex-1 overflow-y-auto py-4" style={{ overflowX: 'hidden' }}>
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
-              <div key={item.id} className="relative group" style={{ overflow: 'visible' }}>
-                <button
-                  onClick={() => handleMenuClick(item.id)}
-                  className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                    currentView === item.id
-                      ? 'bg-[#E5E5E7] text-[#1D1D1F]'
-                      : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
-                  } ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
-                >
-                  <span className={`flex-shrink-0 ${currentView === item.id ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>
-                    {item.icon}
-                  </span>
-                  {!sidebarCollapsed && (
-                    <span className="text-sm font-medium">{item.label}</span>
-                  )}
-                </button>
-                {/* Tooltip for collapsed sidebar - show on hover when collapsed */}
-                {sidebarCollapsed && (
-                  <span 
-                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
-                    style={{ 
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                )}
-              </div>
+              <MenuItemWithTooltip
+                key={item.id}
+                item={item}
+                isActive={currentView === item.id}
+                sidebarCollapsed={sidebarCollapsed}
+                onClick={() => handleMenuClick(item.id)}
+              />
             ))}
           </div>
         </nav>
 
         {/* Logout Button - mt-auto pushes it to bottom */}
         <div className="border-t border-[#D2D2D7] p-2 flex-shrink-0 mt-auto">
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors relative group ${
-              sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'
-            }`}
-          >
-            <LogOut className="w-5 h-5 text-[#86868B] flex-shrink-0" />
-            {!sidebarCollapsed && (
-              <span className="text-sm font-medium">Logout</span>
-            )}
-            {sidebarCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
-                style={{
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                }}
-              >
-                Logout
-              </span>
-            )}
-          </button>
+          <LogoutButtonWithTooltip 
+            sidebarCollapsed={sidebarCollapsed} 
+            onLogout={handleLogout}
+          />
         </div>
       </aside>
 
