@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft } from 'lucide-react';
 
@@ -93,6 +93,11 @@ function ExpandCollapseButton({
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Reset tooltip when sidebar state changes
+  useEffect(() => {
+    setShowTooltip(false);
+  }, [sidebarCollapsed]);
 
   const handleMouseEnter = () => {
     if (buttonRef.current) {

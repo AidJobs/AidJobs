@@ -102,8 +102,18 @@ export default function AdminPage() {
         console.error('Search status error:', searchRes.status, errorText);
         setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText}` });
       } else {
-        const searchData = await searchRes.json();
-        setSearchStatus(searchData);
+        try {
+          const text = await searchRes.text();
+          if (!text || text.trim() === '') {
+            setSearchStatus({ enabled: false, error: 'Empty response from search status endpoint' });
+          } else {
+            const searchData = JSON.parse(text);
+            setSearchStatus(searchData);
+          }
+        } catch (error) {
+          console.error('Failed to parse search status:', error);
+          setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Invalid JSON response from search status endpoint' });
+        }
       }
 
       if (crawlRes && crawlRes.ok) {
