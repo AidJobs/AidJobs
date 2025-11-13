@@ -53,14 +53,14 @@ export default function AdminLayoutClient({
   };
 
   return (
-    <div className="h-screen flex bg-white" style={{ overflowY: 'hidden', overflowX: 'visible' }}>
-      {/* Collapsible Sidebar */}
-      <aside
-        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
-          sidebarCollapsed ? 'w-16' : 'w-64'
-        }`}
-        style={{ overflowY: 'auto', overflowX: 'visible' }}
-      >
+    <div className="h-screen flex overflow-hidden bg-white">
+      {/* Collapsible Sidebar Wrapper - allows tooltip overflow */}
+      <div className="relative" style={{ overflow: 'visible' }}>
+        <aside
+          className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
+            sidebarCollapsed ? 'w-16' : 'w-64'
+          }`}
+        >
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7] flex-shrink-0">
           {!sidebarCollapsed && (
@@ -76,14 +76,21 @@ export default function AdminLayoutClient({
             ) : (
               <ChevronLeft className="w-5 h-5" />
             )}
-            <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-              {sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            </span>
+            {sidebarCollapsed && (
+              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
+                style={{
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                }}
+              >
+                {sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              </span>
+            )}
           </button>
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto py-4" style={{ overflowX: 'visible' }}>
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
               <button
@@ -104,11 +111,10 @@ export default function AdminLayoutClient({
                 {/* Tooltip for collapsed sidebar - show on hover when collapsed */}
                 {sidebarCollapsed && (
                   <span 
-                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[100]"
+                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
                     style={{ 
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      marginLeft: '8px'
                     }}
                   >
                     {item.label}
@@ -130,16 +136,22 @@ export default function AdminLayoutClient({
               <span className="text-sm font-medium">Logout</span>
             )}
             {sidebarCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
+                style={{
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                }}
+              >
                 Logout
               </span>
             )}
           </button>
         </div>
       </aside>
+      </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden" style={{ overflow: 'hidden' }}>
+      <main className="flex-1 overflow-hidden">
         {children}
       </main>
     </div>
