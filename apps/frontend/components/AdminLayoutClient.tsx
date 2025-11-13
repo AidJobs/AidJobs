@@ -56,9 +56,10 @@ export default function AdminLayoutClient({
     <div className="h-screen flex overflow-hidden bg-white">
       {/* Collapsible Sidebar */}
       <aside
-        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col relative ${
+        className={`bg-[#FBFBFD] border-r border-[#D2D2D7] transition-all duration-300 ease-apple flex flex-col ${
           sidebarCollapsed ? 'w-16' : 'w-64'
         }`}
+        style={{ overflow: 'visible' }}
       >
         {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7] flex-shrink-0">
@@ -89,28 +90,29 @@ export default function AdminLayoutClient({
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="flex-1 overflow-y-auto py-4" style={{ overflowX: 'hidden' }}>
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleMenuClick(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative group ${
-                  currentView === item.id
-                    ? 'bg-[#E5E5E7] text-[#1D1D1F]'
-                    : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
-                }`}
-              >
-                <span className={`flex-shrink-0 ${currentView === item.id ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>
-                  {item.icon}
-                </span>
-                {!sidebarCollapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
-                )}
+              <div key={item.id} className="relative group" style={{ overflow: 'visible' }}>
+                <button
+                  onClick={() => handleMenuClick(item.id)}
+                  className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                    currentView === item.id
+                      ? 'bg-[#E5E5E7] text-[#1D1D1F]'
+                      : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                  } ${sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'}`}
+                >
+                  <span className={`flex-shrink-0 ${currentView === item.id ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>
+                    {item.icon}
+                  </span>
+                  {!sidebarCollapsed && (
+                    <span className="text-sm font-medium">{item.label}</span>
+                  )}
+                </button>
                 {/* Tooltip for collapsed sidebar - show on hover when collapsed */}
                 {sidebarCollapsed && (
                   <span 
-                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
+                    className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
                     style={{ 
                       top: '50%',
                       transform: 'translateY(-50%)',
@@ -119,7 +121,7 @@ export default function AdminLayoutClient({
                     {item.label}
                   </span>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         </nav>
@@ -128,14 +130,16 @@ export default function AdminLayoutClient({
         <div className="border-t border-[#D2D2D7] p-2 flex-shrink-0 mt-auto">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors relative group"
+            className={`w-full flex items-center px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors relative group ${
+              sidebarCollapsed ? 'justify-center' : 'justify-start gap-3'
+            }`}
           >
-            <LogOut className="w-5 h-5 text-[#86868B]" />
+            <LogOut className="w-5 h-5 text-[#86868B] flex-shrink-0" />
             {!sidebarCollapsed && (
               <span className="text-sm font-medium">Logout</span>
             )}
             {sidebarCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
+              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999]"
                 style={{
                   top: '50%',
                   transform: 'translateY(-50%)',
