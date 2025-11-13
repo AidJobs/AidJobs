@@ -835,7 +835,7 @@ export default function AdminSourcesPage() {
                   </div>
                   {selectedPreset && (
                     <p className="mt-2 text-caption-sm text-[#86868B]">
-                      Preset "{selectedPreset}" loaded. Please enter the Careers URL below.
+                      Preset &quot;{selectedPreset}&quot; loaded. Please enter the Careers URL below.
                     </p>
                   )}
                 </div>
