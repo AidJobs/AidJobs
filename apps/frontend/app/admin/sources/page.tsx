@@ -31,6 +31,16 @@ type SourceFormData = {
   time_window: string;
 };
 
+type Preset = {
+  name: string;
+  description: string;
+  org_name: string;
+  org_type: string;
+  source_type: string;
+  crawl_frequency_days: number;
+  parser_hint: string;
+};
+
 export default function AdminSourcesPage() {
   const router = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
@@ -42,6 +52,9 @@ export default function AdminSourcesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSource, setEditingSource] = useState<Source | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [loadingPresets, setLoadingPresets] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -94,6 +107,62 @@ export default function AdminSourcesPage() {
   useEffect(() => {
     fetchSources();
   }, [page, statusFilter, searchQuery, fetchSources]);
+
+  const fetchPresets = useCallback(async () => {
+    setLoadingPresets(true);
+    try {
+      const res = await fetch('/api/admin/presets/sources', {
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch presets');
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok' && json.data) {
+        setPresets(json.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch presets:', error);
+      // Don't show error toast - presets are optional
+    } finally {
+      setLoadingPresets(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (showAddModal) {
+      fetchPresets();
+    }
+  }, [showAddModal, fetchPresets]);
+
+  const handlePresetSelect = (presetName: string) => {
+    const preset = presets.find(p => p.name === presetName);
+    if (preset) {
+      setSelectedPreset(presetName);
+      setFormData({
+        org_name: preset.org_name || '',
+        careers_url: '', // Presets don't include URL, user must enter
+        source_type: preset.source_type,
+        org_type: preset.org_type || '',
+        crawl_frequency_days: preset.crawl_frequency_days || 3,
+        parser_hint: preset.parser_hint || '',
+        time_window: '',
+      });
+      toast.success(`Preset "${presetName}" loaded`);
+    }
+  };
+
+  const handleClearPreset = () => {
+    setSelectedPreset('');
+    resetForm();
+  };
 
   const handleAddSource = async () => {
     try {
@@ -351,6 +420,7 @@ export default function AdminSourcesPage() {
       parser_hint: '',
       time_window: '',
     });
+    setSelectedPreset('');
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -548,6 +618,47 @@ export default function AdminSourcesPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 {showAddModal ? 'Add Source' : 'Edit Source'}
               </h2>
+
+              {showAddModal && presets.length > 0 && (
+                <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Use Preset (Optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedPreset}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handlePresetSelect(e.target.value);
+                        } else {
+                          handleClearPreset();
+                        }
+                      }}
+                      className="flex-1 border border-gray-300 rounded px-3 py-2 bg-white text-gray-900"
+                    >
+                      <option value="">-- Select a preset --</option>
+                      {presets.map((preset) => (
+                        <option key={preset.name} value={preset.name}>
+                          {preset.name} - {preset.description}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedPreset && (
+                      <button
+                        onClick={handleClearPreset}
+                        className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100 text-gray-700"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {selectedPreset && (
+                    <p className="mt-2 text-xs text-gray-600">
+                      Preset "{selectedPreset}" loaded. Please enter the Careers URL below.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div>
