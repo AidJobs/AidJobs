@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
 import { useAdminView } from '@/components/AdminViewContext';
 
 type DbStatus = {
@@ -50,6 +50,7 @@ export default function AdminPage() {
   const [reindexing, setReindexing] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [crawlerStatus, setCrawlerStatus] = useState<any>(null);
 
   const addToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
@@ -83,9 +84,10 @@ export default function AdminPage() {
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbRes, searchRes] = await Promise.all([
+      const [dbRes, searchRes, crawlRes] = await Promise.all([
         fetch('/api/db/status'),
         fetch('/api/search/status'),
+        fetch('/api/admin/crawl/status').catch(() => null), // May fail if not authenticated
       ]);
 
       if (!dbRes.ok) {
@@ -93,7 +95,7 @@ export default function AdminPage() {
         console.error('DB status error:', dbRes.status, errorText);
         setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${errorText}` });
       } else {
-        const dbData = await dbRes.json();
+      const dbData = await dbRes.json();
         setDbStatus(dbData);
       }
 
@@ -102,8 +104,13 @@ export default function AdminPage() {
         console.error('Search status error:', searchRes.status, errorText);
         setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText}` });
       } else {
-        const searchData = await searchRes.json();
+      const searchData = await searchRes.json();
         setSearchStatus(searchData);
+      }
+
+      if (crawlRes && crawlRes.ok) {
+        const crawlData = await crawlRes.json();
+        setCrawlerStatus(crawlData.data || crawlData);
       }
     } catch (error) {
       console.error('Failed to fetch status:', error);
@@ -184,16 +191,78 @@ export default function AdminPage() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return (
+        // Calculate system health score (0-100)
+        const calculateHealthScore = () => {
+          let score = 0;
+          let total = 0;
+          
+          if (dbStatus) {
+            total += 1;
+            if (dbStatus.ok) score += 1;
+          }
+          
+          if (searchStatus) {
+            total += 1;
+            if (searchStatus.enabled) score += 1;
+          }
+          
+          if (crawlerStatus) {
+            total += 1;
+            if (crawlerStatus.running) score += 1;
+          }
+          
+          return total > 0 ? Math.round((score / total) * 100) : 0;
+        };
+
+        const healthScore = calculateHealthScore();
+        const healthColor = healthScore >= 80 ? '#86868B' : healthScore >= 50 ? '#86868B' : '#86868B';
+
+  return (
           <div className="h-full p-8 overflow-y-auto">
             <div className="max-w-7xl mx-auto">
-              <div className="mb-8">
-                <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Dashboard</h1>
-                <p className="text-body-sm text-[#86868B]">System overview and status</p>
-              </div>
+              <div className="mb-8 flex items-center justify-between">
+          <div>
+                  <h1 className="text-headline font-semibold text-[#1D1D1F] mb-2">Dashboard</h1>
+                  <p className="text-body-sm text-[#86868B]">System overview and status</p>
+          </div>
+          <button
+                  onClick={fetchStatus}
+                  disabled={loading}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+          >
+                  <RefreshCw className={`w-5 h-5 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                    Refresh status
+                  </span>
+          </button>
+        </div>
 
-              {/* Status Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* System Health Score */}
+              <div className="bg-white border border-[#D2D2D7] rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-[#86868B]" />
+                    <h2 className="text-title font-semibold text-[#1D1D1F]">System Health</h2>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-3xl font-semibold text-[#1D1D1F]">{healthScore}%</div>
+                      <div className="text-caption text-[#86868B]">Overall</div>
+                    </div>
+                    <div className="w-16 h-16 rounded-full border-4 border-[#D2D2D7] flex items-center justify-center" style={{
+                      borderTopColor: healthColor,
+                      borderRightColor: healthColor,
+                      transform: `rotate(${(healthScore / 100) * 360 - 90}deg)`,
+                      transition: 'transform 0.3s ease-apple'
+                    }}>
+                      <div className="w-12 h-12 rounded-full bg-[#F5F5F7]"></div>
+                    </div>
+                  </div>
+          </div>
+        </div>
+
+              {/* Status Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 {/* Database Status */}
                 <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -202,38 +271,47 @@ export default function AdminPage() {
                       <h2 className="text-title font-semibold text-[#1D1D1F]">Database</h2>
                     </div>
                     {dbStatus?.ok ? (
-                      <CheckCircle className="w-5 h-5 text-[#30D158]" />
+                      <div className="w-2 h-2 bg-[#86868B] rounded-full relative group" title="Connected">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Connected
+                        </span>
+                      </div>
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-[#FF3B30]" />
+                      <div className="relative group">
+                        <AlertCircle className="w-5 h-5 text-[#86868B]" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Disconnected
+                        </span>
+                      </div>
                     )}
                   </div>
-                  {dbStatus?.ok ? (
+            {dbStatus?.ok ? (
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center">
                         <span className="text-body-sm text-[#86868B]">Jobs</span>
                         <span className="text-3xl font-semibold text-[#1D1D1F]">
-                          {dbStatus.row_counts?.jobs || 0}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
+                    {dbStatus.row_counts?.jobs || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
                         <span className="text-body-sm text-[#86868B]">Sources</span>
                         <span className="text-3xl font-semibold text-[#1D1D1F]">
-                          {dbStatus.row_counts?.sources || 0}
-                        </span>
-                      </div>
-                      <div className="pt-4 border-t border-[#D2D2D7]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                          <span className="text-caption text-[#86868B]">Connected</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-body-sm text-[#FF3B30]">
-                      {dbStatus?.error || 'Database not available'}
-                    </div>
-                  )}
+                    {dbStatus.row_counts?.sources || 0}
+                  </span>
                 </div>
+                      <div className="pt-4 border-t border-[#D2D2D7]">
+                  <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                          <span className="text-caption text-[#86868B]">Connected</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+                    <div className="text-body-sm text-[#86868B]">
+                {dbStatus?.error || 'Database not available'}
+              </div>
+            )}
+          </div>
 
                 {/* Search Status */}
                 <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
@@ -243,103 +321,214 @@ export default function AdminPage() {
                       <h2 className="text-title font-semibold text-[#1D1D1F]">Search</h2>
                     </div>
                     {searchStatus?.enabled ? (
-                      <CheckCircle className="w-5 h-5 text-[#30D158]" />
+                      <div className="w-2 h-2 bg-[#86868B] rounded-full relative group" title="Enabled">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Enabled
+                        </span>
+                      </div>
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-[#FF3B30]" />
+                      <div className="relative group">
+                        <AlertCircle className="w-5 h-5 text-[#86868B]" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Disabled
+                        </span>
+                      </div>
                     )}
                   </div>
-                  {searchStatus?.enabled ? (
+            {searchStatus?.enabled ? (
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center">
                         <span className="text-body-sm text-[#86868B]">Index</span>
                         <span className="text-body-sm font-mono text-[#1D1D1F]">
-                          {searchStatus.index?.name || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
+                    {searchStatus.index?.name || 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
                         <span className="text-body-sm text-[#86868B]">Documents</span>
                         <span className="text-3xl font-semibold text-[#1D1D1F]">
-                          {searchStatus.index?.stats.numberOfDocuments || 0}
-                        </span>
-                      </div>
-                      {searchStatus.index?.lastReindexedAt && (
+                    {searchStatus.index?.stats.numberOfDocuments || 0}
+                  </span>
+                </div>
+                {searchStatus.index?.lastReindexedAt && (
                         <div className="flex justify-between items-center text-caption">
                           <span className="text-[#86868B]">Last reindexed</span>
                           <span className="text-[#1D1D1F]">
-                            {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
+                      {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
+                    </span>
+                  </div>
+                )}
                       <div className="pt-4 border-t border-[#D2D2D7]">
                         <div className="flex items-center gap-2 mb-4">
-                          <div className={`w-2 h-2 rounded-full ${
-                            searchStatus.index?.stats.isIndexing ? 'bg-[#FF9500]' : 'bg-[#30D158]'
-                          }`}></div>
+                          <div className={`w-2 h-2 rounded-full bg-[#86868B]`}></div>
                           <span className="text-caption text-[#86868B]">
-                            {searchStatus.index?.stats.isIndexing ? 'Indexing...' : 'Ready'}
+                      {searchStatus.index?.stats.isIndexing ? 'Indexing...' : 'Ready'}
+                    </span>
+                  </div>
+                        <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleReindex}
+                    disabled={reindexing}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                  >
+                            <RotateCw className={`w-5 h-5 text-[#86868B] ${reindexing ? 'animate-spin' : ''}`} />
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                    {reindexing ? 'Reindexing...' : 'Reindex Now'}
+                            </span>
+                  </button>
+                        </div>
+                </div>
+              </div>
+            ) : (
+                    <div className="space-y-4">
+                      <div className="text-body-sm text-[#86868B]">
+                  {searchStatus?.error || 'Search not enabled'}
+                </div>
+                <button
+                  onClick={handleInitialize}
+                  disabled={initializing}
+                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                      >
+                        {initializing ? (
+                          <RotateCw className="w-5 h-5 text-[#86868B] animate-spin" />
+                        ) : (
+                          <Play className="w-5 h-5 text-[#86868B]" />
+                        )}
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                  {initializing ? 'Initializing...' : 'Initialize Index'}
+                        </span>
+                </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Crawler Status */}
+                <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Network className="w-5 h-5 text-[#86868B]" />
+                      <h2 className="text-title font-semibold text-[#1D1D1F]">Crawler</h2>
+                    </div>
+                    {crawlerStatus?.running ? (
+                      <div className="w-2 h-2 bg-[#86868B] rounded-full relative group">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Running
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-2 h-2 bg-[#D2D2D7] rounded-full relative group">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                          Stopped
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {crawlerStatus ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-[#86868B]">Active</span>
+                        <span className="text-3xl font-semibold text-[#1D1D1F]">
+                          {crawlerStatus.in_flight || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-[#86868B]">Queued</span>
+                        <span className="text-3xl font-semibold text-[#1D1D1F]">
+                          {crawlerStatus.due_count || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-body-sm text-[#86868B]">Locked</span>
+                        <span className="text-3xl font-semibold text-[#1D1D1F]">
+                          {crawlerStatus.locked || 0}
+                        </span>
+                      </div>
+                      <div className="pt-4 border-t border-[#D2D2D7]">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${crawlerStatus.running ? 'bg-[#86868B]' : 'bg-[#D2D2D7]'}`}></div>
+                          <span className="text-caption text-[#86868B]">
+                            {crawlerStatus.running ? 'Running' : 'Stopped'}
                           </span>
                         </div>
-                        <button
-                          onClick={handleReindex}
-                          disabled={reindexing}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-body-sm font-medium bg-[#0071E3] text-white rounded-lg hover:bg-[#0077ED] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                        >
-                          {reindexing ? (
-                            <>
-                              <RotateCw className="w-4 h-4 animate-spin" />
-                              <span>Reindexing...</span>
-                            </>
-                          ) : (
-                            <>
-                              <RotateCw className="w-4 h-4" />
-                              <span>Reindex Now</span>
-                            </>
-                          )}
-                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="text-body-sm text-[#FF3B30]">
-                        {searchStatus?.error || 'Search not enabled'}
-                      </div>
-                      <button
-                        onClick={handleInitialize}
-                        disabled={initializing}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-body-sm font-medium bg-[#30D158] text-white rounded-lg hover:bg-[#34C759] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {initializing ? (
-                          <>
-                            <RotateCw className="w-4 h-4 animate-spin" />
-                            <span>Initializing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4" />
-                            <span>Initialize Index</span>
-                          </>
-                        )}
-                      </button>
+                    <div className="text-body-sm text-[#86868B]">
+                      Crawler status unavailable
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-title font-semibold text-[#1D1D1F]">Actions</h2>
-                  <button
-                    onClick={fetchStatus}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2.5 text-body-sm font-medium text-[#1D1D1F] bg-[#F5F5F7] rounded-lg hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    <span>Refresh</span>
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                      Refresh status
-                    </span>
-                  </button>
+              {/* Quick Stats and Recent Activity */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Quick Stats */}
+                <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-[#86868B]" />
+                    <h2 className="text-title font-semibold text-[#1D1D1F]">Quick Stats</h2>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-[#86868B]">Total Jobs</span>
+                      <span className="text-body font-semibold text-[#1D1D1F]">
+                        {dbStatus?.row_counts?.jobs || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-[#86868B]">Active Sources</span>
+                      <span className="text-body font-semibold text-[#1D1D1F]">
+                        {dbStatus?.row_counts?.sources || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-[#86868B]">Indexed Documents</span>
+                      <span className="text-body font-semibold text-[#1D1D1F]">
+                        {searchStatus?.index?.stats.numberOfDocuments || 0}
+                      </span>
+                    </div>
+                    {searchStatus?.index?.lastReindexedAt && (
+                      <div className="pt-3 border-t border-[#D2D2D7]">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-[#86868B]" />
+                          <span className="text-caption text-[#86868B]">
+                            Last reindex: {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+                {/* Recent Activity */}
+                <div className="bg-white border border-[#D2D2D7] rounded-lg p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity className="w-5 h-5 text-[#86868B]" />
+                    <h2 className="text-title font-semibold text-[#1D1D1F]">Recent Activity</h2>
+                  </div>
+                  <div className="space-y-3">
+                    {searchStatus?.index?.lastReindexedAt ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                        <div className="flex-1">
+                          <div className="text-body-sm text-[#1D1D1F]">Search index reindexed</div>
+                          <div className="text-caption text-[#86868B]">
+                            {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-body-sm text-[#86868B]">No recent activity</div>
+                    )}
+                    {dbStatus?.ok && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                        <div className="flex-1">
+                          <div className="text-body-sm text-[#1D1D1F]">Database connected</div>
+                          <div className="text-caption text-[#86868B]">System operational</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -407,8 +596,8 @@ export default function AdminPage() {
               <div className="bg-white border border-[#D2D2D7] rounded-lg p-8 text-center">
                 <p className="text-body text-[#86868B]">Setup management coming soon</p>
               </div>
-            </div>
           </div>
+        </div>
         );
 
       default:

@@ -61,7 +61,7 @@ export default function AdminLayoutClient({
         }`}
       >
         {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7]">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-[#D2D2D7] flex-shrink-0">
           {!sidebarCollapsed && (
             <h1 className="text-lg font-semibold text-[#1D1D1F]">AidJobs</h1>
           )}
@@ -75,14 +75,14 @@ export default function AdminLayoutClient({
             ) : (
               <ChevronLeft className="w-5 h-5" />
             )}
-            <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+            <span className="absolute left-full ml-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
               {sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             </span>
           </button>
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4">
           <div className="space-y-1 px-2">
             {menuItems.map((item) => (
               <button
@@ -90,11 +90,11 @@ export default function AdminLayoutClient({
                 onClick={() => handleMenuClick(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative group ${
                   currentView === item.id
-                    ? 'bg-[#0071E3] text-white'
+                    ? 'bg-[#E5E5E7] text-[#1D1D1F]'
                     : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
                 }`}
               >
-                <span className={`flex-shrink-0 ${currentView === item.id ? 'text-white' : 'text-[#86868B]'}`}>
+                <span className={`flex-shrink-0 ${currentView === item.id ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`}>
                   {item.icon}
                 </span>
                 {!sidebarCollapsed && (
@@ -111,7 +111,7 @@ export default function AdminLayoutClient({
         </nav>
 
         {/* Logout Button */}
-        <div className="border-t border-[#D2D2D7] p-2">
+        <div className="border-t border-[#D2D2D7] p-2 flex-shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors relative group"
