@@ -97,23 +97,37 @@ export default function AdminPage() {
         setDbStatus(dbData);
       }
 
-      if (!searchRes.ok) {
-        const errorText = await searchRes.text();
-        console.error('Search status error:', searchRes.status, errorText);
-        setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText}` });
-      } else {
-        try {
+      // Handle search status response
+      try {
+        if (!searchRes.ok) {
+          const errorText = await searchRes.text();
+          console.error('Search status error:', searchRes.status, errorText);
+          setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText || 'Unknown error'}` });
+        } else {
+          // Read response as text first to check if it's empty
           const text = await searchRes.text();
+          
           if (!text || text.trim() === '') {
+            console.error('Search status returned empty response');
             setSearchStatus({ enabled: false, error: 'Empty response from search status endpoint' });
           } else {
-            const searchData = JSON.parse(text);
-            setSearchStatus(searchData);
+            try {
+              const searchData = JSON.parse(text);
+              setSearchStatus(searchData);
+            } catch (parseError) {
+              console.error('Failed to parse search status JSON. Response:', text.substring(0, 200));
+              console.error('Parse error:', parseError);
+              // Provide user-friendly error message
+              const errorMsg = parseError instanceof Error && parseError.message.includes('Expecting value') 
+                ? 'Empty or invalid response from search status endpoint. Please check backend logs.'
+                : `Invalid JSON response: ${parseError instanceof Error ? parseError.message : 'Parse error'}`;
+              setSearchStatus({ enabled: false, error: errorMsg });
+            }
           }
-        } catch (error) {
-          console.error('Failed to parse search status:', error);
-          setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Invalid JSON response from search status endpoint' });
         }
+      } catch (error) {
+        console.error('Failed to process search status response:', error);
+        setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Failed to fetch search status' });
       }
 
       if (crawlRes && crawlRes.ok) {
