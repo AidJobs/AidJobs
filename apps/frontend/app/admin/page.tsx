@@ -93,7 +93,7 @@ export default function AdminPage() {
         console.error('DB status error:', dbRes.status, errorText);
         setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${errorText}` });
       } else {
-      const dbData = await dbRes.json();
+        const dbData = await dbRes.json();
         setDbStatus(dbData);
       }
 
@@ -102,13 +102,16 @@ export default function AdminPage() {
         console.error('Search status error:', searchRes.status, errorText);
         setSearchStatus({ enabled: false, error: `HTTP ${searchRes.status}: ${errorText}` });
       } else {
-      const searchData = await searchRes.json();
+        const searchData = await searchRes.json();
         setSearchStatus(searchData);
       }
 
       if (crawlRes && crawlRes.ok) {
         const crawlData = await crawlRes.json();
         setCrawlerStatus(crawlData.data || crawlData);
+      } else if (crawlRes && !crawlRes.ok) {
+        // Log but don't fail the entire status fetch if crawler status fails
+        console.warn('Crawler status unavailable:', crawlRes.status);
       }
     } catch (error) {
       console.error('Failed to fetch status:', error);
@@ -123,9 +126,16 @@ export default function AdminPage() {
   const handleInitialize = async () => {
     setInitializing(true);
     try {
-      const response = await fetch('/admin/search/init', {
+      const response = await fetch('/api/admin/search/init', {
         method: 'POST',
+        credentials: 'include',
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
 
       if (data.success) {
@@ -145,9 +155,16 @@ export default function AdminPage() {
   const handleReindex = async () => {
     setReindexing(true);
     try {
-      const response = await fetch('/admin/search/reindex', {
+      const response = await fetch('/api/admin/search/reindex', {
         method: 'POST',
+        credentials: 'include',
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP ${response.status}`);
+      }
+      
       const data: ReindexResult = await response.json();
 
       if (data.error) {
@@ -217,21 +234,21 @@ export default function AdminPage() {
       <div className="h-full p-4 overflow-y-auto">
         <div className="max-w-7xl mx-auto">
           <div className="mb-4 flex items-center justify-between">
-          <div>
+            <div>
               <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Dashboard</h1>
               <p className="text-caption text-[#86868B]">System overview and status</p>
-          </div>
-          <button
+            </div>
+            <button
               onClick={fetchStatus}
               disabled={loading}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-          >
+            >
               <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
               <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
                 Refresh status
               </span>
-          </button>
-        </div>
+            </button>
+          </div>
 
           {/* System Health Score - Elegant Circle */}
           <div className="bg-white border border-[#D2D2D7] rounded-lg p-4 mb-4">

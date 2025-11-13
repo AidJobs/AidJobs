@@ -24,6 +24,7 @@ from app.presets import router as presets_router
 from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
+from security.admin_auth import admin_required
 import psycopg2
 from app.db_config import db_config
 
@@ -269,12 +270,8 @@ async def admin_search_settings():
 
 
 @app.post("/admin/search/init")
-async def admin_search_init():
-    """Initialize Meilisearch index (dev-only, idempotent)"""
-    env = os.getenv("AIDJOBS_ENV", "").lower()
-    if env != "dev":
-        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
-    
+async def admin_search_init(admin: str = Depends(admin_required)):
+    """Initialize Meilisearch index (admin-only, idempotent)"""
     try:
         search_service._init_meilisearch()
         return {
@@ -290,11 +287,8 @@ async def admin_search_init():
 
 @app.get("/admin/search/reindex")
 @app.post("/admin/search/reindex")
-async def admin_search_reindex():
-    """Reindex jobs to search engine (dev-only, supports GET and POST)"""
-    env = os.getenv("AIDJOBS_ENV", "").lower()
-    if env != "dev":
-        raise HTTPException(status_code=403, detail="Admin endpoints only available in dev mode")
+async def admin_search_reindex(admin: str = Depends(admin_required)):
+    """Reindex jobs to search engine (admin-only, supports GET and POST)"""
     return await search_service.reindex_jobs()
 
 
