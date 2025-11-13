@@ -1,190 +1,132 @@
-# Quick Test Guide - API Source Framework
+# 🚀 Quick Dashboard Test - 5 Minutes
 
-## 🚀 Quick Start (5 Minutes)
+## **FASTEST WAY TO TEST**
 
-### Step 1: Test with a Simple Public API
+### Step 1: Open Browser Console (30 seconds)
 
-1. **Open Admin Panel**
-   - Go to `http://localhost:5000/admin/sources`
-   - Click "Add Source"
+1. Go to: `https://www.aidjobs.app/admin`
+2. Press **F12** to open Developer Tools
+3. Click **Console** tab
 
-2. **Fill in the form:**
-   - **Organization Name**: "Test API"
-   - **Careers URL**: `https://jsonplaceholder.typicode.com/posts`
-   - **Source Type**: `api`
-   - **Crawl Frequency**: `3` days
-   - **Parser Hint** (paste this JSON):
-   ```json
-   {
-     "v": 1,
-     "base_url": "https://jsonplaceholder.typicode.com",
-     "path": "/posts",
-     "method": "GET",
-     "auth": {"type": "none"},
-     "headers": {},
-     "query": {"_limit": 10},
-     "pagination": {
-       "type": "offset",
-       "offset_param": "_start",
-       "limit_param": "_limit",
-       "page_size": 10,
-       "max_pages": 1
-     },
-     "data_path": "$",
-     "map": {
-       "title": "title",
-       "description_snippet": "body"
-     },
-     "success_codes": [200]
-   }
-   ```
+### Step 2: Run These Commands (2 minutes)
 
-3. **Click "Create Source"**
+Copy and paste each command one at a time:
 
-4. **Test the Configuration:**
-   - Click the "Test" button next to the source
-   - Should show: `✅ Successfully fetched X jobs`
-   - Check the response for `count`, `first_ids`, etc.
+```javascript
+// Test Database Status
+fetch('/api/db/status')
+  .then(r => r.json())
+  .then(data => {
+    console.log('✅ Database Status:', data);
+    if (data.ok) {
+      console.log(`   Jobs: ${data.row_counts?.jobs || 0}`);
+      console.log(`   Sources: ${data.row_counts?.sources || 0}`);
+    } else {
+      console.error('   ❌ Error:', data.error);
+    }
+  })
+  .catch(e => console.error('❌ Failed:', e));
+```
 
-5. **Simulate Extraction:**
-   - Click the "Simulate" button
-   - Should show 3 normalized job items
-   - Verify fields are mapped correctly
+```javascript
+// Test Search Status
+fetch('/api/search/status')
+  .then(r => r.text())
+  .then(text => {
+    console.log('Response length:', text.length);
+    if (!text || text.length === 0) {
+      console.error('❌ EMPTY RESPONSE!');
+      return;
+    }
+    try {
+      const data = JSON.parse(text);
+      console.log('✅ Search Status:', data);
+      if (data.enabled) {
+        console.log(`   Documents: ${data.index?.stats?.numberOfDocuments || 0}`);
+        console.log(`   Indexing: ${data.index?.stats?.isIndexing || false}`);
+      } else {
+        console.warn('   ⚠️  Disabled:', data.error);
+      }
+    } catch(e) {
+      console.error('❌ JSON Parse Error:', e);
+      console.error('Response:', text.substring(0, 200));
+    }
+  })
+  .catch(e => console.error('❌ Failed:', e));
+```
 
-6. **Run a Crawl:**
-   - Click "Run Crawl" button
-   - Wait for crawl to complete
-   - Check `/admin/crawl` for logs
-   - Verify jobs appear in database
+### Step 3: Check Dashboard (2 minutes)
 
-### Step 2: Verify Results
+1. **Look at Dashboard:**
+   - ✅ Database card should show green dot
+   - ✅ Search card should show status
+   - ✅ Numbers should match console output
+   - ❌ No red errors
 
-1. **Check Database:**
-   ```sql
-   SELECT COUNT(*) FROM jobs WHERE source_id = 'your-source-id';
-   SELECT title, description_snippet FROM jobs LIMIT 5;
-   ```
+2. **Test Buttons:**
+   - Click **Refresh** button (top right)
+   - If search disabled: Click **Initialize Index**
+   - If search enabled: Click **Reindex Now**
 
-2. **Check Search:**
-   - Go to the main search page
-   - Search for jobs
-   - Verify jobs from the API source appear
+3. **Check for Errors:**
+   - Look for red text in console
+   - Look for "Expecting value" errors
+   - Check Network tab for failed requests
 
-3. **Check Crawl Logs:**
-   - Go to `/admin/crawl`
-   - Find your source in the logs
-   - Verify: `found`, `inserted`, `updated` counts
+---
 
-## 🧪 Test Different Auth Methods
+## ✅ **SUCCESS = NO ERRORS**
 
-### Test Query Parameter Auth
+If you see:
+- ✅ Green status indicators
+- ✅ Numbers displayed
+- ✅ Buttons work
+- ✅ No console errors
 
-1. **Set Environment Variable:**
-   ```bash
-   export EXAMPLE_API_KEY="your-api-key"
-   ```
+**Then everything is working!** 🎉
 
-2. **Create Source with this schema:**
-   ```json
-   {
-     "v": 1,
-     "base_url": "https://api.example.com",
-     "path": "/v1/jobs",
-     "method": "GET",
-     "auth": {
-       "type": "query",
-       "query_name": "api_key",
-       "token": "{{SECRET:EXAMPLE_API_KEY}}"
-     },
-     "data_path": "data.items",
-     "map": {
-       "title": "title",
-       "apply_url": "url"
-     },
-     "success_codes": [200]
-   }
-   ```
+---
 
-3. **Test:**
-   - Click "Test" - should check for missing secrets
-   - If secret missing: Error message shows which secrets are missing
-   - If secret present: Test succeeds
+## ❌ **IF YOU SEE ERRORS**
 
-### Test Bearer Token Auth
+### "Expecting value: line 1 column 1"
+**Fix:** Backend needs to be redeployed with latest changes
 
-1. **Set Environment Variable:**
-   ```bash
-   export API_TOKEN="your-bearer-token"
-   ```
+### "Failed to fetch"
+**Fix:** Check `NEXT_PUBLIC_API_URL` in Vercel environment variables
 
-2. **Create Source with this schema:**
-   ```json
-   {
-     "v": 1,
-     "base_url": "https://api.example.com",
-     "path": "/jobs",
-     "method": "GET",
-     "auth": {
-       "type": "bearer",
-       "token": "{{SECRET:API_TOKEN}}"
-     },
-     "data_path": "results",
-     "map": {
-       "title": "job_title",
-       "apply_url": "application_url"
-     },
-     "success_codes": [200]
-   }
-   ```
+### "401 Unauthorized"
+**Fix:** Re-login to admin panel
 
-## 🔍 Troubleshooting
+### Database shows "Disconnected"
+**Fix:** Check `SUPABASE_DB_URL` in Render
 
-### Issue: "Missing required secrets"
-**Solution:** Set the environment variable in your backend environment.
+### Search shows "not configured"
+**Fix:** Check `MEILISEARCH_URL` and `MEILISEARCH_KEY` in Render
 
-### Issue: "Invalid JSON in parser_hint"
-**Solution:** Validate JSON syntax. Use a JSON validator or check for syntax errors.
+---
 
-### Issue: "No items found at data_path"
-**Solution:** 
-- Check the API response structure
-- Try different `data_path` values (e.g., `"data"`, `"results"`, `"$"`)
-- Use browser DevTools to inspect the API response
+## 📊 **EXPECTED OUTPUT**
 
-### Issue: Jobs not appearing
-**Solution:**
-1. Check if crawl completed successfully
-2. Check database: `SELECT COUNT(*) FROM jobs WHERE source_id = '...'`
-3. Check Meilisearch status: `/api/search/status`
-4. Run reindex if needed: `/admin/search/reindex`
+### Database Status:
+```
+✅ Database Status: {ok: true, row_counts: {jobs: 1234, sources: 56}}
+   Jobs: 1234
+   Sources: 56
+```
 
-## 📋 Testing Checklist
+### Search Status (Enabled):
+```
+✅ Search Status: {enabled: true, index: {...}}
+   Documents: 1234
+   Indexing: false
+```
 
-- [ ] Create API source with no auth
-- [ ] Test endpoint returns success
-- [ ] Simulate endpoint returns normalized jobs
-- [ ] Run crawl successfully
-- [ ] Jobs appear in database
-- [ ] Test with API key (query parameter)
-- [ ] Test with Bearer token
-- [ ] Test POST request
-- [ ] Test pagination (offset, page, cursor)
-- [ ] Test field mapping (nested, array)
-- [ ] Test error handling (missing secrets, invalid JSON)
+### Search Status (Disabled):
+```
+⚠️  Disabled: Meilisearch not configured
+```
 
-## 🎯 Next Steps
+---
 
-After testing Phase 1, you can:
-1. Test with real APIs (ReliefWeb, etc.)
-2. Test incremental fetching (since parameter)
-3. Wait for Phase 2 (transforms, throttling, presets)
-4. Create custom API source configurations
-
-## 📚 More Examples
-
-See `test_api_sources.json` for more example configurations including:
-- ReliefWeb Jobs API
-- APIs with different pagination methods
-- APIs with POST requests
-- APIs with complex field mapping
-
+**That's it! If all green, you're good to go!** ✅
