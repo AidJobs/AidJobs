@@ -275,8 +275,17 @@ export default function AdminSourcesPage() {
     resetForm();
   };
 
+  const [exportingSourceId, setExportingSourceId] = useState<string | null>(null);
+
   const handleExportSource = async (id: string) => {
+    if (exportingSourceId) {
+      return;
+    }
+
+    setExportingSourceId(id);
     try {
+      toast.info('Exporting source...');
+      
       const res = await fetch(`/api/admin/sources/${id}/export`, {
         method: 'GET',
         credentials: 'include',
@@ -289,7 +298,8 @@ export default function AdminSourcesPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to export source');
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to export source`;
+        throw new Error(errorMsg);
       }
 
       const json = await res.json();
@@ -453,26 +463,44 @@ export default function AdminSourcesPage() {
         body: JSON.stringify(updates),
       });
 
-      if (!res.ok) {
-        const error = await res.json() as { detail?: string };
-        throw new Error(error.detail || 'Failed to update source');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
       }
 
-      toast.success('Source updated');
-      setShowEditModal(false);
-      setEditingSource(null);
-      resetForm();
-      fetchSources();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to update source`;
+        throw new Error(errorMsg);
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success('Source updated successfully');
+        setShowEditModal(false);
+        setEditingSource(null);
+        setAddEditModalPosition({ x: 0, y: 0 });
+        resetForm();
+        fetchSources();
+      } else {
+        throw new Error(json.error || 'Failed to update source');
+      }
     } catch (error: any) {
       console.error('Failed to update source:', error);
-      toast.error(error.message || 'Failed to update source');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update source';
+      toast.error(errorMsg);
     }
   };
 
-  const handleDeleteSource = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this source?')) return;
+  const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
 
+  const handleDeleteSource = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) return;
+
+    setDeletingSourceId(id);
     try {
+      toast.info('Deleting source...');
+      
       const res = await fetch(`/api/admin/sources/${id}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -485,24 +513,35 @@ export default function AdminSourcesPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to delete source');
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to delete source`;
+        throw new Error(errorMsg);
       }
 
       const json = await res.json();
       if (json.status === 'ok') {
-        toast.success('Source deleted');
+        toast.success('Source deleted successfully');
         fetchSources();
       } else {
         throw new Error(json.error || 'Failed to delete source');
       }
     } catch (error) {
       console.error('Failed to delete source:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete source');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to delete source';
+      toast.error(errorMsg);
+    } finally {
+      setDeletingSourceId(null);
     }
   };
 
+  const [togglingSourceId, setTogglingSourceId] = useState<string | null>(null);
+
   const handleToggleStatus = async (source: Source) => {
+    if (togglingSourceId) {
+      return; // Prevent multiple simultaneous toggles
+    }
+
     const newStatus = source.status === 'active' ? 'paused' : 'active';
+    setTogglingSourceId(source.id);
     
     try {
       const res = await fetch(`/api/admin/sources/${source.id}`, {
@@ -512,15 +551,30 @@ export default function AdminSourcesPage() {
         body: JSON.stringify({ status: newStatus }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to update status');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
       }
 
-      toast.success(`Source ${newStatus === 'active' ? 'resumed' : 'paused'}`);
-      fetchSources();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to update status`;
+        throw new Error(errorMsg);
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success(`Source ${newStatus === 'active' ? 'resumed' : 'paused'} successfully`);
+        fetchSources();
+      } else {
+        throw new Error(json.error || 'Failed to update status');
+      }
     } catch (error) {
       console.error('Failed to update status:', error);
-      toast.error('Failed to update status');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update status';
+      toast.error(errorMsg);
+    } finally {
+      setTogglingSourceId(null);
     }
   };
 
@@ -600,8 +654,18 @@ export default function AdminSourcesPage() {
     }
   };
 
+  const [runningSourceId, setRunningSourceId] = useState<string | null>(null);
+
   const handleRunNow = async (id: string) => {
+    if (runningSourceId) {
+      toast.info('A crawl is already in progress. Please wait...');
+      return;
+    }
+
+    setRunningSourceId(id);
     try {
+      toast.info('Starting crawl...');
+      
       const res = await fetch(`/api/admin/crawl/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -616,19 +680,26 @@ export default function AdminSourcesPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to trigger crawl');
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to trigger crawl`;
+        throw new Error(errorMsg);
       }
 
       const json = await res.json();
       if (json.status === 'ok') {
-        toast.success(json.message || 'Crawl started');
-        fetchSources();
+        toast.success(json.message || 'Crawl started successfully');
+        // Refresh sources after a short delay to show updated status
+        setTimeout(() => {
+          fetchSources();
+        }, 1000);
       } else {
         throw new Error(json.error || 'Failed to trigger crawl');
       }
     } catch (error) {
       console.error('Failed to run crawl:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to run crawl');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to run crawl';
+      toast.error(errorMsg);
+    } finally {
+      setRunningSourceId(null);
     }
   };
 
@@ -675,7 +746,7 @@ export default function AdminSourcesPage() {
     <div className="h-full overflow-hidden flex flex-col">
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
         <div className="w-full max-w-full">
-        <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Sources</h1>
             <p className="text-caption text-[#86868B]">Manage job board crawl sources</p>
@@ -823,20 +894,28 @@ export default function AdminSourcesPage() {
                         <div className="flex gap-1 flex-wrap">
                           <button
                             onClick={() => handleRunNow(source.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={runningSourceId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title="Run now"
                           >
-                            <Play className="w-4 h-4 text-[#86868B]" />
+                            {runningSourceId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Play className="w-4 h-4 text-[#86868B]" />
+                            )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Run now
                             </span>
                           </button>
                           <button
                             onClick={() => handleToggleStatus(source)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={togglingSourceId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title={source.status === 'active' ? 'Pause' : 'Resume'}
                           >
-                            {source.status === 'active' ? (
+                            {togglingSourceId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
+                            ) : source.status === 'active' ? (
                               <Pause className="w-4 h-4 text-[#86868B]" />
                             ) : (
                               <Play className="w-4 h-4 text-[#30D158]" />
@@ -857,40 +936,60 @@ export default function AdminSourcesPage() {
                           </button>
                           <button
                             onClick={() => handleDeleteSource(source.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={deletingSourceId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title="Delete"
                           >
-                            <Trash2 className="w-4 h-4 text-[#FF3B30]" />
+                            {deletingSourceId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#FF3B30] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-[#FF3B30]" />
+                            )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Delete
                             </span>
                           </button>
                           <button
                             onClick={() => handleTestSource(source.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={testLoading}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title="Test source"
                           >
-                            <TestTube className="w-4 h-4 text-[#86868B]" />
+                            {testLoading ? (
+                              <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <TestTube className="w-4 h-4 text-[#86868B]" />
+                            )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Test source
                             </span>
                           </button>
                           <button
                             onClick={() => handleSimulateExtract(source.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={simulateLoading}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title="Simulate extraction"
                           >
-                            <FileCode className="w-4 h-4 text-[#86868B]" />
+                            {simulateLoading ? (
+                              <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <FileCode className="w-4 h-4 text-[#86868B]" />
+                            )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Simulate extraction
                             </span>
                           </button>
                           <button
                             onClick={() => handleExportSource(source.id)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            disabled={exportingSourceId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
                             title="Export source"
                           >
-                            <Download className="w-4 h-4 text-[#86868B]" />
+                            {exportingSourceId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4 text-[#86868B]" />
+                            )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Export source
                             </span>
@@ -930,6 +1029,7 @@ export default function AdminSourcesPage() {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
