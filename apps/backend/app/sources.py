@@ -547,6 +547,8 @@ async def test_source(
             "error": error_msg,
             "host": host if 'host' in locals() else None
         }
+    except HTTPException:
+        raise
     except Exception as e:
         # Catch any other network/DNS errors
         error_msg = str(e)
@@ -560,11 +562,6 @@ async def test_source(
             "error": error_msg,
             "host": host if 'host' in locals() else None
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to test source {source_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if cursor:
             cursor.close()
