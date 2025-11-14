@@ -68,6 +68,8 @@ export default function AdminSourcesPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showCrawlDetails, setShowCrawlDetails] = useState(false);
   const [selectedSourceForDetails, setSelectedSourceForDetails] = useState<Source | null>(null);
+  const [crawlLogs, setCrawlLogs] = useState<any[]>([]);
+  const [loadingCrawlLogs, setLoadingCrawlLogs] = useState(false);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -1014,9 +1016,26 @@ export default function AdminSourcesPage() {
                             </span>
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setSelectedSourceForDetails(source);
                               setShowCrawlDetails(true);
+                              // Fetch crawl logs
+                              setLoadingCrawlLogs(true);
+                              try {
+                                const res = await fetch(`/api/admin/crawl/logs?source_id=${source.id}&limit=10`, {
+                                  credentials: 'include',
+                                });
+                                if (res.ok) {
+                                  const json = await res.json();
+                                  if (json.status === 'ok' && json.data) {
+                                    setCrawlLogs(json.data);
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Failed to fetch crawl logs:', error);
+                              } finally {
+                                setLoadingCrawlLogs(false);
+                              }
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
                             title="View crawl details"
@@ -1553,6 +1572,7 @@ export default function AdminSourcesPage() {
                   onClick={() => {
                     setShowCrawlDetails(false);
                     setSelectedSourceForDetails(null);
+                    setCrawlLogs([]);
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-[#D2D2D7] hover:bg-[#F5F5F7] transition-colors"
                 >
@@ -1562,7 +1582,12 @@ export default function AdminSourcesPage() {
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-4">
+                {loadingCrawlLogs ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
                   {/* Source Info */}
                   <div>
                     <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Source Information</h3>
@@ -1589,39 +1614,120 @@ export default function AdminSourcesPage() {
                     </div>
                   </div>
 
-                  {/* Last Crawl Status */}
-                  <div>
-                    <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                    <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
-                      <div>
-                        <span className="text-caption-sm text-[#86868B]">Status:</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
-                            <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                          ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
-                            <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                          ) : selectedSourceForDetails.last_crawl_status ? (
-                            <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
-                          ) : null}
-                          <span className="text-body-sm text-[#1D1D1F]">
-                            {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
-                          </span>
-                        </div>
+                  {/* Last Crawl Details */}
+                  {crawlLogs.length > 0 ? (
+                    <div>
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
+                        {(() => {
+                          const lastLog = crawlLogs[0];
+                          return (
+                            <>
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Status:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {lastLog.status === 'ok' || lastLog.status === 'success' ? (
+                                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                                  ) : lastLog.status === 'fail' || lastLog.status === 'error' ? (
+                                    <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                                  ) : (
+                                    <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                                  )}
+                                  <span className="text-body-sm text-[#1D1D1F] capitalize">{lastLog.status || 'Unknown'}</span>
+                                </div>
+                              </div>
+                              
+                              {lastLog.ran_at && (
+                                <div>
+                                  <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(lastLog.ran_at)}</p>
+                                </div>
+                              )}
+
+                              {lastLog.duration_ms !== null && lastLog.duration_ms !== undefined && (
+                                <div>
+                                  <span className="text-caption-sm text-[#86868B]">Duration:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1">
+                                    {lastLog.duration_ms < 1000 
+                                      ? `${lastLog.duration_ms}ms` 
+                                      : `${(lastLog.duration_ms / 1000).toFixed(1)}s`}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Job Counts */}
+                              <div className="pt-2 border-t border-[#D2D2D7]">
+                                <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Found</div>
+                                    <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Inserted</div>
+                                    <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Updated</div>
+                                    <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Skipped</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {lastLog.message && (
+                                <div className="pt-2 border-t border-[#D2D2D7]">
+                                  <span className="text-caption-sm text-[#86868B]">Message:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1">{lastLog.message}</p>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
-                      {selectedSourceForDetails.last_crawl_message && (
+                    </div>
+                  ) : selectedSourceForDetails.last_crawled_at ? (
+                    <div>
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
                         <div>
-                          <span className="text-caption-sm text-[#86868B]">Message:</span>
-                          <p className="text-body-sm text-[#1D1D1F] mt-1">{selectedSourceForDetails.last_crawl_message}</p>
+                          <span className="text-caption-sm text-[#86868B]">Status:</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
+                              <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                            ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
+                              <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                            ) : selectedSourceForDetails.last_crawl_status ? (
+                              <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                            ) : null}
+                            <span className="text-body-sm text-[#1D1D1F]">
+                              {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      {selectedSourceForDetails.last_crawled_at && (
+                        {selectedSourceForDetails.last_crawl_message && (
+                          <div>
+                            <span className="text-caption-sm text-[#86868B]">Message:</span>
+                            <p className="text-body-sm text-[#1D1D1F] mt-1">{selectedSourceForDetails.last_crawl_message}</p>
+                          </div>
+                        )}
                         <div>
                           <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
                           <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                      <div className="bg-[#F5F5F7] rounded-lg p-3">
+                        <p className="text-body-sm text-[#86868B]">No crawl history available</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Crawl Statistics */}
                   <div>
@@ -1662,6 +1768,54 @@ export default function AdminSourcesPage() {
                     </div>
                   </div>
 
+                  {/* Crawl History */}
+                  {crawlLogs.length > 1 && (
+                    <div>
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Crawl History</h3>
+                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2 max-h-64 overflow-y-auto">
+                        {crawlLogs.slice(1, 10).map((log: any, index: number) => (
+                          <div key={log.id || index} className="bg-white rounded-lg p-2.5 border border-[#D2D2D7]">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                {log.status === 'ok' || log.status === 'success' ? (
+                                  <div className="w-1.5 h-1.5 bg-[#30D158] rounded-full"></div>
+                                ) : log.status === 'fail' || log.status === 'error' ? (
+                                  <div className="w-1.5 h-1.5 bg-[#FF3B30] rounded-full"></div>
+                                ) : (
+                                  <div className="w-1.5 h-1.5 bg-[#FF9500] rounded-full"></div>
+                                )}
+                                <span className="text-caption-sm font-medium text-[#1D1D1F] capitalize">{log.status || 'Unknown'}</span>
+                              </div>
+                              <span className="text-caption-sm text-[#86868B]">{formatDate(log.ran_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <span className="text-caption-sm text-[#86868B]">
+                                Found: <span className="text-[#1D1D1F] font-medium">{log.found ?? 0}</span>
+                              </span>
+                              {(log.inserted ?? 0) > 0 && (
+                                <span className="text-caption-sm text-[#86868B]">
+                                  +<span className="text-[#30D158] font-medium">{log.inserted}</span>
+                                </span>
+                              )}
+                              {(log.updated ?? 0) > 0 && (
+                                <span className="text-caption-sm text-[#86868B]">
+                                  ~<span className="text-[#0071E3] font-medium">{log.updated}</span>
+                                </span>
+                              )}
+                              {log.duration_ms !== null && log.duration_ms !== undefined && (
+                                <span className="text-caption-sm text-[#86868B] ml-auto">
+                                  {log.duration_ms < 1000 
+                                    ? `${log.duration_ms}ms` 
+                                    : `${(log.duration_ms / 1000).toFixed(1)}s`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Additional Info */}
                   {(selectedSourceForDetails.org_type || selectedSourceForDetails.time_window) && (
                     <div>
@@ -1682,7 +1836,8 @@ export default function AdminSourcesPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
