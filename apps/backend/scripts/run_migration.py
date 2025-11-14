@@ -67,6 +67,17 @@ def main():
         existing_jobs_columns = {row[0] for row in cursor.fetchall()}
         print(f"  Found {len(existing_jobs_columns)} existing column(s) in jobs")
         
+        # Check if robots_cache table exists
+        print("Checking robots_cache table...")
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'robots_cache'
+            )
+        """)
+        robots_cache_exists = cursor.fetchone()[0]
+        print(f"  robots_cache table exists: {robots_cache_exists}")
+        
         # Migration SQL
         migration_sql = """
         -- Add org_type column (used in admin sources - INSERT/UPDATE/SELECT)
@@ -114,6 +125,15 @@ def main():
             ADD COLUMN IF NOT EXISTS policy_flags TEXT[],
             ADD COLUMN IF NOT EXISTS donor_context TEXT[],
             ADD COLUMN IF NOT EXISTS international_eligible BOOLEAN;
+        
+        -- Create robots_cache table if it doesn't exist (required for HTML crawler)
+        CREATE TABLE IF NOT EXISTS robots_cache (
+            host TEXT PRIMARY KEY,
+            robots_txt TEXT,
+            fetched_at TIMESTAMPTZ,
+            crawl_delay_ms INT,
+            disallow JSONB
+        );
         """
         
         print("\nRunning migration...")
@@ -181,6 +201,22 @@ def main():
         for col in sorted(new_jobs_columns):
             marker = "[OK]" if col in required_jobs_columns else "   "
             print(f"  {marker} {col}")
+        
+        # Verify robots_cache table was created
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'robots_cache'
+            )
+        """)
+        robots_cache_exists_after = cursor.fetchone()[0]
+        if robots_cache_exists_after:
+            if not robots_cache_exists:
+                print("\n[OK] Created robots_cache table")
+            else:
+                print("\n[OK] robots_cache table already exists")
+        else:
+            print("\n[WARN] robots_cache table was not created")
         
         print("\n" + "=" * 60)
         print("[OK] Migration completed successfully")
