@@ -108,24 +108,24 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
             try:
                 # Run async crawl
                 async def run_async_crawl():
+                    html_crawler = HTMLCrawler(db_url)  # Always use HTMLCrawler for upsert_jobs
+                    
                     if source_type == 'rss':
-                        crawler = RSSCrawler(db_url)
-                        raw_jobs = await crawler.fetch_feed(careers_url)
+                        rss_crawler = RSSCrawler(db_url)
+                        raw_jobs = await rss_crawler.fetch_feed(careers_url)
                         normalized_jobs = [
-                            crawler.normalize_job(job, org_name)
+                            rss_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
                         ]
                     elif source_type == 'api':
-                        crawler = APICrawler()
-                        raw_jobs = await crawler.fetch_api(careers_url, parser_hint, None)
-                        html_crawler = HTMLCrawler(db_url)
+                        api_crawler = APICrawler()
+                        raw_jobs = await api_crawler.fetch_api(careers_url, parser_hint, None)
                         normalized_jobs = [
                             html_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
                         ]
                     else:  # html (default)
-                        crawler = HTMLCrawler(db_url)
-                        status, headers, html, size = await crawler.fetch_html(careers_url)
+                        status, headers, html, size = await html_crawler.fetch_html(careers_url)
                         
                         if status == 304:
                             return {'status': 'ok', 'message': 'Not modified (304)', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
@@ -136,14 +136,14 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                         if status != 200:
                             return {'status': 'fail', 'message': f'HTTP {status}', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
                         
-                        raw_jobs = crawler.extract_jobs(html, careers_url, parser_hint)
+                        raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
                         normalized_jobs = [
-                            crawler.normalize_job(job, org_name)
+                            html_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
                         ]
                     
-                    # Upsert jobs
-                    counts = await crawler.upsert_jobs(normalized_jobs, source_id)
+                    # Upsert jobs (HTMLCrawler has the upsert_jobs method)
+                    counts = await html_crawler.upsert_jobs(normalized_jobs, source_id)
                     return {'status': 'ok', 'message': f"Found {counts['found']}, inserted {counts['inserted']}, updated {counts['updated']}", 'counts': counts}
                 
                 result = asyncio.run(run_async_crawl())
