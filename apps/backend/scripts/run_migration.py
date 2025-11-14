@@ -177,6 +177,47 @@ def main():
         
         -- Create index for crawl_logs table if it doesn't exist
         CREATE INDEX IF NOT EXISTS idx_crawl_logs_source_id ON crawl_logs(source_id, ran_at DESC);
+        
+        -- Add potential future columns to sources table (for analytics and management)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS last_success_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS total_crawls INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS total_jobs_found INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS avg_crawl_duration_ms INT,
+            ADD COLUMN IF NOT EXISTS last_error TEXT,
+            ADD COLUMN IF NOT EXISTS retry_count INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS enabled_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS tags TEXT[],
+            ADD COLUMN IF NOT EXISTS metadata JSONB;
+        
+        -- Add potential future columns to jobs table (for analytics and features)
+        ALTER TABLE jobs
+            ADD COLUMN IF NOT EXISTS priority_score NUMERIC,
+            ADD COLUMN IF NOT EXISTS view_count INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS apply_count INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS bookmark_count INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS expired_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS salary_range_text TEXT,
+            ADD COLUMN IF NOT EXISTS remote_eligible BOOLEAN,
+            ADD COLUMN IF NOT EXISTS visa_sponsorship BOOLEAN,
+            ADD COLUMN IF NOT EXISTS language_requirements TEXT[],
+            ADD COLUMN IF NOT EXISTS education_level TEXT,
+            ADD COLUMN IF NOT EXISTS experience_years INT,
+            ADD COLUMN IF NOT EXISTS source_priority INT,
+            ADD COLUMN IF NOT EXISTS quality_score NUMERIC,
+            ADD COLUMN IF NOT EXISTS normalized_at TIMESTAMPTZ;
+        
+        -- Add potential future columns to crawl_logs table (for better debugging)
+        ALTER TABLE crawl_logs
+            ADD COLUMN IF NOT EXISTS error_type TEXT,
+            ADD COLUMN IF NOT EXISTS http_status INT,
+            ADD COLUMN IF NOT EXISTS content_size_bytes INT,
+            ADD COLUMN IF NOT EXISTS retry_attempt INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS crawler_version TEXT;
         """
         
         print("\nRunning migration...")
@@ -302,6 +343,44 @@ def main():
                 print("[WARN] duration_ms column missing in crawl_logs")
         else:
             print("[WARN] crawl_logs table was not created")
+        
+        # Count newly added future columns
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'sources' 
+            AND column_name IN ('priority', 'last_success_at', 'total_crawls', 'total_jobs_found', 
+                                'avg_crawl_duration_ms', 'last_error', 'retry_count', 'enabled_at', 
+                                'disabled_at', 'tags', 'metadata')
+        """)
+        new_sources_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        if new_sources_future_cols:
+            print(f"\n[OK] Added {len(new_sources_future_cols)} future column(s) to sources: {', '.join(sorted(new_sources_future_cols))}")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'jobs' 
+            AND column_name IN ('priority_score', 'view_count', 'apply_count', 'bookmark_count', 
+                                'expired_at', 'featured', 'verified', 'salary_range_text', 
+                                'remote_eligible', 'visa_sponsorship', 'language_requirements', 
+                                'education_level', 'experience_years', 'source_priority', 
+                                'quality_score', 'normalized_at')
+        """)
+        new_jobs_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        if new_jobs_future_cols:
+            print(f"[OK] Added {len(new_jobs_future_cols)} future column(s) to jobs: {', '.join(sorted(new_jobs_future_cols))}")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'crawl_logs' 
+            AND column_name IN ('error_type', 'http_status', 'content_size_bytes', 
+                                'retry_attempt', 'crawler_version')
+        """)
+        new_logs_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        if new_logs_future_cols:
+            print(f"[OK] Added {len(new_logs_future_cols)} future column(s) to crawl_logs: {', '.join(sorted(new_logs_future_cols))}")
         
         print("\n" + "=" * 60)
         print("[OK] Migration completed successfully")
