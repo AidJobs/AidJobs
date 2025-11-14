@@ -8,8 +8,12 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const queryString = searchParams.toString();
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    const url = `${backendUrl}/admin/crawl/logs${queryString ? `?${queryString}` : ''}`;
+    console.log(`[proxy] GET ${url}`);
     
-    const res = await fetch(`${BACKEND_URL}/admin/crawl/logs${queryString ? `?${queryString}` : ''}`, {
+    const res = await fetch(url, {
       headers: {
         'Cookie': req.headers.get('cookie') || '',
       },

@@ -5,8 +5,12 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    const url = `${backendUrl}/admin/crawl/run`;
+    console.log(`[proxy] POST ${url}`);
     
-    const res = await fetch(`${BACKEND_URL}/admin/crawl/run`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
