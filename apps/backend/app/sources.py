@@ -420,6 +420,10 @@ async def test_source(
         source_type = source['source_type']
         parser_hint = source.get('parser_hint')
         
+        # Support 'json' as an alias for 'api'
+        if source_type == 'json':
+            source_type = 'api'
+        
         # Extract host for response
         from urllib.parse import urlparse
         parsed = urlparse(url)
@@ -526,12 +530,34 @@ async def test_source(
                 "host": host
             }
         
-    except httpx.HTTPError as e:
+    except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.error(f"Failed to test source {source_id}: {e}")
+        error_msg = str(e)
+        # Provide more user-friendly error messages
+        if "Name or service not known" in error_msg or "getaddrinfo failed" in error_msg:
+            error_msg = f"DNS resolution failed for host. Please check if the URL is correct and the hostname is valid."
+        elif "Connection refused" in error_msg:
+            error_msg = f"Connection refused. The server may be down or not accepting connections."
+        elif "timeout" in error_msg.lower():
+            error_msg = f"Connection timeout. The server took too long to respond."
+        
+        return {
+            "ok": False,
+            "status": 0,
+            "error": error_msg,
+            "host": host if 'host' in locals() else None
+        }
+    except Exception as e:
+        # Catch any other network/DNS errors
+        error_msg = str(e)
+        if "Name or service not known" in error_msg or "getaddrinfo" in error_msg:
+            error_msg = f"DNS resolution failed for host. Please check if the URL is correct and the hostname is valid."
+        
         logger.error(f"Failed to test source {source_id}: {e}")
         return {
             "ok": False,
             "status": 0,
-            "error": str(e),
+            "error": error_msg,
             "host": host if 'host' in locals() else None
         }
     except HTTPException:
@@ -749,6 +775,10 @@ async def simulate_extract(
         # Import crawler modules
         source_type = source['source_type']
         
+        # Support 'json' as an alias for 'api'
+        if source_type == 'json':
+            source_type = 'api'
+        
         if source_type == 'html':
             from crawler.html_fetch import fetch_html_jobs
             jobs = await fetch_html_jobs(
@@ -791,7 +821,10 @@ async def simulate_extract(
                 for job in raw_jobs
             ]
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported source_type: {source_type}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported source_type: {source_type}. Supported types: html, rss, api (or json as alias for api)"
+            )
         
         # Return first 3 items
         sample = jobs[:3] if jobs else []
