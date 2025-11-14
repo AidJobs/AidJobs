@@ -78,6 +78,17 @@ def main():
         robots_cache_exists = cursor.fetchone()[0]
         print(f"  robots_cache table exists: {robots_cache_exists}")
         
+        # Check if domain_policies table exists
+        print("Checking domain_policies table...")
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'domain_policies'
+            )
+        """)
+        domain_policies_exists = cursor.fetchone()[0]
+        print(f"  domain_policies table exists: {domain_policies_exists}")
+        
         # Migration SQL
         migration_sql = """
         -- Add org_type column (used in admin sources - INSERT/UPDATE/SELECT)
@@ -133,6 +144,18 @@ def main():
             fetched_at TIMESTAMPTZ,
             crawl_delay_ms INT,
             disallow JSONB
+        );
+        
+        -- Create domain_policies table if it doesn't exist (required for domain rate limiting)
+        CREATE TABLE IF NOT EXISTS domain_policies (
+            host TEXT PRIMARY KEY,
+            max_concurrency INT DEFAULT 1,
+            min_request_interval_ms INT DEFAULT 3000,
+            max_pages INT DEFAULT 10,
+            max_kb_per_page INT DEFAULT 1024,
+            allow_js BOOLEAN DEFAULT FALSE,
+            last_seen_status TEXT,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
         );
         """
         
@@ -217,6 +240,22 @@ def main():
                 print("\n[OK] robots_cache table already exists")
         else:
             print("\n[WARN] robots_cache table was not created")
+        
+        # Verify domain_policies table was created
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'domain_policies'
+            )
+        """)
+        domain_policies_exists_after = cursor.fetchone()[0]
+        if domain_policies_exists_after:
+            if not domain_policies_exists:
+                print("[OK] Created domain_policies table")
+            else:
+                print("[OK] domain_policies table already exists")
+        else:
+            print("[WARN] domain_policies table was not created")
         
         print("\n" + "=" * 60)
         print("[OK] Migration completed successfully")
