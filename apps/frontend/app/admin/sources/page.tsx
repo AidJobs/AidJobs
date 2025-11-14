@@ -100,12 +100,19 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        throw new Error('Failed to fetch sources');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to fetch sources');
       }
 
       const json = await res.json();
-      setSources(json.data.items);
-      setTotal(json.data.total);
+      if (json.status === 'ok' && json.data) {
+        setSources(json.data.items || []);
+        setTotal(json.data.total || 0);
+      } else {
+        console.error('Invalid sources response:', json);
+        setSources([]);
+        setTotal(0);
+      }
     } catch (error) {
       console.error('Failed to fetch sources:', error);
       toast.error('Failed to fetch sources');

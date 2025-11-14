@@ -114,16 +114,27 @@ export default function AdminCrawlPage() {
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to fetch crawl status');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to fetch crawl status');
       }
 
       const json = await res.json();
-      setCrawlStatus(json.data);
+      if (json.status === 'ok' && json.data) {
+        setCrawlStatus(json.data);
+      } else {
+        console.error('Invalid crawl status response:', json);
+      }
     } catch (error) {
       console.error('Failed to fetch crawl status:', error);
+      // Don't show toast for status - it's not critical
     }
-  }, []);
+  }, [router]);
 
   const fetchLogs = useCallback(async (sourceId?: string) => {
     setLogsLoading(true);
@@ -137,19 +148,31 @@ export default function AdminCrawlPage() {
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to fetch logs');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to fetch logs');
       }
 
       const json = await res.json();
-      setLogs(json.data);
+      if (json.status === 'ok' && json.data) {
+        setLogs(json.data);
+      } else {
+        setLogs([]);
+        console.error('Invalid logs response:', json);
+      }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
-      toast.error('Failed to fetch logs');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch logs');
+      setLogs([]);
     } finally {
       setLogsLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchSources();

@@ -10,14 +10,38 @@ export async function GET(req: NextRequest) {
       headers: {
         'Cookie': req.headers.get('cookie') || '',
       },
+      credentials: 'include',
     });
 
+    // Handle 401 - redirect to login
+    if (res.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      console.error('Crawl status error:', res.status, errorText);
+      return NextResponse.json(
+        { status: 'error', error: `HTTP ${res.status}: ${errorText}` },
+        { status: res.status }
+      );
+    }
+
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(data, { 
+      status: res.status,
+      headers: {
+        'Set-Cookie': res.headers.get('set-cookie') || '',
+      },
+    });
   } catch (error) {
     console.error('Crawl status proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
     return NextResponse.json(
-      { status: 'error', error: 'Failed to fetch crawl status' },
+      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
       { status: 500 }
     );
   }
