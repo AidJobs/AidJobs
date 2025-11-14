@@ -1051,7 +1051,6 @@ export default function AdminSourcesPage() {
         </div>
         </div>
       </div>
-    </div>
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ overflow: 'visible' }}>
