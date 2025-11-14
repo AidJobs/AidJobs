@@ -163,6 +163,10 @@ export default function AdminPage() {
       } else if (crawlRes && !crawlRes.ok) {
         // Log but don't fail the entire status fetch if crawler status fails
         console.warn('Crawler status unavailable:', crawlRes.status);
+        setCrawlerStatus(null); // Clear stale data
+      } else if (crawlRes === null) {
+        // Request failed, clear stale data
+        setCrawlerStatus(null);
       }
     } catch (error) {
       console.error('Failed to fetch status:', error);

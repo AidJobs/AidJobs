@@ -75,10 +75,13 @@ export default function AdminSourcesPage() {
     time_window: '',
   });
 
-  // Draggable modal state
-  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
+  // Draggable modal state - separate position for each modal
+  const [addEditModalPosition, setAddEditModalPosition] = useState({ x: 0, y: 0 });
+  const [testModalPosition, setTestModalPosition] = useState({ x: 0, y: 0 });
+  const [simulateModalPosition, setSimulateModalPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [activeModalRef, setActiveModalRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
   const addEditModalRef = useRef<HTMLDivElement>(null);
   const testModalRef = useRef<HTMLDivElement>(null);
   const simulateModalRef = useRef<HTMLDivElement>(null);
@@ -86,15 +89,16 @@ export default function AdminSourcesPage() {
   const pageSize = 20;
 
   // Draggable modal handlers
-  const handleMouseDown = (e: React.MouseEvent, modalRef: React.RefObject<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent, modalRef: React.RefObject<HTMLDivElement>, getPosition: () => { x: number; y: number }) => {
     const target = e.target as HTMLElement;
     const header = target.closest('.modal-header');
     if (header && !target.closest('button') && modalRef.current) {
-      const rect = modalRef.current.getBoundingClientRect();
       setIsDragging(true);
+      setActiveModalRef(modalRef);
+      const currentPos = getPosition();
       setDragStart({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: e.clientX - currentPos.x,
+        y: e.clientY - currentPos.y,
       });
       e.preventDefault();
     }
@@ -102,22 +106,38 @@ export default function AdminSourcesPage() {
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const container = document.querySelector('.fixed.inset-0');
+      if (isDragging && activeModalRef?.current) {
+        const modal = activeModalRef.current;
+        const container = modal.closest('.fixed.inset-0') as HTMLElement;
         if (container) {
           const containerRect = container.getBoundingClientRect();
-          const newX = e.clientX - dragStart.x - containerRect.left;
-          const newY = e.clientY - dragStart.y - containerRect.top;
-          setModalPosition({
-            x: Math.max(-containerRect.width / 2, Math.min(containerRect.width / 2, newX)),
-            y: Math.max(-containerRect.height / 2, Math.min(containerRect.height / 2, newY)),
-          });
+          const newX = e.clientX - dragStart.x;
+          const newY = e.clientY - dragStart.y;
+          
+          // Determine which modal is being dragged and update its position
+          if (activeModalRef === addEditModalRef) {
+            setAddEditModalPosition({
+              x: Math.max(-containerRect.width / 2, Math.min(containerRect.width / 2, newX)),
+              y: Math.max(-containerRect.height / 2, Math.min(containerRect.height / 2, newY)),
+            });
+          } else if (activeModalRef === testModalRef) {
+            setTestModalPosition({
+              x: Math.max(-containerRect.width / 2, Math.min(containerRect.width / 2, newX)),
+              y: Math.max(-containerRect.height / 2, Math.min(containerRect.height / 2, newY)),
+            });
+          } else if (activeModalRef === simulateModalRef) {
+            setSimulateModalPosition({
+              x: Math.max(-containerRect.width / 2, Math.min(containerRect.width / 2, newX)),
+              y: Math.max(-containerRect.height / 2, Math.min(containerRect.height / 2, newY)),
+            });
+          }
         }
       }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      setActiveModalRef(null);
     };
 
     if (isDragging) {
@@ -130,9 +150,20 @@ export default function AdminSourcesPage() {
         document.body.style.userSelect = '';
       };
     }
-  }, [isDragging, dragStart]);
+  }, [isDragging, dragStart, activeModalRef]);
+
+  // AbortController ref for race condition protection
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchSources = useCallback(async () => {
+    // Cancel previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -147,6 +178,7 @@ export default function AdminSourcesPage() {
 
       const res = await fetch(`/api/admin/sources?${params}`, {
         credentials: 'include',
+        signal: abortController.signal,
       });
 
       if (res.status === 401) {
@@ -169,10 +201,17 @@ export default function AdminSourcesPage() {
         setTotal(0);
       }
     } catch (error) {
+      // Ignore abort errors (request was cancelled)
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('Failed to fetch sources:', error);
       toast.error('Failed to fetch sources');
     } finally {
-      setLoading(false);
+      // Only set loading to false if this is the current request
+      if (abortControllerRef.current === abortController) {
+        setLoading(false);
+      }
     }
   }, [page, statusFilter, searchQuery, router]);
 
@@ -604,7 +643,11 @@ export default function AdminSourcesPage() {
       parser_hint: source.parser_hint || '',
       time_window: source.time_window || '',
     });
+    // Show advanced options if source has advanced fields
+    setShowAdvanced(!!(source.org_type || source.time_window || 
+      (source.parser_hint && source.source_type !== 'api')));
     setShowEditModal(true);
+    setAddEditModalPosition({ x: 0, y: 0 }); // Reset position when opening
   };
 
   const resetForm = () => {
@@ -897,15 +940,15 @@ export default function AdminSourcesPage() {
             ref={addEditModalRef}
             className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
             style={{
-              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
-              cursor: isDragging ? 'grabbing' : 'default',
+              transform: addEditModalPosition.x !== 0 || addEditModalPosition.y !== 0 ? `translate(${addEditModalPosition.x}px, ${addEditModalPosition.y}px)` : undefined,
+              cursor: isDragging && activeModalRef === addEditModalRef ? 'grabbing' : 'default',
             }}
           >
             <div className="p-4 overflow-y-auto flex-1 rounded-t-lg">
               {/* Header - Draggable */}
               <div 
                 className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none"
-                onMouseDown={(e) => handleMouseDown(e, addEditModalRef)}
+                onMouseDown={(e) => handleMouseDown(e, addEditModalRef, () => addEditModalPosition)}
               >
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">
@@ -921,7 +964,7 @@ export default function AdminSourcesPage() {
                     setShowEditModal(false);
                     setEditingSource(null);
                     setShowAdvanced(false);
-                    setModalPosition({ x: 0, y: 0 });
+                    setAddEditModalPosition({ x: 0, y: 0 });
                     resetForm();
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
@@ -1121,12 +1164,12 @@ export default function AdminSourcesPage() {
             ref={testModalRef}
             className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             style={{
-              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
-              cursor: isDragging ? 'grabbing' : 'default',
+              transform: testModalPosition.x !== 0 || testModalPosition.y !== 0 ? `translate(${testModalPosition.x}px, ${testModalPosition.y}px)` : undefined,
+              cursor: isDragging && activeModalRef === testModalRef ? 'grabbing' : 'default',
             }}
           >
             <div className="p-4">
-              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, testModalRef)}>
+              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, testModalRef, () => testModalPosition)}>
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Test Results</h2>
                   <p className="text-caption text-[#86868B] mt-0.5">Source connectivity test results</p>
@@ -1135,7 +1178,7 @@ export default function AdminSourcesPage() {
                   onClick={() => {
                     setShowTestModal(false);
                     setTestResult(null);
-                    setModalPosition({ x: 0, y: 0 });
+                    setTestModalPosition({ x: 0, y: 0 });
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
@@ -1236,7 +1279,7 @@ export default function AdminSourcesPage() {
                       onClick={() => {
                         setShowTestModal(false);
                         setTestResult(null);
-                        setModalPosition({ x: 0, y: 0 });
+                        setTestModalPosition({ x: 0, y: 0 });
                       }}
                       className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
                     >
@@ -1257,12 +1300,12 @@ export default function AdminSourcesPage() {
             ref={simulateModalRef}
             className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             style={{
-              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
-              cursor: isDragging ? 'grabbing' : 'default',
+              transform: simulateModalPosition.x !== 0 || simulateModalPosition.y !== 0 ? `translate(${simulateModalPosition.x}px, ${simulateModalPosition.y}px)` : undefined,
+              cursor: isDragging && activeModalRef === simulateModalRef ? 'grabbing' : 'default',
             }}
           >
             <div className="p-4">
-              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, simulateModalRef)}>
+              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, simulateModalRef, () => simulateModalPosition)}>
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Simulation Results</h2>
                   <p className="text-caption text-[#86868B] mt-0.5">Job extraction simulation results</p>
@@ -1271,7 +1314,7 @@ export default function AdminSourcesPage() {
                   onClick={() => {
                     setShowSimulateModal(false);
                     setSimulateResult(null);
-                    setModalPosition({ x: 0, y: 0 });
+                    setSimulateModalPosition({ x: 0, y: 0 });
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
@@ -1336,7 +1379,7 @@ export default function AdminSourcesPage() {
                       onClick={() => {
                         setShowSimulateModal(false);
                         setSimulateResult(null);
-                        setModalPosition({ x: 0, y: 0 });
+                        setSimulateModalPosition({ x: 0, y: 0 });
                       }}
                       className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
                     >
