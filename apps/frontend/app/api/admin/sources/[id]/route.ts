@@ -4,13 +4,12 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const resolvedParams = await Promise.resolve(params);
     const body = await request.json();
     
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${resolvedParams.id}`, {
+    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -62,11 +61,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const resolvedParams = await Promise.resolve(params);
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${resolvedParams.id}`, {
+    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}`, {
       method: 'DELETE',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

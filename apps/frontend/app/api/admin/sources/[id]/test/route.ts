@@ -4,11 +4,10 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const resolvedParams = await Promise.resolve(params);
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${resolvedParams.id}/test`, {
+    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}/test`, {
       method: 'POST',
       headers: {
         'Cookie': request.headers.get('cookie') || '',
