@@ -3,6 +3,7 @@ Crawler management endpoints for admin.
 """
 import os
 import logging
+import asyncio
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
@@ -15,7 +16,9 @@ except ImportError:
     psycopg2 = None
 
 from app.db_config import db_config
-from crawler.html_fetch import fetch_html, extract_jobs, upsert_jobs
+from crawler.html_fetch import HTMLCrawler
+from crawler.rss_fetch import RSSCrawler
+from crawler.api_fetch import APICrawler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,9 +71,9 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
         
         cursor.execute(
             """
-            SELECT id, org_name, careers_url, source_type, status
+            SELECT id, org_name, careers_url, source_type, status, parser_hint
             FROM sources
-            WHERE id = %s
+            WHERE id::text = %s
             """,
             (source_id,)
         )
@@ -87,35 +90,66 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
             raise HTTPException(status_code=400, detail="Cannot crawl deleted source")
         
         careers_url = source['careers_url']
+        source_type = source.get('source_type', 'html')
+        org_name = source.get('org_name')
+        parser_hint = source.get('parser_hint')
         
         # Initialize log entry
         log_status = "running"
         log_message = None
         stats = {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
         
-        try:
-            # Fetch HTML
-            logger.info(f"Fetching HTML from {careers_url}")
-            html = fetch_html(careers_url)
-            
-            if not html:
-                log_status = "failed"
-                log_message = f"Failed to fetch HTML from {careers_url}"
-            else:
-                # Extract jobs
-                logger.info(f"Extracting jobs from HTML")
-                jobs = extract_jobs(html, careers_url)
-                
-                if not jobs:
-                    log_status = "success"
-                    log_message = "No jobs found"
-                else:
-                    # Upsert jobs
-                    logger.info(f"Upserting {len(jobs)} jobs")
-                    stats = upsert_jobs(jobs, source_id)
+        # Get database URL for crawlers
+        db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+        if not db_url:
+            log_status = "failed"
+            log_message = "Database URL not configured"
+        else:
+            try:
+                # Run async crawl
+                async def run_async_crawl():
+                    if source_type == 'rss':
+                        crawler = RSSCrawler(db_url)
+                        raw_jobs = await crawler.fetch_feed(careers_url)
+                        normalized_jobs = [
+                            crawler.normalize_job(job, org_name)
+                            for job in raw_jobs
+                        ]
+                    elif source_type == 'api':
+                        crawler = APICrawler()
+                        raw_jobs = await crawler.fetch_api(careers_url, parser_hint, None)
+                        html_crawler = HTMLCrawler(db_url)
+                        normalized_jobs = [
+                            html_crawler.normalize_job(job, org_name)
+                            for job in raw_jobs
+                        ]
+                    else:  # html (default)
+                        crawler = HTMLCrawler(db_url)
+                        status, headers, html, size = await crawler.fetch_html(careers_url)
+                        
+                        if status == 304:
+                            return {'status': 'ok', 'message': 'Not modified (304)', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                        
+                        if status == 403:
+                            return {'status': 'fail', 'message': 'Blocked by robots.txt', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                        
+                        if status != 200:
+                            return {'status': 'fail', 'message': f'HTTP {status}', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                        
+                        raw_jobs = crawler.extract_jobs(html, careers_url, parser_hint)
+                        normalized_jobs = [
+                            crawler.normalize_job(job, org_name)
+                            for job in raw_jobs
+                        ]
                     
-                    log_status = "success"
-                    log_message = f"Processed {stats['found']} jobs"
+                    # Upsert jobs
+                    counts = await crawler.upsert_jobs(normalized_jobs, source_id)
+                    return {'status': 'ok', 'message': f"Found {counts['found']}, inserted {counts['inserted']}, updated {counts['updated']}", 'counts': counts}
+                
+                result = asyncio.run(run_async_crawl())
+                stats = result.get('counts', stats)
+                log_status = result.get('status', 'ok')
+                log_message = result.get('message', 'Crawl completed')
                 
                 # Update source last_crawled_at
                 cursor.execute(
@@ -124,15 +158,15 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                     SET last_crawled_at = NOW(),
                         last_crawl_status = %s,
                         updated_at = NOW()
-                    WHERE id = %s
+                    WHERE id::text = %s
                     """,
                     (log_status, source_id)
                 )
-        
-        except Exception as e:
-            logger.error(f"Crawl failed: {e}")
-            log_status = "failed"
-            log_message = str(e)
+            
+            except Exception as e:
+                logger.error(f"Crawl failed: {e}")
+                log_status = "failed"
+                log_message = str(e)[:500]
         
         # Write crawl log
         cursor.execute(
