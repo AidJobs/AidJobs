@@ -157,6 +157,26 @@ def main():
             last_seen_status TEXT,
             updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        
+        -- Create crawl_logs table if it doesn't exist (required for crawl history tracking)
+        CREATE TABLE IF NOT EXISTS crawl_logs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            source_id UUID REFERENCES sources(id) ON DELETE CASCADE,
+            ran_at TIMESTAMPTZ DEFAULT NOW(),
+            duration_ms INT,
+            found INT DEFAULT 0,
+            inserted INT DEFAULT 0,
+            updated INT DEFAULT 0,
+            skipped INT DEFAULT 0,
+            status TEXT NOT NULL,
+            message TEXT
+        );
+        
+        -- Add duration_ms column to crawl_logs if missing (idempotent)
+        ALTER TABLE crawl_logs ADD COLUMN IF NOT EXISTS duration_ms INT;
+        
+        -- Create index for crawl_logs table if it doesn't exist
+        CREATE INDEX IF NOT EXISTS idx_crawl_logs_source_id ON crawl_logs(source_id, ran_at DESC);
         """
         
         print("\nRunning migration...")
@@ -256,6 +276,32 @@ def main():
                 print("[OK] domain_policies table already exists")
         else:
             print("[WARN] domain_policies table was not created")
+        
+        # Verify crawl_logs table was created
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'crawl_logs'
+            )
+        """)
+        crawl_logs_exists_after = cursor.fetchone()[0]
+        if crawl_logs_exists_after:
+            print("[OK] crawl_logs table exists")
+            
+            # Verify duration_ms column exists in crawl_logs
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns 
+                    WHERE table_name = 'crawl_logs' AND column_name = 'duration_ms'
+                )
+            """)
+            duration_ms_exists = cursor.fetchone()[0]
+            if duration_ms_exists:
+                print("[OK] duration_ms column exists in crawl_logs")
+            else:
+                print("[WARN] duration_ms column missing in crawl_logs")
+        else:
+            print("[WARN] crawl_logs table was not created")
         
         print("\n" + "=" * 60)
         print("[OK] Migration completed successfully")
