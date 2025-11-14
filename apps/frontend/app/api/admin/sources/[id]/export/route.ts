@@ -7,7 +7,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}/export`, {
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    console.log(`[proxy] GET ${backendUrl}/admin/sources/${params.id}/export`);
+    
+    const response = await fetch(`${backendUrl}/admin/sources/${params.id}/export`, {
       method: 'GET',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

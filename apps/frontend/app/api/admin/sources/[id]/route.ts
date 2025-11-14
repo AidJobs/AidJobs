@@ -9,7 +9,11 @@ export async function PATCH(
   try {
     const body = await request.json();
     
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}`, {
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    console.log(`[proxy] PATCH ${backendUrl}/admin/sources/${params.id}`);
+    
+    const response = await fetch(`${backendUrl}/admin/sources/${params.id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -64,7 +68,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/admin/sources/${params.id}`, {
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    console.log(`[proxy] DELETE ${backendUrl}/admin/sources/${params.id}`);
+    
+    const response = await fetch(`${backendUrl}/admin/sources/${params.id}`, {
       method: 'DELETE',
       headers: {
         'Cookie': request.headers.get('cookie') || '',
