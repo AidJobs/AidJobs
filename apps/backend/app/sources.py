@@ -119,7 +119,7 @@ def list_sources(
             SELECT 
                 id::text, org_name, careers_url, source_type, org_type, status,
                 crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
-                parser_hint, time_window, consecutive_failures, consecutive_nochange,
+                last_crawl_message, parser_hint, time_window, consecutive_failures, consecutive_nochange,
                 created_at, updated_at
             FROM sources
             {where_clause}

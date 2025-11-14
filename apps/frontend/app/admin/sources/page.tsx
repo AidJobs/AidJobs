@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles, Check, XCircle } from 'lucide-react';
+import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles, Check, XCircle, Info } from 'lucide-react';
 
 type Source = {
   id: string;
@@ -16,6 +16,7 @@ type Source = {
   next_run_at: string | null;
   last_crawled_at: string | null;
   last_crawl_status: string | null;
+  last_crawl_message: string | null;
   parser_hint: string | null;
   time_window: string | null;
   consecutive_failures?: number | null;
@@ -65,6 +66,8 @@ export default function AdminSourcesPage() {
   const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [simulateLoading, setSimulateLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showCrawlDetails, setShowCrawlDetails] = useState(false);
+  const [selectedSourceForDetails, setSelectedSourceForDetails] = useState<Source | null>(null);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -997,6 +1000,19 @@ export default function AdminSourcesPage() {
                               Export source
                             </span>
                           </button>
+                          <button
+                            onClick={() => {
+                              setSelectedSourceForDetails(source);
+                              setShowCrawlDetails(true);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                            title="View crawl details"
+                          >
+                            <Info className="w-4 h-4 text-[#0071E3]" />
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                              View crawl details
+                            </span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1494,6 +1510,171 @@ export default function AdminSourcesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Crawl Details Drawer (Right Side Panel) */}
+      {showCrawlDetails && selectedSourceForDetails && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-30 z-40 transition-opacity"
+            onClick={() => {
+              setShowCrawlDetails(false);
+              setSelectedSourceForDetails(null);
+            }}
+          />
+          
+          {/* Drawer */}
+          <div className={`fixed right-0 top-0 bottom-0 w-full max-w-md bg-white border-l border-[#D2D2D7] shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+            showCrawlDetails ? 'translate-x-0' : 'translate-x-full'
+          }`}>
+            <div className="h-full flex flex-col overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-[#D2D2D7] bg-[#F5F5F7]">
+                <div>
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Crawl Details</h2>
+                  <p className="text-caption text-[#86868B] mt-0.5">
+                    {selectedSourceForDetails.org_name || 'Source'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCrawlDetails(false);
+                    setSelectedSourceForDetails(null);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-[#D2D2D7] hover:bg-[#F5F5F7] transition-colors"
+                >
+                  <X className="w-4 h-4 text-[#86868B]" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-4">
+                  {/* Source Info */}
+                  <div>
+                    <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Source Information</h3>
+                    <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
+                      <div>
+                        <span className="text-caption-sm text-[#86868B]">URL:</span>
+                        <p className="text-body-sm text-[#1D1D1F] break-all">{selectedSourceForDetails.careers_url}</p>
+                      </div>
+                      <div>
+                        <span className="text-caption-sm text-[#86868B]">Type:</span>
+                        <p className="text-body-sm text-[#1D1D1F] font-mono">{selectedSourceForDetails.source_type}</p>
+                      </div>
+                      <div>
+                        <span className="text-caption-sm text-[#86868B]">Status:</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className={`w-2 h-2 rounded-full ${
+                            selectedSourceForDetails.status === 'active' ? 'bg-[#30D158]' :
+                            selectedSourceForDetails.status === 'paused' ? 'bg-[#86868B]' :
+                            'bg-[#FF3B30]'
+                          }`}></div>
+                          <span className="text-body-sm text-[#1D1D1F]">{selectedSourceForDetails.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Last Crawl Status */}
+                  <div>
+                    <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                    <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
+                      <div>
+                        <span className="text-caption-sm text-[#86868B]">Status:</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
+                            <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                          ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
+                            <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                          ) : selectedSourceForDetails.last_crawl_status ? (
+                            <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                          ) : null}
+                          <span className="text-body-sm text-[#1D1D1F]">
+                            {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
+                          </span>
+                        </div>
+                      </div>
+                      {selectedSourceForDetails.last_crawl_message && (
+                        <div>
+                          <span className="text-caption-sm text-[#86868B]">Message:</span>
+                          <p className="text-body-sm text-[#1D1D1F] mt-1">{selectedSourceForDetails.last_crawl_message}</p>
+                        </div>
+                      )}
+                      {selectedSourceForDetails.last_crawled_at && (
+                        <div>
+                          <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                          <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Crawl Statistics */}
+                  <div>
+                    <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Statistics</h3>
+                    <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-caption-sm text-[#86868B]">Frequency:</span>
+                        <span className="text-body-sm text-[#1D1D1F]">
+                          {selectedSourceForDetails.crawl_frequency_days || '-'} days
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-caption-sm text-[#86868B]">Next Run:</span>
+                        <span className="text-body-sm text-[#1D1D1F]">
+                          {formatDate(selectedSourceForDetails.next_run_at)}
+                        </span>
+                      </div>
+                      {(selectedSourceForDetails.consecutive_failures ?? 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-caption-sm text-[#86868B]">Consecutive Failures:</span>
+                          <span className={`text-body-sm font-semibold ${
+                            (selectedSourceForDetails.consecutive_failures ?? 0) >= 5 
+                              ? 'text-[#FF3B30]' 
+                              : 'text-[#FF9500]'
+                          }`}>
+                            {selectedSourceForDetails.consecutive_failures}
+                          </span>
+                        </div>
+                      )}
+                      {(selectedSourceForDetails.consecutive_nochange ?? 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-caption-sm text-[#86868B]">Consecutive No-Change:</span>
+                          <span className="text-body-sm text-[#86868B]">
+                            {selectedSourceForDetails.consecutive_nochange}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional Info */}
+                  {(selectedSourceForDetails.org_type || selectedSourceForDetails.time_window) && (
+                    <div>
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Additional Settings</h3>
+                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
+                        {selectedSourceForDetails.org_type && (
+                          <div className="flex justify-between">
+                            <span className="text-caption-sm text-[#86868B]">Organization Type:</span>
+                            <span className="text-body-sm text-[#1D1D1F]">{selectedSourceForDetails.org_type}</span>
+                          </div>
+                        )}
+                        {selectedSourceForDetails.time_window && (
+                          <div className="flex justify-between">
+                            <span className="text-caption-sm text-[#86868B]">Time Window:</span>
+                            <span className="text-body-sm text-[#1D1D1F]">{selectedSourceForDetails.time_window}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
