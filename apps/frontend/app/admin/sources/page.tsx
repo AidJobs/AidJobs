@@ -981,7 +981,7 @@ export default function AdminSourcesPage() {
             </div>
 
             {/* Actions - Icon-only buttons */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7] relative overflow-visible">
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7] relative overflow-visible rounded-b-lg">
               <button
                 onClick={() => {
                   setShowAddModal(false);
