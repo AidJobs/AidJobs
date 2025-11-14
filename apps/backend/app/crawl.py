@@ -95,17 +95,36 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
         parser_hint = source.get('parser_hint')
         
         # Initialize log entry
+        import time
+        start_time = time.time()
         log_status = "running"
         log_message = None
         stats = {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
+        duration_ms = 0
         
         # Get database URL for crawlers
         db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
         if not db_url:
             log_status = "failed"
             log_message = "Database URL not configured"
+            duration_ms = int((time.time() - start_time) * 1000)
         else:
             try:
+                # Get source metadata for updating
+                cursor.execute(
+                    """
+                    SELECT org_type, crawl_frequency_days, consecutive_failures, consecutive_nochange
+                    FROM sources
+                    WHERE id::text = %s
+                    """,
+                    (source_id,)
+                )
+                source_meta = cursor.fetchone()
+                org_type = source_meta.get('org_type') if source_meta else None
+                base_freq_days = source_meta.get('crawl_frequency_days') if source_meta else None
+                consecutive_failures = source_meta.get('consecutive_failures', 0) if source_meta else 0
+                consecutive_nochange = source_meta.get('consecutive_nochange', 0) if source_meta else 0
+                
                 # Run async crawl
                 async def run_async_crawl():
                     html_crawler = HTMLCrawler(db_url)  # Always use HTMLCrawler for upsert_jobs
@@ -117,8 +136,8 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                             rss_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
                         ]
-                    elif source_type == 'api':
-                        api_crawler = APICrawler()
+                    elif source_type == 'api' or source_type == 'json':
+                        api_crawler = APICrawler(db_url)
                         raw_jobs = await api_crawler.fetch_api(careers_url, parser_hint, None)
                         normalized_jobs = [
                             html_crawler.normalize_job(job, org_name)
@@ -147,34 +166,70 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                     return {'status': 'ok', 'message': f"Found {counts['found']}, inserted {counts['inserted']}, updated {counts['updated']}", 'counts': counts}
                 
                 result = asyncio.run(run_async_crawl())
+                duration_ms = int((time.time() - start_time) * 1000)
                 stats = result.get('counts', stats)
                 log_status = result.get('status', 'ok')
                 log_message = result.get('message', 'Crawl completed')
                 
-                # Update source last_crawled_at
+                # Update consecutive counters
+                if log_status == 'fail':
+                    new_consecutive_failures = consecutive_failures + 1
+                    new_consecutive_nochange = 0
+                else:
+                    new_consecutive_failures = 0
+                    if stats['inserted'] == 0 and stats['updated'] == 0:
+                        new_consecutive_nochange = consecutive_nochange + 1
+                    else:
+                        new_consecutive_nochange = 0
+                
+                # Compute next_run_at using orchestrator logic
+                from orchestrator import CrawlerOrchestrator
+                orchestrator = CrawlerOrchestrator(db_url)
+                next_run_at = orchestrator.compute_next_run(
+                    base_freq_days,
+                    org_type,
+                    stats['inserted'],
+                    stats['updated'],
+                    new_consecutive_failures,
+                    new_consecutive_nochange
+                )
+                
+                # Check circuit breaker
+                new_status = source['status']
+                if new_consecutive_failures >= 5:
+                    new_status = 'paused'
+                    log_message += ' (auto-paused after 5 failures)'
+                
+                # Update source with all fields
                 cursor.execute(
                     """
                     UPDATE sources
                     SET last_crawled_at = NOW(),
                         last_crawl_status = %s,
+                        last_crawl_message = %s,
+                        consecutive_failures = %s,
+                        consecutive_nochange = %s,
+                        next_run_at = %s,
+                        status = %s,
                         updated_at = NOW()
                     WHERE id::text = %s
                     """,
-                    (log_status, source_id)
+                    (log_status, log_message, new_consecutive_failures, new_consecutive_nochange, next_run_at, new_status, source_id)
                 )
             
             except Exception as e:
                 logger.error(f"Crawl failed: {e}")
                 log_status = "failed"
                 log_message = str(e)[:500]
+                duration_ms = int((time.time() - start_time) * 1000)
         
         # Write crawl log
         cursor.execute(
             """
             INSERT INTO crawl_logs (
-                source_id, found, inserted, updated, skipped, status, message
+                source_id, found, inserted, updated, skipped, status, message, duration_ms
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, ran_at
             """,
             (
@@ -185,6 +240,7 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                 stats['skipped'],
                 log_status,
                 log_message,
+                duration_ms,
             )
         )
         
@@ -252,11 +308,12 @@ def get_crawl_logs(
                     cl.status,
                     cl.message,
                     cl.ran_at,
+                    cl.duration_ms,
                     s.org_name,
                     s.careers_url
                 FROM crawl_logs cl
                 LEFT JOIN sources s ON cl.source_id = s.id
-                WHERE cl.source_id = %s
+                WHERE cl.source_id::text = %s
                 ORDER BY cl.ran_at DESC
                 LIMIT %s
                 """,
@@ -275,6 +332,7 @@ def get_crawl_logs(
                     cl.status,
                     cl.message,
                     cl.ran_at,
+                    cl.duration_ms,
                     s.org_name,
                     s.careers_url
                 FROM crawl_logs cl
@@ -302,6 +360,7 @@ def get_crawl_logs(
                 'status': log['status'],
                 'message': log['message'],
                 'ran_at': log['ran_at'].isoformat() if log['ran_at'] else None,
+                'duration_ms': log.get('duration_ms'),
             })
         
         return {

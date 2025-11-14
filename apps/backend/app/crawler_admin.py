@@ -64,7 +64,7 @@ async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
                        parser_hint, crawl_frequency_days, consecutive_failures,
                        consecutive_nochange
                 FROM sources
-                WHERE id = %s
+                WHERE id::text = %s
             """, (request.source_id,))
             
             source = cur.fetchone()
@@ -152,7 +152,7 @@ async def get_logs(
                     SELECT l.*, s.org_name, s.careers_url
                     FROM crawl_logs l
                     JOIN sources s ON s.id = l.source_id
-                    WHERE l.source_id = %s
+                    WHERE l.source_id::text = %s
                     ORDER BY l.ran_at DESC
                     LIMIT %s
                 """, (source_id, limit))
@@ -169,9 +169,27 @@ async def get_logs(
     finally:
         conn.close()
     
+    # Convert to list of dicts with proper field names
+    logs_list = []
+    for log in logs:
+        logs_list.append({
+            'id': str(log['id']),
+            'source_id': str(log['source_id']),
+            'org_name': log.get('org_name'),
+            'careers_url': log.get('careers_url'),
+            'found': log.get('found', 0),
+            'inserted': log.get('inserted', 0),
+            'updated': log.get('updated', 0),
+            'skipped': log.get('skipped', 0),
+            'status': log.get('status', 'unknown'),
+            'message': log.get('message'),
+            'ran_at': log['ran_at'].isoformat() if log.get('ran_at') else None,
+            'duration_ms': log.get('duration_ms'),
+        })
+    
     return {
         "status": "ok",
-        "data": logs
+        "data": logs_list
     }
 
 
