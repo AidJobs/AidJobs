@@ -803,8 +803,8 @@ export default function AdminSourcesPage() {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ overflow: 'visible' }}>
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col" style={{ overflow: 'visible' }}>
-            <div className="p-4 overflow-y-auto flex-1">
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-4 overflow-y-auto flex-1 rounded-t-lg">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div>
