@@ -408,18 +408,31 @@ export default function AdminSourcesPage() {
         }),
       });
 
-      if (!res.ok) {
-        const error = await res.json() as { detail?: string };
-        throw new Error(error.detail || 'Failed to create source');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
       }
 
-      toast.success('Source created and queued for crawl');
-      setShowAddModal(false);
-      resetForm();
-      fetchSources();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to create source`;
+        throw new Error(errorMsg);
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success('Source created and queued for crawl');
+        setShowAddModal(false);
+        setAddEditModalPosition({ x: 0, y: 0 });
+        resetForm();
+        fetchSources();
+      } else {
+        throw new Error(json.error || 'Failed to create source');
+      }
     } catch (error: any) {
       console.error('Failed to create source:', error);
-      toast.error(error.message || 'Failed to create source');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create source';
+      toast.error(errorMsg);
     }
   };
 

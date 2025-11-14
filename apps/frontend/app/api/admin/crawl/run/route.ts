@@ -16,6 +16,14 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
+    // Handle 401 - redirect to login
+    if (res.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
     if (!res.ok) {
       const errorText = await res.text().catch(() => 'Unknown error');
       let errorData;

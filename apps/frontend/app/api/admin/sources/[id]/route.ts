@@ -19,6 +19,14 @@ export async function PATCH(
       body: JSON.stringify(body),
     });
 
+    // Handle 401 - redirect to login
+    if (response.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       let errorData;
@@ -28,7 +36,7 @@ export async function PATCH(
         errorData = { detail: errorText };
       }
       return NextResponse.json(
-        { status: 'error', error: errorData.detail || `HTTP ${response.status}: ${errorText}` },
+        { status: 'error', error: errorData.detail || errorData.error || `HTTP ${response.status}: ${errorText}` },
         { status: response.status }
       );
     }
@@ -64,6 +72,14 @@ export async function DELETE(
       credentials: 'include',
     });
 
+    // Handle 401 - redirect to login
+    if (response.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       let errorData;
@@ -73,7 +89,7 @@ export async function DELETE(
         errorData = { detail: errorText };
       }
       return NextResponse.json(
-        { status: 'error', error: errorData.detail || `HTTP ${response.status}: ${errorText}` },
+        { status: 'error', error: errorData.detail || errorData.error || `HTTP ${response.status}: ${errorText}` },
         { status: response.status }
       );
     }

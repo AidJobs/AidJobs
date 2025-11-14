@@ -67,8 +67,32 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Cookie': request.headers.get('cookie') || '',
       },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
+
+    // Handle 401 - redirect to login
+    if (response.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('Sources create error:', response.status, errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { detail: errorText };
+      }
+      return NextResponse.json(
+        { status: 'error', error: errorData.detail || errorData.error || `HTTP ${response.status}: ${errorText}` },
+        { status: response.status }
+      );
+    }
 
     const data = await response.json();
     
@@ -80,8 +104,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('API proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
     return NextResponse.json(
-      { status: 'error', error: 'Internal server error' },
+      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
       { status: 500 }
     );
   }

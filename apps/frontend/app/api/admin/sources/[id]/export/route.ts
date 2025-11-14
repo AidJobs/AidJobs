@@ -15,6 +15,14 @@ export async function GET(
       credentials: 'include',
     });
 
+    // Handle 401 - redirect to login
+    if (response.status === 401) {
+      return NextResponse.json(
+        { status: 'error', error: 'Authentication required', authenticated: false },
+        { status: 401 }
+      );
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       let errorData;
