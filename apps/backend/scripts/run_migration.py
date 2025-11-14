@@ -45,16 +45,27 @@ def main():
         sys.exit(1)
     
     try:
-        # Check current columns
-        print("Checking current columns...")
+        # Check current columns in sources table
+        print("Checking current columns in sources table...")
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'sources'
             ORDER BY column_name
         """)
-        existing_columns = {row[0] for row in cursor.fetchall()}
-        print(f"  Found {len(existing_columns)} existing column(s)")
+        existing_sources_columns = {row[0] for row in cursor.fetchall()}
+        print(f"  Found {len(existing_sources_columns)} existing column(s) in sources")
+        
+        # Check current columns in jobs table
+        print("Checking current columns in jobs table...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'jobs'
+            ORDER BY column_name
+        """)
+        existing_jobs_columns = {row[0] for row in cursor.fetchall()}
+        print(f"  Found {len(existing_jobs_columns)} existing column(s) in jobs")
         
         # Migration SQL
         migration_sql = """
@@ -85,40 +96,90 @@ def main():
         -- Add consecutive_nochange column (used for tracking unchanged crawls)
         ALTER TABLE sources 
             ADD COLUMN IF NOT EXISTS consecutive_nochange INT DEFAULT 0;
+        
+        -- Add taxonomy columns to jobs table (required for search functionality)
+        ALTER TABLE jobs
+            ADD COLUMN IF NOT EXISTS org_type TEXT,
+            ADD COLUMN IF NOT EXISTS career_type TEXT,
+            ADD COLUMN IF NOT EXISTS contract_type TEXT,
+            ADD COLUMN IF NOT EXISTS work_modality TEXT,
+            ADD COLUMN IF NOT EXISTS country_name TEXT,
+            ADD COLUMN IF NOT EXISTS region_code TEXT,
+            ADD COLUMN IF NOT EXISTS level_norm TEXT,
+            ADD COLUMN IF NOT EXISTS mission_tags TEXT[],
+            ADD COLUMN IF NOT EXISTS crisis_type TEXT[],
+            ADD COLUMN IF NOT EXISTS response_phase TEXT,
+            ADD COLUMN IF NOT EXISTS humanitarian_cluster TEXT[],
+            ADD COLUMN IF NOT EXISTS benefits TEXT[],
+            ADD COLUMN IF NOT EXISTS policy_flags TEXT[],
+            ADD COLUMN IF NOT EXISTS donor_context TEXT[],
+            ADD COLUMN IF NOT EXISTS international_eligible BOOLEAN;
         """
         
         print("\nRunning migration...")
         cursor.execute(migration_sql)
         
-        # Verify columns were added
+        # Verify columns were added to sources table
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'sources'
             ORDER BY column_name
         """)
-        new_columns = {row[0] for row in cursor.fetchall()}
+        new_sources_columns = {row[0] for row in cursor.fetchall()}
         
-        added_columns = new_columns - existing_columns
+        added_sources_columns = new_sources_columns - existing_sources_columns
         
-        required_columns = {
+        required_sources_columns = {
             'org_type', 'notes', 'time_window', 'next_run_at',
             'last_crawl_message', 'consecutive_failures', 'consecutive_nochange'
         }
-        if required_columns.issubset(new_columns):
-            if added_columns:
-                print(f"[OK] Added {len(added_columns)} column(s): {', '.join(sorted(added_columns))}")
+        if required_sources_columns.issubset(new_sources_columns):
+            if added_sources_columns:
+                print(f"[OK] Added {len(added_sources_columns)} column(s) to sources: {', '.join(sorted(added_sources_columns))}")
             else:
-                print("[OK] All required columns already exist (idempotent)")
+                print("[OK] All required columns already exist in sources (idempotent)")
         else:
-            missing = required_columns - new_columns
-            print(f"[WARN] Warning: Columns still missing: {', '.join(sorted(missing))}")
+            missing = required_sources_columns - new_sources_columns
+            print(f"[WARN] Warning: Columns still missing in sources: {', '.join(sorted(missing))}")
         
-        # Show final column list
+        # Verify columns were added to jobs table
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'jobs'
+            ORDER BY column_name
+        """)
+        new_jobs_columns = {row[0] for row in cursor.fetchall()}
+        
+        added_jobs_columns = new_jobs_columns - existing_jobs_columns
+        
+        required_jobs_columns = {
+            'org_type', 'career_type', 'contract_type', 'work_modality',
+            'country_name', 'region_code', 'level_norm', 'mission_tags',
+            'crisis_type', 'response_phase', 'humanitarian_cluster',
+            'benefits', 'policy_flags', 'donor_context', 'international_eligible'
+        }
+        if required_jobs_columns.issubset(new_jobs_columns):
+            if added_jobs_columns:
+                print(f"[OK] Added {len(added_jobs_columns)} column(s) to jobs: {', '.join(sorted(added_jobs_columns))}")
+            else:
+                print("[OK] All required columns already exist in jobs (idempotent)")
+        else:
+            missing = required_jobs_columns - new_jobs_columns
+            print(f"[WARN] Warning: Columns still missing in jobs: {', '.join(sorted(missing))}")
+        
+        # Show final column lists
         print("\nFinal columns in sources table:")
         print("-" * 60)
-        for col in sorted(new_columns):
-            marker = "[OK]" if col in required_columns else "   "
+        for col in sorted(new_sources_columns):
+            marker = "[OK]" if col in required_sources_columns else "   "
+            print(f"  {marker} {col}")
+        
+        print("\nFinal columns in jobs table (showing taxonomy columns):")
+        print("-" * 60)
+        for col in sorted(new_jobs_columns):
+            marker = "[OK]" if col in required_jobs_columns else "   "
             print(f"  {marker} {col}")
         
         print("\n" + "=" * 60)
