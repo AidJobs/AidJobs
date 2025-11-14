@@ -39,9 +39,9 @@ def main():
         conn = psycopg2.connect(**conn_params, connect_timeout=10)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
-        print("✓ Connected to database\n")
+        print("[OK] Connected to database\n")
     except psycopg2.OperationalError as e:
-        print(f"✗ Connection failed: {e}")
+        print(f"[ERROR] Connection failed: {e}")
         sys.exit(1)
     
     try:
@@ -65,6 +65,10 @@ def main():
         -- Add notes column (used in find_earn.py when creating sources from submissions)
         ALTER TABLE sources 
             ADD COLUMN IF NOT EXISTS notes TEXT;
+        
+        -- Add time_window column (used for RSS feed time window configuration)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS time_window TEXT;
         """
         
         print("\nRunning migration...")
@@ -81,31 +85,28 @@ def main():
         
         added_columns = new_columns - existing_columns
         
-        if 'org_type' in new_columns and 'notes' in new_columns:
+        required_columns = {'org_type', 'notes', 'time_window'}
+        if required_columns.issubset(new_columns):
             if added_columns:
-                print(f"✓ Added {len(added_columns)} column(s): {', '.join(sorted(added_columns))}")
+                print(f"[OK] Added {len(added_columns)} column(s): {', '.join(sorted(added_columns))}")
             else:
-                print("✓ All required columns already exist (idempotent)")
+                print("[OK] All required columns already exist (idempotent)")
         else:
-            missing = []
-            if 'org_type' not in new_columns:
-                missing.append('org_type')
-            if 'notes' not in new_columns:
-                missing.append('notes')
-            print(f"⚠ Warning: Columns still missing: {', '.join(missing)}")
+            missing = required_columns - new_columns
+            print(f"[WARN] Warning: Columns still missing: {', '.join(sorted(missing))}")
         
         # Show final column list
         print("\nFinal columns in sources table:")
         print("-" * 60)
         for col in sorted(new_columns):
-            marker = "✓" if col in ['org_type', 'notes'] else " "
+            marker = "[OK]" if col in ['org_type', 'notes', 'time_window'] else "   "
             print(f"  {marker} {col}")
         
         print("\n" + "=" * 60)
-        print("✓ Migration completed successfully")
+        print("[OK] Migration completed successfully")
         
     except Exception as e:
-        print(f"\n✗ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
