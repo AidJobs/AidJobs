@@ -347,6 +347,7 @@ def delete_source(
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        logger.info(f"[sources] Deleting source {source_id}")
         cursor.execute("""
             UPDATE sources
             SET status = 'deleted', updated_at = NOW()
@@ -357,6 +358,7 @@ def delete_source(
         deleted = cursor.fetchone()
         
         if not deleted:
+            logger.warning(f"[sources] Source {source_id} not found for deletion")
             raise HTTPException(status_code=404, detail="Source not found")
         
         conn.commit()
@@ -403,6 +405,7 @@ async def test_source(
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        logger.info(f"[sources] Testing source {source_id}")
         cursor.execute("""
             SELECT id::text, careers_url, source_type, parser_hint FROM sources WHERE id::text = %s
         """, (source_id,))
@@ -410,6 +413,7 @@ async def test_source(
         source = cursor.fetchone()
         
         if not source:
+            logger.warning(f"[sources] Source {source_id} not found for testing")
             raise HTTPException(status_code=404, detail="Source not found")
         
         url = source['careers_url']
