@@ -21,7 +21,18 @@ logger = logging.getLogger(__name__)
 # Common job listing selectors (heuristics)
 JOB_SELECTORS = [
     '.job-listing', '.job-item', '.career-item', '.position',
-    'article.job', 'div.vacancy', 'tr.job-row', 'li.job'
+    'article.job', 'div.vacancy', 'tr.job-row', 'li.job',
+    # Additional common patterns
+    '[class*="job"]', '[class*="position"]', '[class*="vacancy"]', '[class*="career"]',
+    '[class*="opening"]', '[id*="job"]', '[id*="position"]', '[id*="vacancy"]',
+    'article[class*="job"]', 'div[class*="job"]', 'li[class*="job"]',
+    'tr[class*="job"]', 'section[class*="job"]', 'div[class*="position"]',
+    # Table-based listings
+    'tbody tr', 'table tr[data-job]', 'table tr[data-position]',
+    # List-based listings
+    'ul.jobs li', 'ol.jobs li', 'ul.positions li', 'ul.vacancies li',
+    # Card-based listings
+    '.card[class*="job"]', '.card[class*="position"]', '[role="article"]'
 ]
 
 # Location patterns for parsing
@@ -124,11 +135,41 @@ class HTMLCrawler:
             all_links = soup.find_all('a', href=True)
             job_links = [
                 link for link in all_links
-                if any(keyword in link.get_text().lower() for keyword in ['position', 'job', 'vacancy', 'career', 'opening'])
+                if any(keyword in link.get_text().lower() for keyword in [
+                    'position', 'job', 'vacancy', 'career', 'opening', 'opportunity',
+                    'recruitment', 'hiring', 'apply', 'application', 'posting'
+                ]) or any(keyword in link.get('href', '').lower() for keyword in [
+                    '/job', '/position', '/vacancy', '/career', '/opening', '/opportunity',
+                    '/recruitment', '/hiring', '/apply', '/application', '/posting'
+                ])
             ]
             if job_links:
                 logger.debug(f"[html_fetch] Found {len(job_links)} job links")
                 job_elements = job_links[:50]  # Limit to first 50
+        
+        # Last resort: try finding structured data (JSON-LD, microdata)
+        if not job_elements:
+            # Look for JSON-LD structured data
+            json_ld_scripts = soup.find_all('script', type='application/ld+json')
+            for script in json_ld_scripts:
+                try:
+                    import json
+                    data = json.loads(script.string)
+                    if isinstance(data, dict) and data.get('@type') == 'JobPosting':
+                        # Create a synthetic element for this job
+                        job_elements.append(data)
+                    elif isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict) and item.get('@type') == 'JobPosting':
+                                job_elements.append(item)
+                except:
+                    pass
+            
+            # Look for microdata
+            microdata_jobs = soup.find_all(attrs={'itemtype': lambda x: x and 'JobPosting' in x})
+            if microdata_jobs:
+                logger.debug(f"[html_fetch] Found {len(microdata_jobs)} jobs via microdata")
+                job_elements = microdata_jobs[:50]
         
         # Extract data from each element
         for elem in job_elements:
@@ -140,9 +181,56 @@ class HTMLCrawler:
         return jobs
     
     def _extract_job_from_element(self, elem, base_url: str) -> Optional[Dict]:
-        """Extract job data from a single HTML element"""
+        """Extract job data from a single HTML element or JSON-LD dict"""
         job = {}
         
+        # Handle JSON-LD structured data (dict)
+        if isinstance(elem, dict):
+            job['title'] = elem.get('title') or elem.get('name') or ''
+            if not job['title']:
+                return None
+            
+            # Apply URL from structured data
+            if 'url' in elem:
+                job['apply_url'] = elem['url']
+            elif 'applicationUrl' in elem:
+                job['apply_url'] = elem['applicationUrl']
+            elif 'identifier' in elem and isinstance(elem['identifier'], dict):
+                job['apply_url'] = elem['identifier'].get('value', base_url)
+            else:
+                job['apply_url'] = base_url
+            
+            # Location from structured data
+            if 'jobLocation' in elem:
+                location = elem['jobLocation']
+                if isinstance(location, dict):
+                    if 'address' in location:
+                        addr = location['address']
+                        if isinstance(addr, dict):
+                            parts = []
+                            if 'addressLocality' in addr:
+                                parts.append(addr['addressLocality'])
+                            if 'addressCountry' in addr:
+                                parts.append(addr['addressCountry'])
+                            job['location_raw'] = ', '.join(parts) if parts else None
+                    elif 'name' in location:
+                        job['location_raw'] = location['name']
+            
+            # Description from structured data
+            if 'description' in elem:
+                job['description_snippet'] = elem['description'][:500] if elem['description'] else None
+            
+            # Deadline from structured data
+            if 'validThrough' in elem:
+                try:
+                    from dateutil import parser as date_parser
+                    job['deadline'] = date_parser.parse(elem['validThrough']).date()
+                except:
+                    pass
+            
+            return job
+        
+        # Handle HTML elements
         # Title
         title_elem = elem.find(['h1', 'h2', 'h3', 'h4', 'a'])
         if title_elem:

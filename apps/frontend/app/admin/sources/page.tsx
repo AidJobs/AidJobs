@@ -1037,21 +1037,83 @@ export default function AdminSourcesPage() {
                               Edit
                             </span>
                           </button>
-                          <button
-                            onClick={() => handleDeleteSource(source.id)}
-                            disabled={deletingSourceId === source.id}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                            title="Delete"
-                          >
-                            {deletingSourceId === source.id ? (
-                              <div className="w-4 h-4 border-2 border-[#FF3B30] border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4 text-[#FF3B30]" />
-                            )}
-                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                              Delete
-                            </span>
-                          </button>
+                          {source.status === 'deleted' ? (
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Are you sure you want to permanently delete this source? This action cannot be undone and will delete all associated crawl logs.')) return;
+                                
+                                setDeletingSourceId(source.id);
+                                try {
+                                  toast.info('Permanently deleting source...');
+                                  
+                                  const res = await fetch(`/api/admin/sources/${source.id}/permanent`, {
+                                    method: 'DELETE',
+                                    credentials: 'include',
+                                  });
+
+                                  if (res.status === 401) {
+                                    router.push('/admin/login');
+                                    return;
+                                  }
+
+                                  if (!res.ok) {
+                                    const errorText = await res.text().catch(() => 'Unknown error');
+                                    console.error('Permanent delete error:', res.status, errorText);
+                                    let errorData;
+                                    try {
+                                      errorData = JSON.parse(errorText);
+                                    } catch {
+                                      errorData = { error: errorText, detail: errorText };
+                                    }
+                                    const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to permanently delete source`;
+                                    throw new Error(errorMsg);
+                                  }
+
+                                  const json = await res.json();
+                                  if (json.status === 'ok') {
+                                    toast.success('Source permanently deleted');
+                                    fetchSources();
+                                  } else {
+                                    throw new Error(json.error || 'Failed to permanently delete source');
+                                  }
+                                } catch (error: any) {
+                                  console.error('Failed to permanently delete source:', error);
+                                  const errorMsg = error instanceof Error ? error.message : 'Failed to permanently delete source';
+                                  toast.error(errorMsg);
+                                } finally {
+                                  setDeletingSourceId(null);
+                                }
+                              }}
+                              disabled={deletingSourceId === source.id}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#FF3B30] hover:bg-[#FF2D20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                              title="Permanently delete"
+                            >
+                              {deletingSourceId === source.id ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-white" />
+                              )}
+                              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                                Permanently delete
+                              </span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDeleteSource(source.id)}
+                              disabled={deletingSourceId === source.id}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                              title="Delete"
+                            >
+                              {deletingSourceId === source.id ? (
+                                <div className="w-4 h-4 border-2 border-[#FF3B30] border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-[#FF3B30]" />
+                              )}
+                              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                                Delete
+                              </span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleTestSource(source.id)}
                             disabled={testLoading}
@@ -1654,7 +1716,7 @@ export default function AdminSourcesPage() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black bg-opacity-30 z-40 transition-opacity"
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
             onClick={() => {
               setShowCrawlDetails(false);
               setSelectedSourceForDetails(null);
@@ -1720,128 +1782,181 @@ export default function AdminSourcesPage() {
                     </div>
                   </div>
 
-                  {/* Last Crawl Details - Always show most recent data */}
-                  {(() => {
-                    // Prioritize crawl logs if available, otherwise use source data
-                    const lastLog = crawlLogs.length > 0 ? crawlLogs[0] : null;
-                    const hasCrawlData = lastLog || selectedSourceForDetails.last_crawled_at;
-                    
-                    if (lastLog) {
-                      // Show detailed crawl log data
-                      return (
-                        <div>
-                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                          <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
-                            <div>
-                              <span className="text-caption-sm text-[#86868B]">Status:</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                {lastLog.status === 'ok' || lastLog.status === 'success' ? (
-                                  <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                                ) : lastLog.status === 'fail' || lastLog.status === 'error' ? (
-                                  <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                                ) : (
-                                  <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
-                                )}
-                                <span className="text-body-sm text-[#1D1D1F] capitalize">{lastLog.status || 'Unknown'}</span>
+                  {/* Last Crawl Details - Always show consistent structure */}
+                  <div>
+                    <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                    <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
+                      {(() => {
+                        // Prioritize crawl logs if available, otherwise use source data
+                        const lastLog = crawlLogs.length > 0 ? crawlLogs[0] : null;
+                        const hasLogData = lastLog && (lastLog.status || lastLog.ran_at);
+                        const hasSourceData = selectedSourceForDetails.last_crawled_at;
+                        
+                        if (hasLogData) {
+                          // Show detailed crawl log data
+                          return (
+                            <>
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Status:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {lastLog.status === 'ok' || lastLog.status === 'success' ? (
+                                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                                  ) : lastLog.status === 'fail' || lastLog.status === 'error' ? (
+                                    <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                                  ) : (
+                                    <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                                  )}
+                                  <span className="text-body-sm text-[#1D1D1F] capitalize">{lastLog.status || 'Unknown'}</span>
+                                </div>
                               </div>
-                            </div>
-                            
-                            {lastLog.ran_at && (
+                              
+                              {lastLog.ran_at && (
+                                <div>
+                                  <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(lastLog.ran_at)}</p>
+                                </div>
+                              )}
+
+                              {lastLog.duration_ms !== null && lastLog.duration_ms !== undefined && (
+                                <div>
+                                  <span className="text-caption-sm text-[#86868B]">Duration:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1">
+                                    {lastLog.duration_ms < 1000 
+                                      ? `${lastLog.duration_ms}ms` 
+                                      : `${(lastLog.duration_ms / 1000).toFixed(1)}s`}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Job Counts - Always show grid */}
+                              <div className="pt-2 border-t border-[#D2D2D7]">
+                                <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Found</div>
+                                    <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Inserted</div>
+                                    <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Updated</div>
+                                    <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Skipped</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {lastLog.message && (
+                                <div className="pt-2 border-t border-[#D2D2D7]">
+                                  <span className="text-caption-sm text-[#86868B]">Message:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{lastLog.message}</p>
+                                </div>
+                              )}
+                            </>
+                          );
+                        } else if (hasSourceData) {
+                          // Fallback to source data if no logs available
+                          return (
+                            <>
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Status:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
+                                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                                  ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
+                                    <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                                  ) : selectedSourceForDetails.last_crawl_status ? (
+                                    <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                                  ) : (
+                                    <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                                  )}
+                                  <span className="text-body-sm text-[#1D1D1F] capitalize">
+                                    {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
+                                  </span>
+                                </div>
+                              </div>
+                              {selectedSourceForDetails.last_crawl_message && (
+                                <div>
+                                  <span className="text-caption-sm text-[#86868B]">Message:</span>
+                                  <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{selectedSourceForDetails.last_crawl_message}</p>
+                                </div>
+                              )}
                               <div>
                                 <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
-                                <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(lastLog.ran_at)}</p>
+                                <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
                               </div>
-                            )}
-
-                            {lastLog.duration_ms !== null && lastLog.duration_ms !== undefined && (
-                              <div>
-                                <span className="text-caption-sm text-[#86868B]">Duration:</span>
-                                <p className="text-body-sm text-[#1D1D1F] mt-1">
-                                  {lastLog.duration_ms < 1000 
-                                    ? `${lastLog.duration_ms}ms` 
-                                    : `${(lastLog.duration_ms / 1000).toFixed(1)}s`}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Job Counts */}
-                            <div className="pt-2 border-t border-[#D2D2D7]">
-                              <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-white rounded-lg p-2">
-                                  <div className="text-caption-sm text-[#86868B]">Found</div>
-                                  <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
-                                </div>
-                                <div className="bg-white rounded-lg p-2">
-                                  <div className="text-caption-sm text-[#86868B]">Inserted</div>
-                                  <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
-                                </div>
-                                <div className="bg-white rounded-lg p-2">
-                                  <div className="text-caption-sm text-[#86868B]">Updated</div>
-                                  <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
-                                </div>
-                                <div className="bg-white rounded-lg p-2">
-                                  <div className="text-caption-sm text-[#86868B]">Skipped</div>
-                                  <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {lastLog.message && (
+                              {/* Job Counts placeholder for consistency */}
                               <div className="pt-2 border-t border-[#D2D2D7]">
-                                <span className="text-caption-sm text-[#86868B]">Message:</span>
-                                <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{lastLog.message}</p>
+                                <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Found</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Inserted</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Updated</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Skipped</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    } else if (selectedSourceForDetails.last_crawled_at) {
-                      // Fallback to source data if no logs available
-                      return (
-                        <div>
-                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                          <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
-                            <div>
-                              <span className="text-caption-sm text-[#86868B]">Status:</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
-                                  <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                                ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
-                                  <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                                ) : selectedSourceForDetails.last_crawl_status ? (
-                                  <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
-                                ) : null}
-                                <span className="text-body-sm text-[#1D1D1F] capitalize">
-                                  {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
-                                </span>
-                              </div>
-                            </div>
-                            {selectedSourceForDetails.last_crawl_message && (
+                            </>
+                          );
+                        } else {
+                          // No crawl data available - show placeholder structure
+                          return (
+                            <>
                               <div>
-                                <span className="text-caption-sm text-[#86868B]">Message:</span>
-                                <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{selectedSourceForDetails.last_crawl_message}</p>
+                                <span className="text-caption-sm text-[#86868B]">Status:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
+                                  <span className="text-body-sm text-[#86868B]">No crawl history</span>
+                                </div>
                               </div>
-                            )}
-                            <div>
-                              <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
-                              <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    } else {
-                      // No crawl data available
-                      return (
-                        <div>
-                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                          <div className="bg-[#F5F5F7] rounded-lg p-3">
-                            <p className="text-body-sm text-[#86868B]">No crawl history available</p>
-                          </div>
-                        </div>
-                      );
-                    }
-                  })()}
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                                <p className="text-body-sm text-[#86868B] mt-1">-</p>
+                              </div>
+                              {/* Job Counts placeholder for consistency */}
+                              <div className="pt-2 border-t border-[#D2D2D7]">
+                                <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Found</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Inserted</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Updated</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-caption-sm text-[#86868B]">Skipped</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">-</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        }
+                      })()}
+                    </div>
+                  </div>
 
                   {/* Crawl Statistics */}
                   <div>
