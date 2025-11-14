@@ -320,7 +320,10 @@ export default function AdminSourcesPage() {
       }
     } catch (error) {
       console.error('Failed to export source:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to export source');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to export source';
+      toast.error(errorMsg);
+    } finally {
+      setExportingSourceId(null);
     }
   };
 
