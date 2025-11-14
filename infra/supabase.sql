@@ -199,6 +199,7 @@ CREATE TABLE IF NOT EXISTS sources (
     consecutive_nochange INT DEFAULT 0,
     parser_hint TEXT,
     time_window TEXT,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -210,7 +211,8 @@ ALTER TABLE sources
     ADD COLUMN IF NOT EXISTS last_crawl_message TEXT,
     ADD COLUMN IF NOT EXISTS consecutive_failures INT DEFAULT 0,
     ADD COLUMN IF NOT EXISTS consecutive_nochange INT DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS time_window TEXT;
+    ADD COLUMN IF NOT EXISTS time_window TEXT,
+    ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- Create indexes for sources table
 CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);

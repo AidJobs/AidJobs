@@ -756,11 +756,14 @@ async def simulate_extract(
             )
         elif source_type == 'rss':
             from crawler.rss_fetch import fetch_rss_jobs
+            # time_window is a string like "22:00-05:00", not a number
+            # RSS crawler doesn't use time_window_days parameter in fetch_rss_jobs
+            # It's stored but not used in the current implementation
             jobs = await fetch_rss_jobs(
                 url=source['careers_url'],
                 org_name=source['org_name'],
                 org_type=source['org_type'],
-                time_window_days=int(source['time_window']) if source['time_window'] else None,
+                time_window_days=None,  # Not currently used in RSS crawler
                 conn_params=conn_params
             )
         elif source_type == 'api':
