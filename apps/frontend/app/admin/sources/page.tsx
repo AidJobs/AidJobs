@@ -244,8 +244,18 @@ export default function AdminSourcesPage() {
 
   const handleAddSource = async () => {
     try {
-      // Validate JSON for API sources
-      if (formData.source_type === 'api' && formData.parser_hint) {
+      // Validate required fields
+      if (!formData.careers_url) {
+        toast.error('Source URL is required');
+        return;
+      }
+
+      // Validate JSON for API sources (required)
+      if (formData.source_type === 'api') {
+        if (!formData.parser_hint || !formData.parser_hint.trim()) {
+          toast.error('API Configuration (JSON) is required for API sources');
+          return;
+        }
         try {
           const parsed = JSON.parse(formData.parser_hint);
           if (parsed.v !== 1) {
@@ -253,7 +263,7 @@ export default function AdminSourcesPage() {
             return;
           }
         } catch (e) {
-          toast.error('Invalid JSON in parser_hint. Please check the syntax.');
+          toast.error('Invalid JSON in API Configuration. Please check the syntax.');
           return;
         }
       }
@@ -292,8 +302,18 @@ export default function AdminSourcesPage() {
     if (!editingSource) return;
 
     try {
-      // Validate JSON for API sources
-      if (formData.source_type === 'api' && formData.parser_hint) {
+      // Validate required fields
+      if (!formData.careers_url) {
+        toast.error('Source URL is required');
+        return;
+      }
+
+      // Validate JSON for API sources (required)
+      if (formData.source_type === 'api') {
+        if (!formData.parser_hint || !formData.parser_hint.trim()) {
+          toast.error('API Configuration (JSON) is required for API sources');
+          return;
+        }
         try {
           const parsed = JSON.parse(formData.parser_hint);
           if (parsed.v !== 1) {
@@ -301,7 +321,7 @@ export default function AdminSourcesPage() {
             return;
           }
         } catch (e) {
-          toast.error('Invalid JSON in parser_hint. Please check the syntax.');
+          toast.error('Invalid JSON in API Configuration. Please check the syntax.');
           return;
         }
       }
@@ -563,7 +583,7 @@ export default function AdminSourcesPage() {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
-                className="border border-[#D2D2D7] rounded px-3 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                className="border border-[#D2D2D7] rounded-lg px-3 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
               >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
@@ -580,7 +600,7 @@ export default function AdminSourcesPage() {
                   setSearchQuery(e.target.value);
                   setPage(1);
                 }}
-                className="w-full border border-[#D2D2D7] rounded px-3 py-1.5 bg-white text-[#1D1D1F] text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                className="w-full border border-[#D2D2D7] rounded-lg px-3 py-1.5 bg-white text-[#1D1D1F] text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
               />
             </div>
           </div>
@@ -761,7 +781,7 @@ export default function AdminSourcesPage() {
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 border border-[#D2D2D7] rounded text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
+                  className="px-3 py-1.5 border border-[#D2D2D7] rounded-lg text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
                 >
                   Previous
                 </button>
@@ -771,7 +791,7 @@ export default function AdminSourcesPage() {
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1.5 border border-[#D2D2D7] rounded text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
+                  className="px-3 py-1.5 border border-[#D2D2D7] rounded-lg text-caption text-[#1D1D1F] disabled:opacity-50 hover:bg-[#F5F5F7] transition-colors"
                 >
                   Next
                 </button>
@@ -792,7 +812,7 @@ export default function AdminSourcesPage() {
                     {showAddModal ? 'Add Source' : 'Edit Source'}
                   </h2>
                   <p className="text-caption text-[#86868B] mt-0.5">
-                    {showAddModal ? 'Add a new job board source' : 'Update source configuration'}
+                    {showAddModal ? 'Add a new source (URL, API, RSS, or JSON)' : 'Update source configuration'}
                   </p>
                 </div>
                 <button
@@ -809,48 +829,40 @@ export default function AdminSourcesPage() {
                 </button>
               </div>
 
-              {/* Preset Selection - Simplified */}
-              {showAddModal && presets.length > 0 && (
-                <div className="mb-3 p-2.5 bg-gradient-to-r from-[#F5F5F7] to-white border border-[#D2D2D7] rounded-lg">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-[#0071E3]" />
-                    <label className="text-caption font-medium text-[#1D1D1F]">
-                      Quick Start
-                    </label>
-                  </div>
-                  <select
-                    value={selectedPreset}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handlePresetSelect(e.target.value);
-                      } else {
-                        handleClearPreset();
-                      }
-                    }}
-                    className="w-full border border-[#D2D2D7] rounded px-2.5 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                  >
-                    <option value="">Start from scratch</option>
-                    {presets.map((preset) => (
-                      <option key={preset.name} value={preset.name}>
-                        {preset.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* Essential Fields */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Careers URL <span className="text-[#FF3B30]">*</span>
+                    Source Type <span className="text-[#FF3B30]">*</span>
+                  </label>
+                  <select
+                    value={formData.source_type}
+                    onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
+                    className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
+                  >
+                    <option value="html">HTML (Web Page / URL)</option>
+                    <option value="rss">RSS Feed</option>
+                    <option value="api">API (JSON/REST)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
+                    {formData.source_type === 'api' ? 'Base URL or Endpoint' : formData.source_type === 'rss' ? 'RSS Feed URL' : 'Source URL'} <span className="text-[#FF3B30]">*</span>
                   </label>
                   <input
                     type="url"
                     value={formData.careers_url}
                     onChange={(e) => setFormData({ ...formData, careers_url: e.target.value })}
                     className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
-                    placeholder="https://example.org/careers"
+                    placeholder={
+                      formData.source_type === 'api' 
+                        ? 'https://api.example.com or https://api.example.com/jobs'
+                        : formData.source_type === 'rss'
+                        ? 'https://example.org/feed.xml'
+                        : 'https://example.org/careers'
+                    }
                     required
                   />
                 </div>
@@ -864,24 +876,29 @@ export default function AdminSourcesPage() {
                     value={formData.org_name}
                     onChange={(e) => setFormData({ ...formData, org_name: e.target.value })}
                     className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
-                    placeholder="e.g., UNICEF"
+                    placeholder="Organization name (optional)"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                    Source Type
-                  </label>
-                  <select
-                    value={formData.source_type}
-                    onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
-                    className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
-                  >
-                    <option value="html">HTML (Web Page)</option>
-                    <option value="rss">RSS Feed</option>
-                    <option value="api">API</option>
-                  </select>
-                </div>
+                {/* API Configuration - Show immediately when API is selected */}
+                {formData.source_type === 'api' && (
+                  <div>
+                    <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
+                      API Configuration (JSON v1 schema) <span className="text-[#FF3B30]">*</span>
+                    </label>
+                    <textarea
+                      value={formData.parser_hint}
+                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                      className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] font-mono text-caption-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                      placeholder='{"v": 1, "base_url": "https://api.example.com", "path": "/jobs", "auth": {...}}'
+                      rows={6}
+                      required
+                    />
+                    <p className="mt-1 text-caption-sm text-[#86868B]">
+                      Must include version field (v: 1). Use SECRET:NAME for secrets.
+                    </p>
+                  </div>
+                )}
 
                 {/* Advanced Options - Collapsible */}
                 <div className="border-t border-[#D2D2D7] pt-3">
@@ -927,24 +944,6 @@ export default function AdminSourcesPage() {
                           <span className="text-caption-sm text-[#86868B]">days</span>
                         </div>
                       </div>
-
-                      {formData.source_type === 'api' && (
-                        <div>
-                          <label className="block text-caption-sm font-medium text-[#86868B] mb-1">
-                            API Configuration (JSON v1 schema)
-                          </label>
-                          <textarea
-                            value={formData.parser_hint}
-                            onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                            className="w-full border border-[#D2D2D7] rounded-lg px-2.5 py-1.5 bg-white text-[#1D1D1F] font-mono text-caption-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                            placeholder='{"v": 1, "base_url": "https://example.com", "path": "/jobs", ...}'
-                            rows={6}
-                          />
-                          <p className="mt-1 text-caption-sm text-[#86868B]">
-                            Must include version field (v: 1). Use SECRET:NAME for secrets.
-                          </p>
-                        </div>
-                      )}
 
                       {formData.source_type !== 'api' && (
                         <div>
