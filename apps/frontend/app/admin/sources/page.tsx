@@ -302,7 +302,14 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error('Export source error:', res.status, errorText, 'Source ID:', id);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, detail: errorText };
+        }
         const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to export source`;
         throw new Error(errorMsg);
       }
@@ -533,7 +540,14 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error('Delete source error:', res.status, errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, detail: errorText };
+        }
         const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to delete source`;
         throw new Error(errorMsg);
       }
@@ -578,7 +592,14 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error('Toggle status error:', res.status, errorText, 'Source ID:', source.id);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, detail: errorText };
+        }
         const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to update status`;
         throw new Error(errorMsg);
       }
@@ -614,8 +635,18 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to test source');
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error('Test source error:', res.status, errorText, 'Source ID:', id);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, detail: errorText };
+        }
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to test source`;
+        setTestResult({ ok: false, error: errorMsg });
+        toast.error(errorMsg);
+        return;
       }
 
       const result = await res.json();
@@ -653,8 +684,18 @@ export default function AdminSourcesPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to simulate extract');
+        const errorText = await res.text().catch(() => 'Unknown error');
+        console.error('Simulate extract error:', res.status, errorText, 'Source ID:', id);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText, detail: errorText };
+        }
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to simulate extract`;
+        setSimulateResult({ ok: false, error: errorMsg });
+        toast.error(errorMsg);
+        return;
       }
 
       const result = await res.json();
@@ -1338,65 +1379,65 @@ export default function AdminSourcesPage() {
 
               {testLoading ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D1D1F]"></div>
-                  <p className="mt-4 text-caption text-[#86868B]">Testing source...</p>
+                  <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="mt-3 text-caption text-[#86868B]">Testing source...</p>
                 </div>
               ) : testResult ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className={`p-3 rounded-lg ${testResult.ok ? 'bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30' : 'bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30'}`}>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <div className={`w-2 h-2 rounded-full ${testResult.ok ? 'bg-[#30D158]' : 'bg-[#FF3B30]'}`}></div>
-                      <span className={`text-body font-semibold ${testResult.ok ? 'text-[#30D158]' : 'text-[#FF3B30]'}`}>
+                      <span className={`text-body-sm font-semibold ${testResult.ok ? 'text-[#30D158]' : 'text-[#FF3B30]'}`}>
                         {testResult.ok ? 'Test Passed' : 'Test Failed'}
                       </span>
                     </div>
                     {testResult.error && (
-                      <p className="text-caption text-[#FF3B30]">{testResult.error}</p>
+                      <p className="text-caption text-[#FF3B30] mt-1">{testResult.error}</p>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-caption font-medium text-[#86868B] mb-1">Status Code</label>
+                      <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Status Code</label>
                       <p className="text-body-sm text-[#1D1D1F]">{testResult.status ?? 'N/A'}</p>
                     </div>
                     <div>
-                      <label className="block text-caption font-medium text-[#86868B] mb-1">Host</label>
+                      <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Host</label>
                       <p className="text-body-sm text-[#1D1D1F]">{testResult.host ?? 'N/A'}</p>
                     </div>
                     {testResult.count !== undefined && (
                       <div>
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">Jobs Found</label>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Jobs Found</label>
                         <p className="text-body-sm text-[#1D1D1F]">{testResult.count}</p>
                       </div>
                     )}
                     {testResult.message && (
                       <div className="col-span-2">
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">Message</label>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Message</label>
                         <p className="text-body-sm text-[#1D1D1F]">{testResult.message}</p>
                       </div>
                     )}
                     {testResult.size && (
                       <div>
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">Content Size</label>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Content Size</label>
                         <p className="text-body-sm text-[#1D1D1F]">{testResult.size} bytes</p>
                       </div>
                     )}
                     {testResult.etag && (
                       <div>
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">ETag</label>
-                        <p className="text-caption text-[#1D1D1F] font-mono">{testResult.etag}</p>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">ETag</label>
+                        <p className="text-caption font-mono text-[#1D1D1F]">{testResult.etag}</p>
                       </div>
                     )}
                     {testResult.last_modified && (
                       <div>
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">Last Modified</label>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Last Modified</label>
                         <p className="text-body-sm text-[#1D1D1F]">{testResult.last_modified}</p>
                       </div>
                     )}
                     {testResult.missing_secrets && (
                       <div className="col-span-2">
-                        <label className="block text-caption font-medium text-[#FF3B30] mb-1">Missing Secrets</label>
+                        <label className="block text-caption-sm font-medium text-[#FF3B30] mb-1">Missing Secrets</label>
                         <ul className="list-disc list-inside text-caption text-[#FF3B30]">
                           {testResult.missing_secrets.map((secret: string, idx: number) => (
                             <li key={idx}>{secret}</li>
@@ -1406,25 +1447,25 @@ export default function AdminSourcesPage() {
                     )}
                     {testResult.first_ids && testResult.first_ids.length > 0 && (
                       <div className="col-span-2">
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">First 5 Job IDs</label>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">First 5 Job IDs</label>
                         <div className="space-y-1">
                           {testResult.first_ids.map((id: string, idx: number) => (
-                            <p key={idx} className="text-caption text-[#1D1D1F] font-mono">{id}</p>
+                            <p key={idx} className="text-caption font-mono text-[#1D1D1F]">{id}</p>
                           ))}
                         </div>
                       </div>
                     )}
                     {testResult.headers_sanitized && (
                       <div className="col-span-2">
-                        <label className="block text-caption font-medium text-[#86868B] mb-1">Headers (Sanitized)</label>
-                        <pre className="text-caption-sm bg-[#F5F5F7] p-3 rounded-lg border border-[#D2D2D7] overflow-x-auto font-mono text-[#1D1D1F]">
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">Headers (Sanitized)</label>
+                        <pre className="text-caption-sm bg-[#F5F5F7] p-2.5 rounded-lg border border-[#D2D2D7] overflow-x-auto font-mono text-[#1D1D1F]">
                           {JSON.stringify(testResult.headers_sanitized, null, 2)}
                         </pre>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-3 pt-3 border-t border-[#D2D2D7] flex justify-end">
                     <button
                       onClick={() => {
                         setShowTestModal(false);
@@ -1474,31 +1515,31 @@ export default function AdminSourcesPage() {
 
               {simulateLoading ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D1D1F]"></div>
-                  <p className="mt-4 text-caption text-[#86868B]">Simulating extraction...</p>
+                  <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="mt-3 text-caption text-[#86868B]">Simulating extraction...</p>
                 </div>
               ) : simulateResult ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {simulateResult.ok ? (
                     <>
                       <div className="p-3 bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-1.5">
                           <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                          <span className="text-body font-semibold text-[#30D158]">Simulation Successful</span>
+                          <span className="text-body-sm font-semibold text-[#30D158]">Simulation Successful</span>
                         </div>
-                        <p className="text-caption text-[#30D158]">Found {simulateResult.count ?? 0} jobs</p>
+                        <p className="text-caption text-[#30D158] mt-1">Found {simulateResult.count ?? 0} jobs</p>
                       </div>
 
                       {simulateResult.sample && Array.isArray(simulateResult.sample) && simulateResult.sample.length > 0 && (
                         <div>
-                          <h3 className="text-body font-semibold text-[#1D1D1F] mb-3">Sample Jobs (First 3)</h3>
-                          <div className="space-y-3">
+                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Sample Jobs (First 3)</h3>
+                          <div className="space-y-2.5">
                             {simulateResult.sample.map((job: any, idx: number) => (
-                              <div key={idx} className="p-3 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
+                              <div key={idx} className="p-2.5 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
                                 <div className="grid grid-cols-1 gap-2">
                                   {Object.entries(job).map(([key, value]) => (
                                     <div key={key}>
-                                      <label className="block text-caption-sm font-medium text-[#86868B] mb-1">{key}</label>
+                                      <label className="block text-caption-sm font-medium text-[#86868B] mb-0.5">{key}</label>
                                       <p className="text-body-sm text-[#1D1D1F] break-words">
                                         {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
                                       </p>
@@ -1513,18 +1554,18 @@ export default function AdminSourcesPage() {
                     </>
                   ) : (
                     <div className="p-3 bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1.5">
                         <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                        <span className="text-body font-semibold text-[#FF3B30]">Simulation Failed</span>
+                        <span className="text-body-sm font-semibold text-[#FF3B30]">Simulation Failed</span>
                       </div>
-                      <p className="text-caption text-[#FF3B30]">{simulateResult.error ?? 'Unknown error'}</p>
+                      <p className="text-caption text-[#FF3B30] mt-1">{simulateResult.error ?? 'Unknown error'}</p>
                       {simulateResult.error_category && (
                         <p className="text-caption-sm text-[#FF3B30] mt-1 opacity-80">Category: {simulateResult.error_category}</p>
                       )}
                     </div>
                   )}
 
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-3 pt-3 border-t border-[#D2D2D7] flex justify-end">
                     <button
                       onClick={() => {
                         setShowSimulateModal(false);
