@@ -11,8 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    import psycopg2
-    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    import psycopg2  # pyright: ignore[reportMissingModuleSource]
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT  # pyright: ignore[reportMissingModuleSource]
     from app.db_config import db_config
 except ImportError as e:
     print(f"Error: Required dependencies not available: {e}")
@@ -69,6 +69,22 @@ def main():
         -- Add time_window column (used for RSS feed time window configuration)
         ALTER TABLE sources 
             ADD COLUMN IF NOT EXISTS time_window TEXT;
+        
+        -- Add next_run_at column (used for scheduling crawls)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS next_run_at TIMESTAMPTZ;
+        
+        -- Add last_crawl_message column (used for storing crawl error messages)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS last_crawl_message TEXT;
+        
+        -- Add consecutive_failures column (used for tracking failed crawls)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS consecutive_failures INT DEFAULT 0;
+        
+        -- Add consecutive_nochange column (used for tracking unchanged crawls)
+        ALTER TABLE sources 
+            ADD COLUMN IF NOT EXISTS consecutive_nochange INT DEFAULT 0;
         """
         
         print("\nRunning migration...")
@@ -85,7 +101,10 @@ def main():
         
         added_columns = new_columns - existing_columns
         
-        required_columns = {'org_type', 'notes', 'time_window'}
+        required_columns = {
+            'org_type', 'notes', 'time_window', 'next_run_at',
+            'last_crawl_message', 'consecutive_failures', 'consecutive_nochange'
+        }
         if required_columns.issubset(new_columns):
             if added_columns:
                 print(f"[OK] Added {len(added_columns)} column(s): {', '.join(sorted(added_columns))}")
@@ -99,7 +118,7 @@ def main():
         print("\nFinal columns in sources table:")
         print("-" * 60)
         for col in sorted(new_columns):
-            marker = "[OK]" if col in ['org_type', 'notes', 'time_window'] else "   "
+            marker = "[OK]" if col in required_columns else "   "
             print(f"  {marker} {col}")
         
         print("\n" + "=" * 60)

@@ -284,8 +284,8 @@ async def approve_submission(
         try:
             cursor.execute(
                 """
-                INSERT INTO sources (org_name, careers_url, source_type, status, notes)
-                VALUES (%s, %s, %s, 'active', 'Created from Find & Earn submission')
+                INSERT INTO sources (org_name, careers_url, source_type, status, notes, next_run_at)
+                VALUES (%s, %s, %s, 'active', 'Created from Find & Earn submission', NOW())
                 RETURNING id::text
                 """,
                 (org_name, submission['url'], submission['source_type'])
