@@ -6,22 +6,26 @@ const nextConfig = {
     if (!api) return [];
 
     return [
+      // Rewrite public API routes (search, healthz, etc.) to backend
+      // Exclude /api/admin/* - those are handled by Next.js API routes in app/api/admin/*
       {
-        source: '/api/:path*',
-        destination: `${api}/api/:path*`,
-        // Exclude /api/admin/* routes - these are handled by Next.js API routes (app/api/admin/*)
-        // which act as proxies to the backend
-        has: [
-          {
-            type: 'header',
-            key: 'x-nextjs-rewrite',
-            value: 'false',
-          },
-        ],
+        source: '/api/search/:path*',
+        destination: `${api}/api/search/:path*`,
       },
-      // Note: Admin pages (like /admin/login) are served by Next.js pages
-      // Admin API calls are proxied via /api/admin/* routes (app/api/admin/*), not rewrites
-      // The rewrite above is for public API routes like /api/search, /api/healthz, etc.
+      {
+        source: '/api/healthz',
+        destination: `${api}/api/healthz`,
+      },
+      {
+        source: '/api/capabilities',
+        destination: `${api}/api/capabilities`,
+      },
+      {
+        source: '/api/jobs/:path*',
+        destination: `${api}/api/jobs/:path*`,
+      },
+      // Note: /api/admin/* routes are NOT rewritten - they are handled by Next.js API routes
+      // in app/api/admin/* which act as proxies to the backend
     ];
   },
 };
