@@ -287,7 +287,7 @@ def update_source(
         sql_query = f"""
             UPDATE sources
             SET {', '.join(updates)}
-            WHERE id = %s
+            WHERE id::text = %s
             RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                       crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                       parser_hint, time_window, created_at, updated_at
@@ -350,7 +350,7 @@ def delete_source(
         cursor.execute("""
             UPDATE sources
             SET status = 'deleted', updated_at = NOW()
-            WHERE id = %s
+            WHERE id::text = %s
             RETURNING id::text
         """, (source_id,))
         
@@ -404,7 +404,7 @@ async def test_source(
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         cursor.execute("""
-            SELECT id::text, careers_url, source_type, parser_hint FROM sources WHERE id = %s
+            SELECT id::text, careers_url, source_type, parser_hint FROM sources WHERE id::text = %s
         """, (source_id,))
         
         source = cursor.fetchone()
@@ -574,7 +574,7 @@ def export_source(
                 status, crawl_frequency_days, parser_hint, time_window,
                 created_at, updated_at
             FROM sources
-            WHERE id = %s
+            WHERE id::text = %s
         """, (source_id,))
         
         source = cursor.fetchone()
@@ -734,7 +734,7 @@ async def simulate_extract(
                 id::text, org_name, careers_url, source_type, org_type,
                 parser_hint, time_window
             FROM sources
-            WHERE id = %s
+            WHERE id::text = %s
         """, (source_id,))
         
         source = cursor.fetchone()
