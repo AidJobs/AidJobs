@@ -353,7 +353,8 @@ def main():
                                 'avg_crawl_duration_ms', 'last_error', 'retry_count', 'enabled_at', 
                                 'disabled_at', 'tags', 'metadata')
         """)
-        new_sources_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        new_sources_future_cols = [row[0] for row in rows]
         if new_sources_future_cols:
             print(f"\n[OK] Added {len(new_sources_future_cols)} future column(s) to sources: {', '.join(sorted(new_sources_future_cols))}")
         
@@ -367,7 +368,8 @@ def main():
                                 'education_level', 'experience_years', 'source_priority', 
                                 'quality_score', 'normalized_at')
         """)
-        new_jobs_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        new_jobs_future_cols = [row[0] for row in rows]
         if new_jobs_future_cols:
             print(f"[OK] Added {len(new_jobs_future_cols)} future column(s) to jobs: {', '.join(sorted(new_jobs_future_cols))}")
         
@@ -378,7 +380,8 @@ def main():
             AND column_name IN ('error_type', 'http_status', 'content_size_bytes', 
                                 'retry_attempt', 'crawler_version')
         """)
-        new_logs_future_cols = [row['column_name'] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        new_logs_future_cols = [row[0] for row in rows]
         if new_logs_future_cols:
             print(f"[OK] Added {len(new_logs_future_cols)} future column(s) to crawl_logs: {', '.join(sorted(new_logs_future_cols))}")
         
