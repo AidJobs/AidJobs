@@ -782,8 +782,8 @@ export default function AdminSourcesPage() {
       </div>
 
       {(showAddModal || showEditModal) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ overflow: 'visible' }}>
+          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col" style={{ overflow: 'visible' }}>
             <div className="p-4 overflow-y-auto flex-1">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
@@ -982,7 +982,7 @@ export default function AdminSourcesPage() {
             </div>
 
             {/* Actions - Icon-only buttons */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7]">
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7] relative overflow-visible">
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -995,7 +995,7 @@ export default function AdminSourcesPage() {
                 title="Cancel"
               >
                 <XCircle className="w-4 h-4 text-[#86868B]" />
-                <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999] shadow-lg">
                   Cancel
                 </span>
               </button>
@@ -1005,7 +1005,7 @@ export default function AdminSourcesPage() {
                 title={showAddModal ? 'Create Source' : 'Save Changes'}
               >
                 <Check className="w-4 h-4 text-[#86868B]" />
-                <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999] shadow-lg">
                   {showAddModal ? 'Create Source' : 'Save Changes'}
                 </span>
               </button>
