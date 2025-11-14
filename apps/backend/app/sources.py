@@ -383,6 +383,84 @@ def delete_source(
             conn.close()
 
 
+@router.delete("/admin/sources/{source_id}/permanent")
+def permanently_delete_source(
+    request: Request,
+    source_id: str,
+    admin: str = Depends(admin_required)
+):
+    """Permanently delete a source from the database (only for deleted sources)."""
+    if not psycopg2:
+        raise HTTPException(status_code=503, detail="Database driver not available")
+    
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    conn = None
+    cursor = None
+    
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # First check if source exists and is deleted
+        cursor.execute("""
+            SELECT id::text, status
+            FROM sources
+            WHERE id::text = %s
+        """, (source_id,))
+        
+        source = cursor.fetchone()
+        
+        if not source:
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        if source['status'] != 'deleted':
+            raise HTTPException(status_code=400, detail="Source must be deleted before permanent deletion. Use DELETE /admin/sources/{id} first.")
+        
+        logger.info(f"[sources] Permanently deleting source {source_id}")
+        
+        # Delete associated crawl logs first (foreign key constraint)
+        cursor.execute("""
+            DELETE FROM crawl_logs
+            WHERE source_id::text = %s
+        """, (source_id,))
+        
+        # Delete crawl locks
+        cursor.execute("""
+            DELETE FROM crawl_locks
+            WHERE source_id::text = %s
+        """, (source_id,))
+        
+        # Delete the source
+        cursor.execute("""
+            DELETE FROM sources
+            WHERE id::text = %s
+        """, (source_id,))
+        
+        conn.commit()
+        
+        return {
+            "status": "ok",
+            "data": {"id": source_id},
+            "error": None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Failed to permanently delete source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 @router.post("/admin/sources/{source_id}/test")
 async def test_source(
     request: Request,

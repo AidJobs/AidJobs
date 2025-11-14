@@ -243,15 +243,20 @@ export default function AdminSourcesPage() {
             }
           }
           
-          // Refresh crawl logs
+          // Refresh crawl logs - always fetch fresh data
           const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${selectedSourceForDetails.id}&limit=10`, {
             credentials: 'include',
+            cache: 'no-store',
           });
           if (logsRes.ok) {
             const logsJson = await logsRes.json();
-            if (logsJson.status === 'ok' && logsJson.data) {
+            if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
               setCrawlLogs(logsJson.data);
+            } else {
+              setCrawlLogs([]);
             }
+          } else {
+            setCrawlLogs([]);
           }
         } catch (error) {
           console.error('Failed to refresh crawl details:', error);
@@ -847,8 +852,8 @@ export default function AdminSourcesPage() {
 
   return (
     <div className="h-full overflow-hidden flex flex-col">
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
-        <div className="w-full max-w-full">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4" style={{ width: '100%' }}>
+        <div className="w-full max-w-full" style={{ width: '100%', maxWidth: '100%' }}>
           <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Sources</h1>
@@ -918,29 +923,26 @@ export default function AdminSourcesPage() {
           ) : sources.length === 0 ? (
             <div className="p-8 text-center text-[#86868B] text-caption">No sources found</div>
           ) : (
-            <div className="overflow-x-auto -mx-4 px-4">
-              <table className="w-full" style={{ minWidth: '1000px' }}>
+            <div className="overflow-x-auto -mx-4 px-4" style={{ width: '100%' }}>
+              <table className="w-full" style={{ minWidth: '900px', width: '100%' }}>
                 <thead className="bg-[#F5F5F7] border-b border-[#D2D2D7]">
                   <tr>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[120px]">Org</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[200px]">URL</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Org</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[220px]">URL</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[80px]">Type</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Status</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[60px]">Freq</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Next run</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Last crawl</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Status</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Last Crawl</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Failures</th>
-                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[280px]">Actions</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[240px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D2D2D7]">
                   {sources.map((source) => (
                     <tr key={source.id} className="hover:bg-[#F5F5F7] transition-colors">
-                      <td className="px-3 py-2 text-body-sm text-[#1D1D1F] truncate">{source.org_name || '-'}</td>
-                      <td className="px-3 py-2 text-body-sm">
+                      <td className="px-3 py-2 text-caption text-[#1D1D1F] truncate">{source.org_name || '-'}</td>
+                      <td className="px-3 py-2">
                         <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] hover:underline text-caption truncate block" title={source.careers_url}>
-                          {source.careers_url.length > 35 ? `${source.careers_url.substring(0, 35)}...` : source.careers_url}
+                          {source.careers_url.length > 40 ? `${source.careers_url.substring(0, 40)}...` : source.careers_url}
                         </a>
                       </td>
                       <td className="px-3 py-2 text-caption text-[#1D1D1F] font-mono">{source.source_type}</td>
@@ -951,24 +953,19 @@ export default function AdminSourcesPage() {
                             source.status === 'paused' ? 'bg-[#86868B]' :
                             'bg-[#FF3B30]'
                           }`}></div>
-                          <span className="text-[#1D1D1F]">{source.status}</span>
+                          <span className="text-caption text-[#1D1D1F]">{source.status}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-caption text-[#1D1D1F]">{source.crawl_frequency_days || '-'}</td>
-                      <td className="px-3 py-2 text-caption text-[#86868B] truncate" title={formatDate(source.next_run_at)}>{formatDate(source.next_run_at)}</td>
-                      <td className="px-3 py-2 text-caption text-[#86868B] truncate" title={formatDate(source.last_crawled_at)}>{formatDate(source.last_crawled_at)}</td>
                       <td className="px-3 py-2 text-caption">
                         <div className="flex items-center gap-2">
-                          {source.last_crawl_status === 'success' && (
+                          {source.last_crawl_status === 'ok' || source.last_crawl_status === 'success' ? (
                             <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                          )}
-                          {source.last_crawl_status === 'error' && (
+                          ) : source.last_crawl_status === 'fail' || source.last_crawl_status === 'error' ? (
                             <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                          )}
-                          {source.last_crawl_status && source.last_crawl_status !== 'success' && source.last_crawl_status !== 'error' && (
-                            <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
-                          )}
-                          <span className="text-[#1D1D1F]">{source.last_crawl_status || '-'}</span>
+                          ) : source.last_crawl_status ? (
+                            <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                          ) : null}
+                          <span className="text-caption text-[#86868B]">{formatDate(source.last_crawled_at)}</span>
                         </div>
                       </td>
                       <td className="px-3 py-2 text-caption">
@@ -1184,13 +1181,14 @@ export default function AdminSourcesPage() {
                                   }
                                 }
                                 
-                                // Fetch crawl logs
+                                // Fetch crawl logs - always fetch fresh data
                                 const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${source.id}&limit=10`, {
                                   credentials: 'include',
+                                  cache: 'no-store',
                                 });
                                 if (logsRes.ok) {
                                   const logsJson = await logsRes.json();
-                                  if (logsJson.status === 'ok' && logsJson.data) {
+                                  if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
                                     setCrawlLogs(logsJson.data);
                                   } else {
                                     setCrawlLogs([]);
@@ -1480,7 +1478,7 @@ export default function AdminSourcesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div 
             ref={testModalRef}
-            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             style={{
               transform: testModalPosition.x !== 0 || testModalPosition.y !== 0 ? `translate(${testModalPosition.x}px, ${testModalPosition.y}px)` : undefined,
               cursor: isDragging && activeModalRef === testModalRef ? 'grabbing' : 'default',
@@ -1599,9 +1597,13 @@ export default function AdminSourcesPage() {
                         setTestResult(null);
                         setTestModalPosition({ x: 0, y: 0 });
                       }}
-                      className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                      title="Close"
                     >
-                      Close
+                      <X className="w-4 h-4 text-[#86868B]" />
+                      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                        Close
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1616,7 +1618,7 @@ export default function AdminSourcesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div 
             ref={simulateModalRef}
-            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             style={{
               transform: simulateModalPosition.x !== 0 || simulateModalPosition.y !== 0 ? `translate(${simulateModalPosition.x}px, ${simulateModalPosition.y}px)` : undefined,
               cursor: isDragging && activeModalRef === simulateModalRef ? 'grabbing' : 'default',
@@ -1699,9 +1701,13 @@ export default function AdminSourcesPage() {
                         setSimulateResult(null);
                         setSimulateModalPosition({ x: 0, y: 0 });
                       }}
-                      className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
+                      title="Close"
                     >
-                      Close
+                      <X className="w-4 h-4 text-[#86868B]" />
+                      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                        Close
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1792,8 +1798,8 @@ export default function AdminSourcesPage() {
                         const hasLogData = lastLog && (lastLog.status || lastLog.ran_at);
                         const hasSourceData = selectedSourceForDetails.last_crawled_at;
                         
-                        if (hasLogData) {
-                          // Show detailed crawl log data
+                        if (hasLogData && lastLog) {
+                          // Show detailed crawl log data - always use log data
                           return (
                             <>
                               <div>
@@ -1828,25 +1834,25 @@ export default function AdminSourcesPage() {
                                 </div>
                               )}
 
-                              {/* Job Counts - Always show grid */}
+                              {/* Job Counts - Always show from log data */}
                               <div className="pt-2 border-t border-[#D2D2D7]">
                                 <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="bg-white rounded-lg p-2">
                                     <div className="text-caption-sm text-[#86868B]">Found</div>
-                                    <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
+                                    <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found !== null && lastLog.found !== undefined ? lastLog.found : 0}</div>
                                   </div>
                                   <div className="bg-white rounded-lg p-2">
                                     <div className="text-caption-sm text-[#86868B]">Inserted</div>
-                                    <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
+                                    <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted !== null && lastLog.inserted !== undefined ? lastLog.inserted : 0}</div>
                                   </div>
                                   <div className="bg-white rounded-lg p-2">
                                     <div className="text-caption-sm text-[#86868B]">Updated</div>
-                                    <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
+                                    <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated !== null && lastLog.updated !== undefined ? lastLog.updated : 0}</div>
                                   </div>
                                   <div className="bg-white rounded-lg p-2">
                                     <div className="text-caption-sm text-[#86868B]">Skipped</div>
-                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
+                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped !== null && lastLog.skipped !== undefined ? lastLog.skipped : 0}</div>
                                   </div>
                                 </div>
                               </div>
