@@ -224,6 +224,47 @@ export default function AdminSourcesPage() {
     fetchSources();
   }, [page, statusFilter, searchQuery, fetchSources]);
 
+  // Refresh source data and crawl logs when drawer is open
+  useEffect(() => {
+    if (showCrawlDetails && selectedSourceForDetails) {
+      const refreshData = async () => {
+        try {
+          // Fetch fresh source data
+          const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
+            credentials: 'include',
+          });
+          if (sourceRes.ok) {
+            const sourceJson = await sourceRes.json();
+            if (sourceJson.status === 'ok' && sourceJson.data?.items) {
+              const freshSource = sourceJson.data.items.find((s: Source) => s.id === selectedSourceForDetails.id);
+              if (freshSource) {
+                setSelectedSourceForDetails(freshSource);
+              }
+            }
+          }
+          
+          // Refresh crawl logs
+          const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${selectedSourceForDetails.id}&limit=10`, {
+            credentials: 'include',
+          });
+          if (logsRes.ok) {
+            const logsJson = await logsRes.json();
+            if (logsJson.status === 'ok' && logsJson.data) {
+              setCrawlLogs(logsJson.data);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to refresh crawl details:', error);
+        }
+      };
+      
+      // Refresh immediately and then every 5 seconds while drawer is open
+      refreshData();
+      const interval = setInterval(refreshData, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [showCrawlDetails, selectedSourceForDetails?.id]);
+
   const fetchPresets = useCallback(async () => {
     setLoadingPresets(true);
     try {
@@ -1058,22 +1099,46 @@ export default function AdminSourcesPage() {
                           </button>
                           <button
                             onClick={async () => {
+                              // Set source and open drawer immediately
                               setSelectedSourceForDetails(source);
                               setShowCrawlDetails(true);
-                              // Fetch crawl logs
                               setLoadingCrawlLogs(true);
+                              
                               try {
-                                const res = await fetch(`/api/admin/crawl/logs?source_id=${source.id}&limit=10`, {
+                                // Fetch fresh source data - use the sources list endpoint with query filter
+                                const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
                                   credentials: 'include',
                                 });
-                                if (res.ok) {
-                                  const json = await res.json();
-                                  if (json.status === 'ok' && json.data) {
-                                    setCrawlLogs(json.data);
+                                if (sourceRes.ok) {
+                                  const sourceJson = await sourceRes.json();
+                                  if (sourceJson.status === 'ok' && sourceJson.data?.items) {
+                                    const freshSource = sourceJson.data.items.find((s: Source) => s.id === source.id);
+                                    if (freshSource) {
+                                      setSelectedSourceForDetails(freshSource);
+                                    } else {
+                                      // If not found in list, keep the current source
+                                      setSelectedSourceForDetails(source);
+                                    }
                                   }
                                 }
+                                
+                                // Fetch crawl logs
+                                const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${source.id}&limit=10`, {
+                                  credentials: 'include',
+                                });
+                                if (logsRes.ok) {
+                                  const logsJson = await logsRes.json();
+                                  if (logsJson.status === 'ok' && logsJson.data) {
+                                    setCrawlLogs(logsJson.data);
+                                  } else {
+                                    setCrawlLogs([]);
+                                  }
+                                } else {
+                                  setCrawlLogs([]);
+                                }
                               } catch (error) {
-                                console.error('Failed to fetch crawl logs:', error);
+                                console.error('Failed to fetch crawl details:', error);
+                                setCrawlLogs([]);
                               } finally {
                                 setLoadingCrawlLogs(false);
                               }
@@ -1655,120 +1720,128 @@ export default function AdminSourcesPage() {
                     </div>
                   </div>
 
-                  {/* Last Crawl Details */}
-                  {crawlLogs.length > 0 ? (
-                    <div>
-                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
-                        {(() => {
-                          const lastLog = crawlLogs[0];
-                          return (
-                            <>
+                  {/* Last Crawl Details - Always show most recent data */}
+                  {(() => {
+                    // Prioritize crawl logs if available, otherwise use source data
+                    const lastLog = crawlLogs.length > 0 ? crawlLogs[0] : null;
+                    const hasCrawlData = lastLog || selectedSourceForDetails.last_crawled_at;
+                    
+                    if (lastLog) {
+                      // Show detailed crawl log data
+                      return (
+                        <div>
+                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                          <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
+                            <div>
+                              <span className="text-caption-sm text-[#86868B]">Status:</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                {lastLog.status === 'ok' || lastLog.status === 'success' ? (
+                                  <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                                ) : lastLog.status === 'fail' || lastLog.status === 'error' ? (
+                                  <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                                ) : (
+                                  <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                                )}
+                                <span className="text-body-sm text-[#1D1D1F] capitalize">{lastLog.status || 'Unknown'}</span>
+                              </div>
+                            </div>
+                            
+                            {lastLog.ran_at && (
                               <div>
-                                <span className="text-caption-sm text-[#86868B]">Status:</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  {lastLog.status === 'ok' || lastLog.status === 'success' ? (
-                                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                                  ) : lastLog.status === 'fail' || lastLog.status === 'error' ? (
-                                    <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                                  ) : (
-                                    <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
-                                  )}
-                                  <span className="text-body-sm text-[#1D1D1F] capitalize">{lastLog.status || 'Unknown'}</span>
+                                <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                                <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(lastLog.ran_at)}</p>
+                              </div>
+                            )}
+
+                            {lastLog.duration_ms !== null && lastLog.duration_ms !== undefined && (
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Duration:</span>
+                                <p className="text-body-sm text-[#1D1D1F] mt-1">
+                                  {lastLog.duration_ms < 1000 
+                                    ? `${lastLog.duration_ms}ms` 
+                                    : `${(lastLog.duration_ms / 1000).toFixed(1)}s`}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Job Counts */}
+                            <div className="pt-2 border-t border-[#D2D2D7]">
+                              <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-white rounded-lg p-2">
+                                  <div className="text-caption-sm text-[#86868B]">Found</div>
+                                  <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-2">
+                                  <div className="text-caption-sm text-[#86868B]">Inserted</div>
+                                  <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-2">
+                                  <div className="text-caption-sm text-[#86868B]">Updated</div>
+                                  <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-2">
+                                  <div className="text-caption-sm text-[#86868B]">Skipped</div>
+                                  <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
                                 </div>
                               </div>
-                              
-                              {lastLog.ran_at && (
-                                <div>
-                                  <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
-                                  <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(lastLog.ran_at)}</p>
-                                </div>
-                              )}
+                            </div>
 
-                              {lastLog.duration_ms !== null && lastLog.duration_ms !== undefined && (
-                                <div>
-                                  <span className="text-caption-sm text-[#86868B]">Duration:</span>
-                                  <p className="text-body-sm text-[#1D1D1F] mt-1">
-                                    {lastLog.duration_ms < 1000 
-                                      ? `${lastLog.duration_ms}ms` 
-                                      : `${(lastLog.duration_ms / 1000).toFixed(1)}s`}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Job Counts */}
+                            {lastLog.message && (
                               <div className="pt-2 border-t border-[#D2D2D7]">
-                                <span className="text-caption-sm text-[#86868B] mb-2 block">Job Counts:</span>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-white rounded-lg p-2">
-                                    <div className="text-caption-sm text-[#86868B]">Found</div>
-                                    <div className="text-body-sm font-semibold text-[#1D1D1F] mt-0.5">{lastLog.found ?? 0}</div>
-                                  </div>
-                                  <div className="bg-white rounded-lg p-2">
-                                    <div className="text-caption-sm text-[#86868B]">Inserted</div>
-                                    <div className="text-body-sm font-semibold text-[#30D158] mt-0.5">{lastLog.inserted ?? 0}</div>
-                                  </div>
-                                  <div className="bg-white rounded-lg p-2">
-                                    <div className="text-caption-sm text-[#86868B]">Updated</div>
-                                    <div className="text-body-sm font-semibold text-[#0071E3] mt-0.5">{lastLog.updated ?? 0}</div>
-                                  </div>
-                                  <div className="bg-white rounded-lg p-2">
-                                    <div className="text-caption-sm text-[#86868B]">Skipped</div>
-                                    <div className="text-body-sm font-semibold text-[#86868B] mt-0.5">{lastLog.skipped ?? 0}</div>
-                                  </div>
-                                </div>
+                                <span className="text-caption-sm text-[#86868B]">Message:</span>
+                                <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{lastLog.message}</p>
                               </div>
-
-                              {lastLog.message && (
-                                <div className="pt-2 border-t border-[#D2D2D7]">
-                                  <span className="text-caption-sm text-[#86868B]">Message:</span>
-                                  <p className="text-body-sm text-[#1D1D1F] mt-1">{lastLog.message}</p>
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  ) : selectedSourceForDetails.last_crawled_at ? (
-                    <div>
-                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                      <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
-                        <div>
-                          <span className="text-caption-sm text-[#86868B]">Status:</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
-                              <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                            ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
-                              <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                            ) : selectedSourceForDetails.last_crawl_status ? (
-                              <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
-                            ) : null}
-                            <span className="text-body-sm text-[#1D1D1F]">
-                              {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
-                            </span>
+                            )}
                           </div>
                         </div>
-                        {selectedSourceForDetails.last_crawl_message && (
-                          <div>
-                            <span className="text-caption-sm text-[#86868B]">Message:</span>
-                            <p className="text-body-sm text-[#1D1D1F] mt-1">{selectedSourceForDetails.last_crawl_message}</p>
-                          </div>
-                        )}
+                      );
+                    } else if (selectedSourceForDetails.last_crawled_at) {
+                      // Fallback to source data if no logs available
+                      return (
                         <div>
-                          <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
-                          <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
+                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                          <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
+                            <div>
+                              <span className="text-caption-sm text-[#86868B]">Status:</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                {selectedSourceForDetails.last_crawl_status === 'ok' || selectedSourceForDetails.last_crawl_status === 'success' ? (
+                                  <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                                ) : selectedSourceForDetails.last_crawl_status === 'fail' || selectedSourceForDetails.last_crawl_status === 'error' ? (
+                                  <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
+                                ) : selectedSourceForDetails.last_crawl_status ? (
+                                  <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
+                                ) : null}
+                                <span className="text-body-sm text-[#1D1D1F] capitalize">
+                                  {selectedSourceForDetails.last_crawl_status || 'Never crawled'}
+                                </span>
+                              </div>
+                            </div>
+                            {selectedSourceForDetails.last_crawl_message && (
+                              <div>
+                                <span className="text-caption-sm text-[#86868B]">Message:</span>
+                                <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{selectedSourceForDetails.last_crawl_message}</p>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-caption-sm text-[#86868B]">Crawled At:</span>
+                              <p className="text-body-sm text-[#1D1D1F] mt-1">{formatDate(selectedSourceForDetails.last_crawled_at)}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
-                      <div className="bg-[#F5F5F7] rounded-lg p-3">
-                        <p className="text-body-sm text-[#86868B]">No crawl history available</p>
-                      </div>
-                    </div>
-                  )}
+                      );
+                    } else {
+                      // No crawl data available
+                      return (
+                        <div>
+                          <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Last Crawl</h3>
+                          <div className="bg-[#F5F5F7] rounded-lg p-3">
+                            <p className="text-body-sm text-[#86868B]">No crawl history available</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                  })()}
 
                   {/* Crawl Statistics */}
                   <div>
