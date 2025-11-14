@@ -15,8 +15,23 @@ export async function PATCH(
         'Content-Type': 'application/json',
         'Cookie': request.headers.get('cookie') || '',
       },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { detail: errorText };
+      }
+      return NextResponse.json(
+        { status: 'error', error: errorData.detail || `HTTP ${response.status}: ${errorText}` },
+        { status: response.status }
+      );
+    }
 
     const data = await response.json();
     
@@ -28,8 +43,9 @@ export async function PATCH(
     });
   } catch (error) {
     console.error('API proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
     return NextResponse.json(
-      { status: 'error', error: 'Internal server error' },
+      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
       { status: 500 }
     );
   }
@@ -45,7 +61,22 @@ export async function DELETE(
       headers: {
         'Cookie': request.headers.get('cookie') || '',
       },
+      credentials: 'include',
     });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { detail: errorText };
+      }
+      return NextResponse.json(
+        { status: 'error', error: errorData.detail || `HTTP ${response.status}: ${errorText}` },
+        { status: response.status }
+      );
+    }
 
     const data = await response.json();
     
@@ -57,8 +88,9 @@ export async function DELETE(
     });
   } catch (error) {
     console.error('API proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
     return NextResponse.json(
-      { status: 'error', error: 'Internal server error' },
+      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
       { status: 500 }
     );
   }

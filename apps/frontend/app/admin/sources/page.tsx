@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles, Check, XCircle } from 'lucide-react';
@@ -75,7 +75,62 @@ export default function AdminSourcesPage() {
     time_window: '',
   });
 
+  // Draggable modal state
+  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const addEditModalRef = useRef<HTMLDivElement>(null);
+  const testModalRef = useRef<HTMLDivElement>(null);
+  const simulateModalRef = useRef<HTMLDivElement>(null);
+
   const pageSize = 20;
+
+  // Draggable modal handlers
+  const handleMouseDown = (e: React.MouseEvent, modalRef: React.RefObject<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const header = target.closest('.modal-header');
+    if (header && !target.closest('button') && modalRef.current) {
+      const rect = modalRef.current.getBoundingClientRect();
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      e.preventDefault();
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const container = document.querySelector('.fixed.inset-0');
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const newX = e.clientX - dragStart.x - containerRect.left;
+          const newY = e.clientY - dragStart.y - containerRect.top;
+          setModalPosition({
+            x: Math.max(-containerRect.width / 2, Math.min(containerRect.width / 2, newX)),
+            y: Math.max(-containerRect.height / 2, Math.min(containerRect.height / 2, newY)),
+          });
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'none';
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isDragging, dragStart]);
 
   const fetchSources = useCallback(async () => {
     setLoading(true);
@@ -188,8 +243,14 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to export source');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to export source');
       }
 
       const json = await res.json();
@@ -205,10 +266,12 @@ export default function AdminSourcesPage() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         toast.success('Source exported successfully');
+      } else {
+        throw new Error(json.error || 'Invalid export response');
       }
     } catch (error) {
       console.error('Failed to export source:', error);
-      toast.error('Failed to export source');
+      toast.error(error instanceof Error ? error.message : 'Failed to export source');
     }
   };
 
@@ -335,27 +398,14 @@ export default function AdminSourcesPage() {
 
       const updates: any = {};
       
-      if (formData.org_name !== editingSource.org_name) {
-        updates.org_name = formData.org_name || null;
-      }
-      if (formData.careers_url !== editingSource.careers_url) {
-        updates.careers_url = formData.careers_url;
-      }
-      if (formData.source_type !== editingSource.source_type) {
-        updates.source_type = formData.source_type;
-      }
-      if (formData.org_type !== editingSource.org_type) {
-        updates.org_type = formData.org_type || null;
-      }
-      if (formData.crawl_frequency_days !== editingSource.crawl_frequency_days) {
-        updates.crawl_frequency_days = formData.crawl_frequency_days;
-      }
-      if (formData.parser_hint !== editingSource.parser_hint) {
-        updates.parser_hint = formData.parser_hint || null;
-      }
-      if (formData.time_window !== editingSource.time_window) {
-        updates.time_window = formData.time_window || null;
-      }
+      // Always include fields that might have changed
+      updates.org_name = formData.org_name || null;
+      updates.careers_url = formData.careers_url;
+      updates.source_type = formData.source_type;
+      updates.org_type = formData.org_type || null;
+      updates.crawl_frequency_days = formData.crawl_frequency_days;
+      updates.parser_hint = formData.parser_hint || null;
+      updates.time_window = formData.time_window || null;
 
       const res = await fetch(`/api/admin/sources/${editingSource.id}`, {
         method: 'PATCH',
@@ -389,15 +439,26 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to delete source');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
       }
 
-      toast.success('Source deleted');
-      fetchSources();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to delete source');
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success('Source deleted');
+        fetchSources();
+      } else {
+        throw new Error(json.error || 'Failed to delete source');
+      }
     } catch (error) {
       console.error('Failed to delete source:', error);
-      toast.error('Failed to delete source');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete source');
     }
   };
 
@@ -433,6 +494,16 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to test source');
+      }
+
       const result = await res.json();
       setTestResult(result);
       
@@ -443,8 +514,9 @@ export default function AdminSourcesPage() {
       }
     } catch (error) {
       console.error('Failed to test source:', error);
-      toast.error('Failed to test source');
-      setTestResult({ ok: false, error: 'Failed to test source' });
+      const errorMsg = error instanceof Error ? error.message : 'Failed to test source';
+      toast.error(errorMsg);
+      setTestResult({ ok: false, error: errorMsg });
     } finally {
       setTestLoading(false);
     }
@@ -461,6 +533,16 @@ export default function AdminSourcesPage() {
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to simulate extract');
+      }
+
       const result = await res.json();
       setSimulateResult(result);
 
@@ -471,8 +553,9 @@ export default function AdminSourcesPage() {
       }
     } catch (error) {
       console.error('Failed to simulate extract:', error);
-      toast.error('Failed to simulate extract');
-      setSimulateResult({ ok: false, error: 'Failed to simulate extract' });
+      const errorMsg = error instanceof Error ? error.message : 'Failed to simulate extract';
+      toast.error(errorMsg);
+      setSimulateResult({ ok: false, error: errorMsg });
     } finally {
       setSimulateLoading(false);
     }
@@ -480,35 +563,33 @@ export default function AdminSourcesPage() {
 
   const handleRunNow = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/sources/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          status: 'active',
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to queue source');
-      }
-
-      const res2 = await fetch(`/api/admin/crawl/run`, {
+      const res = await fetch(`/api/admin/crawl/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ source_id: id }),
       });
 
-      if (!res2.ok) {
-        throw new Error('Failed to trigger crawl');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
       }
 
-      toast.success('Crawl started');
-      fetchSources();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to trigger crawl');
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success(json.message || 'Crawl started');
+        fetchSources();
+      } else {
+        throw new Error(json.error || 'Failed to trigger crawl');
+      }
     } catch (error) {
       console.error('Failed to run crawl:', error);
-      toast.error('Failed to run crawl');
+      toast.error(error instanceof Error ? error.message : 'Failed to run crawl');
     }
   };
 
@@ -548,8 +629,9 @@ export default function AdminSourcesPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="h-full p-4 overflow-y-auto">
-      <div className="max-w-7xl mx-auto">
+    <div className="h-full overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+        <div className="w-full max-w-full">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Sources</h1>
@@ -564,7 +646,7 @@ export default function AdminSourcesPage() {
                 onChange={handleImportSource}
                 className="hidden"
               />
-              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                 Import source
               </span>
             </label>
@@ -573,7 +655,7 @@ export default function AdminSourcesPage() {
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
             >
               <Plus className="w-4 h-4 text-[#86868B]" />
-              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                 Add source
               </span>
             </button>
@@ -619,33 +701,33 @@ export default function AdminSourcesPage() {
           ) : sources.length === 0 ? (
             <div className="p-8 text-center text-[#86868B] text-caption">No sources found</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 px-4">
+              <table className="w-full" style={{ minWidth: '1000px' }}>
                 <thead className="bg-[#F5F5F7] border-b border-[#D2D2D7]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Org</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">URL</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Freq</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Next run</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Last crawl</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Failures</th>
-                    <th className="px-4 py-3 text-left text-caption font-medium text-[#86868B] uppercase">Actions</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[120px]">Org</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[200px]">URL</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[80px]">Type</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Status</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[60px]">Freq</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Next run</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Last crawl</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Status</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Failures</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[280px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D2D2D7]">
                   {sources.map((source) => (
                     <tr key={source.id} className="hover:bg-[#F5F5F7] transition-colors">
-                      <td className="px-4 py-3 text-body text-[#1D1D1F]">{source.org_name || '-'}</td>
-                      <td className="px-4 py-3 text-body">
-                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] hover:underline text-caption">
-                          {source.careers_url.substring(0, 40)}...
+                      <td className="px-3 py-2 text-body-sm text-[#1D1D1F] truncate">{source.org_name || '-'}</td>
+                      <td className="px-3 py-2 text-body-sm">
+                        <a href={source.careers_url} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] hover:underline text-caption truncate block" title={source.careers_url}>
+                          {source.careers_url.length > 35 ? `${source.careers_url.substring(0, 35)}...` : source.careers_url}
                         </a>
                       </td>
-                      <td className="px-4 py-3 text-caption text-[#1D1D1F] font-mono">{source.source_type}</td>
-                      <td className="px-4 py-3 text-caption">
+                      <td className="px-3 py-2 text-caption text-[#1D1D1F] font-mono">{source.source_type}</td>
+                      <td className="px-3 py-2 text-caption">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
                             source.status === 'active' ? 'bg-[#30D158]' :
@@ -655,10 +737,10 @@ export default function AdminSourcesPage() {
                           <span className="text-[#1D1D1F]">{source.status}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-caption text-[#1D1D1F]">{source.crawl_frequency_days || '-'}</td>
-                      <td className="px-4 py-3 text-caption text-[#86868B]">{formatDate(source.next_run_at)}</td>
-                      <td className="px-4 py-3 text-caption text-[#86868B]">{formatDate(source.last_crawled_at)}</td>
-                      <td className="px-4 py-3 text-caption">
+                      <td className="px-3 py-2 text-caption text-[#1D1D1F]">{source.crawl_frequency_days || '-'}</td>
+                      <td className="px-3 py-2 text-caption text-[#86868B] truncate" title={formatDate(source.next_run_at)}>{formatDate(source.next_run_at)}</td>
+                      <td className="px-3 py-2 text-caption text-[#86868B] truncate" title={formatDate(source.last_crawled_at)}>{formatDate(source.last_crawled_at)}</td>
+                      <td className="px-3 py-2 text-caption">
                         <div className="flex items-center gap-2">
                           {source.last_crawl_status === 'success' && (
                             <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
@@ -672,10 +754,10 @@ export default function AdminSourcesPage() {
                           <span className="text-[#1D1D1F]">{source.last_crawl_status || '-'}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-caption">
-                        <div className="flex items-center gap-2">
+                      <td className="px-3 py-2 text-caption">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {(source.consecutive_failures ?? 0) > 0 && (
-                            <span className={`px-2 py-0.5 rounded text-caption ${
+                            <span className={`px-1.5 py-0.5 rounded text-caption-sm ${
                               (source.consecutive_failures ?? 0) >= 5 
                                 ? 'bg-[#FF3B30] text-white font-semibold' 
                                 : 'bg-[#FF9500] text-white'
@@ -684,17 +766,17 @@ export default function AdminSourcesPage() {
                             </span>
                           )}
                           {(source.consecutive_nochange ?? 0) > 0 && (
-                            <span className="px-2 py-0.5 rounded text-caption bg-[#F5F5F7] text-[#86868B]" title={`Consecutive no-change: ${source.consecutive_nochange ?? 0}`}>
+                            <span className="px-1.5 py-0.5 rounded text-caption-sm bg-[#F5F5F7] text-[#86868B]" title={`Consecutive no-change: ${source.consecutive_nochange ?? 0}`}>
                               NC: {source.consecutive_nochange ?? 0}
                             </span>
                           )}
                           {(!source.consecutive_failures || source.consecutive_failures === 0) && 
                            (!source.consecutive_nochange || source.consecutive_nochange === 0) && (
-                            <span className="text-[#86868B]">-</span>
+                            <span className="text-caption-sm text-[#86868B]">-</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <div className="flex gap-1 flex-wrap">
                           <button
                             onClick={() => handleRunNow(source.id)}
@@ -702,7 +784,7 @@ export default function AdminSourcesPage() {
                             title="Run now"
                           >
                             <Play className="w-4 h-4 text-[#86868B]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Run now
                             </span>
                           </button>
@@ -716,7 +798,7 @@ export default function AdminSourcesPage() {
                             ) : (
                               <Play className="w-4 h-4 text-[#30D158]" />
                             )}
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               {source.status === 'active' ? 'Pause' : 'Resume'}
                             </span>
                           </button>
@@ -726,7 +808,7 @@ export default function AdminSourcesPage() {
                             title="Edit"
                           >
                             <Edit className="w-4 h-4 text-[#86868B]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Edit
                             </span>
                           </button>
@@ -736,7 +818,7 @@ export default function AdminSourcesPage() {
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4 text-[#FF3B30]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Delete
                             </span>
                           </button>
@@ -746,7 +828,7 @@ export default function AdminSourcesPage() {
                             title="Test source"
                           >
                             <TestTube className="w-4 h-4 text-[#86868B]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Test source
                             </span>
                           </button>
@@ -756,7 +838,7 @@ export default function AdminSourcesPage() {
                             title="Simulate extraction"
                           >
                             <FileCode className="w-4 h-4 text-[#86868B]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Simulate extraction
                             </span>
                           </button>
@@ -766,7 +848,7 @@ export default function AdminSourcesPage() {
                             title="Export source"
                           >
                             <Download className="w-4 h-4 text-[#86868B]" />
-                            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                               Export source
                             </span>
                           </button>
@@ -807,13 +889,24 @@ export default function AdminSourcesPage() {
           )}
         </div>
       </div>
+    </div>
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ overflow: 'visible' }}>
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+          <div 
+            ref={addEditModalRef}
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
+            style={{
+              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
+              cursor: isDragging ? 'grabbing' : 'default',
+            }}
+          >
             <div className="p-4 overflow-y-auto flex-1 rounded-t-lg">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
+              {/* Header - Draggable */}
+              <div 
+                className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none"
+                onMouseDown={(e) => handleMouseDown(e, addEditModalRef)}
+              >
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">
                     {showAddModal ? 'Add Source' : 'Edit Source'}
@@ -828,6 +921,7 @@ export default function AdminSourcesPage() {
                     setShowEditModal(false);
                     setEditingSource(null);
                     setShowAdvanced(false);
+                    setModalPosition({ x: 0, y: 0 });
                     resetForm();
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
@@ -1023,14 +1117,25 @@ export default function AdminSourcesPage() {
       {/* Test Results Modal */}
       {showTestModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-title font-semibold text-[#1D1D1F]">Test Results</h2>
+          <div 
+            ref={testModalRef}
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            style={{
+              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
+              cursor: isDragging ? 'grabbing' : 'default',
+            }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, testModalRef)}>
+                <div>
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Test Results</h2>
+                  <p className="text-caption text-[#86868B] mt-0.5">Source connectivity test results</p>
+                </div>
                 <button
                   onClick={() => {
                     setShowTestModal(false);
                     setTestResult(null);
+                    setModalPosition({ x: 0, y: 0 });
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
@@ -1045,10 +1150,10 @@ export default function AdminSourcesPage() {
                 </div>
               ) : testResult ? (
                 <div className="space-y-4">
-                  <div className={`p-4 rounded-lg ${testResult.ok ? 'bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30' : 'bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30'}`}>
+                  <div className={`p-3 rounded-lg ${testResult.ok ? 'bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30' : 'bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className={`w-2 h-2 rounded-full ${testResult.ok ? 'bg-[#30D158]' : 'bg-[#FF3B30]'}`}></div>
-                      <span className={`text-body-lg font-semibold ${testResult.ok ? 'text-[#30D158]' : 'text-[#FF3B30]'}`}>
+                      <span className={`text-body font-semibold ${testResult.ok ? 'text-[#30D158]' : 'text-[#FF3B30]'}`}>
                         {testResult.ok ? 'Test Passed' : 'Test Failed'}
                       </span>
                     </div>
@@ -1057,31 +1162,31 @@ export default function AdminSourcesPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-caption font-medium text-[#86868B] mb-1">Status Code</label>
-                      <p className="text-body text-[#1D1D1F]">{testResult.status ?? 'N/A'}</p>
+                      <p className="text-body-sm text-[#1D1D1F]">{testResult.status ?? 'N/A'}</p>
                     </div>
                     <div>
                       <label className="block text-caption font-medium text-[#86868B] mb-1">Host</label>
-                      <p className="text-body text-[#1D1D1F]">{testResult.host ?? 'N/A'}</p>
+                      <p className="text-body-sm text-[#1D1D1F]">{testResult.host ?? 'N/A'}</p>
                     </div>
                     {testResult.count !== undefined && (
                       <div>
                         <label className="block text-caption font-medium text-[#86868B] mb-1">Jobs Found</label>
-                        <p className="text-body text-[#1D1D1F]">{testResult.count}</p>
+                        <p className="text-body-sm text-[#1D1D1F]">{testResult.count}</p>
                       </div>
                     )}
                     {testResult.message && (
                       <div className="col-span-2">
                         <label className="block text-caption font-medium text-[#86868B] mb-1">Message</label>
-                        <p className="text-body text-[#1D1D1F]">{testResult.message}</p>
+                        <p className="text-body-sm text-[#1D1D1F]">{testResult.message}</p>
                       </div>
                     )}
                     {testResult.size && (
                       <div>
                         <label className="block text-caption font-medium text-[#86868B] mb-1">Content Size</label>
-                        <p className="text-body text-[#1D1D1F]">{testResult.size} bytes</p>
+                        <p className="text-body-sm text-[#1D1D1F]">{testResult.size} bytes</p>
                       </div>
                     )}
                     {testResult.etag && (
@@ -1093,7 +1198,7 @@ export default function AdminSourcesPage() {
                     {testResult.last_modified && (
                       <div>
                         <label className="block text-caption font-medium text-[#86868B] mb-1">Last Modified</label>
-                        <p className="text-body text-[#1D1D1F]">{testResult.last_modified}</p>
+                        <p className="text-body-sm text-[#1D1D1F]">{testResult.last_modified}</p>
                       </div>
                     )}
                     {testResult.missing_secrets && (
@@ -1119,20 +1224,21 @@ export default function AdminSourcesPage() {
                     {testResult.headers_sanitized && (
                       <div className="col-span-2">
                         <label className="block text-caption font-medium text-[#86868B] mb-1">Headers (Sanitized)</label>
-                        <pre className="text-caption-sm bg-[#F5F5F7] p-3 rounded border border-[#D2D2D7] overflow-x-auto font-mono text-[#1D1D1F]">
+                        <pre className="text-caption-sm bg-[#F5F5F7] p-3 rounded-lg border border-[#D2D2D7] overflow-x-auto font-mono text-[#1D1D1F]">
                           {JSON.stringify(testResult.headers_sanitized, null, 2)}
                         </pre>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-4 flex justify-end">
                     <button
                       onClick={() => {
                         setShowTestModal(false);
                         setTestResult(null);
+                        setModalPosition({ x: 0, y: 0 });
                       }}
-                      className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
+                      className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
                     >
                       Close
                     </button>
@@ -1147,14 +1253,25 @@ export default function AdminSourcesPage() {
       {/* Simulate Results Modal */}
       {showSimulateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-title font-semibold text-[#1D1D1F]">Simulation Results</h2>
+          <div 
+            ref={simulateModalRef}
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            style={{
+              transform: modalPosition.x !== 0 || modalPosition.y !== 0 ? `translate(${modalPosition.x}px, ${modalPosition.y}px)` : undefined,
+              cursor: isDragging ? 'grabbing' : 'default',
+            }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, simulateModalRef)}>
+                <div>
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Simulation Results</h2>
+                  <p className="text-caption text-[#86868B] mt-0.5">Job extraction simulation results</p>
+                </div>
                 <button
                   onClick={() => {
                     setShowSimulateModal(false);
                     setSimulateResult(null);
+                    setModalPosition({ x: 0, y: 0 });
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors"
                 >
@@ -1171,25 +1288,25 @@ export default function AdminSourcesPage() {
                 <div className="space-y-4">
                   {simulateResult.ok ? (
                     <>
-                      <div className="p-4 bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30 rounded-lg">
+                      <div className="p-3 bg-[#30D158] bg-opacity-10 border border-[#30D158] border-opacity-30 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                          <span className="text-body-lg font-semibold text-[#30D158]">Simulation Successful</span>
+                          <span className="text-body font-semibold text-[#30D158]">Simulation Successful</span>
                         </div>
                         <p className="text-caption text-[#30D158]">Found {simulateResult.count ?? 0} jobs</p>
                       </div>
 
                       {simulateResult.sample && Array.isArray(simulateResult.sample) && simulateResult.sample.length > 0 && (
                         <div>
-                          <h3 className="text-body-lg font-semibold text-[#1D1D1F] mb-3">Sample Jobs (First 3)</h3>
-                          <div className="space-y-4">
+                          <h3 className="text-body font-semibold text-[#1D1D1F] mb-3">Sample Jobs (First 3)</h3>
+                          <div className="space-y-3">
                             {simulateResult.sample.map((job: any, idx: number) => (
-                              <div key={idx} className="p-4 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
+                              <div key={idx} className="p-3 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
                                 <div className="grid grid-cols-1 gap-2">
                                   {Object.entries(job).map(([key, value]) => (
                                     <div key={key}>
                                       <label className="block text-caption-sm font-medium text-[#86868B] mb-1">{key}</label>
-                                      <p className="text-body text-[#1D1D1F] break-words">
+                                      <p className="text-body-sm text-[#1D1D1F] break-words">
                                         {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
                                       </p>
                                     </div>
@@ -1202,10 +1319,10 @@ export default function AdminSourcesPage() {
                       )}
                     </>
                   ) : (
-                    <div className="p-4 bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30 rounded-lg">
+                    <div className="p-3 bg-[#FF3B30] bg-opacity-10 border border-[#FF3B30] border-opacity-30 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2 h-2 bg-[#FF3B30] rounded-full"></div>
-                        <span className="text-body-lg font-semibold text-[#FF3B30]">Simulation Failed</span>
+                        <span className="text-body font-semibold text-[#FF3B30]">Simulation Failed</span>
                       </div>
                       <p className="text-caption text-[#FF3B30]">{simulateResult.error ?? 'Unknown error'}</p>
                       {simulateResult.error_category && (
@@ -1214,13 +1331,14 @@ export default function AdminSourcesPage() {
                     </div>
                   )}
 
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-4 flex justify-end">
                     <button
                       onClick={() => {
                         setShowSimulateModal(false);
                         setSimulateResult(null);
+                        setModalPosition({ x: 0, y: 0 });
                       }}
-                      className="px-4 py-2 bg-[#0071E3] text-white rounded text-body hover:bg-[#0077ED] transition-colors"
+                      className="px-3 py-1.5 bg-[#0071E3] text-white rounded-lg text-caption hover:bg-[#0077ED] transition-colors"
                     >
                       Close
                     </button>

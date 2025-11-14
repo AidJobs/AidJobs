@@ -12,7 +12,22 @@ export async function POST(
       headers: {
         'Cookie': request.headers.get('cookie') || '',
       },
+      credentials: 'include',
     });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      return NextResponse.json(
+        { ok: false, error: errorData.error || errorData.detail || `HTTP ${response.status}: ${errorText}` },
+        { status: response.status }
+      );
+    }
 
     const data = await response.json();
     
@@ -24,8 +39,9 @@ export async function POST(
     });
   } catch (error) {
     console.error('API proxy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
     return NextResponse.json(
-      { ok: false, error: 'Internal server error' },
+      { ok: false, error: `Failed to connect to backend: ${errorMessage}` },
       { status: 500 }
     );
   }
