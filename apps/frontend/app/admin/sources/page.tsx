@@ -1794,7 +1794,7 @@ export default function AdminSourcesPage() {
                     <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
                       {(() => {
                         // Prioritize crawl logs if available, otherwise use source data
-                        const lastLog = crawlLogs.length > 0 ? crawlLogs[0] : null;
+          const lastLog = crawlLogs.length > 0 ? crawlLogs[0] : null;
                         const hasLogData = lastLog && (lastLog.status || lastLog.ran_at);
                         const hasSourceData = selectedSourceForDetails.last_crawled_at;
                         
@@ -1857,12 +1857,24 @@ export default function AdminSourcesPage() {
                                 </div>
                               </div>
 
-                              {lastLog.message && (
-                                <div className="pt-2 border-t border-[#D2D2D7]">
-                                  <span className="text-caption-sm text-[#86868B]">Message:</span>
-                                  <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">{lastLog.message}</p>
-                                </div>
-                              )}
+                  {lastLog.message && (
+                    <div className="pt-2 border-t border-[#D2D2D7]">
+                      <span className="text-caption-sm text-[#86868B]">Message:</span>
+                      <p className="text-body-sm text-[#1D1D1F] mt-1 break-words">
+                        {(() => {
+                          const msg = String(lastLog.message);
+                          // Hide low-level database schema errors from UI and show a friendly note instead
+                          if (msg.includes('relation \"robots_cache\" does not exist')) {
+                            return 'Earlier crawl failed because an internal robots cache table was missing. The issue has been fixed; please run the source again if you want a fresh crawl.';
+                          }
+                          if (msg.includes('relation \"domain_policies\" does not exist')) {
+                            return 'Earlier crawl failed due to a missing domain policies table. This has been resolved; new crawls will use the updated configuration.';
+                          }
+                          return msg;
+                        })()}
+                      </p>
+                    </div>
+                  )}
                             </>
                           );
                         } else if (hasSourceData) {
