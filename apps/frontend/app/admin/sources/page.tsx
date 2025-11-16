@@ -1299,7 +1299,7 @@ export default function AdminSourcesPage() {
               cursor: isDragging && activeModalRef === addEditModalRef ? 'grabbing' : 'default',
             }}
           >
-            <div className="p-4 overflow-y-auto flex-1 rounded-t-lg">
+            <div className="p-4 overflow-y-auto flex-1">
               {/* Header - Draggable */}
               <div 
                 className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none"
@@ -1480,7 +1480,7 @@ export default function AdminSourcesPage() {
             </div>
 
             {/* Actions - Icon-only buttons */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7] relative overflow-visible rounded-b-lg">
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-[#D2D2D7] bg-[#F5F5F7] relative overflow-visible">
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -1517,13 +1517,13 @@ export default function AdminSourcesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div 
             ref={testModalRef}
-            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
             style={{
               transform: testModalPosition.x !== 0 || testModalPosition.y !== 0 ? `translate(${testModalPosition.x}px, ${testModalPosition.y}px)` : undefined,
               cursor: isDragging && activeModalRef === testModalRef ? 'grabbing' : 'default',
             }}
           >
-            <div className="p-4">
+            <div className="p-4 overflow-y-auto flex-1">
               <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, testModalRef, () => testModalPosition)}>
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Test Results</h2>
@@ -1657,13 +1657,13 @@ export default function AdminSourcesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div 
             ref={simulateModalRef}
-            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white border border-[#D2D2D7] rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
             style={{
               transform: simulateModalPosition.x !== 0 || simulateModalPosition.y !== 0 ? `translate(${simulateModalPosition.x}px, ${simulateModalPosition.y}px)` : undefined,
               cursor: isDragging && activeModalRef === simulateModalRef ? 'grabbing' : 'default',
             }}
           >
-            <div className="p-4">
+            <div className="p-4 overflow-y-auto flex-1">
               <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, simulateModalRef, () => simulateModalPosition)}>
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Simulation Results</h2>
