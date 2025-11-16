@@ -272,11 +272,11 @@ export default function AdminSourcesPage() {
   // Auto-refresh source data and crawl logs when drawer is open
   useEffect(() => {
     if (showCrawlDetails && selectedSourceForDetails) {
-      // Refresh immediately and then every 3 seconds while drawer is open
+      // Refresh immediately and then every 1.5 seconds while drawer is open (faster refresh)
       refreshCrawlDetails(selectedSourceForDetails.id);
       const interval = setInterval(
         () => refreshCrawlDetails(selectedSourceForDetails.id!),
-        3000
+        1500
       );
       return () => clearInterval(interval);
     }
