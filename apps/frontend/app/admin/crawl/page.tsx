@@ -38,7 +38,6 @@ export default function AdminCrawlPage() {
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [runningDue, setRunningDue] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchCrawlStatus = useCallback(async () => {
     try {
@@ -63,7 +62,7 @@ export default function AdminCrawlPage() {
       }
     } catch (error) {
       console.error('Failed to fetch crawl status:', error);
-      // Don't show toast - auto-refresh will retry
+      toast.error('Failed to fetch crawl status');
     }
   }, [router]);
 
@@ -93,6 +92,7 @@ export default function AdminCrawlPage() {
       }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
+      toast.error('Failed to fetch logs');
       setLogs([]);
     } finally {
       setLogsLoading(false);
@@ -142,28 +142,13 @@ export default function AdminCrawlPage() {
     toast.success('Status refreshed');
   };
 
-  // Initial fetch
+  // Initial fetch only - no auto-refresh to save API quota on free tiers
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchCrawlStatus(), fetchLogs()]);
       setLoading(false);
     };
     init();
-  }, [fetchCrawlStatus, fetchLogs]);
-
-  // Auto-refresh every 5 seconds
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => {
-      fetchCrawlStatus();
-      fetchLogs();
-    }, 5000);
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-    };
   }, [fetchCrawlStatus, fetchLogs]);
 
   const formatDate = (dateStr: string) => {
