@@ -171,6 +171,34 @@ class HTMLCrawler:
                 logger.debug(f"[html_fetch] Found {len(microdata_jobs)} jobs via microdata")
                 job_elements = microdata_jobs[:50]
         
+        # Additional fallback: try more generic patterns for UNESCO-style sites
+        if not job_elements:
+            # Look for common UNESCO/UN organization patterns
+            # Try finding table rows with job-like content
+            table_rows = soup.find_all('tr')
+            for tr in table_rows:
+                text = tr.get_text().lower()
+                # Check if row contains job-related keywords
+                if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer']):
+                    # Check if it has a link (likely a job listing)
+                    if tr.find('a', href=True):
+                        job_elements.append(tr)
+                        if len(job_elements) >= 50:
+                            break
+            
+            # Try finding divs/sections with job-like content
+            if not job_elements:
+                all_divs = soup.find_all(['div', 'section', 'article'])
+                for div in all_divs:
+                    text = div.get_text().lower()
+                    # Check for job keywords and presence of a link
+                    if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity']) and div.find('a', href=True):
+                        # Make sure it's not too large (likely a container, not a single job)
+                        if len(text) < 2000:  # Reasonable size for a single job listing
+                            job_elements.append(div)
+                            if len(job_elements) >= 50:
+                                break
+        
         # Extract data from each element
         for elem in job_elements:
             job = self._extract_job_from_element(elem, base_url)
