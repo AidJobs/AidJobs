@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
         'Cookie': req.headers.get('cookie') || '',
       },
       credentials: 'include',
+      cache: 'no-store', // Always fetch fresh data, never cache
     });
 
     // Handle 401 - redirect to login

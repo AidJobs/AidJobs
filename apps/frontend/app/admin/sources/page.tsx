@@ -232,8 +232,8 @@ export default function AdminSourcesPage() {
   const refreshCrawlDetails = useCallback(
     async (sourceId: string) => {
       try {
-        // Fetch fresh source data - use cache: 'no-store' to ensure fresh data
-        const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
+        // Fetch fresh source data - use cache: 'no-store' and timestamp to ensure fresh data
+        const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all&_t=${Date.now()}`, {
           credentials: 'include',
           cache: 'no-store',
         });
@@ -247,8 +247,8 @@ export default function AdminSourcesPage() {
           }
         }
 
-        // Refresh crawl logs - always fetch fresh data
-        const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${sourceId}&limit=10`, {
+        // Refresh crawl logs - always fetch fresh data with timestamp to bust cache
+        const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${sourceId}&limit=10&_t=${Date.now()}`, {
           credentials: 'include',
           cache: 'no-store',
         });
@@ -817,9 +817,14 @@ export default function AdminSourcesPage() {
         // Immediately refresh sources to pick up updated last_crawl_* fields
         fetchSources();
 
-        // If the crawl details drawer is open for this source, refresh its logs right away
+        // If the crawl details drawer is open for this source, refresh its logs
+        // Add a small delay to ensure database transaction is committed and visible
         if (showCrawlDetails && selectedSourceForDetails?.id === id) {
+          // Refresh immediately, then again after a short delay to catch the new log
           await refreshCrawlDetails(id);
+          setTimeout(async () => {
+            await refreshCrawlDetails(id);
+          }, 500);
         }
       } else {
         throw new Error(json.error || 'Failed to trigger crawl');
