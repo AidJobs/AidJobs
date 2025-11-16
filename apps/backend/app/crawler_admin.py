@@ -123,7 +123,8 @@ async def get_status(admin=Depends(admin_required)):
                 cur.execute("SELECT COUNT(*) as count FROM crawl_locks")
                 locked_count = cur.fetchone()['count']
             except psycopg2_errors.UndefinedTable:
-                # Table doesn't exist yet - create it
+                # Table doesn't exist yet - rollback the failed transaction first
+                conn.rollback()
                 logger.warning("crawl_locks table does not exist, creating it...")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS crawl_locks (
