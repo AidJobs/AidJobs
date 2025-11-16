@@ -159,6 +159,11 @@ def main():
         );
         
         -- Create crawl_logs table if it doesn't exist (required for crawl history tracking)
+        CREATE TABLE IF NOT EXISTS crawl_locks (
+            source_id UUID PRIMARY KEY,
+            locked_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        
         CREATE TABLE IF NOT EXISTS crawl_logs (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             source_id UUID REFERENCES sources(id) ON DELETE CASCADE,
@@ -317,6 +322,22 @@ def main():
                 print("[OK] domain_policies table already exists")
         else:
             print("[WARN] domain_policies table was not created")
+        
+        # Verify crawl_locks table was created
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'crawl_locks'
+            )
+        """)
+        crawl_locks_exists_after = cursor.fetchone()[0]
+        if crawl_locks_exists_after:
+            if not crawl_locks_exists:
+                print("[OK] Created crawl_locks table")
+            else:
+                print("[OK] crawl_locks table already exists")
+        else:
+            print("[WARN] crawl_locks table was not created")
         
         # Verify crawl_logs table was created
         cursor.execute("""
