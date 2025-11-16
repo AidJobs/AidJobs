@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
-
-type Source = {
-  id: string;
-  org_name: string | null;
-  careers_url: string;
-  status: string;
-  next_run_at: string | null;
-  last_crawled_at: string | null;
-  last_crawl_status: string | null;
+type CrawlStatus = {
+  running: boolean;
+  pool: {
+    global_max: number;
+    available: number;
+  };
+  due_count: number;
+  locked: number;
+  in_flight: number;
 };
 
 type CrawlLog = {
@@ -31,87 +31,20 @@ type CrawlLog = {
   ran_at: string;
 };
 
-type CrawlStatus = {
-  running: boolean;
-  pool: {
-    global_max: number;
-    available: number;
-  };
-  due_count: number;
-  locked: number;
-  in_flight: number;
-};
-
-type DomainPolicy = {
-  host: string;
-  max_concurrency: number;
-  min_request_interval_ms: number;
-  max_pages: number;
-  max_kb_per_page: number;
-  allow_js: boolean;
-};
-
 export default function AdminCrawlPage() {
   const router = useRouter();
-  const [sources, setSources] = useState<Source[]>([]);
-  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
-  const [logs, setLogs] = useState<CrawlLog[]>([]);
   const [crawlStatus, setCrawlStatus] = useState<CrawlStatus | null>(null);
+  const [logs, setLogs] = useState<CrawlLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showPolicyEditor, setShowPolicyEditor] = useState(false);
-  const [policyHost, setPolicyHost] = useState('');
-  const [policy, setPolicy] = useState<DomainPolicy>({
-    host: '',
-    max_concurrency: 1,
-    min_request_interval_ms: 3000,
-    max_pages: 10,
-    max_kb_per_page: 1024,
-    allow_js: false,
-  });
-
-  const fetchSources = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: '1',
-        size: '100',
-        status: statusFilter,
-      });
-      
-      if (searchQuery) {
-        params.append('query', searchQuery);
-      }
-
-      const res = await fetch(`/api/admin/sources?${params}`, {
-        credentials: 'include',
-      });
-
-      if (res.status === 401) {
-        router.push('/admin/login');
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch sources');
-      }
-
-      const json = await res.json();
-      setSources(json.data.items);
-    } catch (error) {
-      console.error('Failed to fetch sources:', error);
-      toast.error('Failed to fetch sources');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, searchQuery, router]);
+  const [runningDue, setRunningDue] = useState(false);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchCrawlStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/crawl/status', {
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (res.status === 401) {
@@ -127,25 +60,19 @@ export default function AdminCrawlPage() {
       const json = await res.json();
       if (json.status === 'ok' && json.data) {
         setCrawlStatus(json.data);
-      } else {
-        console.error('Invalid crawl status response:', json);
       }
     } catch (error) {
       console.error('Failed to fetch crawl status:', error);
-      // Don't show toast for status - it's not critical
+      // Don't show toast - auto-refresh will retry
     }
   }, [router]);
 
-  const fetchLogs = useCallback(async (sourceId?: string) => {
+  const fetchLogs = useCallback(async () => {
     setLogsLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '50' });
-      if (sourceId) {
-        params.append('source_id', sourceId);
-      }
-
-      const res = await fetch(`/api/admin/crawl/logs?${params}`, {
+      const res = await fetch('/api/admin/crawl/logs?limit=15', {
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (res.status === 401) {
@@ -163,472 +90,283 @@ export default function AdminCrawlPage() {
         setLogs(json.data);
       } else {
         setLogs([]);
-        console.error('Invalid logs response:', json);
       }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch logs');
       setLogs([]);
     } finally {
       setLogsLoading(false);
     }
   }, [router]);
 
-  useEffect(() => {
-    fetchSources();
-    fetchCrawlStatus();
-    fetchLogs();
-  }, [statusFilter, searchQuery, fetchSources, fetchCrawlStatus, fetchLogs]);
-
-  useEffect(() => {
-    if (selectedSourceId) {
-      fetchLogs(selectedSourceId);
-    } else {
-      fetchLogs();
-    }
-  }, [selectedSourceId, fetchLogs]);
-
-  const handleRunSource = async (sourceId: string) => {
-    try {
-      const res = await fetch('/api/admin/crawl/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ source_id: sourceId }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to run crawl');
-      }
-
-      const json = await res.json();
-      toast.success(json.message || 'Crawl queued');
-      
-      setTimeout(() => {
-        fetchCrawlStatus();
-        fetchLogs(selectedSourceId || undefined);
-      }, 1000);
-    } catch (error: any) {
-      console.error('Failed to run crawl:', error);
-      toast.error(error.message || 'Failed to run crawl');
-    }
-  };
-
   const handleRunDue = async () => {
+    setRunningDue(true);
     try {
       const res = await fetch('/api/admin/crawl/run_due', {
         method: 'POST',
         credentials: 'include',
       });
 
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to run due crawls');
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to run due crawls');
       }
 
       const json = await res.json();
-      toast.success(`Queued ${json.data.queued || 0} crawls`);
+      const queued = json.data?.queued || 0;
+      toast.success(`Queued ${queued} crawl${queued !== 1 ? 's' : ''}`);
       
+      // Refresh status and logs after a short delay
       setTimeout(() => {
         fetchCrawlStatus();
-        fetchLogs(selectedSourceId || undefined);
+        fetchLogs();
       }, 1000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to run due crawls:', error);
-      toast.error(error.message || 'Failed to run due crawls');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to run due crawls';
+      toast.error(errorMsg);
+    } finally {
+      setRunningDue(false);
     }
   };
 
-  const handleRefreshStatus = () => {
-    fetchCrawlStatus();
-    fetchSources();
-    fetchLogs(selectedSourceId || undefined);
+  const handleRefresh = async () => {
+    setLoading(true);
+    await Promise.all([fetchCrawlStatus(), fetchLogs()]);
+    setLoading(false);
     toast.success('Status refreshed');
   };
 
-  const handleOpenPolicyEditor = async (sourceUrl: string) => {
-    try {
-      const url = new URL(sourceUrl);
-      const host = url.hostname;
-      setPolicyHost(host);
-      
-      const res = await fetch(`/api/admin/domain_policies/${host}`, {
-        credentials: 'include',
-      });
+  // Initial fetch
+  useEffect(() => {
+    const init = async () => {
+      await Promise.all([fetchCrawlStatus(), fetchLogs()]);
+      setLoading(false);
+    };
+    init();
+  }, [fetchCrawlStatus, fetchLogs]);
 
-      if (!res.ok) {
-        throw new Error('Failed to fetch policy');
+  // Auto-refresh every 5 seconds
+  useEffect(() => {
+    refreshIntervalRef.current = setInterval(() => {
+      fetchCrawlStatus();
+      fetchLogs();
+    }, 5000);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
       }
+    };
+  }, [fetchCrawlStatus, fetchLogs]);
 
-      const json = await res.json();
-      setPolicy(json.data);
-      setShowPolicyEditor(true);
-    } catch (error: any) {
-      console.error('Failed to fetch policy:', error);
-      toast.error(error.message || 'Failed to fetch policy');
-    }
-  };
-
-  const handleSavePolicy = async () => {
-    try {
-      const res = await fetch(`/api/admin/domain_policies/${policyHost}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          max_concurrency: policy.max_concurrency,
-          min_request_interval_ms: policy.min_request_interval_ms,
-          max_pages: policy.max_pages,
-          max_kb_per_page: policy.max_kb_per_page,
-          allow_js: policy.allow_js,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to save policy');
-      }
-
-      toast.success('Policy saved');
-      setShowPolicyEditor(false);
-    } catch (error: any) {
-      console.error('Failed to save policy:', error);
-      toast.error(error.message || 'Failed to save policy');
-    }
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Never';
+  const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleString();
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const formatDuration = (ms: number | null) => {
-    if (!ms) return 'N/A';
+    if (!ms) return '-';
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
-  const selectedSource = sources.find(s => s.id === selectedSourceId);
-
   return (
-    <div>
-      <div className="border-b border-gray-200 bg-white">
-        <div className="max-w-[1800px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Crawler Status</h1>
-              <p className="text-sm text-gray-600 mt-1">Monitor and manage web crawler</p>
+    <div className="h-full overflow-y-auto p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Crawler</h1>
+            <p className="text-caption text-[#86868B]">Monitor crawl activity and status</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRunDue}
+              disabled={runningDue}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#0071E3] hover:bg-[#0077ED] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+              title="Run due sources"
+            >
+              {runningDue ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 text-white" />
+              )}
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                Run due sources
+              </span>
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+              title="Refresh status"
+            >
+              <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                Refresh status
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Overview */}
+        {crawlStatus && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#86868B]" />
+                  <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Status</h2>
+                </div>
+                {crawlStatus.running ? (
+                  <div className="w-2 h-2 bg-[#30D158] rounded-full relative group">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Running
+                    </span>
+                  </div>
+                ) : (
+                  <div className="w-2 h-2 bg-[#86868B] rounded-full relative group">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                      Stopped
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="text-2xl font-semibold text-[#1D1D1F]">
+                {crawlStatus.running ? 'Running' : 'Stopped'}
+              </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleRunDue}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Run Due Sources
-              </button>
-              <button
-                onClick={handleRefreshStatus}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Refresh Status
-              </button>
+
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Queued</h2>
+              </div>
+              <div className="text-2xl font-semibold text-[#1D1D1F]">
+                {crawlStatus.due_count || 0}
+              </div>
+              <div className="text-caption text-[#86868B] mt-1">Sources due for crawl</div>
+            </div>
+
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Active</h2>
+              </div>
+              <div className="text-2xl font-semibold text-[#1D1D1F]">
+                {crawlStatus.in_flight || 0}
+              </div>
+              <div className="text-caption text-[#86868B] mt-1">Crawls in progress</div>
+            </div>
+
+            <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-[#86868B]" />
+                <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Available</h2>
+              </div>
+              <div className="text-2xl font-semibold text-[#1D1D1F]">
+                {crawlStatus.pool.available}/{crawlStatus.pool.global_max}
+              </div>
+              <div className="text-caption text-[#86868B] mt-1">Concurrent slots</div>
             </div>
           </div>
+        )}
 
-          {crawlStatus && (
-            <div className="grid grid-cols-5 gap-4 text-sm">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-gray-600 mb-1">Status</div>
-                <div className="text-lg font-semibold text-gray-900">
-                  {crawlStatus.running ? (
-                    <span className="text-green-600">Running</span>
-                  ) : (
-                    <span className="text-gray-600">Stopped</span>
-                  )}
+        {/* Recent Activity */}
+        <div className="bg-white border border-[#D2D2D7] rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-[#86868B]" />
+            <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Recent Activity</h2>
+          </div>
+
+          {logsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-caption text-[#86868B]">No crawl activity yet</div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="bg-[#F5F5F7] rounded-lg p-3 border border-[#D2D2D7] hover:bg-[#E5E5E7] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        {log.status === 'ok' || log.status === 'success' ? (
+                          <div className="w-2 h-2 bg-[#30D158] rounded-full flex-shrink-0"></div>
+                        ) : log.status === 'fail' || log.status === 'error' ? (
+                          <div className="w-2 h-2 bg-[#FF3B30] rounded-full flex-shrink-0"></div>
+                        ) : (
+                          <div className="w-2 h-2 bg-[#FF9500] rounded-full flex-shrink-0"></div>
+                        )}
+                        <span className="text-body-sm font-semibold text-[#1D1D1F] truncate">
+                          {log.org_name || 'Unnamed'}
+                        </span>
+                        <span className="text-caption text-[#86868B] flex-shrink-0">
+                          {formatDate(log.ran_at)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-caption-sm text-[#86868B]">Found:</span>
+                          <span className="text-body-sm font-semibold text-[#1D1D1F]">{log.found}</span>
+                        </div>
+                        {log.inserted > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-caption-sm text-[#86868B]">+</span>
+                            <span className="text-body-sm font-semibold text-[#30D158]">{log.inserted}</span>
+                          </div>
+                        )}
+                        {log.updated > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-caption-sm text-[#86868B]">~</span>
+                            <span className="text-body-sm font-semibold text-[#0071E3]">{log.updated}</span>
+                          </div>
+                        )}
+                        {log.duration_ms !== null && log.duration_ms !== undefined && (
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <Clock className="w-3 h-3 text-[#86868B]" />
+                            <span className="text-caption-sm text-[#86868B]">{formatDuration(log.duration_ms)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {log.message && (
+                        <div className="mt-2 pt-2 border-t border-[#D2D2D7]">
+                          <p className="text-caption-sm text-[#86868B] line-clamp-2">{log.message}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-gray-600 mb-1">Due Now</div>
-                <div className="text-lg font-semibold text-gray-900">{crawlStatus.due_count}</div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-gray-600 mb-1">In Flight</div>
-                <div className="text-lg font-semibold text-gray-900">{crawlStatus.in_flight}</div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-gray-600 mb-1">Available Slots</div>
-                <div className="text-lg font-semibold text-gray-900">{crawlStatus.pool.available}/{crawlStatus.pool.global_max}</div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <div className="text-gray-600 mb-1">Locked</div>
-                <div className="text-lg font-semibold text-gray-900">{crawlStatus.locked}</div>
-              </div>
+              ))}
             </div>
           )}
         </div>
       </div>
-
-      <div className="max-w-[1800px] mx-auto px-6 py-6">
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-1">
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sources</h2>
-              
-              <div className="mb-4 space-y-2">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                >
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-
-              {loading ? (
-                <div className="text-center text-gray-600 py-8">Loading...</div>
-              ) : sources.length === 0 ? (
-                <div className="text-center text-gray-600 py-8">No sources found</div>
-              ) : (
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                  {sources.map((source) => (
-                    <div
-                      key={source.id}
-                      onClick={() => setSelectedSourceId(source.id)}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedSourceId === source.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-gray-200 bg-white hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="font-medium text-gray-900 mb-1">
-                        {source.org_name || 'Unnamed'}
-                      </div>
-                      <div className="text-xs text-gray-600 mb-2 truncate">
-                        {source.careers_url}
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className={`px-2 py-0.5 rounded ${
-                          source.status === 'active' ? 'bg-green-100 text-green-700' :
-                          source.status === 'paused' ? 'bg-gray-100 text-gray-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {source.status}
-                        </span>
-                        {source.last_crawl_status && (
-                          <span className={`px-2 py-0.5 rounded ${
-                            source.last_crawl_status === 'success' ? 'bg-green-100 text-green-700' :
-                            source.last_crawl_status === 'failed' ? 'bg-red-100 text-red-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {source.last_crawl_status}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600 mt-2">
-                        Next: {formatDate(source.next_run_at)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="col-span-2 space-y-6">
-            {selectedSource && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      {selectedSource.org_name || 'Unnamed'}
-                    </h2>
-                    <p className="text-sm text-gray-600">{selectedSource.careers_url}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleRunSource(selectedSource.id)}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
-                    >
-                      Run Now
-                    </button>
-                    <button
-                      onClick={() => handleOpenPolicyEditor(selectedSource.careers_url)}
-                      className="px-3 py-1.5 bg-white border border-gray-200 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors text-sm"
-                    >
-                      Domain Policy
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Crawl Logs {selectedSource && `(${selectedSource.org_name || 'Unnamed'})`}
-              </h2>
-
-              {logsLoading ? (
-                <div className="text-center text-gray-600 py-8">Loading...</div>
-              ) : logs.length === 0 ? (
-                <div className="text-center text-gray-600 py-8">No logs found</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left">
-                        <th className="pb-2 text-gray-600 font-medium">Time</th>
-                        <th className="pb-2 text-gray-600 font-medium">Org</th>
-                        <th className="pb-2 text-gray-600 font-medium text-right">Found</th>
-                        <th className="pb-2 text-gray-600 font-medium text-right">Inserted</th>
-                        <th className="pb-2 text-gray-600 font-medium text-right">Updated</th>
-                        <th className="pb-2 text-gray-600 font-medium text-right">Skipped</th>
-                        <th className="pb-2 text-gray-600 font-medium text-right">Duration</th>
-                        <th className="pb-2 text-gray-600 font-medium">Status</th>
-                        <th className="pb-2 text-gray-600 font-medium">Message</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logs.map((log) => (
-                        <tr key={log.id} className="border-b border-gray-200">
-                          <td className="py-2 text-gray-900">{formatDate(log.ran_at)}</td>
-                          <td className="py-2 text-gray-900">{log.org_name || 'Unnamed'}</td>
-                          <td className="py-2 text-gray-900 text-right">{log.found}</td>
-                          <td className="py-2 text-gray-900 text-right">{log.inserted}</td>
-                          <td className="py-2 text-gray-900 text-right">{log.updated}</td>
-                          <td className="py-2 text-gray-900 text-right">{log.skipped}</td>
-                          <td className="py-2 text-gray-900 text-right">{formatDuration(log.duration_ms)}</td>
-                          <td className="py-2">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              log.status === 'success' ? 'bg-green-100 text-green-700' :
-                              log.status === 'failed' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {log.status}
-                            </span>
-                          </td>
-                          <td className="py-2 text-gray-600 text-xs max-w-xs truncate">
-                            {log.message || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {showPolicyEditor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Domain Policy: {policyHost}
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Max Concurrency
-                </label>
-                <input
-                  type="number"
-                  value={policy.max_concurrency}
-                  onChange={(e) => setPolicy({ ...policy, max_concurrency: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                  min="1"
-                  max="10"
-                />
-                <p className="text-xs text-gray-600 mt-1">Simultaneous requests to this domain</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Min Request Interval (ms)
-                </label>
-                <input
-                  type="number"
-                  value={policy.min_request_interval_ms}
-                  onChange={(e) => setPolicy({ ...policy, min_request_interval_ms: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                  min="100"
-                  max="60000"
-                  step="100"
-                />
-                <p className="text-xs text-gray-600 mt-1">Delay between requests to this domain</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Max Pages
-                </label>
-                <input
-                  type="number"
-                  value={policy.max_pages}
-                  onChange={(e) => setPolicy({ ...policy, max_pages: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                  min="1"
-                  max="100"
-                />
-                <p className="text-xs text-gray-600 mt-1">Maximum pages to crawl per session</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">
-                  Max KB per Page
-                </label>
-                <input
-                  type="number"
-                  value={policy.max_kb_per_page}
-                  onChange={(e) => setPolicy({ ...policy, max_kb_per_page: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900"
-                  min="100"
-                  max="10240"
-                  step="100"
-                />
-                <p className="text-xs text-gray-600 mt-1">Maximum page size to download</p>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="allow_js"
-                  checked={policy.allow_js}
-                  onChange={(e) => setPolicy({ ...policy, allow_js: e.target.checked })}
-                  className="mr-2"
-                />
-                <label htmlFor="allow_js" className="text-sm font-medium text-gray-900">
-                  Allow JavaScript
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleSavePolicy}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Save Policy
-              </button>
-              <button
-                onClick={() => setShowPolicyEditor(false)}
-                className="flex-1 px-4 py-2 bg-white border border-gray-200 text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
