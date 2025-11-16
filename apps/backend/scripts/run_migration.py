@@ -89,6 +89,17 @@ def main():
         domain_policies_exists = cursor.fetchone()[0]
         print(f"  domain_policies table exists: {domain_policies_exists}")
         
+        # Check if crawl_locks table exists
+        print("Checking crawl_locks table...")
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'crawl_locks'
+            )
+        """)
+        crawl_locks_exists = cursor.fetchone()[0]
+        print(f"  crawl_locks table exists: {crawl_locks_exists}")
+        
         # Migration SQL
         migration_sql = """
         -- Add org_type column (used in admin sources - INSERT/UPDATE/SELECT)
