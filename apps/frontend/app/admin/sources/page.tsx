@@ -232,9 +232,10 @@ export default function AdminSourcesPage() {
   const refreshCrawlDetails = useCallback(
     async (sourceId: string) => {
       try {
-        // Fetch fresh source data
+        // Fetch fresh source data - use cache: 'no-store' to ensure fresh data
         const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
           credentials: 'include',
+          cache: 'no-store',
         });
         if (sourceRes.ok) {
           const sourceJson = await sourceRes.json();
