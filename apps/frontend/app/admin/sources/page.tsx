@@ -70,6 +70,8 @@ export default function AdminSourcesPage() {
   const [selectedSourceForDetails, setSelectedSourceForDetails] = useState<Source | null>(null);
   const [crawlLogs, setCrawlLogs] = useState<any[]>([]);
   const [loadingCrawlLogs, setLoadingCrawlLogs] = useState(false);
+  // Track which source was just crawled to give clear visual feedback
+  const [recentlyRanSourceId, setRecentlyRanSourceId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -157,6 +159,7 @@ export default function AdminSourcesPage() {
     }
   }, [isDragging, dragStart, activeModalRef]);
 
+  // Track which source is currently running a manual crawl
   // AbortController ref for race condition protection
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -225,50 +228,58 @@ export default function AdminSourcesPage() {
   }, [page, statusFilter, searchQuery, fetchSources]);
 
   // Refresh source data and crawl logs when drawer is open
-  useEffect(() => {
-    if (showCrawlDetails && selectedSourceForDetails) {
-      const refreshData = async () => {
-        try {
-          // Fetch fresh source data
-          const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
-            credentials: 'include',
-          });
-          if (sourceRes.ok) {
-            const sourceJson = await sourceRes.json();
-            if (sourceJson.status === 'ok' && sourceJson.data?.items) {
-              const freshSource = sourceJson.data.items.find((s: Source) => s.id === selectedSourceForDetails.id);
-              if (freshSource) {
-                setSelectedSourceForDetails(freshSource);
-              }
+  // Shared helper to refresh source + crawl logs for a given source id
+  const refreshCrawlDetails = useCallback(
+    async (sourceId: string) => {
+      try {
+        // Fetch fresh source data
+        const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
+          credentials: 'include',
+        });
+        if (sourceRes.ok) {
+          const sourceJson = await sourceRes.json();
+          if (sourceJson.status === 'ok' && sourceJson.data?.items) {
+            const freshSource = sourceJson.data.items.find((s: Source) => s.id === sourceId);
+            if (freshSource) {
+              setSelectedSourceForDetails(freshSource);
             }
           }
-          
-          // Refresh crawl logs - always fetch fresh data
-          const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${selectedSourceForDetails.id}&limit=10`, {
-            credentials: 'include',
-            cache: 'no-store',
-          });
-          if (logsRes.ok) {
-            const logsJson = await logsRes.json();
-            if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
-              setCrawlLogs(logsJson.data);
-            } else {
-              setCrawlLogs([]);
-            }
+        }
+
+        // Refresh crawl logs - always fetch fresh data
+        const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${sourceId}&limit=10`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (logsRes.ok) {
+          const logsJson = await logsRes.json();
+          if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
+            setCrawlLogs(logsJson.data);
           } else {
             setCrawlLogs([]);
           }
-        } catch (error) {
-          console.error('Failed to refresh crawl details:', error);
+        } else {
+          setCrawlLogs([]);
         }
-      };
-      
-      // Refresh immediately and then every 5 seconds while drawer is open
-      refreshData();
-      const interval = setInterval(refreshData, 5000);
+      } catch (error) {
+        console.error('Failed to refresh crawl details:', error);
+      }
+    },
+    []
+  );
+
+  // Auto-refresh source data and crawl logs when drawer is open
+  useEffect(() => {
+    if (showCrawlDetails && selectedSourceForDetails) {
+      // Refresh immediately and then every 3 seconds while drawer is open
+      refreshCrawlDetails(selectedSourceForDetails.id);
+      const interval = setInterval(
+        () => refreshCrawlDetails(selectedSourceForDetails.id!),
+        3000
+      );
       return () => clearInterval(interval);
     }
-  }, [showCrawlDetails, selectedSourceForDetails?.id]);
+  }, [showCrawlDetails, selectedSourceForDetails?.id, refreshCrawlDetails]);
 
   const fetchPresets = useCallback(async () => {
     setLoadingPresets(true);
@@ -771,6 +782,8 @@ export default function AdminSourcesPage() {
     }
 
     setRunningSourceId(id);
+    // Mark this source as recently triggered so we can highlight it for a short period
+    setRecentlyRanSourceId(id);
     try {
       toast.info('Starting crawl...');
       
@@ -794,11 +807,19 @@ export default function AdminSourcesPage() {
 
       const json = await res.json();
       if (json.status === 'ok') {
-        toast.success(json.message || 'Crawl started successfully');
-        // Refresh sources after a short delay to show updated status
-        setTimeout(() => {
-          fetchSources();
-        }, 1000);
+        const message =
+          json.data?.message ||
+          json.message ||
+          'Crawl completed. Open the crawl details panel to see results.';
+        toast.success(message);
+
+        // Immediately refresh sources to pick up updated last_crawl_* fields
+        fetchSources();
+
+        // If the crawl details drawer is open for this source, refresh its logs right away
+        if (showCrawlDetails && selectedSourceForDetails?.id === id) {
+          await refreshCrawlDetails(id);
+        }
       } else {
         throw new Error(json.error || 'Failed to trigger crawl');
       }
@@ -808,6 +829,10 @@ export default function AdminSourcesPage() {
       toast.error(errorMsg);
     } finally {
       setRunningSourceId(null);
+      // Clear the highlight after a short delay so the user sees which source just ran
+      setTimeout(() => {
+        setRecentlyRanSourceId((current) => (current === id ? null : current));
+      }, 8000);
     }
   };
 
@@ -965,7 +990,18 @@ export default function AdminSourcesPage() {
                           ) : source.last_crawl_status ? (
                             <div className="w-2 h-2 bg-[#FF9500] rounded-full"></div>
                           ) : null}
-                          <span className="text-caption text-[#86868B]">{formatDate(source.last_crawled_at)}</span>
+                          {runningSourceId === source.id ? (
+                            <>
+                              <div className="w-2 h-2 bg-[#FF9500] rounded-full animate-pulse"></div>
+                              <span className="text-caption text-[#FF9500]">Running…</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-caption text-[#86868B]">
+                                {formatDate(source.last_crawled_at)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-caption">
@@ -1162,40 +1198,10 @@ export default function AdminSourcesPage() {
                               setSelectedSourceForDetails(source);
                               setShowCrawlDetails(true);
                               setLoadingCrawlLogs(true);
-                              
+
                               try {
-                                // Fetch fresh source data - use the sources list endpoint with query filter
-                                const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all`, {
-                                  credentials: 'include',
-                                });
-                                if (sourceRes.ok) {
-                                  const sourceJson = await sourceRes.json();
-                                  if (sourceJson.status === 'ok' && sourceJson.data?.items) {
-                                    const freshSource = sourceJson.data.items.find((s: Source) => s.id === source.id);
-                                    if (freshSource) {
-                                      setSelectedSourceForDetails(freshSource);
-                                    } else {
-                                      // If not found in list, keep the current source
-                                      setSelectedSourceForDetails(source);
-                                    }
-                                  }
-                                }
-                                
-                                // Fetch crawl logs - always fetch fresh data
-                                const logsRes = await fetch(`/api/admin/crawl/logs?source_id=${source.id}&limit=10`, {
-                                  credentials: 'include',
-                                  cache: 'no-store',
-                                });
-                                if (logsRes.ok) {
-                                  const logsJson = await logsRes.json();
-                                  if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
-                                    setCrawlLogs(logsJson.data);
-                                  } else {
-                                    setCrawlLogs([]);
-                                  }
-                                } else {
-                                  setCrawlLogs([]);
-                                }
+                                // Use shared helper to refresh both source and logs
+                                await refreshCrawlDetails(source.id);
                               } catch (error) {
                                 console.error('Failed to fetch crawl details:', error);
                                 setCrawlLogs([]);
