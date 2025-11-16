@@ -19,20 +19,26 @@ from core.domain_limits import DomainLimiter
 logger = logging.getLogger(__name__)
 
 # Common job listing selectors (heuristics)
+# These work generically across most job sites without needing per-site configuration
 JOB_SELECTORS = [
+    # Standard job listing classes
     '.job-listing', '.job-item', '.career-item', '.position',
     'article.job', 'div.vacancy', 'tr.job-row', 'li.job',
-    # Additional common patterns
+    # Additional common patterns (attribute contains)
     '[class*="job"]', '[class*="position"]', '[class*="vacancy"]', '[class*="career"]',
     '[class*="opening"]', '[id*="job"]', '[id*="position"]', '[id*="vacancy"]',
     'article[class*="job"]', 'div[class*="job"]', 'li[class*="job"]',
     'tr[class*="job"]', 'section[class*="job"]', 'div[class*="position"]',
-    # Table-based listings
+    # Table-based listings (common in UN/INGO sites)
     'tbody tr', 'table tr[data-job]', 'table tr[data-position]',
+    'table tbody tr', 'tr[class*="row"]', 'tr[class*="item"]',
     # List-based listings
     'ul.jobs li', 'ol.jobs li', 'ul.positions li', 'ul.vacancies li',
+    'ul[class*="job"] li', 'ol[class*="job"] li',
     # Card-based listings
-    '.card[class*="job"]', '.card[class*="position"]', '[role="article"]'
+    '.card[class*="job"]', '.card[class*="position"]', '[role="article"]',
+    # Generic content containers with job-like patterns
+    'div[class*="listing"]', 'div[class*="posting"]', 'div[class*="opportunity"]'
 ]
 
 # Location patterns for parsing
@@ -175,31 +181,42 @@ class HTMLCrawler:
                 logger.debug(f"[html_fetch] Found {len(microdata_jobs)} jobs via microdata")
                 job_elements = microdata_jobs[:50]
         
-        # Additional fallback: try more generic patterns for UNESCO-style sites
+        # Additional fallback: try more generic patterns for UN/INGO organization sites
+        # This works for UNESCO, UNDP, and similar sites without needing per-site configuration
         if not job_elements:
-            # Look for common UNESCO/UN organization patterns
-            # Try finding table rows with job-like content
+            # Strategy 1: Look for table rows with job-like content (common in UN sites)
             table_rows = soup.find_all('tr')
             for tr in table_rows:
                 text = tr.get_text().lower()
                 # Check if row contains job-related keywords
-                if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer']):
+                if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer', 'manager', 'coordinator']):
                     # Check if it has a link (likely a job listing)
                     if tr.find('a', href=True):
                         job_elements.append(tr)
                         if len(job_elements) >= 50:
                             break
             
-            # Try finding divs/sections with job-like content
+            # Strategy 2: Try finding divs/sections with job-like content
             if not job_elements:
                 all_divs = soup.find_all(['div', 'section', 'article'])
                 for div in all_divs:
                     text = div.get_text().lower()
                     # Check for job keywords and presence of a link
-                    if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity']) and div.find('a', href=True):
+                    if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer']) and div.find('a', href=True):
                         # Make sure it's not too large (likely a container, not a single job)
                         if len(text) < 2000:  # Reasonable size for a single job listing
                             job_elements.append(div)
+                            if len(job_elements) >= 50:
+                                break
+            
+            # Strategy 3: Look for list items (li) with job-like content
+            if not job_elements:
+                list_items = soup.find_all('li')
+                for li in list_items:
+                    text = li.get_text().lower()
+                    if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity']) and li.find('a', href=True):
+                        if len(text) < 1000:  # Reasonable size for a list item job listing
+                            job_elements.append(li)
                             if len(job_elements) >= 50:
                                 break
         
