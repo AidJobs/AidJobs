@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2 import errors as psycopg2_errors
 
 from security.admin_auth import admin_required
 from orchestrator import get_orchestrator
@@ -116,9 +117,22 @@ async def get_status(admin=Depends(admin_required)):
             """)
             due_count = cur.fetchone()['count']
             
-            # Get locked count
-            cur.execute("SELECT COUNT(*) as count FROM crawl_locks")
-            locked_count = cur.fetchone()['count']
+            # Get locked count - handle missing table gracefully
+            locked_count = 0
+            try:
+                cur.execute("SELECT COUNT(*) as count FROM crawl_locks")
+                locked_count = cur.fetchone()['count']
+            except psycopg2_errors.UndefinedTable:
+                # Table doesn't exist yet - create it
+                logger.warning("crawl_locks table does not exist, creating it...")
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS crawl_locks (
+                        source_id UUID PRIMARY KEY,
+                        locked_at TIMESTAMPTZ DEFAULT NOW()
+                    )
+                """)
+                conn.commit()
+                locked_count = 0
     finally:
         conn.close()
     
