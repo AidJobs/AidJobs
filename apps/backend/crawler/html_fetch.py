@@ -137,10 +137,14 @@ class HTMLCrawler:
                 link for link in all_links
                 if any(keyword in link.get_text().lower() for keyword in [
                     'position', 'job', 'vacancy', 'career', 'opening', 'opportunity',
-                    'recruitment', 'hiring', 'apply', 'application', 'posting'
+                    'recruitment', 'hiring', 'apply', 'application', 'posting',
+                    'consultant', 'specialist', 'officer', 'manager', 'coordinator',
+                    'programme', 'project', 'fellowship', 'internship'
                 ]) or any(keyword in link.get('href', '').lower() for keyword in [
                     '/job', '/position', '/vacancy', '/career', '/opening', '/opportunity',
-                    '/recruitment', '/hiring', '/apply', '/application', '/posting'
+                    '/recruitment', '/hiring', '/apply', '/application', '/posting',
+                    '/consultant', '/specialist', '/officer', '/post', '/vacancies',
+                    '/opportunities', '/employment', '/work-with-us'
                 ])
             ]
             if job_links:
@@ -259,14 +263,23 @@ class HTMLCrawler:
             return job
         
         # Handle HTML elements
-        # Title
-        title_elem = elem.find(['h1', 'h2', 'h3', 'h4', 'a'])
+        # Title - try multiple strategies
+        title_elem = elem.find(['h1', 'h2', 'h3', 'h4', 'h5', 'a', 'strong', 'b'])
         if title_elem:
             job['title'] = title_elem.get_text().strip()
         else:
-            job['title'] = elem.get_text().strip()[:200]
+            # Try to find title in first line or first strong/bold element
+            first_line = elem.get_text().split('\n')[0].strip()
+            if first_line and len(first_line) > 10:
+                job['title'] = first_line[:200]
+            else:
+                job['title'] = elem.get_text().strip()[:200]
         
-        if not job['title']:
+        # Clean up title (remove extra whitespace, newlines)
+        if job['title']:
+            job['title'] = ' '.join(job['title'].split())
+        
+        if not job['title'] or len(job['title']) < 3:
             return None
         
         # Apply URL
