@@ -72,6 +72,8 @@ export default function AdminSourcesPage() {
   const [loadingCrawlLogs, setLoadingCrawlLogs] = useState(false);
   // Track which source was just crawled to give clear visual feedback
   const [recentlyRanSourceId, setRecentlyRanSourceId] = useState<string | null>(null);
+  // Ref to track auto-refresh interval
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -230,7 +232,10 @@ export default function AdminSourcesPage() {
   // Refresh source data and crawl logs when drawer is open
   // Shared helper to refresh source + crawl logs for a given source id
   const refreshCrawlDetails = useCallback(
-    async (sourceId: string) => {
+    async (sourceId: string, silent: boolean = false) => {
+      if (!silent) {
+        setLoadingCrawlLogs(true);
+      }
       try {
         // Fetch fresh source data - use cache: 'no-store' and timestamp to ensure fresh data
         const sourceRes = await fetch(`/api/admin/sources?page=1&size=100&status=all&_t=${Date.now()}`, {
@@ -256,14 +261,21 @@ export default function AdminSourcesPage() {
           const logsJson = await logsRes.json();
           if (logsJson.status === 'ok' && logsJson.data && Array.isArray(logsJson.data)) {
             setCrawlLogs(logsJson.data);
+            console.log(`[CrawlDetails] Refreshed logs for ${sourceId}:`, logsJson.data.length, 'logs');
           } else {
+            console.warn(`[CrawlDetails] Invalid logs response for ${sourceId}:`, logsJson);
             setCrawlLogs([]);
           }
         } else {
+          console.error(`[CrawlDetails] Failed to fetch logs for ${sourceId}:`, logsRes.status);
           setCrawlLogs([]);
         }
       } catch (error) {
-        console.error('Failed to refresh crawl details:', error);
+        console.error(`[CrawlDetails] Error refreshing details for ${sourceId}:`, error);
+      } finally {
+        if (!silent) {
+          setLoadingCrawlLogs(false);
+        }
       }
     },
     []
@@ -271,14 +283,33 @@ export default function AdminSourcesPage() {
 
   // Auto-refresh source data and crawl logs when drawer is open
   useEffect(() => {
-    if (showCrawlDetails && selectedSourceForDetails) {
-      // Refresh immediately and then every 1.5 seconds while drawer is open (faster refresh)
-      refreshCrawlDetails(selectedSourceForDetails.id);
-      const interval = setInterval(
-        () => refreshCrawlDetails(selectedSourceForDetails.id!),
-        1500
-      );
-      return () => clearInterval(interval);
+    // Clear any existing interval
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+
+    if (showCrawlDetails && selectedSourceForDetails?.id) {
+      const sourceId = selectedSourceForDetails.id;
+      console.log(`[CrawlDetails] Starting auto-refresh for source ${sourceId}`);
+      
+      // Refresh immediately
+      refreshCrawlDetails(sourceId, false);
+      
+      // Set up interval for auto-refresh every 2 seconds
+      refreshIntervalRef.current = setInterval(() => {
+        console.log(`[CrawlDetails] Auto-refreshing for source ${sourceId}`);
+        refreshCrawlDetails(sourceId, true); // Silent refresh (no loading spinner)
+      }, 2000);
+
+      // Cleanup on unmount or when dependencies change
+      return () => {
+        if (refreshIntervalRef.current) {
+          console.log(`[CrawlDetails] Stopping auto-refresh for source ${sourceId}`);
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+      };
     }
   }, [showCrawlDetails, selectedSourceForDetails?.id, refreshCrawlDetails]);
 
