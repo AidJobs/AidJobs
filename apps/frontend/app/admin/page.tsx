@@ -79,6 +79,22 @@ export default function AdminPage() {
     }
   }, [router]);
 
+  // Helper to avoid dumping full HTML/error pages into the UI
+  const sanitizeErrorText = (status: number, raw: string | null | undefined) => {
+    if (!raw) return `Request failed with status ${status}`;
+    const trimmed = raw.trim();
+    // If the backend returned HTML (e.g. a 404 page with CSS like "--bg: 255 255 255"),
+    // don't show the entire document in the UI – just a concise message.
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.includes('--bg')) {
+      return `Request failed with status ${status}. Check server logs for details.`;
+    }
+    // Limit very long messages
+    if (trimmed.length > 300) {
+      return `${trimmed.slice(0, 300)}…`;
+    }
+    return trimmed;
+  };
+
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
@@ -92,9 +108,10 @@ export default function AdminPage() {
       ]);
 
       if (!dbRes.ok) {
-        const errorText = await dbRes.text();
-        console.error('DB status error:', dbRes.status, errorText);
-        setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${errorText}` });
+        const rawText = await dbRes.text().catch(() => '');
+        const safeMessage = sanitizeErrorText(dbRes.status, rawText);
+        console.error('DB status error:', dbRes.status, rawText || '(no body)');
+        setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${safeMessage}` });
       } else {
         try {
           const dbData = await dbRes.json();
@@ -109,14 +126,19 @@ export default function AdminPage() {
       try {
         if (!searchRes || !searchRes.ok) {
           const statusCode = searchRes?.status || 0;
-          let errorText = 'Unknown error';
+          let rawText: string | null = null;
           try {
-            errorText = await searchRes?.text() || 'No response from server';
+            // Attempt to read text, but guard against non-Response errors
+            if (searchRes && 'text' in searchRes && typeof searchRes.text === 'function') {
+              rawText = await (searchRes as Response).text();
+            }
           } catch (e) {
-            errorText = searchRes instanceof Error ? searchRes.message : 'Network error';
+            // Ignore, we'll fall back to a generic message
+            rawText = (e instanceof Error ? e.message : null) ?? null;
           }
-          console.error('Search status error:', statusCode, errorText);
-          setSearchStatus({ enabled: false, error: `HTTP ${statusCode}: ${errorText}` });
+          const safeMessage = sanitizeErrorText(statusCode, rawText ?? 'No response from server');
+          console.error('Search status error:', statusCode, rawText || '(no body)');
+          setSearchStatus({ enabled: false, error: `HTTP ${statusCode}: ${safeMessage}` });
         } else {
           // Read response as text first to check if it's empty
           let text = '';
