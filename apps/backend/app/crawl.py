@@ -153,9 +153,15 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                             return {'status': 'fail', 'message': 'Blocked by robots.txt', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
                         
                         if status != 200:
-                            return {'status': 'fail', 'message': f'HTTP {status}', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                            return {'status': 'fail', 'message': f'HTTP {status}: Failed to fetch HTML', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
                         
+                        # Extract jobs using the same logic as simulation
                         raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
+                        
+                        if not raw_jobs:
+                            logger.warning(f"[crawl] No jobs extracted from {careers_url}. HTML size: {size} bytes")
+                            return {'status': 'fail', 'message': f'No jobs found. HTML fetched successfully ({size} bytes) but extraction returned 0 jobs. Try adding a parser_hint CSS selector.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                        
                         normalized_jobs = [
                             html_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
