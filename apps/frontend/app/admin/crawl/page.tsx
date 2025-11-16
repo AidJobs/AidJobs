@@ -52,17 +52,42 @@ export default function AdminCrawlPage() {
       }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to fetch crawl status');
+        let errorData;
+        try {
+          errorData = await res.json();
+        } catch {
+          errorData = { error: `HTTP ${res.status}: Failed to fetch crawl status` };
+        }
+        console.error('Crawl status error:', res.status, errorData);
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to fetch crawl status`;
+        toast.error(errorMsg);
+        setCrawlStatus(null);
+        return;
       }
 
       const json = await res.json();
+      
+      // Handle different response formats
       if (json.status === 'ok' && json.data) {
         setCrawlStatus(json.data);
+      } else if (json.status === 'error') {
+        // Backend returned an error
+        console.error('Crawl status error:', json.error);
+        toast.error(json.error || 'Failed to fetch crawl status');
+        setCrawlStatus(null);
+      } else if (json.data) {
+        // Some backends return data directly
+        setCrawlStatus(json.data);
+      } else {
+        // Unexpected format - log but don't show error to user
+        console.warn('Unexpected crawl status response format:', json);
+        setCrawlStatus(null);
       }
     } catch (error) {
       console.error('Failed to fetch crawl status:', error);
-      toast.error('Failed to fetch crawl status');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch crawl status';
+      toast.error(errorMsg);
+      setCrawlStatus(null);
     }
   }, [router]);
 
@@ -186,14 +211,13 @@ export default function AdminCrawlPage() {
               onClick={handleRunDue}
               disabled={runningDue}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#0071E3] hover:bg-[#0077ED] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-              title="Run due sources"
             >
               {runningDue ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Play className="w-4 h-4 text-white" />
               )}
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                 Run due sources
               </span>
             </button>
@@ -201,10 +225,9 @@ export default function AdminCrawlPage() {
               onClick={handleRefresh}
               disabled={loading}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-              title="Refresh status"
             >
               <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading ? 'animate-spin' : ''}`} />
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                 Refresh status
               </span>
             </button>
