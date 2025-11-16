@@ -851,11 +851,15 @@ export default function AdminSourcesPage() {
         // If the crawl details drawer is open for this source, refresh its logs
         // Add a small delay to ensure database transaction is committed and visible
         if (showCrawlDetails && selectedSourceForDetails?.id === id) {
-          // Refresh immediately, then again after a short delay to catch the new log
-          await refreshCrawlDetails(id);
+          console.log(`[CrawlDetails] Crawl completed for source ${id}, refreshing drawer`);
+          // Refresh immediately, then again after delays to catch the new log
+          await refreshCrawlDetails(id, false);
           setTimeout(async () => {
-            await refreshCrawlDetails(id);
+            await refreshCrawlDetails(id, true);
           }, 500);
+          setTimeout(async () => {
+            await refreshCrawlDetails(id, true);
+          }, 1500);
         }
       } else {
         throw new Error(json.error || 'Failed to trigger crawl');
@@ -1232,19 +1236,11 @@ export default function AdminSourcesPage() {
                           <button
                             onClick={async () => {
                               // Set source and open drawer immediately
+                              console.log(`[CrawlDetails] Opening drawer for source ${source.id}`);
                               setSelectedSourceForDetails(source);
                               setShowCrawlDetails(true);
-                              setLoadingCrawlLogs(true);
-
-                              try {
-                                // Use shared helper to refresh both source and logs
-                                await refreshCrawlDetails(source.id);
-                              } catch (error) {
-                                console.error('Failed to fetch crawl details:', error);
-                                setCrawlLogs([]);
-                              } finally {
-                                setLoadingCrawlLogs(false);
-                              }
+                              // refreshCrawlDetails will be called by useEffect, but we can trigger it immediately too
+                              // The useEffect will handle the auto-refresh setup
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
                             title="View crawl details"
@@ -1787,6 +1783,11 @@ export default function AdminSourcesPage() {
                 </div>
                 <button
                   onClick={() => {
+                    // Clear interval when closing drawer
+                    if (refreshIntervalRef.current) {
+                      clearInterval(refreshIntervalRef.current);
+                      refreshIntervalRef.current = null;
+                    }
                     setShowCrawlDetails(false);
                     setSelectedSourceForDetails(null);
                     setCrawlLogs([]);
