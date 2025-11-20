@@ -950,17 +950,21 @@ class SearchService:
             cursor.execute("SELECT COUNT(*) as count FROM jobs")
             jobs_count = cursor.fetchone()['count']
             
+            # Get count of active jobs (what's visible on frontend)
+            cursor.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'active'")
+            active_jobs_count = cursor.fetchone()['count']
+            
             cursor.execute("SELECT COUNT(*) as count FROM sources")
             sources_count = cursor.fetchone()['count']
             
-            # Get job counts by source for breakdown
+            # Get job counts by source for breakdown (only active jobs, what's visible on frontend)
             cursor.execute("""
                 SELECT 
                     s.id::text as source_id,
                     s.org_name,
                     COUNT(j.id) as job_count
                 FROM sources s
-                LEFT JOIN jobs j ON j.source_id = s.id
+                LEFT JOIN jobs j ON j.source_id = s.id AND j.status = 'active'
                 GROUP BY s.id, s.org_name
                 ORDER BY job_count DESC, s.org_name
             """)
@@ -977,6 +981,7 @@ class SearchService:
                 "ok": True,
                 "row_counts": {
                     "jobs": jobs_count,
+                    "active_jobs": active_jobs_count,
                     "sources": sources_count
                 },
                 "source_breakdown": source_breakdown

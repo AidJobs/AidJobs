@@ -8,6 +8,7 @@ type DbStatus = {
   ok: boolean;
   row_counts?: {
     jobs: number;
+    active_jobs?: number;
     sources: number;
   };
   source_breakdown?: Array<{
@@ -456,11 +457,19 @@ export default function AdminPage() {
               {dbStatus?.ok ? (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-caption text-[#86868B]">Jobs</span>
+                    <span className="text-caption text-[#86868B]">Total Jobs</span>
                     <span className="text-2xl font-semibold text-[#1D1D1F]">
                       {dbStatus.row_counts?.jobs || 0}
                     </span>
                   </div>
+                  {dbStatus.row_counts?.active_jobs !== undefined && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-caption text-[#86868B]">Active (Frontend)</span>
+                      <span className="text-body-lg font-semibold text-[#0071E3]">
+                        {dbStatus.row_counts.active_jobs}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-caption text-[#86868B]">Sources</span>
                     <span className="text-2xl font-semibold text-[#1D1D1F]">
