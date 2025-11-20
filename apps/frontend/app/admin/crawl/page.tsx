@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap } from 'lucide-react';
+import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap, Trash2 } from 'lucide-react';
 
 type CrawlStatus = {
   running: boolean;
@@ -38,6 +38,7 @@ export default function AdminCrawlPage() {
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [runningDue, setRunningDue] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   const fetchCrawlStatus = useCallback(async () => {
     try {
@@ -167,6 +168,42 @@ export default function AdminCrawlPage() {
     toast.success('Status refreshed');
   };
 
+  const handleCleanupExpired = async () => {
+    setCleaningUp(true);
+    try {
+      const res = await fetch('/api/admin/crawl/cleanup_expired', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to cleanup expired jobs');
+      }
+
+      const json = await res.json();
+      const deleted = json.data?.deleted || 0;
+      toast.success(`Cleaned up ${deleted} expired job${deleted !== 1 ? 's' : ''}`);
+      
+      // Refresh status after cleanup
+      setTimeout(() => {
+        fetchCrawlStatus();
+        fetchLogs();
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to cleanup expired jobs:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to cleanup expired jobs';
+      toast.error(errorMsg);
+    } finally {
+      setCleaningUp(false);
+    }
+  };
+
   // Initial fetch only - no auto-refresh to save API quota on free tiers
   useEffect(() => {
     const init = async () => {
@@ -219,6 +256,20 @@ export default function AdminCrawlPage() {
               )}
               <span className="absolute right-0 top-full mt-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
                 Run due sources
+              </span>
+            </button>
+            <button
+              onClick={handleCleanupExpired}
+              disabled={cleaningUp}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#FF3B30] hover:bg-[#FF453A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+            >
+              {cleaningUp ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 text-white" />
+              )}
+              <span className="absolute right-0 top-full mt-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                Cleanup expired jobs
               </span>
             </button>
             <button
