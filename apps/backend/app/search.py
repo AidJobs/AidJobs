@@ -944,21 +944,42 @@ class SearchService:
             # Connect with timeout (10 seconds)
             conn = psycopg2.connect(**conn_params, connect_timeout=10)
             
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             
             # Get row counts for jobs and sources tables
             cursor.execute("SELECT COUNT(*) as count FROM jobs")
-            jobs_count = cursor.fetchone()[0]
+            jobs_count = cursor.fetchone()['count']
             
             cursor.execute("SELECT COUNT(*) as count FROM sources")
-            sources_count = cursor.fetchone()[0]
+            sources_count = cursor.fetchone()['count']
+            
+            # Get job counts by source for breakdown
+            cursor.execute("""
+                SELECT 
+                    s.id::text as source_id,
+                    s.org_name,
+                    COUNT(j.id) as job_count
+                FROM sources s
+                LEFT JOIN jobs j ON j.source_id = s.id
+                GROUP BY s.id, s.org_name
+                ORDER BY job_count DESC, s.org_name
+            """)
+            source_breakdown = [
+                {
+                    "source_id": row['source_id'],
+                    "org_name": row['org_name'],
+                    "job_count": row['job_count']
+                }
+                for row in cursor.fetchall()
+            ]
             
             return {
                 "ok": True,
                 "row_counts": {
                     "jobs": jobs_count,
                     "sources": sources_count
-                }
+                },
+                "source_breakdown": source_breakdown
             }
         except Exception as e:
             logger.error(f"Database status check failed: {e}")

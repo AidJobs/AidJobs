@@ -10,6 +10,11 @@ type DbStatus = {
     jobs: number;
     sources: number;
   };
+  source_breakdown?: Array<{
+    source_id: string;
+    org_name: string;
+    job_count: number;
+  }>;
   error?: string;
 };
 
@@ -462,6 +467,23 @@ export default function AdminPage() {
                       {dbStatus.row_counts?.sources || 0}
                     </span>
                   </div>
+                  {dbStatus.source_breakdown && dbStatus.source_breakdown.length > 0 && (
+                    <div className="pt-2 border-t border-[#D2D2D7] mt-2">
+                      <div className="text-caption text-[#86868B] mb-1.5">Jobs by Source</div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {dbStatus.source_breakdown.map((source) => (
+                          <div key={source.source_id} className="flex justify-between items-center">
+                            <span className="text-caption-sm text-[#86868B] truncate flex-1 mr-2">
+                              {source.org_name || 'Unnamed'}
+                            </span>
+                            <span className="text-caption font-semibold text-[#1D1D1F] flex-shrink-0">
+                              {source.job_count}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-caption text-[#FF3B30]">
