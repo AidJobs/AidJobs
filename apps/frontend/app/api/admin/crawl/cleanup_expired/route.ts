@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,21 +11,10 @@ export async function POST(req: NextRequest) {
     const url = `${backendUrl}/admin/crawl/cleanup_expired`;
     console.log(`[proxy] POST ${url}`);
     
-    const token = cookies().get('aidjobs-admin-token')?.value;
-    
-    if (!token) {
-      return NextResponse.json(
-        { status: 'error', error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Cookie': req.headers.get('cookie') || '',
-        'Authorization': `Bearer ${token}`,
       },
       credentials: 'include',
     });
