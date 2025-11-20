@@ -482,6 +482,42 @@ class CrawlerOrchestrator:
                 # Always release lock
                 await self.release_lock(source['id'])
     
+    async def cleanup_expired_jobs(self) -> Dict:
+        """
+        Delete jobs that have passed their application deadline.
+        
+        Returns:
+            {'deleted': int, 'message': str}
+        """
+        conn = self._get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                # Delete jobs where deadline < CURRENT_DATE
+                cur.execute("""
+                    DELETE FROM jobs
+                    WHERE deadline IS NOT NULL
+                    AND deadline < CURRENT_DATE
+                """)
+                deleted_count = cur.rowcount
+                conn.commit()
+                
+                if deleted_count > 0:
+                    logger.info(f"[orchestrator] Cleaned up {deleted_count} expired job(s)")
+                
+                return {
+                    'deleted': deleted_count,
+                    'message': f'Deleted {deleted_count} expired job(s)'
+                }
+        except Exception as e:
+            logger.error(f"[orchestrator] Error cleaning up expired jobs: {e}")
+            conn.rollback()
+            return {
+                'deleted': 0,
+                'message': f'Error: {str(e)}'
+            }
+        finally:
+            conn.close()
+    
     async def run_due_sources_once(self) -> Dict:
         """Run all due sources once (for manual trigger)"""
         sources = await self.get_due_sources()
@@ -504,9 +540,29 @@ class CrawlerOrchestrator:
         
         consecutive_errors = 0
         max_consecutive_errors = 5
+        last_cleanup_time = None
+        cleanup_interval_hours = 24  # Run cleanup once per day
         
         while self.running:
             try:
+                # Run cleanup for expired jobs once per day
+                now = datetime.utcnow()
+                should_cleanup = False
+                if last_cleanup_time is None:
+                    should_cleanup = True
+                else:
+                    hours_since_cleanup = (now - last_cleanup_time).total_seconds() / 3600
+                    if hours_since_cleanup >= cleanup_interval_hours:
+                        should_cleanup = True
+                
+                if should_cleanup:
+                    try:
+                        cleanup_result = await self.cleanup_expired_jobs()
+                        logger.info(f"[orchestrator] Cleanup result: {cleanup_result['message']}")
+                        last_cleanup_time = now
+                    except Exception as cleanup_error:
+                        logger.error(f"[orchestrator] Cleanup error: {cleanup_error}")
+                
                 await self.run_due_sources_once()
                 consecutive_errors = 0  # Reset error counter on success
             except psycopg2.OperationalError as e:

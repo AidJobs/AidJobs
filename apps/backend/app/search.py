@@ -404,7 +404,16 @@ class SearchService:
         try:
             index = self.meili_client.index(self.meili_index_name)
             
-            filter_conditions = ["status = 'active'"]
+            # Calculate today's date for Meilisearch filter (format: YYYY-MM-DD)
+            from datetime import date
+            today_str = date.today().isoformat()
+            
+            # Filter by active status and exclude expired jobs
+            # Meilisearch date comparison: deadline >= today (or deadline is null)
+            filter_conditions = [
+                "status = 'active'",
+                f"(deadline IS NULL OR deadline >= {today_str})"
+            ]
             
             if filters.get('country_iso'):
                 filter_conditions.append(f"country_iso = '{filters['country_iso']}'")
@@ -532,7 +541,11 @@ class SearchService:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Build WHERE clause
-            where_conditions = ["status = 'active'"]
+            # Filter by active status and exclude expired jobs (deadline < CURRENT_DATE)
+            where_conditions = [
+                "status = 'active'",
+                "(deadline IS NULL OR deadline >= CURRENT_DATE)"
+            ]
             params = []
 
             # Search query using ILIKE
@@ -709,7 +722,9 @@ class SearchService:
             cursor.execute("""
                 SELECT country_iso, COUNT(*) as count
                 FROM jobs
-                WHERE status = 'active' AND country_iso IS NOT NULL
+                WHERE status = 'active' 
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+                AND country_iso IS NOT NULL
                 GROUP BY country_iso
                 ORDER BY count DESC
                 LIMIT 50
@@ -720,7 +735,9 @@ class SearchService:
             cursor.execute("""
                 SELECT level_norm, COUNT(*) as count
                 FROM jobs
-                WHERE status = 'active' AND level_norm IS NOT NULL
+                WHERE status = 'active' 
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+                AND level_norm IS NOT NULL
                 GROUP BY level_norm
                 ORDER BY count DESC
                 LIMIT 50
@@ -731,7 +748,9 @@ class SearchService:
             cursor.execute("""
                 SELECT international_eligible, COUNT(*) as count
                 FROM jobs
-                WHERE status = 'active' AND international_eligible IS NOT NULL
+                WHERE status = 'active' 
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+                AND international_eligible IS NOT NULL
                 GROUP BY international_eligible
                 ORDER BY count DESC
             """)
@@ -744,7 +763,8 @@ class SearchService:
             cursor.execute("""
                 SELECT tag, COUNT(*) as count
                 FROM jobs, UNNEST(mission_tags) as tag
-                WHERE status = 'active'
+                WHERE status = 'active' 
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 GROUP BY tag
                 ORDER BY count DESC
                 LIMIT 10
@@ -788,10 +808,14 @@ class SearchService:
             try:
                 index = self.meili_client.index(self.meili_index_name)
                 
+                # Calculate today's date for Meilisearch filter
+                from datetime import date
+                today_str = date.today().isoformat()
+                
                 search_result = index.search("", {
                     "facets": ["country_iso", "level_norm", "mission_tags", "international_eligible"],
                     "limit": 0,
-                    "filter": "status = 'active'"
+                    "filter": f"status = 'active' AND (deadline IS NULL OR deadline >= {today_str})"
                 })
                 
                 facet_distribution = search_result.get("facetDistribution", {})
@@ -950,21 +974,28 @@ class SearchService:
             cursor.execute("SELECT COUNT(*) as count FROM jobs")
             jobs_count = cursor.fetchone()['count']
             
-            # Get count of active jobs (what's visible on frontend)
-            cursor.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'active'")
+            # Get count of active jobs (what's visible on frontend) - exclude expired
+            cursor.execute("""
+                SELECT COUNT(*) as count 
+                FROM jobs 
+                WHERE status = 'active' 
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+            """)
             active_jobs_count = cursor.fetchone()['count']
             
             cursor.execute("SELECT COUNT(*) as count FROM sources")
             sources_count = cursor.fetchone()['count']
             
-            # Get job counts by source for breakdown (only active jobs, what's visible on frontend)
+            # Get job counts by source for breakdown (only active, non-expired jobs, what's visible on frontend)
             cursor.execute("""
                 SELECT 
                     s.id::text as source_id,
                     s.org_name,
                     COUNT(j.id) as job_count
                 FROM sources s
-                LEFT JOIN jobs j ON j.source_id = s.id AND j.status = 'active'
+                LEFT JOIN jobs j ON j.source_id = s.id 
+                    AND j.status = 'active' 
+                    AND (j.deadline IS NULL OR j.deadline >= CURRENT_DATE)
                 GROUP BY s.id, s.org_name
                 ORDER BY job_count DESC, s.org_name
             """)
@@ -1159,6 +1190,7 @@ class SearchService:
                     raw_metadata
                 FROM jobs
                 WHERE status = 'active'
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 ORDER BY created_at DESC
             """)
             

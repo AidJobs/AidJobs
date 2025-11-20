@@ -99,6 +99,20 @@ async def run_due(admin=Depends(admin_required)):
     }
 
 
+@router.post("/cleanup_expired")
+async def cleanup_expired(admin=Depends(admin_required)):
+    """Manually trigger cleanup of expired jobs"""
+    db_url = get_db_url()
+    orchestrator = get_orchestrator(db_url)
+    
+    result = await orchestrator.cleanup_expired_jobs()
+    
+    return {
+        "status": "ok",
+        "data": result
+    }
+
+
 @router.get("/status")
 async def get_status(admin=Depends(admin_required)):
     """Get crawler status"""
