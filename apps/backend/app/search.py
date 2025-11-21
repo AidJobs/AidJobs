@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from app.db_config import db_config
 from app.normalizer import Normalizer
 from app.analytics import analytics_tracker
+from app.rerank import rerank_results
 from core import normalize
 
 if TYPE_CHECKING:
@@ -87,7 +88,10 @@ class SearchService:
                     'title',
                     'org_name',
                     'description_snippet',
-                    'mission_tags'
+                    'mission_tags',
+                    'impact_domain',
+                    'functional_role',
+                    'matched_keywords'
                 ])
                 
                 index.update_filterable_attributes([
@@ -108,7 +112,12 @@ class SearchService:
                     'donor_context',
                     'project_modality',
                     'application_window.rolling',
-                    'status'
+                    'status',
+                    'impact_domain',
+                    'functional_role',
+                    'experience_level',
+                    'sdgs',
+                    'low_confidence'
                 ])
                 
                 index.update_sortable_attributes([
@@ -192,6 +201,10 @@ class SearchService:
         benefits: Optional[list[str]] = None,
         policy_flags: Optional[list[str]] = None,
         donor_context: Optional[list[str]] = None,
+        # Trinity Search enrichment filters
+        impact_domain: Optional[list[str]] = None,
+        functional_role: Optional[list[str]] = None,
+        experience_level: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Normalize user-friendly filter inputs to canonical form.
@@ -259,6 +272,16 @@ class SearchService:
             if normalized_donors:
                 normalized['donor_context'] = normalized_donors
         
+        # Trinity Search enrichment filters (pass through as-is, already canonical)
+        if impact_domain:
+            normalized['impact_domain'] = [id.strip() for id in impact_domain if id]
+        
+        if functional_role:
+            normalized['functional_role'] = [fr.strip() for fr in functional_role if fr]
+        
+        if experience_level:
+            normalized['experience_level'] = experience_level.strip()
+        
         return normalized
     
     def _lookup_country_from_db(self, country_name: str) -> Optional[str]:
@@ -303,6 +326,10 @@ class SearchService:
         benefits: Optional[list[str]] = None,
         policy_flags: Optional[list[str]] = None,
         donor_context: Optional[list[str]] = None,
+        # Trinity Search enrichment filters
+        impact_domain: Optional[list[str]] = None,
+        functional_role: Optional[list[str]] = None,
+        experience_level: Optional[str] = None,
     ) -> dict[str, Any]:
         start_time = time.time()
         request_id = str(uuid.uuid4())
@@ -324,6 +351,9 @@ class SearchService:
             "benefits": benefits,
             "policy_flags": policy_flags,
             "donor_context": donor_context,
+            "impact_domain": impact_domain,
+            "functional_role": functional_role,
+            "experience_level": experience_level,
         }
         
         normalized_filters = self._normalize_filters(
@@ -340,6 +370,9 @@ class SearchService:
             benefits=benefits,
             policy_flags=policy_flags,
             donor_context=donor_context,
+            impact_domain=impact_domain,
+            functional_role=functional_role,
+            experience_level=experience_level,
         )
 
         result = None
@@ -471,6 +504,31 @@ class SearchService:
                 if donors:
                     d_filters = " OR ".join([f"donor_context = '{d}'" for d in donors])
                     filter_conditions.append(f"({d_filters})")
+            
+            # Enrichment filters
+            if filters.get('impact_domain'):
+                impact_domains = filters['impact_domain']
+                if impact_domains:
+                    id_filters = " OR ".join([f"impact_domain = '{id}'" for id in impact_domains])
+                    filter_conditions.append(f"({id_filters})")
+            
+            if filters.get('functional_role'):
+                functional_roles = filters['functional_role']
+                if functional_roles:
+                    fr_filters = " OR ".join([f"functional_role = '{fr}'" for fr in functional_roles])
+                    filter_conditions.append(f"({fr_filters})")
+            
+            if filters.get('experience_level'):
+                filter_conditions.append(f"experience_level = '{filters['experience_level']}'")
+            
+            if filters.get('sdgs'):
+                sdgs = filters['sdgs']
+                if sdgs:
+                    sdg_filters = " OR ".join([f"sdgs = {sdg}" for sdg in sdgs])
+                    filter_conditions.append(f"({sdg_filters})")
+            
+            if filters.get('is_remote') is True:
+                filter_conditions.append("work_modality = 'remote' OR work_modality = 'hybrid'")
             
             filter_str = " AND ".join(filter_conditions)
             
@@ -641,7 +699,9 @@ class SearchService:
                 SELECT 
                     id, org_name, title, location_raw, country_iso, 
                     level_norm, deadline, apply_url, last_seen_at,
-                    mission_tags, international_eligible, org_type
+                    mission_tags, international_eligible, org_type,
+                    impact_domain, functional_role, experience_level, sdgs,
+                    matched_keywords, confidence_overall, low_confidence
                 FROM jobs 
                 WHERE {where_clause}
                 ORDER BY {order_by}
@@ -667,6 +727,17 @@ class SearchService:
                 
                 # Compute and attach relevance reasons
                 item['reasons'] = self._compute_reasons(item, q, filters)
+                
+                # Ensure enrichment fields are properly formatted
+                # PostgreSQL arrays are already returned as Python lists, but ensure they're not None
+                if item.get('impact_domain') is None:
+                    item['impact_domain'] = []
+                if item.get('functional_role') is None:
+                    item['functional_role'] = []
+                if item.get('sdgs') is None:
+                    item['sdgs'] = []
+                if item.get('matched_keywords') is None:
+                    item['matched_keywords'] = []
                 
                 items.append(item)
 
@@ -1187,7 +1258,11 @@ class SearchService:
                     compensation_visible, compensation_type, 
                     compensation_min_usd, compensation_max_usd,
                     compensation_currency, compensation_confidence,
-                    raw_metadata
+                    raw_metadata,
+                    impact_domain, impact_confidences, functional_role, functional_confidences,
+                    experience_level, estimated_experience_years, experience_confidence,
+                    sdgs, sdg_confidences, sdg_explanation, matched_keywords,
+                    confidence_overall, low_confidence, low_confidence_reason
                 FROM jobs
                 WHERE status = 'active'
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
@@ -1275,6 +1350,13 @@ class SearchService:
                 deadline = raw_doc.get('deadline')
                 last_seen_at = raw_doc.get('last_seen_at')
                 
+                # Extract enrichment fields
+                impact_domain = raw_doc.get('impact_domain', []) or []
+                functional_role = raw_doc.get('functional_role', []) or []
+                experience_level = raw_doc.get('experience_level')
+                sdgs = raw_doc.get('sdgs', []) or []
+                matched_keywords = raw_doc.get('matched_keywords', []) or []
+                
                 normalized_doc = {
                     'id': str(raw_doc['id']) if raw_doc.get('id') else None,
                     'org_name': raw_doc.get('org_name'),
@@ -1302,6 +1384,12 @@ class SearchService:
                     'compensation_max_usd': raw_doc.get('compensation_max_usd'),
                     'compensation_currency': raw_doc.get('compensation_currency'),
                     'status': raw_doc.get('status', 'active'),
+                    'impact_domain': impact_domain,
+                    'functional_role': functional_role,
+                    'experience_level': experience_level,
+                    'sdgs': sdgs,
+                    'matched_keywords': matched_keywords,
+                    'low_confidence': raw_doc.get('low_confidence', False),
                     'raw_metadata': {
                         'unknown': unknowns
                     }

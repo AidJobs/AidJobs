@@ -334,6 +334,34 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS duplicate_of UUID,
     ADD COLUMN IF NOT EXISTS raw_metadata JSONB;
 
+-- Add enrichment columns to jobs table (idempotent)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS impact_domain TEXT[],
+    ADD COLUMN IF NOT EXISTS impact_confidences JSONB,
+    ADD COLUMN IF NOT EXISTS functional_role TEXT[],
+    ADD COLUMN IF NOT EXISTS functional_confidences JSONB,
+    ADD COLUMN IF NOT EXISTS experience_level TEXT,
+    ADD COLUMN IF NOT EXISTS estimated_experience_years JSONB,
+    ADD COLUMN IF NOT EXISTS experience_confidence NUMERIC,
+    ADD COLUMN IF NOT EXISTS sdgs INTEGER[],
+    ADD COLUMN IF NOT EXISTS sdg_confidences JSONB,
+    ADD COLUMN IF NOT EXISTS sdg_explanation TEXT,
+    ADD COLUMN IF NOT EXISTS matched_keywords TEXT[],
+    ADD COLUMN IF NOT EXISTS confidence_overall NUMERIC,
+    ADD COLUMN IF NOT EXISTS low_confidence BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS low_confidence_reason TEXT,
+    ADD COLUMN IF NOT EXISTS embedding_input TEXT,
+    ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS enrichment_version INTEGER DEFAULT 1;
+
+-- Create index for enrichment fields
+CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);
+CREATE INDEX IF NOT EXISTS idx_jobs_functional_role ON jobs USING GIN(functional_role);
+CREATE INDEX IF NOT EXISTS idx_jobs_experience_level ON jobs(experience_level);
+CREATE INDEX IF NOT EXISTS idx_jobs_sdgs ON jobs USING GIN(sdgs);
+CREATE INDEX IF NOT EXISTS idx_jobs_low_confidence ON jobs(low_confidence) WHERE low_confidence = TRUE;
+CREATE INDEX IF NOT EXISTS idx_jobs_enriched_at ON jobs(enriched_at);
+
 -- Indexes for jobs table
 CREATE INDEX IF NOT EXISTS idx_jobs_search_tsv ON jobs USING GIN(search_tsv);
 CREATE INDEX IF NOT EXISTS idx_jobs_status_deadline ON jobs(status, deadline);

@@ -27,6 +27,9 @@ from slowapi import _rate_limit_exceeded_handler
 from security.admin_auth import admin_required
 import psycopg2
 from app.db_config import db_config
+from app.query_parser import parse_query
+from app.autocomplete import get_suggestions
+from app.enrichment import enrich_and_save_job, batch_enrich_jobs
 
 load_dotenv()
 
@@ -222,6 +225,10 @@ async def search_query(
     benefits: Optional[list[str]] = Query(None, description="Filter by benefits"),
     policy_flags: Optional[list[str]] = Query(None, description="Filter by policy flags"),
     donor_context: Optional[list[str]] = Query(None, description="Filter by donor context"),
+    # Trinity Search enrichment filters
+    impact_domain: Optional[list[str]] = Query(None, description="Filter by impact domain"),
+    functional_role: Optional[list[str]] = Query(None, description="Filter by functional role"),
+    experience_level: Optional[str] = Query(None, description="Filter by experience level"),
 ):
     return await search_service.search_query(
         q=q,
@@ -241,12 +248,90 @@ async def search_query(
         benefits=benefits,
         policy_flags=policy_flags,
         donor_context=donor_context,
+        impact_domain=impact_domain,
+        functional_role=functional_role,
+        experience_level=experience_level,
     )
 
 
 @app.get("/api/search/facets")
 async def search_facets():
     return await search_service.get_facets()
+
+
+@app.post("/api/search/parse")
+@limiter.limit(RATE_LIMIT_SEARCH)
+async def parse_search_query(
+    request: Request,
+    body: dict,
+):
+    """Parse a natural language search query into structured filters."""
+    query = body.get("query", "")
+    if not query:
+        return {
+            "status": "ok",
+            "data": {
+                "impact_domain": [],
+                "functional_role": [],
+                "experience_level": "",
+                "location": "",
+                "is_remote": False,
+                "free_text": "",
+            },
+            "error": None,
+        }
+    
+    try:
+        parsed = parse_query(query)
+        if parsed:
+            return {
+                "status": "ok",
+                "data": parsed,
+                "error": None,
+            }
+        else:
+            return {
+                "status": "error",
+                "data": None,
+                "error": "Failed to parse query",
+            }
+    except Exception as e:
+        logger.error(f"[api/search/parse] Error: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "data": None,
+            "error": str(e),
+        }
+
+
+@app.get("/api/search/autocomplete")
+@limiter.limit(RATE_LIMIT_SEARCH)
+async def autocomplete_suggestions(
+    request: Request,
+    q: Optional[str] = Query(None, description="Partial search text"),
+):
+    """Get autocomplete suggestions based on partial text."""
+    if not q:
+        return {
+            "status": "ok",
+            "data": [],
+            "error": None,
+        }
+    
+    try:
+        suggestions = get_suggestions(q)
+        return {
+            "status": "ok",
+            "data": suggestions,
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[api/search/autocomplete] Error: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "data": [],
+            "error": str(e),
+        }
 
 
 @app.get("/api/jobs/{job_id}")
@@ -306,6 +391,100 @@ async def admin_search_init(admin: str = Depends(admin_required)):
 async def admin_search_reindex(admin: str = Depends(admin_required)):
     """Reindex jobs to search engine (admin-only, supports GET and POST)"""
     return await search_service.reindex_jobs()
+
+
+@app.post("/admin/jobs/enrich")
+async def admin_enrich_job(
+    request: Request,
+    body: dict,
+    admin: str = Depends(admin_required),
+):
+    """Manually enrich a single job."""
+    job_id = body.get("job_id")
+    if not job_id:
+        raise HTTPException(status_code=400, detail="job_id is required")
+    
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id::text, title, description_snippet, org_name, location_raw, functional_tags
+            FROM jobs
+            WHERE id::text = %s
+        """, (job_id,))
+        
+        job = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        functional_role_hint = None
+        if job.get("functional_tags"):
+            functional_role_hint = " ".join(job["functional_tags"][:3])
+        
+        success = enrich_and_save_job(
+            job_id=job_id,
+            title=job["title"],
+            description=job.get("description_snippet") or "",
+            org_name=job.get("org_name"),
+            location=job.get("location_raw"),
+            functional_role_hint=functional_role_hint,
+        )
+        
+        if success:
+            return {
+                "status": "ok",
+                "data": {"job_id": job_id, "enriched": True},
+                "error": None,
+            }
+        else:
+            return {
+                "status": "error",
+                "data": None,
+                "error": "Failed to enrich job",
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[admin/jobs/enrich] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/jobs/enrich/batch")
+async def admin_enrich_jobs_batch(
+    request: Request,
+    body: dict,
+    admin: str = Depends(admin_required),
+):
+    """Manually enrich multiple jobs in batch."""
+    job_ids = body.get("job_ids", [])
+    if not job_ids or not isinstance(job_ids, list):
+        raise HTTPException(status_code=400, detail="job_ids array is required")
+    
+    if len(job_ids) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 jobs per batch")
+    
+    try:
+        result = batch_enrich_jobs(job_ids)
+        return {
+            "status": "ok",
+            "data": result,
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/jobs/enrich/batch] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/admin/normalize/reindex")

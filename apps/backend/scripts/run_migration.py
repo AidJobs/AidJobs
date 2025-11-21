@@ -208,6 +208,34 @@ def main():
             ADD COLUMN IF NOT EXISTS tags TEXT[],
             ADD COLUMN IF NOT EXISTS metadata JSONB;
         
+        -- Add enrichment columns to jobs table (Trinity Search)
+        ALTER TABLE jobs
+            ADD COLUMN IF NOT EXISTS impact_domain TEXT[],
+            ADD COLUMN IF NOT EXISTS impact_confidences JSONB,
+            ADD COLUMN IF NOT EXISTS functional_role TEXT[],
+            ADD COLUMN IF NOT EXISTS functional_confidences JSONB,
+            ADD COLUMN IF NOT EXISTS experience_level TEXT,
+            ADD COLUMN IF NOT EXISTS estimated_experience_years JSONB,
+            ADD COLUMN IF NOT EXISTS experience_confidence NUMERIC,
+            ADD COLUMN IF NOT EXISTS sdgs INTEGER[],
+            ADD COLUMN IF NOT EXISTS sdg_confidences JSONB,
+            ADD COLUMN IF NOT EXISTS sdg_explanation TEXT,
+            ADD COLUMN IF NOT EXISTS matched_keywords TEXT[],
+            ADD COLUMN IF NOT EXISTS confidence_overall NUMERIC,
+            ADD COLUMN IF NOT EXISTS low_confidence BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS low_confidence_reason TEXT,
+            ADD COLUMN IF NOT EXISTS embedding_input TEXT,
+            ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS enrichment_version INTEGER DEFAULT 1;
+        
+        -- Create indexes for enrichment fields
+        CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);
+        CREATE INDEX IF NOT EXISTS idx_jobs_functional_role ON jobs USING GIN(functional_role);
+        CREATE INDEX IF NOT EXISTS idx_jobs_experience_level ON jobs(experience_level);
+        CREATE INDEX IF NOT EXISTS idx_jobs_sdgs ON jobs USING GIN(sdgs);
+        CREATE INDEX IF NOT EXISTS idx_jobs_low_confidence ON jobs(low_confidence) WHERE low_confidence = TRUE;
+        CREATE INDEX IF NOT EXISTS idx_jobs_enriched_at ON jobs(enriched_at);
+        
         -- Add potential future columns to jobs table (for analytics and features)
         ALTER TABLE jobs
             ADD COLUMN IF NOT EXISTS priority_score NUMERIC,
@@ -278,7 +306,10 @@ def main():
             'org_type', 'career_type', 'contract_type', 'work_modality',
             'country_name', 'region_code', 'level_norm', 'mission_tags',
             'crisis_type', 'response_phase', 'humanitarian_cluster',
-            'benefits', 'policy_flags', 'donor_context', 'international_eligible'
+            'benefits', 'policy_flags', 'donor_context', 'international_eligible',
+            'impact_domain', 'functional_role', 'experience_level', 'sdgs',
+            'matched_keywords', 'confidence_overall', 'low_confidence',
+            'enriched_at', 'enrichment_version'
         }
         if required_jobs_columns.issubset(new_jobs_columns):
             if added_jobs_columns:

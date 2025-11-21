@@ -6,6 +6,7 @@ import JobInspector from '@/components/JobInspector';
 import SavedJobsPanel from '@/components/SavedJobsPanel';
 import Toast from '@/components/Toast';
 import CollectionsNav from '@/components/CollectionsNav';
+import TrinitySearchBar from '@/components/TrinitySearchBar';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 
 type Capabilities = {
@@ -28,6 +29,12 @@ type Job = {
   mission_tags?: string[];
   international_eligible?: boolean;
   reasons?: string[];
+  // Enrichment fields
+  impact_domain?: string[];
+  functional_role?: string[];
+  experience_level?: string;
+  match_score?: number;
+  top_reasons?: string[];
 };
 
 type SearchResponse = {
@@ -374,13 +381,68 @@ export default function HomeClient() {
           </div>
           
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search roles, orgs, or skills… (Press / to focus)"
-              className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            <TrinitySearchBar
+              onSearch={async (filters, freeText) => {
+                // Update search query state
+                setSearchQuery(freeText || Object.values(filters).filter(v => v).join(' ') || '');
+                
+                // Build search params from parsed filters
+                const params = new URLSearchParams();
+                if (freeText) params.set('q', freeText);
+                if (filters.impact_domain?.length) {
+                  filters.impact_domain.forEach(d => params.append('impact_domain', d));
+                }
+                if (filters.functional_role?.length) {
+                  filters.functional_role.forEach(r => params.append('functional_role', r));
+                }
+                if (filters.experience_level) params.set('experience_level', filters.experience_level);
+                if (filters.location) {
+                  // Try to match location to country filter
+                  setCountry(filters.location);
+                  params.set('country', filters.location);
+                }
+                if (filters.is_remote) {
+                  params.set('work_modality', 'remote');
+                }
+                
+                // Update URL params
+                updateURLParams();
+                
+                // Trigger search with new params
+                setPage(1);
+                if (abortControllerRef.current) {
+                  abortControllerRef.current.abort();
+                }
+                abortControllerRef.current = new AbortController();
+                setSearching(true);
+                
+                params.append('page', '1');
+                params.append('size', '20');
+                if (sortBy && sortBy !== 'relevance') params.append('sort', sortBy);
+                
+                try {
+                  const response = await fetch(`/api/search/query?${params.toString()}`, {
+                    signal: abortControllerRef.current.signal,
+                  });
+                  const data: SearchResponse = await response.json();
+                  
+                  setResults(data.data.items);
+                  setTotal(data.data.total);
+                  setPage(1);
+                  setSearchSource(data.data.source || '');
+                  
+                  fetchFacets();
+                } catch (error: any) {
+                  if (error.name !== 'AbortError') {
+                    console.error('Search error:', error);
+                    setResults([]);
+                    setTotal(0);
+                  }
+                } finally {
+                  setSearching(false);
+                }
+              }}
+              initialQuery={searchQuery}
             />
           </div>
 
@@ -663,8 +725,33 @@ export default function HomeClient() {
                             )}
                           </div>
                           <p className="text-sm text-gray-600 mb-1">{job.org_name}</p>
-                          {job.reasons && job.reasons.length > 0 && (
-                            <div className="flex gap-1.5 mb-1">
+                          
+                          {/* Match Score */}
+                          {job.match_score !== undefined && (
+                            <div className="mb-2">
+                              <span className="px-2 py-0.5 text-xs font-semibold text-green-700 bg-green-50 rounded">
+                                Match: {job.match_score}%
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Top Reasons */}
+                          {job.top_reasons && job.top_reasons.length > 0 && (
+                            <div className="flex gap-1.5 mb-2 flex-wrap">
+                              {job.top_reasons.map((reason, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded"
+                                >
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Legacy reasons (for backward compatibility) */}
+                          {job.reasons && job.reasons.length > 0 && !job.top_reasons && (
+                            <div className="flex gap-1.5 mb-2 flex-wrap">
                               {job.reasons.map((reason, idx) => (
                                 <span 
                                   key={idx}
@@ -675,6 +762,32 @@ export default function HomeClient() {
                               ))}
                             </div>
                           )}
+                          
+                          {/* Enrichment Badges */}
+                          <div className="flex gap-1.5 mb-2 flex-wrap">
+                            {job.impact_domain?.map((domain, idx) => (
+                              <span
+                                key={`impact-${idx}`}
+                                className="px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-50 rounded"
+                              >
+                                {domain}
+                              </span>
+                            ))}
+                            {job.functional_role?.map((role, idx) => (
+                              <span
+                                key={`role-${idx}`}
+                                className="px-2 py-0.5 text-xs font-medium text-indigo-700 bg-indigo-50 rounded"
+                              >
+                                {role}
+                              </span>
+                            ))}
+                            {job.experience_level && (
+                              <span className="px-2 py-0.5 text-xs font-medium text-teal-700 bg-teal-50 rounded">
+                                {job.experience_level}
+                              </span>
+                            )}
+                          </div>
+                          
                           <div className="flex gap-3 text-xs text-gray-500">
                             {(job.location_raw || job.country) && (
                               <span>{job.location_raw || job.country}</span>
