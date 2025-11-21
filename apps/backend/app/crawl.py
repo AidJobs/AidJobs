@@ -159,15 +159,25 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                         raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
                         
                         if not raw_jobs:
-                            logger.warning(f"[crawl] No jobs extracted from {careers_url}. HTML size: {size} bytes")
-                            return {'status': 'fail', 'message': f'No jobs found. HTML fetched successfully ({size} bytes) but extraction returned 0 jobs. Try adding a parser_hint CSS selector.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                            logger.warning(f"[crawl] No jobs extracted from {careers_url}. HTML size: {size} bytes, parser_hint: {parser_hint or 'none'}")
+                            return {'status': 'fail', 'message': f'No jobs found. HTML fetched successfully ({size} bytes) but extraction returned 0 jobs. Try adding a parser_hint CSS selector to help identify job listings.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                        
+                        logger.info(f"[crawl] Extracted {len(raw_jobs)} raw jobs from {careers_url}")
                         
                         normalized_jobs = [
                             html_crawler.normalize_job(job, org_name)
                             for job in raw_jobs
                         ]
+                        
+                        # Filter out jobs that lost their title during normalization
+                        normalized_jobs = [job for job in normalized_jobs if job.get('title')]
+                        logger.info(f"[crawl] Normalized to {len(normalized_jobs)} jobs with titles")
                     
                     # Upsert jobs (HTMLCrawler has the upsert_jobs method)
+                    if not normalized_jobs:
+                        logger.warning(f"[crawl] No valid jobs after normalization from {careers_url}")
+                        return {'status': 'fail', 'message': 'No valid jobs found after extraction and normalization. Check if the page structure matches expected job listing format.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
+                    
                     counts = await html_crawler.upsert_jobs(normalized_jobs, source_id)
                     
                     # Create a more informative message
