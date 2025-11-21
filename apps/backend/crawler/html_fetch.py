@@ -550,23 +550,36 @@ class HTMLCrawler:
             return counts
         
         conn = self._get_db_conn()
+        jobs_to_enrich = []  # Track jobs that need enrichment
+        
         try:
             with conn.cursor() as cur:
                 for job in jobs:
                     # Check if exists
                     cur.execute("""
-                        SELECT id, last_seen_at FROM jobs WHERE canonical_hash = %s
+                        SELECT id, last_seen_at, enriched_at FROM jobs WHERE canonical_hash = %s
                     """, (job['canonical_hash'],))
                     
                     existing = cur.fetchone()
                     
                     if existing:
+                        job_id = str(existing[0])
                         # Update last_seen_at
                         cur.execute("""
                             UPDATE jobs SET last_seen_at = NOW()
                             WHERE canonical_hash = %s
                         """, (job['canonical_hash'],))
                         counts['updated'] += 1
+                        
+                        # Trigger enrichment if not already enriched or if job was updated
+                        # (re-enrich on update to catch any changes)
+                        jobs_to_enrich.append({
+                            'id': job_id,
+                            'title': job.get('title', ''),
+                            'description': job.get('description_snippet', ''),
+                            'org_name': job.get('org_name'),
+                            'location': job.get('location_raw'),
+                        })
                     else:
                         # Insert new job
                         cur.execute("""
@@ -580,7 +593,7 @@ class HTMLCrawler:
                                 %s, %s, %s, %s,
                                 %s, %s, %s,
                                 %s, %s, 'active'
-                            )
+                            ) RETURNING id
                         """, (
                             source_id, job.get('org_name'), job.get('title'),
                             job.get('location_raw'), job.get('country_iso'),
@@ -590,9 +603,36 @@ class HTMLCrawler:
                             job.get('deadline'), job.get('apply_url'),
                             job.get('description_snippet'), job['canonical_hash']
                         ))
+                        job_id = str(cur.fetchone()[0])
                         counts['inserted'] += 1
+                        
+                        # Trigger enrichment for newly inserted jobs
+                        jobs_to_enrich.append({
+                            'id': job_id,
+                            'title': job.get('title', ''),
+                            'description': job.get('description_snippet', ''),
+                            'org_name': job.get('org_name'),
+                            'location': job.get('location_raw'),
+                        })
                 
                 conn.commit()
+                
+                # Trigger enrichment for all jobs (asynchronously, non-blocking)
+                if jobs_to_enrich:
+                    try:
+                        from app.enrichment_worker import trigger_enrichment_on_job_create_or_update
+                        for job_data in jobs_to_enrich:
+                            trigger_enrichment_on_job_create_or_update(
+                                job_id=job_data['id'],
+                                title=job_data['title'],
+                                description=job_data['description'],
+                                org_name=job_data['org_name'],
+                                location=job_data['location'],
+                            )
+                        logger.info(f"[html_fetch] Triggered enrichment for {len(jobs_to_enrich)} job(s)")
+                    except Exception as e:
+                        # Don't fail the crawl if enrichment fails
+                        logger.warning(f"[html_fetch] Failed to trigger enrichment: {e}")
         
         except Exception as e:
             logger.error(f"[html_fetch] Error upserting jobs: {e}")

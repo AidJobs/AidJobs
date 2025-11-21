@@ -5,13 +5,18 @@ Event-driven job enrichment on create/update.
 import logging
 from typing import Optional
 import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from app.enrichment import enrich_and_save_job
 
 logger = logging.getLogger(__name__)
 
+# Thread pool for running enrichment in background
+_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="enrichment")
 
-async def enrich_job_async(
+
+def _enrich_job_sync(
     job_id: str,
     title: str,
     description: str,
@@ -20,23 +25,17 @@ async def enrich_job_async(
     functional_role_hint: Optional[str] = None,
 ) -> bool:
     """
-    Asynchronously enrich a job.
-    
-    This is a wrapper that runs the synchronous enrich_and_save_job in a thread pool.
+    Synchronously enrich a job (runs in thread pool).
     """
     try:
-        loop = asyncio.get_event_loop()
-        success = await loop.run_in_executor(
-            None,
-            enrich_and_save_job,
-            job_id,
-            title,
-            description,
-            org_name,
-            location,
-            functional_role_hint,
+        return enrich_and_save_job(
+            job_id=job_id,
+            title=title,
+            description=description,
+            org_name=org_name,
+            location=location,
+            functional_role_hint=functional_role_hint,
         )
-        return success
     except Exception as e:
         logger.error(f"[enrichment_worker] Error enriching job {job_id}: {e}", exc_info=True)
         return False
@@ -54,19 +53,20 @@ def trigger_enrichment_on_job_create_or_update(
     Trigger enrichment when a job is created or updated.
     
     This function is called from the crawler/orchestrator after a job is inserted/updated.
-    It runs enrichment asynchronously to avoid blocking the crawl process.
+    It runs enrichment in a background thread to avoid blocking the crawl process.
+    
+    This is a fire-and-forget operation - it doesn't wait for completion.
     """
     try:
-        # Run enrichment in background
-        asyncio.create_task(
-            enrich_job_async(
-                job_id=job_id,
-                title=title,
-                description=description or "",
-                org_name=org_name,
-                location=location,
-                functional_role_hint=functional_role_hint,
-            )
+        # Submit to thread pool (non-blocking)
+        _executor.submit(
+            _enrich_job_sync,
+            job_id=job_id,
+            title=title,
+            description=description or "",
+            org_name=org_name,
+            location=location,
+            functional_role_hint=functional_role_hint,
         )
         logger.info(f"[enrichment_worker] Triggered enrichment for job {job_id}")
     except Exception as e:
