@@ -299,12 +299,95 @@ class HTMLCrawler:
         if not job['title'] or len(job['title']) < 3:
             return None
         
-        # Apply URL
-        link = elem.find('a', href=True)
-        if link:
-            job['apply_url'] = urljoin(base_url, link['href'])
+        # Apply URL - improved extraction to find the best job detail link
+        # Strategy 1: Find all links in the element and prioritize job detail links
+        all_links = elem.find_all('a', href=True)
+        
+        if all_links:
+            # Prioritize links that look like job detail pages
+            # Prefer links with keywords like "view", "details", "read", "apply", or job-specific paths
+            best_link = None
+            best_score = -1
+            
+            for link in all_links:
+                href = link.get('href', '').lower()
+                link_text = link.get_text().lower().strip()
+                
+                # Skip invalid links
+                if href.startswith('#') or href.startswith('javascript:') or not href:
+                    continue
+                
+                # Score links based on relevance
+                score = 0
+                
+                # High priority: links with job detail keywords in href
+                if any(kw in href for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/opportunity/', '/consultant/']):
+                    score += 10
+                
+                # High priority: links with job detail keywords in text
+                if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info', 'learn more']):
+                    score += 8
+                
+                # Medium priority: links that look like detail pages (have IDs or slugs)
+                if re.search(r'/\d+', href) or re.search(r'/[a-z0-9-]{10,}$', href):  # Has ID or long slug
+                    score += 5
+                
+                # Medium priority: links that are NOT listing pages
+                if not any(kw in href for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search']):
+                    score += 3
+                
+                # Penalty: links that are clearly listing pages
+                if any(kw in href for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search']):
+                    score -= 10
+                
+                if score > best_score:
+                    best_score = score
+                    best_link = link
+            
+            if best_link and best_score >= 0:
+                job['apply_url'] = urljoin(base_url, best_link['href'])
+            elif all_links:
+                # Fallback to first non-anchor link if no good match found
+                for link in all_links:
+                    href = link.get('href', '')
+                    if href and not href.startswith('#') and not href.startswith('javascript:'):
+                        job['apply_url'] = urljoin(base_url, href)
+                        break
+                else:
+                    # Last resort: use base_url
+                    job['apply_url'] = base_url
+            else:
+                job['apply_url'] = base_url
         else:
-            job['apply_url'] = base_url
+            # Strategy 2: Check parent element for links (for table rows, list items, etc.)
+            parent = elem.parent
+            if parent:
+                parent_links = parent.find_all('a', href=True)
+                if parent_links:
+                    # Use same scoring logic for parent links
+                    best_link = None
+                    best_score = -1
+                    for link in parent_links:
+                        href = link.get('href', '').lower()
+                        if href.startswith('#') or href.startswith('javascript:') or not href:
+                            continue
+                        score = 0
+                        if any(kw in href for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply']):
+                            score += 10
+                        if not any(kw in href for kw in ['/jobs', '/careers', '/vacancies', '/list']):
+                            score += 3
+                        if score > best_score:
+                            best_score = score
+                            best_link = link
+                    
+                    if best_link:
+                        job['apply_url'] = urljoin(base_url, best_link['href'])
+                    else:
+                        job['apply_url'] = base_url
+                else:
+                    job['apply_url'] = base_url
+            else:
+                job['apply_url'] = base_url
         
         # Location
         location_elem = elem.find(class_=re.compile(r'location|place|city'))
