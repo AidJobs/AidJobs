@@ -564,11 +564,38 @@ class HTMLCrawler:
                     
                     if existing:
                         job_id = str(existing[0])
-                        # Update last_seen_at
+                        # Update job data (including apply_url, title, description, etc.) and last_seen_at
+                        # This ensures we get the latest data, especially better apply_urls
                         cur.execute("""
-                            UPDATE jobs SET last_seen_at = NOW()
+                            UPDATE jobs SET
+                                title = %s,
+                                location_raw = %s,
+                                country_iso = %s,
+                                level_norm = %s,
+                                career_type = %s,
+                                work_modality = %s,
+                                mission_tags = %s,
+                                international_eligible = %s,
+                                deadline = %s,
+                                apply_url = %s,
+                                description_snippet = %s,
+                                last_seen_at = NOW(),
+                                updated_at = NOW()
                             WHERE canonical_hash = %s
-                        """, (job['canonical_hash'],))
+                        """, (
+                            job.get('title'),
+                            job.get('location_raw'),
+                            job.get('country_iso'),
+                            job.get('level_norm'),
+                            job.get('career_type'),
+                            job.get('work_modality'),
+                            job.get('mission_tags', []),
+                            job.get('international_eligible', False),
+                            job.get('deadline'),
+                            job.get('apply_url'),
+                            job.get('description_snippet'),
+                            job['canonical_hash']
+                        ))
                         counts['updated'] += 1
                         
                         # Trigger enrichment if not already enriched or if job was updated

@@ -169,7 +169,20 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                     
                     # Upsert jobs (HTMLCrawler has the upsert_jobs method)
                     counts = await html_crawler.upsert_jobs(normalized_jobs, source_id)
-                    return {'status': 'ok', 'message': f"Found {counts['found']}, inserted {counts['inserted']}, updated {counts['updated']}", 'counts': counts}
+                    
+                    # Create a more informative message
+                    if counts['found'] == 0:
+                        message = "No jobs found on the page"
+                    elif counts['inserted'] > 0 and counts['updated'] > 0:
+                        message = f"Found {counts['found']} job(s): {counts['inserted']} new, {counts['updated']} updated"
+                    elif counts['inserted'] > 0:
+                        message = f"Found {counts['found']} job(s): {counts['inserted']} new"
+                    elif counts['updated'] > 0:
+                        message = f"Found {counts['found']} job(s): {counts['updated']} updated with latest data"
+                    else:
+                        message = f"Found {counts['found']} job(s) (no changes)"
+                    
+                    return {'status': 'ok', 'message': message, 'counts': counts}
                 
                 result = asyncio.run(run_async_crawl())
                 duration_ms = int((time.time() - start_time) * 1000)
