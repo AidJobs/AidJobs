@@ -184,17 +184,55 @@ class HTMLCrawler:
         # Additional fallback: try more generic patterns for UN/INGO organization sites
         # This works for UNESCO, UNDP, and similar sites without needing per-site configuration
         if not job_elements:
+            # Strategy 0: UNDP-specific pattern (text-based structure with "Job Title", "Apply by", "Location")
+            # UNDP uses a pattern like: "Job Title [title] Apply by [date] Location [location]"
+            if 'undp.org' in base_url.lower() or 'cj_view_consultancies' in base_url.lower():
+                # Find all text that contains "Job Title" pattern
+                page_text = soup.get_text()
+                # Split by "Job Title" to find individual job entries
+                job_sections = re.split(r'(?i)Job Title\s+', page_text)
+                if len(job_sections) > 1:
+                    logger.debug(f"[html_fetch] Found {len(job_sections) - 1} potential UNDP job sections")
+                    # Create synthetic job elements from text sections
+                    for i, section in enumerate(job_sections[1:], 1):  # Skip first empty section
+                        # Extract title (first line after "Job Title")
+                        lines = section.strip().split('\n')
+                        if lines:
+                            title = lines[0].strip()
+                            # Look for "Apply by" and "Location" in the section
+                            apply_by = None
+                            location = None
+                            for line in lines[1:10]:  # Check first 10 lines
+                                line_lower = line.lower()
+                                if 'apply by' in line_lower:
+                                    apply_by = line.replace('Apply by', '').replace('APPLY BY', '').strip()
+                                elif 'location' in line_lower and not location:
+                                    location = line.replace('Location', '').replace('LOCATION', '').strip()
+                            
+                            # Only create job if we have a title
+                            if title and len(title) > 5:
+                                # Create a synthetic dict for this job
+                                job_elements.append({
+                                    'title': title,
+                                    'apply_by': apply_by,
+                                    'location': location,
+                                    'section_text': section[:500]  # Store first 500 chars for link extraction
+                                })
+                                if len(job_elements) >= 100:  # Limit to 100 jobs
+                                    break
+            
             # Strategy 1: Look for table rows with job-like content (common in UN sites)
-            table_rows = soup.find_all('tr')
-            for tr in table_rows:
-                text = tr.get_text().lower()
-                # Check if row contains job-related keywords
-                if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer', 'manager', 'coordinator']):
-                    # Check if it has a link (likely a job listing)
-                    if tr.find('a', href=True):
-                        job_elements.append(tr)
-                        if len(job_elements) >= 50:
-                            break
+            if not job_elements:
+                table_rows = soup.find_all('tr')
+                for tr in table_rows:
+                    text = tr.get_text().lower()
+                    # Check if row contains job-related keywords
+                    if any(kw in text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'consultant', 'specialist', 'officer', 'manager', 'coordinator']):
+                        # Check if it has a link (likely a job listing)
+                        if tr.find('a', href=True):
+                            job_elements.append(tr)
+                            if len(job_elements) >= 50:
+                                break
             
             # Strategy 2: Try finding divs/sections with job-like content
             if not job_elements:
@@ -232,6 +270,56 @@ class HTMLCrawler:
     def _extract_job_from_element(self, elem, base_url: str) -> Optional[Dict]:
         """Extract job data from a single HTML element or JSON-LD dict"""
         job = {}
+        
+        # Handle UNDP synthetic job dict (from text-based extraction)
+        if isinstance(elem, dict) and 'title' in elem and 'section_text' in elem:
+            job['title'] = elem.get('title', '').strip()
+            if not job['title']:
+                return None
+            
+            # Extract location
+            job['location_raw'] = elem.get('location', '').strip()
+            
+            # Extract deadline from "Apply by" field
+            apply_by = elem.get('apply_by', '').strip()
+            if apply_by:
+                try:
+                    # Try to parse date (UNDP format: "Nov-21-25" or similar)
+                    # Common formats: "Nov-21-25", "Nov 21, 2025", etc.
+                    date_str = apply_by.replace('-', ' ').strip()
+                    # Try various date formats
+                    for fmt in ['%b %d %y', '%b %d, %Y', '%B %d, %Y', '%b-%d-%y']:
+                        try:
+                            parsed_date = datetime.strptime(date_str, fmt)
+                            job['deadline'] = parsed_date.date()
+                            break
+                        except:
+                            continue
+                except:
+                    pass
+            
+            # Try to find apply URL - UNDP jobs typically link to detail pages
+            # Look for links in the original HTML that might be near this job
+            section_text = elem.get('section_text', '')
+            job['apply_url'] = base_url  # Default fallback
+            
+            # Try to find a link in the HTML that matches this title
+            # Parse the section text as HTML to find links
+            try:
+                section_soup = BeautifulSoup(section_text[:1000] if len(section_text) > 1000 else section_text, 'lxml')
+                links = section_soup.find_all('a', href=True)
+                if links:
+                    # Use the first link that looks like a job detail page
+                    for link in links:
+                        href = link.get('href', '')
+                        if href and not href.startswith('#') and not href.startswith('javascript:'):
+                            job['apply_url'] = urljoin(base_url, href)
+                            break
+            except:
+                pass
+            
+            job['description_snippet'] = section_text[:300] if section_text else None
+            return job
         
         # Handle JSON-LD structured data (dict)
         if isinstance(elem, dict):
