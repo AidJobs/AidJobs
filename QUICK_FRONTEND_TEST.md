@@ -23,7 +23,7 @@
    ```powershell
    cd apps/backend
    $env:SUPABASE_DB_URL="postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
-   $env:OPENROUTER_API_KEY="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"
+   $env:OPENROUTER_API_KEY="your-api-key-here"
    python -m uvicorn main:app --reload
    ```
 

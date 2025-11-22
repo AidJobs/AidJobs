@@ -2,7 +2,7 @@
 
 ## ✅ Configured
 
-**API Key**: `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`  
+**API Key**: `YOUR_OPENROUTER_API_KEY` (Set in Render environment variables, never commit to git)  
 **Model**: `openai/gpt-4o-mini`  
 **Status**: ✅ Working (tested successfully)
 
@@ -11,7 +11,7 @@
 Set these in your environment or `.env` file:
 
 ```bash
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=your-api-key-here
 OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
