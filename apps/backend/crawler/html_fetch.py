@@ -184,42 +184,69 @@ class HTMLCrawler:
         # Additional fallback: try more generic patterns for UN/INGO organization sites
         # This works for UNESCO, UNDP, and similar sites without needing per-site configuration
         if not job_elements:
-            # Strategy 0: UNDP-specific pattern (text-based structure with "Job Title", "Apply by", "Location")
+            # Strategy 0: UNDP-specific pattern (HTML-based structure with "Job Title", "Apply by", "Location")
             # UNDP uses a pattern like: "Job Title [title] Apply by [date] Location [location]"
             if 'undp.org' in base_url.lower() or 'cj_view_consultancies' in base_url.lower():
-                # Find all text that contains "Job Title" pattern
-                page_text = soup.get_text()
-                # Split by "Job Title" to find individual job entries
-                job_sections = re.split(r'(?i)Job Title\s+', page_text)
-                if len(job_sections) > 1:
-                    logger.debug(f"[html_fetch] Found {len(job_sections) - 1} potential UNDP job sections")
-                    # Create synthetic job elements from text sections
-                    for i, section in enumerate(job_sections[1:], 1):  # Skip first empty section
-                        # Extract title (first line after "Job Title")
-                        lines = section.strip().split('\n')
-                        if lines:
-                            title = lines[0].strip()
-                            # Look for "Apply by" and "Location" in the section
-                            apply_by = None
-                            location = None
-                            for line in lines[1:10]:  # Check first 10 lines
-                                line_lower = line.lower()
-                                if 'apply by' in line_lower:
-                                    apply_by = line.replace('Apply by', '').replace('APPLY BY', '').strip()
-                                elif 'location' in line_lower and not location:
-                                    location = line.replace('Location', '').replace('LOCATION', '').strip()
-                            
-                            # Only create job if we have a title
-                            if title and len(title) > 5:
-                                # Create a synthetic dict for this job
-                                job_elements.append({
-                                    'title': title,
-                                    'apply_by': apply_by,
-                                    'location': location,
-                                    'section_text': section[:500]  # Store first 500 chars for link extraction
-                                })
-                                if len(job_elements) >= 100:  # Limit to 100 jobs
-                                    break
+                # Find all elements that contain "Job Title" text (preserving HTML structure)
+                # Look for text nodes or elements containing "Job Title"
+                job_title_pattern = re.compile(r'(?i)Job Title\s+', re.IGNORECASE)
+                
+                # Find all text nodes that contain "Job Title"
+                for text_node in soup.find_all(string=job_title_pattern):
+                    # Get the parent element that contains this text
+                    parent = text_node.parent
+                    if not parent:
+                        continue
+                    
+                    # Find the container element (could be div, tr, li, etc.)
+                    # Look for a parent that contains the full job entry
+                    container = parent
+                    for _ in range(3):  # Go up max 3 levels to find container
+                        if container and container.name in ['tr', 'div', 'li', 'article', 'section']:
+                            # Check if this container has a link (job detail page)
+                            link = container.find('a', href=True)
+                            if link:
+                                # Extract title from text after "Job Title"
+                                full_text = container.get_text()
+                                title_match = re.search(r'(?i)Job Title\s+([^\n]+)', full_text)
+                                if title_match:
+                                    title = title_match.group(1).strip()
+                                    if title and len(title) > 5:
+                                        # Store the container element with metadata
+                                        job_elements.append({
+                                            'element': container,
+                                            'title': title,
+                                            'link': link,
+                                            'full_text': full_text
+                                        })
+                                        if len(job_elements) >= 100:  # Limit to 100 jobs
+                                            break
+                                break
+                        container = container.parent if container else None
+                
+                # If we didn't find jobs using the above method, try finding table rows or divs
+                # that contain "Job Title" text and have links
+                if not job_elements:
+                    # Look for table rows or divs containing "Job Title"
+                    for elem in soup.find_all(['tr', 'div', 'li']):
+                        text = elem.get_text()
+                        if job_title_pattern.search(text):
+                            # Extract title
+                            title_match = re.search(r'(?i)Job Title\s+([^\n]+)', text)
+                            if title_match:
+                                title = title_match.group(1).strip()
+                                if title and len(title) > 5:
+                                    # Find link in this element
+                                    link = elem.find('a', href=True)
+                                    if link:
+                                        job_elements.append({
+                                            'element': elem,
+                                            'title': title,
+                                            'link': link,
+                                            'full_text': text
+                                        })
+                                        if len(job_elements) >= 100:
+                                            break
             
             # Strategy 1: Look for table rows with job-like content (common in UN sites)
             if not job_elements:
@@ -271,24 +298,107 @@ class HTMLCrawler:
         """Extract job data from a single HTML element or JSON-LD dict"""
         job = {}
         
-        # Handle UNDP synthetic job dict (from text-based extraction)
-        if isinstance(elem, dict) and 'title' in elem and 'section_text' in elem:
+        # Handle UNDP job dict (from HTML-based extraction with element and link)
+        if isinstance(elem, dict) and 'title' in elem and 'element' in elem and 'link' in elem:
             job['title'] = elem.get('title', '').strip()
             if not job['title']:
                 return None
             
-            # Extract location
-            job['location_raw'] = elem.get('location', '').strip()
+            # Extract apply URL from the link we found
+            link = elem.get('link')
+            element = elem.get('element')
             
-            # Extract deadline from "Apply by" field
-            apply_by = elem.get('apply_by', '').strip()
+            # Try to find the best link for this job
+            job['apply_url'] = base_url  # Default fallback
+            
+            # Collect all links from the element
+            all_links = []
+            if link and link.get('href'):
+                all_links.append(link)
+            if element:
+                all_links.extend(element.find_all('a', href=True))
+            
+            # Score and find the best link
+            best_link = None
+            best_score = -1
+            
+            for candidate_link in all_links:
+                href = candidate_link.get('href', '')
+                if not href or href.startswith('#') or href.startswith('javascript:'):
+                    continue
+                
+                href_lower = href.lower()
+                link_text = candidate_link.get_text().lower().strip()
+                
+                # Score links based on relevance
+                score = 0
+                
+                # High priority: links that look like job detail pages (not listing pages)
+                if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/id=']):
+                    score += 10
+                
+                # High priority: links with job detail keywords in text
+                if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info', 'learn more']):
+                    score += 8
+                
+                # Medium priority: links with IDs or slugs (likely detail pages)
+                if re.search(r'/\d+', href) or re.search(r'/[a-z0-9-]{10,}$', href):
+                    score += 5
+                
+                # Penalty: links that are clearly listing pages
+                if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies']):
+                    score -= 10
+                
+                # Penalty: if href is just the base path
+                parsed_base = urlparse(base_url)
+                parsed_href = urlparse(href)
+                if parsed_href.path == parsed_base.path or parsed_href.path == parsed_base.path.rstrip('/'):
+                    score -= 5
+                
+                if score > best_score:
+                    best_score = score
+                    best_link = candidate_link
+            
+            # Use the best link if we found one with positive score
+            if best_link and best_score >= 0:
+                href = best_link.get('href', '')
+                job['apply_url'] = urljoin(base_url, href)
+            elif all_links:
+                # Fallback: use first valid link even if score is negative
+                for candidate_link in all_links:
+                    href = candidate_link.get('href', '')
+                    if href and not href.startswith('#') and not href.startswith('javascript:'):
+                        job['apply_url'] = urljoin(base_url, href)
+                        break
+            
+            # Extract location and deadline from full text
+            full_text = elem.get('full_text', '')
+            job['location_raw'] = None
+            apply_by = None
+            
+            # Look for "Location" and "Apply by" in the text
+            lines = full_text.split('\n')
+            for line in lines:
+                line_lower = line.lower()
+                if 'location' in line_lower and not job['location_raw']:
+                    # Extract location (text after "Location")
+                    location_match = re.search(r'(?i)Location\s*:?\s*(.+)', line)
+                    if location_match:
+                        job['location_raw'] = location_match.group(1).strip()
+                elif 'apply by' in line_lower and not apply_by:
+                    # Extract apply by date
+                    apply_by_match = re.search(r'(?i)Apply by\s*:?\s*(.+)', line)
+                    if apply_by_match:
+                        apply_by = apply_by_match.group(1).strip()
+            
+            # Parse deadline from "Apply by" field
             if apply_by:
                 try:
                     # Try to parse date (UNDP format: "Nov-21-25" or similar)
                     # Common formats: "Nov-21-25", "Nov 21, 2025", etc.
                     date_str = apply_by.replace('-', ' ').strip()
                     # Try various date formats
-                    for fmt in ['%b %d %y', '%b %d, %Y', '%B %d, %Y', '%b-%d-%y']:
+                    for fmt in ['%b %d %y', '%b %d, %Y', '%B %d, %Y', '%b-%d-%y', '%d-%b-%y', '%d %b %y']:
                         try:
                             parsed_date = datetime.strptime(date_str, fmt)
                             job['deadline'] = parsed_date.date()
@@ -298,27 +408,9 @@ class HTMLCrawler:
                 except:
                     pass
             
-            # Try to find apply URL - UNDP jobs typically link to detail pages
-            # Look for links in the original HTML that might be near this job
-            section_text = elem.get('section_text', '')
-            job['apply_url'] = base_url  # Default fallback
+            # Extract description snippet
+            job['description_snippet'] = full_text[:500] if full_text else None
             
-            # Try to find a link in the HTML that matches this title
-            # Parse the section text as HTML to find links
-            try:
-                section_soup = BeautifulSoup(section_text[:1000] if len(section_text) > 1000 else section_text, 'lxml')
-                links = section_soup.find_all('a', href=True)
-                if links:
-                    # Use the first link that looks like a job detail page
-                    for link in links:
-                        href = link.get('href', '')
-                        if href and not href.startswith('#') and not href.startswith('javascript:'):
-                            job['apply_url'] = urljoin(base_url, href)
-                            break
-            except:
-                pass
-            
-            job['description_snippet'] = section_text[:300] if section_text else None
             return job
         
         # Handle JSON-LD structured data (dict)

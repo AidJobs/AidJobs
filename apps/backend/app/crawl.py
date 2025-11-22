@@ -138,11 +138,43 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                         ]
                     elif source_type == 'api' or source_type == 'json':
                         api_crawler = APICrawler(db_url)
-                        raw_jobs = await api_crawler.fetch_api(careers_url, parser_hint, None)
-                        normalized_jobs = [
-                            html_crawler.normalize_job(job, org_name)
-                            for job in raw_jobs
-                        ]
+                        try:
+                            raw_jobs = await api_crawler.fetch_api(careers_url, parser_hint, None)
+                            logger.info(f"[crawl] API fetch returned {len(raw_jobs)} raw jobs from {careers_url}")
+                            
+                            if not raw_jobs:
+                                # Fallback: try HTML extraction for UNDP if API returns nothing
+                                if 'undp.org' in careers_url.lower():
+                                    logger.info(f"[crawl] API returned no jobs for UNDP, trying HTML extraction as fallback")
+                                    status, headers, html, size = await html_crawler.fetch_html(careers_url)
+                                    if status == 200:
+                                        raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
+                                        logger.info(f"[crawl] HTML fallback extracted {len(raw_jobs)} jobs")
+                            
+                            normalized_jobs = [
+                                html_crawler.normalize_job(job, org_name)
+                                for job in raw_jobs
+                            ]
+                            
+                            # Log apply_url extraction for debugging
+                            for job in normalized_jobs[:3]:  # Log first 3 jobs
+                                logger.debug(f"[crawl] Sample job: title='{job.get('title')}', apply_url='{job.get('apply_url')}'")
+                        except Exception as api_error:
+                            logger.error(f"[crawl] API fetch failed: {api_error}")
+                            # For UNDP, try HTML as fallback
+                            if 'undp.org' in careers_url.lower():
+                                logger.info(f"[crawl] Trying HTML extraction as fallback for UNDP")
+                                status, headers, html, size = await html_crawler.fetch_html(careers_url)
+                                if status == 200:
+                                    raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
+                                    normalized_jobs = [
+                                        html_crawler.normalize_job(job, org_name)
+                                        for job in raw_jobs
+                                    ]
+                                else:
+                                    raise api_error
+                            else:
+                                raise api_error
                     else:  # html (default)
                         status, headers, html, size = await html_crawler.fetch_html(careers_url)
                         
