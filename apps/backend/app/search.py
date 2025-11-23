@@ -77,12 +77,35 @@ class SearchService:
             try:
                 try:
                     index = self.meili_client.get_index(self.meili_index_name)
-                except Exception:
-                    task = self.meili_client.create_index(
-                        self.meili_index_name,
-                        {'primaryKey': 'id'}
-                    )
-                    index = self.meili_client.get_index(self.meili_index_name)
+                    # Index exists, verify it's accessible
+                    index.get_stats()
+                except Exception as index_error:
+                    # Index doesn't exist, create it
+                    logger.info(f"[aidjobs] Index '{self.meili_index_name}' not found, creating...")
+                    try:
+                        task = self.meili_client.create_index(
+                            self.meili_index_name,
+                            {'primaryKey': 'id'}
+                        )
+                        # Wait for task to complete
+                        import time
+                        max_wait = 5  # Wait up to 5 seconds
+                        waited = 0
+                        while waited < max_wait:
+                            task_status = self.meili_client.get_task(task.task_uid)
+                            if task_status.status in ['succeeded', 'failed']:
+                                break
+                            time.sleep(0.5)
+                            waited += 0.5
+                        
+                        if task_status.status == 'failed':
+                            raise Exception(f"Index creation failed: {task_status.error}")
+                        
+                        index = self.meili_client.get_index(self.meili_index_name)
+                        logger.info(f"[aidjobs] Index '{self.meili_index_name}' created successfully")
+                    except Exception as create_error:
+                        logger.error(f"[aidjobs] Failed to create index: {create_error}")
+                        raise
                 
                 index.update_searchable_attributes([
                     'title',

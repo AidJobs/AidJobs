@@ -120,10 +120,11 @@ async def diagnostics_meili_openrouter() -> dict[str, Any]:
                 try:
                     index = search_service.meili_client.get_index(meili_index)
                     stats = index.get_stats()
+                    # IndexStats is an object, not a dict - access attributes directly
                     diagnostics["meilisearch"]["index_status"] = {
                         "exists": True,
-                        "documents": stats.get("numberOfDocuments", 0),
-                        "indexing": stats.get("isIndexing", False)
+                        "documents": getattr(stats, "number_of_documents", 0),
+                        "indexing": getattr(stats, "is_indexing", False)
                     }
                 except Exception as e:
                     diagnostics["meilisearch"]["index_status"] = {
