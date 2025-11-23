@@ -198,31 +198,103 @@ class HTMLCrawler:
                     if not parent:
                         continue
                     
+                    # Extract title from text after "Job Title"
+                    title_text = text_node.string if hasattr(text_node, 'string') else str(text_node)
+                    title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', title_text)
+                    if not title_match:
+                        # Try to get title from the next text node or parent
+                        next_text = parent.get_text() if parent else ''
+                        title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', next_text)
+                    
+                    if not title_match:
+                        continue
+                    
+                    title = title_match.group(1).strip()
+                    if not title or len(title) < 5:
+                        continue
+                    
                     # Find the container element (could be div, tr, li, etc.)
                     # Look for a parent that contains the full job entry
                     container = parent
-                    for _ in range(3):  # Go up max 3 levels to find container
-                        if container and container.name in ['tr', 'div', 'li', 'article', 'section']:
-                            # Check if this container has a link (job detail page)
-                            link = container.find('a', href=True)
-                            if link:
-                                # Extract title from text after "Job Title"
+                    for _ in range(5):  # Go up max 5 levels to find container
+                        if container and container.name in ['tr', 'div', 'li', 'article', 'section', 'td']:
+                            # Find ALL links in this container
+                            # For table rows, only get links in THIS row, not parent/sibling rows
+                            all_links = []
+                            
+                            if container.name == 'tr':
+                                # For table rows, only get links in cells of THIS row
+                                cells = container.find_all(['td', 'th'])
+                                for cell in cells:
+                                    cell_links = cell.find_all('a', href=True)
+                                    all_links.extend(cell_links)
+                            else:
+                                # For other containers, get all links
+                                all_links = container.find_all('a', href=True)
+                            
+                            # If no links in container, check immediate children only (not parent)
+                            if not all_links and container:
+                                # Check direct children for links
+                                for child in container.children:
+                                    if hasattr(child, 'find_all'):
+                                        child_links = child.find_all('a', href=True)
+                                        all_links.extend(child_links)
+                            
+                            # Find the best link - prefer links that are near the title or have job-related paths
+                            best_link = None
+                            best_score = -1
+                            
+                            for link in all_links:
+                                href = link.get('href', '')
+                                if not href or href.startswith('#') or href.startswith('javascript:'):
+                                    continue
+                                
+                                href_lower = href.lower()
+                                link_text = link.get_text().lower().strip()
+                                
+                                score = 0
+                                
+                                # High priority: links with job detail patterns
+                                if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/id=', '/consultancy/']):
+                                    score += 20
+                                
+                                # High priority: links with IDs or unique identifiers
+                                if re.search(r'/\d+', href) or re.search(r'/[a-z0-9-]{10,}', href):
+                                    score += 15
+                                
+                                # Medium: links with detail keywords in text
+                                if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full']):
+                                    score += 10
+                                
+                                # Penalty: listing pages
+                                if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies']):
+                                    score -= 20
+                                
+                                # Check if link is in the same cell/container as the title
+                                link_parent = link.parent
+                                if link_parent and (link_parent == container or container.find(link)):
+                                    score += 5
+                                
+                                if score > best_score:
+                                    best_score = score
+                                    best_link = link
+                            
+                            if best_link and best_score >= 0:
                                 full_text = container.get_text()
-                                title_match = re.search(r'(?i)Job Title\s+([^\n]+)', full_text)
-                                if title_match:
-                                    title = title_match.group(1).strip()
-                                    if title and len(title) > 5:
-                                        # Store the container element with metadata
-                                        job_elements.append({
-                                            'element': container,
-                                            'title': title,
-                                            'link': link,
-                                            'full_text': full_text
-                                        })
-                                        if len(job_elements) >= 100:  # Limit to 100 jobs
-                                            break
-                                break
+                                job_elements.append({
+                                    'element': container,
+                                    'title': title,
+                                    'link': best_link,
+                                    'full_text': full_text,
+                                    'title_text': title  # Store original title for uniqueness
+                                })
+                                if len(job_elements) >= 100:  # Limit to 100 jobs
+                                    break
+                            break
                         container = container.parent if container else None
+                    
+                    if len(job_elements) >= 100:
+                        break
                 
                 # If we didn't find jobs using the above method, try finding table rows or divs
                 # that contain "Job Title" text and have links
@@ -232,18 +304,46 @@ class HTMLCrawler:
                         text = elem.get_text()
                         if job_title_pattern.search(text):
                             # Extract title
-                            title_match = re.search(r'(?i)Job Title\s+([^\n]+)', text)
+                            title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', text)
                             if title_match:
                                 title = title_match.group(1).strip()
                                 if title and len(title) > 5:
-                                    # Find link in this element
-                                    link = elem.find('a', href=True)
-                                    if link:
+                                    # Find ALL links in this element and score them
+                                    all_links = elem.find_all('a', href=True)
+                                    best_link = None
+                                    best_score = -1
+                                    
+                                    for link in all_links:
+                                        href = link.get('href', '')
+                                        if not href or href.startswith('#') or href.startswith('javascript:'):
+                                            continue
+                                        
+                                        href_lower = href.lower()
+                                        score = 0
+                                        
+                                        # High priority: job detail patterns
+                                        if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/id=', '/consultancy/']):
+                                            score += 20
+                                        
+                                        # High priority: unique IDs
+                                        if re.search(r'/\d+', href) or re.search(r'/[a-z0-9-]{10,}', href):
+                                            score += 15
+                                        
+                                        # Penalty: listing pages
+                                        if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies']):
+                                            score -= 20
+                                        
+                                        if score > best_score:
+                                            best_score = score
+                                            best_link = link
+                                    
+                                    if best_link and best_score >= 0:
                                         job_elements.append({
                                             'element': elem,
                                             'title': title,
-                                            'link': link,
-                                            'full_text': text
+                                            'link': best_link,
+                                            'full_text': text,
+                                            'title_text': title
                                         })
                                         if len(job_elements) >= 100:
                                             break
@@ -286,12 +386,37 @@ class HTMLCrawler:
                                 break
         
         # Extract data from each element
+        seen_urls = set()  # Track URLs to ensure uniqueness
+        seen_titles = set()  # Track titles to avoid duplicates
+        
         for elem in job_elements:
             job = self._extract_job_from_element(elem, base_url)
             if job and job.get('title'):
+                title = job.get('title', '').strip()
+                apply_url = job.get('apply_url', '')
+                
+                # Skip if we've seen this exact title+URL combination
+                job_key = (title.lower(), apply_url)
+                if job_key in seen_urls:
+                    logger.debug(f"[html_fetch] Skipping duplicate job: {title[:50]}... -> {apply_url}")
+                    continue
+                
+                # Skip if URL is the base URL (not a specific job page)
+                if apply_url == base_url or apply_url == base_url.rstrip('/'):
+                    # Only skip if we already have a job with this title
+                    if title.lower() in seen_titles:
+                        logger.debug(f"[html_fetch] Skipping job with base URL: {title[:50]}...")
+                        continue
+                
+                seen_urls.add(job_key)
+                seen_titles.add(title.lower())
                 jobs.append(job)
+                
+                # Log first few jobs for debugging
+                if len(jobs) <= 3:
+                    logger.debug(f"[html_fetch] Extracted job {len(jobs)}: '{title[:50]}...' -> {apply_url}")
         
-        logger.info(f"[html_fetch] Extracted {len(jobs)} jobs from {base_url}")
+        logger.info(f"[html_fetch] Extracted {len(jobs)} unique jobs from {base_url}")
         return jobs
     
     def _extract_job_from_element(self, elem, base_url: str) -> Optional[Dict]:
