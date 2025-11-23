@@ -55,6 +55,102 @@ async def dev_status() -> dict[str, Any]:
     }
 
 
+@router.get("/diagnostics/meili-openrouter")
+async def diagnostics_meili_openrouter() -> dict[str, Any]:
+    """
+    Detailed diagnostics for Meilisearch and OpenRouter configuration.
+    Shows what the backend actually sees from environment variables.
+    """
+    from app.search import search_service
+    from app.ai_service import get_ai_service
+    
+    diagnostics = {
+        "meilisearch": {
+            "enabled": False,
+            "configured": False,
+            "connected": False,
+            "error": None,
+            "env_vars": {},
+            "client_status": None,
+            "index_status": None
+        },
+        "openrouter": {
+            "enabled": False,
+            "configured": False,
+            "api_key_set": False,
+            "model": None,
+            "error": None
+        }
+    }
+    
+    # Check Meilisearch
+    meili_url = os.getenv("MEILISEARCH_URL")
+    meili_key = os.getenv("MEILISEARCH_KEY")
+    meili_host = os.getenv("MEILI_HOST")
+    meili_master_key = os.getenv("MEILI_MASTER_KEY")
+    meili_api_key = os.getenv("MEILI_API_KEY")
+    meili_index = os.getenv("MEILI_JOBS_INDEX", "jobs_index")
+    enable_search = os.getenv("AIDJOBS_ENABLE_SEARCH", "true").lower()
+    
+    diagnostics["meilisearch"]["env_vars"] = {
+        "MEILISEARCH_URL": "SET" if meili_url else "NOT SET",
+        "MEILISEARCH_KEY": "SET" if meili_key else "NOT SET",
+        "MEILI_HOST": "SET" if meili_host else "NOT SET",
+        "MEILI_MASTER_KEY": "SET" if meili_master_key else "NOT SET",
+        "MEILI_API_KEY": "SET" if meili_api_key else "NOT SET",
+        "MEILI_JOBS_INDEX": meili_index,
+        "AIDJOBS_ENABLE_SEARCH": enable_search
+    }
+    
+    has_new_config = bool(meili_url and meili_key)
+    has_legacy_config = bool(meili_host and (meili_master_key or meili_api_key))
+    diagnostics["meilisearch"]["configured"] = has_new_config or has_legacy_config
+    diagnostics["meilisearch"]["enabled"] = search_service.meili_enabled if search_service else False
+    
+    if search_service:
+        diagnostics["meilisearch"]["client_status"] = "initialized" if search_service.meili_client else "not initialized"
+        diagnostics["meilisearch"]["error"] = search_service.meili_error
+        
+        if search_service.meili_client:
+            try:
+                health = search_service.meili_client.health()
+                diagnostics["meilisearch"]["connected"] = health.get("status") == "available"
+                
+                # Check index
+                try:
+                    index = search_service.meili_client.get_index(meili_index)
+                    stats = index.get_stats()
+                    diagnostics["meilisearch"]["index_status"] = {
+                        "exists": True,
+                        "documents": stats.get("numberOfDocuments", 0),
+                        "indexing": stats.get("isIndexing", False)
+                    }
+                except Exception as e:
+                    diagnostics["meilisearch"]["index_status"] = {
+                        "exists": False,
+                        "error": str(e)
+                    }
+            except Exception as e:
+                diagnostics["meilisearch"]["connected"] = False
+                diagnostics["meilisearch"]["error"] = str(e)
+    
+    # Check OpenRouter
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    
+    diagnostics["openrouter"]["api_key_set"] = bool(openrouter_key)
+    diagnostics["openrouter"]["configured"] = bool(openrouter_key)
+    diagnostics["openrouter"]["model"] = openrouter_model
+    
+    ai_service = get_ai_service()
+    diagnostics["openrouter"]["enabled"] = ai_service.enabled if ai_service else False
+    
+    return {
+        "status": "ok",
+        "data": diagnostics
+    }
+
+
 @router.get("/setup/status")
 async def setup_status() -> dict[str, Any]:
     """
@@ -79,12 +175,12 @@ async def setup_status() -> dict[str, Any]:
         },
         "env_vars": {
             "supabase": ["SUPABASE_DB_URL", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"],
-            "meilisearch": ["MEILISEARCH_URL", "MEILISEARCH_KEY"],
+            "meilisearch": ["MEILISEARCH_URL", "MEILISEARCH_KEY", "MEILI_HOST", "MEILI_MASTER_KEY", "MEILI_API_KEY"],
             "payments": {
                 "paypal": ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"],
                 "razorpay": ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"]
             },
-            "ai": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
+            "ai": ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
         }
     }
     
@@ -105,20 +201,31 @@ async def setup_status() -> dict[str, Any]:
     
     # Check Meilisearch
     try:
-        if search_service and hasattr(search_service, 'client'):
-            health = search_service.client.health()
+        from app.search import search_service
+        if search_service and search_service.meili_enabled and search_service.meili_client:
+            health = search_service.meili_client.health()
             status["meili"] = "ok" if health.get("status") == "available" else "warn"
         else:
-            status["meili"] = "warn"
-    except Exception:
+            # Check if config exists but not initialized
+            meili_url = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_HOST")
+            meili_key = os.getenv("MEILISEARCH_KEY") or os.getenv("MEILI_MASTER_KEY") or os.getenv("MEILI_API_KEY")
+            if meili_url and meili_key:
+                status["meili"] = "warn"  # Config exists but not connected
+            else:
+                status["meili"] = "fail"  # No config
+    except Exception as e:
         status["meili"] = "fail"
+        status["meili_error"] = str(e)
     
     # Check payment providers
     status["payments"]["paypal"] = bool(os.getenv("PAYPAL_CLIENT_ID") and os.getenv("PAYPAL_CLIENT_SECRET"))
     status["payments"]["razorpay"] = bool(os.getenv("RAZORPAY_KEY_ID") and os.getenv("RAZORPAY_KEY_SECRET"))
     
-    # Check AI providers
-    status["ai"] = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
+    # Check AI providers (OpenRouter)
+    status["ai"] = bool(os.getenv("OPENROUTER_API_KEY"))
+    # Also check legacy AI providers for backward compatibility
+    if not status["ai"]:
+        status["ai"] = bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
     
     return {
         "status": "ok",
