@@ -12,6 +12,7 @@ from app.ai_service import get_ai_service
 from app.db_config import db_config
 from app.enrichment_review import auto_flag_job_for_review
 from app.enrichment_history import record_enrichment_change
+from app.enrichment_preprocessor import preprocess_job_for_enrichment
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,7 @@ def enrich_job(
     org_name: Optional[str] = None,
     location: Optional[str] = None,
     functional_role_hint: Optional[str] = None,
+    apply_url: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Enrich a single job using AI service and apply rules.
@@ -344,14 +346,36 @@ def enrich_job(
         logger.warning(f"[enrichment] AI service not enabled, skipping enrichment for job {job_id}")
         return None
     
-    # Log input quality
-    desc_length = len(description) if description else 0
-    logger.info(f"[enrichment] Enriching job {job_id}: title='{title[:50]}...', desc_length={desc_length}")
-    
-    # Call AI service
-    enrichment_data = ai_service.enrich_job(
+    # Preprocess input to improve quality
+    preprocessed = preprocess_job_for_enrichment(
         title=title,
         description=description or "",
+        org_name=org_name,
+        location=location,
+        apply_url=apply_url,
+    )
+    
+    # Use preprocessed values
+    normalized_title = preprocessed["normalized_title"]
+    enhanced_description = preprocessed["enhanced_description"]
+    input_quality_score = preprocessed["input_quality_score"]
+    
+    # Log input quality
+    logger.info(
+        f"[enrichment] Enriching job {job_id}: "
+        f"title='{normalized_title[:50]}...', "
+        f"desc_length={preprocessed['description_length']}, "
+        f"input_quality={input_quality_score:.2f}"
+    )
+    
+    # Adjust confidence expectations based on input quality
+    # Lower quality input should result in lower confidence
+    min_confidence_adjustment = input_quality_score
+    
+    # Call AI service with preprocessed input
+    enrichment_data = ai_service.enrich_job(
+        title=normalized_title,
+        description=enhanced_description,
         org_name=org_name,
         location=location,
         functional_role_hint=functional_role_hint,
@@ -365,14 +389,30 @@ def enrich_job(
     if not validate_enrichment_response(enrichment_data, job_id):
         logger.warning(f"[enrichment] Validation found issues for job {job_id}, continuing with corrected data")
     
+    # Adjust confidence based on input quality
+    if input_quality_score < 0.7:
+        # Lower input quality should reduce confidence
+        if enrichment_data.get("confidence_overall"):
+            enrichment_data["confidence_overall"] = enrichment_data["confidence_overall"] * input_quality_score
+        if enrichment_data.get("experience_confidence"):
+            enrichment_data["experience_confidence"] = enrichment_data["experience_confidence"] * input_quality_score
+        # Adjust impact domain confidences
+        impact_confidences = enrichment_data.get("impact_confidences", {})
+        for domain in impact_confidences:
+            impact_confidences[domain] = impact_confidences[domain] * input_quality_score
+    
     # Apply hybrid rules
     enrichment_data = apply_enrichment_rules(enrichment_data)
+    
+    # Store input quality score for reference
+    enrichment_data["input_quality_score"] = input_quality_score
     
     # Log confidence scores
     logger.info(
         f"[enrichment] Job {job_id} enrichment: "
         f"confidence_overall={enrichment_data.get('confidence_overall', 'N/A')}, "
         f"experience_confidence={enrichment_data.get('experience_confidence', 'N/A')}, "
+        f"input_quality={input_quality_score:.2f}, "
         f"low_confidence={enrichment_data.get('low_confidence', False)}, "
         f"impact_domains={len(enrichment_data.get('impact_domain', []))}, "
         f"functional_roles={len(enrichment_data.get('functional_role', []))}"
@@ -599,7 +639,7 @@ def batch_enrich_jobs(
         # Fetch job data
         placeholders = ",".join(["%s"] * len(job_ids))
         cursor.execute(f"""
-            SELECT id::text, title, description_snippet, org_name, location_raw, functional_tags
+            SELECT id::text, title, description_snippet, org_name, location_raw, functional_tags, apply_url
             FROM jobs
             WHERE id::text IN ({placeholders})
         """, job_ids)
@@ -625,6 +665,7 @@ def batch_enrich_jobs(
                     org_name=job.get("org_name"),
                     location=job.get("location_raw"),
                     functional_role_hint=functional_role_hint,
+                    apply_url=job.get("apply_url"),
                 )
                 
                 if success:

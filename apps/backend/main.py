@@ -416,7 +416,7 @@ async def admin_enrich_job(
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         cursor.execute("""
-            SELECT id::text, title, description_snippet, org_name, location_raw, functional_tags
+            SELECT id::text, title, description_snippet, org_name, location_raw, functional_tags, apply_url
             FROM jobs
             WHERE id::text = %s
         """, (job_id,))
@@ -439,6 +439,7 @@ async def admin_enrich_job(
             org_name=job.get("org_name"),
             location=job.get("location_raw"),
             functional_role_hint=functional_role_hint,
+            apply_url=job.get("apply_url"),
         )
         
         if success:
@@ -595,6 +596,238 @@ async def get_enrichment_quality_dashboard(
         }
     except Exception as e:
         logger.error(f"[admin/enrichment/quality-dashboard] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Enrichment Feedback Endpoints
+@app.post("/admin/enrichment/feedback")
+async def submit_enrichment_feedback(
+    request: Request,
+    body: dict,
+    admin: str = Depends(admin_required),
+):
+    """Submit feedback about an enrichment error."""
+    from app.enrichment_feedback import submit_feedback
+    
+    job_id = body.get("job_id")
+    feedback_type = body.get("feedback_type")
+    field_name = body.get("field_name")
+    original_value = body.get("original_value")
+    corrected_value = body.get("corrected_value")
+    feedback_notes = body.get("feedback_notes")
+    submitted_by = body.get("submitted_by")
+    
+    if not all([job_id, feedback_type, field_name]):
+        raise HTTPException(status_code=400, detail="job_id, feedback_type, and field_name are required")
+    
+    try:
+        success = submit_feedback(
+            job_id=job_id,
+            feedback_type=feedback_type,
+            field_name=field_name,
+            original_value=original_value,
+            corrected_value=corrected_value,
+            feedback_notes=feedback_notes,
+            submitted_by=submitted_by,
+        )
+        
+        if success:
+            return {
+                "status": "ok",
+                "data": {"message": "Feedback submitted successfully"},
+                "error": None,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to submit feedback")
+    except Exception as e:
+        logger.error(f"[admin/enrichment/feedback] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/enrichment/feedback/patterns")
+async def get_enrichment_feedback_patterns(
+    field_name: Optional[str] = None,
+    limit: int = 100,
+    admin: str = Depends(admin_required),
+):
+    """Get feedback patterns to identify systematic errors."""
+    from app.enrichment_feedback import get_feedback_patterns
+    
+    try:
+        patterns = get_feedback_patterns(field_name=field_name, limit=limit)
+        return {
+            "status": "ok",
+            "data": {
+                "patterns": patterns,
+                "count": len(patterns),
+            },
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/feedback/patterns] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Ground Truth Endpoints
+@app.post("/admin/enrichment/ground-truth")
+async def add_ground_truth(
+    request: Request,
+    body: dict,
+    admin: str = Depends(admin_required),
+):
+    """Add a ground truth entry (manually labeled job)."""
+    from app.enrichment_ground_truth import add_ground_truth
+    
+    job_id = body.get("job_id")
+    title = body.get("title")
+    description_snippet = body.get("description_snippet")
+    org_name = body.get("org_name")
+    location_raw = body.get("location_raw")
+    impact_domain = body.get("impact_domain", [])
+    functional_role = body.get("functional_role", [])
+    experience_level = body.get("experience_level")
+    sdgs = body.get("sdgs", [])
+    labeled_by = body.get("labeled_by", "admin")
+    notes = body.get("notes")
+    
+    if not job_id or not title:
+        raise HTTPException(status_code=400, detail="job_id and title are required")
+    
+    try:
+        success = add_ground_truth(
+            job_id=job_id,
+            title=title,
+            description_snippet=description_snippet,
+            org_name=org_name,
+            location_raw=location_raw,
+            impact_domain=impact_domain,
+            functional_role=functional_role,
+            experience_level=experience_level,
+            sdgs=sdgs,
+            labeled_by=labeled_by,
+            notes=notes,
+        )
+        
+        if success:
+            return {
+                "status": "ok",
+                "data": {"message": "Ground truth added successfully"},
+                "error": None,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to add ground truth")
+    except Exception as e:
+        logger.error(f"[admin/enrichment/ground-truth] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/enrichment/validate/{job_id}")
+async def validate_enrichment_accuracy(
+    job_id: str,
+    admin: str = Depends(admin_required),
+):
+    """Validate AI enrichment against ground truth for a job."""
+    from app.enrichment_ground_truth import validate_enrichment_accuracy
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    from app.db_config import db_config
+    
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    try:
+        # Get current AI enrichment
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT 
+                impact_domain, functional_role, experience_level, sdgs,
+                confidence_overall
+            FROM jobs
+            WHERE id::text = %s
+        """, (job_id,))
+        
+        job = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        ai_enrichment = {
+            "impact_domain": job.get("impact_domain", []),
+            "functional_role": job.get("functional_role", []),
+            "experience_level": job.get("experience_level"),
+            "sdgs": job.get("sdgs", []),
+        }
+        
+        # Validate against ground truth
+        results = validate_enrichment_accuracy(job_id, ai_enrichment)
+        
+        return {
+            "status": "ok",
+            "data": results,
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/validate] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Consistency Validation Endpoints
+@app.get("/admin/enrichment/consistency/{job_id}")
+async def check_enrichment_consistency(
+    job_id: str,
+    admin: str = Depends(admin_required),
+):
+    """Check if a job's enrichment is consistent with similar jobs."""
+    from app.enrichment_consistency import check_consistency
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    from app.db_config import db_config
+    
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    try:
+        # Get current enrichment
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT 
+                impact_domain, functional_role, experience_level, sdgs
+            FROM jobs
+            WHERE id::text = %s
+        """, (job_id,))
+        
+        job = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        enrichment = {
+            "impact_domain": job.get("impact_domain", []),
+            "functional_role": job.get("functional_role", []),
+            "experience_level": job.get("experience_level"),
+            "sdgs": job.get("sdgs", []),
+        }
+        
+        # Check consistency
+        results = check_consistency(job_id, enrichment)
+        
+        return {
+            "status": "ok",
+            "data": results,
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/consistency] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

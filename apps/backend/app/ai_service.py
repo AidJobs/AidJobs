@@ -1,11 +1,14 @@
 """
 AI Service for OpenRouter integration.
 Handles all LLM calls using gpt-4o-mini via OpenRouter.
+Includes retry with exponential backoff and circuit breaker for resilience.
 """
 import os
 import json
 import logging
+import time
 from typing import Any, Optional, Dict, List
+from collections import deque
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -13,6 +16,72 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# Circuit breaker configuration
+CIRCUIT_BREAKER_ERROR_THRESHOLD = 0.10  # 10% error rate triggers circuit breaker
+CIRCUIT_BREAKER_WINDOW_SECONDS = 300  # 5 minutes
+CIRCUIT_BREAKER_RESET_SECONDS = 60  # 1 minute before retry
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 1.0  # Start with 1 second
+MAX_RETRY_DELAY = 10.0  # Max 10 seconds
+
+
+class CircuitBreaker:
+    """Simple circuit breaker pattern for API resilience."""
+    
+    def __init__(self, error_threshold: float = 0.10, window_seconds: int = 300, reset_seconds: int = 60):
+        self.error_threshold = error_threshold
+        self.window_seconds = window_seconds
+        self.reset_seconds = reset_seconds
+        self.error_history = deque()  # (timestamp, is_error)
+        self.circuit_open = False
+        self.circuit_open_since = None
+        self._lock = False  # Simple lock flag
+    
+    def record_call(self, is_error: bool):
+        """Record a call result."""
+        now = time.time()
+        self.error_history.append((now, is_error))
+        
+        # Remove old entries outside window
+        cutoff = now - self.window_seconds
+        while self.error_history and self.error_history[0][0] < cutoff:
+            self.error_history.popleft()
+        
+        # Calculate error rate
+        if len(self.error_history) >= 10:  # Need at least 10 calls to evaluate
+            errors = sum(1 for _, is_err in self.error_history if is_err)
+            error_rate = errors / len(self.error_history)
+            
+            if error_rate >= self.error_threshold and not self.circuit_open:
+                self.circuit_open = True
+                self.circuit_open_since = now
+                logger.warning(f"[ai_service] Circuit breaker OPENED: error rate {error_rate:.1%} >= {self.error_threshold:.1%}")
+    
+    def can_make_call(self) -> bool:
+        """Check if we can make a call (circuit is closed or reset period passed)."""
+        if not self.circuit_open:
+            return True
+        
+        # Check if reset period has passed
+        if self.circuit_open_since:
+            elapsed = time.time() - self.circuit_open_since
+            if elapsed >= self.reset_seconds:
+                # Try to close circuit (half-open state)
+                self.circuit_open = False
+                self.circuit_open_since = None
+                logger.info("[ai_service] Circuit breaker CLOSED (half-open state)")
+                return True
+        
+        return False
+    
+    def record_success(self):
+        """Record a successful call (helps close circuit)."""
+        if self.circuit_open:
+            # If we get a success in half-open state, close the circuit
+            self.circuit_open = False
+            self.circuit_open_since = None
+            logger.info("[ai_service] Circuit breaker CLOSED after successful call")
 
 
 class AIService:
@@ -23,6 +92,11 @@ class AIService:
         self.model = OPENROUTER_MODEL
         self.base_url = OPENROUTER_BASE_URL
         self.enabled = bool(self.api_key)
+        self.circuit_breaker = CircuitBreaker(
+            error_threshold=CIRCUIT_BREAKER_ERROR_THRESHOLD,
+            window_seconds=CIRCUIT_BREAKER_WINDOW_SECONDS,
+            reset_seconds=CIRCUIT_BREAKER_RESET_SECONDS
+        )
         
         if not self.enabled:
             logger.warning("[ai_service] OpenRouter API key not configured. AI features disabled.")
@@ -34,64 +108,128 @@ class AIService:
         response_format: Optional[Dict[str, str]] = None,
         max_tokens: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Make a call to OpenRouter API."""
+        """
+        Make a call to OpenRouter API with retry and circuit breaker.
+        
+        Implements:
+        - Exponential backoff retry (up to 3 attempts)
+        - Circuit breaker to stop calling if error rate > 10%
+        - Graceful degradation on failures
+        """
         if not self.enabled:
             logger.warning("[ai_service] OpenRouter not enabled, skipping call")
             return None
         
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://aidjobs.app",
-                "X-Title": "AidJobs Trinity Search",
-            }
-            
-            payload = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature,
-            }
-            
-            if response_format:
-                payload["response_format"] = response_format
-            
-            if max_tokens:
-                payload["max_tokens"] = max_tokens
-            
-            with httpx.Client(timeout=30.0) as client:
-                response = client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                if "choices" in data and len(data["choices"]) > 0:
-                    content = data["choices"][0]["message"]["content"]
-                    if response_format and response_format.get("type") == "json_object":
-                        # Parse JSON and return as dict with "content" key for consistency
-                        try:
-                            parsed = json.loads(content) if isinstance(content, str) else content
-                            return {"content": parsed, "raw": data}
-                        except json.JSONDecodeError as e:
-                            logger.error(f"[ai_service] Failed to parse JSON response: {e}, content: {content[:200]}")
-                            return None
-                    return {"content": content, "raw": data}
-                
-                logger.error(f"[ai_service] Unexpected response format: {data}")
-                return None
-                
-        except httpx.HTTPError as e:
-            logger.error(f"[ai_service] HTTP error calling OpenRouter: {e}")
+        # Check circuit breaker
+        if not self.circuit_breaker.can_make_call():
+            logger.warning("[ai_service] Circuit breaker is OPEN, skipping call")
             return None
-        except json.JSONDecodeError as e:
-            logger.error(f"[ai_service] JSON decode error: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[ai_service] Unexpected error: {e}", exc_info=True)
-            return None
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://aidjobs.app",
+            "X-Title": "AidJobs Trinity Search",
+        }
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        
+        if response_format:
+            payload["response_format"] = response_format
+        
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        
+        # Retry with exponential backoff
+        last_error = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                # Calculate delay for this attempt (exponential backoff)
+                if attempt > 0:
+                    delay = min(INITIAL_RETRY_DELAY * (2 ** (attempt - 1)), MAX_RETRY_DELAY)
+                    logger.info(f"[ai_service] Retry attempt {attempt + 1}/{MAX_RETRIES} after {delay:.1f}s delay")
+                    time.sleep(delay)
+                
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{self.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    if "choices" in data and len(data["choices"]) > 0:
+                        content = data["choices"][0]["message"]["content"]
+                        if response_format and response_format.get("type") == "json_object":
+                            # Parse JSON and return as dict with "content" key for consistency
+                            try:
+                                parsed = json.loads(content) if isinstance(content, str) else content
+                                # Record success
+                                self.circuit_breaker.record_call(False)
+                                self.circuit_breaker.record_success()
+                                return {"content": parsed, "raw": data}
+                            except json.JSONDecodeError as e:
+                                logger.error(f"[ai_service] Failed to parse JSON response: {e}, content: {content[:200]}")
+                                last_error = e
+                                self.circuit_breaker.record_call(True)
+                                continue  # Retry
+                        # Record success
+                        self.circuit_breaker.record_call(False)
+                        self.circuit_breaker.record_success()
+                        return {"content": content, "raw": data}
+                    
+                    logger.error(f"[ai_service] Unexpected response format: {data}")
+                    last_error = ValueError("Unexpected response format")
+                    self.circuit_breaker.record_call(True)
+                    continue  # Retry
+                    
+            except httpx.HTTPStatusError as e:
+                # HTTP errors (4xx, 5xx) - record and retry
+                status_code = e.response.status_code
+                if status_code >= 500:
+                    # Server errors - retry
+                    logger.warning(f"[ai_service] HTTP {status_code} error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+                    last_error = e
+                    self.circuit_breaker.record_call(True)
+                    continue
+                else:
+                    # Client errors (4xx) - don't retry
+                    logger.error(f"[ai_service] HTTP {status_code} client error: {e}")
+                    self.circuit_breaker.record_call(True)
+                    return None
+                    
+            except httpx.TimeoutException as e:
+                logger.warning(f"[ai_service] Timeout error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+                last_error = e
+                self.circuit_breaker.record_call(True)
+                continue  # Retry on timeout
+                
+            except httpx.NetworkError as e:
+                logger.warning(f"[ai_service] Network error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+                last_error = e
+                self.circuit_breaker.record_call(True)
+                continue  # Retry on network errors
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"[ai_service] JSON decode error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+                last_error = e
+                self.circuit_breaker.record_call(True)
+                continue  # Retry
+                
+            except Exception as e:
+                logger.error(f"[ai_service] Unexpected error (attempt {attempt + 1}/{MAX_RETRIES}): {e}", exc_info=True)
+                last_error = e
+                self.circuit_breaker.record_call(True)
+                continue  # Retry
+        
+        # All retries failed
+        logger.error(f"[ai_service] All {MAX_RETRIES} retry attempts failed. Last error: {last_error}")
+        return None
     
     def enrich_job(
         self,

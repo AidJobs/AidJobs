@@ -502,7 +502,7 @@ CREATE INDEX IF NOT EXISTS idx_enrichment_feedback_field ON enrichment_feedback(
 -- Enrichment Ground Truth: Manually labeled test set for accuracy validation
 CREATE TABLE IF NOT EXISTS enrichment_ground_truth (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    job_id UUID UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description_snippet TEXT,
     org_name TEXT,

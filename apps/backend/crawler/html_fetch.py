@@ -1060,6 +1060,7 @@ class HTMLCrawler:
                             'description': job.get('description_snippet', ''),
                             'org_name': job.get('org_name'),
                             'location': job.get('location_raw'),
+                            'apply_url': job.get('apply_url'),
                         })
                 
                 conn.commit()
@@ -1075,6 +1076,7 @@ class HTMLCrawler:
                                 description=job_data['description'],
                                 org_name=job_data['org_name'],
                                 location=job_data['location'],
+                                apply_url=job_data.get('apply_url'),
                             )
                         logger.info(f"[html_fetch] Triggered enrichment for {len(jobs_to_enrich)} job(s)")
                     except Exception as e:

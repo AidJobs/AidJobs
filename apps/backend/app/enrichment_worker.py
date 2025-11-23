@@ -23,6 +23,7 @@ def _enrich_job_sync(
     org_name: Optional[str] = None,
     location: Optional[str] = None,
     functional_role_hint: Optional[str] = None,
+    apply_url: Optional[str] = None,
 ) -> bool:
     """
     Synchronously enrich a job (runs in thread pool).
@@ -35,6 +36,7 @@ def _enrich_job_sync(
             org_name=org_name,
             location=location,
             functional_role_hint=functional_role_hint,
+            apply_url=apply_url,
         )
     except Exception as e:
         logger.error(f"[enrichment_worker] Error enriching job {job_id}: {e}", exc_info=True)
@@ -48,6 +50,7 @@ def trigger_enrichment_on_job_create_or_update(
     org_name: Optional[str] = None,
     location: Optional[str] = None,
     functional_role_hint: Optional[str] = None,
+    apply_url: Optional[str] = None,
 ) -> None:
     """
     Trigger enrichment when a job is created or updated.
@@ -67,6 +70,7 @@ def trigger_enrichment_on_job_create_or_update(
             org_name=org_name,
             location=location,
             functional_role_hint=functional_role_hint,
+            apply_url=apply_url,
         )
         logger.info(f"[enrichment_worker] Triggered enrichment for job {job_id}")
     except Exception as e:
