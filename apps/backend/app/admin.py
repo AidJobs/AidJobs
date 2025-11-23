@@ -634,3 +634,103 @@ async def normalize_and_reindex() -> dict[str, Any]:
             "data": None,
             "error": str(e),
         }
+
+
+@router.post("/database/migrate")
+async def apply_database_migration() -> dict[str, Any]:
+    """
+    Apply database schema migration (idempotent).
+    Creates enrichment tables if they don't exist.
+    """
+    from pathlib import Path
+    from urllib.parse import urlparse, unquote
+    
+    if not psycopg2:
+        raise HTTPException(
+            status_code=500,
+            detail="psycopg2 not available"
+        )
+    
+    # Get database connection
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not configured (SUPABASE_DB_URL not set)"
+        )
+    
+    # Locate SQL file
+    project_root = Path(__file__).parent.parent.parent.parent
+    schema_file = project_root / "infra" / "supabase.sql"
+    
+    if not schema_file.exists():
+        raise HTTPException(
+            status_code=500,
+            detail=f"Schema file not found: {schema_file}"
+        )
+    
+    try:
+        # Connect to database
+        conn = psycopg2.connect(**conn_params, connect_timeout=10)
+        cursor = conn.cursor()
+        
+        # Get initial state
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name IN ('enrichment_reviews', 'enrichment_history', 'enrichment_feedback', 'enrichment_ground_truth')
+            ORDER BY table_name
+        """)
+        existing_before = [row[0] for row in cursor.fetchall()]
+        
+        # Read and apply schema
+        with open(schema_file, 'r', encoding='utf-8') as f:
+            schema_sql = f.read()
+        
+        cursor.execute(schema_sql)
+        conn.commit()
+        
+        # Check what was created
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name IN ('enrichment_reviews', 'enrichment_history', 'enrichment_feedback', 'enrichment_ground_truth')
+            ORDER BY table_name
+        """)
+        existing_after = [row[0] for row in cursor.fetchall()]
+        
+        new_tables = set(existing_after) - set(existing_before)
+        
+        # Get row counts for all enrichment tables
+        table_counts = {}
+        for table in existing_after:
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            table_counts[table] = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "status": "ok",
+            "data": {
+                "tables_before": existing_before,
+                "tables_after": existing_after,
+                "new_tables": sorted(new_tables),
+                "table_counts": table_counts,
+                "message": f"Migration applied. {len(new_tables)} new table(s) created." if new_tables else "All tables already exist (idempotent)."
+            },
+            "error": None,
+        }
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        traceback_str = traceback.format_exc()
+        logger.error(f"Migration failed: {error_detail}\n{traceback_str}")
+        
+        return {
+            "status": "error",
+            "data": None,
+            "error": error_detail,
+        }
