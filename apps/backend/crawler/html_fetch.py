@@ -193,6 +193,9 @@ class HTMLCrawler:
                 # Strategy: Find each "Job Title" occurrence and its associated unique link
                 # We need to ensure each job gets its own link, not a shared one
                 
+                # Track used links to prevent duplicates
+                used_links = set()
+                
                 # First, find all "Job Title" text nodes and their positions
                 job_title_nodes = []
                 for text_node in soup.find_all(string=job_title_pattern):
@@ -331,6 +334,7 @@ class HTMLCrawler:
                         continue
                     
                     # Score and select the best link for THIS specific job
+                    # CRITICAL: Exclude links that have already been used by other jobs
                     best_candidate = None
                     best_score = -1000
                     
@@ -339,6 +343,14 @@ class HTMLCrawler:
                         href = candidate['href']
                         href_lower = href.lower()
                         link_text = link.get_text().lower().strip()
+                        
+                        # Normalize href for comparison
+                        normalized_href = href.rstrip('/').split('#')[0].split('?')[0]
+                        
+                        # CRITICAL: Skip if this link has already been used
+                        if normalized_href in used_links:
+                            logger.debug(f"[html_fetch] Skipping already-used link for '{title[:50]}...': {href}")
+                            continue
                         
                         score = candidate.get('priority', 50)
                         
@@ -385,7 +397,11 @@ class HTMLCrawler:
                         # Store the resolved URL for this job
                         resolved_url = urljoin(base_url, best_href)
                         
-                        logger.debug(f"[html_fetch] Job \'{title[:50]}...\' -> Link: {best_href} (score: {best_score:.1f})")
+                        # Normalize and mark this link as used
+                        normalized_href = best_href.rstrip('/').split('#')[0].split('?')[0]
+                        used_links.add(normalized_href)
+                        
+                        logger.debug(f"[html_fetch] Job '{title[:50]}...' -> Link: {best_href} (score: {best_score:.1f})")
                         
                         job_elements.append({
                             'element': container,
@@ -398,9 +414,32 @@ class HTMLCrawler:
                         })
                         
                         if len(job_elements) >= 100:
-                                    break
+                            break
+                    else:
+                        logger.warning(f"[html_fetch] No valid link found for job '{title[:50]}...' (all links may be duplicates or invalid)")
                 
                 logger.info(f"[html_fetch] UNDP extraction found {len(job_elements)} job elements")
+                
+                # Log URL uniqueness check
+                if job_elements:
+                    extracted_urls = []
+                    for elem in job_elements:
+                        if isinstance(elem, dict) and 'resolved_url' in elem:
+                            extracted_urls.append(elem['resolved_url'])
+                        elif isinstance(elem, dict) and 'link_href' in elem:
+                            extracted_urls.append(urljoin(base_url, elem['link_href']))
+                    
+                    unique_urls = set(url.rstrip('/').split('#')[0].split('?')[0] for url in extracted_urls)
+                    if len(unique_urls) < len(extracted_urls):
+                        logger.warning(f"[html_fetch] WARNING: Found {len(extracted_urls)} jobs but only {len(unique_urls)} unique URLs!")
+                        # Log duplicates
+                        from collections import Counter
+                        url_counts = Counter(url.rstrip('/').split('#')[0].split('?')[0] for url in extracted_urls)
+                        for url, count in url_counts.items():
+                            if count > 1:
+                                logger.error(f"[html_fetch] URL used {count} times: {url}")
+                    else:
+                        logger.info(f"[html_fetch] ✓ All {len(job_elements)} jobs have unique URLs")
             
             # Strategy 1: Look for table rows with job-like content (common in UN sites)
             if not job_elements:
