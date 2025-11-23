@@ -385,11 +385,11 @@ class HTMLCrawler:
                         # Store the resolved URL for this job
                         resolved_url = urljoin(base_url, best_href)
                         
-                        logger.debug(f"[html_fetch] Job '{title[:50]}...' -> Link: {best_href} (score: {best_score:.1f})")
+                        logger.debug(f"[html_fetch] Job \'{title[:50]}...\' -> Link: {best_href} (score: {best_score:.1f})")
                         
-                                job_elements.append({
+                        job_elements.append({
                             'element': container,
-                                    'title': title,
+                            'title': title,
                             'link': best_link,
                             'link_href': best_href,  # Store the href directly
                             'resolved_url': resolved_url,  # Store resolved URL
