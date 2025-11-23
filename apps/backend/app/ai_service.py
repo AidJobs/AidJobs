@@ -120,30 +120,47 @@ class AIService:
         
         context = "\n".join(context_parts) if context_parts else "No additional context."
         
+        # Detect if description is too short
+        desc_length = len(description) if description else 0
+        is_short_description = desc_length < 50
+        
+        # Build prompt with appropriate warnings
+        description_warning = ""
+        if is_short_description:
+            description_warning = "\n\nWARNING: Job description is very short or missing. Set confidence_overall to a low value (<0.50) and explain why in the response. Do not guess or default to common values."
+        
         prompt = f"""You are an expert job classifier for humanitarian and development roles. Analyze the following job posting and extract structured information.
+
+CRITICAL INSTRUCTIONS:
+- Analyze the ACTUAL job content, not examples or defaults
+- Do NOT default to common values like "Officer / Associate" or "WASH" unless the job actually requires them
+- If the job description is insufficient, set low confidence scores (<0.50) and explain why
+- Base your classification on the specific job title, description, and context provided
+- Use confidence scores to reflect your certainty: high confidence (>0.80) only when very certain, low confidence (<0.60) when uncertain
 
 Job Title: {title}
 
 Job Description:
-{description}
+{description if description else "[No description provided]"}
 
 Additional Context:
 {context}
+{description_warning}
 
 Extract and return a JSON object with the following structure:
 {{
-  "impact_domain": ["domain1", "domain2"],  // Array of 1-3 impact domains from the canonical list
+  "impact_domain": ["domain1", "domain2"],  // Array of 1-3 impact domains from the canonical list (empty array if uncertain)
   "impact_confidences": {{"domain1": 0.85, "domain2": 0.75}},  // Confidence scores (0-1) for each domain
-  "functional_role": ["role1", "role2"],  // Array of 1-3 functional roles from the canonical list
+  "functional_role": ["role1", "role2"],  // Array of 1-3 functional roles from the canonical list (empty array if uncertain)
   "functional_confidences": {{"role1": 0.90, "role2": 0.70}},  // Confidence scores (0-1) for each role
-  "experience_level": "Officer / Associate",  // One of: "Early / Junior", "Officer / Associate", "Specialist / Advisor", "Manager / Senior Manager", "Head of Unit / Director", "Expert / Technical Lead"
-  "estimated_experience_years": {{"min": 2, "max": 5}},  // Estimated years of experience required
-  "experience_confidence": 0.80,  // Confidence in experience level (0-1)
-  "sdgs": [3, 6],  // Array of 0-2 SDG numbers (1-17) that this job contributes to
-  "sdg_confidences": {{"3": 0.88, "6": 0.72}},  // Confidence scores (0-1) for each SDG
-  "sdg_explanation": "This role contributes to SDG 3 (Good Health) through primary healthcare delivery and SDG 6 (Clean Water) via WASH interventions.",  // 1-2 sentence explanation
-  "matched_keywords": ["health", "WASH", "primary care", "water", "sanitation"],  // Up to 10 keywords that justify the classification
-  "confidence_overall": 0.82  // Overall confidence in the classification (0-1)
+  "experience_level": "Early / Junior",  // One of: "Early / Junior", "Officer / Associate", "Specialist / Advisor", "Manager / Senior Manager", "Head of Unit / Director", "Expert / Technical Lead" (empty string if uncertain)
+  "estimated_experience_years": {{"min": 0, "max": 2}},  // Estimated years of experience required
+  "experience_confidence": 0.75,  // Confidence in experience level (0-1)
+  "sdgs": [4],  // Array of 0-2 SDG numbers (1-17) that this job contributes to (empty array if uncertain)
+  "sdg_confidences": {{"4": 0.85}},  // Confidence scores (0-1) for each SDG
+  "sdg_explanation": "Brief explanation of SDG contributions",  // 1-2 sentence explanation (null if no SDGs)
+  "matched_keywords": ["keyword1", "keyword2"],  // Up to 10 keywords that justify the classification
+  "confidence_overall": 0.80  // Overall confidence in the classification (0-1) - must reflect actual certainty
 }}
 
 Canonical Impact Domains (use exact labels):
@@ -219,7 +236,7 @@ Experience Levels (use exact labels):
 Return only valid JSON, no markdown formatting."""
 
         messages = [
-            {"role": "system", "content": "You are a precise job classification system. Always return valid JSON."},
+            {"role": "system", "content": "You are a precise job classification system. Analyze each job individually based on its actual content. Do not default to common values. Always return valid JSON. Use confidence scores to reflect your actual certainty."},
             {"role": "user", "content": prompt}
         ]
         

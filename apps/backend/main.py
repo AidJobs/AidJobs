@@ -487,6 +487,117 @@ async def admin_enrich_jobs_batch(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Enrichment Review Queue Endpoints
+@app.get("/admin/enrichment/review-queue")
+async def get_enrichment_review_queue(
+    status: str = "pending",
+    limit: int = 50,
+    offset: int = 0,
+    admin: str = Depends(admin_required),
+):
+    """Get jobs in the enrichment review queue."""
+    from app.enrichment_review import get_review_queue
+    
+    try:
+        reviews = get_review_queue(status=status, limit=limit, offset=offset)
+        return {
+            "status": "ok",
+            "data": {
+                "reviews": reviews,
+                "count": len(reviews),
+                "status": status,
+            },
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/review-queue] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/enrichment/review/{review_id}")
+async def update_enrichment_review(
+    review_id: str,
+    request: Request,
+    body: dict,
+    admin: str = Depends(admin_required),
+):
+    """Update a review entry (approve, reject, or add corrections)."""
+    from app.enrichment_review import update_review
+    
+    status = body.get("status")
+    reviewer_id = body.get("reviewer_id")
+    review_notes = body.get("review_notes")
+    corrected_enrichment = body.get("corrected_enrichment")
+    
+    if not status:
+        raise HTTPException(status_code=400, detail="status is required")
+    
+    try:
+        success = update_review(
+            review_id=review_id,
+            status=status,
+            reviewer_id=reviewer_id,
+            review_notes=review_notes,
+            corrected_enrichment=corrected_enrichment,
+        )
+        
+        if success:
+            return {
+                "status": "ok",
+                "data": {"review_id": review_id, "status": status},
+                "error": None,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update review")
+    except Exception as e:
+        logger.error(f"[admin/enrichment/review] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/enrichment/history/{job_id}")
+async def get_enrichment_history(
+    job_id: str,
+    limit: int = 50,
+    admin: str = Depends(admin_required),
+):
+    """Get enrichment history for a job."""
+    from app.enrichment_history import get_enrichment_history
+    
+    try:
+        history = get_enrichment_history(job_id=job_id, limit=limit)
+        return {
+            "status": "ok",
+            "data": {
+                "job_id": job_id,
+                "history": history,
+                "count": len(history),
+            },
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/history] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/enrichment/quality-dashboard")
+async def get_enrichment_quality_dashboard(
+    admin: str = Depends(admin_required),
+):
+    """Get enrichment quality dashboard with comprehensive metrics."""
+    from app.enrichment_dashboard import get_enrichment_quality_dashboard
+    
+    try:
+        metrics = get_enrichment_quality_dashboard()
+        return {
+            "status": "ok",
+            "data": metrics,
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/quality-dashboard] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/admin/normalize/reindex")
 async def admin_normalize_reindex():
     """

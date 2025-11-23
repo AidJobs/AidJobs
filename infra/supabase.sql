@@ -445,6 +445,83 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Enrichment Review Queue: Quality assurance for low-confidence enrichments
+CREATE TABLE IF NOT EXISTS enrichment_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'needs_review')),
+    reviewer_id UUID,  -- Admin user who reviewed
+    review_notes TEXT,
+    original_enrichment JSONB,  -- Snapshot of enrichment at time of review
+    corrected_enrichment JSONB,  -- Corrected values if any
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_reviews_job_id ON enrichment_reviews(job_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_reviews_status ON enrichment_reviews(status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_enrichment_reviews_created_at ON enrichment_reviews(created_at);
+
+-- Enrichment History: Audit trail of all enrichment changes
+CREATE TABLE IF NOT EXISTS enrichment_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    enrichment_before JSONB,  -- Snapshot before change
+    enrichment_after JSONB,  -- Snapshot after change
+    changed_fields TEXT[],  -- List of fields that changed
+    change_reason TEXT,  -- Why the change was made (auto-enrichment, manual correction, etc.)
+    changed_by TEXT,  -- 'system', 'admin', 'ai_service', etc.
+    changed_at TIMESTAMPTZ DEFAULT NOW(),
+    enrichment_version INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_history_job_id ON enrichment_history(job_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_history_changed_at ON enrichment_history(changed_at);
+CREATE INDEX IF NOT EXISTS idx_enrichment_history_changed_by ON enrichment_history(changed_by);
+
+-- Enrichment Feedback: Human corrections to learn from
+CREATE TABLE IF NOT EXISTS enrichment_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    feedback_type TEXT CHECK (feedback_type IN ('correction', 'flag_incorrect', 'flag_missing')),
+    field_name TEXT,  -- Which field was incorrect (impact_domain, experience_level, etc.)
+    original_value TEXT,  -- What the AI said
+    corrected_value TEXT,  -- What it should be
+    feedback_notes TEXT,
+    submitted_by UUID,  -- User/admin who submitted feedback
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    processed BOOLEAN DEFAULT FALSE,  -- Whether feedback has been used for learning
+    processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_feedback_job_id ON enrichment_feedback(job_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_feedback_processed ON enrichment_feedback(processed) WHERE processed = FALSE;
+CREATE INDEX IF NOT EXISTS idx_enrichment_feedback_field ON enrichment_feedback(field_name);
+
+-- Enrichment Ground Truth: Manually labeled test set for accuracy validation
+CREATE TABLE IF NOT EXISTS enrichment_ground_truth (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description_snippet TEXT,
+    org_name TEXT,
+    location_raw TEXT,
+    -- Ground truth labels
+    impact_domain TEXT[],
+    functional_role TEXT[],
+    experience_level TEXT,
+    sdgs INTEGER[],
+    -- Metadata
+    labeled_by TEXT,  -- Who created this ground truth
+    labeled_at TIMESTAMPTZ DEFAULT NOW(),
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_ground_truth_job_id ON enrichment_ground_truth(job_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_ground_truth_active ON enrichment_ground_truth(is_active) WHERE is_active = TRUE;
+
 -- Row Level Security Policies
 
 -- Jobs table: public read access for active jobs

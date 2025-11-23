@@ -10,6 +10,8 @@ from datetime import datetime
 
 from app.ai_service import get_ai_service
 from app.db_config import db_config
+from app.enrichment_review import auto_flag_job_for_review
+from app.enrichment_history import record_enrichment_change
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,80 @@ MEAL_ROLES = {
     "MEAL / Research / Evidence",
     "Monitoring Officer / Field Monitoring",
     "Data & GIS",
+}
+
+# Canonical lists for validation
+CANONICAL_IMPACT_DOMAINS = {
+    "Climate & Environment",
+    "Climate Adaptation & Resilience",
+    "Disaster Risk Reduction & Preparedness",
+    "Natural Resource Management & Biodiversity",
+    "Water, Sanitation & Hygiene (WASH)",
+    "Food Security & Nutrition",
+    "Agriculture & Livelihoods",
+    "Public Health & Primary Health Care",
+    "Disease Control & Epidemiology",
+    "Sexual & Reproductive Health (SRH)",
+    "Mental Health & Psychosocial Support (MHPSS)",
+    "Education (Access & Quality)",
+    "Education in Emergencies",
+    "Gender Equality & Women's Empowerment",
+    "Child Protection & Early Childhood Development",
+    "Gender-Based Violence (GBV) Prevention & Response",
+    "Shelter & CCCM",
+    "Migration, Refugees & Displacement",
+    "Humanitarian Response & Emergency Operations",
+    "Peacebuilding, Governance & Rule of Law",
+    "Social Protection & Safety Nets",
+    "Economic Recovery & Jobs / Livelihoods",
+    "Water Resource Management & Irrigation",
+    "Urban Resilience & Sustainable Cities",
+    "Digital Development & Data for Development",
+    "Monitoring, Evaluation, Accountability & Learning (MEAL)",
+    "Human Rights & Advocacy",
+    "Anti-Corruption & Transparency",
+    "Energy Access & Renewable Energy",
+    "Disability Inclusion & Accessibility",
+    "Indigenous Peoples & Cultural Rights",
+    "Innovation & Human-Centred Design",
+}
+
+CANONICAL_FUNCTIONAL_ROLES = {
+    "Program & Field Implementation",
+    "Project Management",
+    "MEAL / Research / Evidence",
+    "Data & GIS",
+    "Communications & Advocacy",
+    "Grants / Partnerships / Fundraising",
+    "Finance, Accounting & Audit",
+    "HR, Admin & Ops",
+    "Logistics, Supply Chain & Procurement",
+    "Technical Specialists",
+    "Policy & Advocacy",
+    "IT / Digital / Systems",
+    "Monitoring Officer / Field Monitoring",
+    "Security & Safety",
+    "Shelter / NFI / CCCM Specialist",
+    "Cash & Voucher Assistance (CVA) Specialist",
+    "Livelihoods & Economic Inclusion Specialist",
+    "Education Specialist / EiE Specialist",
+    "Protection Specialist / Child Protection Specialist",
+    "MHPSS Specialist",
+    "Nutrition Specialist",
+    "Health Technical Advisor",
+    "Geographic / Regional Roles",
+    "Senior Leadership",
+    "Consulting / Short-term Technical Experts",
+    "Legal / Compliance / Donor Compliance",
+}
+
+CANONICAL_EXPERIENCE_LEVELS = {
+    "Early / Junior",
+    "Officer / Associate",
+    "Specialist / Advisor",
+    "Manager / Senior Manager",
+    "Head of Unit / Director",
+    "Expert / Technical Lead",
 }
 
 
@@ -110,7 +186,45 @@ def apply_enrichment_rules(enrichment_data: Dict[str, Any]) -> Dict[str, Any]:
             low_confidence = True
             low_confidence_reasons.append("MEAL role requires SDG confidence >= 0.85")
     
-    # Rule 5: Set low_confidence if overall confidence < 0.65
+    # Rule 5: Filter impact_domain by minimum confidence threshold (0.65)
+    impact_domains = enrichment_data.get("impact_domain", [])
+    impact_confidences = enrichment_data.get("impact_confidences", {})
+    if impact_domains:
+        filtered_domains = []
+        filtered_domain_confidences = {}
+        
+        for domain in impact_domains:
+            domain_key = str(domain)
+            confidence = impact_confidences.get(domain_key, 0.0)
+            if confidence >= 0.65:
+                filtered_domains.append(domain)
+                filtered_domain_confidences[domain_key] = confidence
+            else:
+                logger.warning(f"[enrichment] Rejecting impact_domain '{domain}' with low confidence {confidence:.2f} < 0.65")
+        
+        enrichment_data["impact_domain"] = filtered_domains
+        enrichment_data["impact_confidences"] = filtered_domain_confidences
+        
+        # If all domains were filtered out, flag as low confidence
+        if not filtered_domains and impact_domains:
+            low_confidence = True
+            low_confidence_reasons.append("all impact_domains below confidence threshold (0.65)")
+    
+    # Rule 6: Validate experience_level confidence threshold (0.70)
+    experience_level = enrichment_data.get("experience_level")
+    experience_confidence = enrichment_data.get("experience_confidence", 0.0)
+    
+    if experience_level:
+        if experience_confidence < 0.70:
+            # Clear experience level if confidence is too low
+            logger.warning(f"[enrichment] Rejecting experience_level '{experience_level}' with low confidence {experience_confidence:.2f} < 0.70")
+            enrichment_data["experience_level"] = None
+            enrichment_data["experience_confidence"] = None
+            enrichment_data["estimated_experience_years"] = {}
+            low_confidence = True
+            low_confidence_reasons.append(f"experience_level confidence {experience_confidence:.2f} < 0.70")
+    
+    # Rule 7: Set low_confidence if overall confidence < 0.65
     if confidence_overall < 0.65:
         low_confidence = True
         low_confidence_reasons.append(f"overall confidence {confidence_overall:.2f} < 0.65")
@@ -122,6 +236,93 @@ def apply_enrichment_rules(enrichment_data: Dict[str, Any]) -> Dict[str, Any]:
         enrichment_data["low_confidence_reason"] = None
     
     return enrichment_data
+
+
+def validate_enrichment_response(enrichment_data: Dict[str, Any], job_id: str) -> bool:
+    """
+    Validate AI enrichment response structure and values.
+    
+    Returns True if valid, False otherwise.
+    Logs warnings for invalid values.
+    """
+    is_valid = True
+    
+    # Validate impact_domain
+    impact_domains = enrichment_data.get("impact_domain", [])
+    if not isinstance(impact_domains, list):
+        logger.warning(f"[enrichment] Invalid impact_domain type for job {job_id}: {type(impact_domains)}")
+        enrichment_data["impact_domain"] = []
+        is_valid = False
+    else:
+        invalid_domains = [d for d in impact_domains if d not in CANONICAL_IMPACT_DOMAINS]
+        if invalid_domains:
+            logger.warning(f"[enrichment] Invalid impact_domain values for job {job_id}: {invalid_domains}")
+            enrichment_data["impact_domain"] = [d for d in impact_domains if d in CANONICAL_IMPACT_DOMAINS]
+            is_valid = False
+    
+    # Validate functional_role
+    functional_roles = enrichment_data.get("functional_role", [])
+    if not isinstance(functional_roles, list):
+        logger.warning(f"[enrichment] Invalid functional_role type for job {job_id}: {type(functional_roles)}")
+        enrichment_data["functional_role"] = []
+        is_valid = False
+    else:
+        invalid_roles = [r for r in functional_roles if r not in CANONICAL_FUNCTIONAL_ROLES]
+        if invalid_roles:
+            logger.warning(f"[enrichment] Invalid functional_role values for job {job_id}: {invalid_roles}")
+            enrichment_data["functional_role"] = [r for r in functional_roles if r in CANONICAL_FUNCTIONAL_ROLES]
+            is_valid = False
+    
+    # Validate experience_level
+    experience_level = enrichment_data.get("experience_level")
+    if experience_level:
+        if experience_level not in CANONICAL_EXPERIENCE_LEVELS:
+            logger.warning(f"[enrichment] Invalid experience_level for job {job_id}: {experience_level}")
+            enrichment_data["experience_level"] = None
+            enrichment_data["experience_confidence"] = None
+            enrichment_data["estimated_experience_years"] = {}
+            is_valid = False
+    
+    # Validate confidence scores (must be 0-1)
+    confidence_fields = [
+        ("confidence_overall", enrichment_data.get("confidence_overall")),
+        ("experience_confidence", enrichment_data.get("experience_confidence")),
+    ]
+    
+    for field_name, value in confidence_fields:
+        if value is not None:
+            if not isinstance(value, (int, float)) or value < 0 or value > 1:
+                logger.warning(f"[enrichment] Invalid {field_name} for job {job_id}: {value} (must be 0-1)")
+                enrichment_data[field_name] = None
+                is_valid = False
+    
+    # Validate impact_confidences
+    impact_confidences = enrichment_data.get("impact_confidences", {})
+    if not isinstance(impact_confidences, dict):
+        logger.warning(f"[enrichment] Invalid impact_confidences type for job {job_id}: {type(impact_confidences)}")
+        enrichment_data["impact_confidences"] = {}
+        is_valid = False
+    else:
+        for domain, conf in impact_confidences.items():
+            if not isinstance(conf, (int, float)) or conf < 0 or conf > 1:
+                logger.warning(f"[enrichment] Invalid impact_confidences['{domain}'] for job {job_id}: {conf} (must be 0-1)")
+                del impact_confidences[domain]
+                is_valid = False
+    
+    # Validate functional_confidences
+    functional_confidences = enrichment_data.get("functional_confidences", {})
+    if not isinstance(functional_confidences, dict):
+        logger.warning(f"[enrichment] Invalid functional_confidences type for job {job_id}: {type(functional_confidences)}")
+        enrichment_data["functional_confidences"] = {}
+        is_valid = False
+    else:
+        for role, conf in functional_confidences.items():
+            if not isinstance(conf, (int, float)) or conf < 0 or conf > 1:
+                logger.warning(f"[enrichment] Invalid functional_confidences['{role}'] for job {job_id}: {conf} (must be 0-1)")
+                del functional_confidences[role]
+                is_valid = False
+    
+    return is_valid
 
 
 def enrich_job(
@@ -143,6 +344,10 @@ def enrich_job(
         logger.warning(f"[enrichment] AI service not enabled, skipping enrichment for job {job_id}")
         return None
     
+    # Log input quality
+    desc_length = len(description) if description else 0
+    logger.info(f"[enrichment] Enriching job {job_id}: title='{title[:50]}...', desc_length={desc_length}")
+    
     # Call AI service
     enrichment_data = ai_service.enrich_job(
         title=title,
@@ -156,8 +361,22 @@ def enrich_job(
         logger.error(f"[enrichment] AI service returned no data for job {job_id}")
         return None
     
+    # Validate response structure and values
+    if not validate_enrichment_response(enrichment_data, job_id):
+        logger.warning(f"[enrichment] Validation found issues for job {job_id}, continuing with corrected data")
+    
     # Apply hybrid rules
     enrichment_data = apply_enrichment_rules(enrichment_data)
+    
+    # Log confidence scores
+    logger.info(
+        f"[enrichment] Job {job_id} enrichment: "
+        f"confidence_overall={enrichment_data.get('confidence_overall', 'N/A')}, "
+        f"experience_confidence={enrichment_data.get('experience_confidence', 'N/A')}, "
+        f"low_confidence={enrichment_data.get('low_confidence', False)}, "
+        f"impact_domains={len(enrichment_data.get('impact_domain', []))}, "
+        f"functional_roles={len(enrichment_data.get('functional_role', []))}"
+    )
     
     # Build embedding input (for future semantic rerank)
     embedding_parts = [title]
@@ -201,6 +420,38 @@ def save_enrichment_to_db(
     try:
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get current enrichment for history tracking
+        cursor.execute("""
+            SELECT 
+                impact_domain, impact_confidences, functional_role, functional_confidences,
+                experience_level, estimated_experience_years, experience_confidence,
+                sdgs, sdg_confidences, sdg_explanation, matched_keywords,
+                confidence_overall, low_confidence, low_confidence_reason
+            FROM jobs
+            WHERE id::text = %s
+        """, (job_id,))
+        
+        current_job = cursor.fetchone()
+        enrichment_before = None
+        if current_job and current_job.get('impact_domain'):
+            # Build before snapshot
+            enrichment_before = {
+                "impact_domain": current_job.get("impact_domain", []),
+                "impact_confidences": current_job.get("impact_confidences", {}),
+                "functional_role": current_job.get("functional_role", []),
+                "functional_confidences": current_job.get("functional_confidences", {}),
+                "experience_level": current_job.get("experience_level"),
+                "estimated_experience_years": current_job.get("estimated_experience_years", {}),
+                "experience_confidence": current_job.get("experience_confidence"),
+                "sdgs": current_job.get("sdgs", []),
+                "sdg_confidences": current_job.get("sdg_confidences", {}),
+                "sdg_explanation": current_job.get("sdg_explanation"),
+                "matched_keywords": current_job.get("matched_keywords", []),
+                "confidence_overall": current_job.get("confidence_overall"),
+                "low_confidence": current_job.get("low_confidence", False),
+                "low_confidence_reason": current_job.get("low_confidence_reason"),
+            }
         
         # Prepare data
         impact_domain = enrichment_data.get("impact_domain", [])
@@ -268,6 +519,19 @@ def save_enrichment_to_db(
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Record in history
+        record_enrichment_change(
+            job_id=job_id,
+            enrichment_before=enrichment_before,
+            enrichment_after=enrichment_data,
+            change_reason="auto-enrichment",
+            changed_by="ai_service",
+            enrichment_version=enrichment_version
+        )
+        
+        # Auto-flag for review if needed
+        auto_flag_job_for_review(job_id, enrichment_data)
         
         logger.info(f"[enrichment] Saved enrichment for job {job_id}")
         return True
