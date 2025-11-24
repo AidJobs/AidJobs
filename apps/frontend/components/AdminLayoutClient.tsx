@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft, BarChart3 } from 'lucide-react';
 
 type MenuItem = {
   id: string;
@@ -15,6 +15,7 @@ const menuItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/admin' },
   { id: 'sources', label: 'Sources', icon: <Database className="w-5 h-5" />, path: '/admin/sources' },
   { id: 'crawl', label: 'Crawler', icon: <Network className="w-5 h-5" />, path: '/admin/crawl' },
+  { id: 'enrichment', label: 'Enrichment', icon: <BarChart3 className="w-5 h-5" />, path: '/admin/enrichment' },
   { id: 'find-earn', label: 'Find & Earn', icon: <DollarSign className="w-5 h-5" />, path: '/admin/find-earn' },
   { id: 'taxonomy', label: 'Taxonomy', icon: <FileText className="w-5 h-5" />, path: '/admin/taxonomy' },
   { id: 'setup', label: 'Setup', icon: <Settings className="w-5 h-5" />, path: '/admin/setup' },
