@@ -1221,12 +1221,18 @@ class HTMLCrawler:
                         # This prevents overwriting good URLs with generic listing page URLs
                         should_update_url = True
                         if new_apply_url:
-                            # Don't update if new URL is the base URL
-                            base_normalized = base_url.rstrip('/').split('#')[0].split('?')[0]
-                            new_normalized = new_apply_url.rstrip('/').split('#')[0].split('?')[0]
-                            if new_normalized == base_normalized:
-                                should_update_url = False
-                                logger.debug(f"[html_fetch] Keeping existing URL (new is base URL): {current_apply_url}")
+                            # Get source URL for base URL comparison
+                            cur.execute("SELECT careers_url FROM sources WHERE id = %s", (source_id,))
+                            source_row = cur.fetchone()
+                            source_base_url = source_row[0] if source_row else None
+                            
+                            if source_base_url:
+                                # Don't update if new URL is the base URL
+                                base_normalized = source_base_url.rstrip('/').split('#')[0].split('?')[0]
+                                new_normalized = new_apply_url.rstrip('/').split('#')[0].split('?')[0]
+                                if new_normalized == base_normalized:
+                                    should_update_url = False
+                                    logger.debug(f"[html_fetch] Keeping existing URL (new is base URL): {current_apply_url}")
                             
                             # Don't update if new URL is a listing page
                             if any(kw in new_apply_url.lower() for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies']):
