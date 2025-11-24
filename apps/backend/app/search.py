@@ -550,115 +550,115 @@ class SearchService:
         for attempt in range(max_retries + 1):
             try:
                 index = self.meili_client.index(self.meili_index_name)
-            
-            # Calculate today's date for Meilisearch filter (format: YYYY-MM-DD)
-            from datetime import date
-            today_str = date.today().isoformat()
-            
-            # Filter by active status and exclude expired jobs
-            # Meilisearch date comparison: deadline >= today (or deadline is null)
-            filter_conditions = [
-                "status = 'active'",
-                f"(deadline IS NULL OR deadline >= {today_str})"
-            ]
-            
-            if filters.get('country_iso'):
-                filter_conditions.append(f"country_iso = '{filters['country_iso']}'")
-            
-            if filters.get('level_norm'):
-                filter_conditions.append(f"level_norm = '{filters['level_norm']}'")
-            
-            if filters.get('international_eligible') is not None:
-                filter_conditions.append(f"international_eligible = {str(filters['international_eligible']).lower()}")
-            
-            if filters.get('mission_tags'):
-                tags = filters['mission_tags']
-                if tags:
-                    tag_filters = " OR ".join([f"mission_tags = '{tag}'" for tag in tags])
-                    filter_conditions.append(f"({tag_filters})")
-            
-            if filters.get('work_modality'):
-                filter_conditions.append(f"work_modality = '{filters['work_modality']}'")
-            
-            if filters.get('career_type'):
-                filter_conditions.append(f"career_type = '{filters['career_type']}'")
-            
-            if filters.get('org_type'):
-                filter_conditions.append(f"org_type = '{filters['org_type']}'")
-            
-            if filters.get('crisis_type'):
-                crisis_types = filters['crisis_type']
-                if crisis_types:
-                    ct_filters = " OR ".join([f"crisis_type = '{ct}'" for ct in crisis_types])
-                    filter_conditions.append(f"({ct_filters})")
-            
-            if filters.get('response_phase'):
-                filter_conditions.append(f"response_phase = '{filters['response_phase']}'")
-            
-            if filters.get('humanitarian_cluster'):
-                clusters = filters['humanitarian_cluster']
-                if clusters:
-                    hc_filters = " OR ".join([f"humanitarian_cluster = '{hc}'" for hc in clusters])
-                    filter_conditions.append(f"({hc_filters})")
-            
-            if filters.get('benefits'):
-                benefits = filters['benefits']
-                if benefits:
-                    b_filters = " OR ".join([f"benefits = '{b}'" for b in benefits])
-                    filter_conditions.append(f"({b_filters})")
-            
-            if filters.get('policy_flags'):
-                policies = filters['policy_flags']
-                if policies:
-                    p_filters = " OR ".join([f"policy_flags = '{p}'" for p in policies])
-                    filter_conditions.append(f"({p_filters})")
-            
-            if filters.get('donor_context'):
-                donors = filters['donor_context']
-                if donors:
-                    d_filters = " OR ".join([f"donor_context = '{d}'" for d in donors])
-                    filter_conditions.append(f"({d_filters})")
-            
-            # Enrichment filters
-            if filters.get('impact_domain'):
-                impact_domains = filters['impact_domain']
-                if impact_domains:
-                    id_filters = " OR ".join([f"impact_domain = '{id}'" for id in impact_domains])
-                    filter_conditions.append(f"({id_filters})")
-            
-            if filters.get('functional_role'):
-                functional_roles = filters['functional_role']
-                if functional_roles:
-                    fr_filters = " OR ".join([f"functional_role = '{fr}'" for fr in functional_roles])
-                    filter_conditions.append(f"({fr_filters})")
-            
-            if filters.get('experience_level'):
-                filter_conditions.append(f"experience_level = '{filters['experience_level']}'")
-            
-            if filters.get('sdgs'):
-                sdgs = filters['sdgs']
-                if sdgs:
-                    sdg_filters = " OR ".join([f"sdgs = {sdg}" for sdg in sdgs])
-                    filter_conditions.append(f"({sdg_filters})")
-            
-            if filters.get('is_remote') is True:
-                filter_conditions.append("work_modality = 'remote' OR work_modality = 'hybrid'")
-            
-            filter_str = " AND ".join(filter_conditions)
-            
-            offset = (page - 1) * size
-            
-            search_params = {
-                "filter": filter_str,
-                "limit": size,
-                "offset": offset,
-            }
-            
-            if sort == "newest":
-                search_params["sort"] = ["last_seen_at:desc"]
-            elif sort == "closing_soon":
-                search_params["sort"] = ["deadline:asc"]
-            
+                
+                # Calculate today's date for Meilisearch filter (format: YYYY-MM-DD)
+                from datetime import date
+                today_str = date.today().isoformat()
+                
+                # Filter by active status and exclude expired jobs
+                # Meilisearch date comparison: deadline >= today (or deadline is null)
+                filter_conditions = [
+                    "status = 'active'",
+                    f"(deadline IS NULL OR deadline >= {today_str})"
+                ]
+                
+                if filters.get('country_iso'):
+                    filter_conditions.append(f"country_iso = '{filters['country_iso']}'")
+                
+                if filters.get('level_norm'):
+                    filter_conditions.append(f"level_norm = '{filters['level_norm']}'")
+                
+                if filters.get('international_eligible') is not None:
+                    filter_conditions.append(f"international_eligible = {str(filters['international_eligible']).lower()}")
+                
+                if filters.get('mission_tags'):
+                    tags = filters['mission_tags']
+                    if tags:
+                        tag_filters = " OR ".join([f"mission_tags = '{tag}'" for tag in tags])
+                        filter_conditions.append(f"({tag_filters})")
+                
+                if filters.get('work_modality'):
+                    filter_conditions.append(f"work_modality = '{filters['work_modality']}'")
+                
+                if filters.get('career_type'):
+                    filter_conditions.append(f"career_type = '{filters['career_type']}'")
+                
+                if filters.get('org_type'):
+                    filter_conditions.append(f"org_type = '{filters['org_type']}'")
+                
+                if filters.get('crisis_type'):
+                    crisis_types = filters['crisis_type']
+                    if crisis_types:
+                        ct_filters = " OR ".join([f"crisis_type = '{ct}'" for ct in crisis_types])
+                        filter_conditions.append(f"({ct_filters})")
+                
+                if filters.get('response_phase'):
+                    filter_conditions.append(f"response_phase = '{filters['response_phase']}'")
+                
+                if filters.get('humanitarian_cluster'):
+                    clusters = filters['humanitarian_cluster']
+                    if clusters:
+                        hc_filters = " OR ".join([f"humanitarian_cluster = '{hc}'" for hc in clusters])
+                        filter_conditions.append(f"({hc_filters})")
+                
+                if filters.get('benefits'):
+                    benefits = filters['benefits']
+                    if benefits:
+                        b_filters = " OR ".join([f"benefits = '{b}'" for b in benefits])
+                        filter_conditions.append(f"({b_filters})")
+                
+                if filters.get('policy_flags'):
+                    policies = filters['policy_flags']
+                    if policies:
+                        p_filters = " OR ".join([f"policy_flags = '{p}'" for p in policies])
+                        filter_conditions.append(f"({p_filters})")
+                
+                if filters.get('donor_context'):
+                    donors = filters['donor_context']
+                    if donors:
+                        d_filters = " OR ".join([f"donor_context = '{d}'" for d in donors])
+                        filter_conditions.append(f"({d_filters})")
+                
+                # Enrichment filters
+                if filters.get('impact_domain'):
+                    impact_domains = filters['impact_domain']
+                    if impact_domains:
+                        id_filters = " OR ".join([f"impact_domain = '{id}'" for id in impact_domains])
+                        filter_conditions.append(f"({id_filters})")
+                
+                if filters.get('functional_role'):
+                    functional_roles = filters['functional_role']
+                    if functional_roles:
+                        fr_filters = " OR ".join([f"functional_role = '{fr}'" for fr in functional_roles])
+                        filter_conditions.append(f"({fr_filters})")
+                
+                if filters.get('experience_level'):
+                    filter_conditions.append(f"experience_level = '{filters['experience_level']}'")
+                
+                if filters.get('sdgs'):
+                    sdgs = filters['sdgs']
+                    if sdgs:
+                        sdg_filters = " OR ".join([f"sdgs = {sdg}" for sdg in sdgs])
+                        filter_conditions.append(f"({sdg_filters})")
+                
+                if filters.get('is_remote') is True:
+                    filter_conditions.append("work_modality = 'remote' OR work_modality = 'hybrid'")
+                
+                filter_str = " AND ".join(filter_conditions)
+                
+                offset = (page - 1) * size
+                
+                search_params = {
+                    "filter": filter_str,
+                    "limit": size,
+                    "offset": offset,
+                }
+                
+                if sort == "newest":
+                    search_params["sort"] = ["last_seen_at:desc"]
+                elif sort == "closing_soon":
+                    search_params["sort"] = ["deadline:asc"]
+                
                 results = index.search(q or "", search_params)
                 
                 # Attach reasons to each result
