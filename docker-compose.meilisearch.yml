@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: aidjobs-meilisearch
+    restart: always
+    ports:
+      - "7700:7700"
+    environment:
+      # Set a master key for production (generate with: openssl rand -hex 32)
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-change-me-in-production}
+      # Optional: Development mode (no master key required)
+      # MEILI_ENV: development
+    volumes:
+      # Persistent data storage
+      - ./data/meilisearch:/meili_data
+    command:
+      # Run with data directory
+      - ./meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - aidjobs-network
+
+networks:
+  aidjobs-network:
+    driver: bridge
+

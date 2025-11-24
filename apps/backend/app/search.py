@@ -2,6 +2,7 @@ import os
 import uuid
 import logging
 import time
+import asyncio
 from typing import Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from urllib.parse import urlparse
@@ -40,6 +41,10 @@ class SearchService:
         self.db_enabled = self._is_db_enabled()
         self.meili_error = None
         self.last_reindexed_at: Optional[str] = None
+        self._connection_retry_count = 0
+        self._max_retries = 3
+        self._last_health_check = None
+        self._health_check_interval = 60  # Check health every 60 seconds
         
         if self.meili_enabled:
             self._init_meilisearch()
@@ -64,21 +69,52 @@ class SearchService:
     def _is_db_enabled(self) -> bool:
         return db_config.is_db_enabled
     
-    def _init_meilisearch(self) -> None:
-        """Initialize Meilisearch client and configure index. Never crashes."""
+    def _check_meilisearch_health(self) -> bool:
+        """Check if Meilisearch is healthy and accessible. Returns True if healthy."""
+        if not self.meili_client:
+            return False
+        
+        try:
+            # Simple health check - get client health
+            health = self.meili_client.health()
+            if health.status == 'available':
+                self._connection_retry_count = 0
+                self._last_health_check = time.time()
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"[aidjobs] Meilisearch health check failed: {e}")
+            return False
+    
+    def _init_meilisearch(self, retry: bool = False) -> None:
+        """Initialize Meilisearch client and configure index. Never crashes. Supports retry."""
         try:
             meili_host, meili_key = self._get_meili_config()
             
             if not meili_host or not meili_key:
                 raise ValueError("Meilisearch host and key must be configured")
             
+            # Create client with timeout settings for better reliability
             self.meili_client = meilisearch.Client(meili_host, meili_key)
+            
+            # Set connection timeout (if supported by client)
+            try:
+                # Test connection with health check
+                health = self.meili_client.health()
+                if health.status != 'available':
+                    raise Exception(f"Meilisearch health check failed: {health.status}")
+                logger.info(f"[aidjobs] Meilisearch connection verified: {health.status}")
+            except Exception as health_error:
+                logger.warning(f"[aidjobs] Meilisearch health check failed: {health_error}")
+                if not retry:
+                    raise
             
             try:
                 try:
                     index = self.meili_client.get_index(self.meili_index_name)
                     # Index exists, verify it's accessible
                     index.get_stats()
+                    logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' exists and is accessible")
                 except Exception as index_error:
                     # Index doesn't exist, create it
                     logger.info(f"[aidjobs] Index '{self.meili_index_name}' not found, creating...")
@@ -88,8 +124,7 @@ class SearchService:
                             {'primaryKey': 'id'}
                         )
                         # Wait for task to complete
-                        import time
-                        max_wait = 5  # Wait up to 5 seconds
+                        max_wait = 10  # Increased to 10 seconds for reliability
                         waited = 0
                         while waited < max_wait:
                             task_status = self.meili_client.get_task(task.task_uid)
@@ -452,13 +487,42 @@ class SearchService:
         filters: dict[str, Any],
         sort: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
-        """Search using Meilisearch with filters and pagination. Returns None on failure."""
-        if not self.meili_client:
-            logger.warning("Meilisearch client not available")
-            return None
+        """Search using Meilisearch with filters and pagination. Returns None on failure.
+        Includes retry logic and auto-reconnection."""
+        # Check health periodically and reconnect if needed
+        if self._last_health_check is None or (time.time() - self._last_health_check) > self._health_check_interval:
+            if not self._check_meilisearch_health():
+                logger.warning("[aidjobs] Meilisearch health check failed, attempting reconnection...")
+                try:
+                    self._init_meilisearch(retry=True)
+                    if not self._check_meilisearch_health():
+                        logger.error("[aidjobs] Meilisearch reconnection failed, falling back to database")
+                        return None
+                except Exception as reconnect_error:
+                    logger.error(f"[aidjobs] Failed to reconnect to Meilisearch: {reconnect_error}")
+                    return None
         
-        try:
-            index = self.meili_client.index(self.meili_index_name)
+        if not self.meili_client:
+            # Try to reconnect once
+            if self._connection_retry_count < self._max_retries:
+                logger.info(f"[aidjobs] Attempting to reconnect to Meilisearch (attempt {self._connection_retry_count + 1}/{self._max_retries})")
+                try:
+                    self._init_meilisearch(retry=True)
+                    self._connection_retry_count += 1
+                except Exception as e:
+                    logger.warning(f"[aidjobs] Reconnection attempt failed: {e}")
+                    return None
+            else:
+                logger.warning("[aidjobs] Meilisearch client not available after retries")
+                return None
+        
+        # Retry logic for search operations
+        max_retries = 2
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            try:
+                index = self.meili_client.index(self.meili_index_name)
             
             # Calculate today's date for Meilisearch filter (format: YYYY-MM-DD)
             from datetime import date
@@ -568,25 +632,44 @@ class SearchService:
             elif sort == "closing_soon":
                 search_params["sort"] = ["deadline:asc"]
             
-            results = index.search(q or "", search_params)
-            
-            # Attach reasons to each result
-            items = []
-            for hit in results.get("hits", []):
-                hit['reasons'] = self._compute_reasons(hit, q, filters)
-                items.append(hit)
-            
-            return {
-                "items": items,
-                "total": results.get("estimatedTotalHits", 0),
-                "page": page,
-                "size": size,
-                "facets": {},
-            }
-            
-        except Exception as e:
-            logger.error(f"Meilisearch search error: {e}, falling back to database")
-            return None
+                results = index.search(q or "", search_params)
+                
+                # Attach reasons to each result
+                items = []
+                for hit in results.get("hits", []):
+                    hit['reasons'] = self._compute_reasons(hit, q, filters)
+                    items.append(hit)
+                
+                # Success - reset retry count
+                self._connection_retry_count = 0
+                
+                return {
+                    "items": items,
+                    "total": results.get("estimatedTotalHits", 0),
+                    "page": page,
+                    "size": size,
+                    "facets": {},
+                }
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[aidjobs] Meilisearch search attempt {attempt + 1}/{max_retries + 1} failed: {e}")
+                
+                # If it's a connection error, try to reconnect
+                if attempt < max_retries:
+                    error_str = str(e).lower()
+                    if any(keyword in error_str for keyword in ['connection', 'timeout', 'unreachable', 'refused']):
+                        logger.info(f"[aidjobs] Connection error detected, attempting reconnection...")
+                        try:
+                            self._init_meilisearch(retry=True)
+                            # Wait a bit before retry
+                            await asyncio.sleep(0.5)
+                        except Exception as reconnect_error:
+                            logger.warning(f"[aidjobs] Reconnection failed: {reconnect_error}")
+                
+        # All retries failed
+        logger.error(f"[aidjobs] Meilisearch search failed after {max_retries + 1} attempts: {last_error}, falling back to database")
+        return None
 
     async def _search_database(
         self,

@@ -1,0 +1,19 @@
+# Meilisearch Dockerfile for Render deployment
+FROM getmeili/meilisearch:v1.11
+
+# Expose Meilisearch port
+EXPOSE 7700
+
+# Create data directory
+RUN mkdir -p /meili_data
+
+# Set working directory
+WORKDIR /meili_data
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
+  CMD curl -f http://localhost:7700/health || exit 1
+
+# Start Meilisearch with persistent data directory
+CMD ["./meili_data"]
+
