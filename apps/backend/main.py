@@ -599,6 +599,89 @@ async def get_enrichment_quality_dashboard(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/admin/enrichment/unenriched-count")
+async def get_unenriched_count(
+    admin: str = Depends(admin_required),
+):
+    """Get count of jobs without enrichment data."""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT COUNT(*) as count
+            FROM jobs
+            WHERE status = 'active'
+            AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+            AND (impact_domain IS NULL OR impact_domain = '[]'::jsonb)
+        """)
+        
+        result = cursor.fetchone()
+        count = result['count'] if result else 0
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "status": "ok",
+            "data": {"count": count},
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/unenriched-count] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/enrichment/unenriched-jobs")
+async def get_unenriched_jobs(
+    limit: int = Query(50, ge=1, le=100),
+    admin: str = Depends(admin_required),
+):
+    """Get list of job IDs that need enrichment."""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id::text as job_id
+            FROM jobs
+            WHERE status = 'active'
+            AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+            AND (impact_domain IS NULL OR impact_domain = '[]'::jsonb)
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (limit,))
+        
+        results = cursor.fetchall()
+        job_ids = [row['job_id'] for row in results]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "status": "ok",
+            "data": {"job_ids": job_ids, "count": len(job_ids)},
+            "error": None,
+        }
+    except Exception as e:
+        logger.error(f"[admin/enrichment/unenriched-jobs] Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Enrichment Feedback Endpoints
 @app.post("/admin/enrichment/feedback")
 async def submit_enrichment_feedback(

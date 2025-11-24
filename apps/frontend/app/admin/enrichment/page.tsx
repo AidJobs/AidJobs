@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, CheckCircle, AlertCircle, TrendingUp, BarChart3, Users, Flag, Activity } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, TrendingUp, BarChart3, Users, Flag, Activity, Play, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 type QualityDashboard = {
@@ -40,6 +40,8 @@ export default function EnrichmentQualityPage() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [unenrichedCount, setUnenrichedCount] = useState<number | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -97,15 +99,91 @@ export default function EnrichmentQualityPage() {
     }
   }, []);
 
+  const fetchUnenrichedCount = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/enrichment/unenriched-count', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok') {
+          setUnenrichedCount(data.data.count || 0);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch unenriched count:', error);
+    }
+  }, []);
+
+  const handleBatchEnrich = useCallback(async (count: number = 50) => {
+    if (enriching) return;
+    
+    setEnriching(true);
+    try {
+      // First, get unenriched job IDs
+      const jobsResponse = await fetch(`/api/admin/enrichment/unenriched-jobs?limit=${count}`, {
+        credentials: 'include',
+      });
+      
+      if (!jobsResponse.ok) {
+        throw new Error('Failed to fetch unenriched jobs');
+      }
+      
+      const jobsData = await jobsResponse.json();
+      if (jobsData.status !== 'ok' || !jobsData.data?.job_ids || jobsData.data.job_ids.length === 0) {
+        toast.info('No unenriched jobs found');
+        setEnriching(false);
+        return;
+      }
+      
+      const jobIds = jobsData.data.job_ids;
+      
+      // Trigger batch enrichment
+      const enrichResponse = await fetch('/api/admin/jobs/enrich/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ job_ids: jobIds }),
+      });
+      
+      if (!enrichResponse.ok) {
+        const errorData = await enrichResponse.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${enrichResponse.status}`);
+      }
+      
+      const enrichData = await enrichResponse.json();
+      if (enrichData.status === 'ok') {
+        const result = enrichData.data;
+        toast.success(`Enrichment started: ${result.enriched || 0} jobs queued`);
+        // Refresh dashboard after a delay
+        setTimeout(() => {
+          fetchDashboard();
+          fetchReviews();
+          fetchUnenrichedCount();
+        }, 2000);
+      } else {
+        throw new Error(enrichData.error || 'Enrichment failed');
+      }
+    } catch (error) {
+      console.error('Batch enrichment error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to start enrichment');
+    } finally {
+      setEnriching(false);
+    }
+  }, [enriching, fetchDashboard, fetchReviews, fetchUnenrichedCount]);
+
   const handleRefresh = useCallback(async () => {
-    await Promise.all([fetchDashboard(), fetchReviews()]);
+    await Promise.all([fetchDashboard(), fetchReviews(), fetchUnenrichedCount()]);
     toast.success('Dashboard refreshed');
-  }, [fetchDashboard, fetchReviews]);
+  }, [fetchDashboard, fetchReviews, fetchUnenrichedCount]);
 
   useEffect(() => {
     fetchDashboard();
     fetchReviews();
-  }, [fetchDashboard, fetchReviews]);
+    fetchUnenrichedCount();
+  }, [fetchDashboard, fetchReviews, fetchUnenrichedCount]);
 
   if (loading) {
     return (
@@ -185,16 +263,37 @@ export default function EnrichmentQualityPage() {
             <h1 className="text-title font-semibold text-[#1D1D1F] mb-1">Enrichment Quality</h1>
             <p className="text-caption text-[#86868B]">Monitor pipeline quality and bias indicators</p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loading || reviewsLoading}
-            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-          >
-            <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading || reviewsLoading ? 'animate-spin' : ''}`} />
-            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-              Refresh dashboard
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            {unenrichedCount !== null && unenrichedCount > 0 && (
+              <button
+                onClick={() => handleBatchEnrich(50)}
+                disabled={enriching}
+                className="px-3 py-1.5 flex items-center gap-2 rounded-lg bg-[#0071E3] hover:bg-[#0077ED] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white text-caption font-medium"
+              >
+                {enriching ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Enriching...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5" />
+                    Enrich {Math.min(unenrichedCount, 50)} Jobs
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={loading || reviewsLoading || enriching}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+            >
+              <RefreshCw className={`w-4 h-4 text-[#86868B] ${loading || reviewsLoading ? 'animate-spin' : ''}`} />
+              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                Refresh dashboard
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Quality Score */}
@@ -248,9 +347,18 @@ export default function EnrichmentQualityPage() {
                 <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Avg Confidence</h2>
               </div>
               {avgConfidence >= 0.70 ? (
-                <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Good confidence (≥0.70)">
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                    Good confidence (≥0.70)
+                  </span>
+                </div>
               ) : (
-                <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                <div className="relative group">
+                  <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                    Low confidence (<0.70). Consider reviewing enrichments.
+                  </span>
+                </div>
               )}
             </div>
             <div className="space-y-2">
@@ -273,9 +381,18 @@ export default function EnrichmentQualityPage() {
                 <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Low Confidence</h2>
               </div>
               {lowConfPct < 20 ? (
-                <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Low confidence jobs < 20%">
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                    Low confidence jobs < 20% (Good)
+                  </span>
+                </div>
               ) : (
-                <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                <div className="relative group">
+                  <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                    High percentage of low confidence jobs (≥20%). Review recommended.
+                  </span>
+                </div>
               )}
             </div>
             <div className="space-y-2">
@@ -330,9 +447,18 @@ export default function EnrichmentQualityPage() {
                     {washHealthPct.toFixed(1)}%
                   </span>
                   {washHealthPct > 40 ? (
-                    <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                    <div className="relative group">
+                      <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                        Potential bias: WASH + Public Health > 40%
+                      </span>
+                    </div>
                   ) : (
-                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                    <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Balanced distribution">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                        Balanced distribution (<40%)
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -343,9 +469,18 @@ export default function EnrichmentQualityPage() {
                     {maxExpLevelPct.toFixed(1)}%
                   </span>
                   {maxExpLevelPct > 50 ? (
-                    <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                    <div className="relative group">
+                      <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                        Potential bias: One experience level > 50%
+                      </span>
+                    </div>
                   ) : (
-                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
+                    <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Balanced distribution">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                        Balanced distribution (<50%)
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
