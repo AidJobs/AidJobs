@@ -145,21 +145,28 @@ export default function EnrichmentQualityPage() {
     );
   }
 
-  const total = dashboard.total_enriched;
-  const avgConfidence = dashboard.confidence_statistics.average;
-  const lowConfCount = dashboard.confidence_statistics.low_confidence_count;
+  // Safe property access with defaults
+  const total = dashboard.total_enriched || 0;
+  const confidenceStats = dashboard.confidence_statistics || {};
+  const avgConfidence = confidenceStats.average || 0;
+  const lowConfCount = confidenceStats.low_confidence_count || 0;
   const lowConfPct = total > 0 ? (lowConfCount / total) * 100 : 0;
 
   // Calculate WASH + Public Health percentage
-  const washCount = dashboard.impact_domain_distribution.WASH || 0;
-  const healthCount = dashboard.impact_domain_distribution['Public Health'] || 0;
+  const impactDomainDist = dashboard.impact_domain_distribution || {};
+  const washCount = impactDomainDist.WASH || 0;
+  const healthCount = impactDomainDist['Public Health'] || 0;
   const washHealthPct = total > 0 ? ((washCount + healthCount) / total) * 100 : 0;
 
   // Check for bias in experience level
-  const expLevels = Object.entries(dashboard.experience_level_distribution);
-  const maxExpLevelPct = total > 0 
+  const expLevelDist = dashboard.experience_level_distribution || {};
+  const expLevels = Object.entries(expLevelDist);
+  const maxExpLevelPct = total > 0 && expLevels.length > 0
     ? Math.max(...expLevels.map(([_, count]) => (count / total) * 100))
     : 0;
+
+  const reviewQueueStatus = dashboard.review_queue_status || {};
+  const pendingCount = reviewQueueStatus.pending_count || 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -219,7 +226,7 @@ export default function EnrichmentQualityPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Review Queue</p>
-              <p className="text-2xl font-bold text-gray-900">{dashboard.review_queue_status.pending_count}</p>
+              <p className="text-2xl font-bold text-gray-900">{pendingCount}</p>
             </div>
             <Flag className="w-8 h-8 text-orange-600" />
           </div>
@@ -265,29 +272,33 @@ export default function EnrichmentQualityPage() {
           Experience Level Distribution
         </h2>
         <div className="space-y-3">
-          {Object.entries(dashboard.experience_level_distribution)
-            .sort(([, a], [, b]) => b - a)
-            .map(([level, count]) => {
-              const pct = total > 0 ? (count / total) * 100 : 0;
-              const isHigh = pct > 50;
-              return (
-                <div key={level} className="flex items-center">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">{level}</span>
-                      <span className="text-sm text-gray-600">{count} ({pct.toFixed(1)}%)</span>
+          {expLevels.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No experience level data available</p>
+          ) : (
+            Object.entries(expLevelDist)
+              .sort(([, a], [, b]) => (b as number) - (a as number))
+              .map(([level, count]) => {
+                const pct = total > 0 ? ((count as number) / total) * 100 : 0;
+                const isHigh = pct > 50;
+                return (
+                  <div key={level} className="flex items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">{level}</span>
+                        <span className="text-sm text-gray-600">{count} ({pct.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${isHigh ? 'bg-orange-500' : 'bg-blue-500'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${isHigh ? 'bg-orange-500' : 'bg-blue-500'}`}
-                        style={{ width: `${Math.min(pct, 100)}%` }}
-                      />
-                    </div>
+                    {isHigh && <AlertCircle className="w-4 h-4 text-orange-600 ml-2" />}
                   </div>
-                  {isHigh && <AlertCircle className="w-4 h-4 text-orange-600 ml-2" />}
-                </div>
-              );
-            })}
+                );
+              })
+          )}
         </div>
       </div>
 
@@ -298,27 +309,31 @@ export default function EnrichmentQualityPage() {
           Impact Domain Distribution
         </h2>
         <div className="space-y-3">
-          {Object.entries(dashboard.impact_domain_distribution)
-            .sort(([, a], [, b]) => b - a)
-            .map(([domain, count]) => {
-              const pct = total > 0 ? (count / total) * 100 : 0;
-              return (
-                <div key={domain} className="flex items-center">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">{domain}</span>
-                      <span className="text-sm text-gray-600">{count} ({pct.toFixed(1)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full bg-green-500"
-                        style={{ width: `${Math.min(pct, 100)}%` }}
-                      />
+          {Object.keys(impactDomainDist).length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No impact domain data available</p>
+          ) : (
+            Object.entries(impactDomainDist)
+              .sort(([, a], [, b]) => (b as number) - (a as number))
+              .map(([domain, count]) => {
+                const pct = total > 0 ? ((count as number) / total) * 100 : 0;
+                return (
+                  <div key={domain} className="flex items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">{domain}</span>
+                        <span className="text-sm text-gray-600">{count} ({pct.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full bg-green-500"
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+          )}
         </div>
       </div>
 
@@ -340,40 +355,49 @@ export default function EnrichmentQualityPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {reviews.map((review) => (
-              <div key={review.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">{review.job.title}</h3>
-                    <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                        {review.original_enrichment.impact_domain.join(', ') || 'None'}
-                      </span>
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">
-                        {review.original_enrichment.experience_level || 'None'}
-                      </span>
-                      <span className={`px-2 py-1 rounded ${
-                        review.original_enrichment.confidence_overall >= 0.70
-                          ? 'bg-green-100 text-green-800'
-                          : review.original_enrichment.confidence_overall >= 0.50
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        Confidence: {(review.original_enrichment.confidence_overall * 100).toFixed(0)}%
-                      </span>
+            {reviews.map((review) => {
+              const job = review.job || {};
+              const enrichment = review.original_enrichment || {};
+              const impactDomains = Array.isArray(enrichment.impact_domain) 
+                ? enrichment.impact_domain 
+                : [];
+              const confidence = enrichment.confidence_overall || 0;
+              
+              return (
+                <div key={review.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">{job.title || 'Unknown Job'}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2 text-sm">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                          {impactDomains.length > 0 ? impactDomains.join(', ') : 'None'}
+                        </span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">
+                          {enrichment.experience_level || 'None'}
+                        </span>
+                        <span className={`px-2 py-1 rounded ${
+                          confidence >= 0.70
+                            ? 'bg-green-100 text-green-800'
+                            : confidence >= 0.50
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          Confidence: {(confidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2">Reason: {review.reason || 'N/A'}</p>
                     </div>
-                    <p className="text-sm text-gray-600 mt-2">Reason: {review.reason}</p>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      review.status === 'pending' ? 'bg-orange-100 text-orange-800' :
+                      review.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {review.status || 'unknown'}
+                    </span>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    review.status === 'pending' ? 'bg-orange-100 text-orange-800' :
-                    review.status === 'approved' ? 'bg-green-100 text-green-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {review.status}
-                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
