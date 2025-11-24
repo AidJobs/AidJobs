@@ -335,7 +335,7 @@ class HTMLCrawler:
                                     'cell_idx': cell_idx,
                                     'in_title_cell': cell_has_title
                                 })
-                    
+                            
                     # Select best link
                     if candidate_links:
                         # Sort by score (highest first)
@@ -359,18 +359,18 @@ class HTMLCrawler:
                             
                             logger.info(f"[html_fetch] ✓ Job '{title[:50]}...' -> {best_href[:80]} (score: {best_candidate['score']:.1f})")
                             
-                            job_elements.append({
+                                job_elements.append({
                                 'element': container,
-                                'title': title,
+                                    'title': title,
                                 'link': best_candidate['link'],
                                 'link_href': best_href,
                                 'resolved_url': resolved_url,
                                 'full_text': full_text,
                                 'title_text': title
-                            })
+                                })
                             
                             if len(job_elements) >= 100:
-                                break
+                                    break
                         else:
                             logger.warning(f"[html_fetch] No valid link found for '{title[:50]}...' (best score: {best_candidate['score']:.1f})")
                     else:

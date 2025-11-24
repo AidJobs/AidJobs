@@ -15,9 +15,9 @@ from orchestrator import get_orchestrator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/crawl", tags=["crawler_admin"])
-robots_router = APIRouter(prefix="/admin/robots", tags=["robots"])
-policies_router = APIRouter(prefix="/admin/domain_policies", tags=["domain_policies"])
+router = APIRouter(prefix="/api/admin/crawl", tags=["crawler_admin"])
+robots_router = APIRouter(prefix="/api/admin/robots", tags=["robots"])
+policies_router = APIRouter(prefix="/api/admin/domain_policies", tags=["domain_policies"])
 
 
 def get_db_url():
@@ -202,6 +202,128 @@ async def get_status(admin=Depends(admin_required)):
             "in_flight": 3 - orchestrator.semaphore._value
         }
     }
+
+
+@router.get("/diagnostics/undp")
+async def undp_diagnostics(admin=Depends(admin_required)):
+    """Diagnostic endpoint to check UNDP crawl status and verify unique apply_urls"""
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Find UNDP source
+            cur.execute("""
+                SELECT id, org_name, careers_url, source_type, status, parser_hint,
+                       last_crawled_at, last_crawl_status, last_crawl_message,
+                       consecutive_failures, consecutive_nochange
+                FROM sources
+                WHERE org_name ILIKE '%UNDP%' OR careers_url ILIKE '%undp%'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            source = cur.fetchone()
+            
+            if not source:
+                return {
+                    "status": "error",
+                    "message": "No UNDP source found in database"
+                }
+            
+            source_id = source['id']
+            
+            # Get recent crawl logs
+            cur.execute("""
+                SELECT id, status, message, duration_ms, stats, created_at
+                FROM crawl_logs
+                WHERE source_id = %s
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (source_id,))
+            logs = cur.fetchall()
+            
+            # Get UNDP jobs and check for duplicate apply_urls
+            cur.execute("""
+                SELECT id, title, apply_url, fetched_at, last_seen_at
+                FROM jobs
+                WHERE source_id = %s
+                ORDER BY fetched_at DESC
+                LIMIT 100
+            """, (source_id,))
+            jobs = cur.fetchall()
+            
+            # Analyze URL uniqueness
+            url_counts = {}
+            url_to_titles = {}
+            duplicate_urls = []
+            
+            for job in jobs:
+                url = job['apply_url'] or 'NO_URL'
+                normalized_url = url.rstrip('/').split('#')[0].split('?')[0]
+                
+                url_counts[normalized_url] = url_counts.get(normalized_url, 0) + 1
+                if normalized_url not in url_to_titles:
+                    url_to_titles[normalized_url] = []
+                url_to_titles[normalized_url].append(job['title'])
+                
+                if url_counts[normalized_url] > 1 and normalized_url not in duplicate_urls:
+                    duplicate_urls.append(normalized_url)
+            
+            # Prepare response
+            response = {
+                "status": "ok",
+                "source": {
+                    "id": str(source['id']),
+                    "org_name": source['org_name'],
+                    "careers_url": source['careers_url'],
+                    "source_type": source['source_type'],
+                    "status": source['status'],
+                    "last_crawled_at": source['last_crawled_at'].isoformat() if source['last_crawled_at'] else None,
+                    "last_crawl_status": source['last_crawl_status'],
+                    "last_crawl_message": source['last_crawl_message'],
+                    "consecutive_failures": source['consecutive_failures'],
+                    "consecutive_nochange": source['consecutive_nochange']
+                },
+                "jobs": {
+                    "total": len(jobs),
+                    "unique_urls": len(set(url.rstrip('/').split('#')[0].split('?')[0] for url in [j['apply_url'] or 'NO_URL' for j in jobs])),
+                    "has_duplicates": len(duplicate_urls) > 0,
+                    "duplicate_count": len(duplicate_urls),
+                    "duplicate_urls": [
+                        {
+                            "url": url[:100],
+                            "count": url_counts[url],
+                            "jobs": url_to_titles[url][:3]  # First 3 job titles
+                        }
+                        for url in duplicate_urls[:5]  # First 5 duplicates
+                    ]
+                },
+                "recent_logs": [
+                    {
+                        "id": str(log['id']),
+                        "status": log['status'],
+                        "message": log['message'],
+                        "created_at": log['created_at'].isoformat() if log['created_at'] else None,
+                        "stats": log['stats'] if isinstance(log['stats'], dict) else None
+                    }
+                    for log in logs
+                ],
+                "sample_jobs": [
+                    {
+                        "id": str(job['id']),
+                        "title": job['title'][:100],
+                        "apply_url": job['apply_url'][:150] if job['apply_url'] else None,
+                        "fetched_at": job['fetched_at'].isoformat() if job['fetched_at'] else None
+                    }
+                    for job in jobs[:10]
+                ]
+            }
+            
+            return response
+            
+    except Exception as e:
+        logger.error(f"Error in undp_diagnostics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get UNDP diagnostics: {str(e)}")
+    finally:
+        conn.close()
 
 
 @router.get("/logs")
