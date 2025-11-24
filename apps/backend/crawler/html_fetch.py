@@ -186,51 +186,206 @@ class HTMLCrawler:
         if not job_elements:
             # Strategy 0: UNDP-specific pattern (HTML-based structure with "Job Title", "Apply by", "Location")
             # UNDP uses a pattern like: "Job Title [title] Apply by [date] Location [location]"
+            # CRITICAL: This extraction must ensure each job gets a UNIQUE link - no duplicates allowed
             if 'undp.org' in base_url.lower() or 'cj_view_consultancies' in base_url.lower():
                 logger.info(f"[html_fetch] Using UNDP-specific extraction for {base_url}")
+                logger.info(f"[html_fetch] ENTERPRISE MODE: Strict uniqueness enforcement enabled")
+                
                 job_title_pattern = re.compile(r'(?i)Job Title\s+', re.IGNORECASE)
                 
-                # Strategy: Find each "Job Title" occurrence and its associated unique link
-                # We need to ensure each job gets its own link, not a shared one
-                
-                # Track used links to prevent duplicates
+                # Track used links to prevent duplicates (CRITICAL)
                 used_links = set()
+                used_containers = set()  # Track containers to avoid processing same container twice
                 
-                # First, find all "Job Title" text nodes and their positions
-                job_title_nodes = []
-                for text_node in soup.find_all(string=job_title_pattern):
-                    parent = text_node.parent
-                    if not parent:
-                        continue
-                    
-                    # Extract title
-                    title_text = text_node.string if hasattr(text_node, 'string') else str(text_node)
-                    title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', title_text)
-                    if not title_match:
-                        # Try parent text
-                        parent_text = parent.get_text() if parent else ''
-                        title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', parent_text)
-                    
-                    if not title_match:
-                        continue
-                    
-                    title = title_match.group(1).strip()
-                    if not title or len(title) < 5:
-                        continue
-                    
-                    job_title_nodes.append({
-                        'text_node': text_node,
-                        'parent': parent,
-                        'title': title
-                    })
+                # ENTERPRISE APPROACH: Find each job's isolated container
+                # Strategy: Find table rows (tr) that contain "Job Title" - each row is one job
+                # This ensures perfect isolation - no container sharing between jobs
                 
-                logger.debug(f"[html_fetch] Found {len(job_title_nodes)} 'Job Title' occurrences")
+                # First, try to find job rows in a table structure
+                job_rows = []
+                tables = soup.find_all('table')
+                for table in tables:
+                    rows = table.find_all('tr')
+                    for row in rows:
+                        row_text = row.get_text()
+                        if job_title_pattern.search(row_text):
+                            # This row contains a job title - it's a job row
+                            # Extract the title
+                            title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', row_text)
+                            if title_match:
+                                title = title_match.group(1).strip()
+                                if title and len(title) >= 5:
+                                    # Get unique identifier for this row to avoid duplicates
+                                    row_id = id(row)
+                                    if row_id not in used_containers:
+                                        job_rows.append({
+                                            'container': row,
+                                            'title': title,
+                                            'type': 'table_row',
+                                            'row_id': row_id
+                                        })
+                                        used_containers.add(row_id)
                 
-                # For each job title, find its unique associated link
-                for job_info in job_title_nodes:
-                    text_node = job_info['text_node']
-                    parent = job_info['parent']
+                logger.info(f"[html_fetch] Found {len(job_rows)} job rows in table structure")
+                
+                # If no table rows found, fall back to finding "Job Title" text nodes
+                if not job_rows:
+                    logger.info(f"[html_fetch] No table rows found, using text node approach")
+                    job_title_nodes = []
+                    for text_node in soup.find_all(string=job_title_pattern):
+                        parent = text_node.parent
+                        if not parent:
+                            continue
+                        
+                        # Extract title
+                        title_text = text_node.string if hasattr(text_node, 'string') else str(text_node)
+                        title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', title_text)
+                        if not title_match:
+                            # Try parent text
+                            parent_text = parent.get_text() if parent else ''
+                            title_match = re.search(r'(?i)Job Title\s+([^\n\r]+)', parent_text)
+                        
+                        if not title_match:
+                            continue
+                        
+                        title = title_match.group(1).strip()
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        job_title_nodes.append({
+                            'text_node': text_node,
+                            'parent': parent,
+                            'title': title
+                        })
+                    
+                    logger.info(f"[html_fetch] Found {len(job_title_nodes)} 'Job Title' text nodes")
+                
+                # Process job rows (preferred method - better isolation)
+                for job_info in job_rows:
+                    container = job_info['container']
                     title = job_info['title']
+                    row_id = job_info['row_id']
+                    
+                    logger.debug(f"[html_fetch] Processing job: '{title[:60]}...' (row_id: {row_id})")
+                    
+                    # For table rows, extract links from cells in THIS row only
+                    # This ensures perfect isolation - no cross-row contamination
+                    cells = container.find_all(['td', 'th'])
+                    candidate_links = []
+                    
+                    for cell_idx, cell in enumerate(cells):
+                        cell_text = cell.get_text()
+                        cell_has_title = title.lower() in cell_text.lower() or job_title_pattern.search(cell_text)
+                        
+                        # Get ALL links in this cell
+                        cell_links = cell.find_all('a', href=True)
+                        for link in cell_links:
+                            href = link.get('href', '')
+                            if href and not href.startswith('#') and not href.startswith('javascript:'):
+                                # Resolve to absolute URL
+                                resolved_href = urljoin(base_url, href)
+                                normalized_href = resolved_href.rstrip('/').split('#')[0].split('?')[0]
+                                
+                                # CRITICAL: Skip if already used
+                                if normalized_href in used_links:
+                                    logger.debug(f"[html_fetch]   Link already used: {href[:60]}...")
+                                    continue
+                                
+                                # Score this link
+                                score = 100 if cell_has_title else 50
+                                href_lower = href.lower()
+                                link_text = link.get_text().lower().strip()
+                                
+                                # High priority for unique identifiers
+                                if re.search(r'/\d{4,}', href):
+                                    score += 50
+                                elif re.search(r'/[a-z0-9-]{15,}', href):
+                                    score += 40
+                                elif re.search(r'/id[=:](\d+|[a-z0-9-]+)', href, re.I):
+                                    score += 45
+                                
+                                # Job detail patterns
+                                if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/consultancy/']):
+                                    score += 30
+                                
+                                # Detail keywords in link text
+                                if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info']):
+                                    score += 20
+                                
+                                # Heavy penalty for listing pages
+                                if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies', '/all', '/index']):
+                                    score -= 100
+                                
+                                # Penalty for base URL
+                                parsed_base = urlparse(base_url)
+                                parsed_href = urlparse(href)
+                                if parsed_href.path == parsed_base.path or parsed_href.path == parsed_base.path.rstrip('/'):
+                                    score -= 50
+                                
+                                # Bonus if link text contains title
+                                if title.lower()[:20] in link_text:
+                                    score += 15
+                                
+                                candidate_links.append({
+                                    'link': link,
+                                    'href': href,
+                                    'resolved_href': resolved_href,
+                                    'normalized_href': normalized_href,
+                                    'score': score,
+                                    'cell_idx': cell_idx,
+                                    'in_title_cell': cell_has_title
+                                })
+                    
+                    # Select best link
+                    if candidate_links:
+                        # Sort by score (highest first)
+                        candidate_links.sort(key=lambda x: x['score'], reverse=True)
+                        best_candidate = candidate_links[0]
+                        
+                        if best_candidate['score'] > 0:
+                            best_href = best_candidate['href']
+                            resolved_url = best_candidate['resolved_href']
+                            normalized_href = best_candidate['normalized_href']
+                            
+                            # CRITICAL: Double-check uniqueness before adding
+                            if normalized_href in used_links:
+                                logger.warning(f"[html_fetch] CRITICAL: Link collision detected for '{title[:50]}...': {best_href}")
+                                continue
+                            
+                            # Mark as used IMMEDIATELY
+                            used_links.add(normalized_href)
+                            
+                            full_text = container.get_text()
+                            
+                            logger.info(f"[html_fetch] ✓ Job '{title[:50]}...' -> {best_href[:80]} (score: {best_candidate['score']:.1f})")
+                            
+                            job_elements.append({
+                                'element': container,
+                                'title': title,
+                                'link': best_candidate['link'],
+                                'link_href': best_href,
+                                'resolved_url': resolved_url,
+                                'full_text': full_text,
+                                'title_text': title
+                            })
+                            
+                            if len(job_elements) >= 100:
+                                break
+                        else:
+                            logger.warning(f"[html_fetch] No valid link found for '{title[:50]}...' (best score: {best_candidate['score']:.1f})")
+                    else:
+                        logger.warning(f"[html_fetch] No candidate links found for '{title[:50]}...'")
+                
+                # Fallback: Process text nodes if no table rows found
+                if not job_rows and 'job_title_nodes' in locals():
+                    logger.info(f"[html_fetch] Processing {len(job_title_nodes)} text nodes with strict validation")
+                    # For each job title, find its unique associated link
+                    for job_info in job_title_nodes:
+                        text_node = job_info['text_node']
+                        parent = job_info['parent']
+                        title = job_info['title']
+                        
+                        logger.debug(f"[html_fetch] Processing job: '{title[:60]}...'")
                     
                     # Find the most specific container for this job
                     # Start from the parent and go up to find a container (tr, div, etc.)
@@ -258,169 +413,215 @@ class HTMLCrawler:
                                 break
                             container = container.parent if container else None
                     
-                    if not container:
-                        continue
-                    
-                    # CRITICAL: Find links ONLY in this specific container, prioritizing links near the title
-                    # For table rows, only check cells in THIS row
-                    candidate_links = []
-                    
-                    if container.name == 'tr':
-                        # Table row: check each cell individually
-                        cells = container.find_all(['td', 'th'])
-                        for cell_idx, cell in enumerate(cells):
-                            cell_text = cell.get_text()
-                            # Check if this cell contains the job title
-                            cell_has_title = title.lower() in cell_text.lower() or job_title_pattern.search(cell_text)
+                        if not container:
+                            continue
+                        
+                        # CRITICAL: Check if we've already processed this container
+                        container_id = id(container)
+                        if container_id in used_containers:
+                            logger.debug(f"[html_fetch]   Skipping already-processed container for '{title[:50]}...'")
+                            continue
+                        used_containers.add(container_id)
+                        
+                        # CRITICAL: Find links ONLY in this specific container, prioritizing links near the title
+                        # For table rows, only check cells in THIS row
+                        candidate_links = []
+                        
+                        if container.name == 'tr':
+                            # Table row: check each cell individually
+                            cells = container.find_all(['td', 'th'])
+                            for cell_idx, cell in enumerate(cells):
+                                cell_text = cell.get_text()
+                                # Check if this cell contains the job title
+                                cell_has_title = title.lower() in cell_text.lower() or job_title_pattern.search(cell_text)
+                                
+                                # Get links in this cell
+                                cell_links = cell.find_all('a', href=True)
+                                for link in cell_links:
+                                    href = link.get('href', '')
+                                    if href and not href.startswith('#') and not href.startswith('javascript:'):
+                                        # Resolve to absolute URL
+                                        resolved_href = urljoin(base_url, href)
+                                        normalized_href = resolved_href.rstrip('/').split('#')[0].split('?')[0]
+                                        
+                                        # CRITICAL: Skip if already used
+                                        if normalized_href in used_links:
+                                            logger.debug(f"[html_fetch]   Link already used: {href[:60]}...")
+                                            continue
+                                        
+                                        # Score this link
+                                        score = 100 if cell_has_title else 50
+                                        href_lower = href.lower()
+                                        link_text = link.get_text().lower().strip()
+                                        
+                                        # High priority for unique identifiers
+                                        if re.search(r'/\d{4,}', href):
+                                            score += 50
+                                        elif re.search(r'/[a-z0-9-]{15,}', href):
+                                            score += 40
+                                        elif re.search(r'/id[=:](\d+|[a-z0-9-]+)', href, re.I):
+                                            score += 45
+                                        
+                                        # Job detail patterns
+                                        if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/consultancy/']):
+                                            score += 30
+                                        
+                                        # Detail keywords in link text
+                                        if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info']):
+                                            score += 20
+                                        
+                                        # Heavy penalty for listing pages
+                                        if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies', '/all', '/index']):
+                                            score -= 100
+                                        
+                                        # Penalty for base URL
+                                        parsed_base = urlparse(base_url)
+                                        parsed_href = urlparse(href)
+                                        if parsed_href.path == parsed_base.path or parsed_href.path == parsed_base.path.rstrip('/'):
+                                            score -= 50
+                                        
+                                        # Bonus if link text contains title
+                                        if title.lower()[:20] in link_text:
+                                            score += 15
+                                        
+                                        candidate_links.append({
+                                            'link': link,
+                                            'href': href,
+                                            'resolved_href': resolved_href,
+                                            'normalized_href': normalized_href,
+                                            'score': score,
+                                            'cell_idx': cell_idx,
+                                            'in_title_cell': cell_has_title
+                                        })
+                        else:
+                            # Non-table container: find all links and prioritize by proximity to title
+                            all_links = container.find_all('a', href=True)
+                            title_position = None
                             
-                            # Get links in this cell
-                            cell_links = cell.find_all('a', href=True)
-                            for link in cell_links:
+                            # Find position of title in container's HTML structure
+                            try:
+                                title_elem = container.find(string=re.compile(re.escape(title[:30]), re.I))
+                                if title_elem:
+                                    # Calculate approximate position
+                                    container_html = str(container)
+                                    title_pos = container_html.lower().find(title[:30].lower())
+                                    title_position = title_pos if title_pos >= 0 else None
+                            except:
+                                pass
+                            
+                            for link in all_links:
                                 href = link.get('href', '')
                                 if href and not href.startswith('#') and not href.startswith('javascript:'):
-                                    # Prioritize links in the same cell as the title
-                                    priority = 100 if cell_has_title else 50
+                                    # Resolve to absolute URL
+                                    resolved_href = urljoin(base_url, href)
+                                    normalized_href = resolved_href.rstrip('/').split('#')[0].split('?')[0]
+                                    
+                                    # CRITICAL: Skip if already used
+                                    if normalized_href in used_links:
+                                        logger.debug(f"[html_fetch]   Link already used: {href[:60]}...")
+                                        continue
+                                    
+                                    # Calculate link position
+                                    link_pos = None
+                                    try:
+                                        container_html = str(container)
+                                        link_html = str(link)
+                                        link_pos = container_html.find(link_html)
+                                    except:
+                                        pass
+                                    
+                                    # Score based on proximity to title
+                                    score = 50
+                                    if title_position is not None and link_pos is not None:
+                                        distance = abs(link_pos - title_position)
+                                        if distance < 500:  # Within 500 chars of title
+                                            score = 100 - (distance // 10)
+                                    
+                                    href_lower = href.lower()
+                                    link_text = link.get_text().lower().strip()
+                                    
+                                    # High priority for unique identifiers
+                                    if re.search(r'/\d{4,}', href):
+                                        score += 50
+                                    elif re.search(r'/[a-z0-9-]{15,}', href):
+                                        score += 40
+                                    elif re.search(r'/id[=:](\d+|[a-z0-9-]+)', href, re.I):
+                                        score += 45
+                                    
+                                    # Job detail patterns
+                                    if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/consultancy/']):
+                                        score += 30
+                                    
+                                    # Detail keywords in link text
+                                    if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info']):
+                                        score += 20
+                                    
+                                    # Heavy penalty for listing pages
+                                    if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies', '/all', '/index']):
+                                        score -= 100
+                                    
+                                    # Penalty for base URL
+                                    parsed_base = urlparse(base_url)
+                                    parsed_href = urlparse(href)
+                                    if parsed_href.path == parsed_base.path or parsed_href.path == parsed_base.path.rstrip('/'):
+                                        score -= 50
+                                    
+                                    # Bonus if link text contains title
+                                    if title.lower()[:20] in link_text:
+                                        score += 15
+                                    
                                     candidate_links.append({
                                         'link': link,
                                         'href': href,
-                                        'priority': priority,
-                                        'cell_idx': cell_idx,
-                                        'in_title_cell': cell_has_title
+                                        'resolved_href': resolved_href,
+                                        'normalized_href': normalized_href,
+                                        'score': score,
+                                        'distance': abs(link_pos - title_position) if (title_position and link_pos) else None
                                     })
-                    else:
-                        # Non-table container: find all links and prioritize by proximity to title
-                        all_links = container.find_all('a', href=True)
-                        title_position = None
                         
-                        # Find position of title in container's HTML structure
-                        try:
-                            title_elem = container.find(string=re.compile(re.escape(title[:30]), re.I))
-                            if title_elem:
-                                # Calculate approximate position
-                                container_html = str(container)
-                                title_pos = container_html.lower().find(title[:30].lower())
-                                title_position = title_pos if title_pos >= 0 else None
-                        except:
-                            pass
-                        
-                        for link in all_links:
-                            href = link.get('href', '')
-                            if href and not href.startswith('#') and not href.startswith('javascript:'):
-                                # Calculate link position
-                                link_pos = None
-                                try:
-                                    container_html = str(container)
-                                    link_html = str(link)
-                                    link_pos = container_html.find(link_html)
-                                except:
-                                    pass
-                                
-                                # Priority based on proximity to title
-                                priority = 50
-                                if title_position is not None and link_pos is not None:
-                                    distance = abs(link_pos - title_position)
-                                    if distance < 500:  # Within 500 chars of title
-                                        priority = 100 - (distance // 10)
-                                
-                                candidate_links.append({
-                                    'link': link,
-                                    'href': href,
-                                    'priority': priority,
-                                    'distance': abs(link_pos - title_position) if (title_position and link_pos) else None
-                                })
-                    
-                    if not candidate_links:
-                        logger.debug(f"[html_fetch] No links found for job: {title[:50]}...")
-                        continue
-                    
-                    # Score and select the best link for THIS specific job
-                    # CRITICAL: Exclude links that have already been used by other jobs
-                    best_candidate = None
-                    best_score = -1000
-                    
-                    for candidate in candidate_links:
-                        link = candidate['link']
-                        href = candidate['href']
-                        href_lower = href.lower()
-                        link_text = link.get_text().lower().strip()
-                        
-                        # Normalize href for comparison
-                        normalized_href = href.rstrip('/').split('#')[0].split('?')[0]
-                        
-                        # CRITICAL: Skip if this link has already been used
-                        if normalized_href in used_links:
-                            logger.debug(f"[html_fetch] Skipping already-used link for '{title[:50]}...': {href}")
+                        if not candidate_links:
+                            logger.debug(f"[html_fetch] No links found for job: {title[:50]}...")
                             continue
                         
-                        score = candidate.get('priority', 50)
+                        # Select best link (already scored)
+                        candidate_links.sort(key=lambda x: x['score'], reverse=True)
+                        best_candidate = candidate_links[0]
                         
-                        # CRITICAL: High priority for links with unique identifiers (IDs, slugs)
-                        # These are almost certainly job-specific detail pages
-                        if re.search(r'/\d{4,}', href):  # Has numeric ID (4+ digits)
-                            score += 50
-                        elif re.search(r'/[a-z0-9-]{15,}', href):  # Has long unique slug
-                            score += 40
-                        elif re.search(r'/id[=:](\d+|[a-z0-9-]+)', href, re.I):  # Has id= or id: parameter
-                            score += 45
-                        
-                        # High priority: job detail path patterns
-                        if any(kw in href_lower for kw in ['/job/', '/position/', '/vacancy/', '/detail', '/view/', '/apply', '/post/', '/consultant/', '/opportunity/', '/consultancy/']):
-                            score += 30
-                        
-                        # Medium: links with detail keywords in text
-                        if any(kw in link_text for kw in ['view', 'details', 'read more', 'apply', 'see more', 'full', 'more info']):
-                            score += 20
-                        
-                        # CRITICAL: Heavy penalty for listing/generic pages
-                        if any(kw in href_lower for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies', '/all', '/index']):
-                            score -= 100
-                        
-                        # Penalty: if href is just the base URL
-                        parsed_base = urlparse(base_url)
-                        parsed_href = urlparse(href)
-                        if parsed_href.path == parsed_base.path or parsed_href.path == parsed_base.path.rstrip('/'):
-                            score -= 50
-                        
-                        # Bonus: if link text contains part of the job title
-                        if title.lower()[:20] in link_text:
-                            score += 15
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_candidate = candidate
-                    
-                    if best_candidate and best_score > 0:
-                        best_link = best_candidate['link']
-                        best_href = best_candidate['href']
-                        full_text = container.get_text()
-                        
-                        # Store the resolved URL for this job
-                        resolved_url = urljoin(base_url, best_href)
-                        
-                        # Normalize and mark this link as used
-                        normalized_href = best_href.rstrip('/').split('#')[0].split('?')[0]
-                        used_links.add(normalized_href)
-                        
-                        logger.debug(f"[html_fetch] Job '{title[:50]}...' -> Link: {best_href} (score: {best_score:.1f})")
-                        
-                        job_elements.append({
-                            'element': container,
-                            'title': title,
-                            'link': best_link,
-                            'link_href': best_href,  # Store the href directly
-                            'resolved_url': resolved_url,  # Store resolved URL
-                            'full_text': full_text,
-                            'title_text': title
-                        })
-                        
-                        if len(job_elements) >= 100:
-                            break
-                    else:
-                        logger.warning(f"[html_fetch] No valid link found for job '{title[:50]}...' (all links may be duplicates or invalid)")
+                        if best_candidate['score'] > 0:
+                            best_href = best_candidate['href']
+                            resolved_url = best_candidate['resolved_href']
+                            normalized_href = best_candidate['normalized_href']
+                            
+                            # CRITICAL: Double-check uniqueness before adding
+                            if normalized_href in used_links:
+                                logger.warning(f"[html_fetch] CRITICAL: Link collision detected for '{title[:50]}...': {best_href}")
+                                continue
+                            
+                            # Mark as used IMMEDIATELY
+                            used_links.add(normalized_href)
+                            
+                            full_text = container.get_text()
+                            
+                            logger.info(f"[html_fetch] ✓ Job '{title[:50]}...' -> {best_href[:80]} (score: {best_candidate['score']:.1f})")
+                            
+                            job_elements.append({
+                                'element': container,
+                                'title': title,
+                                'link': best_candidate['link'],
+                                'link_href': best_href,
+                                'resolved_url': resolved_url,
+                                'full_text': full_text,
+                                'title_text': title
+                            })
+                            
+                            if len(job_elements) >= 100:
+                                break
+                        else:
+                            logger.warning(f"[html_fetch] No valid link found for '{title[:50]}...' (best score: {best_candidate['score']:.1f})")
                 
                 logger.info(f"[html_fetch] UNDP extraction found {len(job_elements)} job elements")
                 
-                # Log URL uniqueness check
+                # ENTERPRISE VALIDATION: Comprehensive URL uniqueness check
                 if job_elements:
                     extracted_urls = []
                     for elem in job_elements:
@@ -429,17 +630,36 @@ class HTMLCrawler:
                         elif isinstance(elem, dict) and 'link_href' in elem:
                             extracted_urls.append(urljoin(base_url, elem['link_href']))
                     
-                    unique_urls = set(url.rstrip('/').split('#')[0].split('?')[0] for url in extracted_urls)
+                    # Normalize all URLs for comparison
+                    normalized_urls = [url.rstrip('/').split('#')[0].split('?')[0] for url in extracted_urls]
+                    unique_urls = set(normalized_urls)
+                    
                     if len(unique_urls) < len(extracted_urls):
-                        logger.warning(f"[html_fetch] WARNING: Found {len(extracted_urls)} jobs but only {len(unique_urls)} unique URLs!")
-                        # Log duplicates
+                        logger.error(f"[html_fetch] CRITICAL ERROR: Found {len(extracted_urls)} jobs but only {len(unique_urls)} unique URLs!")
+                        logger.error(f"[html_fetch] This indicates a serious extraction bug - multiple jobs are sharing URLs")
+                        
+                        # Log duplicates with job titles
                         from collections import Counter
-                        url_counts = Counter(url.rstrip('/').split('#')[0].split('?')[0] for url in extracted_urls)
+                        url_counts = Counter(normalized_urls)
                         for url, count in url_counts.items():
                             if count > 1:
-                                logger.error(f"[html_fetch] URL used {count} times: {url}")
+                                logger.error(f"[html_fetch] URL used {count} times: {url[:80]}")
+                                # Find which jobs use this URL
+                                matching_jobs = []
+                                for i, elem in enumerate(job_elements):
+                                    elem_url = None
+                                    if isinstance(elem, dict) and 'resolved_url' in elem:
+                                        elem_url = elem['resolved_url']
+                                    elif isinstance(elem, dict) and 'link_href' in elem:
+                                        elem_url = urljoin(base_url, elem['link_href'])
+                                    if elem_url:
+                                        normalized = elem_url.rstrip('/').split('#')[0].split('?')[0]
+                                        if normalized == url:
+                                            matching_jobs.append(elem.get('title', 'Unknown')[:50])
+                                logger.error(f"[html_fetch]   Jobs using this URL: {', '.join(matching_jobs)}")
                     else:
-                        logger.info(f"[html_fetch] ✓ All {len(job_elements)} jobs have unique URLs")
+                        logger.info(f"[html_fetch] ✓ ENTERPRISE VALIDATION PASSED: All {len(job_elements)} jobs have unique URLs")
+                        logger.info(f"[html_fetch] ✓ Used links set contains {len(used_links)} unique normalized URLs")
             
             # Strategy 1: Look for table rows with job-like content (common in UN sites)
             if not job_elements:
