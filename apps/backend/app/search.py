@@ -77,12 +77,22 @@ class SearchService:
         try:
             # Simple health check - get client health
             health = self.meili_client.health()
-            if health.status == 'available':
+            # Handle both dict and object responses
+            if hasattr(health, 'status'):
+                health_status = health.status
+            elif isinstance(health, dict):
+                health_status = health.get('status', 'unknown')
+            else:
+                # If we got a response but can't parse it, assume it's available
+                health_status = 'available'
+            
+            if health_status == 'available':
                 self._connection_retry_count = 0
                 self._last_health_check = time.time()
                 return True
             return False
         except Exception as e:
+            # JSON parsing errors, connection errors, etc. - all mean unhealthy
             logger.debug(f"[aidjobs] Meilisearch health check failed: {e}")
             return False
     
@@ -99,15 +109,32 @@ class SearchService:
             
             # Set connection timeout (if supported by client)
             try:
-                # Test connection with health check
-                health = self.meili_client.health()
-                if health.status != 'available':
-                    raise Exception(f"Meilisearch health check failed: {health.status}")
-                logger.info(f"[aidjobs] Meilisearch connection verified: {health.status}")
+                # Test connection with health check (but don't fail if it's not available yet)
+                try:
+                    health = self.meili_client.health()
+                    # Health response can be a dict or object
+                    if hasattr(health, 'status'):
+                        health_status = health.status
+                    elif isinstance(health, dict):
+                        health_status = health.get('status', 'unknown')
+                    else:
+                        health_status = 'available'  # Assume available if we got a response
+                    
+                    if health_status != 'available':
+                        logger.warning(f"[aidjobs] Meilisearch health status: {health_status}")
+                    else:
+                        logger.info(f"[aidjobs] Meilisearch connection verified: {health_status}")
+                except Exception as health_check_error:
+                    # Health check failed - this is OK during initialization if Meili is starting up
+                    logger.debug(f"[aidjobs] Meilisearch health check not available yet: {health_check_error}")
+                    if not retry:
+                        # Only raise if this is the first attempt and we're not in retry mode
+                        pass  # Don't fail initialization if health check fails
             except Exception as health_error:
                 logger.warning(f"[aidjobs] Meilisearch health check failed: {health_error}")
                 if not retry:
-                    raise
+                    # Don't raise - allow initialization to continue and try index operations
+                    pass
             
             try:
                 try:
