@@ -356,7 +356,7 @@ export default function EnrichmentQualityPage() {
                 <div className="relative group">
                   <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                    Low confidence (<0.70). Consider reviewing enrichments.
+                    Low confidence (&lt;0.70). Consider reviewing enrichments.
                   </span>
                 </div>
               )}
@@ -381,9 +381,9 @@ export default function EnrichmentQualityPage() {
                 <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Low Confidence</h2>
               </div>
               {lowConfPct < 20 ? (
-                <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Low confidence jobs < 20%">
+                <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Low confidence jobs &lt; 20%">
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                    Low confidence jobs < 20% (Good)
+                    Low confidence jobs &lt; 20% (Good)
                   </span>
                 </div>
               ) : (
@@ -403,6 +403,7 @@ export default function EnrichmentQualityPage() {
                 </span>
               </div>
               <div className="text-caption text-[#86868B]">
+                {lowConfPct.toFixed(1)}% {lowConfPct < 20 ? '(Good)' : '(High)'}
                 {lowConfPct.toFixed(1)}% {lowConfPct < 20 ? '(Good)' : '(High)'}
               </div>
             </div>
@@ -450,13 +451,13 @@ export default function EnrichmentQualityPage() {
                     <div className="relative group">
                       <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                        Potential bias: WASH + Public Health > 40%
+                        Potential bias: WASH + Public Health &gt; 40%
                       </span>
                     </div>
                   ) : (
                     <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Balanced distribution">
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                        Balanced distribution (<40%)
+                        Balanced distribution (&lt;40%)
                       </span>
                     </div>
                   )}
@@ -472,13 +473,13 @@ export default function EnrichmentQualityPage() {
                     <div className="relative group">
                       <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                        Potential bias: One experience level > 50%
+                        Potential bias: One experience level &gt; 50%
                       </span>
                     </div>
                   ) : (
                     <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Balanced distribution">
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
-                        Balanced distribution (<50%)
+                        Balanced distribution (&lt;50%)
                       </span>
                     </div>
                   )}
