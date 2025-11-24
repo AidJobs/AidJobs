@@ -1358,20 +1358,6 @@ def fetch_html(url: str) -> Optional[str]:
     """Backwards-compatible sync wrapper (stub - use HTMLCrawler for full functionality)"""
     logger.warning("fetch_html() is deprecated - use HTMLCrawler class")
     return None
-
-
-def extract_jobs(html: str, base_url: str, parser_hint: Optional[str] = None) -> List[Dict]:
-    """Backwards-compatible extraction function"""
-    import os
-    # Only use PostgreSQL connection strings
-    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-    if not db_url:
-        return []
-    
-    crawler = HTMLCrawler(db_url)
-    return crawler.extract_jobs(html, base_url, parser_hint)
-
-
 async def upsert_jobs(jobs: List[Dict], source_id: str) -> Dict[str, int]:
     """Backwards-compatible upsert function"""
     import os
