@@ -387,32 +387,32 @@ class HTMLCrawler:
                         
                         logger.debug(f"[html_fetch] Processing job: '{title[:60]}...'")
                     
-                    # Find the most specific container for this job
-                    # Start from the parent and go up to find a container (tr, div, etc.)
-                    container = None
-                    for level in range(6):  # Check up to 6 levels up
-                        current = parent
-                        for _ in range(level):
-                            if current:
-                                current = current.parent
+                        # Find the most specific container for this job
+                        # Start from the parent and go up to find a container (tr, div, etc.)
+                        container = None
+                        for level in range(6):  # Check up to 6 levels up
+                            current = parent
+                            for _ in range(level):
+                                if current:
+                                    current = current.parent
+                            
+                            if current and current.name in ['tr', 'div', 'li', 'article', 'section', 'td', 'tbody']:
+                                # Check if this container contains the title and has links
+                                container_text = current.get_text()
+                                if job_title_pattern.search(container_text):
+                                    # Verify this is the right container (contains our specific title)
+                                    if title.lower() in container_text.lower():
+                                        container = current
+                                        break
                         
-                        if current and current.name in ['tr', 'div', 'li', 'article', 'section', 'td', 'tbody']:
-                            # Check if this container contains the title and has links
-                            container_text = current.get_text()
-                            if job_title_pattern.search(container_text):
-                                # Verify this is the right container (contains our specific title)
-                                if title.lower() in container_text.lower():
-                                    container = current
+                        if not container:
+                            # Fallback: use parent as container
+                            container = parent
+                            for _ in range(3):
+                                if container and container.name in ['tr', 'div', 'li', 'article', 'section', 'td']:
                                     break
-                    
-                    if not container:
-                        # Fallback: use parent as container
-                        container = parent
-                        for _ in range(3):
-                            if container and container.name in ['tr', 'div', 'li', 'article', 'section', 'td']:
-                                break
-                            container = container.parent if container else None
-                    
+                                container = container.parent if container else None
+                        
                         if not container:
                             continue
                         
