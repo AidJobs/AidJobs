@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info, Database } from 'lucide-react';
+import { toast } from 'sonner';
 
 type ProviderStatus = 'ok' | 'warn' | 'fail';
 
@@ -33,6 +34,7 @@ export default function AdminSetupPage() {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runningMigration, setRunningMigration] = useState(false);
 
   useEffect(() => {
     fetchStatus();
@@ -89,6 +91,44 @@ export default function AdminSetupPage() {
     if (status === 'ok' || status === true) return 'border-green-200 bg-green-50';
     if (status === 'warn') return 'border-orange-200 bg-orange-50';
     return 'border-gray-200 bg-gray-50';
+  };
+
+  const handleRunMigration = async () => {
+    if (!confirm('Run the job deletion audit migration? This will create the audit table, soft delete columns, and impact function.')) {
+      return;
+    }
+
+    setRunningMigration(true);
+    try {
+      const res = await fetch('/api/admin/crawl/run-migration', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.detail || 'Failed to run migration');
+      }
+
+      const data = await res.json();
+      if (data.status === 'ok') {
+        toast.success('Migration completed successfully!');
+        console.log('Migration steps:', data.steps);
+        console.log('Verification:', data.verification);
+      } else {
+        throw new Error(data.error || 'Migration failed');
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to run migration');
+    } finally {
+      setRunningMigration(false);
+    }
   };
 
   if (loading) {
@@ -255,6 +295,38 @@ export default function AdminSetupPage() {
               values are never displayed for security. To configure a provider, add the required
               environment variables to your Secrets.
             </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-2 flex-1">
+            <Database className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-900">
+              <p className="font-medium mb-1">Database Migration</p>
+              <p className="mb-3">
+                Run the job deletion audit migration to enable enterprise-grade job deletion features.
+                This will create the audit table, soft delete columns, and impact analysis function.
+              </p>
+              <button
+                onClick={handleRunMigration}
+                disabled={runningMigration}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+              >
+                {runningMigration ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Running Migration...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4" />
+                    Run Migration
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

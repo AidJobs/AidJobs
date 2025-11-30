@@ -1018,3 +1018,142 @@ async def get_source_analytics(source_id: str, admin=Depends(admin_required)):
         raise HTTPException(status_code=500, detail=f"Failed to get source analytics: {str(e)}")
     finally:
         conn.close()
+
+
+@router.post("/run-migration")
+async def run_deletion_migration(admin: str = Depends(admin_required)):
+    """
+    Run the job deletion audit migration.
+    This creates the audit table, soft delete columns, and impact function.
+    Idempotent - safe to run multiple times.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            results = []
+            
+            # Step 1: Create audit table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS job_deletion_audit (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    source_id UUID REFERENCES sources(id) ON DELETE SET NULL,
+                    deleted_by TEXT NOT NULL,
+                    deletion_type TEXT NOT NULL CHECK (deletion_type IN ('hard', 'soft', 'batch')),
+                    jobs_count INT NOT NULL,
+                    deletion_reason TEXT,
+                    metadata JSONB,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            results.append("✅ Created job_deletion_audit table")
+            
+            # Step 2: Create indexes
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_job_deletion_audit_source_id 
+                ON job_deletion_audit(source_id, created_at DESC)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_job_deletion_audit_deleted_by 
+                ON job_deletion_audit(deleted_by)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_job_deletion_audit_created_at 
+                ON job_deletion_audit(created_at DESC)
+            """)
+            results.append("✅ Created indexes")
+            
+            # Step 3: Add soft delete columns
+            cur.execute("""
+                ALTER TABLE jobs 
+                ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS deleted_by TEXT,
+                ADD COLUMN IF NOT EXISTS deletion_reason TEXT
+            """)
+            results.append("✅ Added soft delete columns to jobs table")
+            
+            # Step 4: Create index for soft-deleted jobs
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_jobs_deleted_at 
+                ON jobs(deleted_at) 
+                WHERE deleted_at IS NOT NULL
+            """)
+            results.append("✅ Created index for soft-deleted jobs")
+            
+            # Step 5: Create impact function
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION get_deletion_impact(source_uuid UUID)
+                RETURNS TABLE (
+                    total_jobs INT,
+                    active_jobs INT,
+                    shortlists_count INT,
+                    enrichment_reviews_count INT,
+                    enrichment_history_count INT,
+                    enrichment_feedback_count INT,
+                    ground_truth_count INT
+                ) AS $$
+                BEGIN
+                    RETURN QUERY
+                    SELECT 
+                        COUNT(*)::INT as total_jobs,
+                        COUNT(*) FILTER (WHERE status = 'active' AND deleted_at IS NULL)::INT as active_jobs,
+                        (SELECT COUNT(*)::INT FROM shortlists s 
+                         INNER JOIN jobs j ON s.job_id = j.id 
+                         WHERE j.source_id = source_uuid AND j.deleted_at IS NULL) as shortlists_count,
+                        (SELECT COUNT(*)::INT FROM enrichment_reviews er
+                         INNER JOIN jobs j ON er.job_id = j.id
+                         WHERE j.source_id = source_uuid AND j.deleted_at IS NULL) as enrichment_reviews_count,
+                        (SELECT COUNT(*)::INT FROM enrichment_history eh
+                         INNER JOIN jobs j ON eh.job_id = j.id
+                         WHERE j.source_id = source_uuid AND j.deleted_at IS NULL) as enrichment_history_count,
+                        (SELECT COUNT(*)::INT FROM enrichment_feedback ef
+                         INNER JOIN jobs j ON ef.job_id = j.id
+                         WHERE j.source_id = source_uuid AND j.deleted_at IS NULL) as enrichment_feedback_count,
+                        (SELECT COUNT(*)::INT FROM enrichment_ground_truth egt
+                         INNER JOIN jobs j ON egt.job_id = j.id
+                         WHERE j.source_id = source_uuid AND j.deleted_at IS NULL) as ground_truth_count
+                    FROM jobs
+                    WHERE source_id = source_uuid AND deleted_at IS NULL;
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+            results.append("✅ Created get_deletion_impact function")
+            
+            conn.commit()
+            
+            # Verify
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'job_deletion_audit'
+                )
+            """)
+            table_exists = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM pg_proc 
+                    WHERE proname = 'get_deletion_impact'
+                )
+            """)
+            function_exists = cur.fetchone()[0]
+            
+            logger.info(f"[migration] Job deletion audit migration completed by {admin}")
+            
+            return {
+                "status": "ok",
+                "message": "Migration completed successfully",
+                "steps": results,
+                "verification": {
+                    "audit_table_exists": table_exists,
+                    "impact_function_exists": function_exists
+                }
+            }
+            
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error in run_deletion_migration: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+    finally:
+        conn.close()
