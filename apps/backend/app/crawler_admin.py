@@ -4,11 +4,11 @@ Admin API routes for crawler management
 import os
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import errors as psycopg2_errors
+from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
+from pydantic import BaseModel  # type: ignore
+import psycopg2  # type: ignore
+from psycopg2.extras import RealDictCursor  # type: ignore
+from psycopg2 import errors as psycopg2_errors  # type: ignore
 
 from security.admin_auth import admin_required
 from orchestrator import get_orchestrator
@@ -202,6 +202,137 @@ async def get_status(admin=Depends(admin_required)):
             "in_flight": 3 - orchestrator.semaphore._value
         }
     }
+
+
+@router.get("/diagnostics/unesco")
+async def unesco_diagnostics(admin=Depends(admin_required)):
+    """Diagnostic endpoint to test UNESCO extraction and verify job extraction"""
+    from crawler.html_fetch import HTMLCrawler
+    
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Find UNESCO source
+            cur.execute("""
+                SELECT id, org_name, careers_url, source_type, status, parser_hint,
+                       last_crawled_at, last_crawl_status, last_crawl_message,
+                       consecutive_failures, consecutive_nochange
+                FROM sources
+                WHERE org_name ILIKE '%UNESCO%' OR careers_url ILIKE '%unesco%'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """)
+            source = cur.fetchone()
+            
+            if not source:
+                return {
+                    "status": "error",
+                    "message": "No UNESCO source found in database"
+                }
+            
+            source_id = source['id']
+            careers_url = source['careers_url']
+            
+            # Test extraction
+            db_url = get_db_url()
+            crawler = HTMLCrawler(db_url)
+            
+            # Fetch HTML
+            status, headers, html, size = await crawler.fetch_html(careers_url)
+            
+            if status != 200:
+                return {
+                    "status": "error",
+                    "message": f"Failed to fetch UNESCO page: HTTP {status}",
+                    "source": {
+                        "id": str(source['id']),
+                        "org_name": source['org_name'],
+                        "careers_url": source['careers_url']
+                    }
+                }
+            
+            # Extract jobs
+            parser_hint = source.get('parser_hint')
+            extracted_jobs = crawler.extract_jobs(html, careers_url, parser_hint)
+            
+            # Get existing UNESCO jobs from database
+            cur.execute("""
+                SELECT id, title, apply_url, fetched_at, last_seen_at
+                FROM jobs
+                WHERE source_id = %s
+                ORDER BY fetched_at DESC
+                LIMIT 50
+            """, (source_id,))
+            existing_jobs = cur.fetchall()
+            
+            # Analyze extraction results
+            extraction_stats = {
+                "html_size_bytes": size,
+                "jobs_extracted": len(extracted_jobs),
+                "has_jobs": len(extracted_jobs) > 0,
+                "sample_jobs": [
+                    {
+                        "title": job.get('title', '')[:100],
+                        "apply_url": job.get('apply_url', '')[:150] if job.get('apply_url') else None,
+                        "location": job.get('location_raw', '')[:100] if job.get('location_raw') else None
+                    }
+                    for job in extracted_jobs[:10]
+                ]
+            }
+            
+            # Get recent crawl logs
+            cur.execute("""
+                SELECT id, status, message, duration_ms, stats, created_at
+                FROM crawl_logs
+                WHERE source_id = %s
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (source_id,))
+            logs = cur.fetchall()
+            
+            return {
+                "status": "ok",
+                "source": {
+                    "id": str(source['id']),
+                    "org_name": source['org_name'],
+                    "careers_url": source['careers_url'],
+                    "source_type": source['source_type'],
+                    "parser_hint": source.get('parser_hint'),
+                    "status": source['status'],
+                    "last_crawled_at": source['last_crawled_at'].isoformat() if source['last_crawled_at'] else None,
+                    "last_crawl_status": source['last_crawl_status'],
+                    "last_crawl_message": source['last_crawl_message']
+                },
+                "extraction_test": extraction_stats,
+                "existing_jobs": {
+                    "total": len(existing_jobs),
+                    "sample": [
+                        {
+                            "id": str(job['id']),
+                            "title": job['title'][:100],
+                            "apply_url": job['apply_url'][:150] if job['apply_url'] else None,
+                            "fetched_at": job['fetched_at'].isoformat() if job['fetched_at'] else None
+                        }
+                        for job in existing_jobs[:10]
+                    ]
+                },
+                "recent_logs": [
+                    {
+                        "id": str(log['id']),
+                        "status": log['status'],
+                        "message": log['message'],
+                        "created_at": log['created_at'].isoformat() if log['created_at'] else None,
+                        "stats": log['stats'] if isinstance(log['stats'], dict) else None
+                    }
+                    for log in logs
+                ]
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in unesco_diagnostics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get UNESCO diagnostics: {str(e)}")
+    finally:
+        conn.close()
 
 
 @router.get("/diagnostics/undp")

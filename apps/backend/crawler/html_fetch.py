@@ -7,10 +7,10 @@ import re
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urljoin
-from bs4 import BeautifulSoup
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from dateutil import parser as date_parser
+from bs4 import BeautifulSoup  # type: ignore
+import psycopg2  # type: ignore
+from psycopg2.extras import RealDictCursor  # type: ignore
+from dateutil import parser as date_parser  # type: ignore
 
 from core.net import HTTPClient
 from core.robots import RobotsChecker
@@ -184,10 +184,101 @@ class HTMLCrawler:
         # Additional fallback: try more generic patterns for UN/INGO organization sites
         # This works for UNESCO, UNDP, and similar sites without needing per-site configuration
         if not job_elements:
-            # Strategy 0: UNDP-specific pattern (HTML-based structure with "Job Title", "Apply by", "Location")
+            # Strategy 0a: UNESCO-specific extraction (common patterns for UNESCO job listings)
+            if 'unesco.org' in base_url.lower():
+                logger.info(f"[html_fetch] Using UNESCO-specific extraction for {base_url}")
+                
+                # UNESCO typically uses structured job listings with specific patterns
+                # Try multiple common UNESCO patterns
+                
+                # Pattern 1: Look for job listings in tables (common UNESCO pattern)
+                tables = soup.find_all('table')
+                for table in tables:
+                    rows = table.find_all('tr')
+                    for row in rows:
+                        # Skip header rows (rows with only th tags or in thead)
+                        if row.find_parent('thead') or (row.find('th') and not row.find('td')):
+                            continue
+                        
+                        # Check if row has job-like content
+                        row_text = row.get_text().lower()
+                        has_job_keywords = any(kw in row_text for kw in [
+                            'position', 'vacancy', 'post', 'recruit', 'opportunity',
+                            'consultant', 'specialist', 'officer', 'manager', 'coordinator',
+                            'programme', 'project', 'fellowship', 'internship'
+                        ])
+                        has_link = row.find('a', href=True)
+                        
+                        # Must have substantial content (not just headers)
+                        if has_job_keywords and has_link and len(row_text.strip()) > 20:
+                            job_elements.append(row)
+                            if len(job_elements) >= 100:
+                                break
+                    if len(job_elements) >= 100:
+                        break
+                
+                # Pattern 2: Look for divs with job listings (UNESCO sometimes uses card-based layouts)
+                if not job_elements:
+                    job_divs = soup.find_all(['div', 'article', 'section'], class_=re.compile(
+                        r'job|position|vacancy|career|opportunity|listing|posting', re.I
+                    ))
+                    for div in job_divs:
+                        div_text = div.get_text().lower()
+                        # Must have job keywords and a link
+                        if any(kw in div_text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity']) and div.find('a', href=True):
+                            # Reasonable size check
+                            if 50 < len(div_text) < 2000:
+                                job_elements.append(div)
+                                if len(job_elements) >= 100:
+                                    break
+                
+                # Pattern 3: Look for list items with job content
+                if not job_elements:
+                    list_items = soup.find_all('li')
+                    for li in list_items:
+                        li_text = li.get_text().lower()
+                        if any(kw in li_text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity']) and li.find('a', href=True):
+                            if 50 < len(li_text) < 1000:
+                                job_elements.append(li)
+                                if len(job_elements) >= 100:
+                                    break
+                
+                # Pattern 4: Look for links with job-related text/URLs (fallback)
+                if not job_elements:
+                    all_links = soup.find_all('a', href=True)
+                    for link in all_links:
+                        href = link.get('href', '').lower()
+                        link_text = link.get_text().lower().strip()
+                        
+                        # Check if link looks like a job detail page
+                        is_job_link = (
+                            any(kw in href for kw in ['/job/', '/position/', '/vacancy/', '/career/', '/opportunity/', '/post/']) or
+                            any(kw in link_text for kw in ['position', 'vacancy', 'post', 'recruit', 'opportunity', 'apply', 'view details']) or
+                            re.search(r'/\d{4,}', href)  # Has numeric ID
+                        )
+                        
+                        # Exclude listing pages
+                        is_listing = any(kw in href for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/all', '/index'])
+                        
+                        if is_job_link and not is_listing:
+                            # Find parent container
+                            parent = link.parent
+                            for _ in range(3):
+                                if parent and parent.name in ['tr', 'div', 'li', 'article', 'section', 'td']:
+                                    if parent not in job_elements:
+                                        job_elements.append(parent)
+                                        break
+                                parent = parent.parent if parent else None
+                            
+                            if len(job_elements) >= 100:
+                                break
+                
+                logger.info(f"[html_fetch] UNESCO extraction found {len(job_elements)} job elements")
+            
+            # Strategy 0b: UNDP-specific pattern (HTML-based structure with "Job Title", "Apply by", "Location")
             # UNDP uses a pattern like: "Job Title [title] Apply by [date] Location [location]"
             # CRITICAL: This extraction must ensure each job gets a UNIQUE link - no duplicates allowed
-            if 'undp.org' in base_url.lower() or 'cj_view_consultancies' in base_url.lower():
+            elif 'undp.org' in base_url.lower() or 'cj_view_consultancies' in base_url.lower():
                 logger.info(f"[html_fetch] Using UNDP-specific extraction for {base_url}")
                 logger.info(f"[html_fetch] ENTERPRISE MODE: Strict uniqueness enforcement enabled")
                 
@@ -748,9 +839,10 @@ class HTMLCrawler:
                 url_to_title[normalized_url] = title
                 jobs.append(job)
         
-                # Log first few jobs for debugging
-                if len(jobs) <= 5:
-                    logger.info(f"[html_fetch] ✓ Job {len(jobs)}: '{title[:50]}...' -> {apply_url}")
+        # Log first few jobs for debugging
+        if jobs and len(jobs) <= 5:
+            for idx, job in enumerate(jobs[:5], 1):
+                logger.info(f"[html_fetch] ✓ Job {idx}: '{job.get('title', '')[:50]}...' -> {job.get('apply_url', '')[:80]}")
         
         # Final validation: Ensure all jobs have unique URLs
         final_urls = [job.get('apply_url', '').rstrip('/').split('#')[0].split('?')[0] for job in jobs]
@@ -918,7 +1010,6 @@ class HTMLCrawler:
             # Deadline from structured data
             if 'validThrough' in elem:
                 try:
-                    from dateutil import parser as date_parser
                     job['deadline'] = date_parser.parse(elem['validThrough']).date()
                 except:
                     pass
@@ -1364,6 +1455,8 @@ def fetch_html(url: str) -> Optional[str]:
     """Backwards-compatible sync wrapper (stub - use HTMLCrawler for full functionality)"""
     logger.warning("fetch_html() is deprecated - use HTMLCrawler class")
     return None
+
+
 async def upsert_jobs(jobs: List[Dict], source_id: str) -> Dict[str, int]:
     """Backwards-compatible upsert function"""
     import os
