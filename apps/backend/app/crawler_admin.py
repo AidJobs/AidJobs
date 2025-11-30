@@ -858,32 +858,54 @@ async def get_crawl_analytics_overview(admin=Depends(admin_required)):
             """)
             top_sources = cur.fetchall()
             
+            # Safely convert week_stats and month_stats to dicts with defaults
+            def safe_dict(row, defaults):
+                if not row:
+                    return defaults
+                result = dict(row)
+                for key, default_val in defaults.items():
+                    if result.get(key) is None:
+                        result[key] = default_val
+                return result
+            
+            default_stats = {
+                "total_sources": 0,
+                "total_crawls": 0,
+                "successful_crawls": 0,
+                "failed_crawls": 0,
+                "warning_crawls": 0,
+                "avg_duration_ms": 0,
+                "total_jobs_found": 0,
+                "total_jobs_inserted": 0,
+                "total_jobs_updated": 0
+            }
+            
             return {
                 "status": "ok",
                 "data": {
-                    "last_7_days": dict(week_stats) if week_stats else {},
-                    "last_30_days": dict(month_stats) if month_stats else {},
+                    "last_7_days": safe_dict(week_stats, default_stats),
+                    "last_30_days": safe_dict(month_stats, default_stats),
                     "daily_trends": [
                         {
-                            "date": trend['date'].isoformat() if trend['date'] else None,
-                            "total_crawls": trend['total_crawls'],
-                            "successful_crawls": trend['successful_crawls'],
-                            "failed_crawls": trend['failed_crawls'],
-                            "success_rate": round((trend['successful_crawls'] / trend['total_crawls'] * 100) if trend['total_crawls'] > 0 else 0, 2)
+                            "date": trend['date'].isoformat() if trend.get('date') else None,
+                            "total_crawls": trend.get('total_crawls', 0) or 0,
+                            "successful_crawls": trend.get('successful_crawls', 0) or 0,
+                            "failed_crawls": trend.get('failed_crawls', 0) or 0,
+                            "success_rate": round((trend.get('successful_crawls', 0) / trend.get('total_crawls', 1) * 100) if trend.get('total_crawls', 0) > 0 else 0, 2)
                         }
-                        for trend in daily_trends
+                        for trend in (daily_trends or [])
                     ],
                     "top_sources": [
                         {
-                            "source_id": str(source['id']),
-                            "org_name": source['org_name'],
-                            "crawl_count": source['crawl_count'],
-                            "total_jobs_found": source['total_jobs_found'] or 0,
-                            "total_changes": source['total_changes'] or 0,
-                            "avg_duration_ms": round(source['avg_duration_ms'] or 0, 2),
-                            "success_rate": round(source['success_rate'] or 0, 2)
+                            "source_id": str(source.get('id', '')),
+                            "org_name": source.get('org_name') or 'Unknown',
+                            "crawl_count": source.get('crawl_count', 0) or 0,
+                            "total_jobs_found": source.get('total_jobs_found', 0) or 0,
+                            "total_changes": source.get('total_changes', 0) or 0,
+                            "avg_duration_ms": round(float(source.get('avg_duration_ms', 0) or 0), 2),
+                            "success_rate": round(float(source.get('success_rate', 0) or 0), 2)
                         }
-                        for source in top_sources
+                        for source in (top_sources or [])
                     ]
                 }
             }

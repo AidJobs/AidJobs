@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Database, TrendingDown, TrendingUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -142,6 +142,135 @@ export default function DataQualityPage() {
     return 'bg-red-50 border-red-200';
   };
 
+  // Quality Metric Card Component with Tooltip
+  function QualityMetricCard({ label, value, subtitle, icon, tooltip, score, getQualityBg, getQualityColor }: {
+    label: string;
+    value: string;
+    subtitle: string;
+    icon: React.ReactNode;
+    tooltip: string;
+    score: number | null;
+    getQualityBg: (score: number) => string;
+    getQualityColor: (score: number) => string;
+  }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+    const iconRef = useRef<HTMLDivElement>(null);
+
+    const handleMouseEnter = () => {
+      if (iconRef.current) {
+        const rect = iconRef.current.getBoundingClientRect();
+        setTooltipPosition({
+          left: rect.left + rect.width / 2,
+          top: rect.top - 8,
+        });
+      }
+      setShowTooltip(true);
+    };
+
+    const bgClass = score !== null ? getQualityBg(score) : 'bg-white';
+    const borderClass = score !== null ? 'border-2' : 'border';
+    const valueColor = score !== null ? getQualityColor(score) : 'text-[#1D1D1F]';
+
+    return (
+      <div className={`p-6 rounded-xl ${borderClass} ${bgClass} relative`}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-[#86868B]">{label}</span>
+          <div
+            ref={iconRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={() => setShowTooltip(false)}
+            className="relative cursor-help"
+          >
+            {icon}
+            {showTooltip && (
+              <div
+                className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-normal max-w-xs z-[9999]"
+                style={{
+                  left: `${tooltipPosition.left}px`,
+                  top: `${tooltipPosition.top}px`,
+                  transform: 'translate(-50%, -100%)',
+                  marginTop: '-4px',
+                }}
+              >
+                {tooltip}
+                <div
+                  className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#1D1D1F]"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className={`text-3xl font-bold ${valueColor}`}>
+          {value}
+        </div>
+        <div className="text-xs text-[#86868B] mt-1">{subtitle}</div>
+      </div>
+    );
+  }
+
+  // Issue Card Component with Tooltip
+  function IssueCard({ icon, title, value, description, tooltip }: {
+    icon: React.ReactNode;
+    title: string;
+    value: string;
+    description: string;
+    tooltip: string;
+  }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+    const iconRef = useRef<HTMLDivElement>(null);
+
+    const handleMouseEnter = () => {
+      if (iconRef.current) {
+        const rect = iconRef.current.getBoundingClientRect();
+        setTooltipPosition({
+          left: rect.left + rect.width / 2,
+          top: rect.top - 8,
+        });
+      }
+      setShowTooltip(true);
+    };
+
+    return (
+      <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white relative">
+        <div className="flex items-center gap-2 mb-4">
+          <div
+            ref={iconRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={() => setShowTooltip(false)}
+            className="relative cursor-help"
+          >
+            {icon}
+            {showTooltip && (
+              <div
+                className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-normal max-w-xs z-[9999]"
+                style={{
+                  left: `${tooltipPosition.left}px`,
+                  top: `${tooltipPosition.top}px`,
+                  transform: 'translate(-50%, -100%)',
+                  marginTop: '-4px',
+                }}
+              >
+                {tooltip}
+                <div
+                  className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#1D1D1F]"
+                />
+              </div>
+            )}
+          </div>
+          <h3 className="font-semibold text-[#1D1D1F]">{title}</h3>
+        </div>
+        <div className="text-2xl font-bold text-[#1D1D1F] mb-2">
+          {value}
+        </div>
+        <div className="text-sm text-[#86868B]">
+          {description}
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -179,97 +308,78 @@ export default function DataQualityPage() {
         {/* Global Quality Overview */}
         {globalQuality && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className={`p-6 rounded-xl border-2 ${getQualityBg(globalQuality.global_quality_score)}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-[#86868B]">Global Quality Score</span>
-                <Database className="w-5 h-5 text-[#86868B]" />
-              </div>
-              <div className={`text-3xl font-bold ${getQualityColor(globalQuality.global_quality_score)}`}>
-                {globalQuality.global_quality_score.toFixed(1)}
-              </div>
-              <div className="text-xs text-[#86868B] mt-1">Out of 100</div>
-            </div>
+            <QualityMetricCard
+              label="Global Quality Score"
+              value={globalQuality.global_quality_score.toFixed(1)}
+              subtitle="Out of 100"
+              icon={<Database className="w-5 h-5 text-[#86868B]" />}
+              tooltip="Overall data quality score across all sources. 80+ is excellent, 60-79 is good, below 60 needs attention."
+              score={globalQuality.global_quality_score}
+              getQualityBg={getQualityBg}
+              getQualityColor={getQualityColor}
+            />
 
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-[#86868B]">Total Jobs</span>
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <div className="text-3xl font-bold text-[#1D1D1F]">
-                {globalQuality.total_jobs.toLocaleString()}
-              </div>
-              <div className="text-xs text-[#86868B] mt-1">Across {globalQuality.total_sources} sources</div>
-            </div>
+            <QualityMetricCard
+              label="Total Jobs"
+              value={globalQuality.total_jobs.toLocaleString()}
+              subtitle={`Across ${globalQuality.total_sources} sources`}
+              icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+              tooltip="Total number of jobs in the system across all sources."
+              score={null}
+              getQualityBg={getQualityBg}
+              getQualityColor={getQualityColor}
+            />
 
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-[#86868B]">Unique URLs</span>
-                <TrendingUp className="w-5 h-5 text-green-600" />
-              </div>
-              <div className="text-3xl font-bold text-[#1D1D1F]">
-                {globalQuality.unique_urls.toLocaleString()}
-              </div>
-              <div className="text-xs text-[#86868B] mt-1">
-                {((globalQuality.unique_urls / globalQuality.total_jobs) * 100).toFixed(1)}% uniqueness
-              </div>
-            </div>
+            <QualityMetricCard
+              label="Unique URLs"
+              value={globalQuality.unique_urls.toLocaleString()}
+              subtitle={`${((globalQuality.unique_urls / globalQuality.total_jobs) * 100).toFixed(1)}% uniqueness`}
+              icon={<TrendingUp className="w-5 h-5 text-green-600" />}
+              tooltip="Number of unique apply URLs. Higher uniqueness means less duplicate job postings."
+              score={null}
+              getQualityBg={getQualityBg}
+              getQualityColor={getQualityColor}
+            />
 
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-[#86868B]">Issues Detected</span>
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div className="text-3xl font-bold text-[#1D1D1F]">
-                {(globalQuality.null_urls + globalQuality.listing_page_urls).toLocaleString()}
-              </div>
-              <div className="text-xs text-[#86868B] mt-1">
-                {globalQuality.sources_with_issues} sources affected
-              </div>
-            </div>
+            <QualityMetricCard
+              label="Issues Detected"
+              value={(globalQuality.null_urls + globalQuality.listing_page_urls).toLocaleString()}
+              subtitle={`${globalQuality.sources_with_issues} sources affected`}
+              icon={<AlertTriangle className="w-5 h-5 text-yellow-600" />}
+              tooltip="Total number of jobs with data quality issues (missing URLs, listing page URLs instead of detail pages)."
+              score={null}
+              getQualityBg={getQualityBg}
+              getQualityColor={getQualityColor}
+            />
           </div>
         )}
 
         {/* Issue Breakdown */}
         {globalQuality && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center gap-2 mb-4">
-                <XCircle className="w-5 h-5 text-red-600" />
-                <h3 className="font-semibold text-[#1D1D1F]">Null URLs</h3>
-              </div>
-              <div className="text-2xl font-bold text-[#1D1D1F] mb-2">
-                {globalQuality.null_urls.toLocaleString()}
-              </div>
-              <div className="text-sm text-[#86868B]">
-                Jobs missing apply URLs
-              </div>
-            </div>
+            <IssueCard
+              icon={<XCircle className="w-5 h-5 text-red-600" />}
+              title="Null URLs"
+              value={globalQuality.null_urls.toLocaleString()}
+              description="Jobs missing apply URLs"
+              tooltip="Jobs that don't have an application URL. These jobs cannot be applied to directly and need to be fixed."
+            />
 
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                <h3 className="font-semibold text-[#1D1D1F]">Listing Page URLs</h3>
-              </div>
-              <div className="text-2xl font-bold text-[#1D1D1F] mb-2">
-                {globalQuality.listing_page_urls.toLocaleString()}
-              </div>
-              <div className="text-sm text-[#86868B]">
-                Jobs pointing to listing pages instead of detail pages
-              </div>
-            </div>
+            <IssueCard
+              icon={<AlertTriangle className="w-5 h-5 text-yellow-600" />}
+              title="Listing Page URLs"
+              value={globalQuality.listing_page_urls.toLocaleString()}
+              description="Jobs pointing to listing pages instead of detail pages"
+              tooltip="Jobs where the apply URL points to a job listing page instead of the specific job detail page. Users would need to search for the job again."
+            />
 
-            <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-              <div className="flex items-center gap-2 mb-4">
-                <Info className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-[#1D1D1F]">Sources with Issues</h3>
-              </div>
-              <div className="text-2xl font-bold text-[#1D1D1F] mb-2">
-                {globalQuality.sources_with_issues}
-              </div>
-              <div className="text-sm text-[#86868B]">
-                Sources requiring attention
-              </div>
-            </div>
+            <IssueCard
+              icon={<Info className="w-5 h-5 text-blue-600" />}
+              title="Sources with Issues"
+              value={globalQuality.sources_with_issues.toString()}
+              description="Sources requiring attention"
+              tooltip="Number of sources that have at least one data quality issue. Click on sources in the list below to see detailed quality reports."
+            />
           </div>
         )}
 

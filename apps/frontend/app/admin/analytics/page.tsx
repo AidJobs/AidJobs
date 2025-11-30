@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { RefreshCw, TrendingUp, TrendingDown, Activity, CheckCircle, XCircle, AlertCircle, Clock, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -142,6 +142,68 @@ export default function AnalyticsPage() {
     ? (analytics.last_30_days.successful_crawls / analytics.last_30_days.total_crawls) * 100
     : 0;
 
+  // Metric Card Component with Tooltip
+  function MetricCard({ label, value, subtitle, icon, tooltip }: {
+    label: string;
+    value: string;
+    subtitle: string;
+    icon: React.ReactNode;
+    tooltip: string;
+  }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
+    const iconRef = useRef<HTMLDivElement>(null);
+
+    const handleMouseEnter = () => {
+      if (iconRef.current) {
+        const rect = iconRef.current.getBoundingClientRect();
+        setTooltipPosition({
+          left: rect.left + rect.width / 2,
+          top: rect.top - 8,
+        });
+      }
+      setShowTooltip(true);
+    };
+
+    return (
+      <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white relative">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-[#86868B]">{label}</span>
+          <div
+            ref={iconRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={() => setShowTooltip(false)}
+            className="relative cursor-help"
+          >
+            {icon}
+            {showTooltip && (
+              <div
+                className="fixed px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded shadow-lg pointer-events-none whitespace-normal max-w-xs z-[9999]"
+                style={{
+                  left: `${tooltipPosition.left}px`,
+                  top: `${tooltipPosition.top}px`,
+                  transform: 'translate(-50%, -100%)',
+                  marginTop: '-4px',
+                }}
+              >
+                {tooltip}
+                <div
+                  className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#1D1D1F]"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-3xl font-bold text-[#1D1D1F]">
+          {value}
+        </div>
+        <div className="text-xs text-[#86868B] mt-1">
+          {subtitle}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-white">
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -164,57 +226,37 @@ export default function AnalyticsPage() {
 
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#86868B]">Success Rate (7d)</span>
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="text-3xl font-bold text-[#1D1D1F]">
-              {weekSuccessRate.toFixed(1)}%
-            </div>
-            <div className="text-xs text-[#86868B] mt-1">
-              {analytics.last_7_days.successful_crawls} / {analytics.last_7_days.total_crawls} crawls
-            </div>
-          </div>
+          <MetricCard
+            label="Success Rate (7d)"
+            value={`${weekSuccessRate.toFixed(1)}%`}
+            subtitle={`${analytics.last_7_days.successful_crawls} / ${analytics.last_7_days.total_crawls} crawls`}
+            icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+            tooltip="Percentage of successful crawls in the last 7 days. Higher is better."
+          />
 
-          <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#86868B]">Total Crawls (7d)</span>
-              <Activity className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="text-3xl font-bold text-[#1D1D1F]">
-              {analytics.last_7_days.total_crawls}
-            </div>
-            <div className="text-xs text-[#86868B] mt-1">
-              Across {analytics.last_7_days.total_sources} sources
-            </div>
-          </div>
+          <MetricCard
+            label="Total Crawls (7d)"
+            value={analytics.last_7_days.total_crawls.toString()}
+            subtitle={`Across ${analytics.last_7_days.total_sources} sources`}
+            icon={<Activity className="w-5 h-5 text-blue-600" />}
+            tooltip="Total number of crawl attempts in the last 7 days across all sources."
+          />
 
-          <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#86868B]">Jobs Found (7d)</span>
-              <TrendingUp className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="text-3xl font-bold text-[#1D1D1F]">
-              {analytics.last_7_days.total_jobs_found?.toLocaleString() || 0}
-            </div>
-            <div className="text-xs text-[#86868B] mt-1">
-              {analytics.last_7_days.total_jobs_inserted || 0} inserted, {analytics.last_7_days.total_jobs_updated || 0} updated
-            </div>
-          </div>
+          <MetricCard
+            label="Jobs Found (7d)"
+            value={(analytics.last_7_days.total_jobs_found || 0).toLocaleString()}
+            subtitle={`${analytics.last_7_days.total_jobs_inserted || 0} inserted, ${analytics.last_7_days.total_jobs_updated || 0} updated`}
+            icon={<TrendingUp className="w-5 h-5 text-green-600" />}
+            tooltip="Total jobs discovered in the last 7 days. Shows new jobs inserted and existing jobs updated."
+          />
 
-          <div className="p-6 rounded-xl border border-[#D2D2D7] bg-white">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#86868B]">Avg Duration</span>
-              <Clock className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="text-3xl font-bold text-[#1D1D1F]">
-              {analytics.last_7_days.avg_duration_ms ? (analytics.last_7_days.avg_duration_ms / 1000).toFixed(1) : '0'}s
-            </div>
-            <div className="text-xs text-[#86868B] mt-1">
-              Per crawl
-            </div>
-          </div>
+          <MetricCard
+            label="Avg Duration"
+            value={analytics.last_7_days.avg_duration_ms ? `${(analytics.last_7_days.avg_duration_ms / 1000).toFixed(1)}s` : '0s'}
+            subtitle="Per crawl"
+            icon={<Clock className="w-5 h-5 text-purple-600" />}
+            tooltip="Average time taken per crawl operation. Lower is better for performance."
+          />
         </div>
 
         {/* Daily Trends */}
