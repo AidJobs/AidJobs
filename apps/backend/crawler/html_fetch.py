@@ -109,14 +109,62 @@ class HTMLCrawler:
         self,
         html: str,
         base_url: str,
-        parser_hint: Optional[str] = None
+        parser_hint: Optional[str] = None,
+        preferred_plugin: Optional[str] = None,
+        plugin_config: Optional[Dict] = None
     ) -> List[Dict]:
         """
-        Extract job listings from HTML.
+        Extract job listings from HTML using plugin system.
+        
+        Args:
+            html: HTML content
+            base_url: Base URL for resolving relative links
+            parser_hint: Legacy CSS selector hint (now used as plugin config)
+            preferred_plugin: Preferred plugin name (from database)
+            plugin_config: Plugin configuration dict
         
         Returns:
             List of raw job dicts with keys:
                 title, org_name, location_raw, apply_url, description_snippet, deadline
+        """
+        # Use plugin system
+        try:
+            from crawler.plugins import get_plugin_registry
+            
+            registry = get_plugin_registry()
+            
+            # Build config from parser_hint if provided
+            config = plugin_config or {}
+            if parser_hint and 'parser_hint' not in config:
+                config['parser_hint'] = parser_hint
+            
+            # Extract using plugin
+            result = registry.extract(html, base_url, config, preferred_plugin)
+            
+            if result.is_success():
+                logger.info(f"[html_fetch] Plugin extraction successful: {len(result.jobs)} jobs (confidence={result.confidence:.2f})")
+                return result.jobs
+            else:
+                logger.warning(f"[html_fetch] Plugin extraction failed: {result.message}")
+                # Fallback to legacy extraction for backward compatibility
+                return self._extract_jobs_legacy(html, base_url, parser_hint)
+        
+        except Exception as e:
+            logger.error(f"[html_fetch] Plugin system error, falling back to legacy: {e}", exc_info=True)
+            # Fallback to legacy extraction
+            return self._extract_jobs_legacy(html, base_url, parser_hint)
+    
+    def _extract_jobs_legacy(
+        self,
+        html: str,
+        base_url: str,
+        parser_hint: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Legacy extraction method (fallback when plugin system fails).
+        
+        Returns:
+            List of raw job dicts
         """
         soup = BeautifulSoup(html, 'lxml')
         jobs = []
@@ -129,14 +177,6 @@ class HTMLCrawler:
             job_elements = soup.select(parser_hint)
         
         # Fallback to common selectors
-        if not job_elements:
-            for selector in JOB_SELECTORS:
-                job_elements = soup.select(selector)
-                if job_elements:
-                    logger.debug(f"[html_fetch] Found {len(job_elements)} jobs using selector: {selector}")
-                    break
-        
-        # If still no elements, try finding links with job-related keywords
         if not job_elements:
             all_links = soup.find_all('a', href=True)
             job_links = [
