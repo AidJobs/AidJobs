@@ -111,8 +111,20 @@ export default function DataQualityPage() {
       const qualityData = results
         .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
         .map(r => r.value)
-        .filter(r => r.status === 'ok' && r.data)
-        .map(r => r.data);
+        .filter(r => r && r.status === 'ok' && r.data)
+        .map(r => {
+          // Ensure all required fields have defaults
+          const data = r.data;
+          return {
+            ...data,
+            duplicate_urls: data.duplicate_urls || [],
+            quality_score: data.quality_score ?? 0,
+            total_jobs: data.total_jobs ?? 0,
+            unique_urls: data.unique_urls ?? 0,
+            null_urls: data.null_urls ?? 0,
+            listing_page_urls: data.listing_page_urls ?? 0,
+          };
+        });
       setSources(qualityData);
     }
   }, [globalQuality]);
@@ -441,9 +453,9 @@ export default function DataQualityPage() {
                             <span className="font-medium">{source.listing_page_urls}</span> listing URLs
                           </span>
                         )}
-                        {source.duplicate_urls.length > 0 && (
+                        {(source.duplicate_urls?.length ?? 0) > 0 && (
                           <span className="text-orange-600">
-                            <span className="font-medium">{source.duplicate_urls.length}</span> duplicates
+                            <span className="font-medium">{source.duplicate_urls?.length ?? 0}</span> duplicates
                           </span>
                         )}
                       </div>
@@ -494,11 +506,11 @@ export default function DataQualityPage() {
                   </div>
                 </div>
 
-                {sourceDetails.duplicate_urls.length > 0 && (
+                {(sourceDetails.duplicate_urls?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="font-semibold text-[#1D1D1F] mb-3">Duplicate URLs</h3>
                     <div className="space-y-2">
-                      {sourceDetails.duplicate_urls.map((dup, idx) => (
+                      {(sourceDetails.duplicate_urls || []).map((dup, idx) => (
                         <div key={idx} className="p-3 rounded-lg border border-orange-200 bg-orange-50">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm font-medium text-orange-900">

@@ -215,8 +215,19 @@ class DataQualityValidator:
                 
                 # Ensure stats is not None and has required keys
                 if not stats:
+                    # Return empty report if no jobs found (not an error)
                     return {
-                        'error': 'Failed to fetch job statistics'
+                        'source_id': str(source_id),
+                        'source_name': source.get('org_name') if source else None,
+                        'source_url': source.get('careers_url') if source else None,
+                        'total_jobs': 0,
+                        'unique_urls': 0,
+                        'null_urls': 0,
+                        'listing_page_urls': 0,
+                        'missing_titles': 0,
+                        'short_titles': 0,
+                        'duplicate_urls': [],
+                        'quality_score': 0.0
                     }
                 
                 # Ensure all required keys exist with defaults
