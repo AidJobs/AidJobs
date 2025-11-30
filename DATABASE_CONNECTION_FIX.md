@@ -4,7 +4,7 @@
 
 The orchestrator is trying to connect to Supabase via IPv6, but the network is unreachable:
 ```
-connection to server at "db.yijlbzlzfahubwukulkv.supabase.co" (2406:da18:243:7410:1764:8b97:a00b:20b0), port 5432 failed: Network is unreachable
+connection to server at "db.[PROJECT_ID].supabase.co" (2406:da18:243:7410:1764:8b97:a00b:20b0), port 5432 failed: Network is unreachable
 ```
 
 ## Root Cause
