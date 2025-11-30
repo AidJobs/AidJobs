@@ -10,6 +10,7 @@ import feedparser
 from dateutil import parser as date_parser
 
 from core.net import HTTPClient
+from core.job_categorizer import JobCategorizer
 
 logger = logging.getLogger(__name__)
 
@@ -110,19 +111,21 @@ class RSSCrawler:
         title_lower = job.get('title', '').lower()
         description_lower = job.get('description_snippet', '').lower()
         
-        # Determine level_norm (seniority)
-        level_keywords = {
-            'intern': ['intern', 'internship', 'trainee', 'graduate'],
-            'junior': ['junior', 'entry', 'assistant', 'associate', 'coordinator'],
-            'mid': ['mid', 'specialist', 'analyst', 'officer'],
-            'senior': ['senior', 'lead', 'principal', 'manager', 'chief', 'head', 'director'],
-        }
+        # Determine level_norm using enterprise categorizer
+        # Infer org_type from source_org_name
+        org_type = None
+        if source_org_name:
+            source_lower = source_org_name.lower()
+            if any(un in source_lower for un in ['un', 'united nations', 'undp', 'unicef', 'unhcr', 'unesco', 'who']):
+                org_type = 'un'
+            elif any(ingo in source_lower for ingo in ['international', 'global', 'world', 'care', 'save', 'oxfam']):
+                org_type = 'ingo'
         
-        job['level_norm'] = None
-        for level, keywords in level_keywords.items():
-            if any(kw in title_lower for kw in keywords):
-                job['level_norm'] = level.capitalize()
-                break
+        job['level_norm'] = JobCategorizer.categorize_from_title_and_description(
+            title=job.get('title'),
+            description=job.get('description_snippet'),
+            org_type=org_type
+        )
         
         # Determine career_type
         job['career_type'] = None

@@ -15,6 +15,7 @@ from dateutil import parser as date_parser  # type: ignore
 from core.net import HTTPClient
 from core.robots import RobotsChecker
 from core.domain_limits import DomainLimiter
+from core.job_categorizer import JobCategorizer
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,8 @@ LOCATION_PATTERNS = [
 ]
 
 # Seniority level keywords
+# Legacy LEVEL_KEYWORDS - DEPRECATED: Use JobCategorizer instead
+# Kept for backward compatibility during migration
 LEVEL_KEYWORDS = {
     'intern': ['intern', 'internship', 'trainee', 'graduate'],
     'junior': ['junior', 'entry', 'assistant', 'associate', 'coordinator'],
@@ -1268,12 +1271,22 @@ class HTMLCrawler:
         # Normalize title
         title_lower = job.get('title', '').lower()
         
-        # Determine level_norm
-        job['level_norm'] = None
-        for level, keywords in LEVEL_KEYWORDS.items():
-            if any(kw in title_lower for kw in keywords):
-                job['level_norm'] = level.capitalize()
-                break
+        # Determine level_norm using enterprise categorizer
+        # Get org_type from source if available
+        org_type = None
+        if source_org_name:
+            # Try to infer org_type from source (could be enhanced with DB lookup)
+            source_lower = source_org_name.lower()
+            if any(un in source_lower for un in ['un', 'united nations', 'undp', 'unicef', 'unhcr', 'unesco', 'who']):
+                org_type = 'un'
+            elif any(ingo in source_lower for ingo in ['international', 'global', 'world', 'care', 'save', 'oxfam']):
+                org_type = 'ingo'
+        
+        job['level_norm'] = JobCategorizer.categorize_from_title_and_description(
+            title=job.get('title'),
+            description=job.get('description_snippet'),
+            org_type=org_type
+        )
         
         # Determine career_type (consultancy, fellowship, staff, internship)
         job['career_type'] = None

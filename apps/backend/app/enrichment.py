@@ -13,6 +13,7 @@ from app.db_config import db_config
 from app.enrichment_review import auto_flag_job_for_review
 from app.enrichment_history import record_enrichment_change
 from app.enrichment_preprocessor import preprocess_job_for_enrichment
+from core.job_categorizer import JobCategorizer
 
 logger = logging.getLogger(__name__)
 
@@ -461,18 +462,29 @@ def save_enrichment_to_db(
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Get current enrichment for history tracking
+        # Get current enrichment and job details for history tracking and level_norm update
         cursor.execute("""
             SELECT 
                 impact_domain, impact_confidences, functional_role, functional_confidences,
                 experience_level, estimated_experience_years, experience_confidence,
                 sdgs, sdg_confidences, sdg_explanation, matched_keywords,
-                confidence_overall, low_confidence, low_confidence_reason
+                confidence_overall, low_confidence, low_confidence_reason,
+                title, description_snippet, level_norm, org_name, source_id
             FROM jobs
             WHERE id::text = %s
         """, (job_id,))
         
         current_job = cursor.fetchone()
+        
+        # Get org_type from source if available
+        org_type = None
+        if current_job and current_job.get('source_id'):
+            cursor.execute("""
+                SELECT org_type FROM sources WHERE id::text = %s
+            """, (str(current_job['source_id']),))
+            source_row = cursor.fetchone()
+            if source_row:
+                org_type = source_row.get('org_type')
         enrichment_before = None
         if current_job and current_job.get('impact_domain'):
             # Build before snapshot
@@ -512,30 +524,54 @@ def save_enrichment_to_db(
         enriched_at = datetime.utcnow()
         enrichment_version = enrichment_data.get("enrichment_version", 1)
         
-        # Update job
-        cursor.execute("""
-            UPDATE jobs
-            SET
-                impact_domain = %s,
-                impact_confidences = %s::jsonb,
-                functional_role = %s,
-                functional_confidences = %s::jsonb,
-                experience_level = %s,
-                estimated_experience_years = %s::jsonb,
-                experience_confidence = %s,
-                sdgs = %s,
-                sdg_confidences = %s::jsonb,
-                sdg_explanation = %s,
-                matched_keywords = %s,
-                confidence_overall = %s,
-                low_confidence = %s,
-                low_confidence_reason = %s,
-                embedding_input = %s,
-                enriched_at = %s,
-                enrichment_version = %s,
-                updated_at = NOW()
-            WHERE id::text = %s
-        """, (
+        # Update level_norm from enrichment experience_level (enterprise categorization)
+        # This is the KEY FIX: Use AI enrichment data to update level_norm
+        updated_level_norm = None
+        if experience_level and experience_confidence and experience_confidence >= 0.70:
+            # Use enrichment data as primary source
+            updated_level_norm = JobCategorizer.categorize_job(
+                title=current_job.get('title') if current_job else None,
+                description=current_job.get('description_snippet') if current_job else None,
+                experience_level=experience_level,
+                org_type=org_type,
+                current_level_norm=current_job.get('level_norm') if current_job else None
+            )
+            
+            if updated_level_norm:
+                logger.info(f"[enrichment] Updating level_norm for job {job_id}: '{current_job.get('level_norm') if current_job else None}' -> '{updated_level_norm}' (from experience_level: {experience_level})")
+        elif current_job and current_job.get('title'):
+            # Fallback: Use context-aware analysis if enrichment not available
+            updated_level_norm = JobCategorizer.categorize_from_title_and_description(
+                title=current_job.get('title'),
+                description=current_job.get('description_snippet'),
+                org_type=org_type
+            )
+            if updated_level_norm and updated_level_norm != current_job.get('level_norm'):
+                logger.info(f"[enrichment] Updating level_norm for job {job_id} via analysis: '{current_job.get('level_norm')}' -> '{updated_level_norm}'")
+        
+        # Update job (including level_norm if updated)
+        update_fields = [
+            "impact_domain = %s",
+            "impact_confidences = %s::jsonb",
+            "functional_role = %s",
+            "functional_confidences = %s::jsonb",
+            "experience_level = %s",
+            "estimated_experience_years = %s::jsonb",
+            "experience_confidence = %s",
+            "sdgs = %s",
+            "sdg_confidences = %s::jsonb",
+            "sdg_explanation = %s",
+            "matched_keywords = %s",
+            "confidence_overall = %s",
+            "low_confidence = %s",
+            "low_confidence_reason = %s",
+            "embedding_input = %s",
+            "enriched_at = %s",
+            "enrichment_version = %s",
+            "updated_at = NOW()"
+        ]
+        
+        update_values = [
             impact_domain,
             impact_confidences,
             functional_role,
@@ -553,8 +589,20 @@ def save_enrichment_to_db(
             embedding_input,
             enriched_at,
             enrichment_version,
-            job_id,
-        ))
+        ]
+        
+        # Add level_norm update if we have a new value
+        if updated_level_norm:
+            update_fields.insert(-1, "level_norm = %s")  # Insert before updated_at
+            update_values.insert(-1, updated_level_norm)
+        
+        update_values.append(job_id)  # For WHERE clause
+        
+        cursor.execute(f"""
+            UPDATE jobs
+            SET {', '.join(update_fields)}
+            WHERE id::text = %s
+        """, tuple(update_values))
         
         conn.commit()
         cursor.close()
