@@ -4,7 +4,9 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function GET(req: NextRequest) {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/admin/session`, {
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    const res = await fetch(`${backendUrl}/api/admin/session`, {
       headers: {
         'Cookie': req.headers.get('cookie') || '',
       },

@@ -7,7 +7,9 @@ export async function GET(
   { params }: { params: { host: string } }
 ) {
   try {
-    const res = await fetch(`${BACKEND_URL}/admin/domain_policies/${params.host}`, {
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    const res = await fetch(`${backendUrl}/api/admin/domain_policies/${params.host}`, {
       headers: {
         'Cookie': req.headers.get('cookie') || '',
       },

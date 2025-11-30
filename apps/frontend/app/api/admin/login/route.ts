@@ -5,8 +5,10 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
     
-    const res = await fetch(`${BACKEND_URL}/api/admin/login`, {
+    const res = await fetch(`${backendUrl}/api/admin/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
