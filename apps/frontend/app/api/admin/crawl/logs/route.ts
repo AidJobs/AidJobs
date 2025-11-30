@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const queryString = searchParams.toString();
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/crawl/logs${queryString ? `?${queryString}` : ''}`;
+    const url = `${backendUrl}/api/admin/crawl/logs${queryString ? `?${queryString}` : ''}`;
     console.log(`[proxy] GET ${url}`);
     
     const res = await fetch(url, {

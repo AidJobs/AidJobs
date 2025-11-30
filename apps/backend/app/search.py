@@ -927,6 +927,7 @@ class SearchService:
                 SELECT country_iso, COUNT(*) as count
                 FROM jobs
                 WHERE status = 'active' 
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 AND country_iso IS NOT NULL
                 GROUP BY country_iso
@@ -940,6 +941,7 @@ class SearchService:
                 SELECT level_norm, COUNT(*) as count
                 FROM jobs
                 WHERE status = 'active' 
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 AND level_norm IS NOT NULL
                 GROUP BY level_norm
@@ -953,6 +955,7 @@ class SearchService:
                 SELECT international_eligible, COUNT(*) as count
                 FROM jobs
                 WHERE status = 'active' 
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 AND international_eligible IS NOT NULL
                 GROUP BY international_eligible
@@ -968,6 +971,7 @@ class SearchService:
                 SELECT tag, COUNT(*) as count
                 FROM jobs, UNNEST(mission_tags) as tag
                 WHERE status = 'active' 
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 GROUP BY tag
                 ORDER BY count DESC
@@ -1183,6 +1187,7 @@ class SearchService:
                 SELECT COUNT(*) as count 
                 FROM jobs 
                 WHERE status = 'active' 
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
             """)
             active_jobs_count = cursor.fetchone()['count']
@@ -1199,6 +1204,7 @@ class SearchService:
                 FROM sources s
                 LEFT JOIN jobs j ON j.source_id = s.id 
                     AND j.status = 'active' 
+                    AND j.deleted_at IS NULL
                     AND (j.deadline IS NULL OR j.deadline >= CURRENT_DATE)
                 GROUP BY s.id, s.org_name
                 ORDER BY job_count DESC, s.org_name
@@ -1398,6 +1404,7 @@ class SearchService:
                     confidence_overall, low_confidence, low_confidence_reason
                 FROM jobs
                 WHERE status = 'active'
+                AND deleted_at IS NULL
                 AND (deadline IS NULL OR deadline >= CURRENT_DATE)
                 ORDER BY created_at DESC
             """)

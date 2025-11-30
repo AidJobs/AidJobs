@@ -50,6 +50,7 @@ def get_enrichment_quality_dashboard() -> Dict[str, Any]:
                 COUNT(CASE WHEN LENGTH(description_snippet) < 50 OR description_snippet IS NULL THEN 1 END) as short_desc_count
             FROM jobs
             WHERE status = 'active'
+            AND deleted_at IS NULL
         """)
         overall = cursor.fetchone()
         metrics["overall"] = dict(overall) if overall else {}
@@ -62,7 +63,7 @@ def get_enrichment_quality_dashboard() -> Dict[str, Any]:
                 AVG(confidence_overall) as avg_confidence,
                 AVG(experience_confidence) as avg_exp_confidence
             FROM jobs
-            WHERE experience_level IS NOT NULL AND status = 'active'
+            WHERE experience_level IS NOT NULL AND status = 'active' AND deleted_at IS NULL
             GROUP BY experience_level
             ORDER BY count DESC
         """)
@@ -81,6 +82,7 @@ def get_enrichment_quality_dashboard() -> Dict[str, Any]:
             WHERE impact_domain IS NOT NULL 
                 AND array_length(impact_domain, 1) > 0
                 AND status = 'active'
+                AND deleted_at IS NULL
             GROUP BY domain
             ORDER BY count DESC
             LIMIT 20
@@ -104,7 +106,7 @@ def get_enrichment_quality_dashboard() -> Dict[str, Any]:
                 END as confidence_range,
                 COUNT(*) as count
             FROM jobs
-            WHERE confidence_overall IS NOT NULL AND status = 'active'
+            WHERE confidence_overall IS NOT NULL AND status = 'active' AND deleted_at IS NULL
             GROUP BY confidence_range
             ORDER BY confidence_range DESC
         """)
@@ -136,6 +138,7 @@ def get_enrichment_quality_dashboard() -> Dict[str, Any]:
             FROM jobs
             WHERE enriched_at >= NOW() - INTERVAL '7 days'
                 AND enriched_at IS NOT NULL
+                AND deleted_at IS NULL
             GROUP BY DATE(enriched_at)
             ORDER BY date DESC
         """)

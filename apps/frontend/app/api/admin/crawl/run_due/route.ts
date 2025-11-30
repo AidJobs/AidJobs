@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/crawl/run_due`;
+    const url = `${backendUrl}/api/admin/crawl/run_due`;
     console.log(`[proxy] POST ${url}`);
     
     const res = await fetch(url, {
