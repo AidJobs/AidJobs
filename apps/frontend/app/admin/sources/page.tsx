@@ -702,6 +702,75 @@ export default function AdminSourcesPage() {
 
   const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
 
+  const handleDeleteJobs = useCallback((source: Source) => {
+    setSourceToDeleteJobs(source);
+    setShowDeleteJobsModal(true);
+    setDeletionImpact(null);
+    setDeletionResult(null);
+    setShowDeletionResult(false);
+    // Fetch deletion impact
+    fetchDeletionImpact(source.id);
+  }, [fetchDeletionImpact]);
+
+  const confirmDeleteJobs = useCallback(async () => {
+    if (!sourceToDeleteJobs) return;
+
+    if (deletionType === 'hard' && !deletionReason.trim()) {
+      toast.error('Deletion reason is required for hard delete');
+      return;
+    }
+
+    setDeletingJobs(true);
+    try {
+      const res = await fetch('/api/admin/crawl/delete-jobs-by-source', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          source_id: sourceToDeleteJobs.id,
+          deletion_type: deletionType,
+          trigger_crawl: deleteJobsTriggerCrawl,
+          dry_run: deleteJobsDryRun,
+          deletion_reason: deletionReason || undefined,
+          export_data: deleteJobsExportData,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || data.detail || 'Failed to delete jobs');
+      }
+
+      if (data.status === 'ok') {
+        setDeletionResult(data);
+        if (deleteJobsDryRun) {
+          setShowDeletionResult(true);
+        } else {
+          toast.success(`Successfully ${deletionType === 'soft' ? 'soft-deleted' : 'hard-deleted'} ${data.data?.deleted_count || 0} jobs`);
+          setShowDeleteJobsModal(false);
+          setSourceToDeleteJobs(null);
+          setDeletionResult(null);
+          setDeletionReason('');
+          setDeleteJobsDryRun(true);
+          setDeleteJobsTriggerCrawl(true);
+          setDeleteJobsExportData(false);
+          // Refresh sources list
+          fetchSources();
+        }
+      } else {
+        throw new Error(data.error || 'Failed to delete jobs');
+      }
+    } catch (error) {
+      console.error('Failed to delete jobs:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete jobs');
+    } finally {
+      setDeletingJobs(false);
+    }
+  }, [sourceToDeleteJobs, deletionType, deletionReason, deleteJobsTriggerCrawl, deleteJobsDryRun, deleteJobsExportData, fetchSources]);
+
   const handleDeleteSource = async (id: string) => {
     if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) return;
 

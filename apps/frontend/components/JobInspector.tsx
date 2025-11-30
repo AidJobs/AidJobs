@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Job = {
   id: string;
@@ -49,6 +49,39 @@ export default function JobInspector({
   const [relatedJobs, setRelatedJobs] = useState<Job[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [applyUrlError, setApplyUrlError] = useState(false);
+
+  const fetchRelatedJobs = useCallback(async (currentJob: Job) => {
+    setLoadingRelated(true);
+    try {
+      // Find related jobs by same org, similar level, or same mission tags
+      const params = new URLSearchParams();
+      if (currentJob.org_name) {
+        params.append('q', currentJob.org_name);
+      }
+      if (currentJob.level_norm) {
+        params.append('level_norm', currentJob.level_norm);
+      }
+      if (currentJob.mission_tags && currentJob.mission_tags.length > 0) {
+        currentJob.mission_tags.slice(0, 2).forEach(tag => {
+          params.append('mission_tags', tag);
+        });
+      }
+      params.append('size', '6');
+
+      const response = await fetch(`/api/search/query?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok' && data.data?.items) {
+          // Filter out the current job and limit to 4
+          setRelatedJobs(data.data.items.filter((j: Job) => j.id !== currentJob.id).slice(0, 4));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch related jobs:', error);
+    } finally {
+      setLoadingRelated(false);
+    }
+  }, []);
 
   // Fetch full job details if missing normalized fields
   useEffect(() => {
@@ -100,40 +133,7 @@ export default function JobInspector({
     if (job && isOpen) {
       fetchRelatedJobs(job);
     }
-  }, [isOpen, job, onClose]);
-
-  const fetchRelatedJobs = async (currentJob: Job) => {
-    setLoadingRelated(true);
-    try {
-      // Find related jobs by same org, similar level, or same mission tags
-      const params = new URLSearchParams();
-      if (currentJob.org_name) {
-        params.append('q', currentJob.org_name);
-      }
-      if (currentJob.level_norm) {
-        params.append('level_norm', currentJob.level_norm);
-      }
-      if (currentJob.mission_tags && currentJob.mission_tags.length > 0) {
-        currentJob.mission_tags.slice(0, 2).forEach(tag => {
-          params.append('mission_tags', tag);
-        });
-      }
-      params.append('size', '6');
-
-      const response = await fetch(`/api/search/query?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'ok' && data.data?.items) {
-          // Filter out the current job and limit to 4
-          setRelatedJobs(data.data.items.filter((j: Job) => j.id !== currentJob.id).slice(0, 4));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch related jobs:', error);
-    } finally {
-      setLoadingRelated(false);
-    }
-  };
+  }, [isOpen, job, onClose, fetchRelatedJobs]);
 
   // Focus management
   useEffect(() => {
@@ -188,10 +188,13 @@ export default function JobInspector({
   if (!isOpen || !job) return null;
 
   const displayJob = fullJob || job;
-  const isClosingSoon = displayJob.deadline
-    ? new Date(displayJob.deadline).getTime() - Date.now() <
-      7 * 24 * 60 * 60 * 1000
-    : false;
+  let isClosingSoon = false;
+  if (displayJob.deadline) {
+    const deadlineTime = new Date(displayJob.deadline).getTime();
+    const now = Date.now();
+    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+    isClosingSoon = (deadlineTime - now) < sevenDaysInMs;
+  }
 
   return (
     <>
@@ -507,6 +510,11 @@ export default function JobInspector({
                     rel="noopener noreferrer"
                     onClick={async (e) => {
                       // Validate URL before opening
+                      if (!displayJob.apply_url) {
+                        e.preventDefault();
+                        setApplyUrlError(true);
+                        return;
+                      }
                       try {
                         const url = new URL(displayJob.apply_url);
                         if (!url.protocol.startsWith('http')) {
@@ -518,9 +526,8 @@ export default function JobInspector({
                         setApplyUrlError(true);
                       }
                     }}
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                >
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
                   Apply Now
                   <svg
                     className="ml-2 w-4 h-4"
@@ -536,6 +543,7 @@ export default function JobInspector({
                     />
                   </svg>
                 </a>
+                )}
               </div>
             )}
 
