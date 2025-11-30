@@ -75,10 +75,15 @@ export default function DataQualityPage() {
         credentials: 'include',
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
       const data = await response.json();
-      if (data.status === 'ok') {
+      if (data.status === 'ok' && data.data) {
+        // Ensure quality_score exists
+        if (typeof data.data.quality_score !== 'number') {
+          data.data.quality_score = 0;
+        }
         setSourceDetails(data.data);
       } else {
         throw new Error(data.error || 'Failed to fetch source quality');
@@ -86,6 +91,7 @@ export default function DataQualityPage() {
     } catch (error) {
       console.error('Failed to fetch source quality:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to fetch source quality');
+      setSourceDetails(null);
     } finally {
       setLoadingDetails(false);
     }
@@ -101,9 +107,11 @@ export default function DataQualityPage() {
         }).then(res => res.json())
       );
       
-      const results = await Promise.all(sourcePromises);
+      const results = await Promise.allSettled(sourcePromises);
       const qualityData = results
-        .filter(r => r.status === 'ok')
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter(r => r.status === 'ok' && r.data)
         .map(r => r.data);
       setSources(qualityData);
     }
@@ -310,11 +318,11 @@ export default function DataQualityPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <QualityMetricCard
               label="Global Quality Score"
-              value={globalQuality.global_quality_score.toFixed(1)}
+              value={(globalQuality.global_quality_score ?? 0).toFixed(1)}
               subtitle="Out of 100"
               icon={<Database className="w-5 h-5 text-[#86868B]" />}
               tooltip="Overall data quality score across all sources. 80+ is excellent, 60-79 is good, below 60 needs attention."
-              score={globalQuality.global_quality_score}
+              score={globalQuality.global_quality_score ?? 0}
               getQualityBg={getQualityBg}
               getQualityColor={getQualityColor}
             />
@@ -332,8 +340,8 @@ export default function DataQualityPage() {
 
             <QualityMetricCard
               label="Unique URLs"
-              value={globalQuality.unique_urls.toLocaleString()}
-              subtitle={`${((globalQuality.unique_urls / globalQuality.total_jobs) * 100).toFixed(1)}% uniqueness`}
+              value={(globalQuality.unique_urls ?? 0).toLocaleString()}
+              subtitle={`${globalQuality.total_jobs > 0 ? ((globalQuality.unique_urls ?? 0) / globalQuality.total_jobs * 100).toFixed(1) : '0.0'}% uniqueness`}
               icon={<TrendingUp className="w-5 h-5 text-green-600" />}
               tooltip="Number of unique apply URLs. Higher uniqueness means less duplicate job postings."
               score={null}
@@ -411,8 +419,8 @@ export default function DataQualityPage() {
                         <h3 className="font-semibold text-[#1D1D1F]">
                           {source.source_name || 'Unnamed Source'}
                         </h3>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getQualityBg(source.quality_score)} ${getQualityColor(source.quality_score)}`}>
-                          Score: {source.quality_score.toFixed(1)}
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getQualityBg(source.quality_score || 0)} ${getQualityColor(source.quality_score || 0)}`}>
+                          Score: {(source.quality_score ?? 0).toFixed(1)}
                         </span>
                       </div>
                       <p className="text-sm text-[#86868B] mb-3">{source.source_url}</p>

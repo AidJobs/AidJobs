@@ -213,6 +213,22 @@ class DataQualityValidator:
                 """, (source_id,))
                 stats = cur.fetchone()
                 
+                # Ensure stats is not None and has required keys
+                if not stats:
+                    return {
+                        'error': 'Failed to fetch job statistics'
+                    }
+                
+                # Ensure all required keys exist with defaults
+                stats_dict = {
+                    'total_jobs': stats.get('total_jobs', 0) or 0,
+                    'unique_urls': stats.get('unique_urls', 0) or 0,
+                    'null_urls': stats.get('null_urls', 0) or 0,
+                    'listing_page_urls': stats.get('listing_page_urls', 0) or 0,
+                    'missing_titles': stats.get('missing_titles', 0) or 0,
+                    'short_titles': stats.get('short_titles', 0) or 0,
+                }
+                
                 # Find duplicate URLs
                 cur.execute("""
                     SELECT apply_url, COUNT(*) as count, 
@@ -228,25 +244,33 @@ class DataQualityValidator:
                 """, (source_id,))
                 duplicates = cur.fetchall()
                 
+                # Safely extract duplicate URLs
+                duplicate_urls_list = []
+                if duplicates:
+                    for dup in duplicates:
+                        try:
+                            apply_url = dup.get('apply_url') or ''
+                            duplicate_urls_list.append({
+                                'url': apply_url[:150] if apply_url else '',
+                                'count': dup.get('count', 0) or 0,
+                                'titles': (dup.get('titles') or [])[:3]  # First 3 titles
+                            })
+                        except Exception as e:
+                            # Skip invalid duplicate entries
+                            continue
+                
                 return {
                     'source_id': str(source_id),
                     'source_name': source.get('org_name'),
                     'source_url': source.get('careers_url'),
-                    'total_jobs': stats['total_jobs'],
-                    'unique_urls': stats['unique_urls'],
-                    'null_urls': stats['null_urls'],
-                    'listing_page_urls': stats['listing_page_urls'],
-                    'missing_titles': stats['missing_titles'],
-                    'short_titles': stats['short_titles'],
-                    'duplicate_urls': [
-                        {
-                            'url': dup['apply_url'][:150],
-                            'count': dup['count'],
-                            'titles': dup['titles'][:3]  # First 3 titles
-                        }
-                        for dup in duplicates
-                    ],
-                    'quality_score': self._calculate_quality_score(stats, duplicates)
+                    'total_jobs': stats_dict['total_jobs'],
+                    'unique_urls': stats_dict['unique_urls'],
+                    'null_urls': stats_dict['null_urls'],
+                    'listing_page_urls': stats_dict['listing_page_urls'],
+                    'missing_titles': stats_dict['missing_titles'],
+                    'short_titles': stats_dict['short_titles'],
+                    'duplicate_urls': duplicate_urls_list,
+                    'quality_score': self._calculate_quality_score(stats_dict, duplicates or [])
                 }
         finally:
             conn.close()

@@ -767,18 +767,35 @@ async def upsert_policy(host: str, policy: DomainPolicyUpdate, admin=Depends(adm
 async def get_source_quality(source_id: str, admin=Depends(admin_required)):
     """Get data quality report for a specific source"""
     from app.data_quality import DataQualityValidator
+    import traceback
     
     db_url = get_db_url()
     validator = DataQualityValidator(db_url)
     
     try:
         report = validator.get_source_quality_report(source_id)
+        
+        # Check if report contains an error
+        if isinstance(report, dict) and 'error' in report:
+            return {
+                "status": "error",
+                "error": report['error']
+            }
+        
+        # Validate report has required fields
+        if not isinstance(report, dict) or 'source_id' not in report:
+            logger.error(f"Invalid report structure: {report}")
+            raise HTTPException(status_code=500, detail="Invalid quality report structure")
+        
         return {
             "status": "ok",
             "data": report
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in get_source_quality: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get quality report: {str(e)}")
 
 
