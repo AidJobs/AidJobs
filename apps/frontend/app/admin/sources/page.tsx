@@ -74,6 +74,8 @@ export default function AdminSourcesPage() {
   const [recentlyRanSourceId, setRecentlyRanSourceId] = useState<string | null>(null);
   // Ref to track auto-refresh interval
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Health scores for sources
+  const [healthScores, setHealthScores] = useState<Record<string, { score: number; priority: number }>>({});
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -228,6 +230,58 @@ export default function AdminSourcesPage() {
   useEffect(() => {
     fetchSources();
   }, [page, statusFilter, searchQuery, fetchSources]);
+
+  // Fetch health scores for sources
+  useEffect(() => {
+    const fetchHealthScores = async () => {
+      if (sources.length === 0) return;
+      
+      try {
+        const scores: Record<string, { score: number; priority: number }> = {};
+        
+        // Fetch health scores for all sources (in batches to avoid overwhelming the API)
+        const batchSize = 10;
+        for (let i = 0; i < sources.length; i += batchSize) {
+          const batch = sources.slice(i, i + batchSize);
+          const promises = batch.map(async (source) => {
+            try {
+              const response = await fetch(`/api/admin/crawl/analytics/source/${source.id}`, {
+                credentials: 'include',
+              });
+              if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'ok' && data.data?.health) {
+                  return {
+                    sourceId: source.id,
+                    score: data.data.health.score,
+                    priority: data.data.health.priority,
+                  };
+                }
+              }
+            } catch (error) {
+              console.error(`Failed to fetch health for source ${source.id}:`, error);
+            }
+            return null;
+          });
+          
+          const results = await Promise.all(promises);
+          results.forEach((result) => {
+            if (result) {
+              scores[result.sourceId] = { score: result.score, priority: result.priority };
+            }
+          });
+        }
+        
+        setHealthScores(scores);
+      } catch (error) {
+        console.error('Failed to fetch health scores:', error);
+      }
+    };
+    
+    if (sources.length > 0) {
+      fetchHealthScores();
+    }
+  }, [sources]);
 
   // Refresh source data and crawl logs when drawer is open
   // Shared helper to refresh source + crawl logs for a given source id
@@ -996,6 +1050,7 @@ export default function AdminSourcesPage() {
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[140px]">Org</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[220px]">URL</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[80px]">Type</th>
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Health</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Status</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Last Crawl</th>
                     <th className="px-3 py-2 text-left text-caption font-medium text-[#86868B] uppercase w-[100px]">Failures</th>
@@ -1012,6 +1067,26 @@ export default function AdminSourcesPage() {
                         </a>
                       </td>
                       <td className="px-3 py-2 text-caption text-[#1D1D1F] font-mono">{source.source_type}</td>
+                      <td className="px-3 py-2 text-caption">
+                        {healthScores[source.id] ? (
+                          <div className="flex items-center gap-2" title={`Health Score: ${healthScores[source.id].score.toFixed(1)}/100, Priority: ${healthScores[source.id].priority}/10`}>
+                            <div className={`w-2 h-2 rounded-full ${
+                              healthScores[source.id].score >= 80 ? 'bg-[#30D158]' :
+                              healthScores[source.id].score >= 60 ? 'bg-[#FF9500]' :
+                              'bg-[#FF3B30]'
+                            }`}></div>
+                            <span className={`text-caption-sm font-medium ${
+                              healthScores[source.id].score >= 80 ? 'text-[#30D158]' :
+                              healthScores[source.id].score >= 60 ? 'text-[#FF9500]' :
+                              'text-[#FF3B30]'
+                            }`}>
+                              {healthScores[source.id].score.toFixed(0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-caption-sm text-[#86868B]">-</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-caption">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
