@@ -13,6 +13,7 @@ export async function GET(
       headers: {
         'Cookie': req.headers.get('cookie') || '',
       },
+      credentials: 'include',
     });
 
     const data = await res.json();
@@ -32,13 +33,16 @@ export async function POST(
 ) {
   try {
     const body = await req.json();
+    // Ensure BACKEND_URL doesn't have trailing /api
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
     
-    const res = await fetch(`${BACKEND_URL}/admin/domain_policies/${params.host}`, {
+    const res = await fetch(`${backendUrl}/api/admin/domain_policies/${params.host}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Cookie': req.headers.get('cookie') || '',
       },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
 
