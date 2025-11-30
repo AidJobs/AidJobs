@@ -348,6 +348,21 @@ def delete_source(
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         logger.info(f"[sources] Deleting source {source_id}")
+        
+        # First check if source exists
+        cursor.execute("""
+            SELECT id::text, org_name
+            FROM sources
+            WHERE id::text = %s
+        """, (source_id,))
+        
+        source = cursor.fetchone()
+        
+        if not source:
+            logger.warning(f"[sources] Source {source_id} not found for deletion")
+            raise HTTPException(status_code=404, detail="Source not found")
+        
+        # Soft delete the source
         cursor.execute("""
             UPDATE sources
             SET status = 'deleted', updated_at = NOW()
@@ -357,9 +372,18 @@ def delete_source(
         
         deleted = cursor.fetchone()
         
-        if not deleted:
-            logger.warning(f"[sources] Source {source_id} not found for deletion")
-            raise HTTPException(status_code=404, detail="Source not found")
+        # Soft delete all associated jobs
+        cursor.execute("""
+            UPDATE jobs
+            SET deleted_at = NOW(),
+                deleted_by = 'system',
+                deletion_reason = 'Source deleted'
+            WHERE source_id::text = %s
+            AND deleted_at IS NULL
+        """, (source_id,))
+        
+        jobs_deleted = cursor.rowcount
+        logger.info(f"[sources] Soft-deleted {jobs_deleted} jobs for source {source_id}")
         
         conn.commit()
         
