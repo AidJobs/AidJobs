@@ -782,3 +782,206 @@ async def get_global_quality(admin=Depends(admin_required)):
     except Exception as e:
         logger.error(f"Error in get_global_quality: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get global quality report: {str(e)}")
+
+
+# Crawl analytics endpoints
+
+@router.get("/analytics/overview")
+async def get_crawl_analytics_overview(admin=Depends(admin_required)):
+    """Get overview of crawl analytics"""
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Overall statistics
+            cur.execute("""
+                SELECT 
+                    COUNT(DISTINCT source_id) as total_sources,
+                    COUNT(*) as total_crawls,
+                    SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as successful_crawls,
+                    SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as failed_crawls,
+                    SUM(CASE WHEN status = 'warn' THEN 1 ELSE 0 END) as warning_crawls,
+                    AVG(duration_ms) as avg_duration_ms,
+                    SUM(found) as total_jobs_found,
+                    SUM(inserted) as total_jobs_inserted,
+                    SUM(updated) as total_jobs_updated
+                FROM crawl_logs
+                WHERE ran_at >= NOW() - INTERVAL '7 days'
+            """)
+            week_stats = cur.fetchone()
+            
+            cur.execute("""
+                SELECT 
+                    COUNT(DISTINCT source_id) as total_sources,
+                    COUNT(*) as total_crawls,
+                    SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as successful_crawls,
+                    SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as failed_crawls,
+                    SUM(CASE WHEN status = 'warn' THEN 1 ELSE 0 END) as warning_crawls,
+                    AVG(duration_ms) as avg_duration_ms,
+                    SUM(found) as total_jobs_found,
+                    SUM(inserted) as total_jobs_inserted,
+                    SUM(updated) as total_jobs_updated
+                FROM crawl_logs
+                WHERE ran_at >= NOW() - INTERVAL '30 days'
+            """)
+            month_stats = cur.fetchone()
+            
+            # Success rate trends (daily for last 7 days)
+            cur.execute("""
+                SELECT 
+                    DATE(ran_at) as date,
+                    COUNT(*) as total_crawls,
+                    SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as successful_crawls,
+                    SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as failed_crawls
+                FROM crawl_logs
+                WHERE ran_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(ran_at)
+                ORDER BY date DESC
+            """)
+            daily_trends = cur.fetchall()
+            
+            # Top sources by activity
+            cur.execute("""
+                SELECT 
+                    s.id,
+                    s.org_name,
+                    COUNT(*) as crawl_count,
+                    SUM(l.found) as total_jobs_found,
+                    SUM(l.inserted + l.updated) as total_changes,
+                    AVG(l.duration_ms) as avg_duration_ms,
+                    SUM(CASE WHEN l.status = 'ok' THEN 1 ELSE 0 END)::float / COUNT(*) * 100 as success_rate
+                FROM crawl_logs l
+                JOIN sources s ON s.id = l.source_id
+                WHERE l.ran_at >= NOW() - INTERVAL '7 days'
+                GROUP BY s.id, s.org_name
+                ORDER BY total_changes DESC
+                LIMIT 10
+            """)
+            top_sources = cur.fetchall()
+            
+            return {
+                "status": "ok",
+                "data": {
+                    "last_7_days": dict(week_stats) if week_stats else {},
+                    "last_30_days": dict(month_stats) if month_stats else {},
+                    "daily_trends": [
+                        {
+                            "date": trend['date'].isoformat() if trend['date'] else None,
+                            "total_crawls": trend['total_crawls'],
+                            "successful_crawls": trend['successful_crawls'],
+                            "failed_crawls": trend['failed_crawls'],
+                            "success_rate": round((trend['successful_crawls'] / trend['total_crawls'] * 100) if trend['total_crawls'] > 0 else 0, 2)
+                        }
+                        for trend in daily_trends
+                    ],
+                    "top_sources": [
+                        {
+                            "source_id": str(source['id']),
+                            "org_name": source['org_name'],
+                            "crawl_count": source['crawl_count'],
+                            "total_jobs_found": source['total_jobs_found'] or 0,
+                            "total_changes": source['total_changes'] or 0,
+                            "avg_duration_ms": round(source['avg_duration_ms'] or 0, 2),
+                            "success_rate": round(source['success_rate'] or 0, 2)
+                        }
+                        for source in top_sources
+                    ]
+                }
+            }
+    except Exception as e:
+        logger.error(f"Error in get_crawl_analytics_overview: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/analytics/source/{source_id}")
+async def get_source_analytics(source_id: str, admin=Depends(admin_required)):
+    """Get analytics for a specific source"""
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Get source info
+            cur.execute("""
+                SELECT id, org_name, careers_url, org_type, status,
+                       last_crawled_at, last_crawl_status, consecutive_failures,
+                       consecutive_nochange, crawl_frequency_days
+                FROM sources
+                WHERE id::text = %s
+            """, (source_id,))
+            source = cur.fetchone()
+            
+            if not source:
+                raise HTTPException(status_code=404, detail="Source not found")
+            
+            # Get health score
+            from app.source_health import SourceHealthScorer
+            scorer = SourceHealthScorer(get_db_url())
+            health = scorer.calculate_health_score(source_id, dict(source))
+            
+            # Get crawl history
+            cur.execute("""
+                SELECT 
+                    ran_at, status, message, duration_ms,
+                    found, inserted, updated, skipped
+                FROM crawl_logs
+                WHERE source_id::text = %s
+                ORDER BY ran_at DESC
+                LIMIT 20
+            """, (source_id,))
+            crawl_history = cur.fetchall()
+            
+            # Get statistics
+            cur.execute("""
+                SELECT 
+                    COUNT(*) as total_crawls,
+                    SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as successful_crawls,
+                    SUM(CASE WHEN status = 'fail' THEN 1 ELSE 0 END) as failed_crawls,
+                    AVG(duration_ms) as avg_duration_ms,
+                    SUM(found) as total_jobs_found,
+                    SUM(inserted) as total_jobs_inserted,
+                    SUM(updated) as total_jobs_updated,
+                    MIN(ran_at) as first_crawl,
+                    MAX(ran_at) as last_crawl
+                FROM crawl_logs
+                WHERE source_id::text = %s
+            """, (source_id,))
+            stats = cur.fetchone()
+            
+            return {
+                "status": "ok",
+                "data": {
+                    "source": {
+                        "id": str(source['id']),
+                        "org_name": source['org_name'],
+                        "careers_url": source['careers_url'],
+                        "org_type": source['org_type'],
+                        "status": source['status'],
+                        "last_crawled_at": source['last_crawled_at'].isoformat() if source['last_crawled_at'] else None,
+                        "last_crawl_status": source['last_crawl_status'],
+                        "consecutive_failures": source['consecutive_failures'],
+                        "consecutive_nochange": source['consecutive_nochange']
+                    },
+                    "health": health,
+                    "statistics": dict(stats) if stats else {},
+                    "recent_crawls": [
+                        {
+                            "ran_at": crawl['ran_at'].isoformat() if crawl['ran_at'] else None,
+                            "status": crawl['status'],
+                            "message": crawl['message'],
+                            "duration_ms": crawl['duration_ms'],
+                            "found": crawl['found'],
+                            "inserted": crawl['inserted'],
+                            "updated": crawl['updated'],
+                            "skipped": crawl['skipped']
+                        }
+                        for crawl in crawl_history
+                    ]
+                }
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_source_analytics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get source analytics: {str(e)}")
+    finally:
+        conn.close()

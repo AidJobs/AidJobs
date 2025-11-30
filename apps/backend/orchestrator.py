@@ -162,15 +162,17 @@ class CrawlerOrchestrator:
         inserted: int,
         updated: int,
         consecutive_failures: int,
-        consecutive_nochange: int
+        consecutive_nochange: int,
+        source_id: Optional[str] = None
     ) -> datetime:
         """
-        Compute next run time with adaptive scheduling.
+        Compute next run time with enhanced adaptive scheduling.
         
         Rules:
         - If many changes (inserted + updated >= 10): decrease frequency
         - If no changes for 3+ runs: increase frequency
         - On failures: exponential backoff
+        - Consider source health score for frequency adjustment
         - Add jitter ±15%
         """
         # Start with base frequency (or default from org type)
@@ -179,30 +181,65 @@ class CrawlerOrchestrator:
         
         freq_days = base_freq_days
         
-        # Adjust based on activity
+        # Adjust based on activity (more sophisticated)
         changes = inserted + updated
         
-        if changes >= 10:
-            # Lots of activity -> crawl more frequently
+        if changes >= 20:
+            # Very high activity -> crawl much more frequently
+            freq_days = max(0.25, freq_days - 2)
+            logger.debug(f"[orchestrator] Very high activity ({changes} changes) -> freq={freq_days} days")
+        elif changes >= 10:
+            # High activity -> crawl more frequently
             freq_days = max(0.5, freq_days - 1)
             logger.debug(f"[orchestrator] High activity ({changes} changes) -> freq={freq_days} days")
-        
+        elif changes >= 5:
+            # Moderate activity -> slight increase
+            freq_days = max(0.5, freq_days - 0.5)
+            logger.debug(f"[orchestrator] Moderate activity ({changes} changes) -> freq={freq_days} days")
         elif changes == 0:
             # No changes
-            if consecutive_nochange >= 3:
-                # Repeated no-change -> crawl less frequently
+            if consecutive_nochange >= 5:
+                # Many consecutive no-changes -> crawl much less frequently
+                freq_days = min(21, freq_days + 3)
+                logger.debug(f"[orchestrator] {consecutive_nochange} consecutive no-changes -> freq={freq_days} days")
+            elif consecutive_nochange >= 3:
+                # Some consecutive no-changes -> crawl less frequently
                 freq_days = min(14, freq_days + 1)
                 logger.debug(f"[orchestrator] {consecutive_nochange} consecutive no-changes -> freq={freq_days} days")
         
-        # Apply failure backoff
+        # Apply failure backoff (enhanced exponential backoff)
         if consecutive_failures > 0:
             # Exponential backoff: 6h * 2^failures, capped at 7 days
-            backoff_hours = 6 * (2 ** consecutive_failures)
+            backoff_hours = 6 * (2 ** min(consecutive_failures, 4))  # Cap at 4 for calculation
             backoff_days = min(7, backoff_hours / 24.0)
             freq_days = max(freq_days, backoff_days)
             logger.debug(f"[orchestrator] {consecutive_failures} failures -> backoff={backoff_days} days")
         
-        # Add jitter ±15%
+        # Consider source health score if available
+        if source_id:
+            try:
+                from app.source_health import SourceHealthScorer
+                scorer = SourceHealthScorer(self.db_url)
+                health = scorer.calculate_health_score(source_id)
+                
+                # Adjust frequency based on health
+                if health['score'] >= 80:
+                    # High health -> can crawl more frequently if activity is high
+                    if health['components']['activity'] >= 70:
+                        freq_days = max(0.5, freq_days - 0.5)
+                elif health['score'] < 50:
+                    # Low health -> crawl less frequently to avoid wasting resources
+                    freq_days = min(14, freq_days + 1)
+                
+                # Use recommended frequency if it's significantly different
+                recommended = health['recommended_frequency_days']
+                if abs(recommended - freq_days) > 2:
+                    freq_days = recommended
+                    logger.debug(f"[orchestrator] Using health-based recommended frequency: {freq_days} days")
+            except Exception as e:
+                logger.debug(f"[orchestrator] Could not calculate health score: {e}")
+        
+        # Add jitter ±15% to spread out crawls
         jitter_factor = random.uniform(0.85, 1.15)
         freq_days *= jitter_factor
         
@@ -212,24 +249,94 @@ class CrawlerOrchestrator:
         return next_run
     
     async def get_due_sources(self, limit: int = MAX_SOURCES_PER_RUN) -> List[Dict]:
-        """Get sources that are due for crawling"""
+        """
+        Get sources that are due for crawling, prioritized by health score.
+        
+        Priority order:
+        1. Sources with highest priority (health score)
+        2. Sources that are most overdue
+        3. Sources with highest activity
+        """
         conn = self._get_db_conn()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get all due sources
                 cur.execute("""
                     SELECT id, org_name, careers_url, source_type, org_type,
                            parser_hint, crawl_frequency_days, consecutive_failures,
-                           consecutive_nochange, last_crawled_at
+                           consecutive_nochange, last_crawled_at, next_run_at,
+                           status, last_crawl_status
                     FROM sources
                     WHERE status = 'active'
                     AND (next_run_at IS NULL OR next_run_at <= NOW())
-                    ORDER BY next_run_at NULLS FIRST
-                    LIMIT %s
-                """, (limit,))
+                """)
                 
-                return cur.fetchall()
+                all_due = cur.fetchall()
+                
+                if not all_due:
+                    return []
+                
+                # Calculate health scores and priorities
+                from app.source_health import SourceHealthScorer
+                scorer = SourceHealthScorer(self.db_url)
+                
+                sources_with_priority = []
+                for source in all_due:
+                    health = scorer.calculate_health_score(str(source['id']), dict(source))
+                    
+                    # Calculate priority score for sorting
+                    # Higher = should be crawled first
+                    priority_score = health['priority'] * 100
+                    
+                    # Boost priority for overdue sources
+                    if source.get('next_run_at'):
+                        overdue_hours = (datetime.utcnow() - source['next_run_at']).total_seconds() / 3600
+                        priority_score += min(50, overdue_hours / 24)  # Max 50 point boost
+                    else:
+                        priority_score += 100  # Never crawled = highest priority
+                    
+                    # Boost priority for high activity
+                    priority_score += health['components']['activity'] * 0.1
+                    
+                    sources_with_priority.append({
+                        **dict(source),
+                        'health_score': health['score'],
+                        'priority': health['priority'],
+                        'priority_score': priority_score
+                    })
+                
+                # Sort by priority score (highest first)
+                sources_with_priority.sort(key=lambda x: x['priority_score'], reverse=True)
+                
+                # Apply time-of-day optimization (avoid peak hours if possible)
+                optimized_sources = self._optimize_time_of_day(sources_with_priority)
+                
+                return optimized_sources[:limit]
         finally:
             conn.close()
+    
+    def _optimize_time_of_day(self, sources: List[Dict]) -> List[Dict]:
+        """
+        Optimize crawl order to avoid peak hours.
+        
+        Peak hours: 9 AM - 5 PM UTC (typical business hours)
+        Prefer crawling during off-peak hours for non-critical sources.
+        """
+        current_hour = datetime.utcnow().hour
+        is_peak_hours = 9 <= current_hour < 17
+        
+        if not is_peak_hours:
+            # Off-peak: crawl in priority order
+            return sources
+        
+        # Peak hours: prioritize high-priority sources, defer low-priority
+        high_priority = [s for s in sources if s['priority'] >= 7]
+        medium_priority = [s for s in sources if 4 <= s['priority'] < 7]
+        low_priority = [s for s in sources if s['priority'] < 4]
+        
+        # During peak hours, prioritize high-priority sources
+        # Low-priority sources can wait until off-peak
+        return high_priority + medium_priority + low_priority
     
     async def acquire_lock(self, source_id: str) -> bool:
         """Try to acquire lock for a source"""
@@ -394,14 +501,15 @@ class CrawlerOrchestrator:
                     else:
                         consecutive_nochange = 0
                 
-                # Compute next run
+                # Compute next run (with source_id for health-based scheduling)
                 next_run_at = self.compute_next_run(
                     source['crawl_frequency_days'],
                     source.get('org_type'),
                     counts['inserted'],
                     counts['updated'],
                     consecutive_failures,
-                    consecutive_nochange
+                    consecutive_nochange,
+                    source_id=str(source['id'])
                 )
                 
                 # Check circuit breaker
