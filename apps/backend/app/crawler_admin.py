@@ -799,6 +799,98 @@ async def get_source_quality(source_id: str, admin=Depends(admin_required)):
         raise HTTPException(status_code=500, detail=f"Failed to get quality report: {str(e)}")
 
 
+@router.post("/delete-jobs-by-org")
+async def delete_jobs_by_org(
+    org_name: str = Query(..., description="Organization name pattern to match (e.g., 'UNDP')"),
+    admin=Depends(admin_required)
+):
+    """
+    Delete all jobs from sources matching an organization name pattern.
+    Useful for cleaning up jobs when source no longer exists.
+    """
+    import traceback
+    
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Find all sources matching the org name pattern
+            cur.execute("""
+                SELECT id::text, org_name, careers_url
+                FROM sources
+                WHERE org_name ILIKE %s
+                OR careers_url ILIKE %s
+            """, (f'%{org_name}%', f'%{org_name}%'))
+            
+            matching_sources = cur.fetchall()
+            
+            if not matching_sources:
+                # If no sources found, try to delete jobs directly by org_name
+                logger.info(f"No sources found matching '{org_name}', attempting direct job deletion")
+                cur.execute("""
+                    UPDATE jobs
+                    SET deleted_at = NOW(),
+                        deleted_by = 'system',
+                        deletion_reason = 'Organization cleanup: ' || %s
+                    WHERE org_name ILIKE %s
+                    AND deleted_at IS NULL
+                """, (org_name, f'%{org_name}%'))
+                
+                jobs_deleted = cur.rowcount
+                conn.commit()
+                
+                return {
+                    "status": "ok",
+                    "data": {
+                        "jobs_deleted": jobs_deleted,
+                        "sources_found": 0,
+                        "message": f"Soft-deleted {jobs_deleted} jobs matching org_name pattern '{org_name}'"
+                    }
+                }
+            
+            # Delete jobs from all matching sources
+            total_jobs_deleted = 0
+            source_ids = []
+            
+            for source in matching_sources:
+                source_id = source['id']
+                source_ids.append(source_id)
+                
+                cur.execute("""
+                    UPDATE jobs
+                    SET deleted_at = NOW(),
+                        deleted_by = 'system',
+                        deletion_reason = 'Organization cleanup: ' || %s
+                    WHERE source_id::text = %s
+                    AND deleted_at IS NULL
+                """, (org_name, source_id))
+                
+                jobs_deleted = cur.rowcount
+                total_jobs_deleted += jobs_deleted
+                logger.info(f"Soft-deleted {jobs_deleted} jobs from source {source['org_name']} ({source_id})")
+            
+            conn.commit()
+            
+            return {
+                "status": "ok",
+                "data": {
+                    "jobs_deleted": total_jobs_deleted,
+                    "sources_found": len(matching_sources),
+                    "source_ids": source_ids,
+                    "sources": [{"id": s['id'], "org_name": s['org_name'], "careers_url": s['careers_url']} for s in matching_sources],
+                    "message": f"Soft-deleted {total_jobs_deleted} jobs from {len(matching_sources)} source(s) matching '{org_name}'"
+                }
+            }
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error deleting jobs by org: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete jobs: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
+
+
 @quality_router.get("/global")
 async def get_global_quality(admin=Depends(admin_required)):
     """Get global data quality report across all sources"""
