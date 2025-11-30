@@ -195,9 +195,25 @@ class HTMLCrawler:
                 tables = soup.find_all('table')
                 for table in tables:
                     rows = table.find_all('tr')
-                    for row in rows:
-                        # Skip header rows (rows with only th tags or in thead)
-                        if row.find_parent('thead') or (row.find('th') and not row.find('td')):
+                    # Enhanced header detection: check first few rows for header patterns
+                    header_keywords = ['title', 'position', 'location', 'deadline', 'apply', 'reference', 'post', 'vacancy']
+                    is_likely_header_row = {}
+                    
+                    for idx, row in enumerate(rows[:5]):  # Check first 5 rows for headers
+                        row_text = row.get_text().lower()
+                        # If row has many header keywords and mostly th tags, it's likely a header
+                        th_count = len(row.find_all('th'))
+                        td_count = len(row.find_all('td'))
+                        header_keyword_count = sum(1 for kw in header_keywords if kw in row_text)
+                        
+                        if (th_count > td_count or header_keyword_count >= 3) and idx < 3:
+                            is_likely_header_row[idx] = True
+                    
+                    for idx, row in enumerate(rows):
+                        # Skip header rows (rows with only th tags or in thead, or identified as header)
+                        if (row.find_parent('thead') or 
+                            (row.find('th') and not row.find('td')) or
+                            is_likely_header_row.get(idx, False)):
                             continue
                         
                         # Check if row has job-like content
@@ -210,10 +226,25 @@ class HTMLCrawler:
                         has_link = row.find('a', href=True)
                         
                         # Must have substantial content (not just headers)
+                        # Also check that it's not just a row of navigation/header links
                         if has_job_keywords and has_link and len(row_text.strip()) > 20:
-                            job_elements.append(row)
-                            if len(job_elements) >= 100:
-                                break
+                            # Additional validation: ensure link is not just a generic navigation link
+                            links = row.find_all('a', href=True)
+                            has_job_link = False
+                            for link in links:
+                                href = link.get('href', '').lower()
+                                link_text = link.get_text().lower().strip()
+                                # Check if link looks like a job detail link
+                                if (any(kw in href for kw in ['/job/', '/position/', '/vacancy/', '/post/', '/opportunity/']) or
+                                    any(kw in link_text for kw in ['view', 'details', 'apply', 'read more']) or
+                                    re.search(r'/\d{4,}', href)):
+                                    has_job_link = True
+                                    break
+                            
+                            if has_job_link or len(links) == 1:  # Single link is likely a job link
+                                job_elements.append(row)
+                                if len(job_elements) >= 100:
+                                    break
                     if len(job_elements) >= 100:
                         break
                 
@@ -274,6 +305,26 @@ class HTMLCrawler:
                                 break
                 
                 logger.info(f"[html_fetch] UNESCO extraction found {len(job_elements)} job elements")
+                
+                # Validate UNESCO extraction results
+                if job_elements:
+                    # Check that elements have links
+                    elements_with_links = 0
+                    for elem in job_elements:
+                        if isinstance(elem, dict):
+                            if elem.get('link') or elem.get('link_href') or elem.get('resolved_url'):
+                                elements_with_links += 1
+                        else:
+                            # BeautifulSoup element
+                            if elem.find('a', href=True):
+                                elements_with_links += 1
+                    
+                    logger.info(f"[html_fetch] UNESCO validation: {elements_with_links}/{len(job_elements)} elements have links")
+                    
+                    if elements_with_links == 0:
+                        logger.warning(f"[html_fetch] UNESCO WARNING: No links found in extracted elements - extraction may have failed")
+                else:
+                    logger.warning(f"[html_fetch] UNESCO WARNING: No job elements found - extraction failed")
             
             # Strategy 0b: UNDP-specific pattern (HTML-based structure with "Job Title", "Apply by", "Location")
             # UNDP uses a pattern like: "Job Title [title] Apply by [date] Location [location]"
@@ -1286,6 +1337,38 @@ class HTMLCrawler:
         if not jobs:
             return counts
         
+        # Pre-upsert validation (enterprise-grade data quality check)
+        try:
+            from app.data_quality import DataQualityValidator
+            validator = DataQualityValidator(self.db_url)
+            
+            # Get source base URL for validation
+            conn = self._get_db_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT careers_url FROM sources WHERE id = %s", (source_id,))
+                    source_row = cur.fetchone()
+                    source_base_url = source_row[0] if source_row else None
+            finally:
+                conn.close()
+            
+            # Validate batch
+            validation_result = validator.validate_batch(jobs, source_base_url)
+            
+            if validation_result['invalid_count'] > 0:
+                logger.warning(f"[html_fetch] Data quality: {validation_result['invalid_count']} invalid jobs found")
+                for invalid in validation_result['invalid_jobs'][:5]:  # Log first 5
+                    logger.warning(f"[html_fetch]   Invalid job: {invalid['job']['title'][:50]}... - {', '.join(invalid['errors'])}")
+            
+            if validation_result['duplicate_check']['has_duplicates']:
+                logger.error(f"[html_fetch] Data quality: {validation_result['duplicate_check']['duplicate_count']} duplicate URLs in batch!")
+                for dup_url in validation_result['duplicate_check']['duplicate_urls'][:3]:
+                    titles = validation_result['duplicate_check']['url_to_titles'].get(dup_url, [])
+                    logger.error(f"[html_fetch]   Duplicate URL: {dup_url[:80]}... used by: {', '.join(titles[:3])}")
+        except Exception as e:
+            # Don't fail upsert if validation fails, but log it
+            logger.warning(f"[html_fetch] Data quality validation error (non-fatal): {e}")
+        
         conn = self._get_db_conn()
         jobs_to_enrich = []  # Track jobs that need enrichment
         
@@ -1308,15 +1391,24 @@ class HTMLCrawler:
                         current_apply_url = current_row[0] if current_row else None
                         new_apply_url = job.get('apply_url', '')
                         
+                        # Get source info for UNDP detection and base URL comparison
+                        cur.execute("SELECT careers_url, org_name FROM sources WHERE id = %s", (source_id,))
+                        source_row = cur.fetchone()
+                        source_base_url = source_row[0] if source_row else None
+                        source_org_name = source_row[1] if source_row else None
+                        
+                        # Check if this is UNDP source
+                        is_undp = (
+                            source_base_url and ('undp.org' in source_base_url.lower() or 'cj_view_consultancies' in source_base_url.lower())
+                        ) or (
+                            source_org_name and 'undp' in source_org_name.lower()
+                        )
+                        
                         # CRITICAL: Only update apply_url if the new one is better (not base URL, has unique identifier)
                         # This prevents overwriting good URLs with generic listing page URLs
+                        # SPECIAL HANDLING: For UNDP, force update if current URL is bad (listing page, base URL, or missing unique identifier)
                         should_update_url = True
                         if new_apply_url:
-                            # Get source URL for base URL comparison
-                            cur.execute("SELECT careers_url FROM sources WHERE id = %s", (source_id,))
-                            source_row = cur.fetchone()
-                            source_base_url = source_row[0] if source_row else None
-                            
                             if source_base_url:
                                 # Don't update if new URL is the base URL
                                 base_normalized = source_base_url.rstrip('/').split('#')[0].split('?')[0]
@@ -1337,6 +1429,30 @@ class HTMLCrawler:
                                 if not new_has_id and current_has_id:
                                     should_update_url = False
                                     logger.debug(f"[html_fetch] Keeping existing URL (has better identifier): {current_apply_url}")
+                            
+                            # ENTERPRISE FIX: For UNDP, force update if current URL is bad
+                            if is_undp and current_apply_url and not should_update_url:
+                                # Check if current URL is bad (listing page, base URL, or missing unique identifier)
+                                current_is_listing = any(kw in current_apply_url.lower() for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies'])
+                                current_is_base = False
+                                if source_base_url:
+                                    current_normalized = current_apply_url.rstrip('/').split('#')[0].split('?')[0]
+                                    base_normalized = source_base_url.rstrip('/').split('#')[0].split('?')[0]
+                                    current_is_base = (current_normalized == base_normalized)
+                                current_has_id = bool(re.search(r'/\d{4,}', current_apply_url) or re.search(r'/[a-z0-9-]{15,}', current_apply_url))
+                                
+                                # Force update if current URL is bad AND new URL is good
+                                new_has_id = bool(re.search(r'/\d{4,}', new_apply_url) or re.search(r'/[a-z0-9-]{15,}', new_apply_url))
+                                new_is_listing = any(kw in new_apply_url.lower() for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/cj_view_consultancies'])
+                                new_is_base = False
+                                if source_base_url:
+                                    new_normalized = new_apply_url.rstrip('/').split('#')[0].split('?')[0]
+                                    base_normalized = source_base_url.rstrip('/').split('#')[0].split('?')[0]
+                                    new_is_base = (new_normalized == base_normalized)
+                                
+                                if (current_is_listing or current_is_base or not current_has_id) and not new_is_listing and not new_is_base and new_has_id:
+                                    should_update_url = True
+                                    logger.info(f"[html_fetch] UNDP: Forcing URL update (current is bad, new is good): {current_apply_url[:80]}... -> {new_apply_url[:80]}...")
                         
                         # Use existing URL if we shouldn't update
                         final_apply_url = new_apply_url if should_update_url else (current_apply_url or new_apply_url)
