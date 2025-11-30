@@ -620,6 +620,7 @@ async def get_unenriched_count(
             SELECT COUNT(*) as count
             FROM jobs
             WHERE status = 'active'
+            AND deleted_at IS NULL
             AND (deadline IS NULL OR deadline >= CURRENT_DATE)
             AND (impact_domain IS NULL OR impact_domain = '[]'::jsonb)
         """)
@@ -661,6 +662,7 @@ async def get_unenriched_jobs(
             SELECT id::text as job_id
             FROM jobs
             WHERE status = 'active'
+            AND deleted_at IS NULL
             AND (deadline IS NULL OR deadline >= CURRENT_DATE)
             AND (impact_domain IS NULL OR impact_domain = '[]'::jsonb)
             ORDER BY created_at DESC

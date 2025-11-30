@@ -128,14 +128,15 @@ async def cleanup_expired(admin=Depends(admin_required)):
 @router.get("/status")
 async def get_status(admin=Depends(admin_required)):
     """Get crawler status"""
-    db_url = get_db_url()
-    orchestrator = get_orchestrator(db_url)
-    
-    conn = get_db_conn()
-    due_count = 0
-    locked_count = 0
-    
     try:
+        db_url = get_db_url()
+        orchestrator = get_orchestrator(db_url)
+        
+        conn = get_db_conn()
+        due_count = 0
+        locked_count = 0
+        
+        try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Get due count - handle missing next_run_at column gracefully
             try:
@@ -192,28 +193,30 @@ async def get_status(admin=Depends(admin_required)):
                 logger.error(f"Error checking crawl_locks: {e}")
                 conn.rollback()
                 locked_count = 0
+        
+        return {
+            "status": "ok",
+            "data": {
+                "running": orchestrator.running,
+                "pool": {
+                    "global_max": 3,
+                    "available": orchestrator.semaphore._value
+                },
+                "due_count": due_count,
+                "locked": locked_count,
+                "in_flight": 3 - orchestrator.semaphore._value
+            }
+        }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in get_status: {e}")
-        if conn:
-            conn.rollback()
+        logger.error(f"Error in get_status: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to get crawler status: {str(e)}")
     finally:
-        if conn:
+        if 'conn' in locals() and conn:
             conn.close()
-    
-    return {
-        "status": "ok",
-        "data": {
-            "running": orchestrator.running,
-            "pool": {
-                "global_max": 3,
-                "available": orchestrator.semaphore._value
-            },
-            "due_count": due_count,
-            "locked": locked_count,
-            "in_flight": 3 - orchestrator.semaphore._value
-        }
-    }
 
 
 @router.get("/diagnostics/unesco")
@@ -779,17 +782,19 @@ async def get_source_quality(source_id: str, admin=Depends(admin_required)):
 @quality_router.get("/global")
 async def get_global_quality(admin=Depends(admin_required)):
     """Get global data quality report across all sources"""
-    from app.data_quality import DataQualityValidator
-    
-    db_url = get_db_url()
-    validator = DataQualityValidator(db_url)
-    
     try:
+        from app.data_quality import DataQualityValidator
+        
+        db_url = get_db_url()
+        validator = DataQualityValidator(db_url)
+        
         report = validator.get_global_quality_report()
         return {
             "status": "ok",
             "data": report
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in get_global_quality: {e}", exc_info=True)
         import traceback
@@ -923,10 +928,13 @@ async def get_crawl_analytics_overview(admin=Depends(admin_required)):
                 }
             }
     except Exception as e:
-        logger.error(f"Error in get_crawl_analytics_overview: {e}")
+        logger.error(f"Error in get_crawl_analytics_overview: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 @router.get("/analytics/source/{source_id}")

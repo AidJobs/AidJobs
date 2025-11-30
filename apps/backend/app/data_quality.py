@@ -316,6 +316,24 @@ class DataQualityValidator:
                 """)
                 global_stats = cur.fetchone()
                 
+                # Handle None result
+                if not global_stats:
+                    global_stats = {
+                        'total_sources': 0,
+                        'total_jobs': 0,
+                        'unique_urls': 0,
+                        'null_urls': 0,
+                        'listing_page_urls': 0
+                    }
+                else:
+                    # Ensure all keys exist with defaults
+                    global_stats = dict(global_stats)
+                    global_stats.setdefault('total_sources', 0)
+                    global_stats.setdefault('total_jobs', 0)
+                    global_stats.setdefault('unique_urls', 0)
+                    global_stats.setdefault('null_urls', 0)
+                    global_stats.setdefault('listing_page_urls', 0)
+                
                 # Sources with issues
                 cur.execute("""
                     SELECT source_id, COUNT(*) as issue_count
