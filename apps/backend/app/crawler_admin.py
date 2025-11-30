@@ -137,62 +137,65 @@ async def get_status(admin=Depends(admin_required)):
         locked_count = 0
         
         try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Get due count - handle missing next_run_at column gracefully
-            try:
-                cur.execute("""
-                    SELECT COUNT(*) as count
-                    FROM sources
-                    WHERE status = 'active'
-                    AND (next_run_at IS NULL OR next_run_at <= NOW())
-                """)
-                due_count = cur.fetchone()['count']
-            except psycopg2_errors.UndefinedColumn:
-                # next_run_at column doesn't exist - fallback to simpler query
-                logger.warning("next_run_at column does not exist, using fallback query")
-                conn.rollback()
-                cur.execute("""
-                    SELECT COUNT(*) as count
-                    FROM sources
-                    WHERE status = 'active'
-                """)
-                due_count = cur.fetchone()['count']
-            
-            # Get locked count - handle missing table gracefully
-            try:
-                cur.execute("SELECT COUNT(*) as count FROM crawl_locks")
-                locked_count = cur.fetchone()['count']
-            except psycopg2_errors.UndefinedTable:
-                # Table doesn't exist yet - need to create it
-                # Rollback the failed transaction first
-                conn.rollback()
-                logger.warning("crawl_locks table does not exist, creating it...")
-                
-                # Use a separate connection for DDL to avoid transaction state issues
-                ddl_conn = None
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get due count - handle missing next_run_at column gracefully
                 try:
-                    ddl_conn = get_db_conn()
-                    ddl_conn.autocommit = True  # DDL operations should use autocommit
-                    with ddl_conn.cursor() as ddl_cur:
-                        ddl_cur.execute("""
-                            CREATE TABLE IF NOT EXISTS crawl_locks (
-                                source_id UUID PRIMARY KEY,
-                                locked_at TIMESTAMPTZ DEFAULT NOW()
-                            )
-                        """)
-                    logger.info("crawl_locks table created successfully")
-                except Exception as ddl_error:
-                    logger.error(f"Failed to create crawl_locks table: {ddl_error}")
-                finally:
-                    if ddl_conn:
-                        ddl_conn.close()
+                    cur.execute("""
+                        SELECT COUNT(*) as count
+                        FROM sources
+                        WHERE status = 'active'
+                        AND (next_run_at IS NULL OR next_run_at <= NOW())
+                    """)
+                    due_count = cur.fetchone()['count']
+                except psycopg2_errors.UndefinedColumn:
+                    # next_run_at column doesn't exist - fallback to simpler query
+                    logger.warning("next_run_at column does not exist, using fallback query")
+                    conn.rollback()
+                    cur.execute("""
+                        SELECT COUNT(*) as count
+                        FROM sources
+                        WHERE status = 'active'
+                    """)
+                    due_count = cur.fetchone()['count']
                 
-                locked_count = 0
-            except Exception as e:
-                # If any other error occurs, log it but don't fail the entire request
-                logger.error(f"Error checking crawl_locks: {e}")
-                conn.rollback()
-                locked_count = 0
+                # Get locked count - handle missing table gracefully
+                try:
+                    cur.execute("SELECT COUNT(*) as count FROM crawl_locks")
+                    locked_count = cur.fetchone()['count']
+                except psycopg2_errors.UndefinedTable:
+                    # Table doesn't exist yet - need to create it
+                    # Rollback the failed transaction first
+                    conn.rollback()
+                    logger.warning("crawl_locks table does not exist, creating it...")
+                    
+                    # Use a separate connection for DDL to avoid transaction state issues
+                    ddl_conn = None
+                    try:
+                        ddl_conn = get_db_conn()
+                        ddl_conn.autocommit = True  # DDL operations should use autocommit
+                        with ddl_conn.cursor() as ddl_cur:
+                            ddl_cur.execute("""
+                                CREATE TABLE IF NOT EXISTS crawl_locks (
+                                    source_id UUID PRIMARY KEY,
+                                    locked_at TIMESTAMPTZ DEFAULT NOW()
+                                )
+                            """)
+                        logger.info("crawl_locks table created successfully")
+                    except Exception as ddl_error:
+                        logger.error(f"Failed to create crawl_locks table: {ddl_error}")
+                    finally:
+                        if ddl_conn:
+                            ddl_conn.close()
+                    
+                    locked_count = 0
+                except Exception as e:
+                    # If any other error occurs, log it but don't fail the entire request
+                    logger.error(f"Error checking crawl_locks: {e}")
+                    conn.rollback()
+                    locked_count = 0
+        finally:
+            # Connection will be closed in outer finally block
+            pass
         
         return {
             "status": "ok",
