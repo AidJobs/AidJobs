@@ -3,7 +3,9 @@ Admin API routes for crawler management
 """
 import os
 import logging
+import json
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
 from pydantic import BaseModel  # type: ignore
 import psycopg2  # type: ignore
@@ -47,6 +49,15 @@ class DomainPolicyUpdate(BaseModel):
     max_pages: Optional[int] = None
     max_kb_per_page: Optional[int] = None
     allow_js: Optional[bool] = None
+
+
+class DeleteJobsRequest(BaseModel):
+    source_id: str
+    deletion_type: str = "soft"  # "soft" or "hard"
+    trigger_crawl: bool = False
+    dry_run: bool = False
+    deletion_reason: Optional[str] = None
+    export_data: bool = False  # Export before deletion
 
 
 # Crawl management endpoints
