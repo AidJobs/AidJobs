@@ -46,6 +46,9 @@ export default function JobInspector({
   const [fullJob, setFullJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isNotFound, setIsNotFound] = useState(false);
+  const [relatedJobs, setRelatedJobs] = useState<Job[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
+  const [applyUrlError, setApplyUrlError] = useState(false);
 
   // Fetch full job details if missing normalized fields
   useEffect(() => {
@@ -92,7 +95,45 @@ export default function JobInspector({
       setFullJob(job);
       setIsLoading(false);
     }
+
+    // Fetch related jobs when job is loaded
+    if (job && isOpen) {
+      fetchRelatedJobs(job);
+    }
   }, [isOpen, job, onClose]);
+
+  const fetchRelatedJobs = async (currentJob: Job) => {
+    setLoadingRelated(true);
+    try {
+      // Find related jobs by same org, similar level, or same mission tags
+      const params = new URLSearchParams();
+      if (currentJob.org_name) {
+        params.append('q', currentJob.org_name);
+      }
+      if (currentJob.level_norm) {
+        params.append('level_norm', currentJob.level_norm);
+      }
+      if (currentJob.mission_tags && currentJob.mission_tags.length > 0) {
+        currentJob.mission_tags.slice(0, 2).forEach(tag => {
+          params.append('mission_tags', tag);
+        });
+      }
+      params.append('size', '6');
+
+      const response = await fetch(`/api/search/query?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok' && data.data?.items) {
+          // Filter out the current job and limit to 4
+          setRelatedJobs(data.data.items.filter((j: Job) => j.id !== currentJob.id).slice(0, 4));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch related jobs:', error);
+    } finally {
+      setLoadingRelated(false);
+    }
+  };
 
   // Focus management
   useEffect(() => {
@@ -444,9 +485,39 @@ export default function JobInspector({
 
             {displayJob.apply_url && (
               <div className="pt-4 border-t border-gray-200">
-                <a
-                  href={displayJob.apply_url}
-                  target="_blank"
+                {applyUrlError ? (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 mb-2">
+                      Unable to verify application URL. The link may be invalid or the job may have been removed.
+                    </p>
+                    <a
+                      href={displayJob.apply_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-yellow-900 underline hover:text-yellow-950"
+                      onClick={() => setApplyUrlError(false)}
+                    >
+                      Try opening anyway
+                    </a>
+                  </div>
+                ) : (
+                  <a
+                    href={displayJob.apply_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={async (e) => {
+                      // Validate URL before opening
+                      try {
+                        const url = new URL(displayJob.apply_url);
+                        if (!url.protocol.startsWith('http')) {
+                          e.preventDefault();
+                          setApplyUrlError(true);
+                        }
+                      } catch {
+                        e.preventDefault();
+                        setApplyUrlError(true);
+                      }
+                    }}
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                 >
@@ -465,6 +536,43 @@ export default function JobInspector({
                     />
                   </svg>
                 </a>
+              </div>
+            )}
+
+            {/* Related Jobs */}
+            {relatedJobs.length > 0 && (
+              <div className="pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  Related Jobs
+                </h4>
+                <div className="space-y-2">
+                  {relatedJobs.map((relatedJob) => (
+                    <div
+                      key={relatedJob.id}
+                      onClick={() => {
+                        // Trigger job selection - parent component should handle this
+                        window.location.hash = `job-${relatedJob.id}`;
+                      }}
+                      className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <h5 className="text-sm font-medium text-gray-900 mb-1">
+                        {relatedJob.title}
+                      </h5>
+                      <p className="text-xs text-gray-600 mb-1">{relatedJob.org_name}</p>
+                      <div className="flex gap-2 text-xs text-gray-500">
+                        {relatedJob.location_raw && <span>{relatedJob.location_raw}</span>}
+                        {relatedJob.level_norm && (
+                          <span className="capitalize">{relatedJob.level_norm}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {loadingRelated && (
+              <div className="pt-6 border-t border-gray-200">
+                <p className="text-sm text-gray-500">Loading related jobs...</p>
               </div>
             )}
           </div>
