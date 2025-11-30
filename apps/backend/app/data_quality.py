@@ -209,6 +209,7 @@ class DataQualityValidator:
                         COUNT(CASE WHEN LENGTH(title) < 5 THEN 1 END) as short_titles
                     FROM jobs
                     WHERE source_id::text = %s
+                    AND deleted_at IS NULL
                 """, (source_id,))
                 stats = cur.fetchone()
                 
@@ -218,6 +219,7 @@ class DataQualityValidator:
                            array_agg(title ORDER BY fetched_at DESC) as titles
                     FROM jobs
                     WHERE source_id::text = %s
+                    AND deleted_at IS NULL
                     AND apply_url IS NOT NULL
                     GROUP BY apply_url
                     HAVING COUNT(*) > 1
@@ -310,6 +312,7 @@ class DataQualityValidator:
                         END) as listing_page_urls
                     FROM jobs
                     WHERE status = 'active'
+                    AND deleted_at IS NULL
                 """)
                 global_stats = cur.fetchone()
                 
@@ -317,10 +320,11 @@ class DataQualityValidator:
                 cur.execute("""
                     SELECT source_id, COUNT(*) as issue_count
                     FROM (
-                        SELECT source_id FROM jobs WHERE apply_url IS NULL
+                        SELECT source_id FROM jobs WHERE apply_url IS NULL AND deleted_at IS NULL
                         UNION ALL
                         SELECT source_id FROM jobs 
-                        WHERE apply_url LIKE '%/jobs%' OR apply_url LIKE '%/careers%'
+                        WHERE deleted_at IS NULL
+                        AND (apply_url LIKE '%/jobs%' OR apply_url LIKE '%/careers%')
                     ) issues
                     GROUP BY source_id
                     ORDER BY issue_count DESC

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
     const response = await fetch(`${backendUrl}/api/admin/data-quality/global`, {
       headers: {
         'Cookie': request.headers.get('cookie') || '',
       },
+      credentials: 'include',
     });
 
     if (!response.ok) {

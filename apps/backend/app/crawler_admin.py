@@ -791,7 +791,9 @@ async def get_global_quality(admin=Depends(admin_required)):
             "data": report
         }
     except Exception as e:
-        logger.error(f"Error in get_global_quality: {e}")
+        logger.error(f"Error in get_global_quality: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to get global quality report: {str(e)}")
 
 
