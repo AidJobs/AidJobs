@@ -17,7 +17,7 @@ Go to **Netlify Dashboard** → **Site settings** → **Environment variables** 
 
 ```
 NEXT_PUBLIC_API_URL=https://aidjobs-backend.onrender.com
-NEXT_PUBLIC_SUPABASE_URL=https://yijlbzlzfahubwukulkv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT_ID].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 NEXT_PUBLIC_MEILI_HOST=https://aidjobs-meili-dev.onrender.com
 NEXT_PUBLIC_AIDJOBS_ENV=dev

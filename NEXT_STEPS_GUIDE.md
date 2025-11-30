@@ -26,17 +26,17 @@ python scripts/run_migration.py
 
 **On Windows (PowerShell)**:
 ```powershell
-$env:SUPABASE_DB_URL="postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+$env:SUPABASE_DB_URL="postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 **On Linux/Mac**:
 ```bash
-export SUPABASE_DB_URL="postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+export SUPABASE_DB_URL="postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 **Or create a `.env` file** in the project root:
 ```
-SUPABASE_DB_URL=postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+SUPABASE_DB_URL=postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
 ```
 
 ---
@@ -189,7 +189,7 @@ Authorization: Bearer <admin-token>
 
 ```powershell
 # 1. Set environment variables
-$env:SUPABASE_DB_URL="postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+$env:SUPABASE_DB_URL="postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 $env:OPENROUTER_API_KEY="your-key-here"
 
 # 2. Run migration

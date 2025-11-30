@@ -28,7 +28,7 @@ Supabase provides a connection pooler that works better with serverless environm
 
 **Pooler URL Format:**
 ```
-postgresql://postgres.yijlbzlzfahubwukulkv:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
 
 **Benefits:**
@@ -57,7 +57,7 @@ The code now tries to resolve the hostname to IPv4 first before connecting.
 If you know the IPv4 address, you can use it directly in the connection string.
 
 **Steps:**
-1. Resolve hostname to IPv4: `nslookup db.yijlbzlzfahubwukulkv.supabase.co`
+1. Resolve hostname to IPv4: `nslookup db.[PROJECT_ID].supabase.co`
 2. Update `SUPABASE_DB_URL` with IPv4 address instead of hostname
 3. **Warning:** IPv4 addresses can change, so this is not recommended
 

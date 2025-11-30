@@ -22,7 +22,7 @@
 1. **Start Backend**:
    ```powershell
    cd apps/backend
-   $env:SUPABASE_DB_URL="postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+   $env:SUPABASE_DB_URL="postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
    $env:OPENROUTER_API_KEY="your-api-key-here"
    python -m uvicorn main:app --reload
    ```
