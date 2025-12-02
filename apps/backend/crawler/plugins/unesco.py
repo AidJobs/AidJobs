@@ -85,9 +85,42 @@ class UNESCOPlugin(ExtractionPlugin):
                 if not title:
                     continue
                 
+                # Validate title is not a date or invalid pattern
+                title_lower = title.lower().strip()
+                # Reject if title is just a date
+                date_patterns = [
+                    r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # DD-MM-YYYY
+                    r'^\d{1,2}\s+[a-z]{3,9}\s+\d{2,4}$',  # DD MMM YYYY
+                    r'^[a-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # MMM DD, YYYY
+                    r'^\d{1,2}-[A-Z]{3,9}-\d{2,4}$',  # DD-MMM-YYYY
+                ]
+                import re
+                is_date = any(re.match(pattern, title_lower) for pattern in date_patterns)
+                if is_date:
+                    logger.warning(f"[unesco] Skipping row - title is a date: '{title}'")
+                    continue
+                
+                # Reject if title is a month abbreviation
+                month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+                if title_lower in month_abbrevs:
+                    logger.warning(f"[unesco] Skipping row - title is a month: '{title}'")
+                    continue
+                
                 # Extract location and deadline
                 location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
                 deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
+                
+                # Validate location is not a month or job title
+                if location:
+                    location_lower = location.lower().strip()
+                    if location_lower in month_abbrevs:
+                        logger.warning(f"[unesco] Invalid location (month): '{location}', setting to None")
+                        location = None
+                    # Check if location looks like a job title (contains job keywords)
+                    job_keywords = ['assistant', 'director', 'manager', 'officer', 'specialist', 'internship']
+                    if any(kw in location_lower for kw in job_keywords):
+                        logger.warning(f"[unesco] Invalid location (contains job keywords): '{location}', setting to None")
+                        location = None
                 
                 # Check if row has a job link
                 link = row.find('a', href=True)

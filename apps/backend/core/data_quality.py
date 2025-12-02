@@ -24,10 +24,14 @@ class DataQualityValidator:
     # Invalid title patterns (labels, dates, placeholders)
     INVALID_TITLE_PATTERNS = [
         r'^(title|location|deadline|closing date|apply by|reference|ref|n/a|na|-|—)$',
-        r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # Date only
-        r'^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$',  # Date with month name
-        r'^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # Month DD, YYYY
+        r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # Date only (DD-MM-YYYY or DD/MM/YYYY)
+        r'^\d{1,2}[-/]\d{1,2}[-/]\d{2}$',  # Date only (DD-MM-YY or DD/MM/YY)
+        r'^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$',  # Date with month name (DD MMM YYYY)
+        r'^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # Month DD, YYYY (Nov 20, 2025)
         r'^(nov|dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct)\s+\d{1,2}$',  # Month + day
+        r'^\d{1,2}-[A-Z]{3,9}-\d{2,4}$',  # DD-MMM-YYYY or DD-MMM-YY (20-DEC-2025)
+        r'^[A-Z]{3,9}\s+\d{1,2},?\s+\d{4}$',  # MMM DD, YYYY (Nov 20, 2025)
+        r'^[A-Za-z]+,?\s+[A-Za-z]+$',  # City, Country pattern (Montreal, Canada) - likely location not title
     ]
     
     # Invalid location patterns
@@ -287,6 +291,30 @@ class DataQualityValidator:
         if title and location and location in title and len(location) > 5:
             issues.append("Title contains location text (may be extraction error)")
             penalty += 10
+        
+        # Check if title is a month abbreviation (likely location contamination)
+        month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+        if title in month_abbrevs:
+            issues.append(f"Title is a month abbreviation: '{title}' (likely extraction error)")
+            penalty += 20
+            reject = True
+        
+        # Check if location is a month abbreviation (should be in location, not title)
+        if location in month_abbrevs:
+            issues.append(f"Location is a month abbreviation: '{location}' (likely extraction error)")
+            penalty += 15
+        
+        # Check if title looks like a location (city, country pattern)
+        if ',' in title and any(kw in title for kw in ['montreal', 'canada', 'paris', 'france', 'geneva', 'switzerland']):
+            issues.append(f"Title looks like a location: '{title}' (likely extraction error)")
+            penalty += 25
+            reject = True
+        
+        # Check if location looks like a job title (contains job keywords)
+        job_keywords = ['assistant', 'director', 'manager', 'officer', 'specialist', 'internship', 'intern']
+        if location and any(kw in location for kw in job_keywords):
+            issues.append(f"Location contains job title keywords: '{location}' (likely extraction error)")
+            penalty += 20
         
         return {
             "issues": issues,
