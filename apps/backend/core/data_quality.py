@@ -3,6 +3,8 @@ Enterprise-grade data quality validation system.
 
 Used by ALL extractors (HTML, RSS, API, JSON, REST) to ensure consistent,
 high-quality job data across all sources.
+
+NOW WITH DATA REPAIR: Instead of rejecting jobs, we attempt to repair them first.
 """
 
 import re
