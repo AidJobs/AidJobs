@@ -921,6 +921,55 @@ async def diagnose_job_id(
         )
         diagnostics["found_by_any_method"] = found_by_any
         
+        # Test 9: Check if job exists but is soft-deleted
+        try:
+            cursor.execute("SELECT id::text, deleted_at, title FROM jobs WHERE id::text = %s LIMIT 1", (job_id,))
+            result = cursor.fetchone()
+            if result:
+                diagnostics["tests"]["including_deleted"] = {
+                    "success": True,
+                    "result": dict(result),
+                    "is_deleted": result.get('deleted_at') is not None,
+                    "query": "WHERE id::text = %s (no deleted_at filter)"
+                }
+            else:
+                diagnostics["tests"]["including_deleted"] = {
+                    "success": False,
+                    "result": None,
+                    "query": "WHERE id::text = %s (no deleted_at filter)"
+                }
+        except Exception as e:
+            diagnostics["tests"]["including_deleted"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 10: Get first 10 job IDs from search endpoint (what UI sees)
+        try:
+            cursor.execute("""
+                SELECT id::text, title, deleted_at 
+                FROM jobs 
+                WHERE deleted_at IS NULL 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            """)
+            search_results = cursor.fetchall()
+            diagnostics["tests"]["search_endpoint_ids"] = {
+                "success": True,
+                "ids": [{"id": row['id'], "title": row.get('title', '')[:50], "deleted_at": row.get('deleted_at')} for row in search_results],
+                "count": len(search_results),
+                "query": "SELECT id::text FROM jobs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10"
+            }
+        except Exception as e:
+            diagnostics["tests"]["search_endpoint_ids"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 11: Check if requested ID is in search results
+        search_ids = [row['id'] for row in search_results] if 'search_results' in locals() else []
+        diagnostics["requested_id_in_search_results"] = job_id in search_ids
+        
         return {
             "status": "ok",
             "data": diagnostics
