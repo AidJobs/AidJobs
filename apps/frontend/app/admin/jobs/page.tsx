@@ -228,13 +228,18 @@ export default function JobManagementPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ 
+          error: `HTTP ${response.status}`,
+          detail: `Server returned ${response.status}`
+        }));
+        const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       if (data.status === 'ok') {
-        toast.success(data.data.message || `Successfully deleted ${data.data.deleted_count} jobs`);
+        const deletedCount = data.data?.deleted_count || 0;
+        toast.success(data.data?.message || `Successfully deleted ${deletedCount} job${deletedCount !== 1 ? 's' : ''}`);
         setSelectedJobs(new Set());
         setShowDeleteModal(false);
         setDeletionReason('');
@@ -243,7 +248,7 @@ export default function JobManagementPage() {
         setHasAnalyzed(false);
         fetchJobs();
       } else {
-        throw new Error(data.error || 'Failed to delete jobs');
+        throw new Error(data.error || data.detail || 'Failed to delete jobs');
       }
     } catch (error) {
       console.error('Failed to delete jobs:', error);

@@ -340,18 +340,31 @@ async def bulk_delete_jobs(
         conn = get_db_conn()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # Validate that at least one filter is provided to prevent accidental deletion of all jobs
+        if not request.job_ids and not request.org_name and not request.source_id:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one filter is required: job_ids, org_name, or source_id"
+            )
+        
         # Build WHERE clause
         where_clauses = []
         params = []
         
         if request.job_ids:
+            if not isinstance(request.job_ids, list) or len(request.job_ids) == 0:
+                raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
             placeholders = ','.join(['%s'] * len(request.job_ids))
             where_clauses.append(f"id::text IN ({placeholders})")
             params.extend(request.job_ids)
         elif request.org_name:
+            if not request.org_name.strip():
+                raise HTTPException(status_code=400, detail="org_name cannot be empty")
             where_clauses.append("org_name ILIKE %s")
             params.append(f"%{request.org_name}%")
         elif request.source_id:
+            if not request.source_id.strip():
+                raise HTTPException(status_code=400, detail="source_id cannot be empty")
             where_clauses.append("source_id::text = %s")
             params.append(request.source_id)
         
@@ -366,7 +379,9 @@ async def bulk_delete_jobs(
         # Only delete non-deleted jobs
         where_clauses.append("deleted_at IS NULL")
         
-        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else "WHERE deleted_at IS NULL"
+        where_clause = f"WHERE {' AND '.join(where_clauses)}"
+        
+        logger.info(f"[bulk_delete] WHERE clause: {where_clause}, params count: {len(params)}")
         
         # Dry run - just count
         if request.dry_run:
@@ -396,16 +411,20 @@ async def bulk_delete_jobs(
         
         # Perform deletion
         if request.deletion_type == "hard":
-            if not request.deletion_reason:
+            if not request.deletion_reason or not request.deletion_reason.strip():
                 raise HTTPException(status_code=400, detail="Deletion reason is required for hard delete")
             
             # Hard delete - actually remove from database
+            logger.info(f"[bulk_delete] Performing hard delete with WHERE: {where_clause}")
             cursor.execute(f"DELETE FROM jobs {where_clause} RETURNING id::text", params)
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
+            logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs")
         else:
             # Soft delete
             deletion_reason = request.deletion_reason or "Bulk deletion via admin"
+            logger.info(f"[bulk_delete] Performing soft delete with WHERE: {where_clause}, reason: {deletion_reason[:50]}")
+            # Note: deletion_reason is for SET clause, params are for WHERE clause
             cursor.execute(f"""
                 UPDATE jobs
                 SET deleted_at = NOW(),
@@ -416,6 +435,7 @@ async def bulk_delete_jobs(
             """, [deletion_reason] + params)
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
+            logger.info(f"[bulk_delete] Soft deleted {deleted_count} jobs")
         
         conn.commit()
         
@@ -459,12 +479,26 @@ async def bulk_delete_jobs(
         }
     except HTTPException:
         raise
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        error_msg = f"Database error: {str(e)}"
+        logger.error(f"[bulk_delete] {error_msg}")
+        logger.error(traceback.format_exc())
+        # Check if it's a column missing error
+        if "column" in str(e).lower() and "does not exist" in str(e).lower():
+            raise HTTPException(
+                status_code=500,
+                detail="Database schema error: Missing deletion columns. Please run migration to add deleted_at, deleted_by, deletion_reason columns."
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Error in bulk delete: {e}")
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"[bulk_delete] {error_msg}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to delete jobs: {str(e)}")
+        raise HTTPException(status_code=500, detail=error_msg)
     finally:
         if cursor:
             cursor.close()

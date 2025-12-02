@@ -354,6 +354,12 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS enrichment_version INTEGER DEFAULT 1;
 
+-- Add soft deletion columns to jobs table (idempotent)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS deleted_by TEXT,
+    ADD COLUMN IF NOT EXISTS deletion_reason TEXT;
+
 -- Create index for enrichment fields
 CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);
 CREATE INDEX IF NOT EXISTS idx_jobs_functional_role ON jobs USING GIN(functional_role);
@@ -361,6 +367,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_experience_level ON jobs(experience_level);
 CREATE INDEX IF NOT EXISTS idx_jobs_sdgs ON jobs USING GIN(sdgs);
 CREATE INDEX IF NOT EXISTS idx_jobs_low_confidence ON jobs(low_confidence) WHERE low_confidence = TRUE;
 CREATE INDEX IF NOT EXISTS idx_jobs_enriched_at ON jobs(enriched_at);
+
+-- Index for soft deletion queries (only index non-null values for performance)
+CREATE INDEX IF NOT EXISTS idx_jobs_deleted_at ON jobs(deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- Indexes for jobs table
 CREATE INDEX IF NOT EXISTS idx_jobs_search_tsv ON jobs USING GIN(search_tsv);
