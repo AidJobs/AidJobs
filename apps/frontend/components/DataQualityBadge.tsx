@@ -41,14 +41,14 @@ export default function DataQualityBadge({
   const hasIssues = (issues && issues.length > 0) || (warnings && warnings.length > 0);
 
   return (
-    <div className="relative group">
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${colors.bg} ${colors.text} ${colors.border} ${size === 'sm' ? 'text-xs' : 'text-sm'} font-medium cursor-help`}>
+    <div className="relative group inline-block">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${colors.bg} ${colors.text} ${colors.border} ${size === 'sm' ? 'text-xs' : 'text-sm'} font-medium cursor-help whitespace-nowrap`}>
         {hasIssues ? (
-          <AlertTriangle className="w-3 h-3" />
+          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
         ) : (
-          <CheckCircle className="w-3 h-3" />
+          <CheckCircle className="w-3 h-3 flex-shrink-0" />
         )}
-        {score}/100
+        <span className="whitespace-nowrap">{score}/100</span>
       </span>
       
       {/* Tooltip on hover */}

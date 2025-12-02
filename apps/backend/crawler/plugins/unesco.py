@@ -144,7 +144,7 @@ class UNESCOPlugin(ExtractionPlugin):
                 location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
                 deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
                 
-                # Validate location is not a month, job title, or same as title
+                # STRICT location validation - reject contaminated locations
                 if location:
                     location_lower = location.lower().strip()
                     title_lower_check = title.lower().strip()
@@ -154,14 +154,51 @@ class UNESCOPlugin(ExtractionPlugin):
                         logger.warning(f"[unesco] REJECTED - location identical to title: '{location}'")
                         continue
                     
+                    # Reject if location contains title (partial contamination)
+                    if title_lower_check and title_lower_check in location_lower and len(title_lower_check) > 5:
+                        logger.warning(f"[unesco] REJECTED - location contains title: '{location}'")
+                        continue
+                    
+                    # Reject if location is a month
                     if location_lower in month_abbrevs:
-                        logger.warning(f"[unesco] Invalid location (month): '{location}', setting to None")
-                        location = None
-                    # Check if location looks like a job title (contains job keywords)
-                    job_keywords = ['assistant', 'director', 'manager', 'officer', 'specialist', 'internship', 'consultant', 'professional', 'grade', 'type of post']
-                    if any(kw in location_lower for kw in job_keywords):
-                        logger.warning(f"[unesco] Invalid location (contains job keywords): '{location}', setting to None")
-                        location = None
+                        logger.warning(f"[unesco] REJECTED - location is a month: '{location}'")
+                        continue
+                    
+                    # STRICT: Reject if location looks like a job title or department
+                    job_title_keywords = [
+                        'assistant', 'director', 'manager', 'officer', 'specialist', 
+                        'internship', 'consultant', 'professional', 'grade', 'type of post',
+                        'deputy', 'senior', 'junior', 'statistical', 'communications',
+                        'public engagement', 'methodologies', 'education', 'project'
+                    ]
+                    # Check if location starts with or contains job keywords (more strict)
+                    location_words = location_lower.split()
+                    if any(kw in location_lower for kw in job_title_keywords):
+                        # Allow if it's a valid location pattern (city, country)
+                        if not (',' in location or any(city in location_lower for city in ['paris', 'montreal', 'kabul', 'cairo', 'geneva', 'bangkok', 'dhaka', 'beijing'])):
+                            logger.warning(f"[unesco] REJECTED - location looks like job title: '{location}'")
+                            continue
+                    
+                    # Reject if location contains date fragments (e.g., "Nov FR", "20 Nov")
+                    date_fragments = ['nov', 'dec', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct']
+                    location_words = location_lower.split()
+                    if any(frag in location_words for frag in date_fragments):
+                        # Only allow if it's clearly a location with a month name (e.g., "November, France" - unlikely)
+                        # Most cases are contamination like "Paris, France Nov FR"
+                        if len(location_words) > 3:  # Suspicious if too many words
+                            logger.warning(f"[unesco] REJECTED - location contains date fragment: '{location}'")
+                            continue
+                    
+                    # Clean location: remove date fragments if they slipped through
+                    location_cleaned = location
+                    for frag in date_fragments:
+                        # Remove standalone month abbreviations
+                        location_cleaned = re.sub(rf'\b{frag}\b', '', location_cleaned, flags=re.IGNORECASE).strip()
+                    location_cleaned = re.sub(r'\s+', ' ', location_cleaned).strip()
+                    
+                    if location_cleaned != location:
+                        logger.info(f"[unesco] Cleaned location: '{location}' -> '{location_cleaned}'")
+                        location = location_cleaned if location_cleaned else None
                 
                 # Verify we have a job link (required)
                 if not link:

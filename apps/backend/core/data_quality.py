@@ -87,11 +87,22 @@ class DataQualityValidator:
             issues.extend(title_validation['issues'])
             score -= title_validation['penalty']
         
-        # 2. Validate location (WARNING - don't reject, but penalize)
+        # 2. Validate location (STRICT - can reject if severely contaminated)
         location_validation = self._validate_location(job.get('location_raw', ''))
+        if location_validation.get('reject', False):
+            logger.warning(f"[data_quality] Job rejected - location contamination: {location_validation['issues']}")
+            return {
+                "valid": False,
+                "score": 0,
+                "issues": location_validation['issues'],
+                "warnings": [],
+                "rejected_reason": location_validation['issues'][0] if location_validation['issues'] else "Location field contamination"
+            }
         if location_validation['issues']:
-            warnings.extend(location_validation['issues'])
+            issues.extend(location_validation['issues'])  # Move to issues (not warnings) for contamination
             score -= location_validation['penalty']
+        if location_validation.get('warnings'):
+            warnings.extend(location_validation['warnings'])
         
         # 3. Validate deadline (WARNING - don't reject, but penalize)
         deadline_validation = self._validate_deadline(job.get('deadline'))
@@ -190,38 +201,91 @@ class DataQualityValidator:
         }
     
     def _validate_location(self, location: Optional[str]) -> Dict[str, Any]:
-        """Validate location field."""
+        """Validate location field - STRICT validation to catch contamination."""
         if not location:
             return {
-                "issues": ["Location is missing"],
-                "penalty": 10
+                "issues": [],
+                "warnings": ["Location is missing"],
+                "penalty": 5,
+                "reject": False
             }
         
         location = location.strip()
+        location_lower = location.lower().strip()
         
-        # Check for invalid patterns
+        # Check for invalid patterns (labels)
         for pattern in self.invalid_location_regex:
             if pattern.match(location):
                 return {
                     "issues": [f"Location appears to be a label: '{location}'"],
-                    "penalty": 15
+                    "penalty": 15,
+                    "reject": False
                 }
         
         issues = []
+        warnings = []
         penalty = 0
+        reject = False
         
-        # Check for suspicious patterns
+        # STRICT: Check if location looks like a job title or department
+        job_title_keywords = [
+            'assistant', 'director', 'manager', 'officer', 'specialist',
+            'internship', 'consultant', 'professional', 'grade', 'type of post',
+            'deputy', 'senior', 'junior', 'statistical', 'communications',
+            'public engagement', 'methodologies', 'education', 'project',
+            'general', 'service', 'contract', 'national'
+        ]
+        
+        # Check if location contains job keywords (more strict)
+        has_job_keywords = any(kw in location_lower for kw in job_title_keywords)
+        
+        if has_job_keywords:
+            # Only allow if it's clearly a valid location pattern (city, country)
+            has_valid_location_pattern = (
+                ',' in location or  # "City, Country" pattern
+                any(city in location_lower for city in [
+                    'paris', 'montreal', 'kabul', 'cairo', 'geneva', 'bangkok',
+                    'dhaka', 'beijing', 'tashkent', 'apia', 'santiago', 'erbil',
+                    'suva', 'almaty', 'perugia', 'moscow'
+                ]) or
+                any(country in location_lower for country in [
+                    'france', 'canada', 'afghanistan', 'egypt', 'switzerland',
+                    'thailand', 'bangladesh', 'china', 'uzbekistan', 'samoa',
+                    'chile', 'iraq', 'fiji', 'kazakhstan', 'italy', 'russia'
+                ])
+            )
+            
+            if not has_valid_location_pattern:
+                issues.append(f"Location looks like a job title/department: '{location}' (severe contamination)")
+                penalty += 30
+                reject = True  # Reject jobs with contaminated locations
+        
+        # STRICT: Check for date fragments in location (e.g., "Nov FR", "20 Nov")
+        date_fragments = ['nov', 'dec', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct']
+        location_words = location_lower.split()
+        has_date_fragments = any(frag in location_words for frag in date_fragments)
+        
+        if has_date_fragments:
+            # If location has date fragments and doesn't look like a valid location, reject
+            if not (',' in location or len(location_words) <= 3):
+                issues.append(f"Location contains date fragments: '{location}' (likely extraction error)")
+                penalty += 25
+                reject = True
+        
+        # Check for suspicious patterns (warnings, not rejections)
         if len(location) < 3:
-            issues.append(f"Location is very short: '{location}'")
+            warnings.append(f"Location is very short: '{location}'")
             penalty += 5
         
         if location.isupper() and len(location) > 10:
-            issues.append("Location is all uppercase (may be formatting issue)")
+            warnings.append("Location is all uppercase (may be formatting issue)")
             penalty += 3
         
         return {
             "issues": issues,
-            "penalty": penalty
+            "warnings": warnings,
+            "penalty": penalty,
+            "reject": reject
         }
     
     def _validate_deadline(self, deadline: Any) -> Dict[str, Any]:

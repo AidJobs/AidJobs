@@ -760,11 +760,13 @@ export default function JobManagementPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 hidden md:table-cell">
-                        <DataQualityBadge 
-                          score={job.data_quality_score} 
-                          issues={job.data_quality_issues || []}
-                          size="sm"
-                        />
+                        <div className="flex items-center justify-start">
+                          <DataQualityBadge 
+                            score={job.data_quality_score} 
+                            issues={job.data_quality_issues || []}
+                            size="sm"
+                          />
+                        </div>
                       </td>
                       <td className="px-3 py-2 hidden lg:table-cell">
                         <div className="text-xs text-[#86868B]">{formatDate(job.created_at)}</div>
