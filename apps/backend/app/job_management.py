@@ -283,9 +283,10 @@ async def get_deletion_impact(
         
         # Count related data (shortlists, enrichment, etc.)
         if request.job_ids:
-            placeholders = ','.join(['%s'] * len(request.job_ids))
-            shortlist_query = f"SELECT COUNT(*) as count FROM shortlists WHERE job_id::text IN ({placeholders})"
-            cursor.execute(shortlist_query, request.job_ids)
+            job_ids_str = [str(jid).strip() for jid in request.job_ids]
+            placeholders = ','.join(['%s'] * len(job_ids_str))
+            shortlist_query = f"SELECT COUNT(*) as count FROM shortlists WHERE job_id::text = ANY(ARRAY[{placeholders}]::text[])"
+            cursor.execute(shortlist_query, job_ids_str)
         else:
             # For org_name or source_id, we need to get job IDs first
             cursor.execute(f"SELECT id::text FROM jobs {where_clause} LIMIT 1000", params)
