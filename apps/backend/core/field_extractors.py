@@ -59,21 +59,67 @@ class FieldExtractor:
     @staticmethod
     def extract_location_from_table_row(row, header_map: Dict[str, int], cells: List) -> Optional[str]:
         """Extract location from table row."""
+        # Try header map first
         if 'location' in header_map and header_map['location'] < len(cells):
             location_cell = cells[header_map['location']]
             location = FieldExtractor._clean_cell_text(location_cell)
             if location and len(location) >= 2:
                 return location
+        
+        # Fallback: search all cells for location-like patterns
+        # Look for city, country patterns (e.g., "Paris, France", "Montreal, Canada")
+        location_patterns = [
+            r'([A-Z][a-zA-Z\s]+),\s*([A-Z][a-zA-Z\s]+)',  # City, Country
+            r'([A-Z][a-zA-Z\s]+)\s+\(([A-Z]{2,3})\)',  # City (Country Code)
+        ]
+        
+        for cell in cells:
+            cell_text = FieldExtractor._clean_cell_text(cell)
+            if not cell_text or len(cell_text) < 3:
+                continue
+            
+            # Check if cell looks like a location (contains city/country keywords)
+            location_keywords = ['paris', 'montreal', 'geneva', 'cairo', 'kabul', 'bangkok', 'dhaka', 
+                               'france', 'canada', 'switzerland', 'egypt', 'afghanistan', 'thailand', 'bangladesh']
+            if any(kw in cell_text.lower() for kw in location_keywords):
+                # Validate it's not a job title
+                job_title_keywords = ['director', 'manager', 'officer', 'specialist', 'assistant']
+                if not any(kw in cell_text.lower() for kw in job_title_keywords):
+                    return cell_text
+        
         return None
     
     @staticmethod
     def extract_deadline_from_table_row(row, header_map: Dict[str, int], cells: List) -> Optional[date]:
         """Extract deadline from table row."""
+        # Try header map first
         if 'deadline' in header_map and header_map['deadline'] < len(cells):
             deadline_cell = cells[header_map['deadline']]
             deadline_text = FieldExtractor._clean_cell_text(deadline_cell)
             if deadline_text:
-                return FieldExtractor.parse_deadline(deadline_text)
+                parsed = FieldExtractor.parse_deadline(deadline_text)
+                if parsed:
+                    return parsed
+        
+        # Fallback: search all cells for date patterns
+        date_patterns = [
+            r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}',  # DD-MM-YYYY
+            r'\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}',  # DD MMM YYYY
+            r'[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}',  # MMM DD, YYYY
+        ]
+        
+        for cell in cells:
+            cell_text = FieldExtractor._clean_cell_text(cell)
+            if not cell_text:
+                continue
+            
+            # Check if cell contains a date pattern
+            for pattern in date_patterns:
+                if re.search(pattern, cell_text):
+                    parsed = FieldExtractor.parse_deadline(cell_text)
+                    if parsed:
+                        return parsed
+        
         return None
     
     @staticmethod
@@ -146,27 +192,28 @@ class FieldExtractor:
             cell_text = cell.get_text().lower().strip()
             
             # Map common column names (more specific matching to avoid false positives)
-            # Title/Position column
-            if any(kw in cell_text for kw in ['title', 'position', 'post', 'job title', 'job position']):
+            # Title/Position column (check first, highest priority)
+            if any(kw in cell_text for kw in ['title', 'position', 'post', 'job title', 'job position', 'post title', 'vacancy']):
                 if 'title' not in column_map:  # Don't overwrite if already found
                     column_map['title'] = idx
-            # Location column
-            elif any(kw in cell_text for kw in ['location', 'place', 'city', 'country', 'duty station']):
+            # Location column (UNESCO uses "Duty Station")
+            elif any(kw in cell_text for kw in ['location', 'place', 'city', 'country', 'duty station', 'duty', 'station', 'work location', 'office']):
                 if 'location' not in column_map:
                     column_map['location'] = idx
-            # Deadline column
-            elif any(kw in cell_text for kw in ['deadline', 'closing', 'apply by', 'expire', 'closing date', 'application deadline']):
+            # Deadline column (UNESCO uses "Application Deadline" or "Closing Date")
+            elif any(kw in cell_text for kw in ['deadline', 'closing', 'apply by', 'expire', 'closing date', 'application deadline', 'deadline for application', 'closing date for application']):
                 if 'deadline' not in column_map:
                     column_map['deadline'] = idx
             # Reference column
-            elif any(kw in cell_text for kw in ['reference', 'ref', 'id', 'job id', 'vacancy id']):
+            elif any(kw in cell_text for kw in ['reference', 'ref', 'id', 'job id', 'vacancy id', 'post number']):
                 if 'reference' not in column_map:
                     column_map['reference'] = idx
             # Apply/Link column
-            elif any(kw in cell_text for kw in ['apply', 'link', 'url', 'details', 'view']):
+            elif any(kw in cell_text for kw in ['apply', 'link', 'url', 'details', 'view', 'more', 'action']):
                 if 'apply' not in column_map:
                     column_map['apply'] = idx
         
+        logger.debug(f"[field_extractor] Parsed header map: {column_map}")
         return column_map
 
 

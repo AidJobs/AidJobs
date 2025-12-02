@@ -141,8 +141,15 @@ class UNESCOPlugin(ExtractionPlugin):
                     continue
                 
                 # Extract location and deadline (only if we have a valid title)
+                # Use header map if available, otherwise try fallback extraction
                 location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
                 deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
+                
+                # DEBUG: Log extraction results
+                if not location:
+                    logger.debug(f"[unesco] No location extracted for '{title[:50]}...' - cells: {[c.get_text().strip()[:30] for c in cells]}")
+                if not deadline:
+                    logger.debug(f"[unesco] No deadline extracted for '{title[:50]}...' - cells: {[c.get_text().strip()[:30] for c in cells]}")
                 
                 # STRICT location validation - reject contaminated locations
                 if location:
