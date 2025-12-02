@@ -312,7 +312,12 @@ export default function JobManagementPage() {
         setExportData(false);
         setImpactAnalysis(null);
         setHasAnalyzed(false);
-        fetchJobs();
+        // Force refresh by resetting page to 1 and clearing cache
+        setPage(1);
+        // Small delay to ensure backend has processed deletion
+        setTimeout(() => {
+          fetchJobs();
+        }, 100);
       } else {
         throw new Error(data.error || data.detail || 'Failed to delete jobs');
       }

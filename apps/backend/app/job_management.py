@@ -116,8 +116,11 @@ async def search_jobs(
             where_clauses.append("(deleted_at IS NULL)")
         elif status == 'deleted':
             where_clauses.append("(deleted_at IS NOT NULL)")
-        elif not include_deleted:
-            where_clauses.append("(deleted_at IS NULL)")
+        else:
+            # status == 'all' or None
+            # Always exclude deleted jobs unless explicitly included
+            if not include_deleted:
+                where_clauses.append("(deleted_at IS NULL)")
         
         # Search query (title, org_name, description)
         if query:
