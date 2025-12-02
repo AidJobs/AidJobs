@@ -377,14 +377,14 @@ class DataQualityValidator:
             'apia', 'samoa', 'santiago', 'chile', 'erbil', 'iraq', 'suva', 'fiji',
             'almaty', 'kazakhstan', 'perugia', 'italy', 'moscow', 'russian'
         ]
-        if ',' in title and any(kw in title_lower for kw in location_indicators):
+        if ',' in title and any(kw in title for kw in location_indicators):
             issues.append(f"Title looks like a location: '{title}' (likely extraction error)")
             penalty += 25
             reject = True
         
         # Check if title is just a label (common in table headers)
         label_patterns = ['title', 'location', 'deadline', 'closing date', 'apply by', 'reference', 'ref', 'grade', 'level', 'type of post', 'project assistant', 'service contract', 'logistics officer', 'general services']
-        if title_lower in label_patterns:
+        if title in label_patterns:
             issues.append(f"Title is a label: '{title}' (likely extraction error)")
             penalty += 20
             reject = True

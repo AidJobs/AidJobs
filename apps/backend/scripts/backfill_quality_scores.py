@@ -53,7 +53,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from core.data_quality import data_quality_validator
 
 
-def backfill_quality_scores(db_url: str, batch_size: int = 100, dry_run: bool = False):
+def backfill_quality_scores(db_url: str, batch_size: int = 100, dry_run: bool = False, force_rescore: bool = False):
     """Backfill quality scores for existing jobs."""
     conn = None
     cursor = None
@@ -63,17 +63,28 @@ def backfill_quality_scores(db_url: str, batch_size: int = 100, dry_run: bool = 
         conn = psycopg2.connect(db_url)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Count jobs without quality scores
-        cursor.execute("""
-            SELECT COUNT(*) as count
-            FROM jobs
-            WHERE data_quality_score IS NULL
-        """)
-        total_jobs = cursor.fetchone()['count']
-        logger.info(f"Found {total_jobs} jobs without quality scores")
+        if force_rescore:
+            # Count all active jobs for re-scoring
+            cursor.execute("""
+                SELECT COUNT(*) as count
+                FROM jobs
+                WHERE deleted_at IS NULL
+            """)
+            total_jobs = cursor.fetchone()['count']
+            logger.info(f"🔄 FORCE MODE: Found {total_jobs} active jobs to re-score with updated validation")
+        else:
+            # Count jobs without quality scores
+            cursor.execute("""
+                SELECT COUNT(*) as count
+                FROM jobs
+                WHERE data_quality_score IS NULL
+            """)
+            total_jobs = cursor.fetchone()['count']
+            logger.info(f"Found {total_jobs} jobs without quality scores")
         
-        if total_jobs == 0:
+        if total_jobs == 0 and not force_rescore:
             logger.info("All jobs already have quality scores!")
+            logger.info("💡 Tip: Use --force or --rescore to re-score all jobs with updated validation")
             return
         
         if dry_run:
@@ -86,20 +97,35 @@ def backfill_quality_scores(db_url: str, batch_size: int = 100, dry_run: bool = 
         rejected_count = 0
         
         while offset < total_jobs:
-            # Fetch batch of jobs without quality scores
-            cursor.execute("""
-                SELECT 
-                    id::text,
-                    title,
-                    location_raw,
-                    deadline,
-                    apply_url,
-                    org_name
-                FROM jobs
-                WHERE data_quality_score IS NULL
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-            """, (batch_size, offset))
+            # Fetch batch of jobs
+            if force_rescore:
+                cursor.execute("""
+                    SELECT 
+                        id::text,
+                        title,
+                        location_raw,
+                        deadline,
+                        apply_url,
+                        org_name
+                    FROM jobs
+                    WHERE deleted_at IS NULL
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """, (batch_size, offset))
+            else:
+                cursor.execute("""
+                    SELECT 
+                        id::text,
+                        title,
+                        location_raw,
+                        deadline,
+                        apply_url,
+                        org_name
+                    FROM jobs
+                    WHERE data_quality_score IS NULL
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """, (batch_size, offset))
             
             jobs = cursor.fetchall()
             if not jobs:
@@ -202,8 +228,9 @@ if __name__ == "__main__":
         logger.error("Please set SUPABASE_DB_URL or DATABASE_URL")
         sys.exit(1)
     
-    # Check for dry-run flag
+    # Check for flags
     dry_run = '--dry-run' in sys.argv or '-n' in sys.argv
+    force_rescore = '--force' in sys.argv or '--rescore' in sys.argv
     
     # Mask URL in logs
     try:
@@ -215,7 +242,7 @@ if __name__ == "__main__":
         logger.info("Database: [connection string from environment]")
     
     try:
-        backfill_quality_scores(db_url, dry_run=dry_run)
+        backfill_quality_scores(db_url, batch_size=100, dry_run=dry_run, force_rescore=force_rescore)
         logger.info("\n✅ Backfill completed successfully!")
     except Exception as e:
         logger.error(f"\n❌ Backfill failed: {e}")
