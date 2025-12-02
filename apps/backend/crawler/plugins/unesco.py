@@ -54,26 +54,45 @@ class UNESCOPlugin(ExtractionPlugin):
                 continue
             
             # Find header row and parse column mapping
-            for idx, row in enumerate(rows[:5]):  # Check first 5 rows
-                cells = row.find_all(['th', 'td'])
-                if not cells:
-                    continue
-                
-                # Check if this looks like a header row
-                row_text = row.get_text().lower()
-                header_keywords = ['title', 'position', 'location', 'deadline', 'apply', 'reference']
-                header_keyword_count = sum(1 for kw in header_keywords if kw in row_text)
-                
-                # If row has many header keywords or mostly th tags, it's likely a header
-                if header_keyword_count >= 2 or (len(row.find_all('th')) > len(row.find_all('td'))):
-                    header_map = field_extractor.parse_table_header(row)
-                    logger.info(f"[unesco] Found header row with columns: {header_map}")
-                    break
+            # UNESCO often has header in thead or first row with th tags
+            thead = table.find('thead')
+            if thead:
+                header_row = thead.find('tr')
+                if header_row:
+                    header_map = field_extractor.parse_table_header(header_row)
+                    logger.info(f"[unesco] Found header in thead with columns: {header_map}")
+            
+            # If no thead, check first few rows
+            if not header_map:
+                for idx, row in enumerate(rows[:10]):  # Check first 10 rows (more thorough)
+                    cells = row.find_all(['th', 'td'])
+                    if not cells:
+                        continue
+                    
+                    # Check if this looks like a header row
+                    row_text = row.get_text().lower()
+                    header_keywords = ['title', 'position', 'location', 'duty station', 'deadline', 'application deadline', 'apply', 'reference', 'closing']
+                    header_keyword_count = sum(1 for kw in header_keywords if kw in row_text)
+                    
+                    # If row has many header keywords or mostly th tags, it's likely a header
+                    if header_keyword_count >= 2 or (len(row.find_all('th')) > len(row.find_all('td'))):
+                        header_map = field_extractor.parse_table_header(row)
+                        logger.info(f"[unesco] Found header row at index {idx} with columns: {header_map}")
+                        break
             
             # Extract jobs from data rows using header map
+            header_row_found = False
             for row in rows:
-                # Skip header rows
-                if row.find_parent('thead') or (row.find('th') and not row.find('td')):
+                # Skip header rows (check if this is the header row we identified)
+                if row.find_parent('thead'):
+                    header_row_found = True
+                    continue
+                
+                # Skip rows that are mostly th tags (likely header)
+                th_count = len(row.find_all('th'))
+                td_count = len(row.find_all('td'))
+                if th_count > td_count and th_count > 0:
+                    header_row_found = True
                     continue
                 
                 cells = row.find_all(['td', 'th'])
