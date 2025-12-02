@@ -250,9 +250,11 @@ async def get_deletion_impact(
         params = []
         
         if request.job_ids:
-            placeholders = ','.join(['%s'] * len(request.job_ids))
-            where_clauses.append(f"id::text IN ({placeholders})")
-            params.extend(request.job_ids)
+            # Use text array comparison - same as deletion endpoint
+            job_ids_str = [str(jid).strip() for jid in request.job_ids]
+            placeholders = ','.join(['%s'] * len(job_ids_str))
+            where_clauses.append(f"id::text = ANY(ARRAY[{placeholders}]::text[])")
+            params.extend(job_ids_str)
         elif request.org_name:
             where_clauses.append("org_name ILIKE %s")
             params.append(f"%{request.org_name}%")
