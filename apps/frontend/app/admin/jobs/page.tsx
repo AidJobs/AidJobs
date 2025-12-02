@@ -66,8 +66,8 @@ export default function JobManagementPage() {
   const [deletionType, setDeletionType] = useState<'soft' | 'hard'>('soft');
   const [deletionReason, setDeletionReason] = useState('');
   const [exportData, setExportData] = useState(false);
-  const [dryRun, setDryRun] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<SearchFilters>({
@@ -175,8 +175,7 @@ export default function JobManagementPage() {
       const data = await response.json();
       if (data.status === 'ok') {
         setImpactAnalysis(data.data);
-        // After a successful analysis, switch off dry-run so the next click will perform deletion
-        setDryRun(false);
+        setHasAnalyzed(true);
         toast.success('Impact analyzed. Review details and click Delete to proceed.');
       } else {
         throw new Error(data.error || 'Failed to analyze impact');
@@ -190,11 +189,13 @@ export default function JobManagementPage() {
   }, [selectedJobs, filters]);
 
   const handleDelete = async () => {
-    if (dryRun) {
+    // If impact hasn't been analyzed yet, analyze first
+    if (!hasAnalyzed) {
       await fetchImpactAnalysis();
       return;
     }
 
+    // Validate hard delete requires reason
     if (deletionType === 'hard' && !deletionReason.trim()) {
       toast.error('Deletion reason is required for hard delete');
       return;
@@ -206,7 +207,7 @@ export default function JobManagementPage() {
         deletion_type: deletionType,
         deletion_reason: deletionReason || undefined,
         export_data: exportData,
-        dry_run: false,
+        dry_run: false, // Always false for actual deletion
       };
 
       if (selectedJobs.size > 0) {
@@ -238,7 +239,8 @@ export default function JobManagementPage() {
         setShowDeleteModal(false);
         setDeletionReason('');
         setExportData(false);
-        setDryRun(true);
+        setImpactAnalysis(null);
+        setHasAnalyzed(false);
         fetchJobs();
       } else {
         throw new Error(data.error || 'Failed to delete jobs');
@@ -531,7 +533,7 @@ export default function JobManagementPage() {
                   onClick={() => {
                     setShowDeleteModal(true);
                     setImpactAnalysis(null);
-                    setDryRun(true);
+                    setHasAnalyzed(false);
                   }}
                   className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1.5 text-xs"
                 >
@@ -664,7 +666,7 @@ export default function JobManagementPage() {
                                 setSelectedJobs(new Set([job.id]));
                                 setShowDeleteModal(true);
                                 setImpactAnalysis(null);
-                                setDryRun(true);
+                                setHasAnalyzed(false);
                               }}
                               className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
                               aria-label="Delete job"
@@ -721,53 +723,55 @@ export default function JobManagementPage() {
       {/* Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-[#D2D2D7] px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-[#1D1D1F] flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto shadow-lg">
+            <div className="sticky top-0 bg-white border-b border-[#D2D2D7] px-4 py-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-[#1D1D1F] flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
                 Delete Jobs
               </h2>
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
+                  setImpactAnalysis(null);
+                  setHasAnalyzed(false);
                 }}
-                className="p-2 hover:bg-[#F5F5F7] rounded-lg transition-colors"
+                className="p-1.5 hover:bg-[#F5F5F7] rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-[#86868B]" />
+                <X className="w-4 h-4 text-[#86868B]" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 space-y-4">
               {/* Impact Analysis Preview */}
               {loadingImpact ? (
-                <div className="p-4 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
+                <div className="p-3 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
                   <div className="flex items-center gap-2 text-[#86868B]">
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Analyzing deletion impact...</span>
+                    <span className="text-xs">Analyzing deletion impact...</span>
                   </div>
                 </div>
               ) : impactAnalysis ? (
-                <div className={`p-4 rounded-lg border-2 ${getRiskColor(impactAnalysis.risk_level)}`}>
-                  <div className="flex items-start gap-3 mb-3">
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className={`p-3 rounded-lg border-2 ${getRiskColor(impactAnalysis.risk_level)}`}>
+                  <div className="flex items-start gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-semibold mb-2">Deletion Impact Analysis</p>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                      <p className="text-sm font-semibold mb-2">Deletion Impact</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-[#86868B]">Total Jobs:</span>
-                          <span className="font-semibold ml-2">{impactAnalysis.total_jobs}</span>
+                          <span className="text-[#86868B]">Total:</span>
+                          <span className="font-semibold ml-1">{impactAnalysis.total_jobs}</span>
                         </div>
                         <div>
-                          <span className="text-[#86868B]">Active Jobs:</span>
-                          <span className="font-semibold ml-2">{impactAnalysis.active_jobs}</span>
+                          <span className="text-[#86868B]">Active:</span>
+                          <span className="font-semibold ml-1">{impactAnalysis.active_jobs}</span>
                         </div>
                         <div>
-                          <span className="text-[#86868B]">User Shortlists:</span>
-                          <span className="font-semibold ml-2">{impactAnalysis.shortlists_count}</span>
+                          <span className="text-[#86868B]">Shortlists:</span>
+                          <span className="font-semibold ml-1">{impactAnalysis.shortlists_count}</span>
                         </div>
                         <div>
-                          <span className="text-[#86868B]">Risk Level:</span>
-                          <span className={`font-semibold ml-2 capitalize ${impactAnalysis.risk_level === 'high' ? 'text-red-600' : impactAnalysis.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>
+                          <span className="text-[#86868B]">Risk:</span>
+                          <span className={`font-semibold ml-1 capitalize ${impactAnalysis.risk_level === 'high' ? 'text-red-600' : impactAnalysis.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>
                             {impactAnalysis.risk_level}
                           </span>
                         </div>
@@ -779,37 +783,37 @@ export default function JobManagementPage() {
 
               {/* Deletion Type */}
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-[#1D1D1F] flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
+                <label className="text-xs font-semibold text-[#1D1D1F] flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />
                   Deletion Type
                 </label>
-                <div className="flex gap-3">
-                  <label className="flex-1 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
+                <div className="flex gap-2">
+                  <label className="flex-1 p-2.5 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
                     <input
                       type="radio"
                       name="deletionType"
                       value="soft"
                       checked={deletionType === 'soft'}
                       onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
-                      className="mr-2"
+                      className="mr-1.5"
                     />
                     <div>
-                      <div className="font-medium text-[#1D1D1F]">Soft Delete</div>
-                      <div className="text-xs text-[#86868B] mt-1">Mark as deleted (recoverable)</div>
+                      <div className="text-sm font-medium text-[#1D1D1F]">Soft Delete</div>
+                      <div className="text-[11px] text-[#86868B] mt-0.5">Recoverable</div>
                     </div>
                   </label>
-                  <label className="flex-1 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
+                  <label className="flex-1 p-2.5 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
                     <input
                       type="radio"
                       name="deletionType"
                       value="hard"
                       checked={deletionType === 'hard'}
                       onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
-                      className="mr-2"
+                      className="mr-1.5"
                     />
                     <div>
-                      <div className="font-medium text-[#1D1D1F]">Hard Delete</div>
-                      <div className="text-xs text-[#86868B] mt-1">Permanently remove (cannot be recovered)</div>
+                      <div className="text-sm font-medium text-[#1D1D1F]">Hard Delete</div>
+                      <div className="text-[11px] text-[#86868B] mt-0.5">Permanent</div>
                     </div>
                   </label>
                 </div>
@@ -817,71 +821,64 @@ export default function JobManagementPage() {
 
               {/* Deletion Reason */}
               {deletionType === 'hard' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-[#1D1D1F]">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#1D1D1F]">
                     Deletion Reason <span className="text-red-600">*</span>
                   </label>
                   <textarea
                     value={deletionReason}
                     onChange={(e) => setDeletionReason(e.target.value)}
-                    placeholder="Explain why you're performing a hard delete (required for audit trail)"
-                    className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
-                    rows={3}
+                    placeholder="Required for audit trail..."
+                    className="w-full px-2.5 py-2 border border-[#D2D2D7] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                    rows={2}
                   />
                 </div>
               )}
 
-              {/* Options */}
-              <div className="space-y-3 p-4 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={dryRun}
-                    onChange={(e) => setDryRun(e.target.checked)}
-                    className="w-4 h-4 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-[#1D1D1F]">Dry Run Mode</span>
-                    <p className="text-xs text-[#86868B]">Preview deletion without actually deleting</p>
-                  </div>
-                </label>
+              {/* Export Option */}
+              <div className="p-3 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={exportData}
                     onChange={(e) => setExportData(e.target.checked)}
-                    className="w-4 h-4 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
+                    className="w-3.5 h-3.5 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
                   />
                   <div className="flex-1">
-                    <span className="text-sm font-medium text-[#1D1D1F]">Export Data Before Deletion</span>
-                    <p className="text-xs text-[#86868B]">Download job data as JSON before deletion</p>
+                    <span className="text-xs font-medium text-[#1D1D1F]">Export data before deletion</span>
+                    <p className="text-[11px] text-[#86868B] mt-0.5">Download as JSON</p>
                   </div>
                 </label>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleDelete}
-                  disabled={deleting || (deletionType === 'hard' && !deletionReason.trim())}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                  disabled={deleting || loadingImpact || (hasAnalyzed && deletionType === 'hard' && !deletionReason.trim())}
+                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                 >
                   {deleting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      {dryRun ? 'Analyzing...' : 'Deleting...'}
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : loadingImpact ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Analyzing...
                     </>
                   ) : (
                     <>
-                      {dryRun ? (
+                      {hasAnalyzed ? (
                         <>
-                          <AlertTriangle className="w-4 h-4" />
-                          Analyze Impact
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {deletionType === 'soft' ? 'Soft Delete' : 'Hard Delete'}
                         </>
                       ) : (
                         <>
-                          <Trash2 className="w-4 h-4" />
-                          {deletionType === 'soft' ? 'Soft Delete' : 'Hard Delete'}
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Analyze Impact
                         </>
                       )}
                     </>
@@ -890,8 +887,10 @@ export default function JobManagementPage() {
                 <button
                   onClick={() => {
                     setShowDeleteModal(false);
+                    setImpactAnalysis(null);
+                    setHasAnalyzed(false);
                   }}
-                  className="px-4 py-2.5 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors font-medium"
+                  className="px-3 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors text-sm font-medium"
                 >
                   Cancel
                 </button>

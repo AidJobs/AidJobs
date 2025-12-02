@@ -20,6 +20,14 @@ from app.db_config import db_config
 
 logger = logging.getLogger(__name__)
 
+# Try to import Meilisearch for index updates
+try:
+    import meilisearch
+    MEILISEARCH_AVAILABLE = True
+except ImportError:
+    meilisearch = None  # type: ignore[assignment]
+    MEILISEARCH_AVAILABLE = False
+
 router = APIRouter(prefix="/api/admin/jobs", tags=["job_management"])
 
 
@@ -410,6 +418,32 @@ async def bulk_delete_jobs(
             deleted_count = len(deleted_ids)
         
         conn.commit()
+        
+        # Remove deleted jobs from Meilisearch index (both hard and soft deletes)
+        # Soft-deleted jobs should also be removed from search since they're filtered out
+        if deleted_ids and MEILISEARCH_AVAILABLE:
+            try:
+                meili_host = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_HOST")
+                meili_key = os.getenv("MEILISEARCH_KEY") or os.getenv("MEILI_API_KEY")
+                meili_index_name = os.getenv("MEILI_JOBS_INDEX", "jobs_index")
+                
+                if meili_host and meili_key:
+                    client = meilisearch.Client(meili_host, meili_key)
+                    index = client.index(meili_index_name)
+                    
+                    # Delete in batches of 100 (Meilisearch limit)
+                    batch_size = 100
+                    for i in range(0, len(deleted_ids), batch_size):
+                        batch = deleted_ids[i:i + batch_size]
+                        try:
+                            index.delete_documents(batch)
+                            logger.info(f"Deleted {len(batch)} jobs from Meilisearch index")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete some jobs from Meilisearch: {e}")
+                            # Continue with other batches even if one fails
+            except Exception as e:
+                logger.warning(f"Failed to update Meilisearch after deletion: {e}")
+                # Don't fail the entire operation if Meilisearch update fails
         
         logger.info(f"Bulk deleted {deleted_count} jobs (type: {request.deletion_type})")
         
