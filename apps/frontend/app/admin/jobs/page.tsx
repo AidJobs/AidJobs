@@ -728,7 +728,6 @@ export default function JobManagementPage() {
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
-                  setShowImpactModal(false);
                 }}
                 className="p-2 hover:bg-[#F5F5F7] rounded-lg transition-colors"
               >
@@ -889,7 +888,6 @@ export default function JobManagementPage() {
                 <button
                   onClick={() => {
                     setShowDeleteModal(false);
-                    setShowImpactModal(false);
                   }}
                   className="px-4 py-2.5 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors font-medium"
                 >
