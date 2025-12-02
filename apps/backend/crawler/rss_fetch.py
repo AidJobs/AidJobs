@@ -86,8 +86,49 @@ class RSSCrawler:
             except:
                 pass
         
-        # Try to extract location from title or description
+        # Enhanced location extraction from description
         job['location_raw'] = None
+        description_text = job.get('description_snippet', '') or job.get('title', '')
+        if description_text:
+            # Look for location patterns in description
+            location_patterns = [
+                r'Location[:\s]+([A-Z][a-zA-Z\s,]+)',
+                r'Duty Station[:\s]+([A-Z][a-zA-Z\s,]+)',
+                r'Based in[:\s]+([A-Z][a-zA-Z\s,]+)',
+                r'([A-Z][a-zA-Z\s]+),\s*([A-Z][a-zA-Z\s]+)',  # City, Country
+            ]
+            
+            for pattern in location_patterns:
+                match = re.search(pattern, description_text, re.IGNORECASE)
+                if match:
+                    location = match.group(1) if match.lastindex >= 1 else match.group(0)
+                    # Clean location
+                    location = re.sub(r'^(Location|Duty Station|Based in)[:\s]+', '', location, flags=re.I).strip()
+                    # Validate it's not a job title
+                    job_keywords = ['director', 'manager', 'officer', 'specialist', 'assistant']
+                    if location and len(location) >= 3 and not any(kw in location.lower() for kw in job_keywords):
+                        job['location_raw'] = location
+                        break
+        
+        # Enhanced deadline extraction from description
+        if not job.get('deadline') and description_text:
+            deadline_patterns = [
+                r'Deadline[:\s]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})',
+                r'Closing Date[:\s]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})',
+                r'Apply by[:\s]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})',
+                r'Application Deadline[:\s]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})',
+            ]
+            
+            for pattern in deadline_patterns:
+                match = re.search(pattern, description_text, re.IGNORECASE)
+                if match:
+                    try:
+                        parsed = date_parser.parse(match.group(1), fuzzy=True)
+                        if parsed.date() > datetime.now().date():
+                            job['deadline'] = parsed.date()
+                            break
+                    except:
+                        continue
         
         # Org name
         job['org_name'] = None
