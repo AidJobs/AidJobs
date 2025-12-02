@@ -780,6 +780,76 @@ async def export_jobs(
             conn.close()
 
 
+@router.get("/diagnose/search-vs-db")
+async def diagnose_search_vs_db(
+    admin=Depends(admin_required)
+):
+    """
+    Compare what the search endpoint returns vs what's actually in the database.
+    This helps identify if there's a mismatch between UI and database.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get what search endpoint would return (first 50 jobs)
+        cursor.execute("""
+            SELECT id::text, title, deleted_at, created_at
+            FROM jobs 
+            WHERE deleted_at IS NULL 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        """)
+        search_results = cursor.fetchall()
+        search_ids = [row['id'] for row in search_results]
+        
+        # Get total count
+        cursor.execute("SELECT COUNT(*) as total FROM jobs WHERE deleted_at IS NULL")
+        active_count = cursor.fetchone()['total']
+        
+        cursor.execute("SELECT COUNT(*) as total FROM jobs")
+        total_count = cursor.fetchone()['total']
+        
+        return {
+            "status": "ok",
+            "data": {
+                "search_endpoint_results": {
+                    "count": len(search_results),
+                    "ids": search_ids[:20],  # First 20 for display
+                    "sample_jobs": [
+                        {
+                            "id": row['id'],
+                            "title": row.get('title', '')[:50],
+                            "created_at": str(row.get('created_at', ''))[:19]
+                        }
+                        for row in search_results[:10]
+                    ]
+                },
+                "database_stats": {
+                    "total_jobs": total_count,
+                    "active_jobs": active_count,
+                    "deleted_jobs": total_count - active_count
+                },
+                "note": "These are the job IDs that the search endpoint returns (what UI sees). Compare these with the IDs you're trying to delete."
+            }
+        }
+    except Exception as e:
+        logger.error(f"[diagnose_search_vs_db] Error: {e}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc() if os.getenv("AIDJOBS_ENV", "").lower() == "dev" else None
+        }
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 @router.get("/diagnose/{job_id}")
 async def diagnose_job_id(
     job_id: str,
