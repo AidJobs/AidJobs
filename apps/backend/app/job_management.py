@@ -90,6 +90,7 @@ async def search_jobs(
     include_deleted: bool = Query(False),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    quality_min: Optional[int] = Query(None, ge=0, le=100),
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=200),
     sort_by: Optional[str] = Query(None),
@@ -147,6 +148,11 @@ async def search_jobs(
             where_clauses.append("created_at <= %s")
             params.append(date_to)
         
+        # Quality score filter
+        if quality_min is not None:
+            where_clauses.append("data_quality_score >= %s")
+            params.append(quality_min)
+        
         where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         
         # Count total
@@ -180,7 +186,9 @@ async def search_jobs(
                 fetched_at,
                 deleted_at,
                 deleted_by,
-                deletion_reason
+                deletion_reason,
+                data_quality_score,
+                data_quality_issues
             FROM jobs
             {where_clause}
             {order_by}

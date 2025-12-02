@@ -2,7 +2,7 @@
 UNESCO-specific extraction plugin.
 
 Handles UNESCO job listings with multiple fallback patterns:
-1. Table rows with job listings
+1. Table rows with job listings (ENHANCED: proper column mapping)
 2. Divs with job listings (card-based layouts)
 3. List items with job content
 4. Links with job-related text/URLs
@@ -12,6 +12,7 @@ import logging
 from typing import List, Dict, Optional
 from urllib.parse import urljoin
 from .base import ExtractionPlugin, PluginResult
+from core.field_extractors import field_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -43,54 +44,70 @@ class UNESCOPlugin(ExtractionPlugin):
         
         self.logger.info(f"Using UNESCO-specific extraction for {base_url}")
         
-        # Pattern 1: Table rows with job listings
+        # Pattern 1: Table rows with job listings (ENHANCED with proper column mapping)
         tables = soup.find_all('table')
-        header_keywords = ['title', 'position', 'location', 'deadline', 'apply', 'reference', 'post', 'vacancy']
-        is_likely_header_row = {}
-        
-        for idx, row in enumerate(tables[0].find_all('tr')[:5] if tables else []):
-            row_text = row.get_text().lower()
-            th_count = len(row.find_all('th'))
-            td_count = len(row.find_all('td'))
-            header_keyword_count = sum(1 for kw in header_keywords if kw in row_text)
-            
-            if (th_count > td_count or header_keyword_count >= 3) and idx < 3:
-                is_likely_header_row[idx] = True
+        header_map = None
         
         for table in tables:
             rows = table.find_all('tr')
-            for idx, row in enumerate(rows):
-                if (row.find_parent('thead') or
-                    (row.find('th') and not row.find('td')) or
-                    is_likely_header_row.get(idx, False)):
+            if not rows:
+                continue
+            
+            # Find header row and parse column mapping
+            for idx, row in enumerate(rows[:5]):  # Check first 5 rows
+                cells = row.find_all(['th', 'td'])
+                if not cells:
                     continue
                 
+                # Check if this looks like a header row
                 row_text = row.get_text().lower()
-                has_job_keywords = any(kw in row_text for kw in [
-                    'position', 'vacancy', 'post', 'recruit', 'opportunity',
-                    'consultant', 'specialist', 'officer', 'manager', 'coordinator',
-                    'programme', 'project', 'fellowship', 'internship'
-                ])
-                has_link = row.find('a', href=True)
+                header_keywords = ['title', 'position', 'location', 'deadline', 'apply', 'reference']
+                header_keyword_count = sum(1 for kw in header_keywords if kw in row_text)
                 
-                if has_job_keywords and has_link and len(row_text.strip()) > 20:
-                    links = row.find_all('a', href=True)
-                    has_job_link = False
-                    for link in links:
-                        href = link.get('href', '').lower()
-                        link_text = link.get_text().lower().strip()
-                        if (any(kw in href for kw in ['/job/', '/position/', '/vacancy/', '/post/', '/opportunity/']) or
-                            any(kw in link_text for kw in ['view', 'details', 'apply', 'read more']) or
-                            re.search(r'/\d{4,}', href)):
-                            has_job_link = True
-                            break
-                    
-                    if has_job_link or len(links) == 1:
-                        job_elements.append(row)
-                        if len(job_elements) >= 100:
-                            break
-            if len(job_elements) >= 100:
-                break
+                # If row has many header keywords or mostly th tags, it's likely a header
+                if header_keyword_count >= 2 or (len(row.find_all('th')) > len(row.find_all('td'))):
+                    header_map = field_extractor.parse_table_header(row)
+                    logger.info(f"[unesco] Found header row with columns: {header_map}")
+                    break
+            
+            # Extract jobs from data rows using header map
+            for row in rows:
+                # Skip header rows
+                if row.find_parent('thead') or (row.find('th') and not row.find('td')):
+                    continue
+                
+                cells = row.find_all(['td', 'th'])
+                if len(cells) < 2:  # Need at least 2 cells
+                    continue
+                
+                # Extract title using header map
+                title = field_extractor.extract_title_from_table_row(row, header_map or {}, cells)
+                if not title:
+                    continue
+                
+                # Extract location and deadline
+                location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
+                deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
+                
+                # Check if row has a job link
+                link = row.find('a', href=True)
+                if not link:
+                    continue
+                
+                # Add to job elements with extracted data
+                job_elements.append({
+                    'row': row,
+                    'title': title,
+                    'location': location,
+                    'deadline': deadline,
+                    'link': link
+                })
+                
+                if len(job_elements) >= 100:
+                    break
+            
+            if job_elements:
+                break  # Found jobs, no need to check other tables
         
         # Pattern 2: Divs with job listings
         if not job_elements:
@@ -161,31 +178,63 @@ class UNESCOPlugin(ExtractionPlugin):
         # Convert to standard job format
         jobs = []
         for elem in job_elements:
-            link = elem.find('a', href=True)
-            if not link:
-                continue
-            
-            href = link.get('href', '')
-            if not href or href.startswith('#') or href.startswith('javascript:'):
-                continue
-            
-            apply_url = urljoin(base_url, href)
-            
-            # Extract title
-            title = link.get_text().strip()
-            if not title or len(title) < 5:
-                # Try to find title in parent element
-                parent_text = elem.get_text().strip()
-                if len(parent_text) > len(title):
-                    # Use first line or first 100 chars
-                    title = parent_text.split('\n')[0][:100].strip()
-            
-            if title and len(title) >= 5:
-                jobs.append({
+            # Handle enhanced table row extraction
+            if isinstance(elem, dict):
+                title = elem.get('title')
+                location = elem.get('location')
+                deadline = elem.get('deadline')
+                link = elem.get('link')
+                row = elem.get('row')
+                
+                if not link or not title:
+                    continue
+                
+                href = link.get('href', '')
+                if not href or href.startswith('#') or href.startswith('javascript:'):
+                    continue
+                
+                apply_url = urljoin(base_url, href)
+                
+                job = {
                     'title': title,
                     'apply_url': apply_url,
-                    'description_snippet': elem.get_text()[:500] if elem.get_text() else None
-                })
+                    'description_snippet': row.get_text()[:500] if row else None
+                }
+                
+                # Add location and deadline if extracted
+                if location:
+                    job['location_raw'] = location
+                if deadline:
+                    job['deadline'] = deadline
+                
+                jobs.append(job)
+            else:
+                # Fallback: original extraction logic for non-table elements
+                link = elem.find('a', href=True)
+                if not link:
+                    continue
+                
+                href = link.get('href', '')
+                if not href or href.startswith('#') or href.startswith('javascript:'):
+                    continue
+                
+                apply_url = urljoin(base_url, href)
+                
+                # Extract title
+                title = link.get_text().strip()
+                if not title or len(title) < 5:
+                    # Try to find title in parent element
+                    parent_text = elem.get_text().strip()
+                    if len(parent_text) > len(title):
+                        # Use first line or first 100 chars
+                        title = parent_text.split('\n')[0][:100].strip()
+                
+                if title and len(title) >= 5:
+                    jobs.append({
+                        'title': title,
+                        'apply_url': apply_url,
+                        'description_snippet': elem.get_text()[:500] if elem.get_text() else None
+                    })
         
         confidence = 0.9 if len(jobs) > 0 else 0.0
         

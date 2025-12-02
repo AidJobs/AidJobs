@@ -360,6 +360,11 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS deleted_by TEXT,
     ADD COLUMN IF NOT EXISTS deletion_reason TEXT;
 
+-- Add data quality columns to jobs table (idempotent)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS data_quality_score INTEGER,
+    ADD COLUMN IF NOT EXISTS data_quality_issues JSONB;
+
 -- Create index for enrichment fields
 CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);
 CREATE INDEX IF NOT EXISTS idx_jobs_functional_role ON jobs USING GIN(functional_role);
@@ -370,6 +375,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_enriched_at ON jobs(enriched_at);
 
 -- Index for soft deletion queries (only index non-null values for performance)
 CREATE INDEX IF NOT EXISTS idx_jobs_deleted_at ON jobs(deleted_at) WHERE deleted_at IS NOT NULL;
+
+-- Index for data quality filtering
+CREATE INDEX IF NOT EXISTS idx_jobs_quality_score ON jobs(data_quality_score) WHERE data_quality_score IS NOT NULL;
 
 -- Indexes for jobs table
 CREATE INDEX IF NOT EXISTS idx_jobs_search_tsv ON jobs USING GIN(search_tsv);

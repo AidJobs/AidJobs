@@ -156,6 +156,24 @@ try:
     app.include_router(robots_router)
     app.include_router(policies_router)
     app.include_router(quality_router)
+except ImportError:
+    logger.warning("Some admin routers not available")
+
+# Add job management routes
+try:
+    from app.job_management import router as job_management_router
+    app.include_router(job_management_router)
+except ImportError:
+    logger.warning("Job management router not available")
+
+# Add data quality logs routes
+try:
+    from app.data_quality_logs import router as data_quality_logs_router
+    app.include_router(data_quality_logs_router, prefix="/api/admin/data-quality", tags=["data_quality_logs"])
+except ImportError:
+    logger.warning("Data quality logs router not available")
+    app.include_router(policies_router)
+    app.include_router(quality_router)
 except ImportError as e:
     logger.warning(f"[main] Could not import crawler_admin routes: {e}")
 

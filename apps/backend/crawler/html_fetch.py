@@ -2,6 +2,7 @@
 HTML crawler: fetch, extract, normalize, and upsert jobs
 """
 import hashlib
+import json
 import logging
 import re
 from typing import List, Dict, Optional, Tuple
@@ -1391,36 +1392,51 @@ class HTMLCrawler:
             return counts
         
         # Pre-upsert validation (enterprise-grade data quality check)
+        # Validate and score each job, filter out invalid ones
         try:
-            from app.data_quality import DataQualityValidator
-            validator = DataQualityValidator(self.db_url)
+            from core.data_quality import data_quality_validator
+            import json
             
-            # Get source base URL for validation
-            conn = self._get_db_conn()
-            try:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT careers_url FROM sources WHERE id = %s", (source_id,))
-                    source_row = cur.fetchone()
-                    source_base_url = source_row[0] if source_row else None
-            finally:
-                conn.close()
+            valid_jobs = []
+            rejected_count = 0
+            quality_stats = {'high': 0, 'medium': 0, 'low': 0}
             
-            # Validate batch
-            validation_result = validator.validate_batch(jobs, source_base_url)
+            for job in jobs:
+                # Validate and score job
+                quality_result = data_quality_validator.validate_and_score(job)
+                
+                if not quality_result['valid']:
+                    rejected_count += 1
+                    logger.warning(f"[html_fetch] Job rejected: {job.get('title', 'N/A')[:50]}... - {quality_result['rejected_reason']}")
+                    continue
+                
+                # Add quality score and issues to job
+                job['data_quality_score'] = quality_result['score']
+                job['data_quality_issues'] = quality_result['issues'] + quality_result['warnings']
+                
+                # Track quality distribution
+                if quality_result['score'] >= 80:
+                    quality_stats['high'] += 1
+                elif quality_result['score'] >= 60:
+                    quality_stats['medium'] += 1
+                else:
+                    quality_stats['low'] += 1
+                
+                valid_jobs.append(job)
             
-            if validation_result['invalid_count'] > 0:
-                logger.warning(f"[html_fetch] Data quality: {validation_result['invalid_count']} invalid jobs found")
-                for invalid in validation_result['invalid_jobs'][:5]:  # Log first 5
-                    logger.warning(f"[html_fetch]   Invalid job: {invalid['job']['title'][:50]}... - {', '.join(invalid['errors'])}")
+            if rejected_count > 0:
+                logger.warning(f"[html_fetch] Data quality: {rejected_count} jobs rejected, {len(valid_jobs)} jobs passed validation")
             
-            if validation_result['duplicate_check']['has_duplicates']:
-                logger.error(f"[html_fetch] Data quality: {validation_result['duplicate_check']['duplicate_count']} duplicate URLs in batch!")
-                for dup_url in validation_result['duplicate_check']['duplicate_urls'][:3]:
-                    titles = validation_result['duplicate_check']['url_to_titles'].get(dup_url, [])
-                    logger.error(f"[html_fetch]   Duplicate URL: {dup_url[:80]}... used by: {', '.join(titles[:3])}")
+            if quality_stats['low'] > 0:
+                logger.warning(f"[html_fetch] Data quality: {quality_stats['low']} low-quality jobs (score < 60), {quality_stats['medium']} medium (60-79), {quality_stats['high']} high (80+)")
+            
+            # Replace jobs list with validated jobs
+            jobs = valid_jobs
+            counts['found'] = len(jobs)
+            
         except Exception as e:
             # Don't fail upsert if validation fails, but log it
-            logger.warning(f"[html_fetch] Data quality validation error (non-fatal): {e}")
+            logger.warning(f"[html_fetch] Data quality validation error (non-fatal): {e}", exc_info=True)
         
         conn = self._get_db_conn()
         jobs_to_enrich = []  # Track jobs that need enrichment
@@ -1524,6 +1540,8 @@ class HTMLCrawler:
                                 deadline = %s,
                                 apply_url = %s,
                                 description_snippet = %s,
+                                data_quality_score = %s,
+                                data_quality_issues = %s,
                                 last_seen_at = NOW(),
                                 updated_at = NOW()
                             WHERE canonical_hash = %s
@@ -1539,6 +1557,8 @@ class HTMLCrawler:
                             job.get('deadline'),
                             final_apply_url,  # Use the final URL (may be existing if new is worse)
                             job.get('description_snippet'),
+                            job.get('data_quality_score'),
+                            json.dumps(job.get('data_quality_issues', [])) if job.get('data_quality_issues') else None,
                             job['canonical_hash']
                         ))
                         counts['updated'] += 1
@@ -1559,12 +1579,14 @@ class HTMLCrawler:
                                 source_id, org_name, title, location_raw, country_iso,
                                 level_norm, career_type, work_modality, mission_tags,
                                 international_eligible, deadline, apply_url,
-                                description_snippet, canonical_hash, status
+                                description_snippet, canonical_hash, status,
+                                data_quality_score, data_quality_issues
                             ) VALUES (
                                 %s, %s, %s, %s, %s,
                                 %s, %s, %s, %s,
                                 %s, %s, %s,
-                                %s, %s, 'active'
+                                %s, %s, 'active',
+                                %s, %s
                             ) RETURNING id
                         """, (
                             source_id, job.get('org_name'), job.get('title'),
@@ -1573,7 +1595,9 @@ class HTMLCrawler:
                             job.get('work_modality'), job.get('mission_tags', []),
                             job.get('international_eligible', False),
                             job.get('deadline'), job.get('apply_url'),
-                            job.get('description_snippet'), job['canonical_hash']
+                            job.get('description_snippet'), job['canonical_hash'],
+                            job.get('data_quality_score'),
+                            json.dumps(job.get('data_quality_issues', [])) if job.get('data_quality_issues') else None
                         ))
                         job_id = str(cur.fetchone()[0])
                         counts['inserted'] += 1

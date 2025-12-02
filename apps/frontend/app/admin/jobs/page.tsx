@@ -7,6 +7,7 @@ import {
   CheckCircle, XCircle, Calendar, Building2, Globe, FileText, Info,
   ChevronDown, ChevronUp, Shield, History, Database, Briefcase, X
 } from 'lucide-react';
+import DataQualityBadge from '@/components/DataQualityBadge';
 
 type Job = {
   id: string;
@@ -30,6 +31,8 @@ type Job = {
   deleted_at: string | null;
   deleted_by: string | null;
   deletion_reason: string | null;
+  data_quality_score: number | null;
+  data_quality_issues: string[] | null;
 };
 
 type SearchFilters = {
@@ -40,6 +43,7 @@ type SearchFilters = {
   include_deleted: boolean;
   date_from: string;
   date_to: string;
+  quality_min: number | null;
   sort_by: 'created_at' | 'deadline' | 'title' | 'org_name';
   sort_order: 'asc' | 'desc';
 };
@@ -78,6 +82,7 @@ export default function JobManagementPage() {
     include_deleted: false,
     date_from: '',
     date_to: '',
+    quality_min: null,
     sort_by: 'created_at',
     sort_order: 'desc',
   });
@@ -95,6 +100,9 @@ export default function JobManagementPage() {
       if (filters.include_deleted) params.append('include_deleted', 'true');
       if (filters.date_from) params.append('date_from', filters.date_from);
       if (filters.date_to) params.append('date_to', filters.date_to);
+      if (filters.quality_min !== null && filters.quality_min !== undefined) {
+        params.append('quality_min', filters.quality_min.toString());
+      }
       params.append('page', page.toString());
       params.append('size', size.toString());
       params.append('sort_by', filters.sort_by);
@@ -581,6 +589,18 @@ export default function JobManagementPage() {
                     className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1D1D1F] mb-1">Min Quality Score</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filters.quality_min || ''}
+                    onChange={(e) => setFilters({ ...filters, quality_min: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="0-100"
+                    className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -656,6 +676,7 @@ export default function JobManagementPage() {
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/12">Deadline</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/6">Source</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-1/12">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden md:table-cell w-1/12">Quality</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/12">Created</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-16">Actions</th>
                 </tr>
@@ -663,14 +684,14 @@ export default function JobManagementPage() {
               <tbody className="divide-y divide-[#D2D2D7]">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-10 text-center">
+                    <td colSpan={10} className="px-3 py-10 text-center">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#86868B]" />
                       <p className="text-[#86868B]">Loading jobs...</p>
                     </td>
                   </tr>
                 ) : jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-10 text-center">
+                    <td colSpan={10} className="px-3 py-10 text-center">
                       <Database className="w-12 h-12 mx-auto mb-4 text-[#86868B]" />
                       <p className="text-[#86868B]">No jobs found</p>
                     </td>
@@ -737,6 +758,13 @@ export default function JobManagementPage() {
                             Active
                           </span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 hidden md:table-cell">
+                        <DataQualityBadge 
+                          score={job.data_quality_score} 
+                          issues={job.data_quality_issues || []}
+                          size="sm"
+                        />
                       </td>
                       <td className="px-3 py-2 hidden lg:table-cell">
                         <div className="text-xs text-[#86868B]">{formatDate(job.created_at)}</div>
