@@ -507,10 +507,11 @@ export default function JobManagementPage() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
               <input
                 type="text"
-                placeholder="Search jobs by title, organization, or description..."
+                placeholder="Search jobs..."
                 value={filters.query}
                 onChange={(e) => setFilters({ ...filters, query: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                title="Search jobs by title, organization, or description"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -641,23 +642,28 @@ export default function JobManagementPage() {
                 {jobs.filter(j => j.deleted_at).length > 0 && (
                   <button
                     onClick={() => handleRestore(Array.from(selectedJobs))}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1.5 text-xs"
+                    disabled={selectedJobs.size === 0}
+                    className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                    title="Restore selected jobs"
+                    aria-label="Restore selected jobs"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Restore</span>
                   </button>
                 )}
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(true);
-                    setImpactAnalysis(null);
-                    setHasAnalyzed(false);
-                  }}
-                  className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1.5 text-xs"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete</span>
-                </button>
+                {selectedJobs.size > 0 && (
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(true);
+                      setImpactAnalysis(null);
+                      setHasAnalyzed(false);
+                    }}
+                    className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors group relative"
+                    title="Delete selected jobs"
+                    aria-label="Delete selected jobs"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}
