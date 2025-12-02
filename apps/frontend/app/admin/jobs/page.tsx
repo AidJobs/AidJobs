@@ -114,8 +114,21 @@ export default function JobManagementPage() {
 
       const data = await response.json();
       if (data.status === 'ok') {
-        setJobs(data.data.items || []);
+        const newJobs = data.data.items || [];
+        setJobs(newJobs);
         setTotal(data.data.total || 0);
+        
+        // Clear selections for jobs that no longer exist in current results
+        const currentJobIds = new Set(newJobs.map((j: Job) => j.id));
+        const validSelections = Array.from(selectedJobs).filter(id => currentJobIds.has(id));
+        if (validSelections.length !== selectedJobs.size) {
+          const removedCount = selectedJobs.size - validSelections.length;
+          console.warn(`[fetchJobs] Removed ${removedCount} stale job selection(s) that are no longer in current results`);
+          setSelectedJobs(new Set(validSelections));
+          if (removedCount > 0) {
+            toast.info(`${removedCount} selected job${removedCount !== 1 ? 's' : ''} no longer visible. Selection cleared.`);
+          }
+        }
       } else {
         throw new Error(data.error || 'Failed to fetch jobs');
       }
@@ -199,6 +212,27 @@ export default function JobManagementPage() {
     if (selectedJobs.size === 0 && !filters.org_name && !filters.source_id) {
       toast.error('Please select at least one job to delete, or use filters (org_name or source_id)');
       return;
+    }
+    
+    // Validate selected job IDs exist in current jobs list
+    if (selectedJobs.size > 0) {
+      const currentJobIds = new Set(jobs.map(j => j.id));
+      const validJobIds = Array.from(selectedJobs).filter(id => currentJobIds.has(id));
+      const invalidJobIds = Array.from(selectedJobs).filter(id => !currentJobIds.has(id));
+      
+      if (invalidJobIds.length > 0) {
+        console.warn(`[delete] ${invalidJobIds.length} selected job ID(s) not found in current results:`, invalidJobIds);
+        toast.warning(`${invalidJobIds.length} selected job${invalidJobIds.length !== 1 ? 's' : ''} no longer visible. Only deleting ${validJobIds.length} valid job${validJobIds.length !== 1 ? 's' : ''}.`);
+        
+        if (validJobIds.length === 0) {
+          toast.error('None of the selected jobs are visible. Please refresh and select jobs again.');
+          setSelectedJobs(new Set());
+          return;
+        }
+        
+        // Update selection to only valid IDs
+        setSelectedJobs(new Set(validJobIds));
+      }
     }
 
     // Validate hard delete requires reason
