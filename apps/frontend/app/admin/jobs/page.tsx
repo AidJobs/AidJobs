@@ -151,6 +151,8 @@ export default function JobManagementPage() {
     }
     searchTimeoutRef.current = setTimeout(() => {
       setPage(1);
+      // Clear selections when filters change (jobs will be different)
+      setSelectedJobs(new Set());
       fetchJobs();
     }, 500);
     return () => {
@@ -158,7 +160,7 @@ export default function JobManagementPage() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [filters.query, filters.org_name]);
+  }, [filters.query, filters.org_name, filters.source_id, filters.status]);
 
   const fetchImpactAnalysis = useCallback(async () => {
     setLoadingImpact(true);
