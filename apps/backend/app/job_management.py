@@ -779,3 +779,164 @@ async def export_jobs(
         if conn:
             conn.close()
 
+
+@router.get("/diagnose/{job_id}")
+async def diagnose_job_id(
+    job_id: str,
+    admin=Depends(admin_required)
+):
+    """
+    Comprehensive diagnostic endpoint to investigate job ID matching issues.
+    Tests multiple query methods and shows detailed information about the job ID.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        diagnostics = {
+            "requested_id": job_id,
+            "id_type": type(job_id).__name__,
+            "id_length": len(job_id),
+            "id_repr": repr(job_id),
+            "tests": {}
+        }
+        
+        # Test 1: Direct UUID comparison
+        try:
+            cursor.execute("SELECT id, id::text, id::uuid::text FROM jobs WHERE id::uuid = %s LIMIT 1", (job_id,))
+            result = cursor.fetchone()
+            diagnostics["tests"]["uuid_direct"] = {
+                "success": result is not None,
+                "result": dict(result) if result else None,
+                "query": "WHERE id::uuid = %s"
+            }
+        except Exception as e:
+            diagnostics["tests"]["uuid_direct"] = {
+                "success": False,
+                "error": str(e),
+                "query": "WHERE id::uuid = %s"
+            }
+        
+        # Test 2: Text comparison (current method)
+        try:
+            cursor.execute("SELECT id, id::text FROM jobs WHERE id::text = %s LIMIT 1", (job_id,))
+            result = cursor.fetchone()
+            diagnostics["tests"]["text_direct"] = {
+                "success": result is not None,
+                "result": dict(result) if result else None,
+                "query": "WHERE id::text = %s"
+            }
+        except Exception as e:
+            diagnostics["tests"]["text_direct"] = {
+                "success": False,
+                "error": str(e),
+                "query": "WHERE id::text = %s"
+            }
+        
+        # Test 3: Text array (current deletion method)
+        try:
+            cursor.execute("SELECT id, id::text FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[]) LIMIT 1", (job_id,))
+            result = cursor.fetchone()
+            diagnostics["tests"]["text_array"] = {
+                "success": result is not None,
+                "result": dict(result) if result else None,
+                "query": "WHERE id::text = ANY(ARRAY[%s]::text[])"
+            }
+        except Exception as e:
+            diagnostics["tests"]["text_array"] = {
+                "success": False,
+                "error": str(e),
+                "query": "WHERE id::text = ANY(ARRAY[%s]::text[])"
+            }
+        
+        # Test 4: ILIKE comparison (case-insensitive)
+        try:
+            cursor.execute("SELECT id, id::text FROM jobs WHERE id::text ILIKE %s LIMIT 1", (job_id,))
+            result = cursor.fetchone()
+            diagnostics["tests"]["text_ilike"] = {
+                "success": result is not None,
+                "result": dict(result) if result else None,
+                "query": "WHERE id::text ILIKE %s"
+            }
+        except Exception as e:
+            diagnostics["tests"]["text_ilike"] = {
+                "success": False,
+                "error": str(e),
+                "query": "WHERE id::text ILIKE %s"
+            }
+        
+        # Test 5: Get sample of all job IDs to see format
+        try:
+            cursor.execute("SELECT id, id::text, pg_typeof(id) as id_type FROM jobs LIMIT 5")
+            samples = cursor.fetchall()
+            diagnostics["tests"]["sample_ids"] = {
+                "success": True,
+                "samples": [dict(row) for row in samples],
+                "query": "SELECT id, id::text, pg_typeof(id) FROM jobs LIMIT 5"
+            }
+        except Exception as e:
+            diagnostics["tests"]["sample_ids"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 6: Count total jobs
+        try:
+            cursor.execute("SELECT COUNT(*) as total FROM jobs")
+            total = cursor.fetchone()['total']
+            diagnostics["tests"]["total_jobs"] = {
+                "success": True,
+                "total": total
+            }
+        except Exception as e:
+            diagnostics["tests"]["total_jobs"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 7: Try to find similar IDs (first 8 chars match)
+        try:
+            prefix = job_id[:8] if len(job_id) >= 8 else job_id
+            cursor.execute("SELECT id::text, title FROM jobs WHERE id::text LIKE %s LIMIT 10", (f"{prefix}%",))
+            similar = cursor.fetchall()
+            diagnostics["tests"]["similar_ids"] = {
+                "success": True,
+                "prefix": prefix,
+                "matches": [{"id": row['id'], "title": row.get('title', '')[:50]} for row in similar],
+                "count": len(similar)
+            }
+        except Exception as e:
+            diagnostics["tests"]["similar_ids"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 8: Check if ID exists with any method
+        found_by_any = any(
+            test.get("success", False) and test.get("result") is not None
+            for test in diagnostics["tests"].values()
+            if isinstance(test, dict) and "result" in test
+        )
+        diagnostics["found_by_any_method"] = found_by_any
+        
+        return {
+            "status": "ok",
+            "data": diagnostics
+        }
+        
+    except Exception as e:
+        logger.error(f"[diagnose] Error: {e}")
+        logger.error(traceback.format_exc())
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc() if os.getenv("AIDJOBS_ENV", "").lower() == "dev" else None
+        }
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
