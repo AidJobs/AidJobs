@@ -732,9 +732,10 @@ class SearchService:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             # Build WHERE clause
-            # Filter by active status and exclude expired jobs (deadline < CURRENT_DATE)
+            # Filter by active status, exclude deleted jobs, and exclude expired jobs (deadline < CURRENT_DATE)
             where_conditions = [
                 "status = 'active'",
+                "deleted_at IS NULL",  # Exclude soft-deleted jobs
                 "(deadline IS NULL OR deadline >= CURRENT_DATE)"
             ]
             params = []
