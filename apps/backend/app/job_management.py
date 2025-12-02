@@ -565,6 +565,11 @@ async def bulk_delete_jobs(
                 logger.warning(f"[bulk_delete] No jobs were deleted! WHERE clause: {where_clause}, params: {params}")
         
         conn.commit()
+        logger.info(f"[bulk_delete] Transaction committed. {deleted_count} jobs deleted.")
+        
+        # Small delay to ensure transaction is fully committed before Meilisearch update
+        import time
+        time.sleep(0.1)  # 100ms delay
         
         # Remove deleted jobs from Meilisearch index (both hard and soft deletes)
         # Soft-deleted jobs should also be removed from search since they're filtered out
