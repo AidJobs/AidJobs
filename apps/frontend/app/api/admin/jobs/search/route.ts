@@ -7,11 +7,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
     
-    const response = await fetch(`${backendUrl}/api/admin/jobs/search?${searchParams.toString()}`, {
+    // Remove cache busting parameter before forwarding
+    const cleanParams = new URLSearchParams(searchParams);
+    cleanParams.delete('_t');
+    
+    const response = await fetch(`${backendUrl}/api/admin/jobs/search?${cleanParams.toString()}`, {
       headers: {
         'Cookie': request.headers.get('cookie') || '',
+        'Cache-Control': 'no-cache',
       },
       credentials: 'include',
+      cache: 'no-store',  // Prevent caching
     });
 
     if (!response.ok) {

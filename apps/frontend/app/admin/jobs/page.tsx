@@ -100,8 +100,15 @@ export default function JobManagementPage() {
       params.append('sort_by', filters.sort_by);
       params.append('sort_order', filters.sort_order);
 
+      // Add cache busting timestamp to ensure fresh data
+      params.append('_t', Date.now().toString());
+      
       const response = await fetch(`/api/admin/jobs/search?${params.toString()}`, {
         credentials: 'include',
+        cache: 'no-store',  // Prevent caching
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       });
 
       if (!response.ok) {
