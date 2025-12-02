@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   Search, Filter, Trash2, RefreshCw, Download, RotateCcw, AlertTriangle,
   CheckCircle, XCircle, Calendar, Building2, Globe, FileText, Info,
-  ChevronDown, ChevronUp, Shield, History, Database, Briefcase, X
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, History, Database, Briefcase, X
 } from 'lucide-react';
 import DataQualityBadge from '@/components/DataQualityBadge';
 
@@ -466,21 +466,23 @@ export default function JobManagementPage() {
               </h1>
               <p className="text-[#86868B]">Search, filter, and manage jobs across all sources</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleExport}
-                className="px-3 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors flex items-center gap-2 text-sm"
+                className="p-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors group relative"
+                title="Export jobs"
+                aria-label="Export jobs"
               >
                 <Download className="w-4 h-4" />
-                <span>Export</span>
               </button>
               <button
                 onClick={fetchJobs}
                 disabled={loading}
-                className="px-3 py-2 bg-[#007AFF] text-white rounded-lg hover:bg-[#0051D5] transition-colors flex items-center gap-2 disabled:opacity-50 text-sm"
+                className="p-2 bg-[#007AFF] text-white rounded-lg hover:bg-[#0051D5] transition-colors disabled:opacity-50 group relative"
+                title="Refresh jobs"
+                aria-label="Refresh jobs"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
               </button>
             </div>
           </div>
@@ -502,7 +504,7 @@ export default function JobManagementPage() {
           {/* Search and Quick Filters */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
               <input
                 type="text"
                 placeholder="Search jobs by title, organization, or description..."
@@ -512,22 +514,27 @@ export default function JobManagementPage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Organization name..."
-                value={filters.org_name}
-                onChange={(e) => setFilters({ ...filters, org_name: e.target.value })}
-                className="px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent w-56 text-sm"
-              />
+              <div className="relative group">
+                <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+                <input
+                  type="text"
+                  placeholder="Organization..."
+                  value={filters.org_name}
+                  onChange={(e) => setFilters({ ...filters, org_name: e.target.value })}
+                  className="pl-8 pr-2.5 py-1.5 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent w-40 text-xs"
+                  title="Filter by organization name"
+                />
+              </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm ${
+                className={`p-2 rounded-lg transition-colors flex items-center gap-1 group relative ${
                   showFilters ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E7]'
                 }`}
+                title={showFilters ? "Hide filters" : "Show filters"}
+                aria-label={showFilters ? "Hide filters" : "Show filters"}
               >
                 <Filter className="w-4 h-4" />
-                <span>Filters</span>
-                {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {showFilters ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
             </div>
           </div>
@@ -821,19 +828,23 @@ export default function JobManagementPage() {
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 border border-[#D2D2D7] rounded-lg hover:bg-[#F5F5F7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 border border-[#D2D2D7] rounded-lg hover:bg-[#F5F5F7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors group relative"
+                  title="Previous page"
+                  aria-label="Previous page"
                 >
-                  Previous
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="px-4 py-1.5 text-sm text-[#1D1D1F]">
-                  Page {page} of {Math.ceil(total / size)}
+                <span className="px-3 py-1.5 text-xs text-[#86868B]">
+                  {page} / {Math.ceil(total / size)}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(Math.ceil(total / size), p + 1))}
                   disabled={page >= Math.ceil(total / size)}
-                  className="px-3 py-1.5 border border-[#D2D2D7] rounded-lg hover:bg-[#F5F5F7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 border border-[#D2D2D7] rounded-lg hover:bg-[#F5F5F7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors group relative"
+                  title="Next page"
+                  aria-label="Next page"
                 >
-                  Next
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
