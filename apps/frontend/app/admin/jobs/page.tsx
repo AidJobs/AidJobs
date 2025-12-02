@@ -663,6 +663,8 @@ export default function JobManagementPage() {
                               onClick={() => {
                                 setSelectedJobs(new Set([job.id]));
                                 setShowDeleteModal(true);
+                                setImpactAnalysis(null);
+                                setDryRun(true);
                               }}
                               className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
                               aria-label="Delete job"
@@ -975,4 +977,3 @@ export default function JobManagementPage() {
     </div>
   );
 }
-
