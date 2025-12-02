@@ -294,15 +294,26 @@ class UNDPPlugin(ExtractionPlugin):
                     if full_text:
                         if not job.get('location_raw'):
                             location_match = re.search(r'(?i)Location\s*:?\s*(.+)', full_text)
-                    if location_match:
-                        job['location_raw'] = location_match.group(1).strip()
-                    
-                    apply_by_match = re.search(r'(?i)Apply by\s*:?\s*(.+)', full_text)
-                    if apply_by_match:
-                        job['deadline_raw'] = apply_by_match.group(1).strip()
+                            if location_match:
+                                job['location_raw'] = location_match.group(1).strip().split('\n')[0].strip()
+                        
+                        if not job.get('deadline'):
+                            deadline_match = re.search(r'(?i)(?:Apply by|Deadline|Closing date)\s*:?\s*(.+)', full_text)
+                            if deadline_match:
+                                deadline_text = deadline_match.group(1).strip().split('\n')[0].strip()
+                                parsed_deadline = field_extractor.parse_deadline(deadline_text)
+                                if parsed_deadline:
+                                    job['deadline'] = parsed_deadline
                 
-                if job.get('title'):
+                # Validate job data using the unified validator (same as UNESCO)
+                validation_result = data_quality_validator.validate_and_score(job)
+                
+                if validation_result['valid']:
+                    job['data_quality_score'] = validation_result['score']
+                    job['data_quality_issues'] = validation_result['issues'] + validation_result['warnings']
                     jobs.append(job)
+                else:
+                    self.logger.warning(f"[undp] Rejected job due to quality issues: {validation_result['rejected_reason']} - Title: {title[:50]}...")
         
         confidence = 0.95 if len(jobs) > 0 and len(unique_urls) == len(extracted_urls) else 0.5
         
