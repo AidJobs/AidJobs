@@ -359,17 +359,24 @@ async def bulk_delete_jobs(
                 raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
             
             # Validate job IDs exist and log details
-            placeholders = ','.join(['%s'] * len(request.job_ids))
+            # Ensure all IDs are strings for consistent comparison
+            job_ids_str = [str(jid).strip() for jid in request.job_ids]
+            placeholders = ','.join(['%s'] * len(job_ids_str))
+            
             check_query = f"""
                 SELECT id::text, title, deleted_at, status
                 FROM jobs 
-                WHERE id::text IN ({placeholders})
+                WHERE id::text = ANY(ARRAY[{placeholders}]::text[])
             """
-            logger.info(f"[bulk_delete] Checking if {len(request.job_ids)} job IDs exist in database...")
-            logger.info(f"[bulk_delete] Sample job IDs: {request.job_ids[:3]}")
-            cursor.execute(check_query, request.job_ids)
+            
+            logger.info(f"[bulk_delete] Checking if {len(job_ids_str)} job IDs exist in database...")
+            logger.info(f"[bulk_delete] Sample job IDs: {job_ids_str[:3]}")
+            logger.info(f"[bulk_delete] Sample job ID types: {[type(id).__name__ for id in job_ids_str[:3]]}")
+            
+            cursor.execute(check_query, job_ids_str)
             existing_jobs = cursor.fetchall()
             existing_ids = [row['id'] for row in existing_jobs]
+            logger.info(f"[bulk_delete] Found {len(existing_ids)} existing jobs in database")
             already_deleted = [row['id'] for row in existing_jobs if row.get('deleted_at')]
             
             logger.info(f"[bulk_delete] Requested {len(request.job_ids)} job IDs")
@@ -399,9 +406,12 @@ async def bulk_delete_jobs(
                     }
                 }
             
-            placeholders = ','.join(['%s'] * len(request.job_ids))
-            where_clauses.append(f"id::text IN ({placeholders})")
-            params.extend(request.job_ids)
+            # Use text array comparison - ensures consistent matching
+            # Convert all IDs to strings and use text array
+            job_ids_str = [str(jid).strip() for jid in request.job_ids]
+            placeholders = ','.join(['%s'] * len(job_ids_str))
+            where_clauses.append(f"id::text = ANY(ARRAY[{placeholders}]::text[])")
+            params.extend(job_ids_str)
         elif request.org_name:
             if not request.org_name.strip():
                 raise HTTPException(status_code=400, detail="org_name cannot be empty")
@@ -436,9 +446,10 @@ async def bulk_delete_jobs(
         # Also check if jobs exist at all (without WHERE clause filters)
         total_existing = 0
         if request.job_ids:
-            placeholders = ','.join(['%s'] * len(request.job_ids))
-            check_all_query = f"SELECT COUNT(*) as count FROM jobs WHERE id::text IN ({placeholders})"
-            cursor.execute(check_all_query, request.job_ids)
+            job_ids_str = [str(jid).strip() for jid in request.job_ids]
+            placeholders = ','.join(['%s'] * len(job_ids_str))
+            check_all_query = f"SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[{placeholders}]::text[])"
+            cursor.execute(check_all_query, job_ids_str)
             total_existing = cursor.fetchone()['count']
             logger.info(f"[bulk_delete] Total jobs with these IDs (including deleted): {total_existing}")
         
@@ -455,9 +466,10 @@ async def bulk_delete_jobs(
                 logger.warning(f"[bulk_delete] Jobs exist but don't match WHERE clause!")
                 logger.warning(f"[bulk_delete] This suggests the WHERE clause is filtering them out")
                 # Check if they're soft-deleted
-                placeholders = ','.join(['%s'] * len(request.job_ids))
-                check_deleted_query = f"SELECT id::text, deleted_at FROM jobs WHERE id::text IN ({placeholders})"
-                cursor.execute(check_deleted_query, request.job_ids)
+                job_ids_str = [str(jid).strip() for jid in request.job_ids]
+                placeholders = ','.join(['%s'] * len(job_ids_str))
+                check_deleted_query = f"SELECT id::text, deleted_at FROM jobs WHERE id::text = ANY(ARRAY[{placeholders}]::text[])"
+                cursor.execute(check_deleted_query, job_ids_str)
                 job_statuses = cursor.fetchall()
                 for job in job_statuses:
                     logger.warning(f"[bulk_delete] Job {job['id']}: deleted_at={job.get('deleted_at')}")
