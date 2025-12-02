@@ -61,7 +61,6 @@ export default function JobManagementPage() {
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImpactModal, setShowImpactModal] = useState(false);
   const [impactAnalysis, setImpactAnalysis] = useState<ImpactAnalysis | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [deletionType, setDeletionType] = useState<'soft' | 'hard'>('soft');
@@ -176,6 +175,9 @@ export default function JobManagementPage() {
       const data = await response.json();
       if (data.status === 'ok') {
         setImpactAnalysis(data.data);
+        // After a successful analysis, switch off dry-run so the next click will perform deletion
+        setDryRun(false);
+        toast.success('Impact analyzed. Review details and click Delete to proceed.');
       } else {
         throw new Error(data.error || 'Failed to analyze impact');
       }
@@ -189,9 +191,7 @@ export default function JobManagementPage() {
 
   const handleDelete = async () => {
     if (dryRun) {
-      // Just show impact analysis
       await fetchImpactAnalysis();
-      setShowImpactModal(true);
       return;
     }
 
@@ -359,8 +359,8 @@ export default function JobManagementPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-semibold text-[#1D1D1F] mb-2 flex items-center gap-3">
-                <Briefcase className="w-8 h-8" />
+              <h1 className="text-2xl font-medium text-[#1D1D1F] mb-1 flex items-center gap-2">
+                <Briefcase className="w-6 h-6" />
                 Job Management
               </h1>
               <p className="text-[#86868B]">Search, filter, and manage jobs across all sources</p>
@@ -368,19 +368,33 @@ export default function JobManagementPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleExport}
-                className="px-4 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors flex items-center gap-2"
+                className="px-3 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors flex items-center gap-2 text-sm"
               >
                 <Download className="w-4 h-4" />
-                Export
+                <span>Export</span>
               </button>
               <button
                 onClick={fetchJobs}
                 disabled={loading}
-                className="px-4 py-2 bg-[#007AFF] text-white rounded-lg hover:bg-[#0051D5] transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-3 py-2 bg-[#007AFF] text-white rounded-lg hover:bg-[#0051D5] transition-colors flex items-center gap-2 disabled:opacity-50 text-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
+                <span>Refresh</span>
               </button>
+            </div>
+          </div>
+
+          {/* Result summary */}
+          <div className="flex items-center justify-between mb-3 text-xs text-[#86868B]">
+            <div>
+              {total > 0
+                ? `Showing ${(page - 1) * size + 1}–${Math.min(page * size, total)} of ${total} jobs` +
+                  (filters.org_name
+                    ? ` for "${filters.org_name}"`
+                    : filters.query
+                    ? ` for "${filters.query}"`
+                    : '')
+                : 'No jobs match the current filters'}
             </div>
           </div>
 
@@ -402,16 +416,16 @@ export default function JobManagementPage() {
                 placeholder="Organization name..."
                 value={filters.org_name}
                 onChange={(e) => setFilters({ ...filters, org_name: e.target.value })}
-                className="px-4 py-2.5 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent w-64"
+                className="px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent w-56 text-sm"
               />
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 ${
+                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm ${
                   showFilters ? 'bg-[#007AFF] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E7]'
                 }`}
               >
                 <Filter className="w-4 h-4" />
-                Filters
+                <span>Filters</span>
                 {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
             </div>
@@ -491,14 +505,14 @@ export default function JobManagementPage() {
 
           {/* Selection Actions */}
           {selectedJobs.size > 0 && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex items-center justify-between">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-blue-900">
+                <span className="text-xs font-medium text-blue-900">
                   {selectedJobs.size} job{selectedJobs.size !== 1 ? 's' : ''} selected
                 </span>
                 <button
                   onClick={() => setSelectedJobs(new Set())}
-                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
                 >
                   Clear selection
                 </button>
@@ -507,23 +521,22 @@ export default function JobManagementPage() {
                 {jobs.filter(j => j.deleted_at).length > 0 && (
                   <button
                     onClick={() => handleRestore(Array.from(selectedJobs))}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1.5 text-xs"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    Restore
+                    <span>Restore</span>
                   </button>
                 )}
                 <button
                   onClick={() => {
                     setShowDeleteModal(true);
-                    if (dryRun) {
-                      fetchImpactAnalysis();
-                    }
+                    setImpactAnalysis(null);
+                    setDryRun(true);
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                  className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1.5 text-xs"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  <span>Delete</span>
                 </button>
               </div>
             </div>
@@ -531,12 +544,12 @@ export default function JobManagementPage() {
         </div>
 
         {/* Jobs Table */}
-        <div className="bg-white rounded-xl border border-[#D2D2D7] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <div className="bg-white rounded-lg border border-[#D2D2D7] overflow-hidden">
+          <div className="w-full">
+            <table className="min-w-full table-fixed">
               <thead className="bg-[#F5F5F7] border-b border-[#D2D2D7]">
                 <tr>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-3 py-2 text-left w-10">
                     <input
                       type="checkbox"
                       checked={selectedJobs.size === jobs.length && jobs.length > 0}
@@ -544,27 +557,27 @@ export default function JobManagementPage() {
                       className="w-4 h-4 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Title</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Organization</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Location</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Deadline</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Source</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Created</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#1D1D1F]">Actions</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-2/6">Title</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-1/6">Organization</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden md:table-cell w-1/6">Location</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/12">Deadline</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/6">Source</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-1/12">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] hidden lg:table-cell w-1/12">Created</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[#1D1D1F] w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D2D2D7]">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center">
+                    <td colSpan={9} className="px-3 py-10 text-center">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#86868B]" />
                       <p className="text-[#86868B]">Loading jobs...</p>
                     </td>
                   </tr>
                 ) : jobs.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center">
+                    <td colSpan={9} className="px-3 py-10 text-center">
                       <Database className="w-12 h-12 mx-auto mb-4 text-[#86868B]" />
                       <p className="text-[#86868B]">No jobs found</p>
                     </td>
@@ -577,7 +590,7 @@ export default function JobManagementPage() {
                         job.deleted_at ? 'opacity-60' : ''
                       }`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <input
                           type="checkbox"
                           checked={selectedJobs.has(job.id)}
@@ -585,29 +598,29 @@ export default function JobManagementPage() {
                           className="w-4 h-4 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[#1D1D1F]">{job.title || 'N/A'}</div>
+                      <td className="px-3 py-2">
+                        <div className="text-sm font-medium text-[#1D1D1F] truncate max-w-xs">{job.title || 'N/A'}</div>
                         {job.level_norm && (
-                          <div className="text-xs text-[#86868B] mt-1 capitalize">{job.level_norm}</div>
+                          <div className="text-[11px] text-[#86868B] mt-0.5 capitalize">{job.level_norm}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-[#1D1D1F]">{job.org_name || 'N/A'}</div>
+                      <td className="px-3 py-2">
+                        <div className="text-sm text-[#1D1D1F] truncate max-w-[10rem]">{job.org_name || 'N/A'}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-[#86868B]">{job.location_raw || 'N/A'}</div>
+                      <td className="px-3 py-2 hidden md:table-cell">
+                        <div className="text-xs text-[#86868B] truncate max-w-[10rem]">{job.location_raw || 'N/A'}</div>
                         {job.country_iso && (
-                          <div className="text-xs text-[#86868B] mt-1">{job.country_iso}</div>
+                          <div className="text-[11px] text-[#86868B] mt-0.5">{job.country_iso}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-[#86868B]">{formatDate(job.deadline)}</div>
+                      <td className="px-3 py-2 hidden lg:table-cell">
+                        <div className="text-xs text-[#86868B]">{formatDate(job.deadline)}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 hidden lg:table-cell">
                         {job.source ? (
-                          <div className="text-sm">
-                            <div className="text-[#1D1D1F]">{job.source.org_name || 'N/A'}</div>
-                            <div className="text-xs text-[#86868B] mt-1">
+                          <div className="text-xs">
+                            <div className="text-[#1D1D1F] truncate max-w-[10rem]">{job.source.org_name || 'N/A'}</div>
+                            <div className="text-[11px] text-[#86868B] mt-0.5">
                               {job.source.status === 'deleted' ? (
                                 <span className="text-red-600">Source Deleted</span>
                               ) : (
@@ -616,10 +629,10 @@ export default function JobManagementPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="text-sm text-[#86868B]">Source not found</div>
+                          <div className="text-xs text-[#86868B]">Source not found</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         {job.deleted_at ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
                             <XCircle className="w-3 h-3" />
@@ -632,16 +645,16 @@ export default function JobManagementPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-[#86868B]">{formatDate(job.created_at)}</div>
+                      <td className="px-3 py-2 hidden lg:table-cell">
+                        <div className="text-xs text-[#86868B]">{formatDate(job.created_at)}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
                           {job.deleted_at ? (
                             <button
                               onClick={() => handleRestore([job.id])}
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                              title="Restore job"
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors group"
+                              aria-label="Restore job"
                             >
                               <RotateCcw className="w-4 h-4" />
                             </button>
@@ -651,16 +664,16 @@ export default function JobManagementPage() {
                                 setSelectedJobs(new Set([job.id]));
                                 setShowDeleteModal(true);
                               }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="Delete job"
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
+                              aria-label="Delete job"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                           <button
                             onClick={() => setShowJobDetails(job.id)}
-                            className="p-1.5 text-[#007AFF] hover:bg-blue-50 rounded transition-colors"
-                            title="View details"
+                            className="p-1.5 text-[#007AFF] hover:bg-blue-50 rounded-lg transition-colors group"
+                            aria-label="View details"
                           >
                             <Info className="w-4 h-4" />
                           </button>
@@ -675,10 +688,10 @@ export default function JobManagementPage() {
 
           {/* Pagination */}
           {total > 0 && (
-            <div className="px-6 py-4 border-t border-[#D2D2D7] flex items-center justify-between">
-              <div className="text-sm text-[#86868B]">
-                Showing {(page - 1) * size + 1} to {Math.min(page * size, total)} of {total} jobs
-              </div>
+          <div className="px-6 py-4 border-t border-[#D2D2D7] flex items-center justify-between">
+            <div className="text-sm text-[#86868B]">
+              Showing {(page - 1) * size + 1} to {Math.min(page * size, total)} of {total} jobs
+            </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
