@@ -319,12 +319,20 @@ export default function JobManagementPage() {
         setExportData(false);
         setImpactAnalysis(null);
         setHasAnalyzed(false);
+        
+        // Immediately remove deleted jobs from UI state for instant feedback
+        if (data.data?.deleted_ids && data.data.deleted_ids.length > 0) {
+          const deletedIdsSet = new Set(data.data.deleted_ids);
+          setJobs(prevJobs => prevJobs.filter(job => !deletedIdsSet.has(job.id)));
+          setTotal(prevTotal => Math.max(0, prevTotal - data.data.deleted_ids.length));
+        }
+        
         // Force refresh by resetting page to 1 and clearing cache
         setPage(1);
-        // Small delay to ensure backend has processed deletion
+        // Small delay to ensure backend has processed deletion, then refresh
         setTimeout(() => {
           fetchJobs();
-        }, 100);
+        }, 300);  // Increased delay to ensure transaction is committed
       } else {
         throw new Error(data.error || data.detail || 'Failed to delete jobs');
       }
