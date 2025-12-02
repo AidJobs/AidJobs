@@ -11,6 +11,8 @@ import logging
 from typing import List, Dict, Optional
 from urllib.parse import urlparse, urljoin
 from .base import ExtractionPlugin, PluginResult
+from core.field_extractors import field_extractor
+from core.data_quality import data_quality_validator
 
 logger = logging.getLogger(__name__)
 
@@ -234,19 +236,64 @@ class UNDPPlugin(ExtractionPlugin):
         else:
             self.logger.info(f"✓ ENTERPRISE VALIDATION PASSED: All {len(job_elements)} jobs have unique URLs")
         
-        # Convert to standard job format
+        # Convert to standard job format using field_extractor for consistency
         jobs = []
         for elem in job_elements:
             if isinstance(elem, dict):
+                title = elem.get('title', '').strip()
+                if not title or len(title) < 5:
+                    continue
+                
+                # Validate title is not a date, location, or label (same as UNESCO)
+                title_lower = title.lower()
+                date_patterns = [
+                    r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',
+                    r'^\d{1,2}\s+[a-z]{3,9}\s+\d{2,4}$',
+                    r'^[a-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',
+                ]
+                if any(re.match(pattern, title_lower) for pattern in date_patterns):
+                    self.logger.warning(f"[undp] REJECTED - title is a date: '{title}'")
+                    continue
+                
+                month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+                if title_lower in month_abbrevs:
+                    self.logger.warning(f"[undp] REJECTED - title is a month: '{title}'")
+                    continue
+                
                 job = {
-                    'title': elem.get('title', ''),
+                    'title': title,
                     'apply_url': elem.get('resolved_url') or urljoin(base_url, elem.get('link_href', '')),
                     'description_snippet': elem.get('full_text', '')[:500] if elem.get('full_text') else None
                 }
-                # Extract location and deadline from full_text
-                full_text = elem.get('full_text', '')
-                if full_text:
-                    location_match = re.search(r'(?i)Location\s*:?\s*(.+)', full_text)
+                
+                # Extract location and deadline using field_extractor for consistency
+                container = elem.get('element')
+                if container:
+                    cells = container.find_all(['td', 'th'])
+                    if cells:
+                        # Try to find header row in parent table
+                        header_map = {}
+                        table = container.find_parent('table')
+                        if table:
+                            header_row = table.find('tr')
+                            if header_row:
+                                header_map = field_extractor.parse_table_header(header_row)
+                        
+                        # Extract using field_extractor
+                        location = field_extractor.extract_location_from_table_row(container, header_map, cells)
+                        deadline = field_extractor.extract_deadline_from_table_row(container, header_map, cells)
+                        
+                        if location:
+                            job['location_raw'] = location
+                        if deadline:
+                            job['deadline'] = deadline
+                
+                # Fallback: Extract location and deadline from full_text if field_extractor didn't find them
+                if not job.get('location_raw') or not job.get('deadline'):
+                    full_text = elem.get('full_text', '')
+                    if full_text:
+                        if not job.get('location_raw'):
+                            location_match = re.search(r'(?i)Location\s*:?\s*(.+)', full_text)
                     if location_match:
                         job['location_raw'] = location_match.group(1).strip()
                     

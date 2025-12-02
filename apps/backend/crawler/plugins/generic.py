@@ -9,6 +9,7 @@ import re
 from typing import List, Dict, Optional
 from urllib.parse import urljoin
 from .base import ExtractionPlugin, PluginResult
+from core.data_quality import data_quality_validator
 
 logger = logging.getLogger(__name__)
 
@@ -161,11 +162,21 @@ class GenericPlugin(ExtractionPlugin):
                                 title = parent_text.split('\n')[0][:100].strip()
                     
                     if title and len(title) >= 5:
-                        jobs.append({
+                        job = {
                             'title': title,
                             'apply_url': apply_url,
                             'description_snippet': elem.get_text()[:500] if hasattr(elem, 'get_text') else None
-                        })
+                        }
+                        
+                        # Validate job data using the unified validator (same as UNESCO/UNDP)
+                        validation_result = data_quality_validator.validate_and_score(job)
+                        
+                        if validation_result['valid']:
+                            job['data_quality_score'] = validation_result['score']
+                            job['data_quality_issues'] = validation_result['issues'] + validation_result['warnings']
+                            jobs.append(job)
+                        else:
+                            self.logger.debug(f"[generic] Rejected job due to quality issues: {validation_result['rejected_reason']} - Title: {title[:50]}...")
         
         confidence = 0.7 if len(jobs) > 0 else 0.0
         
