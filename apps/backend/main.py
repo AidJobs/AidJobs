@@ -159,6 +159,13 @@ try:
 except ImportError as e:
     logger.warning(f"[main] Could not import crawler_admin routes: {e}")
 
+# Add job management routes
+try:
+    from app.job_management import router as job_management_router
+    app.include_router(job_management_router)
+except ImportError as e:
+    logger.warning(f"[main] Could not import job_management routes: {e}")
+
 
 
 

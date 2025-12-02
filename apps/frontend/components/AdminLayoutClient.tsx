@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft, BarChart3, Activity, Shield } from 'lucide-react';
+import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft, BarChart3, Activity, Shield, Briefcase } from 'lucide-react';
 
 type MenuItem = {
   id: string;
@@ -14,6 +14,7 @@ type MenuItem = {
 const menuItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/admin' },
   { id: 'sources', label: 'Sources', icon: <Database className="w-5 h-5" />, path: '/admin/sources' },
+  { id: 'jobs', label: 'Job Management', icon: <Briefcase className="w-5 h-5" />, path: '/admin/jobs' },
   { id: 'crawl', label: 'Crawler', icon: <Network className="w-5 h-5" />, path: '/admin/crawl' },
   { id: 'analytics', label: 'Analytics', icon: <Activity className="w-5 h-5" />, path: '/admin/analytics' },
   { id: 'data-quality', label: 'Data Quality', icon: <Shield className="w-5 h-5" />, path: '/admin/data-quality' },

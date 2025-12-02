@@ -1,0 +1,582 @@
+"""
+Enterprise-Grade Job Management API
+
+Provides comprehensive job search, filtering, bulk operations, and deletion capabilities.
+Works even when sources are deleted.
+"""
+import os
+import logging
+import json
+import traceback
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
+from pydantic import BaseModel  # type: ignore
+import psycopg2  # type: ignore
+from psycopg2.extras import RealDictCursor  # type: ignore
+
+from security.admin_auth import admin_required
+from app.db_config import db_config
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/admin/jobs", tags=["job_management"])
+
+
+def get_db_conn():
+    """Get database connection"""
+    if not psycopg2:
+        raise HTTPException(status_code=503, detail="Database driver not available")
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    return psycopg2.connect(**conn_params, connect_timeout=5)
+
+
+# Request Models
+class JobSearchRequest(BaseModel):
+    query: Optional[str] = None
+    org_name: Optional[str] = None
+    source_id: Optional[str] = None
+    status: Optional[str] = None  # 'active', 'deleted', 'all'
+    include_deleted: bool = False
+    date_from: Optional[str] = None  # ISO format date
+    date_to: Optional[str] = None  # ISO format date
+    page: int = 1
+    size: int = 50
+    sort_by: Optional[str] = None  # 'created_at', 'deadline', 'title', 'org_name'
+    sort_order: Optional[str] = 'desc'  # 'asc' or 'desc'
+
+
+class BulkDeleteRequest(BaseModel):
+    job_ids: Optional[List[str]] = None
+    org_name: Optional[str] = None
+    source_id: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    deletion_type: str = "soft"  # "soft" or "hard"
+    deletion_reason: Optional[str] = None
+    export_data: bool = False
+    dry_run: bool = False
+
+
+class RestoreRequest(BaseModel):
+    job_ids: List[str]
+
+
+class ExportRequest(BaseModel):
+    job_ids: Optional[List[str]] = None
+    org_name: Optional[str] = None
+    source_id: Optional[str] = None
+    format: str = "json"  # "json" or "csv"
+
+
+# Endpoints
+
+@router.get("/search")
+async def search_jobs(
+    query: Optional[str] = Query(None),
+    org_name: Optional[str] = Query(None),
+    source_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    include_deleted: bool = Query(False),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=200),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query('desc'),
+    admin=Depends(admin_required)
+):
+    """
+    Search and filter jobs with pagination.
+    Works even when sources are deleted.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Build WHERE clause
+        where_clauses = []
+        params = []
+        
+        # Status filter
+        if status == 'active':
+            where_clauses.append("status = 'active'")
+            where_clauses.append("(deleted_at IS NULL)")
+        elif status == 'deleted':
+            where_clauses.append("(deleted_at IS NOT NULL)")
+        elif not include_deleted:
+            where_clauses.append("(deleted_at IS NULL)")
+        
+        # Search query (title, org_name, description)
+        if query:
+            where_clauses.append("(title ILIKE %s OR org_name ILIKE %s OR description_snippet ILIKE %s)")
+            search_param = f"%{query}%"
+            params.extend([search_param, search_param, search_param])
+        
+        # Organization name filter
+        if org_name:
+            where_clauses.append("org_name ILIKE %s")
+            params.append(f"%{org_name}%")
+        
+        # Source ID filter
+        if source_id:
+            where_clauses.append("source_id::text = %s")
+            params.append(source_id)
+        
+        # Date range filters
+        if date_from:
+            where_clauses.append("created_at >= %s")
+            params.append(date_from)
+        
+        if date_to:
+            where_clauses.append("created_at <= %s")
+            params.append(date_to)
+        
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        
+        # Count total
+        count_query = f"SELECT COUNT(*) as count FROM jobs {where_clause}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()['count']
+        
+        # Sort
+        valid_sort_fields = ['created_at', 'deadline', 'title', 'org_name', 'fetched_at']
+        sort_field = sort_by if sort_by in valid_sort_fields else 'created_at'
+        sort_dir = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+        order_by = f"ORDER BY {sort_field} {sort_dir}"
+        
+        # Pagination
+        offset = (page - 1) * size
+        
+        # Fetch jobs
+        select_query = f"""
+            SELECT 
+                id::text,
+                title,
+                org_name,
+                location_raw,
+                country_iso,
+                level_norm,
+                deadline,
+                apply_url,
+                status,
+                source_id::text as source_id,
+                created_at,
+                fetched_at,
+                deleted_at,
+                deleted_by,
+                deletion_reason
+            FROM jobs
+            {where_clause}
+            {order_by}
+            LIMIT %s OFFSET %s
+        """
+        cursor.execute(select_query, params + [size, offset])
+        jobs = cursor.fetchall()
+        
+        # Get source info for jobs (even if source is deleted)
+        source_ids = list(set([job['source_id'] for job in jobs if job['source_id']]))
+        source_info = {}
+        if source_ids:
+            placeholders = ','.join(['%s'] * len(source_ids))
+            cursor.execute(f"""
+                SELECT id::text, org_name, careers_url, status
+                FROM sources
+                WHERE id::text IN ({placeholders})
+            """, source_ids)
+            sources = cursor.fetchall()
+            source_info = {s['id']: s for s in sources}
+        
+        # Format response
+        items = []
+        for job in jobs:
+            job_dict = dict(job)
+            source_id = job_dict.get('source_id')
+            if source_id and source_id in source_info:
+                job_dict['source'] = dict(source_info[source_id])
+            else:
+                job_dict['source'] = None  # Source doesn't exist or is deleted
+            items.append(job_dict)
+        
+        return {
+            "status": "ok",
+            "data": {
+                "items": items,
+                "total": total,
+                "page": page,
+                "size": size,
+                "pages": (total + size - 1) // size
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error searching jobs: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to search jobs: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.post("/impact-analysis")
+async def get_deletion_impact(
+    request: BulkDeleteRequest,
+    admin=Depends(admin_required)
+):
+    """
+    Analyze the impact of a potential deletion before executing it.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Build WHERE clause for jobs to be deleted
+        where_clauses = []
+        params = []
+        
+        if request.job_ids:
+            placeholders = ','.join(['%s'] * len(request.job_ids))
+            where_clauses.append(f"id::text IN ({placeholders})")
+            params.extend(request.job_ids)
+        elif request.org_name:
+            where_clauses.append("org_name ILIKE %s")
+            params.append(f"%{request.org_name}%")
+        elif request.source_id:
+            where_clauses.append("source_id::text = %s")
+            params.append(request.source_id)
+        
+        if request.date_from:
+            where_clauses.append("created_at >= %s")
+            params.append(request.date_from)
+        
+        if request.date_to:
+            where_clauses.append("created_at <= %s")
+            params.append(request.date_to)
+        
+        # Only count non-deleted jobs
+        where_clauses.append("deleted_at IS NULL")
+        
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else "WHERE deleted_at IS NULL"
+        
+        # Count affected jobs
+        cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause}", params)
+        total_jobs = cursor.fetchone()['count']
+        
+        # Count active jobs
+        cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause} AND status = 'active'", params)
+        active_jobs = cursor.fetchone()['count']
+        
+        # Count related data (shortlists, enrichment, etc.)
+        if request.job_ids:
+            placeholders = ','.join(['%s'] * len(request.job_ids))
+            shortlist_query = f"SELECT COUNT(*) as count FROM shortlists WHERE job_id::text IN ({placeholders})"
+            cursor.execute(shortlist_query, request.job_ids)
+        else:
+            # For org_name or source_id, we need to get job IDs first
+            cursor.execute(f"SELECT id::text FROM jobs {where_clause} LIMIT 1000", params)
+            job_ids = [row['id'] for row in cursor.fetchall()]
+            if job_ids:
+                placeholders = ','.join(['%s'] * len(job_ids))
+                shortlist_query = f"SELECT COUNT(*) as count FROM shortlists WHERE job_id::text IN ({placeholders})"
+                cursor.execute(shortlist_query, job_ids)
+            else:
+                shortlist_query = "SELECT 0 as count"
+                cursor.execute(shortlist_query)
+        
+        shortlists_count = cursor.fetchone()['count']
+        
+        return {
+            "status": "ok",
+            "data": {
+                "total_jobs": total_jobs,
+                "active_jobs": active_jobs,
+                "deleted_jobs": total_jobs - active_jobs,
+                "shortlists_count": shortlists_count,
+                "enrichment_history_count": 0,  # TODO: Add if enrichment_history table exists
+                "ground_truth_count": 0,  # TODO: Add if ground_truth table exists
+                "risk_level": "high" if total_jobs > 1000 or shortlists_count > 100 else "medium" if total_jobs > 100 else "low"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error analyzing deletion impact: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to analyze impact: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.post("/delete-bulk")
+async def bulk_delete_jobs(
+    request: BulkDeleteRequest,
+    admin=Depends(admin_required)
+):
+    """
+    Bulk delete jobs with comprehensive options.
+    Works even when sources are deleted.
+    """
+    import traceback
+    
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Build WHERE clause
+        where_clauses = []
+        params = []
+        
+        if request.job_ids:
+            placeholders = ','.join(['%s'] * len(request.job_ids))
+            where_clauses.append(f"id::text IN ({placeholders})")
+            params.extend(request.job_ids)
+        elif request.org_name:
+            where_clauses.append("org_name ILIKE %s")
+            params.append(f"%{request.org_name}%")
+        elif request.source_id:
+            where_clauses.append("source_id::text = %s")
+            params.append(request.source_id)
+        
+        if request.date_from:
+            where_clauses.append("created_at >= %s")
+            params.append(request.date_from)
+        
+        if request.date_to:
+            where_clauses.append("created_at <= %s")
+            params.append(request.date_to)
+        
+        # Only delete non-deleted jobs
+        where_clauses.append("deleted_at IS NULL")
+        
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else "WHERE deleted_at IS NULL"
+        
+        # Dry run - just count
+        if request.dry_run:
+            cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause}", params)
+            count = cursor.fetchone()['count']
+            return {
+                "status": "ok",
+                "data": {
+                    "dry_run": True,
+                    "jobs_to_delete": count,
+                    "message": f"Dry run: Would delete {count} jobs"
+                }
+            }
+        
+        # Export data if requested
+        exported_data = None
+        if request.export_data:
+            cursor.execute(f"""
+                SELECT id::text, title, org_name, apply_url, location_raw, deadline, 
+                       created_at, fetched_at, source_id::text as source_id
+                FROM jobs
+                {where_clause}
+                LIMIT 10000
+            """, params)
+            exported_jobs = cursor.fetchall()
+            exported_data = [dict(job) for job in exported_jobs]
+        
+        # Perform deletion
+        if request.deletion_type == "hard":
+            if not request.deletion_reason:
+                raise HTTPException(status_code=400, detail="Deletion reason is required for hard delete")
+            
+            # Hard delete - actually remove from database
+            cursor.execute(f"DELETE FROM jobs {where_clause} RETURNING id::text", params)
+            deleted_ids = [row['id'] for row in cursor.fetchall()]
+            deleted_count = len(deleted_ids)
+        else:
+            # Soft delete
+            deletion_reason = request.deletion_reason or "Bulk deletion via admin"
+            cursor.execute(f"""
+                UPDATE jobs
+                SET deleted_at = NOW(),
+                    deleted_by = 'admin',
+                    deletion_reason = %s
+                {where_clause}
+                RETURNING id::text
+            """, [deletion_reason] + params)
+            deleted_ids = [row['id'] for row in cursor.fetchall()]
+            deleted_count = len(deleted_ids)
+        
+        conn.commit()
+        
+        logger.info(f"Bulk deleted {deleted_count} jobs (type: {request.deletion_type})")
+        
+        return {
+            "status": "ok",
+            "data": {
+                "deleted_count": deleted_count,
+                "deleted_ids": deleted_ids[:100],  # Limit to first 100 IDs
+                "deletion_type": request.deletion_type,
+                "exported_data": exported_data,
+                "message": f"Successfully {request.deletion_type}-deleted {deleted_count} jobs"
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error in bulk delete: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete jobs: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.post("/restore")
+async def restore_jobs(
+    request: RestoreRequest,
+    admin=Depends(admin_required)
+):
+    """
+    Restore soft-deleted jobs.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        placeholders = ','.join(['%s'] * len(request.job_ids))
+        cursor.execute(f"""
+            UPDATE jobs
+            SET deleted_at = NULL,
+                deleted_by = NULL,
+                deletion_reason = NULL
+            WHERE id::text IN ({placeholders})
+            AND deleted_at IS NOT NULL
+            RETURNING id::text
+        """, request.job_ids)
+        
+        restored_ids = [row['id'] for row in cursor.fetchall()]
+        restored_count = len(restored_ids)
+        
+        conn.commit()
+        
+        return {
+            "status": "ok",
+            "data": {
+                "restored_count": restored_count,
+                "restored_ids": restored_ids,
+                "message": f"Successfully restored {restored_count} jobs"
+            }
+        }
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error restoring jobs: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to restore jobs: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.post("/export")
+async def export_jobs(
+    request: ExportRequest,
+    admin=Depends(admin_required)
+):
+    """
+    Export jobs to JSON or CSV format.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Build WHERE clause
+        where_clauses = []
+        params = []
+        
+        if request.job_ids:
+            placeholders = ','.join(['%s'] * len(request.job_ids))
+            where_clauses.append(f"id::text IN ({placeholders})")
+            params.extend(request.job_ids)
+        elif request.org_name:
+            where_clauses.append("org_name ILIKE %s")
+            params.append(f"%{request.org_name}%")
+        elif request.source_id:
+            where_clauses.append("source_id::text = %s")
+            params.append(request.source_id)
+        
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        
+        # Fetch jobs (limit to 10000 for performance)
+        cursor.execute(f"""
+            SELECT 
+                id::text,
+                title,
+                org_name,
+                location_raw,
+                country_iso,
+                level_norm,
+                deadline,
+                apply_url,
+                description_snippet,
+                status,
+                source_id::text as source_id,
+                created_at,
+                fetched_at
+            FROM jobs
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT 10000
+        """, params)
+        
+        jobs = [dict(row) for row in cursor.fetchall()]
+        
+        if request.format == "csv":
+            import csv
+            import io
+            output = io.StringIO()
+            if jobs:
+                writer = csv.DictWriter(output, fieldnames=jobs[0].keys())
+                writer.writeheader()
+                writer.writerows(jobs)
+            csv_content = output.getvalue()
+            return {
+                "status": "ok",
+                "data": {
+                    "format": "csv",
+                    "content": csv_content,
+                    "count": len(jobs)
+                }
+            }
+        else:
+            return {
+                "status": "ok",
+                "data": {
+                    "format": "json",
+                    "jobs": jobs,
+                    "count": len(jobs)
+                }
+            }
+    except Exception as e:
+        logger.error(f"Error exporting jobs: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to export jobs: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
