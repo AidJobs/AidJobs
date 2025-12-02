@@ -195,6 +195,12 @@ export default function JobManagementPage() {
       return;
     }
 
+    // Validate that we have something to delete
+    if (selectedJobs.size === 0 && !filters.org_name && !filters.source_id) {
+      toast.error('Please select at least one job to delete, or use filters (org_name or source_id)');
+      return;
+    }
+
     // Validate hard delete requires reason
     if (deletionType === 'hard' && !deletionReason.trim()) {
       toast.error('Deletion reason is required for hard delete');
@@ -212,14 +218,19 @@ export default function JobManagementPage() {
 
       if (selectedJobs.size > 0) {
         requestBody.job_ids = Array.from(selectedJobs);
+        console.log('[delete] Deleting selected jobs:', Array.from(selectedJobs));
       } else if (filters.org_name) {
         requestBody.org_name = filters.org_name;
+        console.log('[delete] Deleting by org_name:', filters.org_name);
       } else if (filters.source_id) {
         requestBody.source_id = filters.source_id;
+        console.log('[delete] Deleting by source_id:', filters.source_id);
       }
       if (filters.date_from) requestBody.date_from = filters.date_from;
       if (filters.date_to) requestBody.date_to = filters.date_to;
 
+      console.log('[delete] Request body:', requestBody);
+      
       const response = await fetch('/api/admin/jobs/delete-bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,19 +238,31 @@ export default function JobManagementPage() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('[delete] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-          error: `HTTP ${response.status}`,
-          detail: `Server returned ${response.status}`
-        }));
+        const errorText = await response.text();
+        console.error('[delete] Error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: `HTTP ${response.status}`, detail: errorText };
+        }
         const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}`;
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('[delete] Response data:', data);
+      
       if (data.status === 'ok') {
         const deletedCount = data.data?.deleted_count || 0;
-        toast.success(data.data?.message || `Successfully deleted ${deletedCount} job${deletedCount !== 1 ? 's' : ''}`);
+        if (deletedCount === 0) {
+          toast.warning('No jobs were deleted. They may have already been deleted or the filters did not match any jobs.');
+        } else {
+          toast.success(data.data?.message || `Successfully deleted ${deletedCount} job${deletedCount !== 1 ? 's' : ''}`);
+        }
         setSelectedJobs(new Set());
         setShowDeleteModal(false);
         setDeletionReason('');
@@ -251,7 +274,7 @@ export default function JobManagementPage() {
         throw new Error(data.error || data.detail || 'Failed to delete jobs');
       }
     } catch (error) {
-      console.error('Failed to delete jobs:', error);
+      console.error('[delete] Failed to delete jobs:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to delete jobs');
     } finally {
       setDeleting(false);

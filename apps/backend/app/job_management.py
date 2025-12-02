@@ -334,11 +334,14 @@ async def bulk_delete_jobs(
     """
     import traceback
     
+    logger.info(f"[bulk_delete] Received deletion request: type={request.deletion_type}, job_ids={len(request.job_ids) if request.job_ids else 0}, org_name={request.org_name}, source_id={request.source_id}, admin={admin}")
+    
     conn = None
     cursor = None
     try:
         conn = get_db_conn()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        logger.info("[bulk_delete] Database connection established")
         
         # Validate that at least one filter is provided to prevent accidental deletion of all jobs
         if not request.job_ids and not request.org_name and not request.source_id:
@@ -354,6 +357,27 @@ async def bulk_delete_jobs(
         if request.job_ids:
             if not isinstance(request.job_ids, list) or len(request.job_ids) == 0:
                 raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
+            
+            # Validate job IDs exist and are not already deleted
+            placeholders = ','.join(['%s'] * len(request.job_ids))
+            check_query = f"""
+                SELECT id::text, title, deleted_at 
+                FROM jobs 
+                WHERE id::text IN ({placeholders})
+            """
+            cursor.execute(check_query, request.job_ids)
+            existing_jobs = cursor.fetchall()
+            existing_ids = [row['id'] for row in existing_jobs]
+            already_deleted = [row['id'] for row in existing_jobs if row.get('deleted_at')]
+            
+            logger.info(f"[bulk_delete] Requested {len(request.job_ids)} job IDs")
+            logger.info(f"[bulk_delete] Found {len(existing_ids)} existing jobs")
+            if already_deleted:
+                logger.info(f"[bulk_delete] {len(already_deleted)} jobs are already deleted: {already_deleted[:5]}")
+            if len(existing_ids) < len(request.job_ids):
+                missing = set(request.job_ids) - set(existing_ids)
+                logger.warning(f"[bulk_delete] {len(missing)} job IDs not found in database: {list(missing)[:5]}")
+            
             placeholders = ','.join(['%s'] * len(request.job_ids))
             where_clauses.append(f"id::text IN ({placeholders})")
             params.extend(request.job_ids)
@@ -382,6 +406,25 @@ async def bulk_delete_jobs(
         where_clause = f"WHERE {' AND '.join(where_clauses)}"
         
         logger.info(f"[bulk_delete] WHERE clause: {where_clause}, params count: {len(params)}")
+        
+        # First, check how many jobs match the criteria (for debugging)
+        cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause}", params)
+        matching_count = cursor.fetchone()['count']
+        logger.info(f"[bulk_delete] Found {matching_count} jobs matching deletion criteria")
+        
+        if matching_count == 0:
+            logger.warning(f"[bulk_delete] No jobs match the deletion criteria. WHERE: {where_clause}, params: {params}")
+            # Still return success but with 0 count
+            return {
+                "status": "ok",
+                "data": {
+                    "deleted_count": 0,
+                    "deleted_ids": [],
+                    "deletion_type": request.deletion_type,
+                    "exported_data": None,
+                    "message": "No jobs matched the deletion criteria. They may have already been deleted or the filters did not match any jobs."
+                }
+            }
         
         # Dry run - just count
         if request.dry_run:
@@ -415,16 +458,21 @@ async def bulk_delete_jobs(
                 raise HTTPException(status_code=400, detail="Deletion reason is required for hard delete")
             
             # Hard delete - actually remove from database
-            logger.info(f"[bulk_delete] Performing hard delete with WHERE: {where_clause}")
+            logger.info(f"[bulk_delete] Performing hard delete with WHERE: {where_clause}, params: {params}")
             cursor.execute(f"DELETE FROM jobs {where_clause} RETURNING id::text", params)
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
-            logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs")
+            logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs: {deleted_ids[:10]}")
         else:
             # Soft delete
             deletion_reason = request.deletion_reason or "Bulk deletion via admin"
-            logger.info(f"[bulk_delete] Performing soft delete with WHERE: {where_clause}, reason: {deletion_reason[:50]}")
-            # Note: deletion_reason is for SET clause, params are for WHERE clause
+            logger.info(f"[bulk_delete] Performing soft delete with WHERE: {where_clause}, reason: {deletion_reason[:50]}, params count: {len(params)}")
+            
+            # Build the full parameter list: deletion_reason first (for SET clause), then WHERE params
+            full_params = [deletion_reason] + params
+            logger.info(f"[bulk_delete] Full params: deletion_reason='{deletion_reason[:30]}...', WHERE params={params[:5] if len(params) > 5 else params}")
+            
+            # Execute soft delete
             cursor.execute(f"""
                 UPDATE jobs
                 SET deleted_at = NOW(),
@@ -432,10 +480,13 @@ async def bulk_delete_jobs(
                     deletion_reason = %s
                 {where_clause}
                 RETURNING id::text
-            """, [deletion_reason] + params)
+            """, full_params)
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
-            logger.info(f"[bulk_delete] Soft deleted {deleted_count} jobs")
+            logger.info(f"[bulk_delete] Soft deleted {deleted_count} jobs: {deleted_ids[:10] if deleted_ids else 'none'}")
+            
+            if deleted_count == 0:
+                logger.warning(f"[bulk_delete] No jobs were deleted! WHERE clause: {where_clause}, params: {params}")
         
         conn.commit()
         
@@ -465,7 +516,14 @@ async def bulk_delete_jobs(
                 logger.warning(f"Failed to update Meilisearch after deletion: {e}")
                 # Don't fail the entire operation if Meilisearch update fails
         
-        logger.info(f"Bulk deleted {deleted_count} jobs (type: {request.deletion_type})")
+        logger.info(f"[bulk_delete] Bulk deleted {deleted_count} jobs (type: {request.deletion_type})")
+        
+        # If no jobs were deleted, return a warning but still success (might be expected)
+        if deleted_count == 0:
+            logger.warning(f"[bulk_delete] WARNING: No jobs were deleted. This might indicate:")
+            logger.warning(f"[bulk_delete]   - Jobs were already deleted")
+            logger.warning(f"[bulk_delete]   - WHERE clause did not match any jobs")
+            logger.warning(f"[bulk_delete]   - Jobs were filtered out by deleted_at IS NULL check")
         
         return {
             "status": "ok",
@@ -474,7 +532,7 @@ async def bulk_delete_jobs(
                 "deleted_ids": deleted_ids[:100],  # Limit to first 100 IDs
                 "deletion_type": request.deletion_type,
                 "exported_data": exported_data,
-                "message": f"Successfully {request.deletion_type}-deleted {deleted_count} jobs"
+                "message": f"Successfully {request.deletion_type}-deleted {deleted_count} jobs" if deleted_count > 0 else "No jobs were deleted (they may have already been deleted or did not match the filters)"
             }
         }
     except HTTPException:
