@@ -145,8 +145,13 @@ def backfill_quality_scores(db_url: str, batch_size: int = 100, dry_run: bool = 
                     'org_name': job.get('org_name', '')
                 }
                 
-                # Validate and score
-                quality_result = data_quality_validator.validate_and_score(job_dict)
+                # Validate and score (with repair enabled)
+                quality_result = data_quality_validator.validate_and_score(job_dict, attempt_repair=True)
+                
+                # If repairs were made, use the repaired job
+                if quality_result.get('repaired', False) and quality_result.get('repaired_job'):
+                    job_dict = quality_result['repaired_job']
+                    logger.info(f"Job {job['id']} repaired: {', '.join(quality_result.get('repair_log', [])[:2])}")
                 
                 if not quality_result['valid']:
                     # Job should have been rejected - mark it
