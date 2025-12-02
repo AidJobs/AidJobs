@@ -358,7 +358,7 @@ async def bulk_delete_jobs(
             if not isinstance(request.job_ids, list) or len(request.job_ids) == 0:
                 raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
             
-            # Validate job IDs exist and are not already deleted
+            # Validate job IDs exist
             placeholders = ','.join(['%s'] * len(request.job_ids))
             check_query = f"""
                 SELECT id::text, title, deleted_at 
@@ -371,9 +371,12 @@ async def bulk_delete_jobs(
             already_deleted = [row['id'] for row in existing_jobs if row.get('deleted_at')]
             
             logger.info(f"[bulk_delete] Requested {len(request.job_ids)} job IDs")
-            logger.info(f"[bulk_delete] Found {len(existing_ids)} existing jobs")
+            logger.info(f"[bulk_delete] Found {len(existing_ids)} existing jobs in database")
             if already_deleted:
-                logger.info(f"[bulk_delete] {len(already_deleted)} jobs are already deleted: {already_deleted[:5]}")
+                if request.deletion_type == "hard":
+                    logger.info(f"[bulk_delete] {len(already_deleted)} jobs are soft-deleted but will be hard-deleted: {already_deleted[:5]}")
+                else:
+                    logger.info(f"[bulk_delete] {len(already_deleted)} jobs are already deleted and will be skipped: {already_deleted[:5]}")
             if len(existing_ids) < len(request.job_ids):
                 missing = set(request.job_ids) - set(existing_ids)
                 logger.warning(f"[bulk_delete] {len(missing)} job IDs not found in database: {list(missing)[:5]}")
@@ -396,19 +399,28 @@ async def bulk_delete_jobs(
             where_clauses.append("created_at >= %s")
             params.append(request.date_from)
         
+        if request.date_from:
+            where_clauses.append("created_at >= %s")
+            params.append(request.date_from)
+        
         if request.date_to:
             where_clauses.append("created_at <= %s")
             params.append(request.date_to)
         
-        # Only delete non-deleted jobs
-        where_clauses.append("deleted_at IS NULL")
+        # For soft delete, only delete non-deleted jobs
+        # For hard delete, we can delete even already soft-deleted jobs
+        if request.deletion_type == "soft":
+            where_clauses.append("deleted_at IS NULL")
         
-        where_clause = f"WHERE {' AND '.join(where_clauses)}"
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         
         logger.info(f"[bulk_delete] WHERE clause: {where_clause}, params count: {len(params)}")
         
         # First, check how many jobs match the criteria (for debugging)
-        cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause}", params)
+        if where_clause:
+            cursor.execute(f"SELECT COUNT(*) as count FROM jobs {where_clause}", params)
+        else:
+            cursor.execute("SELECT COUNT(*) as count FROM jobs", [])
         matching_count = cursor.fetchone()['count']
         logger.info(f"[bulk_delete] Found {matching_count} jobs matching deletion criteria")
         
@@ -458,8 +470,13 @@ async def bulk_delete_jobs(
                 raise HTTPException(status_code=400, detail="Deletion reason is required for hard delete")
             
             # Hard delete - actually remove from database
+            # Note: Hard delete can delete even already soft-deleted jobs
             logger.info(f"[bulk_delete] Performing hard delete with WHERE: {where_clause}, params: {params}")
-            cursor.execute(f"DELETE FROM jobs {where_clause} RETURNING id::text", params)
+            if where_clause:
+                cursor.execute(f"DELETE FROM jobs {where_clause} RETURNING id::text", params)
+            else:
+                # This should never happen due to validation, but handle it
+                raise HTTPException(status_code=400, detail="Cannot hard delete all jobs - filter required")
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
             logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs: {deleted_ids[:10]}")

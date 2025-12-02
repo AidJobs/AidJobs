@@ -254,13 +254,20 @@ export default function JobManagementPage() {
       }
 
       const data = await response.json();
-      console.log('[delete] Response data:', data);
+      console.log('[delete] Full response data:', JSON.stringify(data, null, 2));
+      console.log('[delete] Deleted count:', data.data?.deleted_count);
+      console.log('[delete] Deleted IDs:', data.data?.deleted_ids);
       
       if (data.status === 'ok') {
         const deletedCount = data.data?.deleted_count || 0;
+        console.log('[delete] Processing deletion result - deletedCount:', deletedCount);
+        
         if (deletedCount === 0) {
-          toast.warning('No jobs were deleted. They may have already been deleted or the filters did not match any jobs.');
+          console.warn('[delete] WARNING: No jobs were deleted!');
+          console.warn('[delete] Response message:', data.data?.message);
+          toast.warning(data.data?.message || 'No jobs were deleted. They may have already been deleted or the filters did not match any jobs.');
         } else {
+          console.log('[delete] Successfully deleted', deletedCount, 'job(s)');
           toast.success(data.data?.message || `Successfully deleted ${deletedCount} job${deletedCount !== 1 ? 's' : ''}`);
         }
         setSelectedJobs(new Set());
