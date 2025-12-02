@@ -145,17 +145,27 @@ class FieldExtractor:
         for idx, cell in enumerate(cells):
             cell_text = cell.get_text().lower().strip()
             
-            # Map common column names
-            if any(kw in cell_text for kw in ['title', 'position', 'post', 'job']):
-                column_map['title'] = idx
-            elif any(kw in cell_text for kw in ['location', 'place', 'city', 'country']):
-                column_map['location'] = idx
-            elif any(kw in cell_text for kw in ['deadline', 'closing', 'apply by', 'expire', 'date']):
-                column_map['deadline'] = idx
-            elif any(kw in cell_text for kw in ['reference', 'ref', 'id']):
-                column_map['reference'] = idx
-            elif any(kw in cell_text for kw in ['apply', 'link', 'url']):
-                column_map['apply'] = idx
+            # Map common column names (more specific matching to avoid false positives)
+            # Title/Position column
+            if any(kw in cell_text for kw in ['title', 'position', 'post', 'job title', 'job position']):
+                if 'title' not in column_map:  # Don't overwrite if already found
+                    column_map['title'] = idx
+            # Location column
+            elif any(kw in cell_text for kw in ['location', 'place', 'city', 'country', 'duty station']):
+                if 'location' not in column_map:
+                    column_map['location'] = idx
+            # Deadline column
+            elif any(kw in cell_text for kw in ['deadline', 'closing', 'apply by', 'expire', 'closing date', 'application deadline']):
+                if 'deadline' not in column_map:
+                    column_map['deadline'] = idx
+            # Reference column
+            elif any(kw in cell_text for kw in ['reference', 'ref', 'id', 'job id', 'vacancy id']):
+                if 'reference' not in column_map:
+                    column_map['reference'] = idx
+            # Apply/Link column
+            elif any(kw in cell_text for kw in ['apply', 'link', 'url', 'details', 'view']):
+                if 'apply' not in column_map:
+                    column_map['apply'] = idx
         
         return column_map
 

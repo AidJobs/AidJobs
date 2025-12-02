@@ -80,51 +80,92 @@ class UNESCOPlugin(ExtractionPlugin):
                 if len(cells) < 2:  # Need at least 2 cells
                     continue
                 
-                # Extract title using header map
-                title = field_extractor.extract_title_from_table_row(row, header_map or {}, cells)
+                # PRIORITY 1: Extract title from link text (most reliable)
+                # Links in job tables almost always contain the actual job title
+                link = row.find('a', href=True)
+                title = None
+                if link:
+                    link_text = link.get_text().strip()
+                    # Link text is usually the job title
+                    if link_text and len(link_text) >= 5:
+                        title = link_text
+                        logger.debug(f"[unesco] Title from link: '{title[:50]}'")
+                
+                # PRIORITY 2: Use header map if no link or link text is too short
+                if not title or len(title) < 5:
+                    title = field_extractor.extract_title_from_table_row(row, header_map or {}, cells)
+                    if title:
+                        logger.debug(f"[unesco] Title from table cell: '{title[:50]}'")
+                
                 if not title:
                     continue
                 
-                # Validate title is not a date or invalid pattern
+                # CRITICAL VALIDATION: Reject invalid titles BEFORE processing
                 title_lower = title.lower().strip()
+                
                 # Reject if title is just a date
                 date_patterns = [
                     r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # DD-MM-YYYY
                     r'^\d{1,2}\s+[a-z]{3,9}\s+\d{2,4}$',  # DD MMM YYYY
-                    r'^[a-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # MMM DD, YYYY
-                    r'^\d{1,2}-[A-Z]{3,9}-\d{2,4}$',  # DD-MMM-YYYY
+                    r'^[a-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # MMM DD, YYYY (Nov 20, 2025)
+                    r'^\d{1,2}-[A-Z]{3,9}-\d{2,4}$',  # DD-MMM-YYYY (20-DEC-2025)
+                    r'^\d{1,2}/[A-Z]{3,9}/\d{2,4}$',  # DD/MMM/YYYY
+                    r'^\d{1,2}\s+[A-Z][a-z]+\s+\d{4}$',  # DD Month YYYY (20 November 2025)
                 ]
                 import re
                 is_date = any(re.match(pattern, title_lower) for pattern in date_patterns)
                 if is_date:
-                    logger.warning(f"[unesco] Skipping row - title is a date: '{title}'")
+                    logger.warning(f"[unesco] REJECTED - title is a date: '{title}'")
                     continue
                 
                 # Reject if title is a month abbreviation
                 month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
                 if title_lower in month_abbrevs:
-                    logger.warning(f"[unesco] Skipping row - title is a month: '{title}'")
+                    logger.warning(f"[unesco] REJECTED - title is a month: '{title}'")
                     continue
                 
-                # Extract location and deadline
+                # Reject if title looks like a location (city, country pattern)
+                if ',' in title and any(kw in title_lower for kw in ['montreal', 'canada', 'kabul', 'afghanistan', 'paris', 'france', 'cairo', 'egypt', 'bangkok', 'thailand']):
+                    logger.warning(f"[unesco] REJECTED - title looks like a location: '{title}'")
+                    continue
+                
+                # Reject if title is a label
+                label_patterns = ['title', 'location', 'deadline', 'closing date', 'apply by', 'reference', 'ref', 'grade', 'level', 'type of post']
+                if title_lower in label_patterns:
+                    logger.warning(f"[unesco] REJECTED - title is a label: '{title}'")
+                    continue
+                
+                # Reject if title is too short (likely a code like "G-6", "P-3")
+                if len(title) < 5:
+                    logger.warning(f"[unesco] REJECTED - title too short: '{title}'")
+                    continue
+                
+                # Extract location and deadline (only if we have a valid title)
                 location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
                 deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
                 
-                # Validate location is not a month or job title
+                # Validate location is not a month, job title, or same as title
                 if location:
                     location_lower = location.lower().strip()
+                    title_lower_check = title.lower().strip()
+                    
+                    # Reject if location is same as title (field contamination)
+                    if location_lower == title_lower_check:
+                        logger.warning(f"[unesco] REJECTED - location identical to title: '{location}'")
+                        continue
+                    
                     if location_lower in month_abbrevs:
                         logger.warning(f"[unesco] Invalid location (month): '{location}', setting to None")
                         location = None
                     # Check if location looks like a job title (contains job keywords)
-                    job_keywords = ['assistant', 'director', 'manager', 'officer', 'specialist', 'internship']
+                    job_keywords = ['assistant', 'director', 'manager', 'officer', 'specialist', 'internship', 'consultant', 'professional', 'grade', 'type of post']
                     if any(kw in location_lower for kw in job_keywords):
                         logger.warning(f"[unesco] Invalid location (contains job keywords): '{location}', setting to None")
                         location = None
                 
-                # Check if row has a job link
-                link = row.find('a', href=True)
+                # Verify we have a job link (required)
                 if not link:
+                    logger.warning(f"[unesco] REJECTED - no link found for title: '{title[:50]}'")
                     continue
                 
                 # Add to job elements with extracted data
