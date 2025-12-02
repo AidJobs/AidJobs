@@ -9,6 +9,7 @@ import re
 from typing import List, Dict, Optional
 from urllib.parse import urljoin
 from .base import ExtractionPlugin, PluginResult
+from core.field_extractors import field_extractor
 from core.data_quality import data_quality_validator
 
 logger = logging.getLogger(__name__)
@@ -54,13 +55,89 @@ class GenericPlugin(ExtractionPlugin):
         """
         soup = self.get_soup(html)
         job_elements = []
+        jobs = []
         
-        # Use parser hint if provided (CSS selector)
-        parser_hint = config.get('parser_hint') if config else None
-        if parser_hint:
-            job_elements = soup.select(parser_hint)
-            if job_elements:
-                self.logger.debug(f"Found {len(job_elements)} jobs using parser_hint: {parser_hint}")
+        # PRIORITY 1: Try table-based extraction using field_extractor (most reliable for structured data)
+        tables = soup.find_all('table')
+        for table in tables:
+            rows = table.find_all('tr')
+            if not rows:
+                continue
+            
+            # Find header row
+            header_map = None
+            thead = table.find('thead')
+            if thead:
+                header_row = thead.find('tr')
+                if header_row:
+                    header_map = field_extractor.parse_table_header(header_row)
+                    self.logger.debug(f"[generic] Found header in thead: {header_map}")
+            
+            if not header_map:
+                for idx, row in enumerate(rows[:10]):
+                    cells = row.find_all(['th', 'td'])
+                    if not cells:
+                        continue
+                    row_text = row.get_text().lower()
+                    header_keywords = ['title', 'position', 'location', 'deadline', 'duty station', 'apply']
+                    if sum(1 for kw in header_keywords if kw in row_text) >= 2 or len(row.find_all('th')) > len(row.find_all('td')):
+                        header_map = field_extractor.parse_table_header(row)
+                        if header_map:
+                            self.logger.debug(f"[generic] Found header at row {idx}: {header_map}")
+                            break
+            
+            # Extract jobs from table rows
+            for row in rows:
+                if row.find_parent('thead'):
+                    continue
+                th_count = len(row.find_all('th'))
+                td_count = len(row.find_all('td'))
+                if th_count > td_count:
+                    continue
+                
+                cells = row.find_all(['td', 'th'])
+                if len(cells) < 2:
+                    continue
+                
+                # Extract using field_extractor
+                title = field_extractor.extract_title_from_table_row(row, header_map or {}, cells)
+                if not title or len(title) < 5:
+                    continue
+                
+                link = row.find('a', href=True)
+                if not link:
+                    continue
+                
+                href = link.get('href', '')
+                if not href or href.startswith('#') or href.startswith('javascript:'):
+                    continue
+                
+                apply_url = urljoin(base_url, href)
+                location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
+                deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
+                
+                jobs.append({
+                    'title': title,
+                    'apply_url': apply_url,
+                    'location_raw': location,
+                    'deadline': deadline,
+                    'description_snippet': row.get_text()[:500] if row else None
+                })
+                
+                if len(jobs) >= 100:
+                    break
+            
+            if jobs:
+                self.logger.info(f"[generic] Extracted {len(jobs)} jobs from table structure")
+                break
+        
+        # PRIORITY 2: Use parser hint if provided (CSS selector)
+        if not jobs:
+            parser_hint = config.get('parser_hint') if config else None
+            if parser_hint:
+                job_elements = soup.select(parser_hint)
+                if job_elements:
+                    self.logger.debug(f"Found {len(job_elements)} jobs using parser_hint: {parser_hint}")
         
         # Try common selectors
         if not job_elements:
