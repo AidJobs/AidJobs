@@ -1406,8 +1406,8 @@ class HTMLCrawler:
                 quality_result = data_quality_validator.validate_and_score(job, attempt_repair=True)
                 
                 # If repairs were made, use the repaired job
-                if quality_result.get('repaired', False):
-                    job = quality_result.get('repaired_job', job)
+                if quality_result.get('repaired', False) and quality_result.get('repaired_job'):
+                    job = quality_result['repaired_job']
                     if quality_result.get('repair_log'):
                         logger.info(f"[html_fetch] Job repaired: {job.get('title', 'N/A')[:50]}... - {', '.join(quality_result['repair_log'][:2])}")
                 
@@ -1420,13 +1420,13 @@ class HTMLCrawler:
                 job['data_quality_score'] = quality_result['score']
                 job['data_quality_issues'] = quality_result['issues'] + quality_result['warnings']
                 
-                # Add repair info if repairs were made
-                if quality_result.get('repaired', False):
-                    repair_info = f"Repaired: {', '.join(quality_result.get('repair_log', [])[:3])}"
-                    if job.get('data_quality_issues'):
-                        job['data_quality_issues'].append(repair_info)
-                    else:
-                        job['data_quality_issues'] = [repair_info]
+                # Add repair info if repairs were made (as positive note, not issue)
+                if quality_result.get('repaired', False) and quality_result.get('repair_log'):
+                    repair_info = f"✓ Repaired: {', '.join(quality_result['repair_log'][:2])}"
+                    # Add to warnings (not issues) since repair is positive
+                    if not job.get('data_quality_issues'):
+                        job['data_quality_issues'] = []
+                    job['data_quality_issues'].append(repair_info)
                 
                 # Track quality distribution
                 if quality_result['score'] >= 80:
