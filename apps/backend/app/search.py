@@ -661,18 +661,58 @@ class SearchService:
                 
                 results = index.search(q or "", search_params)
                 
-                # Attach reasons to each result
+                # Attach reasons to each result and filter out deleted jobs
                 items = []
-                for hit in results.get("hits", []):
-                    hit['reasons'] = self._compute_reasons(hit, q, filters)
-                    items.append(hit)
+                hit_ids = [hit.get('id') for hit in results.get("hits", []) if hit.get('id')]
+                
+                # Safety check: Verify jobs aren't deleted in database
+                # This ensures deleted jobs don't appear even if Meilisearch deletion failed
+                if hit_ids and psycopg2:
+                    try:
+                        conn_params = db_config.get_connection_params()
+                        if conn_params:
+                            conn = psycopg2.connect(**conn_params, connect_timeout=1)
+                            cursor = conn.cursor(cursor_factory=RealDictCursor)
+                            try:
+                                # Check which job IDs are not deleted
+                                placeholders = ','.join(['%s'] * len(hit_ids))
+                                cursor.execute(
+                                    f"SELECT id::text FROM jobs WHERE id::text = ANY(ARRAY[{placeholders}]::text[]) AND deleted_at IS NULL",
+                                    hit_ids
+                                )
+                                valid_ids = {row['id'] for row in cursor.fetchall()}
+                                
+                                # Only include jobs that exist and aren't deleted
+                                for hit in results.get("hits", []):
+                                    if hit.get('id') in valid_ids:
+                                        hit['reasons'] = self._compute_reasons(hit, q, filters)
+                                        items.append(hit)
+                            finally:
+                                cursor.close()
+                                conn.close()
+                        else:
+                            # If DB check fails, include all results (fallback)
+                            for hit in results.get("hits", []):
+                                hit['reasons'] = self._compute_reasons(hit, q, filters)
+                                items.append(hit)
+                    except Exception as db_check_error:
+                        logger.warning(f"[aidjobs] Failed to verify Meilisearch results against database: {db_check_error}")
+                        # Fallback: include all results if DB check fails
+                        for hit in results.get("hits", []):
+                            hit['reasons'] = self._compute_reasons(hit, q, filters)
+                            items.append(hit)
+                else:
+                    # No IDs or no DB - include all results
+                    for hit in results.get("hits", []):
+                        hit['reasons'] = self._compute_reasons(hit, q, filters)
+                        items.append(hit)
                 
                 # Success - reset retry count
                 self._connection_retry_count = 0
                 
                 return {
                     "items": items,
-                    "total": results.get("estimatedTotalHits", 0),
+                    "total": len(items),  # Use filtered count, not Meilisearch estimate
                     "page": page,
                     "size": size,
                     "facets": {},
