@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import Meilisearch for index updates
 try:
-    import meilisearch
+    import meilisearch  # type: ignore[reportMissingImports]
     MEILISEARCH_AVAILABLE = True
 except ImportError:
     meilisearch = None  # type: ignore[assignment]
@@ -427,8 +427,8 @@ async def bulk_delete_jobs(
                 meili_key = os.getenv("MEILISEARCH_KEY") or os.getenv("MEILI_API_KEY")
                 meili_index_name = os.getenv("MEILI_JOBS_INDEX", "jobs_index")
                 
-                if meili_host and meili_key:
-                    client = meilisearch.Client(meili_host, meili_key)
+                if meili_host and meili_key and meilisearch:
+                    client = meilisearch.Client(meili_host, meili_key)  # type: ignore[union-attr]
                     index = client.index(meili_index_name)
                     
                     # Delete in batches of 100 (Meilisearch limit)
