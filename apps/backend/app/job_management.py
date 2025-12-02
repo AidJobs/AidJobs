@@ -970,6 +970,31 @@ async def diagnose_job_id(
         search_ids = [row['id'] for row in search_results] if 'search_results' in locals() else []
         diagnostics["requested_id_in_search_results"] = job_id in search_ids
         
+        # Test 12: Get ALL job IDs from database (for comparison)
+        try:
+            cursor.execute("SELECT id::text FROM jobs ORDER BY created_at DESC LIMIT 100")
+            all_db_ids = [row['id'] for row in cursor.fetchall()]
+            diagnostics["tests"]["all_db_ids_sample"] = {
+                "success": True,
+                "count": len(all_db_ids),
+                "ids": all_db_ids[:20],  # First 20 for comparison
+                "query": "SELECT id::text FROM jobs ORDER BY created_at DESC LIMIT 100"
+            }
+        except Exception as e:
+            diagnostics["tests"]["all_db_ids_sample"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        # Test 13: Check if any of the search result IDs match the requested ID format
+        if search_ids:
+            diagnostics["search_ids_format_check"] = {
+                "requested_id_format": job_id,
+                "search_ids_sample": search_ids[:5],
+                "format_match": any(sid == job_id for sid in search_ids),
+                "length_match": any(len(sid) == len(job_id) for sid in search_ids)
+            }
+        
         return {
             "status": "ok",
             "data": diagnostics
