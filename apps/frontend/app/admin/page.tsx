@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [initializing, setInitializing] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [crawlerStatus, setCrawlerStatus] = useState<any>(null);
+  const [syncingMeilisearch, setSyncingMeilisearch] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
 
   const addToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
