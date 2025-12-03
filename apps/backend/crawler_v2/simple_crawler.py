@@ -10,6 +10,7 @@ Design principles:
 
 import logging
 import asyncio
+import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from urllib.parse import urlparse, urljoin
@@ -87,7 +88,7 @@ class SimpleCrawler:
                 
                 # Check if this looks like a header
                 cell_texts = [c.get_text().strip().lower() for c in cells]
-                header_keywords = ['title', 'position', 'location', 'deadline', 'closing', 'apply']
+                header_keywords = ['title', 'position', 'location', 'deadline', 'closing', 'apply', 'date', 'grade', 'type']
                 
                 keyword_count = sum(1 for text in cell_texts for kw in header_keywords if kw in text)
                 
@@ -100,7 +101,7 @@ class SimpleCrawler:
                             header_map[idx] = 'title'
                         elif 'location' in text or 'duty' in text:
                             header_map[idx] = 'location'
-                        elif 'deadline' in text or 'closing' in text:
+                        elif 'deadline' in text or 'closing' in text or ('date' in text and 'closing' in text):
                             header_map[idx] = 'deadline'
                     break
             
@@ -146,7 +147,10 @@ class SimpleCrawler:
                                 job['location_raw'] = text
                         elif field == 'deadline':
                             if text and len(text) >= 3:
-                                job['deadline'] = text
+                                # Clean and parse deadline
+                                deadline_cleaned = self._parse_deadline(text)
+                                if deadline_cleaned:
+                                    job['deadline'] = deadline_cleaned
                 
                 # Only add if we have title and apply_url
                 if job.get('title') and job.get('apply_url'):
@@ -159,6 +163,89 @@ class SimpleCrawler:
         
         logger.info(f"Extracted {len(jobs)} jobs from HTML")
         return jobs
+    
+    def _parse_deadline(self, text: str) -> Optional[str]:
+        """
+        Parse deadline text into a standard format.
+        
+        Handles formats like:
+        - "12-DEC-2025"
+        - "10/12/2025"
+        - "December 10, 2025"
+        - "10 December 2025"
+        """
+        if not text:
+            return None
+        
+        text = text.strip()
+        
+        # Remove common prefixes
+        prefixes = ['closing date:', 'deadline:', 'apply by:', 'due:', 'by:']
+        for prefix in prefixes:
+            if text.lower().startswith(prefix):
+                text = text[len(prefix):].strip()
+        
+        # Try to parse common date formats
+        import re
+        from datetime import datetime
+        
+        # Format: DD-MMM-YYYY or DD/MMM/YYYY (e.g., "12-DEC-2025")
+        mmm_pattern = r'(\d{1,2})[-/]([A-Z]{3,})[-/](\d{2,4})'
+        match = re.search(mmm_pattern, text.upper())
+        if match:
+            day, month_str, year = match.groups()
+            month_map = {
+                'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
+                'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12
+            }
+            if month_str in month_map:
+                try:
+                    year_int = int(year)
+                    if year_int < 100:
+                        year_int += 2000 if year_int < 50 else 1900
+                    date_obj = datetime(year_int, month_map[month_str], int(day))
+                    return date_obj.strftime('%Y-%m-%d')
+                except:
+                    pass
+        
+        # Format: DD/MM/YYYY or DD-MM-YYYY
+        numeric_pattern = r'(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})'
+        match = re.search(numeric_pattern, text)
+        if match:
+            day, month, year = match.groups()
+            try:
+                year_int = int(year)
+                if year_int < 100:
+                    year_int += 2000 if year_int < 50 else 1900
+                date_obj = datetime(year_int, int(month), int(day))
+                return date_obj.strftime('%Y-%m-%d')
+            except:
+                pass
+        
+        # Format: DD Month YYYY (e.g., "10 December 2025")
+        month_names = [
+            'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december'
+        ]
+        month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+        
+        for i, month_name in enumerate(month_names + month_abbrevs, 1):
+            pattern = rf'(\d{{1,2}})\s+{month_name}\s+(\d{{2,4}})'
+            match = re.search(pattern, text.lower())
+            if match:
+                day, year = match.groups()
+                try:
+                    year_int = int(year)
+                    if year_int < 100:
+                        year_int += 2000 if year_int < 50 else 1900
+                    month_num = (i - 1) % 12 + 1
+                    date_obj = datetime(year_int, month_num, int(day))
+                    return date_obj.strftime('%Y-%m-%d')
+                except:
+                    pass
+        
+        # If we can't parse it, return the original text (database can handle it)
+        return text
     
     def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
         """
