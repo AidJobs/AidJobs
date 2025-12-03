@@ -873,6 +873,167 @@ class SimpleCrawler:
         
         return {'inserted': inserted, 'updated': updated, 'skipped': skipped}
     
+    async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
+        """
+        Enrich job data by fetching and parsing the detail page.
+        
+        This extracts rich metadata like deadline, location, grade, etc.
+        that's only available on the individual job detail pages.
+        """
+        if not job.get('apply_url'):
+            return job
+        
+        try:
+            # Fetch detail page
+            status, html = await self.fetch_html(job['apply_url'])
+            if status != 200:
+                logger.warning(f"Failed to fetch detail page: {job['apply_url']} (HTTP {status})")
+                return job
+            
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # UNDP-specific extraction patterns
+            if 'undp.org' in job['apply_url'].lower():
+                # Pattern 1: Consultancies page structure
+                # Look for "DEADLINE:" label - try multiple approaches
+                deadline_found = False
+                
+                # Approach 1: Find text node with "DEADLINE:"
+                deadline_elem = soup.find(string=re.compile(r'DEADLINE:', re.IGNORECASE))
+                if deadline_elem:
+                    parent = deadline_elem.parent
+                    # Try to find next sibling or parent's next sibling
+                    next_sibling = parent.find_next_sibling() if parent else None
+                    if next_sibling:
+                        deadline_text = next_sibling.get_text()
+                    else:
+                        deadline_text = parent.get_text() if parent else ''
+                    
+                    # Extract date part (e.g., "03-Dec-25" or "03-Dec-25 @ 03:00 PM")
+                    deadline_match = re.search(r'(\d{1,2}[-/]\w{3}[-/]\d{2,4})', deadline_text, re.IGNORECASE)
+                    if deadline_match:
+                        deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                        if deadline_cleaned:
+                            job['deadline'] = deadline_cleaned
+                            deadline_found = True
+                
+                # Approach 2: Look for "Apply Before:" (regular jobs)
+                if not deadline_found:
+                    apply_before = soup.find(string=re.compile(r'Apply Before:', re.IGNORECASE))
+                    if apply_before:
+                        parent = apply_before.parent
+                        if parent:
+                            deadline_text = parent.get_text()
+                            # Extract date (e.g., "12/04/2025")
+                            deadline_match = re.search(r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', deadline_text)
+                            if deadline_match:
+                                deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                                if deadline_cleaned:
+                                    job['deadline'] = deadline_cleaned
+                                    deadline_found = True
+                
+                # Location extraction
+                location_found = False
+                
+                # Approach 1: Look for "OFFICE:" (consultancies)
+                office_elem = soup.find(string=re.compile(r'OFFICE:', re.IGNORECASE))
+                if office_elem:
+                    parent = office_elem.parent
+                    next_sibling = parent.find_next_sibling() if parent else None
+                    if next_sibling:
+                        office_text = next_sibling.get_text()
+                    else:
+                        office_text = parent.get_text() if parent else ''
+                    
+                    # Extract location (e.g., "UNDP-COL - COLOMBIA" -> "COLOMBIA")
+                    # Try pattern: "UNDP-XXX - COUNTRY" or just "COUNTRY"
+                    location_match = re.search(r'OFFICE:\s*[^-]*-?\s*([A-Z][A-Z\s]+)', office_text, re.IGNORECASE)
+                    if location_match:
+                        location = location_match.group(1).strip()
+                        if location and len(location) >= 3:
+                            job['location_raw'] = location
+                            location_found = True
+                
+                # Approach 2: Look for "Locations:" (regular jobs)
+                if not location_found:
+                    locations_elem = soup.find(string=re.compile(r'Locations?:', re.IGNORECASE))
+                    if locations_elem:
+                        parent = locations_elem.parent
+                        next_sibling = parent.find_next_sibling() if parent else None
+                        if next_sibling:
+                            location_text = next_sibling.get_text()
+                        else:
+                            location_text = parent.get_text() if parent else ''
+                        
+                        # Extract location (e.g., "Kyiv, Ukraine")
+                        location_match = re.search(r'Locations?:\s*([^\n\r<]+)', location_text, re.IGNORECASE)
+                        if location_match:
+                            location = location_match.group(1).strip()
+                            # Clean up any HTML or extra text
+                            location = re.sub(r'<[^>]+>', '', location).strip()
+                            if location and len(location) >= 3 and len(location) < 100:
+                                job['location_raw'] = location
+                                location_found = True
+                
+                # Approach 3: Look for location in title area (e.g., "DS - Kyiv")
+                if not location_found and job.get('title'):
+                    title_location_match = re.search(r'DS\s*-\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', job['title'], re.IGNORECASE)
+                    if title_location_match:
+                        job['location_raw'] = title_location_match.group(1).strip()
+                        location_found = True
+                
+                # Look for "Grade:" (e.g., "NPSA-9")
+                grade_elem = soup.find(string=re.compile(r'Grade:', re.IGNORECASE))
+                if grade_elem:
+                    parent = grade_elem.parent
+                    next_sibling = parent.find_next_sibling() if parent else None
+                    if next_sibling:
+                        grade_text = next_sibling.get_text()
+                    else:
+                        grade_text = parent.get_text() if parent else ''
+                    grade_match = re.search(r'Grade:\s*([^\n\r<]+)', grade_text, re.IGNORECASE)
+                    if grade_match:
+                        grade = grade_match.group(1).strip()
+                        if grade:
+                            job['grade'] = grade
+            
+            # Generic extraction patterns (for other sites)
+            else:
+                # Look for common deadline patterns
+                deadline_patterns = [
+                    r'Deadline[:\s]+([^\n\r<]+)',
+                    r'Apply by[:\s]+([^\n\r<]+)',
+                    r'Apply Before[:\s]+([^\n\r<]+)',
+                    r'Closing[:\s]+([^\n\r<]+)',
+                ]
+                for pattern in deadline_patterns:
+                    deadline_match = re.search(pattern, html, re.IGNORECASE)
+                    if deadline_match:
+                        deadline_text = deadline_match.group(1).strip()
+                        deadline_cleaned = self._parse_deadline(deadline_text)
+                        if deadline_cleaned:
+                            job['deadline'] = deadline_cleaned
+                            break
+                
+                # Look for common location patterns
+                location_patterns = [
+                    r'Location[:\s]+([^\n\r<]+)',
+                    r'Duty Station[:\s]+([^\n\r<]+)',
+                    r'Office[:\s]+([^\n\r<]+)',
+                ]
+                for pattern in location_patterns:
+                    location_match = re.search(pattern, html, re.IGNORECASE)
+                    if location_match:
+                        location = location_match.group(1).strip()
+                        if location and len(location) >= 3 and len(location) < 100:
+                            job['location_raw'] = location
+                            break
+            
+        except Exception as e:
+            logger.warning(f"Error enriching job from detail page {job.get('apply_url')}: {e}")
+        
+        return job
+    
     async def crawl_source(self, source: Dict) -> Dict:
         """
         Crawl a single source.
@@ -902,11 +1063,35 @@ class SimpleCrawler:
                         'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
                     }
                 
-                # Extract jobs
+                # Extract jobs from listing page
                 jobs = self.extract_jobs_from_html(html, careers_url)
                 
+                # Enrich jobs from detail pages (for UNDP and other sites)
+                # Only enrich if we have a reasonable number of jobs (avoid timeout)
+                if len(jobs) > 0 and len(jobs) <= 50:  # Limit to 50 jobs to avoid timeout
+                    logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
+                    enriched_jobs = []
+                    for i, job in enumerate(jobs):
+                        if job.get('apply_url'):
+                            try:
+                                enriched_job = await self.enrich_job_from_detail_page(job, careers_url)
+                                enriched_jobs.append(enriched_job)
+                                # Small delay to avoid overwhelming servers (0.3s between requests)
+                                if i < len(jobs) - 1:  # Don't delay after last job
+                                    await asyncio.sleep(0.3)
+                            except Exception as e:
+                                logger.warning(f"Error enriching job {job.get('title', 'unknown')}: {e}")
+                                enriched_jobs.append(job)  # Use original job if enrichment fails
+                        else:
+                            enriched_jobs.append(job)
+                    jobs = enriched_jobs
+                else:
+                    if len(jobs) > 50:
+                        logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
+                    jobs = jobs
+                
                 # Save to database
-                counts = self.save_jobs(jobs, source_id, org_name)
+                counts = self.save_jobs(enriched_jobs, source_id, org_name)
                 
                 return {
                     'status': 'ok' if jobs else 'warn',
