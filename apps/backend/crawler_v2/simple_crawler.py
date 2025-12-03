@@ -1093,12 +1093,19 @@ class SimpleCrawler:
                 if self.use_ai and self.ai_extractor:
                     try:
                         logger.info(f"Attempting AI extraction for {org_name}...")
-                        jobs = self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100)
+                        # Use asyncio.wait_for to add overall timeout (2 minutes max)
+                        jobs = await asyncio.wait_for(
+                            self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
+                            timeout=120.0  # 2 minute overall timeout
+                        )
                         if jobs:
                             logger.info(f"AI extraction successful: {len(jobs)} jobs found")
                         else:
                             logger.info("AI extraction returned no jobs, falling back to rule-based")
                             jobs = self.extract_jobs_from_html(html, careers_url)
+                    except asyncio.TimeoutError:
+                        logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
+                        jobs = self.extract_jobs_from_html(html, careers_url)
                     except Exception as e:
                         logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
                         jobs = self.extract_jobs_from_html(html, careers_url)

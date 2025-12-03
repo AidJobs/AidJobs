@@ -13,6 +13,7 @@ Secondary benefit: Can clean/parse messy data from RSS/API sources if needed.
 import logging
 import json
 import re
+import asyncio
 from typing import Dict, List, Optional
 from bs4 import BeautifulSoup
 import httpx
@@ -47,7 +48,7 @@ class AIJobExtractor:
         if not self.api_key:
             logger.warning("OPENROUTER_API_KEY not set - AI extraction will be disabled")
     
-    def extract_jobs_from_html(self, html: str, base_url: str, max_jobs: int = 100) -> List[Dict]:
+    async def extract_jobs_from_html(self, html: str, base_url: str, max_jobs: int = 100) -> List[Dict]:
         """
         Extract jobs from HTML using AI.
         
@@ -62,7 +63,7 @@ class AIJobExtractor:
             soup = BeautifulSoup(html, 'html.parser')
             
             # Step 1: Find job listing containers using AI
-            job_containers = self._find_job_containers(soup, base_url)
+            job_containers = await self._find_job_containers(soup, base_url)
             
             if not job_containers:
                 logger.info("AI found no job containers")
@@ -71,14 +72,24 @@ class AIJobExtractor:
             logger.info(f"AI found {len(job_containers)} potential job containers")
             
             # Step 2: Extract structured data from each container
+            # Limit to first 20 containers to avoid too many API calls
             jobs = []
-            for i, container in enumerate(job_containers[:max_jobs]):
+            containers_to_process = job_containers[:min(max_jobs, 20)]
+            
+            for i, container in enumerate(containers_to_process):
                 try:
-                    job = self._extract_job_from_container(container, base_url)
+                    job = await self._extract_job_from_container(container, base_url)
                     if job and job.get('title') and job.get('apply_url'):
                         jobs.append(job)
+                    # Small delay between API calls to avoid rate limits
+                    if i < len(containers_to_process) - 1:
+                        await asyncio.sleep(0.5)
                 except Exception as e:
                     logger.warning(f"Error extracting job {i}: {e}")
+                    # If too many errors, fallback early
+                    if i > 0 and len(jobs) == 0:
+                        logger.warning("AI extraction failing consistently, aborting early")
+                        break
                     continue
             
             logger.info(f"AI extracted {len(jobs)} jobs")
@@ -88,7 +99,7 @@ class AIJobExtractor:
             logger.error(f"Error in AI extraction: {e}", exc_info=True)
             return []
     
-    def _find_job_containers(self, soup: BeautifulSoup, base_url: str) -> List:
+    async def _find_job_containers(self, soup: BeautifulSoup, base_url: str) -> List:
         """
         Use AI to identify job listing containers in HTML.
         
@@ -128,7 +139,7 @@ Example response:
 Return ONLY valid JSON, no other text."""
 
         try:
-            response = self._call_llm(prompt)
+            response = await self._call_llm(prompt)
             result = json.loads(response)
             
             selectors = result.get('selectors', [])
@@ -155,7 +166,7 @@ Return ONLY valid JSON, no other text."""
             # Fallback to simple heuristics
             return self._fallback_find_containers(soup)
     
-    def _extract_job_from_container(self, container, base_url: str) -> Optional[Dict]:
+    async def _extract_job_from_container(self, container, base_url: str) -> Optional[Dict]:
         """
         Extract structured job data from a single container using AI.
         """
@@ -199,7 +210,7 @@ CRITICAL RULES:
 Return ONLY valid JSON, no other text, no markdown, no code blocks."""
 
         try:
-            response = self._call_llm(prompt)
+            response = await self._call_llm(prompt)
             job = json.loads(response)
             
             # Clean and validate
@@ -250,41 +261,47 @@ Return ONLY valid JSON, no other text, no markdown, no code blocks."""
             logger.warning(f"AI extraction failed for container: {e}")
             return None
     
-    def _call_llm(self, prompt: str) -> str:
-        """Call LLM API via OpenRouter."""
+    async def _call_llm(self, prompt: str) -> str:
+        """Call LLM API via OpenRouter (async)."""
         if not self.api_key:
             raise ValueError("API key not set")
         
         try:
-            response = httpx.post(
-                self.base_url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://aidjobs.app",
-                    "X-Title": "AidJobs Crawler"
-                },
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a helpful assistant that extracts structured data from HTML. Always return valid JSON only, no markdown, no explanations."
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    "temperature": 0,
-                    "max_tokens": 2000
-                },
-                timeout=30.0
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data['choices'][0]['message']['content'].strip()
+            async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+                response = await client.post(
+                    self.base_url,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://aidjobs.app",
+                        "X-Title": "AidJobs Crawler"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You are a helpful assistant that extracts structured data from HTML. Always return valid JSON only, no markdown, no explanations."
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        "temperature": 0,
+                        "max_tokens": 2000
+                    }
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data['choices'][0]['message']['content'].strip()
             
+        except httpx.TimeoutException:
+            logger.error("LLM API call timed out")
+            raise
+        except httpx.HTTPStatusError as e:
+            logger.error(f"LLM API HTTP error: {e.response.status_code} - {e.response.text}")
+            raise
         except Exception as e:
             logger.error(f"LLM API call failed: {e}")
             raise
