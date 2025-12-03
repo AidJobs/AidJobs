@@ -684,11 +684,11 @@ class SimpleCrawler:
             link_text = link.get_text().strip()
             href = link.get('href', '').strip()
             
-            # Skip if too short or navigation
-            if len(link_text) < 10:
+            # Skip if too short or navigation - more lenient for BRAC
+            if len(link_text) < 8:  # Lowered from 10
                 continue
             
-            if any(nav in link_text.lower() for nav in nav_keywords) and len(link_text) < 25:
+            if any(nav in link_text.lower() for nav in nav_keywords) and len(link_text) < 20:  # Lowered from 25
                 continue
             
             # Skip anchors and javascript
@@ -696,11 +696,14 @@ class SimpleCrawler:
                 continue
             
             # Skip external links to social media, etc.
-            if any(domain in href.lower() for domain in ['facebook.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'youtube.com']):
+            if any(domain in href.lower() for domain in ['facebook.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'youtube.com', 'pinterest.com']):
                 continue
             
-            # If link text is substantial (15+ chars) and not clearly navigation, treat as potential job
-            if len(link_text) >= 15:
+            # More lenient: Accept links with 10+ chars (was 15) OR links with job keywords (8+ chars)
+            has_job_keyword = any(kw in link_text.lower() for kw in ['position', 'job', 'vacancy', 'career', 'opening', 'opportunity', 'recruitment', 'hiring'])
+            is_substantial = len(link_text) >= 10  # Lowered from 15
+            
+            if is_substantial or (has_job_keyword and len(link_text) >= 8):
                 job = {
                     'title': link_text,
                     'apply_url': urljoin(base_url, href)
