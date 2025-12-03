@@ -470,7 +470,7 @@ export default function HomeClient() {
     .sort((a, b) => b[1] - a[1]);
   const visibleMissionTags = showAllTags ? missionTagEntries : missionTagEntries.slice(0, 12);
 
-  const internationalCount = (typeof intlMap?.['true'] === 'number' ? intlMap['true'] : 0) || 0;
+  const internationalCount = (intlMap && intlMap['true']) ? Number(intlMap['true']) : 0;
 
   return (
     <>
@@ -725,10 +725,9 @@ export default function HomeClient() {
               )}
             </div>
           </div>
-        </div>
 
-        <div className="flex gap-6 max-w-7xl mx-auto px-4">
-          <div className="flex-1">
+          <div className="flex gap-6">
+            <div className="flex-1">
             {searching && page === 1 ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
