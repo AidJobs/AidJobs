@@ -4,7 +4,7 @@ Admin API routes for crawler management
 import os
 import logging
 import json
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
 from pydantic import BaseModel  # type: ignore
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/admin/crawl", tags=["crawler_admin"])
 robots_router = APIRouter(prefix="/api/admin/robots", tags=["robots"])
 policies_router = APIRouter(prefix="/api/admin/domain_policies", tags=["domain_policies"])
 quality_router = APIRouter(prefix="/api/admin/data-quality", tags=["data_quality"])
+link_validation_router = APIRouter(prefix="/api/admin/link-validation", tags=["link_validation"])
 
 
 def get_db_url():
@@ -1279,3 +1280,184 @@ async def run_deletion_migration(admin: str = Depends(admin_required)):
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
     finally:
         conn.close()
+
+
+# Link validation endpoints
+
+class ValidateLinksRequest(BaseModel):
+    job_ids: Optional[List[str]] = None
+    urls: Optional[List[str]] = None
+    use_cache: bool = True
+
+
+@link_validation_router.post("/validate")
+async def validate_links(request: ValidateLinksRequest, admin=Depends(admin_required)):
+    """
+    Validate apply URLs for jobs or specific URLs.
+    
+    Args:
+        job_ids: List of job IDs to validate (validates their apply_url)
+        urls: List of URLs to validate directly
+        use_cache: Whether to use cached results (default: True)
+    
+    Returns:
+        Validation results for each URL
+    """
+    db_url = get_db_url()
+    
+    try:
+        from core.link_validator import get_link_validator
+        link_validator = get_link_validator(db_url)
+        
+        urls_to_validate = []
+        
+        # Get URLs from job_ids if provided
+        if request.job_ids:
+            conn = get_db_conn()
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    placeholders = ','.join(['%s'] * len(request.job_ids))
+                    cur.execute(f"""
+                        SELECT DISTINCT apply_url
+                        FROM jobs
+                        WHERE id::text = ANY(ARRAY[{placeholders}]::text[])
+                        AND apply_url IS NOT NULL
+                        AND deleted_at IS NULL
+                    """, request.job_ids)
+                    
+                    for row in cur.fetchall():
+                        if row['apply_url']:
+                            urls_to_validate.append(row['apply_url'])
+            finally:
+                conn.close()
+        
+        # Add direct URLs if provided
+        if request.urls:
+            urls_to_validate.extend(request.urls)
+        
+        if not urls_to_validate:
+            return {
+                "status": "ok",
+                "message": "No URLs to validate",
+                "results": {}
+            }
+        
+        # Validate URLs
+        results = await link_validator.validate_batch(
+            urls_to_validate,
+            use_cache=request.use_cache,
+            max_concurrent=10
+        )
+        
+        # Count valid/invalid
+        valid_count = sum(1 for r in results.values() if r.get('valid', False))
+        invalid_count = len(results) - valid_count
+        
+        return {
+            "status": "ok",
+            "total": len(results),
+            "valid": valid_count,
+            "invalid": invalid_count,
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error validating links: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Link validation failed: {str(e)}")
+
+
+@link_validation_router.get("/stats")
+async def get_validation_stats(
+    job_ids: Optional[str] = Query(None, description="Comma-separated job IDs"),
+    admin=Depends(admin_required)
+):
+    """
+    Get link validation statistics.
+    
+    Args:
+        job_ids: Optional comma-separated list of job IDs to filter by
+    
+    Returns:
+        Validation statistics
+    """
+    db_url = get_db_url()
+    
+    try:
+        from core.link_validator import get_link_validator
+        link_validator = get_link_validator(db_url)
+        
+        job_id_list = None
+        if job_ids:
+            job_id_list = [jid.strip() for jid in job_ids.split(',') if jid.strip()]
+        
+        stats = link_validator.get_validation_stats(job_id_list)
+        
+        return {
+            "status": "ok",
+            "data": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting validation stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+
+@link_validation_router.post("/validate-job/{job_id}")
+async def validate_job_link(job_id: str, admin=Depends(admin_required)):
+    """
+    Validate apply URL for a specific job.
+    
+    Args:
+        job_id: Job ID to validate
+    
+    Returns:
+        Validation result
+    """
+    db_url = get_db_url()
+    
+    try:
+        # Get job's apply_url
+        conn = get_db_conn()
+        apply_url = None
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT apply_url
+                    FROM jobs
+                    WHERE id::text = %s
+                    AND deleted_at IS NULL
+                """, (job_id,))
+                
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Job not found")
+                
+                apply_url = row['apply_url']
+        finally:
+            conn.close()
+        
+        if not apply_url:
+            return {
+                "status": "ok",
+                "message": "Job has no apply URL",
+                "result": None
+            }
+        
+        # Validate URL
+        from core.link_validator import get_link_validator
+        link_validator = get_link_validator(db_url)
+        
+        result = await link_validator.validate_url(apply_url, use_cache=True)
+        
+        return {
+            "status": "ok",
+            "job_id": job_id,
+            "apply_url": apply_url,
+            "result": result
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating job link: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Link validation failed: {str(e)}")

@@ -4,6 +4,7 @@ HTML crawler: fetch, extract, normalize, and upsert jobs
 import hashlib
 import json
 import logging
+import os
 import re
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
@@ -1451,6 +1452,49 @@ class HTMLCrawler:
         except Exception as e:
             # Don't fail upsert if validation fails, but log it
             logger.warning(f"[html_fetch] Data quality validation error (non-fatal): {e}", exc_info=True)
+        
+        # STEP 2: Link validation (optional, can be disabled for performance)
+        # Validate apply URLs to ensure they work
+        validate_links = os.getenv("AIDJOBS_VALIDATE_LINKS", "true").lower() == "true"
+        if validate_links and jobs:
+            try:
+                from core.link_validator import get_link_validator
+                link_validator = get_link_validator(self.db_url)
+                
+                # Validate URLs in batch (async)
+                apply_urls = [job.get('apply_url') for job in jobs if job.get('apply_url')]
+                if apply_urls:
+                    logger.info(f"[html_fetch] Validating {len(apply_urls)} apply URLs...")
+                    validation_results = await link_validator.validate_batch(
+                        apply_urls,
+                        use_cache=True,
+                        max_concurrent=10
+                    )
+                    
+                    # Add validation status to jobs
+                    invalid_count = 0
+                    for job in jobs:
+                        apply_url = job.get('apply_url')
+                        if apply_url and apply_url in validation_results:
+                            result = validation_results[apply_url]
+                            job['link_validation'] = {
+                                'valid': result['valid'],
+                                'status_code': result['status_code'],
+                                'final_url': result['final_url'],
+                                'error': result.get('error')
+                            }
+                            if not result['valid']:
+                                invalid_count += 1
+                                logger.warning(f"[html_fetch] Invalid apply URL: {apply_url} - {result.get('error', 'Unknown error')}")
+                    
+                    if invalid_count > 0:
+                        logger.warning(f"[html_fetch] Link validation: {invalid_count} invalid URLs found out of {len(apply_urls)}")
+                    else:
+                        logger.info(f"[html_fetch] Link validation: All {len(apply_urls)} URLs are valid")
+                        
+            except Exception as e:
+                # Don't fail upsert if link validation fails, but log it
+                logger.warning(f"[html_fetch] Link validation error (non-fatal): {e}", exc_info=True)
         
         conn = self._get_db_conn()
         jobs_to_enrich = []  # Track jobs that need enrichment

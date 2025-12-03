@@ -274,6 +274,20 @@ CREATE TABLE IF NOT EXISTS takedowns (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Link validations table: cache for apply URL validation results
+CREATE TABLE IF NOT EXISTS link_validations (
+    url TEXT PRIMARY KEY,
+    is_valid BOOLEAN NOT NULL,
+    status_code INT,
+    final_url TEXT,
+    redirect_count INT DEFAULT 0,
+    error_message TEXT,
+    validated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index for link validations (for cleanup of old entries)
+CREATE INDEX IF NOT EXISTS idx_link_validations_validated_at ON link_validations(validated_at);
+
 -- Jobs table: parsed job postings
 CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
