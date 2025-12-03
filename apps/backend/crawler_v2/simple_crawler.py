@@ -834,15 +834,18 @@ class SimpleCrawler:
                     canonical_text = f"{title}|{apply_url}".lower()
                     canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
                     
-                    # Check if exists
+                    # Check if exists (including deleted jobs)
                     cur.execute("""
-                        SELECT id FROM jobs WHERE canonical_hash = %s
+                        SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s
                     """, (canonical_hash,))
                     
                     existing = cur.fetchone()
                     
                     if existing:
-                        # Update
+                        # Check if job was deleted
+                        is_deleted = existing[1] is not None
+                        
+                        # Update (and restore if deleted)
                         if deadline_date:
                             cur.execute("""
                                 UPDATE jobs
@@ -850,6 +853,10 @@ class SimpleCrawler:
                                     apply_url = %s,
                                     location_raw = %s,
                                     deadline = %s::DATE,
+                                    deleted_at = NULL,
+                                    deleted_by = NULL,
+                                    deletion_reason = NULL,
+                                    status = 'active',
                                     last_seen_at = NOW(),
                                     updated_at = NOW()
                                 WHERE canonical_hash = %s
@@ -860,11 +867,20 @@ class SimpleCrawler:
                                 SET title = %s,
                                     apply_url = %s,
                                     location_raw = %s,
+                                    deleted_at = NULL,
+                                    deleted_by = NULL,
+                                    deletion_reason = NULL,
+                                    status = 'active',
                                     last_seen_at = NOW(),
                                     updated_at = NOW()
                                 WHERE canonical_hash = %s
                             """, (title, apply_url, location, canonical_hash))
-                        updated += 1
+                        
+                        if is_deleted:
+                            logger.info(f"Restored deleted job: {title[:50]}...")
+                            inserted += 1  # Count restored jobs as inserted
+                        else:
+                            updated += 1
                     else:
                         # Insert
                         if deadline_date:
