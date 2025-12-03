@@ -1308,9 +1308,9 @@ export default function AdminSourcesPage() {
                         <div className="flex gap-1 flex-wrap">
                           <button
                             onClick={() => handleRunNow(source.id)}
-                            disabled={runningSourceId === source.id}
+                            disabled={runningSourceId === source.id || runningNewCrawlerId === source.id}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                            title="Run now"
+                            title="Run now (old crawler)"
                           >
                             {runningSourceId === source.id ? (
                               <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
@@ -1318,7 +1318,22 @@ export default function AdminSourcesPage() {
                               <Play className="w-4 h-4 text-[#86868B]" />
                             )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                              Run now
+                              Run now (old crawler)
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleTestNewCrawler(source.id)}
+                            disabled={runningSourceId === source.id || runningNewCrawlerId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#30D158] bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group border border-[#30D158] border-opacity-30"
+                            title="Test new crawler (v2)"
+                          >
+                            {runningNewCrawlerId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#30D158] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Sparkles className="w-4 h-4 text-[#30D158]" />
+                            )}
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                              Test new crawler (v2)
                             </span>
                           </button>
                           <button
