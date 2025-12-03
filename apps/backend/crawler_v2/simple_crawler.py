@@ -97,6 +97,13 @@ class SimpleCrawler:
             logger.info(f"Strategy 4 (structured data) found {len(jobs)} jobs")
             return jobs
         
+        # Strategy 5: Generic fallback - extract any substantial links from main content
+        logger.info("Trying generic fallback extraction...")
+        jobs = self._extract_generic_fallback(soup, base_url)
+        if jobs:
+            logger.info(f"Strategy 5 (generic fallback) found {len(jobs)} jobs")
+            return jobs
+        
         logger.warning("No extraction strategy found jobs")
         return []
     
@@ -145,12 +152,12 @@ class SimpleCrawler:
                     continue
                 
                 cells = row.find_all(['td', 'th'])
-                if len(cells) < 2:
+                if len(cells) < 1:  # At least 1 cell (more lenient)
                     continue
                 
                 job = {}
                 
-                # Extract title from link
+                # Extract title from link (preferred)
                 link = row.find('a', href=True)
                 if link:
                     link_text = link.get_text().strip()
@@ -160,7 +167,7 @@ class SimpleCrawler:
                         if href and not href.startswith('#') and not href.startswith('javascript:'):
                             job['apply_url'] = urljoin(base_url, href)
                 
-                # Extract from cells
+                # Extract from cells using header map
                 for idx, cell in enumerate(cells):
                     if idx in header_map:
                         field = header_map[idx]
@@ -169,6 +176,13 @@ class SimpleCrawler:
                         if field == 'title' and 'title' not in job:
                             if text and len(text) >= 5:
                                 job['title'] = text
+                                # If no link found, try to find link in this cell
+                                if 'apply_url' not in job:
+                                    cell_link = cell.find('a', href=True)
+                                    if cell_link:
+                                        href = cell_link.get('href', '')
+                                        if href and not href.startswith('#') and not href.startswith('javascript:'):
+                                            job['apply_url'] = urljoin(base_url, href)
                         elif field == 'location':
                             if text and len(text) >= 3:
                                 job['location_raw'] = text
@@ -178,6 +192,28 @@ class SimpleCrawler:
                                 if deadline_cleaned:
                                     job['deadline'] = deadline_cleaned
                 
+                # Also try to extract from row text if header map didn't work
+                if 'title' not in job:
+                    row_text = row.get_text().strip()
+                    # Look for substantial text that might be a title
+                    if len(row_text) >= 10:
+                        # Try to find the first substantial line
+                        lines = [line.strip() for line in row_text.split('\n') if line.strip()]
+                        for line in lines:
+                            if len(line) >= 10 and not any(nav in line.lower() for nav in ['home', 'about', 'contact', 'login']):
+                                job['title'] = line
+                                break
+                
+                # If we have a title but no URL, try to construct URL from title link or row link
+                if job.get('title') and 'apply_url' not in job:
+                    # Try to find any link in the row
+                    row_link = row.find('a', href=True)
+                    if row_link:
+                        href = row_link.get('href', '')
+                        if href and not href.startswith('#') and not href.startswith('javascript:'):
+                            job['apply_url'] = urljoin(base_url, href)
+                
+                # Only add if we have title and apply_url
                 if job.get('title') and job.get('apply_url'):
                     jobs.append(job)
                     if len(jobs) >= 100:
@@ -199,7 +235,8 @@ class SimpleCrawler:
         for selector in [
             'div[class*="job"]', 'div[class*="position"]', 'div[class*="vacancy"]',
             'li[class*="job"]', 'li[class*="position"]', 'article[class*="job"]',
-            'div[class*="listing"]', 'div[class*="item"]'
+            'div[class*="listing"]', 'div[class*="item"]', 'div[class*="card"]',
+            'div[class*="post"]', 'div[class*="entry"]', 'div[class*="result"]'
         ]:
             containers = soup.select(selector)
             if containers:
@@ -216,6 +253,25 @@ class SimpleCrawler:
                 links = section.find_all('a', href=True)
                 if len(links) >= 3:  # Likely a job listing section
                     job_containers.append(section)
+        
+        # Fallback: Look for any container with multiple substantial links (likely job listings)
+        if not job_containers:
+            # Find main content areas
+            main_content = soup.find('main') or soup.find('div', id=lambda x: x and ('content' in x.lower() or 'main' in x.lower()))
+            if main_content:
+                # Look for containers with multiple links (likely job listings)
+                for container in main_content.find_all(['div', 'li', 'article'], recursive=True):
+                    links = container.find_all('a', href=True)
+                    # Filter out navigation/menu links (short text, common nav words)
+                    substantial_links = [
+                        link for link in links 
+                        if len(link.get_text().strip()) >= 10  # Substantial text
+                        and not any(nav_word in link.get_text().lower() for nav_word in ['home', 'about', 'contact', 'login', 'register', 'search'])
+                    ]
+                    if len(substantial_links) >= 2:  # At least 2 substantial links
+                        job_containers.append(container)
+                        if len(job_containers) >= 20:  # Limit containers
+                            break
         
         logger.info(f"Found {len(job_containers)} potential job containers")
         
@@ -280,28 +336,66 @@ class SimpleCrawler:
         # Find all links
         all_links = soup.find_all('a', href=True)
         
-        # Filter for job-like links
+        # Filter for job-like links - more flexible approach
         job_keywords = [
             'position', 'job', 'vacancy', 'career', 'opening', 'opportunity',
             'recruitment', 'hiring', 'apply', 'application', 'posting',
-            'consultant', 'specialist', 'officer', 'manager', 'coordinator'
+            'consultant', 'specialist', 'officer', 'manager', 'coordinator',
+            'analyst', 'advisor', 'assistant', 'director', 'engineer', 'expert'
         ]
+        
+        # Navigation/menu keywords to exclude
+        nav_keywords = ['home', 'about', 'contact', 'login', 'register', 'search', 'menu', 'skip']
         
         job_links = []
         for link in all_links:
-            link_text = link.get_text().strip().lower()
-            href = link.get('href', '').lower()
+            link_text = link.get_text().strip()
+            href = link.get('href', '').strip()
             
-            # Check if link text or URL contains job keywords
-            if any(kw in link_text for kw in job_keywords) or any(kw in href for kw in job_keywords):
-                if len(link_text) >= 5:  # Minimum title length
-                    job_links.append(link)
+            # Skip navigation/menu links
+            if not link_text or len(link_text) < 5:
+                continue
+            
+            link_text_lower = link_text.lower()
+            href_lower = href.lower()
+            
+            # Skip if it's clearly navigation
+            if any(nav in link_text_lower for nav in nav_keywords) and len(link_text) < 20:
+                continue
+            
+            # Skip anchors and javascript
+            if href.startswith('#') or href.startswith('javascript:'):
+                continue
+            
+            # Strategy 1: Link text or URL contains job keywords
+            has_job_keyword = any(kw in link_text_lower for kw in job_keywords) or any(kw in href_lower for kw in job_keywords)
+            
+            # Strategy 2: Link is substantial (long text, likely a job title)
+            is_substantial = len(link_text) >= 15 and not any(nav in link_text_lower for nav in nav_keywords)
+            
+            # Strategy 3: Link is in a job-related section
+            parent = link.parent
+            is_in_job_section = False
+            if parent:
+                parent_class = parent.get('class', [])
+                parent_id = parent.get('id', '')
+                parent_text = parent.get_text().lower()
+                section_indicators = ['job', 'position', 'vacancy', 'career', 'opportunity', 'listing']
+                is_in_job_section = any(
+                    ind in str(parent_class).lower() or 
+                    ind in str(parent_id).lower() or 
+                    ind in parent_text[:200]  # Check first 200 chars
+                    for ind in section_indicators
+                )
+            
+            if has_job_keyword or (is_substantial and is_in_job_section) or (is_substantial and len(link_text) >= 25):
+                job_links.append(link)
         
         logger.info(f"Found {len(job_links)} job-like links")
         
-        for link in job_links[:100]:  # Limit to first 100
+        for link in job_links[:150]:  # Limit to first 150
             link_text = link.get_text().strip()
-            href = link.get('href', '')
+            href = link.get('href', '').strip()
             
             if href.startswith('#') or href.startswith('javascript:'):
                 continue
@@ -311,25 +405,51 @@ class SimpleCrawler:
                 'apply_url': urljoin(base_url, href)
             }
             
-            # Try to extract location/deadline from nearby text
+            # Try to extract location/deadline from nearby text (parent, siblings, nearby elements)
             parent = link.parent
             if parent:
+                # Check parent and siblings
                 parent_text = parent.get_text()
                 
+                # Also check next sibling
+                next_sibling = parent.find_next_sibling()
+                if next_sibling:
+                    parent_text += " " + next_sibling.get_text()
+                
                 # Look for location
-                location_match = re.search(r'Location[:\s]+([^\n\r]+)', parent_text, re.IGNORECASE)
-                if location_match:
-                    location = location_match.group(1).strip()
-                    if 3 <= len(location) < 100:
-                        job['location_raw'] = location
+                location_patterns = [
+                    r'Location[:\s]+([^\n\r<]+)',
+                    r'Duty Station[:\s]+([^\n\r<]+)',
+                    r'Based in[:\s]+([^\n\r<]+)',
+                    r'Location[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                ]
+                for pattern in location_patterns:
+                    location_match = re.search(pattern, parent_text, re.IGNORECASE)
+                    if location_match:
+                        location = location_match.group(1).strip()
+                        # Clean up HTML tags if any
+                        location = re.sub(r'<[^>]+>', '', location)
+                        if 3 <= len(location) < 100:
+                            job['location_raw'] = location
+                            break
                 
                 # Look for deadline
-                deadline_match = re.search(r'(?:Apply by|Deadline|Closing)[:\s]+([^\n\r]+)', parent_text, re.IGNORECASE)
-                if deadline_match:
-                    deadline_text = deadline_match.group(1).strip()
-                    deadline_cleaned = self._parse_deadline(deadline_text)
-                    if deadline_cleaned:
-                        job['deadline'] = deadline_cleaned
+                deadline_patterns = [
+                    r'Apply by[:\s]+([^\n\r<]+)',
+                    r'Deadline[:\s]+([^\n\r<]+)',
+                    r'Closing[:\s]+([^\n\r<]+)',
+                    r'Due[:\s]+([^\n\r<]+)',
+                    r'Application deadline[:\s]+([^\n\r<]+)',
+                ]
+                for pattern in deadline_patterns:
+                    deadline_match = re.search(pattern, parent_text, re.IGNORECASE)
+                    if deadline_match:
+                        deadline_text = deadline_match.group(1).strip()
+                        deadline_text = re.sub(r'<[^>]+>', '', deadline_text)  # Clean HTML
+                        deadline_cleaned = self._parse_deadline(deadline_text)
+                        if deadline_cleaned:
+                            job['deadline'] = deadline_cleaned
+                            break
             
             jobs.append(job)
         
@@ -433,6 +553,94 @@ class SimpleCrawler:
             return job
         
         return None
+    
+    def _extract_generic_fallback(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """
+        Generic fallback: Extract any substantial links from main content area.
+        This is a last resort that tries to find job-like links even without clear patterns.
+        """
+        jobs = []
+        
+        # Find main content area (skip header, footer, nav)
+        main_content = soup.find('main')
+        if not main_content:
+            # Try common content selectors
+            for selector in ['#content', '#main', '.content', '.main', '[role="main"]']:
+                main_content = soup.select_one(selector)
+                if main_content:
+                    break
+        
+        if not main_content:
+            # Fallback: use body but exclude nav, header, footer
+            main_content = soup.find('body')
+            if main_content:
+                # Remove navigation elements
+                for nav in main_content.find_all(['nav', 'header', 'footer']):
+                    nav.decompose()
+        
+        if not main_content:
+            return jobs
+        
+        # Find all links in main content
+        all_links = main_content.find_all('a', href=True)
+        
+        # Filter for substantial links (likely job titles)
+        nav_keywords = ['home', 'about', 'contact', 'login', 'register', 'search', 'menu', 'skip', 'privacy', 'terms']
+        
+        for link in all_links:
+            link_text = link.get_text().strip()
+            href = link.get('href', '').strip()
+            
+            # Skip if too short or navigation
+            if len(link_text) < 10:
+                continue
+            
+            if any(nav in link_text.lower() for nav in nav_keywords) and len(link_text) < 25:
+                continue
+            
+            # Skip anchors and javascript
+            if href.startswith('#') or href.startswith('javascript:'):
+                continue
+            
+            # Skip external links to social media, etc.
+            if any(domain in href.lower() for domain in ['facebook.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'youtube.com']):
+                continue
+            
+            # If link text is substantial (15+ chars) and not clearly navigation, treat as potential job
+            if len(link_text) >= 15:
+                job = {
+                    'title': link_text,
+                    'apply_url': urljoin(base_url, href)
+                }
+                
+                # Try to extract location/deadline from nearby context
+                parent = link.parent
+                if parent:
+                    context_text = parent.get_text()
+                    
+                    # Look for location
+                    location_match = re.search(r'Location[:\s]+([^\n\r<]+)', context_text, re.IGNORECASE)
+                    if location_match:
+                        location = location_match.group(1).strip()
+                        location = re.sub(r'<[^>]+>', '', location)
+                        if 3 <= len(location) < 100:
+                            job['location_raw'] = location
+                    
+                    # Look for deadline
+                    deadline_match = re.search(r'(?:Apply by|Deadline|Closing|Due)[:\s]+([^\n\r<]+)', context_text, re.IGNORECASE)
+                    if deadline_match:
+                        deadline_text = deadline_match.group(1).strip()
+                        deadline_text = re.sub(r'<[^>]+>', '', deadline_text)
+                        deadline_cleaned = self._parse_deadline(deadline_text)
+                        if deadline_cleaned:
+                            job['deadline'] = deadline_cleaned
+                
+                jobs.append(job)
+                
+                if len(jobs) >= 100:  # Limit to 100 jobs
+                    break
+        
+        return jobs
     
     def _parse_deadline(self, text: str) -> Optional[str]:
         """
