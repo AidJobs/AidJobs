@@ -46,10 +46,20 @@ class SimpleCrawler:
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": self.user_agent}
-                )
+                # Use more realistic headers to avoid 403 blocks
+                headers = {
+                    "User-Agent": self.user_agent,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Connection": "keep-alive",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Cache-Control": "max-age=0"
+                }
+                response = await client.get(url, headers=headers)
                 return response.status_code, response.text
         except Exception as e:
             logger.error(f"Error fetching {url}: {e}")
@@ -1091,7 +1101,7 @@ class SimpleCrawler:
                     jobs = jobs
                 
                 # Save to database
-                counts = self.save_jobs(enriched_jobs, source_id, org_name)
+                counts = self.save_jobs(jobs, source_id, org_name)
                 
                 return {
                     'status': 'ok' if jobs else 'warn',
