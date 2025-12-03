@@ -966,6 +966,7 @@ export default function AdminSourcesPage() {
   };
 
   const [runningSourceId, setRunningSourceId] = useState<string | null>(null);
+  const [runningNewCrawlerId, setRunningNewCrawlerId] = useState<string | null>(null);
 
   const handleRunNow = async (id: string) => {
     if (runningSourceId) {
@@ -1031,6 +1032,61 @@ export default function AdminSourcesPage() {
     } finally {
       setRunningSourceId(null);
       // Clear the highlight after a short delay so the user sees which source just ran
+      setTimeout(() => {
+        setRecentlyRanSourceId((current) => (current === id ? null : current));
+      }, 8000);
+    }
+  };
+
+  const handleTestNewCrawler = async (id: string) => {
+    if (runningNewCrawlerId) {
+      toast.info('A crawl is already in progress. Please wait...');
+      return;
+    }
+
+    setRunningNewCrawlerId(id);
+    setRecentlyRanSourceId(id);
+    try {
+      toast.info('Testing new crawler...');
+      
+      const res = await fetch(`/api/admin/crawl-v2/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ source_id: id }),
+      });
+
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to trigger new crawler`;
+        throw new Error(errorMsg);
+      }
+
+      const json = await res.json();
+      if (json.status === 'ok') {
+        toast.success(json.message || 'New crawler started! Check crawl logs in a few seconds.');
+        
+        // Refresh sources after a delay to see results
+        setTimeout(() => {
+          fetchSources();
+          if (showCrawlDetails && selectedSourceForDetails?.id === id) {
+            refreshCrawlDetails(id, true);
+          }
+        }, 3000);
+      } else {
+        throw new Error(json.error || 'Failed to trigger new crawler');
+      }
+    } catch (error) {
+      console.error('Failed to test new crawler:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to test new crawler';
+      toast.error(errorMsg);
+    } finally {
+      setRunningNewCrawlerId(null);
       setTimeout(() => {
         setRecentlyRanSourceId((current) => (current === id ? null : current));
       }, 8000);
