@@ -119,48 +119,34 @@ class UNESCOPlugin(ExtractionPlugin):
                 if not title:
                     continue
                 
-                # CRITICAL VALIDATION: Reject invalid titles BEFORE processing
+                # MINIMAL VALIDATION: Only reject obviously invalid titles
+                # Let repair system and data quality validator handle contamination
                 title_lower = title.lower().strip()
                 
-                # Reject if title is just a date
+                # Only reject if title is EXACTLY a date (full match, not partial)
                 date_patterns = [
-                    r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # DD-MM-YYYY
-                    r'^\d{1,2}\s+[a-z]{3,9}\s+\d{2,4}$',  # DD MMM YYYY
-                    r'^[a-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',  # MMM DD, YYYY (Nov 20, 2025)
-                    r'^\d{1,2}-[A-Z]{3,9}-\d{2,4}$',  # DD-MMM-YYYY (20-DEC-2025)
-                    r'^\d{1,2}/[A-Z]{3,9}/\d{2,4}$',  # DD/MMM/YYYY
-                    r'^\d{1,2}\s+[A-Z][a-z]+\s+\d{4}$',  # DD Month YYYY (20 November 2025)
+                    r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',  # DD-MM-YYYY (exact)
+                    r'^\d{1,2}\s+[a-z]{3,9}\s+\d{2,4}$',  # DD MMM YYYY (exact)
                 ]
                 import re
-                is_date = any(re.match(pattern, title_lower) for pattern in date_patterns)
-                if is_date:
-                    logger.warning(f"[unesco] REJECTED - title is a date: '{title}'")
+                is_exact_date = any(re.fullmatch(pattern, title_lower) for pattern in date_patterns)
+                if is_exact_date:
+                    logger.debug(f"[unesco] Skipping - title is exact date: '{title}'")
                     continue
                 
-                # Reject if title is a month abbreviation
+                # Only reject if title is a single month abbreviation (not part of text)
                 month_abbrevs = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-                if title_lower in month_abbrevs:
-                    logger.warning(f"[unesco] REJECTED - title is a month: '{title}'")
+                if title_lower in month_abbrevs and len(title) <= 3:
+                    logger.debug(f"[unesco] Skipping - title is just month: '{title}'")
                     continue
                 
-                # Reject if title looks like a location (city, country pattern)
-                if ',' in title and any(kw in title_lower for kw in ['montreal', 'canada', 'kabul', 'afghanistan', 'paris', 'france', 'cairo', 'egypt', 'bangkok', 'thailand']):
-                    logger.warning(f"[unesco] REJECTED - title looks like a location: '{title}'")
+                # Only reject if title is a single label word (not part of text)
+                single_label_patterns = ['title', 'location', 'deadline', 'n/a', 'na', '-', '—']
+                if title_lower in single_label_patterns and len(title) <= 10:
+                    logger.debug(f"[unesco] Skipping - title is just label: '{title}'")
                     continue
                 
-                # Reject if title is a label
-                label_patterns = ['title', 'location', 'deadline', 'closing date', 'apply by', 'reference', 'ref', 'grade', 'level', 'type of post']
-                if title_lower in label_patterns:
-                    logger.warning(f"[unesco] REJECTED - title is a label: '{title}'")
-                    continue
-                
-                # Reject if title is too short (likely a code like "G-6", "P-3")
-                if len(title) < 5:
-                    logger.warning(f"[unesco] REJECTED - title too short: '{title}'")
-                    continue
-                
-                # Extract location and deadline (only if we have a valid title)
-                # Use header map if available, otherwise try fallback extraction
+                # Extract location and deadline (let repair handle contamination)
                 location = field_extractor.extract_location_from_table_row(row, header_map or {}, cells)
                 deadline = field_extractor.extract_deadline_from_table_row(row, header_map or {}, cells)
                 
@@ -170,48 +156,8 @@ class UNESCOPlugin(ExtractionPlugin):
                 if not deadline:
                     logger.debug(f"[unesco] No deadline extracted for '{title[:50]}...' - cells: {[c.get_text().strip()[:30] for c in cells]}")
                 
-                # STRICT location validation - reject contaminated locations
-                if location:
-                    location_lower = location.lower().strip()
-                    title_lower_check = title.lower().strip()
-                    
-                    # Reject if location is same as title (field contamination)
-                    if location_lower == title_lower_check:
-                        logger.warning(f"[unesco] REJECTED - location identical to title: '{location}'")
-                        continue
-                    
-                    # Reject if location contains title (partial contamination)
-                    if title_lower_check and title_lower_check in location_lower and len(title_lower_check) > 5:
-                        logger.warning(f"[unesco] REJECTED - location contains title: '{location}'")
-                        continue
-                    
-                    # Reject if location is a month
-                    if location_lower in month_abbrevs:
-                        logger.warning(f"[unesco] REJECTED - location is a month: '{location}'")
-                        continue
-                    
-                    # STRICT: Reject if location looks like a job title or department
-                    job_title_keywords = [
-                        'assistant', 'director', 'manager', 'officer', 'specialist', 
-                        'internship', 'consultant', 'professional', 'grade', 'type of post',
-                        'deputy', 'senior', 'junior', 'statistical', 'communications',
-                        'public engagement', 'methodologies', 'education', 'project'
-                    ]
-                    # Check if location starts with or contains job keywords (more strict)
-                    location_words = location_lower.split()
-                    if any(kw in location_lower for kw in job_title_keywords):
-                        # Allow if it's a valid location pattern (city, country)
-                        if not (',' in location or any(city in location_lower for city in ['paris', 'montreal', 'kabul', 'cairo', 'geneva', 'bangkok', 'dhaka', 'beijing'])):
-                            logger.warning(f"[unesco] REJECTED - location looks like job title: '{location}'")
-                            continue
-                    
-                    # Reject if location contains date fragments (e.g., "Nov FR", "20 Nov")
-                    date_fragments = ['nov', 'dec', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct']
-                    location_words = location_lower.split()
-                    if any(frag in location_words for frag in date_fragments):
-                        # Only allow if it's clearly a location with a month name (e.g., "November, France" - unlikely)
-                        # Most cases are contamination like "Paris, France Nov FR"
-                        if len(location_words) > 3:  # Suspicious if too many words
+                # NO STRICT VALIDATION HERE - let data quality validator and repair system handle it
+                # This allows more jobs to pass through and be repaired if needed
                             logger.warning(f"[unesco] REJECTED - location contains date fragment: '{location}'")
                             continue
                     

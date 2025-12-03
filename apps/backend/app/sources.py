@@ -171,6 +171,61 @@ def create_source(
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # Check if a deleted source with this URL exists
+        cursor.execute("""
+            SELECT id::text, status
+            FROM sources
+            WHERE careers_url = %s
+        """, (source.careers_url,))
+        
+        existing = cursor.fetchone()
+        
+        if existing:
+            if existing['status'] == 'deleted':
+                # Restore the deleted source
+                logger.info(f"[sources] Restoring deleted source {existing['id']}")
+                cursor.execute("""
+                    UPDATE sources
+                    SET status = 'active',
+                        org_name = COALESCE(%s, org_name),
+                        source_type = COALESCE(%s, source_type),
+                        org_type = COALESCE(%s, org_type),
+                        crawl_frequency_days = COALESCE(%s, crawl_frequency_days),
+                        parser_hint = COALESCE(%s, parser_hint),
+                        time_window = COALESCE(%s, time_window),
+                        next_run_at = NOW(),
+                        updated_at = NOW()
+                    WHERE id::text = %s
+                    RETURNING id::text, org_name, careers_url, source_type, org_type, status,
+                              crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
+                              parser_hint, time_window, created_at, updated_at
+                """, (
+                    source.org_name,
+                    source.source_type,
+                    source.org_type,
+                    source.crawl_frequency_days,
+                    source.parser_hint,
+                    source.time_window,
+                    existing['id']
+                ))
+                
+                restored = cursor.fetchone()
+                conn.commit()
+                
+                logger.info(f"[sources] Restored source {restored['id']} with auto-queue (next_run_at=now())")
+                
+                return {
+                    "status": "ok",
+                    "data": dict(restored),
+                    "error": None,
+                    "message": "Source restored from deleted status"
+                }
+            else:
+                # Active source exists
+                conn.rollback()
+                logger.error(f"Duplicate careers_url: {source.careers_url}")
+                raise HTTPException(status_code=409, detail="Source with this URL already exists")
+        
         # Auto-queue: set next_run_at=now() to trigger immediate crawl
         cursor.execute("""
             INSERT INTO sources (
@@ -203,6 +258,8 @@ def create_source(
             "error": None
         }
         
+    except HTTPException:
+        raise
     except psycopg2.IntegrityError as e:
         if conn:
             conn.rollback()
