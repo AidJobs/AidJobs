@@ -57,44 +57,75 @@ class SimpleCrawler:
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:
         """
-        Extract jobs from HTML using simple table-based extraction.
+        Extract jobs from HTML using multiple strategies.
         
-        Strategy:
-        1. Find all tables
-        2. Look for header row (Title, Location, Deadline, etc.)
-        3. Extract data rows
-        4. Build job objects
+        Tries strategies in order until one works:
+        1. Table-based extraction (for UNESCO-style sites)
+        2. Div/list-based extraction (for UNDP-style sites)
+        3. Link-based extraction (for MSF-style sites)
+        4. Structured data (JSON-LD, microdata)
+        5. Generic patterns (job keywords in links)
         """
         soup = BeautifulSoup(html, 'html.parser')
         jobs = []
         
-        # Find all tables
+        # Strategy 1: Table-based extraction (for UNESCO-style sites)
+        logger.info("Trying table-based extraction...")
+        jobs = self._extract_from_tables(soup, base_url)
+        if jobs:
+            logger.info(f"Strategy 1 (tables) found {len(jobs)} jobs")
+            return jobs
+        
+        # Strategy 2: Div/list-based extraction (for UNDP-style sites)
+        logger.info("Trying div/list-based extraction...")
+        jobs = self._extract_from_divs_lists(soup, base_url)
+        if jobs:
+            logger.info(f"Strategy 2 (divs/lists) found {len(jobs)} jobs")
+            return jobs
+        
+        # Strategy 3: Link-based extraction (for MSF-style sites)
+        logger.info("Trying link-based extraction...")
+        jobs = self._extract_from_links(soup, base_url)
+        if jobs:
+            logger.info(f"Strategy 3 (links) found {len(jobs)} jobs")
+            return jobs
+        
+        # Strategy 4: Structured data (JSON-LD, microdata)
+        logger.info("Trying structured data extraction...")
+        jobs = self._extract_from_structured_data(soup, base_url)
+        if jobs:
+            logger.info(f"Strategy 4 (structured data) found {len(jobs)} jobs")
+            return jobs
+        
+        logger.warning("No extraction strategy found jobs")
+        return []
+    
+    def _extract_from_tables(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """Extract jobs from HTML tables (UNESCO-style)"""
+        jobs = []
         tables = soup.find_all('table')
         logger.info(f"Found {len(tables)} tables")
         
         for table in tables:
             rows = table.find_all('tr')
-            if len(rows) < 2:  # Need at least header + 1 data row
+            if len(rows) < 2:
                 continue
             
             # Find header row
             header_row = None
-            header_map = {}  # column_index -> field_name
+            header_map = {}
             
-            for row in rows[:5]:  # Check first 5 rows for header
+            for row in rows[:5]:
                 cells = row.find_all(['th', 'td'])
                 if not cells:
                     continue
                 
-                # Check if this looks like a header
                 cell_texts = [c.get_text().strip().lower() for c in cells]
                 header_keywords = ['title', 'position', 'location', 'deadline', 'closing', 'apply', 'date', 'grade', 'type']
-                
                 keyword_count = sum(1 for text in cell_texts for kw in header_keywords if kw in text)
                 
-                if keyword_count >= 2:  # Has at least 2 header keywords
+                if keyword_count >= 2:
                     header_row = row
-                    # Map columns
                     for idx, cell in enumerate(cells):
                         text = cell.get_text().strip().lower()
                         if 'title' in text or 'position' in text:
@@ -108,11 +139,8 @@ class SimpleCrawler:
             if not header_map:
                 continue
             
-            logger.info(f"Found header with {len(header_map)} mapped columns")
-            
             # Extract data rows
             for row in rows:
-                # Skip header row
                 if row == header_row:
                     continue
                 
@@ -120,10 +148,9 @@ class SimpleCrawler:
                 if len(cells) < 2:
                     continue
                 
-                # Extract fields using header map
                 job = {}
                 
-                # Extract title from link (most reliable)
+                # Extract title from link
                 link = row.find('a', href=True)
                 if link:
                     link_text = link.get_text().strip()
@@ -133,7 +160,7 @@ class SimpleCrawler:
                         if href and not href.startswith('#') and not href.startswith('javascript:'):
                             job['apply_url'] = urljoin(base_url, href)
                 
-                # Extract from cells using header map
+                # Extract from cells
                 for idx, cell in enumerate(cells):
                     if idx in header_map:
                         field = header_map[idx]
@@ -147,22 +174,265 @@ class SimpleCrawler:
                                 job['location_raw'] = text
                         elif field == 'deadline':
                             if text and len(text) >= 3:
-                                # Clean and parse deadline
                                 deadline_cleaned = self._parse_deadline(text)
                                 if deadline_cleaned:
                                     job['deadline'] = deadline_cleaned
                 
-                # Only add if we have title and apply_url
                 if job.get('title') and job.get('apply_url'):
                     jobs.append(job)
-                    if len(jobs) >= 100:  # Limit to 100 jobs per table
+                    if len(jobs) >= 100:
                         break
             
             if jobs:
-                break  # Found jobs, stop looking at other tables
+                break
         
-        logger.info(f"Extracted {len(jobs)} jobs from HTML")
         return jobs
+    
+    def _extract_from_divs_lists(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """Extract jobs from div/list structures (UNDP-style)"""
+        jobs = []
+        
+        # Look for common job container patterns
+        job_containers = []
+        
+        # Try common class patterns
+        for selector in [
+            'div[class*="job"]', 'div[class*="position"]', 'div[class*="vacancy"]',
+            'li[class*="job"]', 'li[class*="position"]', 'article[class*="job"]',
+            'div[class*="listing"]', 'div[class*="item"]'
+        ]:
+            containers = soup.select(selector)
+            if containers:
+                job_containers.extend(containers[:50])  # Limit to first 50
+                break
+        
+        # If no specific containers, look for sections with job-like content
+        if not job_containers:
+            # Look for sections with multiple links that might be jobs
+            sections = soup.find_all(['section', 'div'], class_=lambda x: x and any(
+                kw in x.lower() for kw in ['job', 'position', 'vacancy', 'career', 'opportunity']
+            ))
+            for section in sections:
+                links = section.find_all('a', href=True)
+                if len(links) >= 3:  # Likely a job listing section
+                    job_containers.append(section)
+        
+        logger.info(f"Found {len(job_containers)} potential job containers")
+        
+        for container in job_containers:
+            job = {}
+            
+            # Extract title from link (most reliable)
+            link = container.find('a', href=True)
+            if link:
+                link_text = link.get_text().strip()
+                if link_text and len(link_text) >= 5:
+                    job['title'] = link_text
+                    href = link.get('href', '')
+                    if href and not href.startswith('#') and not href.startswith('javascript:'):
+                        job['apply_url'] = urljoin(base_url, href)
+            
+            # Extract location and deadline from text
+            container_text = container.get_text()
+            
+            # Look for location patterns
+            location_patterns = [
+                r'Location[:\s]+([^\n\r]+)',
+                r'Duty Station[:\s]+([^\n\r]+)',
+                r'Location[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            ]
+            for pattern in location_patterns:
+                match = re.search(pattern, container_text, re.IGNORECASE)
+                if match:
+                    location = match.group(1).strip()
+                    if len(location) >= 3 and len(location) < 100:
+                        job['location_raw'] = location
+                        break
+            
+            # Look for deadline patterns
+            deadline_patterns = [
+                r'Apply by[:\s]+([^\n\r]+)',
+                r'Deadline[:\s]+([^\n\r]+)',
+                r'Closing[:\s]+([^\n\r]+)',
+                r'Due[:\s]+([^\n\r]+)',
+            ]
+            for pattern in deadline_patterns:
+                match = re.search(pattern, container_text, re.IGNORECASE)
+                if match:
+                    deadline_text = match.group(1).strip()
+                    deadline_cleaned = self._parse_deadline(deadline_text)
+                    if deadline_cleaned:
+                        job['deadline'] = deadline_cleaned
+                        break
+            
+            # Only add if we have title and apply_url
+            if job.get('title') and job.get('apply_url'):
+                jobs.append(job)
+                if len(jobs) >= 100:
+                    break
+        
+        return jobs
+    
+    def _extract_from_links(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """Extract jobs from links with job-like patterns (MSF-style)"""
+        jobs = []
+        
+        # Find all links
+        all_links = soup.find_all('a', href=True)
+        
+        # Filter for job-like links
+        job_keywords = [
+            'position', 'job', 'vacancy', 'career', 'opening', 'opportunity',
+            'recruitment', 'hiring', 'apply', 'application', 'posting',
+            'consultant', 'specialist', 'officer', 'manager', 'coordinator'
+        ]
+        
+        job_links = []
+        for link in all_links:
+            link_text = link.get_text().strip().lower()
+            href = link.get('href', '').lower()
+            
+            # Check if link text or URL contains job keywords
+            if any(kw in link_text for kw in job_keywords) or any(kw in href for kw in job_keywords):
+                if len(link_text) >= 5:  # Minimum title length
+                    job_links.append(link)
+        
+        logger.info(f"Found {len(job_links)} job-like links")
+        
+        for link in job_links[:100]:  # Limit to first 100
+            link_text = link.get_text().strip()
+            href = link.get('href', '')
+            
+            if href.startswith('#') or href.startswith('javascript:'):
+                continue
+            
+            job = {
+                'title': link_text,
+                'apply_url': urljoin(base_url, href)
+            }
+            
+            # Try to extract location/deadline from nearby text
+            parent = link.parent
+            if parent:
+                parent_text = parent.get_text()
+                
+                # Look for location
+                location_match = re.search(r'Location[:\s]+([^\n\r]+)', parent_text, re.IGNORECASE)
+                if location_match:
+                    location = location_match.group(1).strip()
+                    if 3 <= len(location) < 100:
+                        job['location_raw'] = location
+                
+                # Look for deadline
+                deadline_match = re.search(r'(?:Apply by|Deadline|Closing)[:\s]+([^\n\r]+)', parent_text, re.IGNORECASE)
+                if deadline_match:
+                    deadline_text = deadline_match.group(1).strip()
+                    deadline_cleaned = self._parse_deadline(deadline_text)
+                    if deadline_cleaned:
+                        job['deadline'] = deadline_cleaned
+            
+            jobs.append(job)
+        
+        return jobs
+    
+    def _extract_from_structured_data(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """Extract jobs from structured data (JSON-LD, microdata)"""
+        jobs = []
+        
+        # Try JSON-LD
+        json_ld_scripts = soup.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            try:
+                import json
+                data = json.loads(script.string)
+                if isinstance(data, dict) and data.get('@type') == 'JobPosting':
+                    job = self._parse_job_posting(data, base_url)
+                    if job:
+                        jobs.append(job)
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and item.get('@type') == 'JobPosting':
+                            job = self._parse_job_posting(item, base_url)
+                            if job:
+                                jobs.append(job)
+            except:
+                pass
+        
+        # Try microdata
+        microdata_jobs = soup.find_all(attrs={'itemtype': lambda x: x and 'JobPosting' in x})
+        for item in microdata_jobs:
+            job = {}
+            
+            # Extract title
+            title_elem = item.find(attrs={'itemprop': 'title'})
+            if title_elem:
+                job['title'] = title_elem.get_text().strip()
+            
+            # Extract URL
+            url_elem = item.find(attrs={'itemprop': 'url'}) or item.find('a', href=True)
+            if url_elem:
+                href = url_elem.get('href') or url_elem.get('content')
+                if href:
+                    job['apply_url'] = urljoin(base_url, href)
+            
+            # Extract location
+            location_elem = item.find(attrs={'itemprop': 'jobLocation'})
+            if location_elem:
+                job['location_raw'] = location_elem.get_text().strip()
+            
+            # Extract deadline
+            deadline_elem = item.find(attrs={'itemprop': 'validThrough'})
+            if deadline_elem:
+                deadline_text = deadline_elem.get_text().strip()
+                deadline_cleaned = self._parse_deadline(deadline_text)
+                if deadline_cleaned:
+                    job['deadline'] = deadline_cleaned
+            
+            if job.get('title') and job.get('apply_url'):
+                jobs.append(job)
+        
+        return jobs
+    
+    def _parse_job_posting(self, data: Dict, base_url: str) -> Optional[Dict]:
+        """Parse a JobPosting structured data object"""
+        job = {}
+        
+        if 'title' in data:
+            job['title'] = str(data['title']).strip()
+        
+        if 'url' in data:
+            url = str(data['url'])
+            job['apply_url'] = urljoin(base_url, url)
+        elif 'applicationUrl' in data:
+            url = str(data['applicationUrl'])
+            job['apply_url'] = urljoin(base_url, url)
+        
+        if 'jobLocation' in data:
+            location = data['jobLocation']
+            if isinstance(location, dict):
+                if 'address' in location:
+                    address = location['address']
+                    if isinstance(address, dict):
+                        city = address.get('addressLocality', '')
+                        country = address.get('addressCountry', '')
+                        job['location_raw'] = f"{city}, {country}".strip(', ')
+                    else:
+                        job['location_raw'] = str(address)
+                else:
+                    job['location_raw'] = str(location)
+            else:
+                job['location_raw'] = str(location)
+        
+        if 'validThrough' in data:
+            deadline_text = str(data['validThrough'])
+            deadline_cleaned = self._parse_deadline(deadline_text)
+            if deadline_cleaned:
+                job['deadline'] = deadline_cleaned
+        
+        if job.get('title') and job.get('apply_url'):
+            return job
+        
+        return None
     
     def _parse_deadline(self, text: str) -> Optional[str]:
         """
