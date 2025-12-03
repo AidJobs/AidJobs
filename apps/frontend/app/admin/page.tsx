@@ -312,6 +312,39 @@ export default function AdminPage() {
   // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
   const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
 
+  const handleSyncMeilisearch = async (execute: boolean = false) => {
+    setSyncingMeilisearch(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(`/api/admin/meilisearch/sync?execute=${execute}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(errorData.error || errorData.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setSyncResult(data);
+      
+      if (execute && data.status === 'ok') {
+        showToast(`Successfully deleted ${data.deleted_count || 0} orphaned jobs from Meilisearch`, 'success');
+        // Refresh search status
+        fetchStatus();
+      } else if (!execute) {
+        showToast(`Dry run: Found ${data.orphaned_count || 0} orphaned jobs. Use "Execute Sync" to delete them.`, 'success');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to sync Meilisearch';
+      showToast(errorMsg, 'error');
+      console.error('Meilisearch sync error:', error);
+    } finally {
+      setSyncingMeilisearch(false);
+    }
+  };
+
   return (
     <>
       <div className="h-full p-4 overflow-y-auto">
