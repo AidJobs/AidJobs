@@ -197,7 +197,23 @@ except ImportError as e:
 
 @app.get("/api/healthz")
 async def healthz():
-    return Capabilities.get_status()
+    """
+    Lightweight health check for Render.
+    Returns immediately without blocking on database checks.
+    """
+    try:
+        # Quick check - don't block on database connection
+        # Just verify the app is running
+        return {
+            "status": "ok",
+            "message": "Service is running"
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
 @app.get("/api/capabilities")

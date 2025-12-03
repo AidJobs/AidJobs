@@ -29,7 +29,8 @@ class Capabilities:
             return False
         
         try:
-            conn = psycopg2.connect(**conn_params, connect_timeout=2)
+            # Use very short timeout for health checks (1 second max)
+            conn = psycopg2.connect(**conn_params, connect_timeout=1)
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
