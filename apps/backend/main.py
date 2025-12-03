@@ -173,6 +173,13 @@ try:
     app.include_router(data_quality_logs_router, prefix="/api/admin/data-quality", tags=["data_quality_logs"])
 except ImportError:
     logger.warning("Data quality logs router not available")
+
+# Add new simple crawler routes
+try:
+    from app.crawler_v2_routes import router as crawler_v2_router
+    app.include_router(crawler_v2_router)
+except ImportError:
+    logger.warning("Crawler v2 router not available")
     app.include_router(policies_router)
     app.include_router(quality_router)
 except ImportError as e:
