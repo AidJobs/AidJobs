@@ -1,8 +1,13 @@
 """
 AI-powered job extraction using LLM.
 
-This uses OpenRouter/OpenAI to extract structured job data from HTML,
-handling different site structures automatically without hardcoded rules.
+This uses OpenRouter/OpenAI to extract structured job data from:
+- HTML pages (primary use case - handles different structures automatically)
+- RSS feed descriptions (optional - for cleaning/parsing messy descriptions)
+- JSON API responses (optional - for complex nested structures)
+
+Primary benefit: Handles HTML pages with different structures without hardcoded rules.
+Secondary benefit: Can clean/parse messy data from RSS/API sources if needed.
 """
 
 import logging
