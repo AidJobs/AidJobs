@@ -24,9 +24,14 @@ class SimpleOrchestrator:
     3. Updates source status and logs
     """
     
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str, use_ai: bool = True):
         self.db_url = db_url
-        self.html_crawler = SimpleCrawler(db_url)
+        # Check if AI should be used (default: True if API key is available)
+        import os
+        if use_ai and not os.getenv('OPENROUTER_API_KEY'):
+            logger.warning("OPENROUTER_API_KEY not set - AI extraction disabled")
+            use_ai = False
+        self.html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
         self.rss_crawler = SimpleRSSCrawler(db_url)
         self.api_crawler = SimpleAPICrawler(db_url)
     

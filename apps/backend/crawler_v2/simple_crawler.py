@@ -26,12 +26,26 @@ class SimpleCrawler:
     """
     Simple crawler that fetches HTML, extracts jobs, and saves to database.
     No complex validation, no repair system - just extract and save.
+    
+    Now supports AI-powered extraction as primary method with rule-based fallback.
     """
     
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str, use_ai: bool = True):
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
         self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
+        self.use_ai = use_ai
+        
+        # Initialize AI extractor if available
+        self.ai_extractor = None
+        if use_ai:
+            try:
+                from core.ai_extractor import AIJobExtractor
+                self.ai_extractor = AIJobExtractor()
+                logger.info("AI extractor initialized")
+            except Exception as e:
+                logger.warning(f"AI extractor not available: {e}")
+                self.use_ai = False
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -1074,7 +1088,23 @@ class SimpleCrawler:
                     }
                 
                 # Extract jobs from listing page
-                jobs = self.extract_jobs_from_html(html, careers_url)
+                # Try AI extraction first if available
+                jobs = []
+                if self.use_ai and self.ai_extractor:
+                    try:
+                        logger.info(f"Attempting AI extraction for {org_name}...")
+                        jobs = self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100)
+                        if jobs:
+                            logger.info(f"AI extraction successful: {len(jobs)} jobs found")
+                        else:
+                            logger.info("AI extraction returned no jobs, falling back to rule-based")
+                            jobs = self.extract_jobs_from_html(html, careers_url)
+                    except Exception as e:
+                        logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
+                        jobs = self.extract_jobs_from_html(html, careers_url)
+                else:
+                    # Use rule-based extraction
+                    jobs = self.extract_jobs_from_html(html, careers_url)
                 
                 # Enrich jobs from detail pages (for UNDP and other sites)
                 # Only enrich if we have a reasonable number of jobs (avoid timeout)
