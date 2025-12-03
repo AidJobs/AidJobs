@@ -121,25 +121,8 @@ class SimpleCrawler:
                     'generic': lambda h, b: self._extract_generic_fallback(BeautifulSoup(h, 'html.parser'), b)
                 }
                 
-                # Use async method if available, otherwise sync
-                import asyncio
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # If loop is running, create a new task
-                        jobs, metadata = asyncio.run_coroutine_threadsafe(
-                            self.strategy_selector.select_and_validate(html, base_url, strategies),
-                            loop
-                        ).result()
-                    else:
-                        jobs, metadata = loop.run_until_complete(
-                            self.strategy_selector.select_and_validate(html, base_url, strategies)
-                        )
-                except RuntimeError:
-                    # No event loop, create one
-                    jobs, metadata = asyncio.run(
-                        self.strategy_selector.select_and_validate(html, base_url, strategies)
-                    )
+                # Use strategy selector (now sync method)
+                jobs, metadata = self.strategy_selector.select_and_validate(html, base_url, strategies)
                 
                 logger.info(f"Strategy selector: {metadata.get('strategy_used', 'unknown')} "
                           f"extracted {len(jobs)} jobs (validated from {metadata.get('original_count', 0)})")

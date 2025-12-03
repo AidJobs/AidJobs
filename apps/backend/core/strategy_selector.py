@@ -270,7 +270,7 @@ class StrategySelector:
         
         return normalized
     
-    async def select_and_validate(
+    def select_and_validate(
         self,
         html: str,
         base_url: str,
