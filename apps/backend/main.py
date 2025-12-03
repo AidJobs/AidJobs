@@ -151,12 +151,15 @@ app.include_router(find_earn_router)
 
 # Add new crawler admin routes
 try:
-    from app.crawler_admin import router as crawler_admin_router, robots_router, policies_router, quality_router, link_validation_router
+    from app.crawler_admin import router as crawler_admin_router, robots_router, policies_router, quality_router, link_validation_router, meilisearch_router
     app.include_router(crawler_admin_router)
     app.include_router(robots_router)
     app.include_router(policies_router)
     app.include_router(quality_router)
     app.include_router(link_validation_router)
+    app.include_router(meilisearch_router)
+    from app.crawler_admin import meilisearch_router
+    app.include_router(meilisearch_router)
 except ImportError:
     logger.warning("Some admin routers not available")
 

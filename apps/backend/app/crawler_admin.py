@@ -22,6 +22,7 @@ robots_router = APIRouter(prefix="/api/admin/robots", tags=["robots"])
 policies_router = APIRouter(prefix="/api/admin/domain_policies", tags=["domain_policies"])
 quality_router = APIRouter(prefix="/api/admin/data-quality", tags=["data_quality"])
 link_validation_router = APIRouter(prefix="/api/admin/link-validation", tags=["link_validation"])
+meilisearch_router = APIRouter(prefix="/api/admin/meilisearch", tags=["meilisearch"])
 
 
 def get_db_url():
@@ -1461,3 +1462,106 @@ async def validate_job_link(job_id: str, admin=Depends(admin_required)):
     except Exception as e:
         logger.error(f"Error validating job link: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Link validation failed: {str(e)}")
+
+
+@meilisearch_router.post("/sync")
+async def sync_meilisearch(execute: bool = False, admin=Depends(admin_required)):
+    """
+    Sync Meilisearch with database - remove orphaned job IDs.
+    
+    Args:
+        execute: If True, actually delete orphaned jobs. If False, dry-run mode.
+    
+    Returns:
+        Sync results
+    """
+    try:
+        import meilisearch
+        
+        # Get Meilisearch config
+        meili_host = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_HOST")
+        meili_key = os.getenv("MEILISEARCH_KEY") or os.getenv("MEILI_API_KEY") or os.getenv("MEILI_MASTER_KEY")
+        meili_index_name = os.getenv("MEILI_JOBS_INDEX", "jobs_index")
+        
+        if not meili_host or not meili_key:
+            raise HTTPException(status_code=400, detail="Meilisearch not configured")
+        
+        # Connect to Meilisearch
+        client = meilisearch.Client(meili_host, meili_key)
+        index = client.index(meili_index_name)
+        
+        # Get all job IDs from Meilisearch
+        logger.info("Fetching all job IDs from Meilisearch...")
+        meili_jobs = index.get_documents({"limit": 10000})
+        meili_ids = {job['id'] for job in meili_jobs.get('results', [])}
+        logger.info(f"Found {len(meili_ids)} jobs in Meilisearch")
+        
+        # Get all job IDs from database
+        logger.info("Fetching all job IDs from database...")
+        conn = get_db_conn()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id::text FROM jobs")
+                db_ids = {row['id'] for row in cur.fetchall()}
+            logger.info(f"Found {len(db_ids)} jobs in database")
+        finally:
+            conn.close()
+        
+        # Find orphaned IDs
+        orphaned_ids = meili_ids - db_ids
+        logger.info(f"Found {len(orphaned_ids)} orphaned job IDs in Meilisearch")
+        
+        if not orphaned_ids:
+            return {
+                "status": "ok",
+                "message": "Meilisearch is in sync with database",
+                "meilisearch_count": len(meili_ids),
+                "database_count": len(db_ids),
+                "orphaned_count": 0,
+                "deleted_count": 0,
+                "dry_run": not execute
+            }
+        
+        # Show sample
+        sample = list(orphaned_ids)[:10]
+        
+        if not execute:
+            return {
+                "status": "ok",
+                "message": f"DRY RUN: Would delete {len(orphaned_ids)} orphaned jobs",
+                "meilisearch_count": len(meili_ids),
+                "database_count": len(db_ids),
+                "orphaned_count": len(orphaned_ids),
+                "sample_orphaned_ids": sample,
+                "deleted_count": 0,
+                "dry_run": True
+            }
+        
+        # Actually delete orphaned jobs
+        orphaned_list = list(orphaned_ids)
+        deleted_count = 0
+        
+        for i in range(0, len(orphaned_list), 100):
+            batch = orphaned_list[i:i+100]
+            try:
+                index.delete_documents(batch)
+                deleted_count += len(batch)
+                logger.info(f"Deleted batch {i//100 + 1}: {len(batch)} jobs (total: {deleted_count}/{len(orphaned_list)})")
+            except Exception as e:
+                logger.error(f"Failed to delete batch: {e}")
+        
+        return {
+            "status": "ok",
+            "message": f"Successfully deleted {deleted_count} orphaned jobs from Meilisearch",
+            "meilisearch_count": len(meili_ids),
+            "database_count": len(db_ids),
+            "orphaned_count": len(orphaned_ids),
+            "deleted_count": deleted_count,
+            "dry_run": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing Meilisearch: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Meilisearch sync failed: {str(e)}")
