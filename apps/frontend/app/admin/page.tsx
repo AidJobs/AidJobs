@@ -541,20 +541,44 @@ export default function AdminPage() {
                   <SearchIcon className="w-4 h-4 text-[#86868B]" />
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Search</h2>
                 </div>
-                {searchStatus?.enabled ? (
-                  <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                      Enabled
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSyncMeilisearch(false)}
+                    disabled={syncingMeilisearch}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
+                    title="Check for orphaned jobs (dry-run)"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 text-[#86868B] ${syncingMeilisearch ? 'animate-spin' : ''}`} />
+                    <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                      Check Sync (Dry-run)
                     </span>
-                  </div>
-                ) : (
-                  <div className="relative group">
-                    <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
-                      Disabled
+                  </button>
+                  <button
+                    onClick={() => handleSyncMeilisearch(true)}
+                    disabled={syncingMeilisearch}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#30D158] bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group border border-[#30D158] border-opacity-30"
+                    title="Sync Meilisearch (remove orphaned jobs)"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 text-[#30D158] ${syncingMeilisearch ? 'animate-spin' : ''}`} />
+                    <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                      Execute Sync
                     </span>
-                  </div>
-                )}
+                  </button>
+                  {searchStatus?.enabled ? (
+                    <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                        Enabled
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="relative group">
+                      <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                        Disabled
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
               {searchStatus?.enabled || searchStatus?.index ? (
                 <div className="space-y-2">
