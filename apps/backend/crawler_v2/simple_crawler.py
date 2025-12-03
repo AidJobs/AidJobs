@@ -274,6 +274,19 @@ class SimpleCrawler:
                         skipped += 1
                         continue
                     
+                    # Parse deadline if present
+                    deadline_date = None
+                    if deadline_str:
+                        # If already in YYYY-MM-DD format, use it
+                        if re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_str):
+                            deadline_date = deadline_str
+                        else:
+                            # Try to parse it
+                            deadline_date = self._parse_deadline(deadline_str)
+                            # Only use if it's in YYYY-MM-DD format
+                            if deadline_date and not re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_date):
+                                deadline_date = None  # Don't save unparseable dates
+                    
                     # Create canonical hash (simple hash of title + URL)
                     import hashlib
                     canonical_text = f"{title}|{apply_url}".lower()
@@ -288,26 +301,48 @@ class SimpleCrawler:
                     
                     if existing:
                         # Update
-                        cur.execute("""
-                            UPDATE jobs
-                            SET title = %s,
-                                apply_url = %s,
-                                location_raw = %s,
-                                last_seen_at = NOW(),
-                                updated_at = NOW()
-                            WHERE canonical_hash = %s
-                        """, (title, apply_url, location, canonical_hash))
+                        if deadline_date:
+                            cur.execute("""
+                                UPDATE jobs
+                                SET title = %s,
+                                    apply_url = %s,
+                                    location_raw = %s,
+                                    deadline = %s::DATE,
+                                    last_seen_at = NOW(),
+                                    updated_at = NOW()
+                                WHERE canonical_hash = %s
+                            """, (title, apply_url, location, deadline_date, canonical_hash))
+                        else:
+                            cur.execute("""
+                                UPDATE jobs
+                                SET title = %s,
+                                    apply_url = %s,
+                                    location_raw = %s,
+                                    last_seen_at = NOW(),
+                                    updated_at = NOW()
+                                WHERE canonical_hash = %s
+                            """, (title, apply_url, location, canonical_hash))
                         updated += 1
                     else:
                         # Insert
-                        cur.execute("""
-                            INSERT INTO jobs (
-                                source_id, org_name, title, apply_url,
-                                location_raw, canonical_hash,
-                                status, fetched_at, last_seen_at
-                            )
-                            VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
-                        """, (source_id, org_name, title, apply_url, location, canonical_hash))
+                        if deadline_date:
+                            cur.execute("""
+                                INSERT INTO jobs (
+                                    source_id, org_name, title, apply_url,
+                                    location_raw, deadline, canonical_hash,
+                                    status, fetched_at, last_seen_at
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s::DATE, %s, 'active', NOW(), NOW())
+                            """, (source_id, org_name, title, apply_url, location, deadline_date, canonical_hash))
+                        else:
+                            cur.execute("""
+                                INSERT INTO jobs (
+                                    source_id, org_name, title, apply_url,
+                                    location_raw, canonical_hash,
+                                    status, fetched_at, last_seen_at
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
+                            """, (source_id, org_name, title, apply_url, location, canonical_hash))
                         inserted += 1
                 
                 conn.commit()
