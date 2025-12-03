@@ -120,12 +120,15 @@ class SourceHealthScorer:
         # Get recent crawl success rate (last 10 crawls)
         cur.execute("""
             SELECT status, COUNT(*) as count
-            FROM crawl_logs
-            WHERE source_id::text = %s
-            AND ran_at >= NOW() - INTERVAL '30 days'
+            FROM (
+                SELECT status
+                FROM crawl_logs
+                WHERE source_id::text = %s
+                AND ran_at >= NOW() - INTERVAL '30 days'
+                ORDER BY ran_at DESC
+                LIMIT 10
+            ) recent_logs
             GROUP BY status
-            ORDER BY ran_at DESC
-            LIMIT 10
         """, (source_id,))
         recent_logs = cur.fetchall()
         
