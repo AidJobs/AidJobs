@@ -51,9 +51,9 @@ class SimpleCrawler:
         """Get database connection"""
         return psycopg2.connect(self.db_url)
     
-    async def fetch_html(self, url: str) -> Tuple[int, str]:
+    async def fetch_html(self, url: str, retry_count: int = 0) -> Tuple[int, str]:
         """
-        Fetch HTML from URL.
+        Fetch HTML from URL with retry logic for 403 errors.
         
         Returns:
             (status_code, html_content)
@@ -74,6 +74,16 @@ class SimpleCrawler:
                     "Cache-Control": "max-age=0"
                 }
                 response = await client.get(url, headers=headers)
+                
+                # If 403 and we haven't retried, try with different User-Agent
+                if response.status_code == 403 and retry_count < 2:
+                    import asyncio
+                    await asyncio.sleep(2)  # Wait before retry
+                    # Try with a different, more common User-Agent
+                    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    logger.info(f"Retrying {url} with different User-Agent (attempt {retry_count + 1})")
+                    return await self.fetch_html(url, retry_count + 1)
+                
                 return response.status_code, response.text
         except Exception as e:
             logger.error(f"Error fetching {url}: {e}")
