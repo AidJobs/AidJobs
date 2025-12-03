@@ -46,6 +46,15 @@ class SimpleCrawler:
             except Exception as e:
                 logger.warning(f"AI extractor not available: {e}")
                 self.use_ai = False
+        
+        # Initialize AI-powered strategy selector
+        self.strategy_selector = None
+        try:
+            from core.strategy_selector import StrategySelector
+            self.strategy_selector = StrategySelector(ai_extractor=self.ai_extractor)
+            logger.info("Strategy selector initialized")
+        except Exception as e:
+            logger.warning(f"Strategy selector not available: {e}")
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -91,15 +100,59 @@ class SimpleCrawler:
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:
         """
-        Extract jobs from HTML using multiple strategies.
+        Extract jobs from HTML using AI-powered strategy selection.
         
-        Tries strategies in order until one works:
-        1. Table-based extraction (for UNESCO-style sites)
-        2. Div/list-based extraction (for UNDP-style sites)
-        3. Link-based extraction (for MSF-style sites)
-        4. Structured data (JSON-LD, microdata)
-        5. Generic patterns (job keywords in links)
+        Uses intelligent strategy selection that:
+        1. Analyzes HTML structure to choose the best strategy
+        2. Tries recommended strategy first
+        3. Falls back to other strategies if needed
+        4. Validates and normalizes results for consistency
+        5. Maintains quality across all sources
         """
+        # Use AI-powered strategy selector if available
+        if self.strategy_selector:
+            try:
+                # Prepare strategy functions
+                strategies = {
+                    'tables': lambda h, b: self._extract_from_tables(BeautifulSoup(h, 'html.parser'), b),
+                    'divs': lambda h, b: self._extract_from_divs_lists(BeautifulSoup(h, 'html.parser'), b),
+                    'links': lambda h, b: self._extract_from_links(BeautifulSoup(h, 'html.parser'), b),
+                    'structured': lambda h, b: self._extract_from_structured_data(BeautifulSoup(h, 'html.parser'), b),
+                    'generic': lambda h, b: self._extract_generic_fallback(BeautifulSoup(h, 'html.parser'), b)
+                }
+                
+                # Use async method if available, otherwise sync
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # If loop is running, create a new task
+                        jobs, metadata = asyncio.run_coroutine_threadsafe(
+                            self.strategy_selector.select_and_validate(html, base_url, strategies),
+                            loop
+                        ).result()
+                    else:
+                        jobs, metadata = loop.run_until_complete(
+                            self.strategy_selector.select_and_validate(html, base_url, strategies)
+                        )
+                except RuntimeError:
+                    # No event loop, create one
+                    jobs, metadata = asyncio.run(
+                        self.strategy_selector.select_and_validate(html, base_url, strategies)
+                    )
+                
+                logger.info(f"Strategy selector: {metadata.get('strategy_used', 'unknown')} "
+                          f"extracted {len(jobs)} jobs (validated from {metadata.get('original_count', 0)})")
+                
+                if metadata.get('warnings'):
+                    logger.warning(f"Validation warnings: {len(metadata['warnings'])} warnings")
+                
+                return jobs
+            except Exception as e:
+                logger.warning(f"Strategy selector failed, falling back to sequential: {e}")
+                # Fall through to sequential strategy
+        
+        # Fallback: Sequential strategy selection (original behavior)
         soup = BeautifulSoup(html, 'html.parser')
         jobs = []
         
