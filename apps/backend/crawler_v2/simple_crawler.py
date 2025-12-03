@@ -131,15 +131,21 @@ class SimpleCrawler:
                 header_keywords = ['title', 'position', 'location', 'deadline', 'closing', 'apply', 'date', 'grade', 'type']
                 keyword_count = sum(1 for text in cell_texts for kw in header_keywords if kw in text)
                 
-                if keyword_count >= 2:
+                # Also check if row has mostly <th> tags (strong indicator of header)
+                th_count = len(row.find_all('th'))
+                td_count = len(row.find_all('td'))
+                is_likely_header = th_count > td_count or keyword_count >= 2
+                
+                if is_likely_header:
                     header_row = row
                     for idx, cell in enumerate(cells):
                         text = cell.get_text().strip().lower()
-                        if 'title' in text or 'position' in text:
+                        # More flexible matching
+                        if 'title' in text or 'position' in text or 'job' in text:
                             header_map[idx] = 'title'
-                        elif 'location' in text or 'duty' in text:
+                        elif 'location' in text or 'duty' in text or 'station' in text:
                             header_map[idx] = 'location'
-                        elif 'deadline' in text or 'closing' in text or ('date' in text and 'closing' in text):
+                        elif 'deadline' in text or 'closing' in text or 'apply by' in text or ('date' in text and ('closing' in text or 'apply' in text)):
                             header_map[idx] = 'deadline'
                     break
             
@@ -175,7 +181,13 @@ class SimpleCrawler:
                         
                         if field == 'title' and 'title' not in job:
                             if text and len(text) >= 5:
-                                job['title'] = text
+                                # Clean text - remove "Job Title" prefix if present
+                                text = re.sub(r'^Job Title\s*', '', text, flags=re.IGNORECASE).strip()
+                                # Remove "Apply by" and "Location" if they got mixed in
+                                text = re.sub(r'\s*Apply by.*$', '', text, flags=re.IGNORECASE).strip()
+                                text = re.sub(r'\s*Location.*$', '', text, flags=re.IGNORECASE).strip()
+                                if text and len(text) >= 5:
+                                    job['title'] = text
                                 # If no link found, try to find link in this cell
                                 if 'apply_url' not in job:
                                     cell_link = cell.find('a', href=True)
@@ -185,24 +197,52 @@ class SimpleCrawler:
                                             job['apply_url'] = urljoin(base_url, href)
                         elif field == 'location':
                             if text and len(text) >= 3:
-                                job['location_raw'] = text
+                                # Clean location - remove "Location" prefix if present
+                                text = re.sub(r'^Location\s*', '', text, flags=re.IGNORECASE).strip()
+                                if text and len(text) >= 3:
+                                    job['location_raw'] = text
                         elif field == 'deadline':
                             if text and len(text) >= 3:
+                                # Clean deadline - remove "Apply by" prefix if present
+                                text = re.sub(r'^Apply by\s*', '', text, flags=re.IGNORECASE).strip()
                                 deadline_cleaned = self._parse_deadline(text)
                                 if deadline_cleaned:
                                     job['deadline'] = deadline_cleaned
                 
-                # Also try to extract from row text if header map didn't work
+                # If header map exists but title not found, try to extract from first cell
+                if 'title' not in job and header_map and len(cells) > 0:
+                    # Try first cell as title if no header map matched
+                    first_cell = cells[0]
+                    first_text = first_cell.get_text().strip()
+                    # Clean and check if it looks like a title
+                    first_text = re.sub(r'^Job Title\s*', '', first_text, flags=re.IGNORECASE).strip()
+                    if first_text and len(first_text) >= 10:
+                        # Check if it contains deadline/location info (shouldn't be in title)
+                        if not re.search(r'Apply by|Location|Deadline', first_text, re.IGNORECASE):
+                            job['title'] = first_text
+                            # Try to find link in first cell
+                            first_link = first_cell.find('a', href=True)
+                            if first_link:
+                                href = first_link.get('href', '')
+                                if href and not href.startswith('#') and not href.startswith('javascript:'):
+                                    job['apply_url'] = urljoin(base_url, href)
+                
+                # Also try to extract from row text if header map didn't work (last resort)
                 if 'title' not in job:
                     row_text = row.get_text().strip()
                     # Look for substantial text that might be a title
                     if len(row_text) >= 10:
-                        # Try to find the first substantial line
+                        # Split by newlines and find the first substantial line that doesn't contain metadata
                         lines = [line.strip() for line in row_text.split('\n') if line.strip()]
                         for line in lines:
+                            # Skip lines that are clearly metadata
+                            if re.search(r'^(Job Title|Apply by|Location|Deadline):?\s*', line, re.IGNORECASE):
+                                continue
                             if len(line) >= 10 and not any(nav in line.lower() for nav in ['home', 'about', 'contact', 'login']):
-                                job['title'] = line
-                                break
+                                # Check if line contains deadline/location (shouldn't be in title)
+                                if not re.search(r'Apply by|Location|Deadline', line, re.IGNORECASE):
+                                    job['title'] = line
+                                    break
                 
                 # If we have a title but no URL, try to construct URL from title link or row link
                 if job.get('title') and 'apply_url' not in job:

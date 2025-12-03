@@ -727,7 +727,7 @@ export default function HomeClient() {
           </div>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex gap-6 max-w-7xl mx-auto px-4">
           <div className="flex-1">
             {searching && page === 1 ? (
               <div className="space-y-2">
@@ -852,8 +852,8 @@ export default function HomeClient() {
                 )}
               </>
             )}
+            </div>
           </div>
-
         </div>
       </div>
 
