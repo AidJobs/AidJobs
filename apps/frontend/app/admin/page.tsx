@@ -332,15 +332,15 @@ export default function AdminPage() {
       setSyncResult(data);
       
       if (execute && data.status === 'ok') {
-        showToast(`Successfully deleted ${data.deleted_count || 0} orphaned jobs from Meilisearch`, 'success');
+        addToast(`Successfully deleted ${data.deleted_count || 0} orphaned jobs from Meilisearch`, 'success');
         // Refresh search status
         fetchStatus();
       } else if (!execute) {
-        showToast(`Dry run: Found ${data.orphaned_count || 0} orphaned jobs. Use "Execute Sync" to delete them.`, 'success');
+        addToast(`Dry run: Found ${data.orphaned_count || 0} orphaned jobs. Use "Execute Sync" to delete them.`, 'success');
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to sync Meilisearch';
-      showToast(errorMsg, 'error');
+      addToast(errorMsg, 'error');
       console.error('Meilisearch sync error:', error);
     } finally {
       setSyncingMeilisearch(false);
@@ -631,6 +631,33 @@ export default function AdminPage() {
                       </span>
                     </button>
                   </div>
+                  {syncResult && (
+                    <div className="mt-3 pt-3 border-t border-[#D2D2D7]">
+                      <div className="text-caption text-[#86868B] mb-1">Sync Result</div>
+                      <div className="space-y-1 text-caption-sm">
+                        <div className="flex justify-between">
+                          <span className="text-[#86868B]">Meilisearch:</span>
+                          <span className="text-[#1D1D1F] font-semibold">{syncResult.meilisearch_count || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#86868B]">Database:</span>
+                          <span className="text-[#1D1D1F] font-semibold">{syncResult.database_count || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#86868B]">Orphaned:</span>
+                          <span className={`font-semibold ${syncResult.orphaned_count > 0 ? 'text-[#FF3B30]' : 'text-[#30D158]'}`}>
+                            {syncResult.orphaned_count || 0}
+                          </span>
+                        </div>
+                        {syncResult.deleted_count > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#86868B]">Deleted:</span>
+                            <span className="text-[#30D158] font-semibold">{syncResult.deleted_count}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
