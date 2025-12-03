@@ -339,12 +339,12 @@ class SimpleCrawler:
                     # Filter out navigation/menu links (short text, common nav words)
                     substantial_links = [
                         link for link in links 
-                        if len(link.get_text().strip()) >= 10  # Substantial text
-                        and not any(nav_word in link.get_text().lower() for nav_word in ['home', 'about', 'contact', 'login', 'register', 'search'])
+                        if len(link.get_text().strip()) >= 8  # More lenient for BRAC (was 10)
+                        and not any(nav_word in link.get_text().lower() for nav_word in ['home', 'about', 'contact', 'login', 'register', 'search', 'skip'])
                     ]
-                    if len(substantial_links) >= 2:  # At least 2 substantial links
+                    if len(substantial_links) >= 1:  # More lenient: at least 1 substantial link (was 2)
                         job_containers.append(container)
-                        if len(job_containers) >= 20:  # Limit containers
+                        if len(job_containers) >= 30:  # Increased limit for BRAC (was 20)
                             break
         
         logger.info(f"Found {len(job_containers)} potential job containers")
@@ -356,11 +356,30 @@ class SimpleCrawler:
             link = container.find('a', href=True)
             if link:
                 link_text = link.get_text().strip()
+                # More lenient: accept 5+ chars (was already 5, but ensure it's not too strict)
                 if link_text and len(link_text) >= 5:
                     job['title'] = link_text
                     href = link.get('href', '')
                     if href and not href.startswith('#') and not href.startswith('javascript:'):
                         job['apply_url'] = urljoin(base_url, href)
+            
+            # If no link found, try to extract from text (for BRAC-style sites)
+            if not job.get('title') and not job.get('apply_url'):
+                container_text = container.get_text().strip()
+                # Look for first substantial line as title
+                lines = [line.strip() for line in container_text.split('\n') if line.strip()]
+                for line in lines[:3]:  # Check first 3 lines
+                    if len(line) >= 10 and not any(nav in line.lower() for nav in ['home', 'about', 'contact', 'login']):
+                        # Check if line contains a link pattern or looks like a title
+                        if not line.startswith('Location') and not line.startswith('Deadline'):
+                            job['title'] = line[:200]  # Limit length
+                            # Try to find a link in the container
+                            all_links = container.find_all('a', href=True)
+                            if all_links:
+                                href = all_links[0].get('href', '')
+                                if href and not href.startswith('#') and not href.startswith('javascript:'):
+                                    job['apply_url'] = urljoin(base_url, href)
+                            break
             
             # Extract location and deadline from text
             container_text = container.get_text()
