@@ -11,9 +11,9 @@ from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from crawler.html_fetch import HTMLCrawler
-from crawler.rss_fetch import RSSCrawler
-from crawler.api_fetch import APICrawler
+from crawler_v2.simple_crawler import SimpleCrawler
+from crawler_v2.rss_crawler import SimpleRSSCrawler
+from crawler_v2.api_crawler import SimpleAPICrawler
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,12 @@ class CrawlerOrchestrator:
     
     def __init__(self, db_url: str):
         self.db_url = db_url
-        self.html_crawler = HTMLCrawler(db_url)
-        self.rss_crawler = RSSCrawler(db_url)
-        self.api_crawler = APICrawler(db_url)
+        # Use enterprise-grade SimpleCrawler (has all Phase 1-4 features)
+        import os
+        use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+        self.html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
+        self.rss_crawler = SimpleRSSCrawler(db_url)
+        self.api_crawler = SimpleAPICrawler(db_url)
         self.running = False
         self.semaphore = asyncio.Semaphore(GLOBAL_MAX_CONCURRENCY)
     
@@ -384,94 +387,24 @@ class CrawlerOrchestrator:
         logger.info(f"[orchestrator] Starting crawl: {source['org_name']} ({url})")
         
         try:
-            # Fetch based on type
+            # Use enterprise-grade SimpleCrawler which handles everything
+            # All crawlers (HTML, RSS, API) have crawl_source method that does:
+            # - Fetch
+            # - Extract
+            # - Normalize
+            # - Geocode
+            # - Quality score
+            # - Save to database
             if source_type == 'rss':
-                raw_jobs = await self.rss_crawler.fetch_feed(url)
-                # Normalize using RSS crawler
-                normalized_jobs = [
-                    self.rss_crawler.normalize_job(job, source.get('org_name'))
-                    for job in raw_jobs
-                ]
-            elif source_type == 'api':
-                # Get last_success_at for incremental fetching
-                last_success_at = None
-                if source.get('last_crawled_at'):
-                    try:
-                        last_success_at = source['last_crawled_at']
-                        if isinstance(last_success_at, str):
-                            from dateutil import parser as date_parser
-                            last_success_at = date_parser.parse(last_success_at)
-                    except Exception as e:
-                        logger.warning(f"[orchestrator] Failed to parse last_crawled_at: {e}")
-                
-                raw_jobs = await self.api_crawler.fetch_api(
-                    url,
-                    source.get('parser_hint'),
-                    last_success_at
-                )
-                # Normalize using HTML crawler (API jobs are similar to HTML)
-                normalized_jobs = [
-                    self.html_crawler.normalize_job(job, source.get('org_name'))
-                    for job in raw_jobs
-                ]
+                result = await self.rss_crawler.crawl_source(source)
+            elif source_type in ['api', 'json']:
+                result = await self.api_crawler.crawl_source(source)
             else:  # html (default)
-                status, headers, html, size = await self.html_crawler.fetch_html(url)
-                
-                if status == 304:
-                    # Not modified
-                    return {
-                        'status': 'ok',
-                        'message': 'Not modified (304)',
-                        'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
-                        'duration_ms': int((time.time() - start_time) * 1000)
-                    }
-                
-                if status == 403:
-                    # Robots disallow
-                    return {
-                        'status': 'fail',
-                        'message': 'Blocked by robots.txt',
-                        'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
-                        'duration_ms': int((time.time() - start_time) * 1000)
-                    }
-                
-                if status != 200:
-                    return {
-                        'status': 'fail',
-                        'message': f'HTTP {status}',
-                        'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
-                        'duration_ms': int((time.time() - start_time) * 1000)
-                    }
-                
-                raw_jobs = self.html_crawler.extract_jobs(html, url, source.get('parser_hint'))
-                # Normalize using HTML crawler
-                normalized_jobs = [
-                    self.html_crawler.normalize_job(job, source.get('org_name'))
-                    for job in raw_jobs
-                ]
+                result = await self.html_crawler.crawl_source(source)
             
-            # Upsert to database
-            counts = await self.html_crawler.upsert_jobs(normalized_jobs, source_id)
-            
-            duration_ms = int((time.time() - start_time) * 1000)
-            
-            # Determine status
-            if counts['inserted'] > 0 or counts['updated'] > 0:
-                status_result = 'ok'
-                message = f"Found {counts['found']}, inserted {counts['inserted']}, updated {counts['updated']}"
-            elif counts['found'] == 0:
-                status_result = 'warn'
-                message = "No jobs found"
-            else:
-                status_result = 'ok'
-                message = "No changes"
-            
-            return {
-                'status': status_result,
-                'message': message,
-                'counts': counts,
-                'duration_ms': duration_ms
-            }
+            # All crawl_source methods return the same format:
+            # {'status': 'ok'|'warn'|'failed', 'message': str, 'counts': dict}
+            return result
         
         except Exception as e:
             logger.error(f"[orchestrator] Error crawling {url}: {e}")

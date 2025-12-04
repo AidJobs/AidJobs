@@ -1673,7 +1673,7 @@ class SimpleCrawler:
             if source_type == 'html':
                 # Check if this source needs browser rendering
                 needs_browser = any(indicator in careers_url.lower() for indicator in [
-                    'amnesty.org', 'ultipro.com', 'pageup', 'savethechildren'
+                    'amnesty.org', 'ultipro.com', 'pageup', 'savethechildren', 'unicef.org'
                 ])
                 
                 # Fetch HTML
@@ -1748,8 +1748,20 @@ class SimpleCrawler:
                         logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
                         jobs = self.extract_jobs_from_html(html, careers_url)
                 else:
-                    # Use rule-based extraction
-                    jobs = self.extract_jobs_from_html(html, careers_url)
+                    # Try plugin system first, then fall back to rule-based extraction
+                    try:
+                        from crawler.plugins import get_plugin_registry
+                        registry = get_plugin_registry()
+                        plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
+                        if plugin_result.is_success() and plugin_result.jobs:
+                            logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
+                            jobs = plugin_result.jobs
+                        else:
+                            logger.info(f"Plugin extraction returned no jobs, falling back to rule-based")
+                            jobs = self.extract_jobs_from_html(html, careers_url)
+                    except Exception as e:
+                        logger.warning(f"Plugin system error: {e}, falling back to rule-based")
+                        jobs = self.extract_jobs_from_html(html, careers_url)
                 
                 # Enrich jobs from detail pages (for UNDP, UNICEF, and other sites)
                 # Only enrich if we have a reasonable number of jobs (avoid timeout)
