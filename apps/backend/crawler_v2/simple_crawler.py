@@ -1136,7 +1136,7 @@ class SimpleCrawler:
                         
                         if not title or not apply_url:
                             reason = f"Missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})"
-                            logger.debug(f"Skipping job: {reason}")
+                            logger.warning(f"Skipping job: {reason}")
                             skipped += 1
                             failed_inserts.append({
                                 'title': title[:100] if title else None,
@@ -1148,9 +1148,9 @@ class SimpleCrawler:
                         
                         # Additional validation before insertion
                         # Check if title is too short or looks invalid
-                        if len(title) < 5:
+                        if len(title) < 3:  # Reduced from 5 to 3 to be more lenient
                             reason = f"Title too short: {title[:50]}"
-                            logger.debug(f"Skipping job: {reason}")
+                            logger.warning(f"Skipping job: {reason}")
                             skipped += 1
                             failed_inserts.append({
                                 'title': title[:100],
@@ -1366,19 +1366,6 @@ class SimpleCrawler:
                                 if has_quality:
                                     insert_fields.append("quality_scored_at")
                                     insert_values.append("NOW()")
-                                if quality_grade:
-                                    insert_fields.append("quality_grade")
-                                    insert_values.append(quality_grade)
-                                if quality_factors:
-                                    import json
-                                    insert_fields.append("quality_factors")
-                                    insert_values.append(json.dumps(quality_factors))
-                                if quality_issues:
-                                    insert_fields.append("quality_issues")
-                                    insert_values.append(quality_issues)
-                                if needs_review is not None:
-                                    insert_fields.append("needs_review")
-                                    insert_values.append(needs_review)
                                 
                                 # Handle NOW() in SQL vs Python values
                                 placeholders = []
@@ -1398,7 +1385,12 @@ class SimpleCrawler:
                                 logger.debug(f"Inserted job: {title[:50]}...")
                             except Exception as e:
                                 error_msg = f"DB insert error: {str(e)}"
-                                logger.error(f"Failed to insert job '{title[:50]}...': {error_msg}")
+                                logger.error(f"Failed to insert job '{title[:50]}...': {error_msg}", exc_info=True)
+                                logger.error(f"Job data: title={title[:50]}, url={apply_url[:100]}")
+                                logger.error(f"Insert fields ({len(insert_fields)}): {insert_fields}")
+                                logger.error(f"Insert values ({len(insert_values)}): {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
+                                logger.error(f"Placeholders ({len(placeholders)}): {placeholders}")
+                                logger.error(f"SQL values ({len(sql_values)}): {[str(v)[:50] for v in sql_values]}")
                                 failed += 1
                                 failed_inserts.append({
                                     'title': title[:100],
