@@ -261,14 +261,14 @@ class ExtractionLogger:
                 # Build query
                 query = """
                     SELECT 
-                        id, source_url, error, payload, attempt_at, operation
+                        id, source_url, error, payload, attempt_at, operation, source_id
                     FROM failed_inserts
                     WHERE 1=1
                 """
                 params = []
                 
                 if source_id:
-                    query += " AND source_id = %s"
+                    query += " AND source_id::text = %s"
                     params.append(source_id)
                 
                 if unresolved_only:
@@ -287,7 +287,8 @@ class ExtractionLogger:
                         'error': row[2],
                         'payload': row[3],
                         'attempt_at': row[4].isoformat() if row[4] else None,
-                        'operation': row[5]
+                        'operation': row[5],
+                        'source_id': str(row[6]) if row[6] else None
                     })
                 
                 return results

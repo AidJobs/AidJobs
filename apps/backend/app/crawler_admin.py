@@ -1640,7 +1640,7 @@ async def get_extraction_stats(
         raise HTTPException(status_code=500, detail=f"Failed to get extraction stats: {str(e)}")
 
 
-@router.post("/backfill-quality-scores")
+@router.post("/backfill-quality-scores", response_model=dict)
 async def backfill_quality_scores(
     limit: int = Query(1000, description="Maximum number of jobs to process"),
     dry_run: bool = Query(False, description="Dry run mode (no database updates)"),
@@ -1771,9 +1771,10 @@ async def get_failed_inserts(
     source_id: Optional[str] = Query(None, description="Filter by source ID"),
     limit: int = Query(50, description="Maximum number of results"),
     unresolved_only: bool = Query(True, description="Only return unresolved failures"),
+    operation: Optional[str] = Query(None, description="Filter by operation type (validation, insert, etc.)"),
     admin=Depends(admin_required)
 ):
-    """Get failed insert logs"""
+    """Get failed insert logs (including validation errors)"""
     try:
         from core.extraction_logger import ExtractionLogger
         db_url = get_db_url()
@@ -1783,7 +1784,45 @@ async def get_failed_inserts(
             limit=limit,
             unresolved_only=unresolved_only
         )
+        
+        # Filter by operation if specified
+        if operation:
+            failed = [f for f in failed if f.get('operation') == operation]
+        
         return {"status": "ok", "data": failed, "count": len(failed)}
     except Exception as e:
         logger.error(f"Error getting failed inserts: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get failed inserts: {str(e)}")
+
+
+@observability_router.get("/validation-errors")
+async def get_validation_errors(
+    source_id: Optional[str] = Query(None, description="Filter by source ID"),
+    limit: int = Query(50, description="Maximum number of results"),
+    admin=Depends(admin_required)
+):
+    """Get validation errors from recent crawls (internal error logs)"""
+    try:
+        from core.extraction_logger import ExtractionLogger
+        db_url = get_db_url()
+        logger_instance = ExtractionLogger(db_url)
+        
+        # Get validation errors (operation='validation')
+        failed = logger_instance.get_failed_inserts(
+            source_id=source_id,
+            limit=limit,
+            unresolved_only=True
+        )
+        
+        # Filter to only validation errors
+        validation_errors = [f for f in failed if f.get('operation') == 'validation']
+        
+        return {
+            "status": "ok",
+            "data": validation_errors,
+            "count": len(validation_errors),
+            "message": f"Found {len(validation_errors)} validation errors"
+        }
+    except Exception as e:
+        logger.error(f"Error getting validation errors: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get validation errors: {str(e)}")
