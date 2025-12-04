@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import DataQualityBadge from "./DataQualityBadge";
 
 type Job = {
   id: string;
@@ -22,6 +23,14 @@ type Job = {
   policy_flags?: string[];
   description_snippet?: string;
   reasons?: string[];
+  quality_score?: number | null;
+  quality_grade?: 'high' | 'medium' | 'low' | 'very_low' | null;
+  quality_issues?: string[] | null;
+  needs_review?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_remote?: boolean | null;
+  geocoding_source?: string | null;
 };
 
 type JobInspectorProps = {
@@ -322,6 +331,19 @@ export default function JobInspector({
                   ))}
                 </div>
               )}
+              {(displayJob.quality_score !== null && displayJob.quality_score !== undefined) && (
+                <div className="mt-2">
+                  <DataQualityBadge
+                    score={displayJob.quality_score}
+                    grade={displayJob.quality_grade}
+                    issues={displayJob.quality_issues || []}
+                    needsReview={displayJob.needs_review ?? false}
+                    isRemote={displayJob.is_remote ?? false}
+                    geocoded={!!(displayJob.latitude && displayJob.longitude)}
+                    size="sm"
+                  />
+                </div>
+              )}
             </div>
 
             {displayJob.description_snippet && (
@@ -338,10 +360,20 @@ export default function JobInspector({
             <div className="grid grid-cols-2 gap-4">
               {displayJob.location_raw && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                  <h4 className="text-xs font-light text-[#86868B] mb-1 flex items-center gap-1.5">
                     Location
+                    {displayJob.is_remote && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-light bg-[#30D158]/10 text-[#30D158] border border-[#30D158]/20" title="Remote job">
+                        Remote
+                      </span>
+                    )}
+                    {displayJob.latitude && displayJob.longitude && !displayJob.is_remote && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-light bg-[#30D158]/10 text-[#30D158] border border-[#30D158]/20" title={`Geocoded via ${displayJob.geocoding_source || 'nominatim'}`}>
+                        Mapped
+                      </span>
+                    )}
                   </h4>
-                  <p className="text-sm text-gray-900">
+                  <p className="text-xs text-[#1D1D1F] font-light">
                     {displayJob.location_raw}
                   </p>
                 </div>

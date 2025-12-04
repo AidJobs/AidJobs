@@ -33,6 +33,14 @@ type Job = {
   deletion_reason: string | null;
   data_quality_score: number | null;
   data_quality_issues: string[] | null;
+  quality_score: number | null;
+  quality_grade: 'high' | 'medium' | 'low' | 'very_low' | null;
+  quality_issues: string[] | null;
+  needs_review: boolean | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_remote: boolean | null;
+  geocoding_source: string | null;
 };
 
 type SearchFilters = {
@@ -44,6 +52,7 @@ type SearchFilters = {
   date_from: string;
   date_to: string;
   quality_min: number | null;
+  needs_review: boolean | null;
   sort_by: 'created_at' | 'deadline' | 'title' | 'org_name';
   sort_order: 'asc' | 'desc';
 };
@@ -83,6 +92,7 @@ export default function JobManagementPage() {
     date_from: '',
     date_to: '',
     quality_min: null,
+    needs_review: null,
     sort_by: 'created_at',
     sort_order: 'desc',
   });
@@ -102,6 +112,9 @@ export default function JobManagementPage() {
       if (filters.date_to) params.append('date_to', filters.date_to);
       if (filters.quality_min !== null && filters.quality_min !== undefined) {
         params.append('quality_min', filters.quality_min.toString());
+      }
+      if (filters.needs_review !== null && filters.needs_review !== undefined) {
+        params.append('needs_review', filters.needs_review.toString());
       }
       params.append('page', page.toString());
       params.append('size', size.toString());
@@ -598,7 +611,7 @@ export default function JobManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#1D1D1F] mb-1">Min Quality Score</label>
+                  <label className="block text-xs font-light text-[#1D1D1F] mb-1">Min Quality Score</label>
                   <input
                     type="number"
                     min="0"
@@ -606,8 +619,17 @@ export default function JobManagementPage() {
                     value={filters.quality_min || ''}
                     onChange={(e) => setFilters({ ...filters, quality_min: e.target.value ? parseInt(e.target.value) : null })}
                     placeholder="0-100"
-                    className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                    className="w-full px-2 py-1.5 text-xs border border-[#D2D2D7] rounded focus:outline-none focus:ring-1 focus:ring-[#007AFF] focus:ring-opacity-20 font-light"
                   />
+                  <label className="flex items-center gap-2 mt-2 text-xs font-light text-[#1D1D1F]">
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5 border border-[#D2D2D7] rounded focus:ring-1 focus:ring-[#007AFF]"
+                      checked={filters.needs_review === true}
+                      onChange={(e) => setFilters({ ...filters, needs_review: e.target.checked ? true : null })}
+                    />
+                    <span>Needs Review</span>
+                  </label>
                 </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -775,8 +797,12 @@ export default function JobManagementPage() {
                       <td className="px-3 py-2 hidden md:table-cell">
                         <div className="flex items-center justify-start">
                           <DataQualityBadge 
-                            score={job.data_quality_score} 
-                            issues={job.data_quality_issues || []}
+                            score={job.quality_score ?? job.data_quality_score} 
+                            grade={job.quality_grade}
+                            issues={job.quality_issues ?? job.data_quality_issues ?? []}
+                            needsReview={job.needs_review ?? false}
+                            isRemote={job.is_remote ?? false}
+                            geocoded={!!(job.latitude && job.longitude)}
                             size="sm"
                           />
                         </div>

@@ -875,7 +875,9 @@ class SearchService:
                     level_norm, deadline, apply_url, last_seen_at,
                     mission_tags, international_eligible, org_type,
                     impact_domain, functional_role, experience_level, sdgs,
-                    matched_keywords, confidence_overall, low_confidence
+                    matched_keywords, confidence_overall, low_confidence,
+                    quality_score, quality_grade, quality_issues, needs_review,
+                    latitude, longitude, is_remote, geocoding_source
                 FROM jobs 
                 WHERE {where_clause}
                 ORDER BY {order_by}

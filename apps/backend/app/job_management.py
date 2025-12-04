@@ -188,7 +188,15 @@ async def search_jobs(
                 deleted_by,
                 deletion_reason,
                 data_quality_score,
-                data_quality_issues
+                data_quality_issues,
+                quality_score,
+                quality_grade,
+                quality_issues,
+                needs_review,
+                latitude,
+                longitude,
+                is_remote,
+                geocoding_source
             FROM jobs
             {where_clause}
             {order_by}

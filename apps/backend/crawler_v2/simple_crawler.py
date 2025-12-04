@@ -85,6 +85,24 @@ class SimpleCrawler:
                 logger.debug("AI normalizer not available (OPENROUTER_API_KEY not set)")
         except Exception as e:
             logger.warning(f"AI normalizer not available: {e}")
+        
+        # Initialize geocoder (Phase 4)
+        self.geocoder = None
+        try:
+            from core.geocoder import get_geocoder
+            self.geocoder = get_geocoder()
+            logger.info("Geocoder initialized")
+        except Exception as e:
+            logger.warning(f"Geocoder not available: {e}")
+        
+        # Initialize quality scorer (Phase 4)
+        self.quality_scorer = None
+        try:
+            from core.data_quality import get_quality_scorer
+            self.quality_scorer = get_quality_scorer()
+            logger.info("Quality scorer initialized")
+        except Exception as e:
+            logger.warning(f"Quality scorer not available: {e}")
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -1059,6 +1077,22 @@ class SimpleCrawler:
                         location = job.get('location_raw', '').strip()
                         deadline_str = job.get('deadline', '').strip()
                         
+                        # Geocoding fields (Phase 4)
+                        latitude = job.get('latitude')
+                        longitude = job.get('longitude')
+                        geocoding_source = job.get('geocoding_source')
+                        is_remote = job.get('is_remote', False)
+                        country = job.get('country', '').strip() or None
+                        country_iso = job.get('country_iso', '').strip() or None
+                        city = job.get('city', '').strip() or None
+                        
+                        # Quality scoring fields (Phase 4)
+                        quality_score = job.get('quality_score')
+                        quality_grade = job.get('quality_grade')
+                        quality_factors = job.get('quality_factors')
+                        quality_issues = job.get('quality_issues', [])
+                        needs_review = job.get('needs_review', False)
+                        
                         if not title or not apply_url:
                             reason = f"Missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})"
                             logger.debug(f"Skipping job: {reason}")
@@ -1129,35 +1163,74 @@ class SimpleCrawler:
                             
                             # Update (and restore if deleted)
                             try:
+                                # Build update fields dynamically
+                                update_fields = [
+                                    "title = %s",
+                                    "apply_url = %s",
+                                    "location_raw = %s",
+                                    "deleted_at = NULL",
+                                    "deleted_by = NULL",
+                                    "deletion_reason = NULL",
+                                    "status = 'active'",
+                                    "last_seen_at = NOW()",
+                                    "updated_at = NOW()"
+                                ]
+                                update_values = [title, apply_url, location]
+                                
                                 if deadline_date:
-                                    cur.execute("""
-                                        UPDATE jobs
-                                        SET title = %s,
-                                            apply_url = %s,
-                                            location_raw = %s,
-                                            deadline = %s::DATE,
-                                            deleted_at = NULL,
-                                            deleted_by = NULL,
-                                            deletion_reason = NULL,
-                                            status = 'active',
-                                            last_seen_at = NOW(),
-                                            updated_at = NOW()
-                                        WHERE canonical_hash = %s
-                                    """, (title, apply_url, location, deadline_date, canonical_hash))
-                                else:
-                                    cur.execute("""
-                                        UPDATE jobs
-                                        SET title = %s,
-                                            apply_url = %s,
-                                            location_raw = %s,
-                                            deleted_at = NULL,
-                                            deleted_by = NULL,
-                                            deletion_reason = NULL,
-                                            status = 'active',
-                                            last_seen_at = NOW(),
-                                            updated_at = NOW()
-                                        WHERE canonical_hash = %s
-                                    """, (title, apply_url, location, canonical_hash))
+                                    update_fields.append("deadline = %s::DATE")
+                                    update_values.append(deadline_date)
+                                
+                                # Add geocoding fields (Phase 4)
+                                if latitude is not None:
+                                    update_fields.append("latitude = %s")
+                                    update_values.append(latitude)
+                                    update_fields.append("geocoded_at = NOW()")
+                                if longitude is not None:
+                                    update_fields.append("longitude = %s")
+                                    update_values.append(longitude)
+                                if geocoding_source:
+                                    update_fields.append("geocoding_source = %s")
+                                    update_values.append(geocoding_source)
+                                if is_remote is not None:
+                                    update_fields.append("is_remote = %s")
+                                    update_values.append(is_remote)
+                                if country:
+                                    update_fields.append("country = %s")
+                                    update_values.append(country)
+                                if country_iso:
+                                    update_fields.append("country_iso = %s")
+                                    update_values.append(country_iso)
+                                if city:
+                                    update_fields.append("city = %s")
+                                    update_values.append(city)
+                                
+                                # Add quality scoring fields (Phase 4)
+                                if quality_score is not None:
+                                    update_fields.append("quality_score = %s")
+                                    update_values.append(quality_score)
+                                    update_fields.append("quality_scored_at = NOW()")
+                                if quality_grade:
+                                    update_fields.append("quality_grade = %s")
+                                    update_values.append(quality_grade)
+                                if quality_factors:
+                                    import json
+                                    update_fields.append("quality_factors = %s::jsonb")
+                                    update_values.append(json.dumps(quality_factors))
+                                if quality_issues:
+                                    update_fields.append("quality_issues = %s")
+                                    update_values.append(quality_issues)
+                                if needs_review is not None:
+                                    update_fields.append("needs_review = %s")
+                                    update_values.append(needs_review)
+                                
+                                update_values.append(canonical_hash)
+                                
+                                cur.execute(f"""
+                                    UPDATE jobs
+                                    SET {', '.join(update_fields)}
+                                    WHERE canonical_hash = %s
+                                """, update_values)
                                 
                                 if is_deleted:
                                     logger.info(f"Restored deleted job: {title[:50]}...")
@@ -1178,24 +1251,77 @@ class SimpleCrawler:
                         else:
                             # Insert
                             try:
+                                # Build insert fields dynamically
+                                insert_fields = [
+                                    "source_id", "org_name", "title", "apply_url",
+                                    "location_raw", "canonical_hash",
+                                    "status", "fetched_at", "last_seen_at"
+                                ]
+                                insert_values = [source_id, org_name, title, apply_url, location, canonical_hash]
+                                
                                 if deadline_date:
-                                    cur.execute("""
-                                        INSERT INTO jobs (
-                                            source_id, org_name, title, apply_url,
-                                            location_raw, deadline, canonical_hash,
-                                            status, fetched_at, last_seen_at
-                                        )
-                                        VALUES (%s, %s, %s, %s, %s, %s::DATE, %s, 'active', NOW(), NOW())
-                                    """, (source_id, org_name, title, apply_url, location, deadline_date, canonical_hash))
-                                else:
-                                    cur.execute("""
-                                        INSERT INTO jobs (
-                                            source_id, org_name, title, apply_url,
-                                            location_raw, canonical_hash,
-                                            status, fetched_at, last_seen_at
-                                        )
-                                        VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
-                                    """, (source_id, org_name, title, apply_url, location, canonical_hash))
+                                    insert_fields.append("deadline")
+                                    insert_values.append(deadline_date)
+                                
+                                # Add geocoding fields (Phase 4)
+                                if latitude is not None:
+                                    insert_fields.append("latitude")
+                                    insert_values.append(latitude)
+                                    insert_fields.append("geocoded_at")
+                                    insert_values.append("NOW()")
+                                if longitude is not None:
+                                    insert_fields.append("longitude")
+                                    insert_values.append(longitude)
+                                if geocoding_source:
+                                    insert_fields.append("geocoding_source")
+                                    insert_values.append(geocoding_source)
+                                if is_remote is not None:
+                                    insert_fields.append("is_remote")
+                                    insert_values.append(is_remote)
+                                if country:
+                                    insert_fields.append("country")
+                                    insert_values.append(country)
+                                if country_iso:
+                                    insert_fields.append("country_iso")
+                                    insert_values.append(country_iso)
+                                if city:
+                                    insert_fields.append("city")
+                                    insert_values.append(city)
+                                
+                                # Add quality scoring fields (Phase 4)
+                                if quality_score is not None:
+                                    insert_fields.append("quality_score")
+                                    insert_values.append(quality_score)
+                                    insert_fields.append("quality_scored_at")
+                                    insert_values.append("NOW()")
+                                if quality_grade:
+                                    insert_fields.append("quality_grade")
+                                    insert_values.append(quality_grade)
+                                if quality_factors:
+                                    import json
+                                    insert_fields.append("quality_factors")
+                                    insert_values.append(json.dumps(quality_factors))
+                                if quality_issues:
+                                    insert_fields.append("quality_issues")
+                                    insert_values.append(quality_issues)
+                                if needs_review is not None:
+                                    insert_fields.append("needs_review")
+                                    insert_values.append(needs_review)
+                                
+                                # Handle NOW() in SQL vs Python values
+                                placeholders = []
+                                sql_values = []
+                                for i, val in enumerate(insert_values):
+                                    if val == "NOW()":
+                                        placeholders.append("NOW()")
+                                    else:
+                                        placeholders.append("%s")
+                                        sql_values.append(val)
+                                
+                                cur.execute(f"""
+                                    INSERT INTO jobs ({', '.join(insert_fields)})
+                                    VALUES ({', '.join(placeholders)})
+                                """, sql_values)
                                 inserted += 1
                             except Exception as e:
                                 error_msg = f"DB insert error: {str(e)}"
@@ -1676,6 +1802,62 @@ class SimpleCrawler:
                     
                     if normalized_count > 0:
                         logger.info(f"AI normalized {normalized_count} field(s) across {len(jobs)} jobs")
+                
+                # Geocode locations (Phase 4) - only for jobs with location but no coordinates
+                if self.geocoder and jobs:
+                    geocoded_count = 0
+                    for job in jobs:
+                        try:
+                            location = job.get('location_raw') or (job.get('location_normalized', {}).get('label') if isinstance(job.get('location_normalized'), dict) else None)
+                            
+                            # Only geocode if we have location but no coordinates
+                            if location and not job.get('latitude') and not job.get('is_remote'):
+                                # Check if already marked as remote
+                                if isinstance(job.get('location_normalized'), dict) and job.get('location_normalized', {}).get('type') == 'remote':
+                                    job['is_remote'] = True
+                                    geocoded_count += 1
+                                else:
+                                    # Geocode the location
+                                    geocoded = await self.geocoder.geocode(location, use_google=False)
+                                    if geocoded:
+                                        job['latitude'] = geocoded.get('latitude')
+                                        job['longitude'] = geocoded.get('longitude')
+                                        job['geocoding_source'] = geocoded.get('source', 'nominatim')
+                                        job['is_remote'] = geocoded.get('is_remote', False)
+                                        
+                                        # Update country/city if geocoding provided better data
+                                        if geocoded.get('country') and not job.get('country'):
+                                            job['country'] = geocoded.get('country')
+                                        if geocoded.get('country_code') and not job.get('country_iso'):
+                                            job['country_iso'] = geocoded.get('country_code')
+                                        if geocoded.get('city') and not job.get('city'):
+                                            job['city'] = geocoded.get('city')
+                                        
+                                        geocoded_count += 1
+                        except Exception as e:
+                            logger.debug(f"Error geocoding job {job.get('title', 'unknown')[:50]}: {e}")
+                            # Continue with original job if geocoding fails
+                    
+                    if geocoded_count > 0:
+                        logger.info(f"Geocoded {geocoded_count} location(s) across {len(jobs)} jobs")
+                
+                # Score data quality (Phase 4)
+                if self.quality_scorer and jobs:
+                    scored_count = 0
+                    for job in jobs:
+                        try:
+                            quality_result = self.quality_scorer.score_job(job)
+                            job['quality_score'] = quality_result['score']
+                            job['quality_grade'] = quality_result['grade']
+                            job['quality_factors'] = quality_result['factors']
+                            job['quality_issues'] = quality_result['issues']
+                            job['needs_review'] = quality_result['needs_review']
+                            scored_count += 1
+                        except Exception as e:
+                            logger.debug(f"Error scoring job {job.get('title', 'unknown')[:50]}: {e}")
+                    
+                    if scored_count > 0:
+                        logger.info(f"Scored quality for {scored_count} job(s)")
                 
                 # Save to database
                 counts = self.save_jobs(jobs, source_id, org_name)
