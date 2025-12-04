@@ -1646,10 +1646,13 @@ async def get_extraction_stats(
 
 @router.post("/backfill-quality-scores")
 async def backfill_quality_scores(
-    request: Request,
+    request: BackfillQualityScoresRequest = BackfillQualityScoresRequest(),
     admin=Depends(admin_required)
 ):
     """Backfill quality scores for existing jobs that don't have scores"""
+    limit = request.limit
+    dry_run = request.dry_run
+    
     try:
         import sys
         from pathlib import Path
