@@ -68,10 +68,14 @@ export default function DataQualityBadge({
           <span className="whitespace-nowrap text-[#86868B] font-light">• {label}</span>
         )}
         {isRemote && (
-          <MapPin className="w-3 h-3 flex-shrink-0 text-[#86868B]" title="Remote job" />
+          <span title="Remote job">
+            <MapPin className="w-3 h-3 flex-shrink-0 text-[#86868B]" />
+          </span>
         )}
         {geocoded && !isRemote && (
-          <MapPin className="w-3 h-3 flex-shrink-0 text-[#30D158]" title="Location geocoded" />
+          <span title="Location geocoded">
+            <MapPin className="w-3 h-3 flex-shrink-0 text-[#30D158]" />
+          </span>
         )}
       </span>
       
