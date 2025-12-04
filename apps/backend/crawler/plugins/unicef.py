@@ -165,19 +165,39 @@ class UNICEFPlugin(ExtractionPlugin):
             if not title or len(title) < 10:
                 continue
             
-            # CRITICAL: Filter out category pages
+            # CRITICAL: Filter out category pages and navigation elements
             title_lower = title.lower()
             if any(exclude in title_lower for exclude in exclude_patterns):
-                logger.debug(f"Excluding category page: {title[:50]}")
+                logger.debug(f"Excluding category/navigation page: {title[:50]}")
                 continue
+            
+            # CRITICAL: Filter out login/application form pages
+            if any(login_term in title_lower for login_term in ['login', 'sign in', 'sign up', 'register', 'candidate login', 'application form']):
+                logger.debug(f"Excluding login/registration page: {title[:50]}")
+                continue
+            
+            # CRITICAL: Filter out URLs that are clearly login/application pages
+            if apply_url:
+                url_lower = apply_url.lower()
+                if any(login_url in url_lower for login_url in ['/login', '/signin', '/signup', '/register', '/applicationform', '/default.asp', 'pageuppeople.com', 'secure.dc7']):
+                    logger.debug(f"Excluding login/application URL: {apply_url[:80]}")
+                    continue
             
             # Check if title looks like a job (has job keywords or is substantial)
             job_keywords = [
                 'officer', 'manager', 'consultant', 'specialist', 'coordinator',
                 'advisor', 'director', 'analyst', 'engineer', 'consultancy',
-                'consultor', 'consultoría', 'position', 'vacancy', 'assignment'
+                'consultor', 'consultoría', 'position', 'vacancy', 'assignment',
+                'programme', 'program', 'assistant', 'associate', 'expert',
+                'representative', 'administrator', 'supervisor', 'lead'
             ]
             has_job_keyword = any(kw in title_lower for kw in job_keywords)
+            
+            # CRITICAL: Reject if title is too generic or looks like navigation
+            generic_titles = ['candidate', 'login', 'register', 'apply', 'search', 'filter', 'view', 'more', 'next', 'previous']
+            if title_lower in generic_titles or len(title_lower.split()) <= 2:
+                logger.debug(f"Excluding - too generic or too short: {title[:50]}")
+                continue
             
             # Allow if has job keyword OR title is substantial (30+ chars)
             if not has_job_keyword and len(title) < 30:
