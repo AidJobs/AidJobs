@@ -83,7 +83,6 @@ export default function JobManagementPage() {
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
-  const [backfilling, setBackfilling] = useState(false);
 
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
