@@ -73,6 +73,18 @@ class SimpleCrawler:
             logger.info("Extraction logger initialized")
         except Exception as e:
             logger.warning(f"Extraction logger not available: {e}")
+        
+        # Initialize AI normalizer (Phase 3)
+        self.ai_normalizer = None
+        try:
+            from core.ai_normalizer import get_ai_normalizer
+            self.ai_normalizer = get_ai_normalizer()
+            if self.ai_normalizer:
+                logger.info("AI normalizer initialized")
+            else:
+                logger.debug("AI normalizer not available (OPENROUTER_API_KEY not set)")
+        except Exception as e:
+            logger.warning(f"AI normalizer not available: {e}")
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -1612,6 +1624,58 @@ class SimpleCrawler:
                     if len(jobs) > 50 and not needs_enrichment:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
                     jobs = jobs
+                
+                # Normalize ambiguous fields using AI (Phase 3) - only when heuristics fail
+                if self.ai_normalizer and jobs:
+                    normalized_count = 0
+                    for job in jobs:
+                        try:
+                            # Check if normalization is needed
+                            needs_normalization = False
+                            
+                            # Check deadline: normalize if not in YYYY-MM-DD format
+                            if job.get('deadline'):
+                                deadline_str = str(job['deadline'])
+                                if not (len(deadline_str) == 10 and deadline_str.count('-') == 2):
+                                    needs_normalization = True
+                            
+                            # Check location: normalize if ambiguous (contains /, ;, or multiple parts)
+                            if job.get('location_raw') and not job.get('location_normalized'):
+                                location = job['location_raw']
+                                if '/' in location or ';' in location or location.count(',') > 1:
+                                    needs_normalization = True
+                            
+                            # Check salary: normalize if present but not structured
+                            if job.get('salary_raw') and not job.get('salary_normalized'):
+                                needs_normalization = True
+                            
+                            # Only normalize if needed (cost control)
+                            if needs_normalization:
+                                normalized_job = await self.ai_normalizer.normalize_job_fields(
+                                    job,
+                                    use_ai_for_deadline=bool(job.get('deadline') and not re.match(r'^\d{4}-\d{2}-\d{2}$', str(job.get('deadline', '')))),
+                                    use_ai_for_location=bool(job.get('location_raw') and not job.get('location_normalized')),
+                                    use_ai_for_salary=bool(job.get('salary_raw') and not job.get('salary_normalized'))
+                                )
+                                
+                                # Update job with normalized fields
+                                if normalized_job.get('deadline') and normalized_job.get('deadline') != job.get('deadline'):
+                                    job['deadline'] = normalized_job['deadline']
+                                    normalized_count += 1
+                                
+                                if normalized_job.get('location_normalized'):
+                                    job['location_normalized'] = normalized_job['location_normalized']
+                                    normalized_count += 1
+                                
+                                if normalized_job.get('salary_normalized'):
+                                    job['salary_normalized'] = normalized_job['salary_normalized']
+                                    normalized_count += 1
+                        except Exception as e:
+                            logger.debug(f"Error normalizing job {job.get('title', 'unknown')[:50]}: {e}")
+                            # Continue with original job if normalization fails
+                    
+                    if normalized_count > 0:
+                        logger.info(f"AI normalized {normalized_count} field(s) across {len(jobs)} jobs")
                 
                 # Save to database
                 counts = self.save_jobs(jobs, source_id, org_name)
