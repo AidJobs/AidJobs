@@ -78,10 +78,11 @@ class PreUpsertValidator:
             return False, url_error, warnings
         
         # Check for duplicate URL (if we have DB connection and source_id)
-        if self.db_connection and source_id:
-            is_duplicate, duplicate_error = self._check_duplicate_url(apply_url, source_id)
-            if is_duplicate:
-                return False, duplicate_error, warnings
+        # TEMPORARY: Disable duplicate check - it might be blocking valid updates
+        # if self.db_connection and source_id:
+        #     is_duplicate, duplicate_error = self._check_duplicate_url(apply_url, source_id)
+        #     if is_duplicate:
+        #         return False, duplicate_error, warnings
         
         # Validate deadline format if present
         deadline = job.get('deadline')

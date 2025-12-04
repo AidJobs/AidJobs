@@ -1091,9 +1091,9 @@ class SimpleCrawler:
         
         if validation_skipped > 0:
             logger.warning(f"Pre-upsert validation: {validation_skipped} jobs failed validation, {len(jobs)} valid")
-            # Log invalid jobs to failed_inserts for tracking (internal error logs)
+            # Log only hard errors to failed_inserts for tracking (internal error logs)
             if self.extraction_logger:
-                for invalid_job, error in validation_result['invalid_jobs']:
+                for invalid_job, error in hard_errors:
                     try:
                         self.extraction_logger.log_failed_insert(
                             source_url=invalid_job.get('apply_url', 'unknown'),
@@ -1111,8 +1111,8 @@ class SimpleCrawler:
                     except Exception as log_error:
                         logger.debug(f"Error logging validation failure: {log_error}")
             
-            # Also log first 10 errors to console
-            for invalid_job, error in validation_result['invalid_jobs'][:10]:
+            # Also log first 10 hard errors to console
+            for invalid_job, error in hard_errors[:10]:
                 logger.warning(f"Validation failed: {error} - Title: '{invalid_job.get('title', 'Unknown')[:50]}', URL: '{invalid_job.get('apply_url', 'None')[:80]}'")
         
         if not jobs:
