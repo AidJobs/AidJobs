@@ -369,12 +369,16 @@ export default function JobManagementPage() {
   const handleBackfillQualityScores = async () => {
     setBackfilling(true);
     try {
-      const response = await fetch('/api/admin/crawl/backfill-quality-scores?limit=1000&dry_run=false', {
+      const response = await fetch('/api/admin/crawl/backfill-quality-scores', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          limit: 1000,
+          dry_run: false,
+        }),
       });
 
       if (!response.ok) {

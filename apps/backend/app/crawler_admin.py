@@ -45,6 +45,10 @@ def get_db_conn():
 class RunSourceRequest(BaseModel):
     source_id: str
 
+class BackfillQualityScoresRequest(BaseModel):
+    limit: int = 1000
+    dry_run: bool = False
+
 
 class DomainPolicyUpdate(BaseModel):
     max_concurrency: Optional[int] = None
@@ -1640,10 +1644,9 @@ async def get_extraction_stats(
         raise HTTPException(status_code=500, detail=f"Failed to get extraction stats: {str(e)}")
 
 
-@router.post("/backfill-quality-scores", response_model=dict)
+@router.post("/backfill-quality-scores")
 async def backfill_quality_scores(
-    limit: int = Query(1000, description="Maximum number of jobs to process"),
-    dry_run: bool = Query(False, description="Dry run mode (no database updates)"),
+    request: Request,
     admin=Depends(admin_required)
 ):
     """Backfill quality scores for existing jobs that don't have scores"""
