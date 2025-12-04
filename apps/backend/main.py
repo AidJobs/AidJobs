@@ -221,6 +221,24 @@ async def healthz():
         }
 
 
+@app.get("/api/debug/routes")
+async def debug_routes(admin: str = Depends(admin_required)):
+    """Debug endpoint to list all registered routes (admin only)"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if route.methods else [],
+                "name": getattr(route, 'name', 'unknown')
+            })
+    return {
+        "status": "ok",
+        "total_routes": len(routes),
+        "routes": sorted(routes, key=lambda x: x['path'])
+    }
+
+
 @app.get("/api/capabilities")
 async def capabilities():
     return Capabilities.get_capabilities()
