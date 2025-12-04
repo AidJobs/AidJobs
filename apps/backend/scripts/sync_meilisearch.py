@@ -8,10 +8,14 @@ This script removes job IDs from Meilisearch that no longer exist in the databas
 import os
 import sys
 import logging
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (optional - dotenv may not be installed)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not available - use system environment variables
+    pass
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

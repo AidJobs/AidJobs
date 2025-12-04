@@ -134,12 +134,22 @@ class SimpleCrawler:
         Extract jobs from HTML using AI-powered strategy selection.
         
         Uses intelligent strategy selection that:
-        1. Analyzes HTML structure to choose the best strategy
-        2. Tries recommended strategy first
-        3. Falls back to other strategies if needed
-        4. Validates and normalizes results for consistency
-        5. Maintains quality across all sources
+        1. Tries JSON-LD structured data FIRST (most reliable)
+        2. Analyzes HTML structure to choose the best strategy
+        3. Tries recommended strategy
+        4. Falls back to other strategies if needed
+        5. Validates and normalizes results for consistency
+        6. Maintains quality across all sources
         """
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # PRIORITY 1: Try JSON-LD structured data FIRST (most reliable source)
+        logger.info("Trying JSON-LD structured data extraction (priority)...")
+        jobs = self._extract_from_structured_data(soup, base_url)
+        if jobs:
+            logger.info(f"JSON-LD extraction found {len(jobs)} jobs")
+            return jobs
+        
         # Use AI-powered strategy selector if available
         if self.strategy_selector:
             try:
@@ -167,7 +177,6 @@ class SimpleCrawler:
                 # Fall through to sequential strategy
         
         # Fallback: Sequential strategy selection (original behavior)
-        soup = BeautifulSoup(html, 'html.parser')
         jobs = []
         
         # Strategy 1: Table-based extraction (for UNESCO-style sites)
@@ -625,17 +634,34 @@ class SimpleCrawler:
             try:
                 import json
                 data = json.loads(script.string)
-                if isinstance(data, dict) and data.get('@type') == 'JobPosting':
-                    job = self._parse_job_posting(data, base_url)
-                    if job:
-                        jobs.append(job)
+                
+                # Handle different JSON-LD structures
+                items_to_check = []
+                
+                if isinstance(data, dict):
+                    # Check if it's a JobPosting directly
+                    if data.get('@type') == 'JobPosting' or 'JobPosting' in str(data.get('@type', '')):
+                        items_to_check.append(data)
+                    # Check if it has @graph (common in structured data)
+                    elif '@graph' in data and isinstance(data['@graph'], list):
+                        items_to_check.extend([item for item in data['@graph'] if isinstance(item, dict)])
+                    # Check if it has itemListElement (for job listings)
+                    elif 'itemListElement' in data and isinstance(data['itemListElement'], list):
+                        items_to_check.extend([item.get('item', {}) for item in data['itemListElement'] if isinstance(item.get('item'), dict)])
                 elif isinstance(data, list):
-                    for item in data:
-                        if isinstance(item, dict) and item.get('@type') == 'JobPosting':
+                    items_to_check = [item for item in data if isinstance(item, dict)]
+                
+                # Process all potential job postings
+                for item in items_to_check:
+                    if isinstance(item, dict):
+                        # Check for JobPosting type (various formats)
+                        item_type = item.get('@type', '')
+                        if item_type == 'JobPosting' or 'JobPosting' in str(item_type):
                             job = self._parse_job_posting(item, base_url)
                             if job:
                                 jobs.append(job)
-            except:
+            except Exception as e:
+                logger.debug(f"Error parsing JSON-LD: {e}")
                 pass
         
         # Try microdata
@@ -674,41 +700,96 @@ class SimpleCrawler:
         return jobs
     
     def _parse_job_posting(self, data: Dict, base_url: str) -> Optional[Dict]:
-        """Parse a JobPosting structured data object"""
+        """Parse a JobPosting structured data object with comprehensive field extraction"""
         job = {}
         
+        # Extract title
         if 'title' in data:
             job['title'] = str(data['title']).strip()
         
-        if 'url' in data:
-            url = str(data['url'])
-            job['apply_url'] = urljoin(base_url, url)
-        elif 'applicationUrl' in data:
-            url = str(data['applicationUrl'])
-            job['apply_url'] = urljoin(base_url, url)
+        # Extract URL (try multiple fields)
+        url_fields = ['url', 'applicationUrl', 'applicationURL', 'applyUrl', 'applyURL', 'jobUrl']
+        for field in url_fields:
+            if field in data:
+                url = str(data[field])
+                if url:
+                    job['apply_url'] = urljoin(base_url, url)
+                    break
         
+        # Extract location (comprehensive handling)
         if 'jobLocation' in data:
             location = data['jobLocation']
             if isinstance(location, dict):
+                # Handle structured location
                 if 'address' in location:
                     address = location['address']
                     if isinstance(address, dict):
-                        city = address.get('addressLocality', '')
-                        country = address.get('addressCountry', '')
-                        job['location_raw'] = f"{city}, {country}".strip(', ')
+                        # Build location string from address components
+                        parts = []
+                        if address.get('addressLocality'):
+                            parts.append(address['addressLocality'])
+                        if address.get('addressRegion'):
+                            parts.append(address['addressRegion'])
+                        if address.get('addressCountry'):
+                            parts.append(address['addressCountry'])
+                        if parts:
+                            job['location_raw'] = ', '.join(parts)
+                        elif address.get('streetAddress'):
+                            job['location_raw'] = str(address['streetAddress'])
                     else:
                         job['location_raw'] = str(address)
+                elif 'name' in location:
+                    job['location_raw'] = str(location['name'])
                 else:
                     job['location_raw'] = str(location)
+            elif isinstance(location, list):
+                # Multiple locations
+                locations = [str(loc.get('name', loc) if isinstance(loc, dict) else loc) for loc in location]
+                job['location_raw'] = '; '.join(locations)
             else:
                 job['location_raw'] = str(location)
         
-        if 'validThrough' in data:
-            deadline_text = str(data['validThrough'])
-            deadline_cleaned = self._parse_deadline(deadline_text)
-            if deadline_cleaned:
-                job['deadline'] = deadline_cleaned
+        # Extract deadline (try multiple fields)
+        deadline_fields = ['validThrough', 'applicationDeadline', 'deadline', 'closingDate', 'expires']
+        for field in deadline_fields:
+            if field in data:
+                deadline_text = str(data[field])
+                deadline_cleaned = self._parse_deadline(deadline_text)
+                if deadline_cleaned:
+                    job['deadline'] = deadline_cleaned
+                    break
         
+        # Extract salary (if available)
+        if 'baseSalary' in data:
+            salary = data['baseSalary']
+            if isinstance(salary, dict):
+                if 'value' in salary:
+                    value = salary['value']
+                    if isinstance(value, dict):
+                        amount = value.get('value', '')
+                        currency = value.get('currency', '')
+                        if amount:
+                            job['salary_raw'] = f"{currency} {amount}".strip()
+                    else:
+                        job['salary_raw'] = str(value)
+                elif 'minValue' in salary and 'maxValue' in salary:
+                    job['salary_raw'] = f"{salary['minValue']} - {salary['maxValue']}"
+        
+        # Extract description (if available)
+        if 'description' in data:
+            job['description'] = str(data['description']).strip()
+        
+        # Extract employment type
+        if 'employmentType' in data:
+            job['employment_type'] = str(data['employmentType'])
+        
+        # Extract hiring organization
+        if 'hiringOrganization' in data:
+            org = data['hiringOrganization']
+            if isinstance(org, dict) and 'name' in org:
+                job['employer'] = str(org['name']).strip()
+        
+        # Validate required fields
         if job.get('title') and job.get('apply_url'):
             return job
         
@@ -807,13 +888,15 @@ class SimpleCrawler:
     
     def _parse_deadline(self, text: str) -> Optional[str]:
         """
-        Parse deadline text into a standard format.
+        Parse deadline text into YYYY-MM-DD format using dateparser.
         
         Handles formats like:
         - "12-DEC-2025"
         - "10/12/2025"
         - "December 10, 2025"
         - "10 December 2025"
+        - "31 Dec" (assumes current year if year missing)
+        - ISO 8601 formats
         """
         if not text:
             return None
@@ -821,12 +904,39 @@ class SimpleCrawler:
         text = text.strip()
         
         # Remove common prefixes
-        prefixes = ['closing date:', 'deadline:', 'apply by:', 'due:', 'by:']
+        prefixes = ['closing date:', 'deadline:', 'apply by:', 'due:', 'by:', 'valid through:', 'expires:']
         for prefix in prefixes:
             if text.lower().startswith(prefix):
                 text = text[len(prefix):].strip()
         
-        # Try to parse common date formats
+        # Remove time components if present (e.g., "2025-12-31T23:59:59Z" -> "2025-12-31")
+        if 'T' in text:
+            text = text.split('T')[0]
+        
+        # Try dateparser first (handles many formats automatically)
+        try:
+            import dateparser
+            from datetime import datetime
+            
+            # Parse with dateparser (handles many locales and formats)
+            parsed_date = dateparser.parse(
+                text,
+                settings={
+                    'PREFER_DAY_OF_MONTH': 'first',
+                    'RELATIVE_BASE': datetime.now(),
+                    'DATE_ORDER': 'DMY',  # Day-Month-Year (common in international formats)
+                    'PREFER_DATES_FROM': 'future'  # Prefer future dates for deadlines
+                }
+            )
+            
+            if parsed_date:
+                return parsed_date.strftime('%Y-%m-%d')
+        except ImportError:
+            logger.warning("dateparser not available, falling back to regex parsing")
+        except Exception as e:
+            logger.debug(f"dateparser failed for '{text}': {e}")
+        
+        # Fallback: Try regex patterns for common formats
         import re
         from datetime import datetime
         
@@ -885,146 +995,220 @@ class SimpleCrawler:
                 except:
                     pass
         
-        # If we can't parse it, return the original text (database can handle it)
-        return text
+        # If already in YYYY-MM-DD format, return as-is
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', text):
+            return text
+        
+        # If we can't parse it, return None (don't save unparseable dates)
+        logger.debug(f"Could not parse deadline: {text}")
+        return None
     
     def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
         """
-        Save jobs to database.
+        Save jobs to database with comprehensive error logging.
         
         Returns:
-            Dict with counts: {inserted, updated, skipped}
+            Dict with counts: {inserted, updated, skipped, failed}
         """
         if not jobs:
-            return {'inserted': 0, 'updated': 0, 'skipped': 0}
+            return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0}
         
         conn = self._get_db_conn()
         inserted = 0
         updated = 0
         skipped = 0
+        failed = 0
+        failed_inserts = []  # Track failed inserts for logging
         
         try:
             with conn.cursor() as cur:
                 for job in jobs:
-                    title = job.get('title', '').strip()
-                    apply_url = job.get('apply_url', '').strip()
-                    location = job.get('location_raw', '').strip()
-                    deadline_str = job.get('deadline', '').strip()
-                    
-                    if not title or not apply_url:
-                        logger.debug(f"Skipping job: missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})")
-                        skipped += 1
-                        continue
-                    
-                    # Additional validation before insertion
-                    # Check if title is too short or looks invalid
-                    if len(title) < 5:
-                        logger.debug(f"Skipping job: title too short: {title[:50]}")
-                        skipped += 1
-                        continue
-                    
-                    # Check for invalid URL patterns
-                    if apply_url.startswith('#') or apply_url.startswith('javascript:'):
-                        logger.debug(f"Skipping job: invalid URL: {apply_url[:50]}")
-                        skipped += 1
-                        continue
-                    
-                    # Parse deadline if present
-                    deadline_date = None
-                    if deadline_str:
-                        # If already in YYYY-MM-DD format, use it
-                        if re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_str):
-                            deadline_date = deadline_str
-                        else:
-                            # Try to parse it
-                            deadline_date = self._parse_deadline(deadline_str)
-                            # Only use if it's in YYYY-MM-DD format
-                            if deadline_date and not re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_date):
-                                deadline_date = None  # Don't save unparseable dates
-                    
-                    # Create canonical hash (simple hash of title + URL)
-                    import hashlib
-                    canonical_text = f"{title}|{apply_url}".lower()
-                    canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
-                    
-                    # Check if exists (including deleted jobs)
-                    cur.execute("""
-                        SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s
-                    """, (canonical_hash,))
-                    
-                    existing = cur.fetchone()
-                    
-                    if existing:
-                        # Check if job was deleted
-                        is_deleted = existing[1] is not None
+                    try:
+                        title = job.get('title', '').strip()
+                        apply_url = job.get('apply_url', '').strip()
+                        location = job.get('location_raw', '').strip()
+                        deadline_str = job.get('deadline', '').strip()
                         
-                        # Update (and restore if deleted)
-                        if deadline_date:
-                            cur.execute("""
-                                UPDATE jobs
-                                SET title = %s,
-                                    apply_url = %s,
-                                    location_raw = %s,
-                                    deadline = %s::DATE,
-                                    deleted_at = NULL,
-                                    deleted_by = NULL,
-                                    deletion_reason = NULL,
-                                    status = 'active',
-                                    last_seen_at = NOW(),
-                                    updated_at = NOW()
-                                WHERE canonical_hash = %s
-                            """, (title, apply_url, location, deadline_date, canonical_hash))
-                        else:
-                            cur.execute("""
-                                UPDATE jobs
-                                SET title = %s,
-                                    apply_url = %s,
-                                    location_raw = %s,
-                                    deleted_at = NULL,
-                                    deleted_by = NULL,
-                                    deletion_reason = NULL,
-                                    status = 'active',
-                                    last_seen_at = NOW(),
-                                    updated_at = NOW()
-                                WHERE canonical_hash = %s
-                            """, (title, apply_url, location, canonical_hash))
+                        if not title or not apply_url:
+                            reason = f"Missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})"
+                            logger.debug(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100] if title else None,
+                                'apply_url': apply_url[:200] if apply_url else None,
+                                'error': reason,
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
                         
-                        if is_deleted:
-                            logger.info(f"Restored deleted job: {title[:50]}...")
-                            inserted += 1  # Count restored jobs as inserted
+                        # Additional validation before insertion
+                        # Check if title is too short or looks invalid
+                        if len(title) < 5:
+                            reason = f"Title too short: {title[:50]}"
+                            logger.debug(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100],
+                                'apply_url': apply_url[:200],
+                                'error': reason,
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
+                        
+                        # Check for invalid URL patterns
+                        if apply_url.startswith('#') or apply_url.startswith('javascript:'):
+                            reason = f"Invalid URL: {apply_url[:50]}"
+                            logger.debug(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100],
+                                'apply_url': apply_url[:200],
+                                'error': reason,
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
+                        
+                        # Parse deadline if present
+                        deadline_date = None
+                        if deadline_str:
+                            # If already in YYYY-MM-DD format, use it
+                            if re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_str):
+                                deadline_date = deadline_str
+                            else:
+                                # Try to parse it
+                                deadline_date = self._parse_deadline(deadline_str)
+                                # Only use if it's in YYYY-MM-DD format
+                                if deadline_date and not re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_date):
+                                    deadline_date = None  # Don't save unparseable dates
+                        
+                        # Create canonical hash (simple hash of title + URL)
+                        import hashlib
+                        canonical_text = f"{title}|{apply_url}".lower()
+                        canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
+                        
+                        # Check if exists (including deleted jobs)
+                        cur.execute("""
+                            SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s
+                        """, (canonical_hash,))
+                        
+                        existing = cur.fetchone()
+                        
+                        if existing:
+                            # Check if job was deleted
+                            is_deleted = existing[1] is not None
+                            
+                            # Update (and restore if deleted)
+                            try:
+                                if deadline_date:
+                                    cur.execute("""
+                                        UPDATE jobs
+                                        SET title = %s,
+                                            apply_url = %s,
+                                            location_raw = %s,
+                                            deadline = %s::DATE,
+                                            deleted_at = NULL,
+                                            deleted_by = NULL,
+                                            deletion_reason = NULL,
+                                            status = 'active',
+                                            last_seen_at = NOW(),
+                                            updated_at = NOW()
+                                        WHERE canonical_hash = %s
+                                    """, (title, apply_url, location, deadline_date, canonical_hash))
+                                else:
+                                    cur.execute("""
+                                        UPDATE jobs
+                                        SET title = %s,
+                                            apply_url = %s,
+                                            location_raw = %s,
+                                            deleted_at = NULL,
+                                            deleted_by = NULL,
+                                            deletion_reason = NULL,
+                                            status = 'active',
+                                            last_seen_at = NOW(),
+                                            updated_at = NOW()
+                                        WHERE canonical_hash = %s
+                                    """, (title, apply_url, location, canonical_hash))
+                                
+                                if is_deleted:
+                                    logger.info(f"Restored deleted job: {title[:50]}...")
+                                    inserted += 1  # Count restored jobs as inserted
+                                else:
+                                    updated += 1
+                            except Exception as e:
+                                error_msg = f"DB update error: {str(e)}"
+                                logger.error(f"Failed to update job '{title[:50]}...': {error_msg}")
+                                failed += 1
+                                failed_inserts.append({
+                                    'title': title[:100],
+                                    'apply_url': apply_url[:200],
+                                    'error': error_msg,
+                                    'payload': {k: str(v)[:200] for k, v in job.items()},
+                                    'operation': 'update'
+                                })
                         else:
-                            updated += 1
-                    else:
-                        # Insert
-                        if deadline_date:
-                            cur.execute("""
-                                INSERT INTO jobs (
-                                    source_id, org_name, title, apply_url,
-                                    location_raw, deadline, canonical_hash,
-                                    status, fetched_at, last_seen_at
-                                )
-                                VALUES (%s, %s, %s, %s, %s, %s::DATE, %s, 'active', NOW(), NOW())
-                            """, (source_id, org_name, title, apply_url, location, deadline_date, canonical_hash))
-                        else:
-                            cur.execute("""
-                                INSERT INTO jobs (
-                                    source_id, org_name, title, apply_url,
-                                    location_raw, canonical_hash,
-                                    status, fetched_at, last_seen_at
-                                )
-                                VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
-                            """, (source_id, org_name, title, apply_url, location, canonical_hash))
-                        inserted += 1
+                            # Insert
+                            try:
+                                if deadline_date:
+                                    cur.execute("""
+                                        INSERT INTO jobs (
+                                            source_id, org_name, title, apply_url,
+                                            location_raw, deadline, canonical_hash,
+                                            status, fetched_at, last_seen_at
+                                        )
+                                        VALUES (%s, %s, %s, %s, %s, %s::DATE, %s, 'active', NOW(), NOW())
+                                    """, (source_id, org_name, title, apply_url, location, deadline_date, canonical_hash))
+                                else:
+                                    cur.execute("""
+                                        INSERT INTO jobs (
+                                            source_id, org_name, title, apply_url,
+                                            location_raw, canonical_hash,
+                                            status, fetched_at, last_seen_at
+                                        )
+                                        VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
+                                    """, (source_id, org_name, title, apply_url, location, canonical_hash))
+                                inserted += 1
+                            except Exception as e:
+                                error_msg = f"DB insert error: {str(e)}"
+                                logger.error(f"Failed to insert job '{title[:50]}...': {error_msg}")
+                                failed += 1
+                                failed_inserts.append({
+                                    'title': title[:100],
+                                    'apply_url': apply_url[:200],
+                                    'error': error_msg,
+                                    'payload': {k: str(v)[:200] for k, v in job.items()},
+                                    'operation': 'insert'
+                                })
+                    except Exception as e:
+                        # Catch any unexpected errors during job processing
+                        error_msg = f"Unexpected error processing job: {str(e)}"
+                        logger.error(f"Error processing job: {error_msg}")
+                        failed += 1
+                        failed_inserts.append({
+                            'title': job.get('title', 'Unknown')[:100],
+                            'apply_url': job.get('apply_url', 'Unknown')[:200],
+                            'error': error_msg,
+                            'payload': {k: str(v)[:200] for k, v in job.items()},
+                            'operation': 'process'
+                        })
                 
                 conn.commit()
         
         except Exception as e:
-            logger.error(f"Error saving jobs: {e}")
+            logger.error(f"Error saving jobs (batch): {e}")
             conn.rollback()
         finally:
             conn.close()
         
-        return {'inserted': inserted, 'updated': updated, 'skipped': skipped}
+        # Log failed inserts summary
+        if failed_inserts:
+            logger.warning(f"Failed to save {len(failed_inserts)} jobs for {org_name} (source_id: {source_id})")
+            # Log first 5 failures in detail
+            for i, failed_job in enumerate(failed_inserts[:5]):
+                logger.warning(f"  Failed job {i+1}: {failed_job.get('title', 'Unknown')} - {failed_job.get('error', 'Unknown error')}")
+            if len(failed_inserts) > 5:
+                logger.warning(f"  ... and {len(failed_inserts) - 5} more failures")
+        
+        return {'inserted': inserted, 'updated': updated, 'skipped': skipped, 'failed': failed}
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
         """
@@ -1372,7 +1556,8 @@ class SimpleCrawler:
                         'found': len(jobs),
                         'inserted': counts['inserted'],
                         'updated': counts['updated'],
-                        'skipped': counts['skipped']
+                        'skipped': counts['skipped'],
+                        'failed': counts.get('failed', 0)
                     }
                 }
             
