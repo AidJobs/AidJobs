@@ -241,7 +241,8 @@ class ExtractionLogger:
         self,
         source_id: Optional[str] = None,
         limit: int = 50,
-        unresolved_only: bool = True
+        unresolved_only: bool = True,
+        operation: Optional[str] = None
     ) -> List[Dict]:
         """
         Get failed insert logs.
@@ -250,6 +251,7 @@ class ExtractionLogger:
             source_id: Optional source ID to filter by
             limit: Maximum number of results
             unresolved_only: Only return unresolved failures
+            operation: Optional operation type to filter by (e.g., 'validation', 'insert')
             
         Returns:
             List of failed insert dictionaries
@@ -273,6 +275,10 @@ class ExtractionLogger:
                 
                 if unresolved_only:
                     query += " AND resolved_at IS NULL"
+                
+                if operation:
+                    query += " AND operation = %s"
+                    params.append(operation)
                 
                 query += " ORDER BY attempt_at DESC LIMIT %s"
                 params.append(limit)

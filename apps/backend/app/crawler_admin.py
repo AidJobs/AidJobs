@@ -1813,9 +1813,10 @@ async def get_failed_inserts(
 async def get_validation_errors(
     source_id: Optional[str] = Query(None, description="Filter by source ID"),
     limit: int = Query(50, description="Maximum number of results"),
+    unresolved_only: bool = Query(True, description="Only return unresolved failures"),
     admin=Depends(admin_required)
 ):
-    """Get validation errors from recent crawls (internal error logs)"""
+    """Get validation errors from failed_inserts table"""
     try:
         from core.extraction_logger import ExtractionLogger
         db_url = get_db_url()
@@ -1825,17 +1826,15 @@ async def get_validation_errors(
         failed = logger_instance.get_failed_inserts(
             source_id=source_id,
             limit=limit,
-            unresolved_only=True
+            unresolved_only=unresolved_only,
+            operation='validation'  # Filter specifically for validation errors
         )
-        
-        # Filter to only validation errors
-        validation_errors = [f for f in failed if f.get('operation') == 'validation']
         
         return {
             "status": "ok",
-            "data": validation_errors,
-            "count": len(validation_errors),
-            "message": f"Found {len(validation_errors)} validation errors"
+            "data": failed,
+            "count": len(failed),
+            "message": f"Found {len(failed)} validation errors"
         }
     except Exception as e:
         logger.error(f"Error getting validation errors: {e}", exc_info=True)
