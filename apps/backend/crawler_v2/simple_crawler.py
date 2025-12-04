@@ -1214,7 +1214,8 @@ class SimpleCrawler:
                 # Fetch HTML
                 status, html = await self.fetch_html(careers_url, use_browser=needs_browser)
                 
-                if status != 200:
+                # Accept any 2xx status as success (some sites use 202, 204, etc.)
+                if status < 200 or status >= 300:
                     return {
                         'status': 'failed',
                         'message': f'HTTP {status}',
