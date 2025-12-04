@@ -1075,10 +1075,10 @@ class SimpleCrawler:
             logger.info(f"Validation warnings: {len(validation_result['warnings'])} warnings")
         
         if validation_skipped > 0:
-            logger.info(f"Pre-upsert validation: {validation_skipped} jobs failed validation, {len(jobs)} valid")
+            logger.warning(f"Pre-upsert validation: {validation_skipped} jobs failed validation, {len(jobs)} valid")
             # Log invalid jobs to failed_inserts for tracking
-            for invalid_job, error in validation_result['invalid_jobs']:
-                logger.debug(f"Validation failed: {error} - {invalid_job.get('title', 'Unknown')[:50]}")
+            for invalid_job, error in validation_result['invalid_jobs'][:10]:  # Log first 10 errors
+                logger.warning(f"Validation failed: {error} - Title: '{invalid_job.get('title', 'Unknown')[:50]}', URL: '{invalid_job.get('apply_url', 'None')[:80]}'")
         
         if not jobs:
             return {
@@ -1949,6 +1949,13 @@ class SimpleCrawler:
                 return {
                     'status': 'ok' if jobs else 'warn',
                     'message': f'Found {len(jobs)} jobs' if jobs else 'No jobs found',
+                    'validation_info': {
+                        'total_extracted': len(jobs),
+                        'validated': counts.get('validated', 0),
+                        'skipped': counts.get('skipped', 0),
+                        'inserted': counts.get('inserted', 0),
+                        'updated': counts.get('updated', 0)
+                    } if jobs else None,
                     'counts': {
                         'found': len(jobs),
                         'inserted': counts['inserted'],
