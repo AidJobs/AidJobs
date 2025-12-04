@@ -1061,31 +1061,6 @@ class SimpleCrawler:
         if not jobs:
             return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
-        # TEMPORARY: DISABLE VALIDATION TO DEBUG CRAWLER ISSUE
-        # Pre-upsert validation (Master Plan 1.2) - DISABLED FOR DEBUGGING
-        # from core.pre_upsert_validator import get_validator
-        # conn = self._get_db_conn()
-        # validator = get_validator(db_connection=conn)
-        # validation_result = validator.validate_batch(jobs, source_id)
-        # 
-        # # Use validated jobs, but also include jobs that only have warnings (not hard errors)
-        # valid_jobs = validation_result['valid_jobs']
-        # invalid_jobs = validation_result['invalid_jobs']
-        # 
-        # # Filter invalid jobs - only reject if it's a hard error (missing title/URL)
-        # # Allow jobs with warnings (like long titles, etc.)
-        # hard_errors = []
-        # for job, error in invalid_jobs:
-        #     # Only reject if missing required fields or invalid URL
-        #     if 'Missing required field' in error or 'Invalid URL' in error or 'Title too short' in error:
-        #         hard_errors.append((job, error))
-        #     else:
-        #         # It's just a warning, include the job
-        #         valid_jobs.append(job)
-        # 
-        # jobs = valid_jobs
-        # validation_skipped = len(hard_errors)
-        
         # TEMPORARY: Skip validation entirely - just do basic checks
         validation_skipped = 0
         valid_jobs = []
@@ -1103,6 +1078,16 @@ class SimpleCrawler:
             logger.warning(f"Basic validation: {validation_skipped} jobs skipped, {len(jobs)} valid")
         
         if not jobs:
+            logger.warning(f"No valid jobs to save after validation (had {len(jobs) + validation_skipped} total)")
+            return {
+                'inserted': 0, 
+                'updated': 0, 
+                'skipped': validation_skipped, 
+                'failed': 0,
+                'validated': 0
+            }
+        
+        if not jobs:
             return {
                 'inserted': 0, 
                 'updated': 0, 
@@ -1116,6 +1101,8 @@ class SimpleCrawler:
         skipped = validation_skipped
         failed = 0
         failed_inserts = []  # Track failed inserts for logging
+        
+        logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
         
         try:
             with conn.cursor() as cur:
@@ -1372,6 +1359,7 @@ class SimpleCrawler:
                                     VALUES ({', '.join(placeholders)})
                                 """, sql_values)
                                 inserted += 1
+                                logger.debug(f"Inserted job: {title[:50]}...")
                             except Exception as e:
                                 error_msg = f"DB insert error: {str(e)}"
                                 logger.error(f"Failed to insert job '{title[:50]}...': {error_msg}")
@@ -1397,12 +1385,17 @@ class SimpleCrawler:
                         })
                 
                 conn.commit()
+                logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {skipped} skipped, {failed} failed")
         
         except Exception as e:
-            logger.error(f"Error saving jobs (batch): {e}")
-            conn.rollback()
+            logger.error(f"Error saving jobs (batch): {e}", exc_info=True)
+            if conn:
+                conn.rollback()
+            # Re-raise to see the actual error
+            raise
         finally:
-            conn.close()
+            if conn:
+                conn.close()
         
         # Log failed inserts summary and to database (Phase 2)
         if failed_inserts:
