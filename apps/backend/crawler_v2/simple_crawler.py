@@ -1107,7 +1107,9 @@ class SimpleCrawler:
         
         logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
         
+        conn = None
         try:
+            conn = self._get_db_conn()
             with conn.cursor() as cur:
                 for job in jobs:
                     try:
