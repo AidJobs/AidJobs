@@ -76,7 +76,9 @@ if normalizer:
 
 **Environment Variables:**
 - `OPENROUTER_API_KEY` - Required for AI normalization
-- `OPENROUTER_MODEL` - Model to use (default: "openai/gpt-4o-mini")
+- `OPENROUTER_MODEL` - Model to use (default: "anthropic/claude-3-haiku")
+  - Can be overridden in Render dashboard for production
+  - Default in code ensures local dev works out of the box
 
 **Cost Control:**
 - Normalizer only runs when heuristics fail
