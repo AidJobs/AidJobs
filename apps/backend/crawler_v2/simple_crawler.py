@@ -1045,8 +1045,89 @@ class SimpleCrawler:
             
             soup = BeautifulSoup(html, 'html.parser')
             
+            # UNICEF-specific extraction patterns
+            if 'unicef.org' in job['apply_url'].lower():
+                # Extract from detail page structure
+                # Look for structured fields: Job no, Contract type, Duty Station, Level, Location, Categories
+                
+                # Extract Location (preferred: Duty Station, fallback: Location)
+                location_found = False
+                
+                # Approach 1: Look for "Duty Station:" (preferred)
+                duty_station_elem = soup.find(string=re.compile(r'Duty Station[:\s]*', re.IGNORECASE))
+                if duty_station_elem:
+                    parent = duty_station_elem.parent
+                    # Get next sibling or parent text
+                    if parent:
+                        next_sibling = parent.find_next_sibling()
+                        if next_sibling:
+                            location_text = next_sibling.get_text().strip()
+                        else:
+                            # Try to find the value in the same parent
+                            location_text = parent.get_text().replace('Duty Station:', '').replace('Duty Station', '').strip()
+                        
+                        if location_text and len(location_text) >= 3 and len(location_text) < 100:
+                            # Clean up
+                            location_text = re.sub(r'<[^>]+>', '', location_text).strip()
+                            location_text = re.sub(r'\s+', ' ', location_text)
+                            if location_text.lower() not in ['n/a', 'na', 'tbd']:
+                                job['location_raw'] = location_text
+                                location_found = True
+                
+                # Approach 2: Look for "Location:" field
+                if not location_found:
+                    location_elem = soup.find(string=re.compile(r'^Location[:\s]*', re.IGNORECASE))
+                    if location_elem:
+                        parent = location_elem.parent
+                        if parent:
+                            next_sibling = parent.find_next_sibling()
+                            if next_sibling:
+                                location_text = next_sibling.get_text().strip()
+                            else:
+                                location_text = parent.get_text().replace('Location:', '').replace('Location', '').strip()
+                            
+                            if location_text and len(location_text) >= 3 and len(location_text) < 100:
+                                location_text = re.sub(r'<[^>]+>', '', location_text).strip()
+                                location_text = re.sub(r'\s+', ' ', location_text)
+                                if location_text.lower() not in ['n/a', 'na', 'tbd']:
+                                    job['location_raw'] = location_text
+                                    location_found = True
+                
+                # Extract Deadline
+                deadline_found = False
+                
+                # Look for "Deadline:" in detail page
+                deadline_elem = soup.find(string=re.compile(r'Deadline[:\s]*', re.IGNORECASE))
+                if deadline_elem:
+                    parent = deadline_elem.parent
+                    if parent:
+                        # Get deadline text
+                        deadline_text = parent.get_text()
+                        # Extract date pattern: "10 Dec 2025 11:55 PM" or "10 Dec 2025"
+                        deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
+                        if deadline_match:
+                            deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                            if deadline_cleaned:
+                                job['deadline'] = deadline_cleaned
+                                deadline_found = True
+                
+                # Also check for deadline in structured data fields
+                if not deadline_found:
+                    # Look for "Closing date" or similar
+                    closing_elem = soup.find(string=re.compile(r'Closing[:\s]*|Apply by[:\s]*', re.IGNORECASE))
+                    if closing_elem:
+                        parent = closing_elem.parent
+                        if parent:
+                            deadline_text = parent.get_text()
+                            deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
+                            if deadline_match:
+                                deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                                if deadline_cleaned:
+                                    job['deadline'] = deadline_cleaned
+                                    deadline_found = True
+            
             # UNDP-specific extraction patterns
-            if 'undp.org' in job['apply_url'].lower():
+            elif 'undp.org' in job['apply_url'].lower():
                 # Pattern 1: Consultancies page structure
                 # Look for "DEADLINE:" label - try multiple approaches
                 deadline_found = False
@@ -1248,10 +1329,19 @@ class SimpleCrawler:
                     # Use rule-based extraction
                     jobs = self.extract_jobs_from_html(html, careers_url)
                 
-                # Enrich jobs from detail pages (for UNDP and other sites)
+                # Enrich jobs from detail pages (for UNDP, UNICEF, and other sites)
                 # Only enrich if we have a reasonable number of jobs (avoid timeout)
-                if len(jobs) > 0 and len(jobs) <= 50:  # Limit to 50 jobs to avoid timeout
-                    logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
+                # Always enrich for UNICEF to get location and deadline from detail pages
+                needs_enrichment = any('unicef.org' in job.get('apply_url', '').lower() or 
+                                      'undp.org' in job.get('apply_url', '').lower() 
+                                      for job in jobs)
+                
+                if len(jobs) > 0 and (len(jobs) <= 50 or needs_enrichment):
+                    if needs_enrichment:
+                        logger.info(f"Enriching {len(jobs)} jobs from detail pages (UNICEF/UNDP require detail page data)...")
+                    else:
+                        logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
+                    
                     enriched_jobs = []
                     for i, job in enumerate(jobs):
                         if job.get('apply_url'):
@@ -1268,7 +1358,7 @@ class SimpleCrawler:
                             enriched_jobs.append(job)
                     jobs = enriched_jobs
                 else:
-                    if len(jobs) > 50:
+                    if len(jobs) > 50 and not needs_enrichment:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
                     jobs = jobs
                 

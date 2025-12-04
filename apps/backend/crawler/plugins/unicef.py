@@ -39,24 +39,66 @@ class UNICEFPlugin(ExtractionPlugin):
             'cookie statement', 'legal', 'accessibility', 'careers homepage',
             'login', 'register', 'career faqs', 'choose language', 'main menu',
             'who we are', 'what we do', 'countries', 'get involved', 'donate',
-            'latest', 'freedom, justice, equality', 'let\'s get to work'
+            'latest', 'freedom, justice, equality', 'let\'s get to work',
+            'refine search', 'view list', 'view map', 'filter results', 'programme',
+            'type of contract', 'position level', 'functional area', 'contract type',
+            'send me jobs', 'job alerts', 'register now', 'subscribe'
+        ]
+        
+        # HTML patterns that indicate category/navigation pages (not jobs)
+        category_html_patterns = [
+            'class*="filter"', 'class*="refine"', 'class*="search"',
+            'class*="category"', 'class*="navigation"', 'class*="menu"',
+            'id*="filter"', 'id*="search"', 'id*="category"'
         ]
         
         # Strategy 1: Look for job listing containers with structured data
         # UNICEF jobs typically have: title, location, deadline in a structured format
+        # Look for containers that have both "Location:" and "Deadline:" text (real jobs)
         job_selectors = [
             'article', 'div[class*="job"]', 'div[class*="vacancy"]',
             'li[class*="job"]', 'div[class*="listing"]', 'div[class*="result"]',
-            'div[class*="card"]', 'div[class*="item"]'
+            'div[class*="card"]', 'div[class*="item"]', 'div[class*="posting"]'
         ]
         
         containers = []
         for selector in job_selectors:
             found = soup.select(selector)
-            if found and len(found) >= 3:  # At least 3 potential jobs
-                containers.extend(found[:100])  # Limit to first 100
-                logger.info(f"Found {len(found)} containers with selector: {selector}")
-                break
+            if found:
+                # Filter out category/navigation containers
+                for elem in found:
+                    elem_text = elem.get_text().lower()
+                    elem_html = str(elem).lower()
+                    
+                    # Skip if it's clearly a category/navigation element
+                    is_category = False
+                    for pattern in exclude_patterns:
+                        if pattern in elem_text:
+                            is_category = True
+                            break
+                    
+                    # Skip if HTML indicates it's a filter/navigation element
+                    if any(html_pattern.replace('*', '') in elem_html for html_pattern in category_html_patterns):
+                        is_category = True
+                    
+                    # Skip if it's a pagination element
+                    if 'more jobs' in elem_text or 'page' in elem_text or 'next' in elem_text or 'previous' in elem_text:
+                        is_category = True
+                    
+                    # Only add if it looks like a real job container
+                    if not is_category:
+                        # Check if it has job-like content (title + location or deadline)
+                        has_title = elem.find(['h2', 'h3', 'h4', 'h5', 'h6', 'a', 'strong'])
+                        has_location_or_deadline = 'location:' in elem_text or 'deadline:' in elem_text
+                        
+                        if has_title and (has_location_or_deadline or len(elem_text) > 100):
+                            containers.append(elem)
+                            if len(containers) >= 100:
+                                break
+                
+                if containers:
+                    logger.info(f"Found {len(containers)} job containers with selector: {selector}")
+                    break
         
         # Strategy 2: Look for structured job entries with title, location, deadline pattern
         if not containers:
@@ -167,12 +209,12 @@ class UNICEFPlugin(ExtractionPlugin):
                 logger.debug(f"No apply URL found for: {title[:50]}")
                 continue
             
-            # Extract location
+            # Extract location from listing page
             location = None
             container_text = container.get_text()
             location_patterns = [
-                r'Location[:\s]+([^\n\r<]+)',
-                r'Location[:\s]+([A-Z][a-zA-Z\s,]+)',
+                r'Location[:\s]+([^\n\r<]+?)(?:\s+Deadline|$)',
+                r'Location[:\s]+([A-Z][a-zA-Z\s,/]+?)(?:\s+Deadline|$)',
             ]
             for pattern in location_patterns:
                 location_match = re.search(pattern, container_text, re.IGNORECASE)
@@ -180,12 +222,19 @@ class UNICEFPlugin(ExtractionPlugin):
                     location = location_match.group(1).strip()
                     # Clean up HTML tags if any
                     location = re.sub(r'<[^>]+>', '', location).strip()
-                    # Remove trailing metadata
+                    # Remove trailing metadata (deadline, etc.)
                     location = re.sub(r'\s*Deadline.*$', '', location, flags=re.IGNORECASE).strip()
-                    if 3 <= len(location) <= 100:
+                    location = re.sub(r'\s*div_location.*$', '', location, flags=re.IGNORECASE).strip()
+                    # Remove HTML artifacts
+                    location = re.sub(r'div_location_\d+', '', location, flags=re.IGNORECASE).strip()
+                    if 3 <= len(location) <= 100 and location.lower() not in ['n/a', 'na', 'tbd']:
                         break
                     else:
                         location = None
+            
+            # If location is still an HTML artifact, clear it (will be extracted from detail page)
+            if location and ('div_location' in location.lower() or location.lower() in ['n/a', 'na']):
+                location = None
             
             # Extract deadline
             deadline = None
