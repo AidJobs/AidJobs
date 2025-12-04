@@ -1406,6 +1406,15 @@ class SimpleCrawler:
                                         placeholders.append("%s")
                                         sql_values.append(val)
                                 
+                                # CRITICAL: Validate SQL construction before executing
+                                try:
+                                    self._validate_sql_construction(insert_fields, insert_values, placeholders, sql_values, "INSERT")
+                                except ValueError as ve:
+                                    logger.error(f"SQL construction validation failed: {ve}")
+                                    logger.error(f"Fields: {insert_fields}")
+                                    logger.error(f"Values: {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
+                                    raise  # Re-raise to be caught by outer exception handler
+                                
                                 cur.execute(f"""
                                     INSERT INTO jobs ({', '.join(insert_fields)})
                                     VALUES ({', '.join(placeholders)})
