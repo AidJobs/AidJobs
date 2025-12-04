@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles, Check, XCircle, Info, AlertTriangle, FileDown, Shield, History, Database } from 'lucide-react';
+import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Sparkles, Check, XCircle, Info, AlertTriangle, FileDown, Shield, History, Database, AlertCircle } from 'lucide-react';
 
 type Source = {
   id: string;
