@@ -1761,9 +1761,17 @@ async def backfill_quality_scores(
             "errors": errors[:10] if errors else []  # Return first 10 errors
         }
         
+    except psycopg2.Error as e:
+        logger.error(f"Database error backfilling quality scores: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         logger.error(f"Error backfilling quality scores: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to backfill quality scores: {str(e)}")
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 
 @observability_router.get("/failed-inserts")
