@@ -2113,17 +2113,25 @@ export default function AdminSourcesPage() {
                           try {
                             const res = await fetch(`/api/admin/observability/validation-errors?source_id=${selectedSourceForDetails.id}&limit=50`, {
                               credentials: 'include',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
                             });
                             if (res.ok) {
                               const data = await res.json();
                               setValidationErrors(data.data || []);
                               setShowValidationErrors(true);
+                              if (data.count === 0) {
+                                toast.info('No validation errors found');
+                              }
                             } else {
-                              toast.error('Failed to fetch validation errors');
+                              const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+                              console.error('Failed to fetch validation errors:', errorData);
+                              toast.error(`Failed to fetch validation errors: ${errorData.error || `HTTP ${res.status}`}`);
                             }
                           } catch (error) {
                             console.error('Failed to fetch validation errors:', error);
-                            toast.error('Failed to fetch validation errors');
+                            toast.error(`Failed to fetch validation errors: ${error instanceof Error ? error.message : 'Network error'}`);
                           } finally {
                             setLoadingValidationErrors(false);
                           }
