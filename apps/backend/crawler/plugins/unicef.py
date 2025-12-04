@@ -171,17 +171,10 @@ class UNICEFPlugin(ExtractionPlugin):
                 logger.debug(f"Excluding category/navigation page: {title[:50]}")
                 continue
             
-            # CRITICAL: Filter out login/application form pages
-            if any(login_term in title_lower for login_term in ['login', 'sign in', 'sign up', 'register', 'candidate login', 'application form']):
+            # CRITICAL: Filter out login/application form pages by title
+            if any(login_term in title_lower for login_term in ['login', 'sign in', 'sign up', 'register', 'candidate login', 'application form', 'candidate']):
                 logger.debug(f"Excluding login/registration page: {title[:50]}")
                 continue
-            
-            # CRITICAL: Filter out URLs that are clearly login/application pages
-            if apply_url:
-                url_lower = apply_url.lower()
-                if any(login_url in url_lower for login_url in ['/login', '/signin', '/signup', '/register', '/applicationform', '/default.asp', 'pageuppeople.com', 'secure.dc7']):
-                    logger.debug(f"Excluding login/application URL: {apply_url[:80]}")
-                    continue
             
             # Check if title looks like a job (has job keywords or is substantial)
             job_keywords = [
@@ -227,6 +220,16 @@ class UNICEFPlugin(ExtractionPlugin):
             
             if not apply_url:
                 logger.debug(f"No apply URL found for: {title[:50]}")
+                continue
+            
+            # CRITICAL: Final validation - reject if URL looks like login/application form
+            apply_url_lower = apply_url.lower()
+            if any(bad_pattern in apply_url_lower for bad_pattern in [
+                '/login', '/signin', '/signup', '/register', '/applicationform',
+                'default.asp', 'pageuppeople.com', 'secure.dc7', '/apply/671',
+                'applicationform/default', 'pageup'
+            ]):
+                logger.debug(f"Excluding - URL is login/application form: {apply_url[:80]}")
                 continue
             
             # Extract location from listing page
