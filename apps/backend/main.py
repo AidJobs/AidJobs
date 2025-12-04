@@ -159,10 +159,11 @@ try:
     app.include_router(link_validation_router)
     app.include_router(meilisearch_router)
     app.include_router(observability_router)
-    from app.crawler_admin import meilisearch_router
-    app.include_router(meilisearch_router)
-except ImportError:
-    logger.warning("Some admin routers not available")
+    logger.info("[main] Successfully loaded all crawler admin routers including observability_router")
+except ImportError as e:
+    logger.warning(f"[main] Some admin routers not available: {e}", exc_info=True)
+except Exception as e:
+    logger.error(f"[main] Error loading crawler admin routers: {e}", exc_info=True)
 
 # Add job management routes
 try:
