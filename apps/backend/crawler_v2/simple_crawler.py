@@ -1746,6 +1746,8 @@ class SimpleCrawler:
                 # Extract jobs from listing page
                 # Try AI extraction first if available
                 jobs = []
+                logger.info(f"Starting job extraction for {org_name} (HTML length: {len(html)} chars)")
+                
                 if self.use_ai and self.ai_extractor:
                     try:
                         logger.info(f"Attempting AI extraction for {org_name}...")
@@ -1781,16 +1783,25 @@ class SimpleCrawler:
                         logger.warning(f"Plugin system error: {e}, falling back to rule-based")
                         jobs = self.extract_jobs_from_html(html, careers_url)
                 
-                # Enrich jobs from detail pages (for UNDP, UNICEF, and other sites)
-                # Only enrich if we have a reasonable number of jobs (avoid timeout)
-                # Always enrich for UNICEF to get location and deadline from detail pages
-                needs_enrichment = any('unicef.org' in job.get('apply_url', '').lower() or 
-                                      'undp.org' in job.get('apply_url', '').lower() 
-                                      for job in jobs)
+                logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
-                if len(jobs) > 0 and (len(jobs) <= 50 or needs_enrichment):
+                if jobs:
+                    logger.info(f"Sample job titles: {[j.get('title', 'No title')[:50] for j in jobs[:3]]}")
+                else:
+                    logger.warning(f"No jobs extracted from listing page for {org_name}")
+                
+                # Enrich jobs from detail pages (for UNDP, UNICEF, and other sites)
+                # TEMPORARY: Skip enrichment for UNICEF due to 403 errors - save jobs from listing page only
+                # Only enrich if we have a reasonable number of jobs (avoid timeout)
+                # Skip enrichment for UNICEF since they're blocking with 403
+                needs_enrichment = any('undp.org' in job.get('apply_url', '').lower() for job in jobs)
+                skip_enrichment = any('unicef.org' in job.get('apply_url', '').lower() for job in jobs)
+                
+                if skip_enrichment:
+                    logger.info(f"Skipping detail page enrichment for {len(jobs)} UNICEF jobs (403 errors - will save from listing page only)")
+                elif len(jobs) > 0 and (len(jobs) <= 50 or needs_enrichment):
                     if needs_enrichment:
-                        logger.info(f"Enriching {len(jobs)} jobs from detail pages (UNICEF/UNDP require detail page data)...")
+                        logger.info(f"Enriching {len(jobs)} jobs from detail pages (UNDP requires detail page data)...")
                     else:
                         logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
                     
