@@ -1058,7 +1058,10 @@ class SimpleCrawler:
         Returns:
             Dict with counts: {inserted, updated, skipped, failed, validated}
         """
+        logger.info(f"save_jobs called: {len(jobs)} jobs, source_id={source_id}, org_name={org_name}")
+        
         if not jobs:
+            logger.warning("save_jobs called with empty jobs list")
             return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
         # TEMPORARY: Skip validation entirely - just do basic checks
