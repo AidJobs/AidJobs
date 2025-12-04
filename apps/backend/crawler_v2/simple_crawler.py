@@ -1051,6 +1051,35 @@ class SimpleCrawler:
         logger.debug(f"Could not parse deadline: {text}")
         return None
     
+    def _validate_sql_construction(self, fields: List[str], values: List, placeholders: List[str], sql_values: List, operation: str = "INSERT") -> None:
+        """
+        Validate SQL construction to catch bugs like duplicate fields or mismatched counts.
+        
+        Raises ValueError if validation fails.
+        """
+        # Check for duplicate fields
+        field_set = set(fields)
+        if len(field_set) != len(fields):
+            duplicates = [f for f in fields if fields.count(f) > 1]
+            raise ValueError(f"{operation} has duplicate fields: {set(duplicates)}")
+        
+        # Check field/placeholder count match
+        if len(fields) != len(placeholders):
+            raise ValueError(f"{operation} field/placeholder mismatch: {len(fields)} fields, {len(placeholders)} placeholders")
+        
+        # Check placeholder/value count match (accounting for NOW() placeholders)
+        now_count = sum(1 for p in placeholders if p == "NOW()")
+        expected_sql_values = len(values) - now_count
+        if len(sql_values) != expected_sql_values:
+            raise ValueError(f"{operation} placeholder/value mismatch: {len(placeholders)} placeholders ({now_count} NOW()), {len(values)} total values, {len(sql_values)} SQL values (expected {expected_sql_values})")
+        
+        # Check that NOW() placeholders align with "NOW()" values
+        for i, (val, placeholder) in enumerate(zip(values, placeholders)):
+            if val == "NOW()" and placeholder != "NOW()":
+                raise ValueError(f"{operation} NOW() value at index {i} doesn't match placeholder '{placeholder}'")
+            if placeholder == "NOW()" and val != "NOW()":
+                raise ValueError(f"{operation} NOW() placeholder at index {i} doesn't match value '{val}'")
+    
     def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
         """
         Save jobs to database with comprehensive error logging and pre-upsert validation.
