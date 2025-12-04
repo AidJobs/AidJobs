@@ -1053,18 +1053,45 @@ class SimpleCrawler:
     
     def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
         """
-        Save jobs to database with comprehensive error logging.
+        Save jobs to database with comprehensive error logging and pre-upsert validation.
         
         Returns:
-            Dict with counts: {inserted, updated, skipped, failed}
+            Dict with counts: {inserted, updated, skipped, failed, validated}
         """
         if not jobs:
-            return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0}
+            return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
+        # Pre-upsert validation (Master Plan 1.2)
+        from core.pre_upsert_validator import get_validator
         conn = self._get_db_conn()
+        validator = get_validator(db_connection=conn)
+        validation_result = validator.validate_batch(jobs, source_id)
+        
+        # Use only validated jobs
+        jobs = validation_result['valid_jobs']
+        validation_skipped = len(validation_result['invalid_jobs'])
+        
+        if validation_result['warnings']:
+            logger.info(f"Validation warnings: {len(validation_result['warnings'])} warnings")
+        
+        if validation_skipped > 0:
+            logger.info(f"Pre-upsert validation: {validation_skipped} jobs failed validation, {len(jobs)} valid")
+            # Log invalid jobs to failed_inserts for tracking
+            for invalid_job, error in validation_result['invalid_jobs']:
+                logger.debug(f"Validation failed: {error} - {invalid_job.get('title', 'Unknown')[:50]}")
+        
+        if not jobs:
+            return {
+                'inserted': 0, 
+                'updated': 0, 
+                'skipped': validation_skipped, 
+                'failed': 0,
+                'validated': 0
+            }
+        
         inserted = 0
         updated = 0
-        skipped = 0
+        skipped = validation_skipped
         failed = 0
         failed_inserts = []  # Track failed inserts for logging
         
@@ -1375,7 +1402,13 @@ class SimpleCrawler:
                         operation=failed_job.get('operation', 'insert')
                     )
         
-        return {'inserted': inserted, 'updated': updated, 'skipped': skipped, 'failed': failed}
+        return {
+            'inserted': inserted, 
+            'updated': updated, 
+            'skipped': skipped, 
+            'failed': failed,
+            'validated': len(jobs) if 'jobs' in locals() else 0
+        }
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
         """
