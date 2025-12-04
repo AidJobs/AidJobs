@@ -1809,6 +1809,11 @@ async def get_failed_inserts(
         raise HTTPException(status_code=500, detail=f"Failed to get failed inserts: {str(e)}")
 
 
+@observability_router.get("/test")
+async def test_observability(admin=Depends(admin_required)):
+    """Test endpoint to verify observability router is working"""
+    return {"status": "ok", "message": "Observability router is working"}
+
 @observability_router.get("/validation-errors")
 async def get_validation_errors(
     source_id: Optional[str] = Query(None, description="Filter by source ID"),
