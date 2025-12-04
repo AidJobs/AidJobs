@@ -70,6 +70,9 @@ export default function AdminSourcesPage() {
   const [selectedSourceForDetails, setSelectedSourceForDetails] = useState<Source | null>(null);
   const [crawlLogs, setCrawlLogs] = useState<any[]>([]);
   const [loadingCrawlLogs, setLoadingCrawlLogs] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<any[]>([]);
+  const [loadingValidationErrors, setLoadingValidationErrors] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
   // Track which source was just crawled to give clear visual feedback
   const [recentlyRanSourceId, setRecentlyRanSourceId] = useState<string | null>(null);
   // Ref to track auto-refresh interval
@@ -2095,6 +2098,96 @@ export default function AdminSourcesPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* View Validation Errors Button */}
+                  {selectedSourceForDetails.last_crawl_status && (
+                    <div className="mb-4">
+                      <button
+                        onClick={async () => {
+                          if (showValidationErrors) {
+                            setShowValidationErrors(false);
+                            setValidationErrors([]);
+                            return;
+                          }
+                          setLoadingValidationErrors(true);
+                          try {
+                            const res = await fetch(`/api/admin/observability/validation-errors?source_id=${selectedSourceForDetails.id}&limit=50`, {
+                              credentials: 'include',
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              setValidationErrors(data.data || []);
+                              setShowValidationErrors(true);
+                            } else {
+                              toast.error('Failed to fetch validation errors');
+                            }
+                          } catch (error) {
+                            console.error('Failed to fetch validation errors:', error);
+                            toast.error('Failed to fetch validation errors');
+                          } finally {
+                            setLoadingValidationErrors(false);
+                          }
+                        }}
+                        disabled={loadingValidationErrors}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FF9500] hover:bg-[#FF8800] disabled:opacity-50 disabled:cursor-not-allowed text-white text-body-sm font-medium rounded-lg transition-colors"
+                      >
+                        {loadingValidationErrors ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : showValidationErrors ? (
+                          <>
+                            <X className="w-4 h-4" />
+                            <span>Hide Validation Errors</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-4 h-4" />
+                            <span>View Validation Errors</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Validation Errors List */}
+                  {showValidationErrors && validationErrors.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">
+                        Validation Errors ({validationErrors.length})
+                      </h3>
+                      <div className="bg-[#FFF4E6] border border-[#FF9500] rounded-lg p-3 space-y-2 max-h-64 overflow-y-auto">
+                        {validationErrors.map((error: any, idx: number) => (
+                          <div key={error.id || idx} className="bg-white rounded-lg p-2.5 border border-[#FF9500]">
+                            <div className="flex items-start gap-2 mb-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-[#FF9500] flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-body-sm font-medium text-[#1D1D1F] break-words">
+                                  {error.payload?.title || 'No title'}
+                                </p>
+                                <p className="text-caption-sm text-[#86868B] break-all mt-0.5">
+                                  {error.source_url}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-caption-sm text-[#FF3B30] mt-1.5 pl-5">
+                              {error.error || 'Validation failed'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {showValidationErrors && validationErrors.length === 0 && (
+                    <div className="mb-4 bg-[#F0F9FF] border border-[#30D158] rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-[#30D158]" />
+                        <p className="text-body-sm text-[#1D1D1F]">No validation errors found</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Last Crawl Details - Always show consistent structure */}
                   <div>
