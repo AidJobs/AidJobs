@@ -510,7 +510,11 @@ class CrawlerOrchestrator:
             # Try to acquire lock
             if not await self.acquire_lock(source['id']):
                 logger.debug(f"[orchestrator] Source {source['org_name']} already locked, skipping")
-                return
+                return {
+                    'status': 'warn',
+                    'message': 'Source already locked',
+                    'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
+                }
             
             try:
                 # Crawl the source
@@ -518,6 +522,9 @@ class CrawlerOrchestrator:
                 
                 # Update source and log
                 await self.update_source_after_crawl(source, result)
+                
+                # Return result so caller can see what happened
+                return result
             
             finally:
                 # Always release lock

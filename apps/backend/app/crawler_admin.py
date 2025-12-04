@@ -94,18 +94,14 @@ async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
     finally:
         conn.close()
     
-    # Run synchronously to get immediate results (for debugging)
-    # import asyncio
-    # asyncio.create_task(orchestrator.run_source_with_lock(dict(source)))
-    
-    # TEMPORARY: Run synchronously to see results immediately
-    import asyncio
-    result = asyncio.run(orchestrator.run_source_with_lock(dict(source)))
+    # TEMPORARY: Run synchronously to get immediate results (for debugging)
+    # This will block until crawl completes, but we'll see results immediately
+    result = await orchestrator.run_source_with_lock(dict(source))
     
     return {
         "status": "ok",
         "message": f"Crawl completed for {source['org_name']}",
-        "data": result
+        "data": result if result else {"status": "completed"}
     }
 
 
