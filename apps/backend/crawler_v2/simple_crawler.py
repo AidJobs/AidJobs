@@ -1305,34 +1305,65 @@ class SimpleCrawler:
                                     insert_values.append(deadline_date)
                                 
                                 # Add geocoding fields (Phase 4)
+                                has_geocoding = False
                                 if latitude is not None:
                                     insert_fields.append("latitude")
                                     insert_values.append(latitude)
-                                    insert_fields.append("geocoded_at")
-                                    insert_values.append("NOW()")
+                                    has_geocoding = True
                                 if longitude is not None:
                                     insert_fields.append("longitude")
                                     insert_values.append(longitude)
+                                    has_geocoding = True
                                 if geocoding_source:
                                     insert_fields.append("geocoding_source")
                                     insert_values.append(geocoding_source)
+                                    has_geocoding = True
                                 if is_remote is not None:
                                     insert_fields.append("is_remote")
                                     insert_values.append(is_remote)
+                                    has_geocoding = True
                                 if country:
                                     insert_fields.append("country")
                                     insert_values.append(country)
+                                    has_geocoding = True
                                 if country_iso:
                                     insert_fields.append("country_iso")
                                     insert_values.append(country_iso)
+                                    has_geocoding = True
                                 if city:
                                     insert_fields.append("city")
                                     insert_values.append(city)
+                                    has_geocoding = True
+                                # Add geocoded_at only if we have any geocoding data
+                                if has_geocoding:
+                                    insert_fields.append("geocoded_at")
+                                    insert_values.append("NOW()")
                                 
                                 # Add quality scoring fields (Phase 4)
+                                has_quality = False
                                 if quality_score is not None:
                                     insert_fields.append("quality_score")
                                     insert_values.append(quality_score)
+                                    has_quality = True
+                                if quality_grade:
+                                    insert_fields.append("quality_grade")
+                                    insert_values.append(quality_grade)
+                                    has_quality = True
+                                if quality_factors:
+                                    import json
+                                    insert_fields.append("quality_factors")
+                                    insert_values.append(json.dumps(quality_factors))
+                                    has_quality = True
+                                if quality_issues:
+                                    insert_fields.append("quality_issues")
+                                    insert_values.append(quality_issues)
+                                    has_quality = True
+                                if needs_review is not None:
+                                    insert_fields.append("needs_review")
+                                    insert_values.append(needs_review)
+                                    has_quality = True
+                                # Add quality_scored_at only if we have any quality data
+                                if has_quality:
                                     insert_fields.append("quality_scored_at")
                                     insert_values.append("NOW()")
                                 if quality_grade:
