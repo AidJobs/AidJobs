@@ -158,8 +158,18 @@ try:
     app.include_router(quality_router)
     app.include_router(link_validation_router)
     app.include_router(meilisearch_router)
-    app.include_router(observability_router)
-    logger.info("[main] Successfully loaded all crawler admin routers including observability_router")
+    
+    # Explicitly verify observability_router before including
+    if observability_router:
+        app.include_router(observability_router)
+        logger.info(f"[main] Successfully loaded observability_router with {len(observability_router.routes)} routes")
+        for route in observability_router.routes:
+            if hasattr(route, 'path'):
+                logger.info(f"[main] Observability route: {route.path} {getattr(route, 'methods', [])}")
+    else:
+        logger.error("[main] observability_router is None!")
+    
+    logger.info("[main] Successfully loaded all crawler admin routers")
 except ImportError as e:
     logger.warning(f"[main] Some admin routers not available: {e}", exc_info=True)
 except Exception as e:
