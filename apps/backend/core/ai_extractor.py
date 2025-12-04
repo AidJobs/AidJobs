@@ -80,6 +80,25 @@ class AIJobExtractor:
                 try:
                     job = await self._extract_job_from_container(container, base_url)
                     if job and job.get('title') and job.get('apply_url'):
+                        # Additional validation: check if this looks like a real job
+                        title = job.get('title', '').lower().strip()
+                        
+                        # Reject obvious non-jobs
+                        non_job_indicators = [
+                            'home', 'about', 'contact', 'privacy', 'terms', 'cookie',
+                            'read more', 'learn more', 'view all', 'click here',
+                            'subscribe', 'newsletter', 'donate', 'support'
+                        ]
+                        
+                        if any(indicator in title for indicator in non_job_indicators) and len(title) < 25:
+                            logger.debug(f"AI: Rejected non-job: {job.get('title', '')[:50]}")
+                            continue
+                        
+                        # Check if title is substantial (not just a date or location)
+                        if len(title) < 10:
+                            logger.debug(f"AI: Rejected too short: {job.get('title', '')[:50]}")
+                            continue
+                        
                         jobs.append(job)
                     # Small delay between API calls to avoid rate limits
                     if i < len(containers_to_process) - 1:
@@ -197,6 +216,14 @@ CRITICAL RULES:
    - "Apply by Dec-11-25" or any deadline text
    - "Location SRI LANKA" or any location text
    - "Job Title" prefix
+   - Navigation text like "Home", "About", "Contact"
+   - Generic text like "Click here", "Read more", "View all"
+
+2. **Only extract if this is ACTUALLY a job posting**:
+   - Must have a job title (not just a date, location, or navigation link)
+   - Must have an apply URL (not just a page link)
+   - Should NOT be: news articles, blog posts, general pages, navigation links
+   - Should be: actual job openings, positions, vacancies, career opportunities
    - Any metadata that's not part of the actual job title
    
    Example: If you see "IC/PPC/2511/105 - IC- Support to develop SoR & HR Rules for CIABOC staff Apply by Dec-11-25 Location SRI LANKA"

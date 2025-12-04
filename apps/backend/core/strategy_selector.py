@@ -148,7 +148,7 @@ class StrategySelector:
     
     def validate_extracted_jobs(self, jobs: List[Dict], source_url: str) -> Tuple[List[Dict], List[str]]:
         """
-        Validate extracted jobs for consistency and quality.
+        Validate extracted jobs for consistency and quality with AI-powered detection.
         
         Args:
             jobs: List of extracted job dictionaries
@@ -165,44 +165,114 @@ class StrategySelector:
         
         # Validation 1: Check for minimum required fields
         for job in jobs:
-            if not job.get('title') or len(job.get('title', '').strip()) < 5:
-                warnings.append(f"Job missing or invalid title: {job.get('title', 'N/A')}")
+            title = job.get('title', '').strip()
+            apply_url = job.get('apply_url', '').strip()
+            
+            if not title or len(title) < 5:
+                warnings.append(f"Job missing or invalid title: {title[:50]}")
                 continue
             
-            if not job.get('apply_url'):
-                warnings.append(f"Job missing apply_url: {job.get('title', 'N/A')}")
+            if not apply_url:
+                warnings.append(f"Job missing apply_url: {title[:50]}")
                 continue
             
-            # Validation 2: Check for common false positives
-            title = job.get('title', '').lower()
-            nav_keywords = ['home', 'about', 'contact', 'login', 'register', 'privacy', 'terms']
-            if any(nav in title for nav in nav_keywords) and len(title) < 20:
-                warnings.append(f"Possible navigation link detected: {job.get('title')}")
-                continue
+            # Validation 2: Enhanced false positive detection
+            title_lower = title.lower()
+            
+            # Navigation/menu keywords (expanded list)
+            nav_keywords = [
+                'home', 'about', 'contact', 'login', 'register', 'privacy', 'terms',
+                'cookie', 'sitemap', 'search', 'menu', 'skip', 'read more', 'view all',
+                'subscribe', 'newsletter', 'donate', 'support', 'volunteer', 'careers',
+                'our work', 'what we do', 'who we are', 'news', 'blog', 'press', 'media'
+            ]
+            
+            # Check if title is clearly navigation
+            if any(nav in title_lower for nav in nav_keywords):
+                # Only reject if it's short (likely nav) or contains multiple nav keywords
+                nav_count = sum(1 for nav in nav_keywords if nav in title_lower)
+                if len(title) < 25 or nav_count >= 2:
+                    warnings.append(f"Navigation link detected: {title[:50]}")
+                    continue
             
             # Validation 3: Check for date-only titles (common extraction error)
             date_patterns = [
                 r'^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$',
                 r'^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$',
-                r'^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$'
+                r'^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$',
+                r'^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
+                r'^(january|february|march|april|may|june|july|august|september|october|november|december)'
             ]
-            if any(re.match(pattern, job.get('title', ''), re.I) for pattern in date_patterns):
-                warnings.append(f"Title appears to be a date: {job.get('title')}")
+            if any(re.match(pattern, title, re.I) for pattern in date_patterns):
+                warnings.append(f"Title appears to be a date: {title[:50]}")
                 continue
             
             # Validation 4: Check for location-only titles
-            if ',' in job.get('title', '') and len(job.get('title', '').split(',')) == 2:
-                # Might be "City, Country" pattern - check if it looks like location
-                parts = job.get('title', '').split(',')
-                if len(parts[0].strip()) < 15 and len(parts[1].strip()) < 15:
-                    warnings.append(f"Title appears to be location: {job.get('title')}")
-                    continue
+            if ',' in title and len(title.split(',')) == 2:
+                parts = title.split(',')
+                # If both parts are short and look like location (capitalized, short)
+                if (len(parts[0].strip()) < 20 and len(parts[1].strip()) < 20 and
+                    parts[0].strip()[0].isupper() and parts[1].strip()[0].isupper()):
+                    # Check if it doesn't contain job-related words
+                    job_words = ['manager', 'officer', 'coordinator', 'specialist', 'advisor', 
+                                'director', 'assistant', 'analyst', 'engineer', 'consultant']
+                    if not any(word in title_lower for word in job_words):
+                        warnings.append(f"Title appears to be location: {title[:50]}")
+                        continue
             
             # Validation 5: Check URL validity
-            apply_url = job.get('apply_url', '')
             if apply_url.startswith('#') or apply_url.startswith('javascript:'):
-                warnings.append(f"Invalid apply_url: {apply_url}")
+                warnings.append(f"Invalid apply_url: {apply_url[:50]}")
                 continue
+            
+            # Validation 6: Check if title looks like a job title (not just random text)
+            # Job titles typically contain job-related keywords or are substantial
+            job_keywords = [
+                'manager', 'officer', 'coordinator', 'specialist', 'advisor', 'director',
+                'assistant', 'analyst', 'engineer', 'consultant', 'expert', 'lead',
+                'senior', 'junior', 'intern', 'volunteer', 'position', 'role', 'vacancy'
+            ]
+            
+            # Check if title is too generic or doesn't look like a job
+            is_generic = title_lower in ['job', 'position', 'vacancy', 'career', 'opportunity', 
+                                        'apply', 'application', 'hiring', 'recruitment']
+            has_job_keyword = any(kw in title_lower for kw in job_keywords)
+            is_substantial = len(title) >= 15
+            
+            # Reject if it's generic AND doesn't have job keywords AND is short
+            if is_generic and not has_job_keyword and len(title) < 20:
+                warnings.append(f"Title too generic: {title[:50]}")
+                continue
+            
+            # Validation 7: Check for common non-job patterns
+            non_job_patterns = [
+                r'^click here',
+                r'^read more',
+                r'^learn more',
+                r'^view details',
+                r'^see all',
+                r'^next page',
+                r'^previous page',
+                r'^\d+$',  # Just a number
+                r'^page \d+$',
+                r'^loading\.\.\.$'
+            ]
+            if any(re.match(pattern, title_lower) for pattern in non_job_patterns):
+                warnings.append(f"Non-job pattern detected: {title[:50]}")
+                continue
+            
+            # Validation 8: Check URL patterns (job URLs often contain job-related terms)
+            url_lower = apply_url.lower()
+            url_job_indicators = ['job', 'position', 'vacancy', 'career', 'opportunity', 
+                                 'apply', 'application', 'posting', 'listing']
+            
+            # If URL doesn't look job-related AND title is short, be suspicious
+            url_looks_like_job = any(indicator in url_lower for indicator in url_job_indicators)
+            if not url_looks_like_job and len(title) < 15:
+                # Still allow if title has job keywords
+                if not has_job_keyword:
+                    warnings.append(f"URL doesn't look job-related: {apply_url[:50]}")
+                    continue
             
             # All validations passed
             valid_jobs.append(job)

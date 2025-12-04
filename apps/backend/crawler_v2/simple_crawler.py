@@ -881,6 +881,20 @@ class SimpleCrawler:
                     deadline_str = job.get('deadline', '').strip()
                     
                     if not title or not apply_url:
+                        logger.debug(f"Skipping job: missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})")
+                        skipped += 1
+                        continue
+                    
+                    # Additional validation before insertion
+                    # Check if title is too short or looks invalid
+                    if len(title) < 5:
+                        logger.debug(f"Skipping job: title too short: {title[:50]}")
+                        skipped += 1
+                        continue
+                    
+                    # Check for invalid URL patterns
+                    if apply_url.startswith('#') or apply_url.startswith('javascript:'):
+                        logger.debug(f"Skipping job: invalid URL: {apply_url[:50]}")
                         skipped += 1
                         continue
                     
