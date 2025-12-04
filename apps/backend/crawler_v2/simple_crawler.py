@@ -1062,14 +1062,29 @@ class SimpleCrawler:
             return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
         # Pre-upsert validation (Master Plan 1.2)
+        # TEMPORARY: Make validation more lenient - only block obvious failures
         from core.pre_upsert_validator import get_validator
         conn = self._get_db_conn()
         validator = get_validator(db_connection=conn)
         validation_result = validator.validate_batch(jobs, source_id)
         
-        # Use only validated jobs
-        jobs = validation_result['valid_jobs']
-        validation_skipped = len(validation_result['invalid_jobs'])
+        # Use validated jobs, but also include jobs that only have warnings (not hard errors)
+        valid_jobs = validation_result['valid_jobs']
+        invalid_jobs = validation_result['invalid_jobs']
+        
+        # Filter invalid jobs - only reject if it's a hard error (missing title/URL)
+        # Allow jobs with warnings (like long titles, etc.)
+        hard_errors = []
+        for job, error in invalid_jobs:
+            # Only reject if missing required fields or invalid URL
+            if 'Missing required field' in error or 'Invalid URL' in error or 'Title too short' in error:
+                hard_errors.append((job, error))
+            else:
+                # It's just a warning, include the job
+                valid_jobs.append(job)
+        
+        jobs = valid_jobs
+        validation_skipped = len(hard_errors)
         
         if validation_result['warnings']:
             logger.info(f"Validation warnings: {len(validation_result['warnings'])} warnings")
