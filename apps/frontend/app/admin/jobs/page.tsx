@@ -82,6 +82,8 @@ export default function JobManagementPage() {
   const [deleting, setDeleting] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState<string | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
@@ -365,6 +367,41 @@ export default function JobManagementPage() {
     }
   };
 
+  const handleBackfillQualityScores = async () => {
+    setBackfilling(true);
+    try {
+      const response = await fetch('/api/admin/crawl/backfill-quality-scores?limit=1000&dry_run=false', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Authentication required. Please login.');
+          return;
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.status === 'ok') {
+        toast.success(`✅ ${data.message} (${data.updated}/${data.total} jobs)`);
+        // Refresh jobs to show updated scores
+        await fetchJobs();
+      } else {
+        throw new Error(data.error || 'Failed to backfill quality scores');
+      }
+    } catch (error) {
+      console.error('Failed to backfill quality scores:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to backfill quality scores');
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const handleRestore = async (jobIds: string[]) => {
     try {
       const response = await fetch('/api/admin/jobs/restore', {
@@ -480,6 +517,19 @@ export default function JobManagementPage() {
               <p className="text-[#86868B]">Search, filter, and manage jobs across all sources</p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleBackfillQualityScores}
+                disabled={backfilling || loading}
+                className="p-2 bg-[#30D158] text-white rounded-lg hover:bg-[#28C048] transition-colors disabled:opacity-50 group relative"
+                title="Backfill quality scores for jobs without scores"
+                aria-label="Backfill quality scores"
+              >
+                {backfilling ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Shield className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={handleExport}
                 className="p-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors group relative"

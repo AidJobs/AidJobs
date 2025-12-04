@@ -1640,6 +1640,132 @@ async def get_extraction_stats(
         raise HTTPException(status_code=500, detail=f"Failed to get extraction stats: {str(e)}")
 
 
+@router.post("/backfill-quality-scores")
+async def backfill_quality_scores(
+    limit: int = Query(1000, description="Maximum number of jobs to process"),
+    dry_run: bool = Query(False, description="Dry run mode (no database updates)"),
+    admin=Depends(admin_required)
+):
+    """Backfill quality scores for existing jobs that don't have scores"""
+    try:
+        import sys
+        from pathlib import Path
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        import json
+        
+        # Get database URL
+        db_url = get_db_url()
+        
+        # Initialize quality scorer
+        from core.data_quality import get_quality_scorer
+        scorer = get_quality_scorer()
+        
+        # Connect to database
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Find jobs without quality scores
+        cur.execute("""
+            SELECT id, title, apply_url, location_raw, deadline, 
+                   org_name, description_snippet, country, country_iso, city,
+                   latitude, longitude, is_remote
+            FROM jobs
+            WHERE quality_score IS NULL
+            AND status = 'active'
+            AND deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (limit,))
+        
+        jobs = cur.fetchall()
+        total_jobs = len(jobs)
+        
+        if total_jobs == 0:
+            cur.close()
+            conn.close()
+            return {
+                "status": "ok",
+                "message": "No jobs need quality scores",
+                "updated": 0,
+                "total": 0
+            }
+        
+        updated = 0
+        errors = []
+        
+        for job in jobs:
+            try:
+                # Convert to dict format expected by scorer
+                job_dict = {
+                    'title': job.get('title', ''),
+                    'apply_url': job.get('apply_url', ''),
+                    'location_raw': job.get('location_raw', ''),
+                    'deadline': str(job.get('deadline')) if job.get('deadline') else None,
+                    'org_name': job.get('org_name', ''),
+                    'description_snippet': job.get('description_snippet', ''),
+                    'country': job.get('country', ''),
+                    'country_iso': job.get('country_iso', ''),
+                    'city': job.get('city', ''),
+                    'latitude': job.get('latitude'),
+                    'longitude': job.get('longitude'),
+                    'is_remote': job.get('is_remote', False)
+                }
+                
+                # Score the job
+                result = scorer.score_job(job_dict)
+                
+                if not dry_run:
+                    # Update job with quality score
+                    cur.execute("""
+                        UPDATE jobs
+                        SET quality_score = %s,
+                            quality_grade = %s,
+                            quality_factors = %s::jsonb,
+                            quality_issues = %s,
+                            needs_review = %s,
+                            quality_scored_at = NOW()
+                        WHERE id = %s
+                    """, (
+                        result['score'],
+                        result['grade'],
+                        json.dumps(result['factors']),
+                        result['issues'],
+                        result['needs_review'],
+                        job['id']
+                    ))
+                    updated += 1
+                else:
+                    updated += 1
+                
+            except Exception as e:
+                errors.append(f"Job {job.get('id')}: {str(e)}")
+                logger.error(f"Error processing job {job.get('id')}: {e}")
+                continue
+        
+        if not dry_run:
+            conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        message = f"Updated {updated} jobs with quality scores" if not dry_run else f"Would update {updated} jobs with quality scores"
+        
+        return {
+            "status": "ok",
+            "message": message,
+            "updated": updated,
+            "total": total_jobs,
+            "dry_run": dry_run,
+            "errors": errors[:10] if errors else []  # Return first 10 errors
+        }
+        
+    except Exception as e:
+        logger.error(f"Error backfilling quality scores: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to backfill quality scores: {str(e)}")
+
+
 @observability_router.get("/failed-inserts")
 async def get_failed_inserts(
     source_id: Optional[str] = Query(None, description="Filter by source ID"),
