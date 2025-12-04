@@ -137,7 +137,7 @@ async def diagnostics_meili_openrouter() -> dict[str, Any]:
     
     # Check OpenRouter
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-haiku")
     
     diagnostics["openrouter"]["api_key_set"] = bool(openrouter_key)
     diagnostics["openrouter"]["configured"] = bool(openrouter_key)

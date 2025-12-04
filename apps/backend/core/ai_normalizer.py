@@ -24,16 +24,16 @@ class AINormalizer:
     Only uses AI when heuristics fail, with caching to minimize API calls.
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "openai/gpt-4o-mini"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "anthropic/claude-3-haiku"):
         """
         Initialize AI normalizer.
         
         Args:
             api_key: OpenRouter API key (or set OPENROUTER_API_KEY env var)
-            model: Model to use (default: gpt-4o-mini for cost-effectiveness)
+            model: Model to use (default: claude-3-haiku for better reliability)
         """
         self.api_key = api_key or os.getenv('OPENROUTER_API_KEY')
-        self.model = model or os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
+        self.model = model or os.getenv('OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         
         # In-memory cache for normalized values (key: hash of input, value: normalized result)
@@ -451,7 +451,7 @@ def get_ai_normalizer() -> Optional[AINormalizer]:
     if _ai_normalizer is None:
         api_key = os.getenv('OPENROUTER_API_KEY')
         if api_key:
-            model = os.getenv('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
+            model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-3-haiku')
             _ai_normalizer = AINormalizer(api_key=api_key, model=model)
         else:
             logger.debug("AI normalizer not initialized - OPENROUTER_API_KEY not set")
