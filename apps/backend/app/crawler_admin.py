@@ -23,6 +23,7 @@ policies_router = APIRouter(prefix="/api/admin/domain_policies", tags=["domain_p
 quality_router = APIRouter(prefix="/api/admin/data-quality", tags=["data_quality"])
 link_validation_router = APIRouter(prefix="/api/admin/link-validation", tags=["link_validation"])
 meilisearch_router = APIRouter(prefix="/api/admin/meilisearch", tags=["meilisearch"])
+observability_router = APIRouter(prefix="/api/admin/observability", tags=["observability"])
 
 
 def get_db_url():
@@ -1565,3 +1566,98 @@ async def sync_meilisearch(execute: bool = False, admin=Depends(admin_required))
     except Exception as e:
         logger.error(f"Error syncing Meilisearch: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Meilisearch sync failed: {str(e)}")
+
+
+# Observability endpoints (Phase 2)
+
+@observability_router.get("/coverage")
+async def get_coverage_stats(
+    source_id: Optional[str] = Query(None, description="Filter by source ID"),
+    hours: int = Query(24, description="Hours to look back"),
+    admin=Depends(admin_required)
+):
+    """Get coverage statistics comparing discovered URLs vs inserted rows"""
+    try:
+        from core.coverage_monitor import CoverageMonitor
+        db_url = get_db_url()
+        monitor = CoverageMonitor(db_url)
+        stats = monitor.get_coverage_stats(source_id=source_id, hours=hours)
+        return {"status": "ok", "data": stats}
+    except Exception as e:
+        logger.error(f"Error getting coverage stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get coverage stats: {str(e)}")
+
+
+@observability_router.get("/coverage/sources")
+async def get_source_coverage(
+    limit: int = Query(50, description="Maximum number of sources"),
+    admin=Depends(admin_required)
+):
+    """Get coverage statistics per source"""
+    try:
+        from core.coverage_monitor import CoverageMonitor
+        db_url = get_db_url()
+        monitor = CoverageMonitor(db_url)
+        sources = monitor.get_source_coverage(limit=limit)
+        return {"status": "ok", "data": sources}
+    except Exception as e:
+        logger.error(f"Error getting source coverage: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get source coverage: {str(e)}")
+
+
+@observability_router.get("/coverage/issues")
+async def get_coverage_issues(
+    threshold: float = Query(5.0, description="Mismatch threshold percentage"),
+    admin=Depends(admin_required)
+):
+    """Flag sources with coverage issues"""
+    try:
+        from core.coverage_monitor import CoverageMonitor
+        db_url = get_db_url()
+        monitor = CoverageMonitor(db_url)
+        flagged = monitor.flag_sources_with_issues(mismatch_threshold=threshold)
+        return {"status": "ok", "data": flagged, "count": len(flagged)}
+    except Exception as e:
+        logger.error(f"Error getting coverage issues: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get coverage issues: {str(e)}")
+
+
+@observability_router.get("/extraction/stats")
+async def get_extraction_stats(
+    source_id: Optional[str] = Query(None, description="Filter by source ID"),
+    hours: int = Query(24, description="Hours to look back"),
+    admin=Depends(admin_required)
+):
+    """Get extraction statistics"""
+    try:
+        from core.extraction_logger import ExtractionLogger
+        db_url = get_db_url()
+        logger_instance = ExtractionLogger(db_url)
+        stats = logger_instance.get_extraction_stats(source_id=source_id, hours=hours)
+        return {"status": "ok", "data": stats}
+    except Exception as e:
+        logger.error(f"Error getting extraction stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get extraction stats: {str(e)}")
+
+
+@observability_router.get("/failed-inserts")
+async def get_failed_inserts(
+    source_id: Optional[str] = Query(None, description="Filter by source ID"),
+    limit: int = Query(50, description="Maximum number of results"),
+    unresolved_only: bool = Query(True, description="Only return unresolved failures"),
+    admin=Depends(admin_required)
+):
+    """Get failed insert logs"""
+    try:
+        from core.extraction_logger import ExtractionLogger
+        db_url = get_db_url()
+        logger_instance = ExtractionLogger(db_url)
+        failed = logger_instance.get_failed_inserts(
+            source_id=source_id,
+            limit=limit,
+            unresolved_only=unresolved_only
+        )
+        return {"status": "ok", "data": failed, "count": len(failed)}
+    except Exception as e:
+        logger.error(f"Error getting failed inserts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get failed inserts: {str(e)}")

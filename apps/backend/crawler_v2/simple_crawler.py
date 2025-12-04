@@ -55,6 +55,24 @@ class SimpleCrawler:
             logger.info("Strategy selector initialized")
         except Exception as e:
             logger.warning(f"Strategy selector not available: {e}")
+        
+        # Initialize HTML storage (Phase 2)
+        self.html_storage = None
+        try:
+            from core.html_storage import get_html_storage
+            self.html_storage = get_html_storage()
+            logger.info("HTML storage initialized")
+        except Exception as e:
+            logger.warning(f"HTML storage not available: {e}")
+        
+        # Initialize extraction logger (Phase 2)
+        self.extraction_logger = None
+        try:
+            from core.extraction_logger import ExtractionLogger
+            self.extraction_logger = ExtractionLogger(db_url)
+            logger.info("Extraction logger initialized")
+        except Exception as e:
+            logger.warning(f"Extraction logger not available: {e}")
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -1199,7 +1217,7 @@ class SimpleCrawler:
         finally:
             conn.close()
         
-        # Log failed inserts summary
+        # Log failed inserts summary and to database (Phase 2)
         if failed_inserts:
             logger.warning(f"Failed to save {len(failed_inserts)} jobs for {org_name} (source_id: {source_id})")
             # Log first 5 failures in detail
@@ -1207,6 +1225,17 @@ class SimpleCrawler:
                 logger.warning(f"  Failed job {i+1}: {failed_job.get('title', 'Unknown')} - {failed_job.get('error', 'Unknown error')}")
             if len(failed_inserts) > 5:
                 logger.warning(f"  ... and {len(failed_inserts) - 5} more failures")
+            
+            # Log to database via extraction_logger
+            if self.extraction_logger:
+                for failed_job in failed_inserts:
+                    self.extraction_logger.log_failed_insert(
+                        source_url=failed_job.get('apply_url', ''),
+                        error=failed_job.get('error', 'Unknown error'),
+                        source_id=source_id,
+                        payload=failed_job.get('payload'),
+                        operation=failed_job.get('operation', 'insert')
+                    )
         
         return {'inserted': inserted, 'updated': updated, 'skipped': skipped, 'failed': failed}
     
@@ -1479,12 +1508,50 @@ class SimpleCrawler:
                 # Fetch HTML
                 status, html = await self.fetch_html(careers_url, use_browser=needs_browser)
                 
+                # Store raw HTML (Phase 2)
+                raw_page_id = None
+                storage_path = None
+                if self.html_storage and html:
+                    try:
+                        storage_path = self.html_storage.store(careers_url, html, source_id)
+                        if storage_path:
+                            # Save raw_page record to database
+                            conn = self._get_db_conn()
+                            try:
+                                with conn.cursor() as cur:
+                                    cur.execute("""
+                                        INSERT INTO raw_pages (
+                                            url, status, storage_path, content_length, source_id, fetched_at
+                                        )
+                                        VALUES (%s, %s, %s, %s, %s, NOW())
+                                        RETURNING id
+                                    """, (careers_url, status, storage_path, len(html), source_id))
+                                    raw_page_id = str(cur.fetchone()[0])
+                                    conn.commit()
+                            except Exception as e:
+                                logger.warning(f"Error saving raw_page record: {e}")
+                                conn.rollback()
+                            finally:
+                                conn.close()
+                    except Exception as e:
+                        logger.warning(f"Error storing HTML: {e}")
+                
                 # Accept any 2xx status as success (some sites use 202, 204, etc.)
                 if status < 200 or status >= 300:
+                    # Log failed extraction
+                    if self.extraction_logger:
+                        self.extraction_logger.log_extraction(
+                            url=careers_url,
+                            status='EMPTY',
+                            source_id=source_id,
+                            raw_page_id=raw_page_id,
+                            reason=f'HTTP {status}',
+                            job_count=0
+                        )
                     return {
                         'status': 'failed',
                         'message': f'HTTP {status}',
-                        'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
+                        'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0}
                     }
                 
                 # Extract jobs from listing page
@@ -1548,6 +1615,45 @@ class SimpleCrawler:
                 
                 # Save to database
                 counts = self.save_jobs(jobs, source_id, org_name)
+                
+                # Log extraction result (Phase 2)
+                if self.extraction_logger:
+                    extraction_status = 'OK'
+                    reason = None
+                    if len(jobs) == 0:
+                        extraction_status = 'EMPTY'
+                        reason = 'No jobs found'
+                    elif counts.get('failed', 0) > 0:
+                        extraction_status = 'DB_FAIL'
+                        reason = f"{counts.get('failed', 0)} jobs failed to insert"
+                    elif counts.get('skipped', 0) > len(jobs) * 0.5:
+                        extraction_status = 'PARTIAL'
+                        reason = f"{counts.get('skipped', 0)} jobs skipped (>{len(jobs)*0.5:.0f}%)"
+                    
+                    # Create summary of extracted fields for logging
+                    extracted_fields = {
+                        'job_count': len(jobs),
+                        'inserted': counts.get('inserted', 0),
+                        'updated': counts.get('updated', 0),
+                        'skipped': counts.get('skipped', 0),
+                        'failed': counts.get('failed', 0)
+                    }
+                    if jobs:
+                        # Sample first job's fields
+                        sample_job = jobs[0]
+                        extracted_fields['sample_title'] = sample_job.get('title', '')[:100]
+                        extracted_fields['has_location'] = bool(sample_job.get('location_raw'))
+                        extracted_fields['has_deadline'] = bool(sample_job.get('deadline'))
+                    
+                    self.extraction_logger.log_extraction(
+                        url=careers_url,
+                        status=extraction_status,
+                        source_id=source_id,
+                        raw_page_id=raw_page_id,
+                        reason=reason,
+                        extracted_fields=extracted_fields,
+                        job_count=len(jobs)
+                    )
                 
                 return {
                     'status': 'ok' if jobs else 'warn',
