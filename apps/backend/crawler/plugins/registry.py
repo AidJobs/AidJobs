@@ -147,6 +147,24 @@ def _register_builtin_plugins(registry: PluginRegistry):
         logger.warning(f"Could not import UNESCO plugin: {e}")
     
     try:
+        from .unicef import UNICEFPlugin
+        registry.register(UNICEFPlugin())
+    except ImportError as e:
+        logger.warning(f"Could not import UNICEF plugin: {e}")
+    
+    try:
+        from .amnesty import AmnestyPlugin
+        registry.register(AmnestyPlugin())
+    except ImportError as e:
+        logger.warning(f"Could not import Amnesty plugin: {e}")
+    
+    try:
+        from .save_the_children import SaveTheChildrenPlugin
+        registry.register(SaveTheChildrenPlugin())
+    except ImportError as e:
+        logger.warning(f"Could not import Save the Children plugin: {e}")
+    
+    try:
         from .generic import GenericPlugin
         registry.register(GenericPlugin())
     except ImportError as e:

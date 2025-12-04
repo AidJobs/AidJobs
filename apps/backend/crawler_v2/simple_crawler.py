@@ -60,13 +60,33 @@ class SimpleCrawler:
         """Get database connection"""
         return psycopg2.connect(self.db_url)
     
-    async def fetch_html(self, url: str, retry_count: int = 0) -> Tuple[int, str]:
+    async def fetch_html(self, url: str, retry_count: int = 0, use_browser: bool = False) -> Tuple[int, str]:
         """
         Fetch HTML from URL with retry logic for 403 errors.
+        
+        Args:
+            url: URL to fetch
+            retry_count: Number of retries attempted
+            use_browser: If True, use browser rendering for JavaScript-heavy sites
         
         Returns:
             (status_code, html_content)
         """
+        # Check if browser rendering is needed
+        if use_browser:
+            try:
+                from crawler.browser_crawler import BrowserCrawler
+                browser_crawler = BrowserCrawler()
+                html = await browser_crawler.fetch_html(url, timeout=30000)
+                if html:
+                    return 200, html
+                else:
+                    logger.warning(f"Browser rendering returned no HTML for {url}")
+            except ImportError:
+                logger.warning("Playwright not installed - browser rendering unavailable")
+            except Exception as e:
+                logger.warning(f"Browser rendering failed: {e}, falling back to HTTP")
+        
         try:
             async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
                 # Use more realistic headers to avoid 403 blocks
@@ -92,6 +112,17 @@ class SimpleCrawler:
                     headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                     logger.info(f"Retrying {url} with different User-Agent (attempt {retry_count + 1})")
                     return await self.fetch_html(url, retry_count + 1)
+                
+                # Check if page requires JavaScript (common indicators)
+                html_text = response.text.lower()
+                if any(indicator in html_text for indicator in [
+                    'unsupported browser', 'javascript required', 'enable javascript',
+                    'loading...', 'please wait', 'pageup', 'ultipro'
+                ]):
+                    logger.info(f"Page appears to require JavaScript, attempting browser rendering for {url}")
+                    # Try browser rendering as fallback
+                    if not use_browser:
+                        return await self.fetch_html(url, retry_count, use_browser=True)
                 
                 return response.status_code, response.text
         except Exception as e:
@@ -1175,8 +1206,13 @@ class SimpleCrawler:
         
         try:
             if source_type == 'html':
+                # Check if this source needs browser rendering
+                needs_browser = any(indicator in careers_url.lower() for indicator in [
+                    'amnesty.org', 'ultipro.com', 'pageup', 'savethechildren'
+                ])
+                
                 # Fetch HTML
-                status, html = await self.fetch_html(careers_url)
+                status, html = await self.fetch_html(careers_url, use_browser=needs_browser)
                 
                 if status != 200:
                     return {
