@@ -1,0 +1,101 @@
+{
+  "branch": "fix/robust-followup-20250105-180000",
+  "pr_url": "https://github.com/AidJobs/AidJobs/pull/new/fix/robust-followup-20250105-180000",
+  "status": "ready_for_labeling",
+  "deliverables": {
+    "labeling_batch": {
+      "path": "apps/backend/tools/labeling/labeling_batch.csv",
+      "rows": 200,
+      "description": "CSV with 200 candidate pages for labeling (url, raw_html_snippet, suggested_label, label)",
+      "suggested_distribution": {
+        "job": 127,
+        "not_job": 73
+      }
+    },
+    "labeling_instructions": {
+      "path": "apps/backend/tools/labeling/labeling_instructions.md",
+      "description": "Clear guidelines for human labelers"
+    },
+    "labeling_ui": {
+      "path": "apps/backend/tools/labeling/app.py",
+      "description": "Flask web UI for labeling (optional, requires: pip install flask)",
+      "usage": "cd apps/backend/tools/labeling && python app.py"
+    },
+    "training_scripts": {
+      "convert": {
+        "path": "apps/backend/scripts/convert_labels_for_training.py",
+        "description": "Converts labels CSV to training format"
+      },
+      "build": {
+        "path": "apps/backend/scripts/build_classifier.py",
+        "description": "Trains TF-IDF + logistic regression model"
+      }
+    },
+    "unit_tests": {
+      "path": "apps/backend/tests/test_classifier_training.py",
+      "description": "Unit tests for training pipeline (requires scikit-learn)"
+    },
+    "model": {
+      "path": "apps/backend/models/job_classifier_v1.pkl",
+      "status": "pending",
+      "description": "Trained model (will be generated after labeling and training)"
+    },
+    "metrics": {
+      "path": "apps/backend/report/classifier_metrics.json",
+      "status": "pending",
+      "description": "Training metrics (accuracy, precision, recall, F1)"
+    }
+  },
+  "workflow": {
+    "step_1": {
+      "action": "Label pages",
+      "options": [
+        "Option A: Edit labeling_batch.csv directly (fill 'label' column with 'job' or 'not_job')",
+        "Option B: Use web UI (python tools/labeling/app.py, then visit http://localhost:5000)"
+      ],
+      "output": "tools/labeling/labels/labels.csv"
+    },
+    "step_2": {
+      "action": "Convert labels to training format",
+      "command": "python scripts/convert_labels_for_training.py",
+      "output": "tools/labeling/training_data.csv"
+    },
+    "step_3": {
+      "action": "Train classifier",
+      "command": "python scripts/build_classifier.py",
+      "outputs": [
+        "models/job_classifier_v1.pkl",
+        "report/classifier_metrics.json"
+      ]
+    },
+    "step_4": {
+      "action": "Verify",
+      "command": "python -m pytest tests/test_classifier_training.py -v",
+      "description": "Run unit tests to verify training pipeline"
+    }
+  },
+  "requirements": {
+    "core": [
+      "scikit-learn (already in requirements.txt)",
+      "beautifulsoup4 (already in requirements.txt)"
+    ],
+    "optional": [
+      "flask (for web UI, see requirements-dev.txt)"
+    ]
+  },
+  "notes": [
+    "Minimum 20 labeled examples needed for training",
+    "Target: F1 score > 0.5 on test set",
+    "Labeling batch generated from test fixtures (21 pages expanded to 200)",
+    "Model will be saved as pickle file with vectorizer + classifier",
+    "All scripts handle missing dependencies gracefully"
+  ],
+  "next_actions": [
+    "1. Human labelers should label the 200 pages in labeling_batch.csv",
+    "2. Run convert_labels_for_training.py to prepare training data",
+    "3. Run build_classifier.py to train the model",
+    "4. Check classifier_metrics.json for performance metrics",
+    "5. Integrate trained model into pipeline/classifier.py"
+  ]
+}
+
