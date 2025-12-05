@@ -404,6 +404,9 @@ class CrawlerOrchestrator:
             
             # All crawl_source methods return the same format:
             # {'status': 'ok'|'warn'|'failed', 'message': str, 'counts': dict}
+            # Add duration_ms to result
+            duration_ms = int((time.time() - start_time) * 1000)
+            result['duration_ms'] = duration_ms
             return result
         
         except Exception as e:
@@ -421,16 +424,21 @@ class CrawlerOrchestrator:
         conn = self._get_db_conn()
         try:
             with conn.cursor() as cur:
-                counts = result['counts']
+                counts = result.get('counts', {})
+                duration_ms = result.get('duration_ms', 0)
+                
+                # Ensure duration_ms is set
+                if not duration_ms:
+                    logger.warning(f"[orchestrator] Missing duration_ms in result for {source.get('org_name')}, using 0")
                 
                 # Update consecutive counters
-                if result['status'] == 'fail':
-                    consecutive_failures = source['consecutive_failures'] + 1
+                if result.get('status') == 'fail':
+                    consecutive_failures = (source.get('consecutive_failures') or 0) + 1
                     consecutive_nochange = 0
                 else:
                     consecutive_failures = 0
-                    if counts['inserted'] == 0 and counts['updated'] == 0:
-                        consecutive_nochange = source['consecutive_nochange'] + 1
+                    if counts.get('inserted', 0) == 0 and counts.get('updated', 0) == 0:
+                        consecutive_nochange = (source.get('consecutive_nochange') or 0) + 1
                     else:
                         consecutive_nochange = 0
                 
@@ -464,8 +472,8 @@ class CrawlerOrchestrator:
                         updated_at = NOW()
                     WHERE id = %s
                 """, (
-                    result['status'],
-                    result['message'],
+                    result.get('status', 'unknown'),
+                    result.get('message', 'Crawl completed'),
                     consecutive_failures,
                     consecutive_nochange,
                     next_run_at,
@@ -474,35 +482,45 @@ class CrawlerOrchestrator:
                 ))
                 
                 # Write crawl log
-                cur.execute("""
-                    INSERT INTO crawl_logs (
-                        source_id, ran_at, duration_ms, found, inserted,
-                        updated, skipped, status, message
-                    ) VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    source['id'],
-                    result['duration_ms'],
-                    counts['found'],
-                    counts['inserted'],
-                    counts['updated'],
-                    counts['skipped'],
-                    result['status'],
-                    result['message']
-                ))
+                try:
+                    cur.execute("""
+                        INSERT INTO crawl_logs (
+                            source_id, ran_at, duration_ms, found, inserted,
+                            updated, skipped, status, message
+                        ) VALUES (%s, NOW(), %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        source['id'],
+                        duration_ms,
+                        counts.get('found', 0),
+                        counts.get('inserted', 0),
+                        counts.get('updated', 0),
+                        counts.get('skipped', 0),
+                        result.get('status', 'unknown'),
+                        result.get('message', 'Crawl completed')
+                    ))
+                    logger.info(f"[orchestrator] Logged crawl to crawl_logs for {source.get('org_name')}")
+                except Exception as log_error:
+                    logger.error(f"[orchestrator] Failed to insert crawl log: {log_error}", exc_info=True)
+                    # Don't fail the whole update if logging fails
                 
                 conn.commit()
+                logger.info(f"[orchestrator] Successfully updated source {source.get('org_name')} after crawl")
                 
                 logger.info(
                     f"[orchestrator] Updated source {source['org_name']}: "
                     f"next_run={next_run_at.isoformat()}, "
-                    f"failures={consecutive_failures}, nochange={consecutive_nochange}"
+                    f"failures={consecutive_failures}, nochange={consecutive_nochange}, "
+                    f"status={result.get('status')}, found={counts.get('found', 0)}, inserted={counts.get('inserted', 0)}"
                 )
         
         except Exception as e:
-            logger.error(f"[orchestrator] Error updating source {source['id']}: {e}")
-            conn.rollback()
+            logger.error(f"[orchestrator] Error updating source after crawl: {e}", exc_info=True)
+            logger.error(f"[orchestrator] Source: {source.get('org_name')}, Result: {result}")
+            if conn:
+                conn.rollback()
         finally:
-            conn.close()
+            if conn:
+                conn.close()
     
     async def run_source_with_lock(self, source: Dict):
         """Run a source with locking and semaphore"""
