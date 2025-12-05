@@ -7,6 +7,7 @@ Simple Flask app to label pages for classifier training.
 
 import os
 import csv
+from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template_string, request, redirect, url_for
 
@@ -34,7 +35,7 @@ def load_batch():
     return rows
 
 
-def save_label(url: str, label: str):
+def save_label(url: str, label: str, labeled_by: str = 'web_ui'):
     """Save a label."""
     # Load existing labels
     labels = {}
@@ -42,17 +43,30 @@ def save_label(url: str, label: str):
         with open(LABELS_CSV, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                labels[row['url']] = row['label']
+                labels[row['url']] = {
+                    'label': row.get('label', ''),
+                    'labeled_by': row.get('labeled_by', ''),
+                    'labeled_at': row.get('labeled_at', '')
+                }
     
     # Update label
-    labels[url] = label
+    labels[url] = {
+        'label': label,
+        'labeled_by': labeled_by,
+        'labeled_at': datetime.utcnow().isoformat() + 'Z'
+    }
     
     # Save all labels
     with open(LABELS_CSV, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['url', 'label'])
+        writer = csv.DictWriter(f, fieldnames=['url', 'label', 'labeled_by', 'labeled_at'])
         writer.writeheader()
-        for url_key, label_val in labels.items():
-            writer.writerow({'url': url_key, 'label': label_val})
+        for url_key, label_data in labels.items():
+            writer.writerow({
+                'url': url_key,
+                'label': label_data['label'],
+                'labeled_by': label_data['labeled_by'],
+                'labeled_at': label_data['labeled_at']
+            })
 
 
 def get_label(url: str) -> str:
@@ -64,7 +78,7 @@ def get_label(url: str) -> str:
         reader = csv.DictReader(f)
         for row in reader:
             if row['url'] == url:
-                return row['label']
+                return row.get('label', '')
     return ''
 
 

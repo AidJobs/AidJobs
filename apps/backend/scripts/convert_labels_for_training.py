@@ -24,7 +24,8 @@ def load_labels(labels_path: Path):
         reader = csv.DictReader(f)
         for row in reader:
             url = row['url']
-            label = row['label'].strip().lower()
+            label = row.get('label', '').strip().lower()
+            # Support both 'job'/'not_job' and '1'/'0' formats
             if label in ['job', 'not_job', '1', '0']:
                 labels[url] = label
     return labels

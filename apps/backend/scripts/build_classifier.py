@@ -38,8 +38,19 @@ def load_training_data(training_path: Path):
     with open(training_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            texts.append(row['html_snippet'])
-            labels.append(int(row['label']))
+            html_snippet = row.get('html_snippet', '')
+            label_str = row.get('label', '').strip()
+            
+            # Convert label to int (support 'job'/'not_job' or '1'/'0')
+            if label_str in ['1', 'job']:
+                label = 1
+            elif label_str in ['0', 'not_job']:
+                label = 0
+            else:
+                continue  # Skip invalid labels
+            
+            texts.append(html_snippet)
+            labels.append(label)
     
     if not texts:
         print("❌ No training data found in CSV")
