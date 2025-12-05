@@ -1,0 +1,165 @@
+{
+  "timestamp": "2025-01-05T21:00:00Z",
+  "diagnosis_summary": {
+    "root_causes": [
+      "Shadow mode enabled by default - jobs written to jobs_side table, not jobs table",
+      "Validation may be skipping jobs due to missing title/apply_url",
+      "SQL construction validation may be catching field/value mismatches",
+      "Duplicate canonical_hash may be causing updates instead of inserts (counted as 'updated', not 'inserted')"
+    ],
+    "failing_steps": [
+      "Step 1: Validation - jobs missing title or apply_url are skipped",
+      "Step 2: Dedupe - existing jobs with same canonical_hash are updated (not inserted)",
+      "Step 3: SQL Construction - field/value count mismatches cause insertion failures",
+      "Step 4: Shadow Mode - if EXTRACTION_SHADOW_MODE=true, jobs go to jobs_side table"
+    ],
+    "file_paths_involved": [
+      "apps/backend/crawler_v2/simple_crawler.py (lines 1083-1511) - save_jobs method",
+      "apps/backend/crawler_v2/simple_crawler.py (lines 1054-1082) - _validate_sql_construction method",
+      "apps/backend/crawler_v2/simple_crawler.py (lines 2047) - crawl_source calls save_jobs",
+      "apps/backend/core/pre_upsert_validator.py - PreUpsertValidator (currently disabled in save_jobs)"
+    ]
+  },
+  "detailed_findings": {
+    "validation_logic": {
+      "location": "apps/backend/crawler_v2/simple_crawler.py:1096-1124",
+      "issue": "Validation is TEMPORARY disabled (comment says 'Skip validation entirely'), but basic checks still apply",
+      "checks_performed": [
+        "apply_url fallback logic (lines 1100-1117)",
+        "Title and apply_url presence check (line 1120)",
+        "Title length check (minimum 3 characters)"
+      ],
+      "jobs_skipped_if": [
+        "Missing title",
+        "Missing apply_url (even after fallback)",
+        "Title shorter than 3 characters"
+      ],
+      "code_snippet": "if job.get('title') and job.get('apply_url') and len(job.get('title', '')) >= 3:\n    valid_jobs.append(job)\nelse:\n    validation_skipped += 1\n    logger.warning(f\"Skipping job - missing title/URL or too short...\")"
+    },
+    "dedupe_logic": {
+      "location": "apps/backend/crawler_v2/simple_crawler.py:1237-1248",
+      "issue": "Canonical hash is computed from title + apply_url. If job already exists, it's UPDATED, not INSERTED",
+      "hash_computation": "canonical_text = f\"{title}|{apply_url}\".lower()\ncanonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()",
+      "duplicate_check": "SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s",
+      "impact": "If canonical_hash exists, job is updated (counted as 'updated', not 'inserted')",
+      "code_snippet": "if existing:\n    # Update (and restore if deleted)\n    ...\n    updated += 1\nelse:\n    # Insert\n    ...\n    inserted += 1"
+    },
+    "sql_construction_validation": {
+      "location": "apps/backend/crawler_v2/simple_crawler.py:1054-1082",
+      "issue": "SQL construction validation checks for duplicate fields and field/value mismatches",
+      "validation_checks": [
+        "Duplicate fields in insert_fields list",
+        "Field/placeholder count mismatch",
+        "Placeholder/value count mismatch (accounting for NOW() placeholders)",
+        "NOW() placeholder/value alignment"
+      ],
+      "error_example": "INSERT has more target columns than expressions - this occurs when field count != value count",
+      "code_snippet": "def _validate_sql_construction(self, fields, values, placeholders, sql_values, operation):\n    # Check for duplicate fields\n    if len(field_set) != len(fields):\n        raise ValueError(f\"{operation} has duplicate fields...\")\n    # Check field/placeholder count match\n    if len(fields) != len(placeholders):\n        raise ValueError(f\"{operation} field/placeholder mismatch...\")"
+    },
+    "shadow_mode_impact": {
+      "location": "Environment variable: EXTRACTION_SHADOW_MODE",
+      "default_value": "true",
+      "issue": "If EXTRACTION_SHADOW_MODE=true, jobs are written to jobs_side table (via pipeline.db_insert), NOT jobs table",
+      "note": "However, SimpleCrawler.save_jobs() writes directly to 'jobs' table, not affected by shadow mode",
+      "clarification": "Shadow mode only affects pipeline.extractor.Extractor when EXTRACTION_USE_NEW_EXTRACTOR=true"
+    },
+    "duplicate_code_issue": {
+      "location": "apps/backend/crawler_v2/simple_crawler.py:1131 and 1141",
+      "issue": "Duplicate 'if not jobs:' check - redundant but harmless",
+      "impact": "None - second check is unreachable code"
+    },
+    "error_handling": {
+      "location": "apps/backend/crawler_v2/simple_crawler.py:1443-1458",
+      "issue": "DB insert errors are caught and logged, but job is marked as 'failed'",
+      "error_logging": "Errors are logged to failed_inserts list and extraction_logger",
+      "code_snippet": "except Exception as e:\n    error_msg = f\"DB insert error: {str(e)}\"\n    logger.error(f\"Failed to insert job...\", exc_info=True)\n    failed += 1\n    failed_inserts.append({...})"
+    }
+  },
+  "environment_flags_analysis": {
+    "EXTRACTION_USE_STORAGE": {
+      "default": "false",
+      "impact": "Pipeline storage integration disabled - SimpleCrawler.save_jobs() is used instead",
+      "status": "OK - this is expected for SimpleCrawler"
+    },
+    "EXTRACTION_SHADOW_MODE": {
+      "default": "true",
+      "impact": "Only affects pipeline.extractor when EXTRACTION_USE_NEW_EXTRACTOR=true",
+      "status": "Does NOT affect SimpleCrawler.save_jobs() - it always writes to 'jobs' table"
+    },
+    "EXTRACTION_USE_NEW_EXTRACTOR": {
+      "default": "false",
+      "impact": "New pipeline extractor is disabled - SimpleCrawler uses default extraction",
+      "status": "OK - SimpleCrawler is the active crawler"
+    }
+  },
+  "recommended_fixes": {
+    "priority_1_critical": [
+      {
+        "issue": "Jobs found but inserted=0 - check if validation is skipping all jobs",
+        "fix": "Add detailed logging before validation to see what jobs are being extracted",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1090",
+        "action": "Log extracted jobs before validation: logger.info(f\"Extracted {len(jobs)} jobs before validation: {[j.get('title', 'No title')[:50] for j in jobs[:5]]}\")"
+      },
+      {
+        "issue": "Check if canonical_hash deduplication is treating all jobs as duplicates",
+        "fix": "Log canonical_hash values and check for hash collisions",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1240",
+        "action": "Log hash before duplicate check: logger.debug(f\"Canonical hash: {canonical_hash} for job: {title[:50]}\")"
+      },
+      {
+        "issue": "SQL construction errors may be silently caught",
+        "fix": "Ensure SQL validation errors are properly logged and not swallowed",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1429-1435",
+        "action": "Validation already raises - ensure outer exception handler logs it properly"
+      }
+    ],
+    "priority_2_important": [
+      {
+        "issue": "Remove duplicate 'if not jobs:' check",
+        "fix": "Remove redundant check at line 1141",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1141-1148",
+        "action": "Delete lines 1141-1148 (duplicate check)"
+      },
+      {
+        "issue": "Add more detailed logging for validation skips",
+        "fix": "Log specific reason for each skipped job",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1122-1124",
+        "action": "Enhance logging to show which validation check failed"
+      }
+    ],
+    "priority_3_enhancement": [
+      {
+        "issue": "Re-enable PreUpsertValidator if needed",
+        "fix": "Currently disabled with 'TEMPORARY: Skip validation entirely' comment",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1096",
+        "action": "Review if PreUpsertValidator should be re-enabled for stricter validation"
+      }
+    ]
+  },
+  "debugging_steps": [
+    "1. Check Render logs for 'Saving X jobs to database' message",
+    "2. Check Render logs for 'Successfully saved jobs: X inserted, Y updated, Z skipped, W failed'",
+    "3. If inserted=0, check for 'Skipping job - missing title/URL' warnings",
+    "4. If inserted=0 but updated>0, jobs are being treated as duplicates",
+    "5. Check failed_inserts table: SELECT * FROM failed_inserts WHERE source_id = '...' ORDER BY attempt_at DESC LIMIT 10",
+    "6. Check extraction_logs table: SELECT * FROM extraction_logs WHERE source_id = '...' ORDER BY created_at DESC LIMIT 10",
+    "7. Verify jobs table has correct schema: Check for all required columns",
+    "8. Test with a single job URL using simulate_extract endpoint to see extraction output"
+  ],
+  "code_snippets": {
+    "save_jobs_signature": "def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:",
+    "validation_check": "if job.get('title') and job.get('apply_url') and len(job.get('title', '')) >= 3:",
+    "canonical_hash": "canonical_text = f\"{title}|{apply_url}\".lower()\ncanonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()",
+    "duplicate_check": "SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s",
+    "insert_statement": "INSERT INTO jobs ({', '.join(insert_fields)}) VALUES ({', '.join(placeholders)})"
+  },
+  "database_schema_check": {
+    "required_columns": [
+      "id", "source_id", "org_name", "title", "apply_url", "location_raw",
+      "canonical_hash", "status", "fetched_at", "last_seen_at", "created_at", "updated_at"
+    ],
+    "unique_constraint": "canonical_hash TEXT NOT NULL UNIQUE",
+    "foreign_key": "source_id UUID REFERENCES sources(id) ON DELETE SET NULL",
+    "note": "Check if jobs table exists and has all required columns"
+  }
+}
