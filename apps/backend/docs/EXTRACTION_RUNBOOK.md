@@ -1,198 +1,150 @@
-# Extraction Pipeline Runbook
+# Extraction Pipeline Runbook (Tasks 1-8)
 
 ## Overview
 
-This document describes the operational procedures for the robust extraction pipeline, including shadow mode deployment, monitoring, and rollback procedures.
+This runbook covers the core extraction pipeline (tasks 1-8) for shadow mode deployment and snapshot inspection.
 
-## Architecture
+## Shadow Mode
 
-The extraction pipeline implements a multi-stage extraction strategy:
+### Enable Shadow Mode
 
-1. **Job Page Classifier** - Determines if page is a job listing
-2. **JSON-LD Extraction** - Extracts structured data (Schema.org JobPosting)
-3. **Meta/OpenGraph Tags** - Extracts from HTML meta tags
-4. **DOM Selectors** - Site-specific extraction using CSS selectors
-5. **Label Heuristics** - Pattern matching for labeled fields
-6. **Regex Fallback** - Date/location pattern matching
-7. **AI Fallback** - LLM extraction as last resort
-
-## Shadow Mode Deployment
-
-### Phase 1: Shadow Mode (48 hours)
-
-**Goal**: Run new extractor in parallel with old extractor, writing to side tables.
-
-1. **Enable Shadow Mode**
-   ```bash
-   export EXTRACTION_SHADOW_MODE=true
-   export EXTRACTION_SHADOW_TABLE=extraction_results_shadow
-   ```
-
-2. **Monitor Metrics**
-   - Field success rates (should be ≥ 85%)
-   - Per-domain success rates (should be ≥ 70% for non-empty domains)
-   - Low-confidence rate (should be < 15%)
-   - AI call count (should stay within limits)
-
-3. **Compare Results**
-   ```bash
-   python scripts/compare_extractors.py --days 7 --output comparison_report.json
-   ```
-
-4. **Review Top Failures**
-   ```bash
-   python scripts/gather-failures.py --days 7
-   ```
-
-### Phase 2: Validation
-
-After 48 hours, validate:
-
-- ✅ Overall field success rate ≥ 85%
-- ✅ Per-domain success rate ≥ 70% (for domains with >10 pages)
-- ✅ Low-confidence rate < 15%
-- ✅ No increase in false positives (non-job pages classified as jobs)
-- ✅ No regression in critical fields (title, employer, location)
-
-### Phase 3: Feature Flag Flip
-
-Only flip the feature flag if all validation criteria are met:
-
+Set environment variables:
 ```bash
-export EXTRACTION_USE_NEW_PIPELINE=true
+export EXTRACTION_SHADOW_MODE=true
+export EXTRACTION_ENABLE_SNAPSHOTS=true
 ```
 
-## Monitoring
+The pipeline will:
+- Write extraction results to snapshots only
+- Not modify production tables
+- Save HTML and metadata for auditing
 
-### Key Metrics
+### Inspect Snapshots
 
-1. **Field Success Rates**
-   - Track per-field extraction success
-   - Alert if any field drops below 80%
+Snapshots are saved to:
+```
+snapshots/{domain}/{sha256(url)}.html
+snapshots/{domain}/{sha256(url)}.meta.json
+```
 
-2. **Confidence Distribution**
-   - Monitor confidence scores
-   - Flag jobs with confidence < 0.5 for manual review
+**View a snapshot:**
+```bash
+# Find snapshot for a URL
+python -c "
+from pipeline.snapshot import SnapshotManager
+sm = SnapshotManager()
+result = sm.retrieve_snapshot('https://example.com/job/123')
+print(json.dumps(result, indent=2))
+"
+```
 
-3. **AI Call Count**
-   - Track AI extraction usage
-   - Alert if approaching limit (2000 calls/day)
+**Check extraction metadata:**
+```bash
+cat snapshots/example.com/*.meta.json | jq '.field_metadata'
+```
 
-4. **Playwright Failures**
-   - Monitor browser rendering failures
-   - Alert if failure rate > 10%
+**Find low-confidence extractions:**
+```bash
+grep -r '"confidence": 0\.[0-4]' snapshots/*/*.meta.json
+```
 
-5. **Per-Domain Performance**
-   - Track success rates per domain
-   - Flag domains with < 70% success
+**Find manual review flags:**
+```bash
+grep -r '"manual_review": true' snapshots/*/*.meta.json
+```
 
-### Prometheus Metrics
+## Validation
 
-- `extraction_total{field, source, status}` - Total extractions
-- `extraction_confidence{field, source}` - Confidence scores
-- `extraction_duration_seconds` - Extraction time
-- `extraction_low_confidence` - Low confidence count
-- `extraction_ai_calls` - AI call count
-- `extraction_playwright_failures` - Browser failures
+### Manual Review Flags
 
-### StatsD Metrics
+The pipeline automatically flags extractions for manual review when:
+- Title is missing or empty
+- Deadline format is invalid
+- Deadline is before posted date
+- Location is generic (N/A, TBD, Multiple, etc.)
 
-- `extraction.{field}.{source}.{status}` - Counter
-- `extraction.{field}.{source}.confidence` - Gauge
-- `extraction.low_confidence` - Counter
-- `extraction.ai.{status}` - Counter
-- `extraction.playwright.failure` - Counter
+Check validation issues:
+```bash
+grep -r '"validation_issues"' snapshots/*/*.meta.json
+```
 
-## Rollback Procedure
+### Confidence Thresholds
 
-If metrics drop below thresholds:
+- **jsonld**: 0.90 (structured data)
+- **meta**: 0.80 (meta tags)
+- **dom**: 0.70 (DOM selectors)
+- **heuristic**: 0.60 (label patterns)
+- **regex**: 0.50 (pattern matching)
+- **ai**: 0.40 (LLM fallback)
 
-1. **Immediate Rollback**
-   ```bash
-   export EXTRACTION_USE_NEW_PIPELINE=false
-   ```
+## Testing
 
-2. **Investigate Issues**
-   ```bash
-   python scripts/gather-failures.py --days 1
-   python scripts/analyze_failures.py --input failures_*.csv
-   ```
+### Run Unit Tests
+```bash
+pytest tests/test_pipeline_extractor.py -v
+```
 
-3. **Fix Issues**
-   - Review top 20 problematic URLs
-   - Update heuristics/selectors
-   - Retrain classifier if needed
+### Run Integration Tests
+```bash
+pytest tests/test_pipeline_integration.py -v
+```
 
-4. **Re-deploy**
-   - Fix issues
-   - Re-run shadow mode
-   - Re-validate metrics
+### Generate Initial Report
+```bash
+python scripts/generate_initial_report_focused.py
+```
 
-## Privacy & ToS Compliance
-
-### Data Handling
-
-- **HTML Snapshots**: Stored locally, not in public repos
-- **PII Redaction**: Automatically redact emails, phone numbers from logs
-- **Retention**: Snapshots retained for 90 days, then deleted
-
-### robots.txt Compliance
-
-- **Default**: Respect robots.txt
-- **Override**: Use `config/domains.yaml` for exceptions
-- **Audit**: Log all robots.txt violations
-
-### Rate Limiting
-
-- **Per-Domain**: Max 2 concurrent requests per domain
-- **Global**: Max 10 concurrent requests total
-- **Backoff**: Exponential backoff on 429 responses
+This processes test fixtures and generates `report/initial-run.json`.
 
 ## Troubleshooting
 
 ### Low Success Rates
 
-1. Check classifier accuracy
-2. Review JSON-LD extraction
-3. Verify heuristics patterns
-4. Check for site structure changes
+1. Check classifier accuracy:
+   ```python
+   from pipeline.classifier import JobPageClassifier
+   classifier = JobPageClassifier()
+   # Test on sample pages
+   ```
 
-### High AI Usage
+2. Review JSON-LD extraction:
+   - Check if sites use Schema.org JobPosting
+   - Verify JSON-LD structure
 
-1. Review why AI fallback is triggered
-2. Improve heuristics to reduce AI dependency
-3. Check cache hit rate
+3. Check heuristics:
+   - Verify label patterns match site structure
+   - Review date parsing
 
-### Playwright Failures
+### Missing Fields
 
-1. Check network connectivity
-2. Verify selectors in `config/domains.yaml`
-3. Review timeout settings
-4. Check for anti-bot measures
+1. Check extraction sources in metadata:
+   ```bash
+   cat snapshots/example.com/*.meta.json | jq '.field_metadata.title'
+   ```
 
-## Support Contacts
+2. Review raw snippets:
+   ```bash
+   cat snapshots/example.com/*.meta.json | jq '.extraction_result.fields.title.raw_snippet'
+   ```
 
-- **Pipeline Issues**: Backend team
-- **Monitoring Alerts**: On-call engineer
-- **Data Quality**: Data team
+### Schema Validation
 
-## Appendix
+Validate all results match strict schema:
+```bash
+python scripts/validate_extraction_schema.py
+```
 
-### Configuration Files
+## Next Steps
 
-- `config/domains.yaml` - Domain-specific overrides
-- `.env` - Environment variables
+After shadow mode validation:
+1. Review top problematic URLs
+2. Adjust heuristics/selectors as needed
+3. Retrain classifier with labeled data
+4. Enable production mode (remove shadow_mode flag)
 
-### Scripts
+## Safety
 
-- `scripts/gather-failures.py` - Export failures to CSV
-- `scripts/retrain-classifier.py` - Retrain ML classifier
-- `scripts/compare_extractors.py` - Compare old vs new
-- `scripts/check_extraction_accuracy.py` - Validate accuracy
-
-### Database Tables
-
-- `extraction_results_shadow` - Shadow mode results
-- `failed_inserts` - Failed extractions
-- `extraction_logs` - Extraction attempts
-
+- **Shadow mode**: All writes go to snapshots only
+- **No production changes**: Database tables not modified
+- **AI limits**: Cached responses, max 200 calls in dry run
+- **Rollback**: Simply disable shadow mode

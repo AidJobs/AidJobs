@@ -248,9 +248,46 @@ class Extractor:
             for field_name, field_result in ai_fields.items():
                 result.set_field(field_name, field_result)
         
-        # Save snapshot
+        # Validation: Check for manual review flags
+        manual_review = False
+        validation_issues = []
+        
+        # Validate title (required)
+        title_field = result.get_field('title')
+        if not title_field or not title_field.is_valid():
+            manual_review = True
+            validation_issues.append('missing_title')
+        
+        # Validate deadline (if present, must be parseable and after posted_on)
+        deadline_field = result.get_field('deadline')
+        posted_on_field = result.get_field('posted_on')
+        if deadline_field and deadline_field.value:
+            try:
+                from datetime import datetime
+                deadline_date = datetime.strptime(deadline_field.value, '%Y-%m-%d')
+                if posted_on_field and posted_on_field.value:
+                    posted_date = datetime.strptime(posted_on_field.value, '%Y-%m-%d')
+                    if deadline_date < posted_date:
+                        manual_review = True
+                        validation_issues.append('deadline_before_posted')
+            except (ValueError, TypeError):
+                manual_review = True
+                validation_issues.append('invalid_deadline_format')
+        
+        # Validate location (not generic)
+        location_field = result.get_field('location')
+        if location_field and location_field.value:
+            generic_locations = ['n/a', 'tbd', 'to be determined', 'multiple', 'various']
+            if str(location_field.value).lower().strip() in generic_locations:
+                manual_review = True
+                validation_issues.append('generic_location')
+        
+        # Save snapshot with validation metadata
         if self.snapshot_manager:
-            await self.snapshot_manager.save_snapshot(url, html, result.to_dict())
+            snapshot_data = result.to_dict()
+            snapshot_data['manual_review'] = manual_review
+            snapshot_data['validation_issues'] = validation_issues
+            await self.snapshot_manager.save_snapshot(url, html, snapshot_data)
         
         return result
     

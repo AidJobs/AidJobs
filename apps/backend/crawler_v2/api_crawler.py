@@ -76,11 +76,45 @@ class SimpleAPICrawler:
             logger.warning("Could not find job array in JSON response")
             return []
         
+        # Use pipeline extractor for unified schema
+        try:
+            from pipeline.extractor import Extractor
+            extractor = Extractor(enable_ai=False, enable_snapshots=False, shadow_mode=True)
+        except ImportError:
+            extractor = None
+        
         # Extract jobs from array
         for item in job_array:
             if not isinstance(item, dict):
                 continue
             
+            # Use pipeline if available
+            if extractor:
+                import asyncio
+                try:
+                    result = asyncio.run(extractor.extract_from_json(item, base_url))
+                    result_dict = result.to_dict()
+                    
+                    # Convert to existing format
+                    job = {}
+                    if result_dict['fields']['title']['value']:
+                        job['title'] = result_dict['fields']['title']['value']
+                    if result_dict['fields']['application_url']['value']:
+                        job['apply_url'] = result_dict['fields']['application_url']['value']
+                    if result_dict['fields']['description']['value']:
+                        job['description_snippet'] = result_dict['fields']['description']['value'][:500]
+                    if result_dict['fields']['location']['value']:
+                        job['location_raw'] = result_dict['fields']['location']['value']
+                    if result_dict['fields']['deadline']['value']:
+                        job['deadline'] = result_dict['fields']['deadline']['value']
+                    
+                    if job.get('title'):
+                        jobs.append(job)
+                    continue
+                except Exception as e:
+                    logger.debug(f"Pipeline extraction failed, using fallback: {e}")
+            
+            # Fallback to simple extraction
             job = {}
             
             # Common field names

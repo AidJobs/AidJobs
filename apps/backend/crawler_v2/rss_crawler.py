@@ -47,13 +47,61 @@ class SimpleRSSCrawler:
             return None
     
     def extract_jobs_from_feed(self, feed: feedparser.FeedParserDict, base_url: str) -> List[Dict]:
-        """Extract jobs from RSS feed"""
+        """Extract jobs from RSS feed using unified pipeline."""
         if not feed or not feed.entries:
             return []
         
         jobs = []
         
+        # Use pipeline extractor for unified schema
+        try:
+            from pipeline.extractor import Extractor
+            extractor = Extractor(enable_ai=False, enable_snapshots=False, shadow_mode=True)
+        except ImportError:
+            # Fallback to simple extraction if pipeline not available
+            extractor = None
+        
         for entry in feed.entries:
+            # Build entry dict for pipeline
+            entry_dict = {}
+            if hasattr(entry, 'title'):
+                entry_dict['title'] = entry.title.strip()
+            if hasattr(entry, 'link'):
+                entry_dict['link'] = entry.link
+            if hasattr(entry, 'description'):
+                entry_dict['description'] = entry.description
+            elif hasattr(entry, 'summary'):
+                entry_dict['description'] = entry.summary
+            
+            # Use pipeline if available
+            if extractor:
+                import asyncio
+                try:
+                    result = asyncio.run(extractor.extract_from_rss(entry_dict, entry_dict.get('link', base_url)))
+                    result_dict = result.to_dict()
+                    
+                    # Convert to existing format
+                    job = {}
+                    if result_dict['fields']['title']['value']:
+                        job['title'] = result_dict['fields']['title']['value']
+                    if result_dict['fields']['application_url']['value']:
+                        job['apply_url'] = result_dict['fields']['application_url']['value']
+                    elif entry_dict.get('link'):
+                        job['apply_url'] = entry_dict['link']
+                    if result_dict['fields']['description']['value']:
+                        job['description_snippet'] = result_dict['fields']['description']['value'][:500]
+                    if result_dict['fields']['location']['value']:
+                        job['location_raw'] = result_dict['fields']['location']['value']
+                    if result_dict['fields']['deadline']['value']:
+                        job['deadline'] = result_dict['fields']['deadline']['value']
+                    
+                    if job.get('title'):
+                        jobs.append(job)
+                    continue
+                except Exception as e:
+                    logger.debug(f"Pipeline extraction failed, using fallback: {e}")
+            
+            # Fallback to simple extraction
             job = {}
             
             # Title

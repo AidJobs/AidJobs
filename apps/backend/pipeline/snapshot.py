@@ -44,14 +44,26 @@ class SnapshotManager:
             with open(html_path, 'w', encoding='utf-8') as f:
                 f.write(html)
             
-            # Save metadata
+            # Save metadata with per-field confidence and sources
+            field_metadata = {}
+            if 'fields' in extraction_result:
+                for field_name, field_data in extraction_result['fields'].items():
+                    field_metadata[field_name] = {
+                        'source': field_data.get('source'),
+                        'confidence': field_data.get('confidence', 0.0),
+                        'value_preview': str(field_data.get('value', ''))[:100] if field_data.get('value') else None
+                    }
+            
             metadata = {
                 "url": url,
                 "domain": domain,
                 "snapshot_at": datetime.utcnow().isoformat() + "Z",
                 "html_size": len(html),
                 "extraction_result": extraction_result,
-                "pipeline_version": extraction_result.get('pipeline_version', '1.0.0')
+                "pipeline_version": extraction_result.get('pipeline_version', '1.0.0'),
+                "field_metadata": field_metadata,
+                "manual_review": extraction_result.get('manual_review', False),
+                "validation_issues": extraction_result.get('validation_issues', [])
             }
             
             meta_path = domain_dir / f"{url_hash}.meta.json"
