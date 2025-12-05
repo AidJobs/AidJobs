@@ -1346,90 +1346,96 @@ class SimpleCrawler:
                         else:
                             # Insert
                             try:
-                                # Build insert fields dynamically
-                                insert_fields = [
-                                    "source_id", "org_name", "title", "apply_url",
-                                    "location_raw", "canonical_hash",
-                                    "status", "fetched_at", "last_seen_at"
-                                ]
-                                insert_values = [source_id, org_name, title, apply_url, location, canonical_hash]
+                                # Build insert fields and values using unified helper to ensure alignment
+                                insert_fields = []
+                                insert_values = []
                                 
+                                def append_field_value(field_name, value):
+                                    """Helper to ensure field/value pairs stay aligned."""
+                                    insert_fields.append(field_name)
+                                    insert_values.append(value)
+                                
+                                # Required fields
+                                append_field_value("source_id", source_id)
+                                append_field_value("org_name", org_name)
+                                append_field_value("title", title)
+                                append_field_value("apply_url", apply_url)
+                                append_field_value("location_raw", location)
+                                append_field_value("canonical_hash", canonical_hash)
+                                append_field_value("status", "active")
+                                append_field_value("fetched_at", "NOW()")
+                                append_field_value("last_seen_at", "NOW()")
+                                
+                                # Optional deadline
                                 if deadline_date:
-                                    insert_fields.append("deadline")
-                                    insert_values.append(deadline_date)
+                                    append_field_value("deadline", deadline_date)
                                 
-                                # Add geocoding fields (Phase 4)
+                                # Geocoding fields (Phase 4)
                                 has_geocoding = False
                                 if latitude is not None:
-                                    insert_fields.append("latitude")
-                                    insert_values.append(latitude)
+                                    append_field_value("latitude", latitude)
                                     has_geocoding = True
                                 if longitude is not None:
-                                    insert_fields.append("longitude")
-                                    insert_values.append(longitude)
+                                    append_field_value("longitude", longitude)
                                     has_geocoding = True
                                 if geocoding_source:
-                                    insert_fields.append("geocoding_source")
-                                    insert_values.append(geocoding_source)
+                                    append_field_value("geocoding_source", geocoding_source)
                                     has_geocoding = True
                                 if is_remote is not None:
-                                    insert_fields.append("is_remote")
-                                    insert_values.append(is_remote)
+                                    append_field_value("is_remote", is_remote)
                                     has_geocoding = True
                                 if country:
-                                    insert_fields.append("country")
-                                    insert_values.append(country)
+                                    append_field_value("country", country)
                                     has_geocoding = True
                                 if country_iso:
-                                    insert_fields.append("country_iso")
-                                    insert_values.append(country_iso)
+                                    append_field_value("country_iso", country_iso)
                                     has_geocoding = True
                                 if city:
-                                    insert_fields.append("city")
-                                    insert_values.append(city)
+                                    append_field_value("city", city)
                                     has_geocoding = True
                                 # Add geocoded_at only if we have any geocoding data
                                 if has_geocoding:
-                                    insert_fields.append("geocoded_at")
-                                    insert_values.append("NOW()")
+                                    append_field_value("geocoded_at", "NOW()")
                                 
-                                # Add quality scoring fields (Phase 4)
+                                # Quality scoring fields (Phase 4)
                                 has_quality = False
                                 if quality_score is not None:
-                                    insert_fields.append("quality_score")
-                                    insert_values.append(quality_score)
+                                    append_field_value("quality_score", quality_score)
                                     has_quality = True
                                 if quality_grade:
-                                    insert_fields.append("quality_grade")
-                                    insert_values.append(quality_grade)
+                                    append_field_value("quality_grade", quality_grade)
                                     has_quality = True
                                 if quality_factors:
                                     import json
-                                    insert_fields.append("quality_factors")
-                                    insert_values.append(json.dumps(quality_factors))
+                                    append_field_value("quality_factors", json.dumps(quality_factors))
                                     has_quality = True
                                 if quality_issues:
-                                    insert_fields.append("quality_issues")
-                                    insert_values.append(quality_issues)
+                                    append_field_value("quality_issues", quality_issues)
                                     has_quality = True
                                 if needs_review is not None:
-                                    insert_fields.append("needs_review")
-                                    insert_values.append(needs_review)
+                                    append_field_value("needs_review", needs_review)
                                     has_quality = True
                                 # Add quality_scored_at only if we have any quality data
                                 if has_quality:
-                                    insert_fields.append("quality_scored_at")
-                                    insert_values.append("NOW()")
+                                    append_field_value("quality_scored_at", "NOW()")
                                 
-                                # Handle NOW() in SQL vs Python values
+                                # Construct placeholders and sql_values safely
                                 placeholders = []
                                 sql_values = []
-                                for i, val in enumerate(insert_values):
-                                    if val == "NOW()":
+                                for v in insert_values:
+                                    if v == "NOW()":
                                         placeholders.append("NOW()")
                                     else:
                                         placeholders.append("%s")
-                                        sql_values.append(val)
+                                        sql_values.append(v)
+                                
+                                # Validation check with strong logging
+                                if len(insert_fields) != len(placeholders):
+                                    logger.error(f"DEBUG_SQL: FIELD/PLACEHOLDER MISMATCH: fields={len(insert_fields)} placeholders={len(placeholders)}")
+                                    logger.error(f"DEBUG_SQL: Fields={insert_fields}")
+                                    logger.error(f"DEBUG_SQL: Placeholders={placeholders}")
+                                    logger.error(f"DEBUG_SQL: ValuesPreview={[str(v)[:80] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
+                                    raise ValueError("Field/placeholder mismatch after reconstruction")
                                 
                                 # DEBUG: Log SQL construction details before validation
                                 logger.error(f"DEBUG_SQL: Field count = {len(insert_fields)} | Value count = {len(insert_values)} | Placeholder count = {len(placeholders)} | SQL value count = {len(sql_values)}")
