@@ -1826,11 +1826,39 @@ class SimpleCrawler:
                     }
                 
                 # Extract jobs from listing page
-                # Try AI extraction first if available
+                # Check if we should use new pipeline extractor (rollout)
                 jobs = []
                 logger.info(f"Starting job extraction for {org_name} (HTML length: {len(html)} chars)")
                 
-                if self.use_ai and self.ai_extractor:
+                # Check rollout config for new extractor
+                use_new_extractor = False
+                try:
+                    from core.rollout_config import get_rollout_config
+                    rollout_config = get_rollout_config()
+                    use_new_extractor = rollout_config.should_use_new_extractor(careers_url)
+                    if use_new_extractor:
+                        logger.info(f"Using NEW pipeline extractor for {org_name} (domain in allowlist, rollout={rollout_config.rollout_percent}%)")
+                except Exception as e:
+                    logger.warning(f"Error checking rollout config: {e}, using default extraction")
+                
+                if use_new_extractor:
+                    # Use new pipeline extractor
+                    try:
+                        from pipeline.integration import PipelineAdapter
+                        pipeline_adapter = PipelineAdapter(
+                            db_url=self.db_url,
+                            enable_ai=self.use_ai,
+                            shadow_mode=rollout_config.is_shadow_mode()
+                        )
+                        jobs = await pipeline_adapter.extract_jobs_from_html(html, careers_url)
+                        logger.info(f"New pipeline extractor found {len(jobs)} jobs for {org_name}")
+                    except Exception as e:
+                        logger.error(f"New pipeline extractor failed: {e}, falling back to default", exc_info=True)
+                        use_new_extractor = False  # Fall through to default
+                
+                if not use_new_extractor:
+                    # Default extraction (existing behavior)
+                    if self.use_ai and self.ai_extractor:
                     try:
                         logger.info(f"Attempting AI extraction for {org_name}...")
                         # Use asyncio.wait_for to add overall timeout (2 minutes max)

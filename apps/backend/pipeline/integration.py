@@ -40,6 +40,9 @@ class PipelineAdapter:
         # Convert to existing format
         jobs = []
         
+        # Note: The new extractor returns a single ExtractionResult for a page
+        # For listing pages, we may need to extract multiple jobs
+        # For now, if it's classified as a job page, we create one job entry
         if result.is_job:
             job = {}
             

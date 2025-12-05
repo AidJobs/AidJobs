@@ -167,6 +167,22 @@ class ExtractionResult:
             "classifier_score": round(self.classifier_score, 2),
             "dedupe_hash": self.dedupe_hash
         }
+    
+    def get_overall_confidence(self) -> float:
+        """Compute overall confidence score from all fields."""
+        if not self.fields:
+            return 0.0
+        
+        # Average confidence of all fields with values
+        confidences = [
+            field.confidence for field in self.fields.values()
+            if field and field.is_valid()
+        ]
+        
+        if not confidences:
+            return 0.0
+        
+        return sum(confidences) / len(confidences)
 
 
 class Extractor:
