@@ -1,0 +1,47 @@
+name: Extraction Pipeline Tests
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend/pipeline/**'
+      - 'apps/backend/tests/test_pipeline_*.py'
+      - '.github/workflows/extraction-tests.yml'
+  push:
+    branches:
+      - 'fix/robust-extractor-*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: apps/backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio scikit-learn
+      
+      - name: Run unit tests
+        working-directory: apps/backend
+        run: |
+          pytest tests/test_pipeline_extractor.py -v --cov=pipeline --cov-report=term-missing
+      
+      - name: Check extraction accuracy
+        working-directory: apps/backend
+        run: |
+          python scripts/check_extraction_accuracy.py --threshold 0.85
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      
+      - name: Validate schema compliance
+        working-directory: apps/backend
+        run: |
+          python scripts/validate_extraction_schema.py
+

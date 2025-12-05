@@ -1,0 +1,216 @@
+{
+  "audit_timestamp": "2025-01-05T19:00:00Z",
+  "audit_version": "1.0.0",
+  "findings": {
+    "database": {
+      "jobs_table": {
+        "name": "jobs",
+        "location": "infra/supabase.sql",
+        "exists": true,
+        "primary_key": "id (UUID)",
+        "unique_constraint": "canonical_hash (TEXT NOT NULL UNIQUE)",
+        "key_columns": [
+          "id", "source_id", "org_name", "title", "location_raw", "country",
+          "country_iso", "city", "deadline", "apply_url", "description_snippet",
+          "canonical_hash", "status", "created_at", "updated_at"
+        ],
+        "enrichment_columns": [
+          "level_norm", "mission_tags", "international_eligible", "org_type",
+          "career_type", "contract_type", "work_modality", "functional_tags",
+          "latitude", "longitude", "geocoding_source", "is_remote",
+          "quality_score", "quality_grade", "quality_factors", "quality_issues"
+        ],
+        "notes": "Comprehensive schema with Phase 1-4 enhancements. Uses canonical_hash for deduplication."
+      },
+      "related_tables": {
+        "sources": {
+          "name": "sources",
+          "relationship": "jobs.source_id REFERENCES sources(id)",
+          "purpose": "Tracks job sources/organizations"
+        },
+        "raw_pages": {
+          "name": "raw_pages",
+          "location": "infra/migrations/phase2_observability.sql",
+          "purpose": "Stores raw HTML for debugging",
+          "relationship": "extraction_logs.raw_page_id REFERENCES raw_pages(id)"
+        },
+        "extraction_logs": {
+          "name": "extraction_logs",
+          "location": "infra/migrations/phase2_observability.sql",
+          "purpose": "Logs extraction attempts and results"
+        },
+        "failed_inserts": {
+          "name": "failed_inserts",
+          "location": "infra/migrations/phase2_observability.sql",
+          "purpose": "Tracks failed insertion attempts"
+        }
+      }
+    },
+    "insertion_code": {
+      "primary_method": {
+        "name": "save_jobs",
+        "location": "apps/backend/crawler_v2/simple_crawler.py:1083",
+        "class": "SimpleCrawler",
+        "signature": "def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict",
+        "features": [
+          "Upsert logic with canonical_hash",
+          "Pre-upsert validation",
+          "Geocoding integration (Phase 4)",
+          "Quality scoring integration (Phase 4)",
+          "Comprehensive error logging",
+          "Failed insert tracking"
+        ],
+        "notes": "Well-implemented but called manually. Not integrated with pipeline extractor."
+      },
+      "other_insertion_points": [
+        {
+          "name": "SimpleRSSCrawler.save_jobs",
+          "location": "apps/backend/crawler_v2/rss_crawler.py:163",
+          "notes": "Similar logic to SimpleCrawler.save_jobs"
+        },
+        {
+          "name": "SimpleAPICrawler.save_jobs",
+          "location": "apps/backend/crawler_v2/api_crawler.py:169",
+          "notes": "Similar logic to SimpleCrawler.save_jobs"
+        }
+      ]
+    },
+    "pipeline": {
+      "extractor": {
+        "name": "Extractor",
+        "location": "apps/backend/pipeline/extractor.py:172",
+        "methods": [
+          "extract_from_html(html, url, soup=None) -> ExtractionResult",
+          "extract_from_rss(feed_data, url) -> ExtractionResult",
+          "extract_from_json(json_data, url) -> ExtractionResult"
+        ],
+        "output_schema": "ExtractionResult",
+        "features": [
+          "7-stage extraction pipeline",
+          "Job page classifier",
+          "JSON-LD extraction",
+          "Meta/OpenGraph parsing",
+          "DOM selectors",
+          "Heuristic extraction",
+          "Regex fallback",
+          "AI fallback (optional)"
+        ],
+        "notes": "Returns ExtractionResult with FieldResult objects. No automatic DB insertion."
+      },
+      "integration": {
+        "name": "PipelineAdapter",
+        "location": "apps/backend/pipeline/integration.py:17",
+        "purpose": "Adapts pipeline to existing crawler interface",
+        "methods": [
+          "extract_jobs_from_html(html, base_url) -> List[Dict]",
+          "extract_from_rss_entry(entry, url) -> Dict",
+          "extract_from_json(json_data, url) -> Dict"
+        ],
+        "notes": "Converts ExtractionResult to existing Dict format. Does not save to DB."
+      },
+      "snapshot": {
+        "name": "SnapshotManager",
+        "location": "apps/backend/pipeline/snapshot.py",
+        "purpose": "Saves raw HTML and extraction metadata",
+        "notes": "Already integrated with extractor. Saves to filesystem/Supabase."
+      }
+    },
+    "api_endpoints": {
+      "existing_job_endpoints": [
+        {
+          "path": "/api/admin/jobs/search",
+          "method": "GET",
+          "location": "apps/backend/app/job_management.py:84",
+          "purpose": "Search and filter jobs (admin)",
+          "authentication": "admin_required"
+        },
+        {
+          "path": "/api/jobs/{job_id}",
+          "method": "GET",
+          "location": "apps/backend/main.py:420",
+          "purpose": "Get single job by ID",
+          "authentication": "None (public)"
+        },
+        {
+          "path": "/api/search/query",
+          "method": "GET",
+          "location": "apps/backend/app/search.py",
+          "purpose": "Search jobs (public)",
+          "authentication": "None (public)"
+        }
+      ],
+      "extraction_endpoints": {
+        "status": "None found",
+        "notes": "No read-only endpoints for extracted jobs from pipeline. Need to add."
+      }
+    },
+    "frontend_consumption": {
+      "job_listing": {
+        "endpoint": "/api/search/query",
+        "location": "apps/frontend (Next.js)",
+        "notes": "Frontend consumes /api/search/query for job listings"
+      },
+      "job_details": {
+        "endpoint": "/api/jobs/{job_id}",
+        "notes": "Frontend consumes /api/jobs/{job_id} for job details"
+      }
+    }
+  },
+  "recommendations": {
+    "database": {
+      "action": "Reuse existing 'jobs' table",
+      "reason": "Comprehensive schema already exists with all needed columns",
+      "shadow_mode": "Create 'jobs_side' table for shadow mode testing"
+    },
+    "insertion": {
+      "action": "Create pipeline/db_insert.py to wrap save_jobs logic",
+      "reason": "Need centralized insertion with shadow mode support",
+      "integration": "Wire into Extractor.extract_from_* methods as optional hook"
+    },
+    "api": {
+      "action": "Add read-only endpoints under /_internal/jobs",
+      "reason": "Need to expose extracted jobs without frontend changes",
+      "authentication": "Use INTERNAL_API_KEY header token"
+    },
+    "field_mapping": {
+      "action": "Create config/integrations.yaml for field mapping",
+      "reason": "Map ExtractionResult fields to jobs table columns",
+      "notes": "ExtractionResult uses 'application_url', jobs table uses 'apply_url'"
+    }
+  },
+  "missing_pieces": [
+    {
+      "component": "pipeline/db_insert.py",
+      "purpose": "Centralized DB insertion with shadow mode",
+      "priority": "high"
+    },
+    {
+      "component": "Extractor integration hook",
+      "purpose": "Optional post-extraction insertion",
+      "priority": "high"
+    },
+    {
+      "component": "Read-only API endpoints",
+      "purpose": "Expose extracted jobs",
+      "priority": "medium"
+    },
+    {
+      "component": "config/integrations.yaml",
+      "purpose": "Field mapping configuration",
+      "priority": "medium"
+    },
+    {
+      "component": "Shadow mode table migration",
+      "purpose": "jobs_side table for testing",
+      "priority": "low (can use existing jobs table with flag)"
+    }
+  ],
+  "safety_considerations": {
+    "default_behavior": "Storage disabled by default (EXTRACTION_USE_STORAGE=false)",
+    "shadow_mode": "Default true (EXTRACTION_SHADOW_MODE=true)",
+    "production_writes": "Opt-in via env var",
+    "deduplication": "Uses existing canonical_hash logic",
+    "validation": "Reuses existing pre-upsert validation"
+  }
+}
+

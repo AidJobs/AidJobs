@@ -39,9 +39,9 @@ else:
 # Change to backend directory for imports
 os.chdir(backend_dir)
 
-from crawler.html_fetch import HTMLCrawler
-from crawler.rss_fetch import RSSCrawler
-from crawler.api_fetch import APICrawler
+from crawler_v2.simple_crawler import SimpleCrawler
+from crawler_v2.rss_crawler import SimpleRSSCrawler
+from crawler_v2.api_crawler import SimpleAPICrawler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -127,18 +127,32 @@ async def test_source_extraction(source: Dict, dry_run: bool = True) -> Dict:
     }
     
     try:
+        import os
+        use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+        
         if source_type == 'html':
-            crawler = HTMLCrawler(db_url)
-            jobs = await crawler.fetch_jobs(careers_url, org_name, source_id)
+            crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            status, html = await crawler.fetch_html(careers_url)
+            if status == 200:
+                jobs = crawler.extract_jobs_from_html(html, careers_url)
+            else:
+                jobs = []
             
         elif source_type == 'rss':
-            crawler = RSSCrawler(db_url)
-            jobs = await crawler.fetch_feed(careers_url)
-            jobs = [crawler.normalize_job(job, org_name) for job in jobs]
+            crawler = SimpleRSSCrawler(db_url)
+            feed = await crawler.fetch_feed(careers_url)
+            if feed:
+                jobs = crawler.extract_jobs_from_feed(feed, careers_url)
+            else:
+                jobs = []
             
         elif source_type == 'json' or source_type == 'api':
-            crawler = APICrawler(db_url)
-            jobs = await crawler.fetch_jobs(careers_url, org_name, source_id)
+            crawler = SimpleAPICrawler(db_url)
+            data = await crawler.fetch_api(careers_url)
+            if data:
+                jobs = crawler.extract_jobs_from_json(data, careers_url)
+            else:
+                jobs = []
             
         else:
             raise ValueError(f"Unknown source type: {source_type}")

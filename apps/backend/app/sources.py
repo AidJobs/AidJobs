@@ -593,7 +593,7 @@ async def test_source(
             try:
                 import json
                 import os
-                from crawler.api_fetch import APICrawler
+                from crawler_v2.api_crawler import SimpleAPICrawler
                 from core.secrets import check_required_secrets, mask_secrets
                 
                 # Check if it's v1 schema
@@ -617,7 +617,7 @@ async def test_source(
                     if not db_url:
                         raise HTTPException(status_code=500, detail="Database not configured")
                     
-                    api_crawler = APICrawler(db_url)
+                    api_crawler = SimpleAPICrawler(db_url)
                     # Temporarily limit to 1 page for testing
                     test_schema = dict(schema)
                     if "pagination" in test_schema:
@@ -936,46 +936,44 @@ async def simulate_extract(
             source_type = 'api'
         
         if source_type == 'html':
-            from crawler.html_fetch import fetch_html_jobs
-            jobs = await fetch_html_jobs(
-                url=source['careers_url'],
-                org_name=source['org_name'],
-                org_type=source['org_type'],
-                parser_hint=source['parser_hint'],
-                conn_params=conn_params
-            )
-        elif source_type == 'rss':
-            from crawler.rss_fetch import fetch_rss_jobs
-            # time_window is a string like "22:00-05:00", not a number
-            # RSS crawler doesn't use time_window_days parameter in fetch_rss_jobs
-            # It's stored but not used in the current implementation
-            jobs = await fetch_rss_jobs(
-                url=source['careers_url'],
-                org_name=source['org_name'],
-                org_type=source['org_type'],
-                time_window_days=None,  # Not currently used in RSS crawler
-                conn_params=conn_params
-            )
-        elif source_type == 'api':
-            from crawler.api_fetch import APICrawler
+            from crawler_v2.simple_crawler import SimpleCrawler
             import os
             db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
             if not db_url:
                 raise HTTPException(status_code=500, detail="Database not configured")
-            api_crawler = APICrawler(db_url)
-            # For simulate, don't use incremental fetching
-            raw_jobs = await api_crawler.fetch_api(
-                source['careers_url'],
-                source.get('parser_hint'),
-                last_success_at=None
-            )
-            # Normalize jobs (similar to orchestrator)
-            from crawler.html_fetch import HTMLCrawler
-            html_crawler = HTMLCrawler(db_url)
-            jobs = [
-                html_crawler.normalize_job(job, source.get('org_name'))
-                for job in raw_jobs
-            ]
+            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+            html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            # Fetch and extract jobs
+            status, html = await html_crawler.fetch_html(source['careers_url'])
+            if status == 200:
+                jobs = html_crawler.extract_jobs_from_html(html, source['careers_url'])
+            else:
+                jobs = []
+        elif source_type == 'rss':
+            from crawler_v2.rss_crawler import SimpleRSSCrawler
+            import os
+            db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+            if not db_url:
+                raise HTTPException(status_code=500, detail="Database not configured")
+            rss_crawler = SimpleRSSCrawler(db_url)
+            feed = await rss_crawler.fetch_feed(source['careers_url'])
+            if feed:
+                jobs = rss_crawler.extract_jobs_from_feed(feed, source['careers_url'])
+            else:
+                jobs = []
+        elif source_type == 'api':
+            from crawler_v2.api_crawler import SimpleAPICrawler
+            import os
+            db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+            if not db_url:
+                raise HTTPException(status_code=500, detail="Database not configured")
+            api_crawler = SimpleAPICrawler(db_url)
+            # For simulate, fetch API and extract jobs
+            data = await api_crawler.fetch_api(source['careers_url'])
+            if data:
+                jobs = api_crawler.extract_jobs_from_json(data, source['careers_url'])
+            else:
+                jobs = []
         else:
             raise HTTPException(
                 status_code=400, 

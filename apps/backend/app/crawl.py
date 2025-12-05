@@ -16,9 +16,9 @@ except ImportError:
     psycopg2 = None
 
 from app.db_config import db_config
-from crawler.html_fetch import HTMLCrawler
-from crawler.rss_fetch import RSSCrawler
-from crawler.api_fetch import APICrawler
+from crawler_v2.simple_crawler import SimpleCrawler
+from crawler_v2.rss_crawler import SimpleRSSCrawler
+from crawler_v2.api_crawler import SimpleAPICrawler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -125,106 +125,47 @@ def run_crawl(request: CrawlRequest, _: None = Depends(require_dev_mode)):
                 consecutive_failures = source_meta.get('consecutive_failures', 0) if source_meta else 0
                 consecutive_nochange = source_meta.get('consecutive_nochange', 0) if source_meta else 0
                 
-                # Run async crawl
+                # Run async crawl using new enterprise scrapers
                 async def run_async_crawl():
-                    html_crawler = HTMLCrawler(db_url)  # Always use HTMLCrawler for upsert_jobs
+                    import os
+                    use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
                     
                     if source_type == 'rss':
-                        rss_crawler = RSSCrawler(db_url)
-                        raw_jobs = await rss_crawler.fetch_feed(careers_url)
-                        normalized_jobs = [
-                            rss_crawler.normalize_job(job, org_name)
-                            for job in raw_jobs
-                        ]
+                        rss_crawler = SimpleRSSCrawler(db_url)
+                        # SimpleRSSCrawler doesn't have normalize_job, jobs are already normalized
+                        result = await rss_crawler.crawl_source({
+                            'id': source_id,
+                            'careers_url': careers_url,
+                            'org_name': org_name,
+                            'source_type': 'rss'
+                        })
+                        counts = result.get('counts', {})
+                        message = result.get('message', 'Crawl completed')
+                        return {'status': result.get('status', 'ok'), 'message': message, 'counts': counts}
                     elif source_type == 'api' or source_type == 'json':
-                        api_crawler = APICrawler(db_url)
-                        try:
-                            raw_jobs = await api_crawler.fetch_api(careers_url, parser_hint, None)
-                            logger.info(f"[crawl] API fetch returned {len(raw_jobs)} raw jobs from {careers_url}")
-                            
-                            if not raw_jobs:
-                                # Fallback: try HTML extraction for UNDP if API returns nothing
-                                if 'undp.org' in careers_url.lower():
-                                    logger.info(f"[crawl] API returned no jobs for UNDP, trying HTML extraction as fallback")
-                                    status, headers, html, size = await html_crawler.fetch_html(careers_url)
-                                    if status == 200:
-                                        raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
-                                        logger.info(f"[crawl] HTML fallback extracted {len(raw_jobs)} jobs")
-                            
-                            normalized_jobs = [
-                                html_crawler.normalize_job(job, org_name)
-                                for job in raw_jobs
-                            ]
-                            
-                            # Log apply_url extraction for debugging
-                            for job in normalized_jobs[:3]:  # Log first 3 jobs
-                                logger.debug(f"[crawl] Sample job: title='{job.get('title')}', apply_url='{job.get('apply_url')}'")
-                        except Exception as api_error:
-                            logger.error(f"[crawl] API fetch failed: {api_error}")
-                            # For UNDP, try HTML as fallback
-                            if 'undp.org' in careers_url.lower():
-                                logger.info(f"[crawl] Trying HTML extraction as fallback for UNDP")
-                                status, headers, html, size = await html_crawler.fetch_html(careers_url)
-                                if status == 200:
-                                    raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
-                                    normalized_jobs = [
-                                        html_crawler.normalize_job(job, org_name)
-                                        for job in raw_jobs
-                                    ]
-                                else:
-                                    raise api_error
-                            else:
-                                raise api_error
+                        api_crawler = SimpleAPICrawler(db_url)
+                        result = await api_crawler.crawl_source({
+                            'id': source_id,
+                            'careers_url': careers_url,
+                            'org_name': org_name,
+                            'source_type': 'api',
+                            'parser_hint': parser_hint
+                        })
+                        counts = result.get('counts', {})
+                        message = result.get('message', 'Crawl completed')
+                        return {'status': result.get('status', 'ok'), 'message': message, 'counts': counts}
                     else:  # html (default)
-                        status, headers, html, size = await html_crawler.fetch_html(careers_url)
-                        
-                        if status == 304:
-                            return {'status': 'ok', 'message': 'Not modified (304)', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
-                        
-                        if status == 403:
-                            return {'status': 'fail', 'message': 'Blocked by robots.txt', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
-                        
-                        if status != 200:
-                            return {'status': 'fail', 'message': f'HTTP {status}: Failed to fetch HTML', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
-                        
-                        # Extract jobs using the same logic as simulation
-                        raw_jobs = html_crawler.extract_jobs(html, careers_url, parser_hint)
-                        
-                        if not raw_jobs:
-                            logger.warning(f"[crawl] No jobs extracted from {careers_url}. HTML size: {size} bytes, parser_hint: {parser_hint or 'none'}")
-                            return {'status': 'fail', 'message': f'No jobs found. HTML fetched successfully ({size} bytes) but extraction returned 0 jobs. Try adding a parser_hint CSS selector to help identify job listings.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
-                        
-                        logger.info(f"[crawl] Extracted {len(raw_jobs)} raw jobs from {careers_url}")
-                        
-                        normalized_jobs = [
-                            html_crawler.normalize_job(job, org_name)
-                            for job in raw_jobs
-                        ]
-                        
-                        # Filter out jobs that lost their title during normalization
-                        normalized_jobs = [job for job in normalized_jobs if job.get('title')]
-                        logger.info(f"[crawl] Normalized to {len(normalized_jobs)} jobs with titles")
-                    
-                    # Upsert jobs (HTMLCrawler has the upsert_jobs method)
-                    if not normalized_jobs:
-                        logger.warning(f"[crawl] No valid jobs after normalization from {careers_url}")
-                        return {'status': 'fail', 'message': 'No valid jobs found after extraction and normalization. Check if the page structure matches expected job listing format.', 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}}
-                    
-                    counts = await html_crawler.upsert_jobs(normalized_jobs, source_id)
-                    
-                    # Create a more informative message
-                    if counts['found'] == 0:
-                        message = "No jobs found on the page"
-                    elif counts['inserted'] > 0 and counts['updated'] > 0:
-                        message = f"Found {counts['found']} job(s): {counts['inserted']} new, {counts['updated']} updated"
-                    elif counts['inserted'] > 0:
-                        message = f"Found {counts['found']} job(s): {counts['inserted']} new"
-                    elif counts['updated'] > 0:
-                        message = f"Found {counts['found']} job(s): {counts['updated']} updated with latest data"
-                    else:
-                        message = f"Found {counts['found']} job(s) (no changes)"
-                    
-                    return {'status': 'ok', 'message': message, 'counts': counts}
+                        html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
+                        result = await html_crawler.crawl_source({
+                            'id': source_id,
+                            'careers_url': careers_url,
+                            'org_name': org_name,
+                            'source_type': 'html',
+                            'parser_hint': parser_hint
+                        })
+                        counts = result.get('counts', {})
+                        message = result.get('message', 'Crawl completed')
+                        return {'status': result.get('status', 'ok'), 'message': message, 'counts': counts}
                 
                 result = asyncio.run(run_async_crawl())
                 duration_ms = int((time.time() - start_time) * 1000)

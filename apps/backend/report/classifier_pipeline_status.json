@@ -1,0 +1,74 @@
+{
+  "status": "partial",
+  "branch": "fix/robust-followup-20250105-180000",
+  "timestamp": "2025-01-05T18:00:00Z",
+  "completed": {
+    "labeling_batch": {
+      "status": "complete",
+      "file": "tools/labeling/labeling_batch.csv",
+      "rows": 200,
+      "suggested_labels": {
+        "job": 127,
+        "not_job": 73
+      }
+    },
+    "labeling_instructions": {
+      "status": "complete",
+      "file": "tools/labeling/labeling_instructions.md"
+    },
+    "labeling_ui": {
+      "status": "complete",
+      "file": "tools/labeling/app.py",
+      "note": "Flask app for web-based labeling (optional)"
+    },
+    "convert_script": {
+      "status": "complete",
+      "file": "scripts/convert_labels_for_training.py"
+    },
+    "build_script": {
+      "status": "complete",
+      "file": "scripts/build_classifier.py"
+    },
+    "unit_tests": {
+      "status": "complete",
+      "file": "tests/test_classifier_training.py"
+    }
+  },
+  "pending": {
+    "human_labeling": {
+      "status": "pending",
+      "description": "Human labelers need to label 200 pages using labeling_batch.csv or web UI",
+      "output": "tools/labeling/labels/labels.csv"
+    },
+    "training_data_conversion": {
+      "status": "pending",
+      "description": "Run scripts/convert_labels_for_training.py after labeling",
+      "output": "tools/labeling/training_data.csv"
+    },
+    "model_training": {
+      "status": "pending",
+      "description": "Run scripts/build_classifier.py after conversion",
+      "output": "models/job_classifier_v1.pkl"
+    },
+    "metrics_report": {
+      "status": "pending",
+      "description": "Generated after training",
+      "output": "report/classifier_metrics.json"
+    }
+  },
+  "next_steps": [
+    "1. Label pages using tools/labeling/labeling_batch.csv or web UI (tools/labeling/app.py)",
+    "2. Run: python scripts/convert_labels_for_training.py",
+    "3. Run: python scripts/build_classifier.py",
+    "4. Verify model: models/job_classifier_v1.pkl",
+    "5. Check metrics: report/classifier_metrics.json"
+  ],
+  "notes": [
+    "Labeling batch generated from test fixtures (21 pages expanded to 200)",
+    "Flask UI requires: pip install flask (or use requirements-dev.txt)",
+    "Training requires scikit-learn (already in requirements.txt)",
+    "Minimum 20 labeled examples needed for training",
+    "Target: F1 score > 0.5 on test set"
+  ]
+}
+

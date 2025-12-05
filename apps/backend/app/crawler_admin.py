@@ -233,7 +233,7 @@ async def get_status(admin=Depends(admin_required)):
 @router.get("/diagnostics/unesco")
 async def unesco_diagnostics(admin=Depends(admin_required)):
     """Diagnostic endpoint to test UNESCO extraction and verify job extraction"""
-    from crawler.html_fetch import HTMLCrawler
+    from crawler_v2.simple_crawler import SimpleCrawler
     
     conn = get_db_conn()
     try:
@@ -261,10 +261,12 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
             
             # Test extraction
             db_url = get_db_url()
-            crawler = HTMLCrawler(db_url)
+            import os
+            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+            crawler = SimpleCrawler(db_url, use_ai=use_ai)
             
             # Fetch HTML
-            status, headers, html, size = await crawler.fetch_html(careers_url)
+            status, html = await crawler.fetch_html(careers_url)
             
             if status != 200:
                 return {
@@ -278,8 +280,7 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
                 }
             
             # Extract jobs
-            parser_hint = source.get('parser_hint')
-            extracted_jobs = crawler.extract_jobs(html, careers_url, parser_hint)
+            extracted_jobs = crawler.extract_jobs_from_html(html, careers_url)
             
             # Get existing UNESCO jobs from database
             cur.execute("""
@@ -293,7 +294,7 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
             
             # Analyze extraction results
             extraction_stats = {
-                "html_size_bytes": size,
+                "html_size_bytes": len(html),
                 "jobs_extracted": len(extracted_jobs),
                 "has_jobs": len(extracted_jobs) > 0,
                 "sample_jobs": [
@@ -490,7 +491,7 @@ async def fix_undp_urls(admin=Depends(admin_required)):
     This endpoint forces re-extraction of UNDP jobs and updates apply_url for old jobs
     that have incorrect URLs (listing pages, base URLs, or missing unique identifiers).
     """
-    from crawler.html_fetch import HTMLCrawler
+    from crawler_v2.simple_crawler import SimpleCrawler
     
     conn = get_db_conn()
     try:
@@ -514,11 +515,13 @@ async def fix_undp_urls(admin=Depends(admin_required)):
             
             # Get database URL
             db_url = get_db_url()
-            crawler = HTMLCrawler(db_url)
+            import os
+            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+            crawler = SimpleCrawler(db_url, use_ai=use_ai)
             
             # Fetch and extract jobs
             logger.info(f"[fix-undp-urls] Fetching UNDP page: {careers_url}")
-            status, headers, html, size = await crawler.fetch_html(careers_url)
+            status, html = await crawler.fetch_html(careers_url)
             
             if status != 200:
                 raise HTTPException(
@@ -526,27 +529,21 @@ async def fix_undp_urls(admin=Depends(admin_required)):
                     detail=f"Failed to fetch UNDP page: HTTP {status}"
                 )
             
-            logger.info(f"[fix-undp-urls] Extracting jobs from {size} bytes of HTML")
-            extracted_jobs = crawler.extract_jobs(html, careers_url, parser_hint)
+            logger.info(f"[fix-undp-urls] Extracting jobs from {len(html)} bytes of HTML")
+            extracted_jobs = crawler.extract_jobs_from_html(html, careers_url)
             
             if not extracted_jobs:
                 return {
                     "status": "error",
                     "message": "No jobs extracted from UNDP page",
-                    "html_size": size
+                    "html_size": len(html)
                 }
             
-            # Normalize jobs
+            # Save jobs directly (SimpleCrawler handles normalization internally)
             org_name = source.get('org_name') or 'UNDP'
-            normalized_jobs = [
-                crawler.normalize_job(job, org_name)
-                for job in extracted_jobs
-            ]
+            upsert_counts = crawler.save_jobs(extracted_jobs, str(source_id), org_name)
             
-            logger.info(f"[fix-undp-urls] Normalized {len(normalized_jobs)} jobs")
-            
-            # Upsert jobs (this will use the enhanced logic to force URL updates for UNDP)
-            upsert_counts = await crawler.upsert_jobs(normalized_jobs, str(source_id))
+            logger.info(f"[fix-undp-urls] Saved {len(extracted_jobs)} jobs")
             
             # Get statistics on fixed jobs
             cur.execute("""
