@@ -1,0 +1,142 @@
+{
+  "status": "code_complete",
+  "branch": "fix/robust-followup-20250105-180000",
+  "pr_url": "https://github.com/AidJobs/AidJobs/pull/new/fix/robust-followup-20250105-180000",
+  "timestamp": "2025-01-05T18:00:00Z",
+  "code_deliverables": {
+    "status": "complete",
+    "items": {
+      "labeling_batch": {
+        "path": "apps/backend/tools/labeling/labeling_batch.csv",
+        "status": "complete",
+        "rows": 200,
+        "columns": ["url", "raw_html_snippet", "suggested_label", "label"]
+      },
+      "labeling_instructions": {
+        "path": "apps/backend/tools/labeling/labeling_instructions.md",
+        "status": "complete"
+      },
+      "labeling_ui": {
+        "path": "apps/backend/tools/labeling/app.py",
+        "status": "complete",
+        "features": [
+          "Loads labeling_batch.csv",
+          "Shows raw_html_snippet and suggested_label",
+          "Allows labeler to change to job/not_job",
+          "Writes to labels/labels.csv with columns: url, label, labeled_by, labeled_at"
+        ]
+      },
+      "labeling_readme": {
+        "path": "apps/backend/tools/labeling/README.md",
+        "status": "complete",
+        "includes": [
+          "Quick start instructions",
+          "Web UI usage",
+          "CSV bulk editing",
+          "Import/export instructions",
+          "Troubleshooting"
+        ]
+      },
+      "convert_script": {
+        "path": "apps/backend/scripts/convert_labels_for_training.py",
+        "status": "complete",
+        "function": "Converts labels/labels.csv to training format"
+      },
+      "build_script": {
+        "path": "apps/backend/scripts/build_classifier.py",
+        "status": "complete",
+        "features": [
+          "Loads labels/labels.csv",
+          "Trains TF-IDF + LogisticRegression",
+          "Saves to models/job_classifier_v1.pkl",
+          "Emits metrics to report/classifier_metrics.json",
+          "Uses deterministic random seed",
+          "Prints summary to stdout"
+        ]
+      },
+      "unit_tests": {
+        "test_classifier_training": {
+          "path": "apps/backend/tests/test_classifier_training.py",
+          "status": "complete",
+          "verifies": [
+            "Training runs",
+            "models/job_classifier_v1.pkl is produced",
+            "report/classifier_metrics.json exists",
+            "Metrics include precision/recall/f1 keys"
+          ]
+        },
+        "test_rule_based_classifier": {
+          "path": "apps/backend/tests/unit/test_rule_based_classifier.py",
+          "status": "complete",
+          "verifies": [
+            "Job keywords detection",
+            "URL pattern matching",
+            "Negative indicators",
+            "Apply button detection",
+            "Job selector detection",
+            "Score normalization"
+          ]
+        }
+      },
+      "requirements": {
+        "path": "apps/backend/requirements-dev.txt",
+        "status": "complete",
+        "includes": ["flask==3.0.0"]
+      }
+    }
+  },
+  "data_deliverables": {
+    "status": "pending_human_labeling",
+    "items": {
+      "labels_csv": {
+        "path": "apps/backend/tools/labeling/labels/labels.csv",
+        "status": "pending",
+        "note": "Will be created after human labeling (via UI or CSV editing)"
+      },
+      "trained_model": {
+        "path": "apps/backend/models/job_classifier_v1.pkl",
+        "status": "pending",
+        "note": "Will be generated after running scripts/build_classifier.py"
+      },
+      "metrics_report": {
+        "path": "apps/backend/report/classifier_metrics.json",
+        "status": "pending",
+        "note": "Will be generated after training"
+      }
+    }
+  },
+  "workflow_status": {
+    "step_1_labeling": {
+      "status": "ready",
+      "action": "Human labelers label 200 pages",
+      "options": [
+        "Web UI: python tools/labeling/app.py",
+        "CSV editing: Edit labeling_batch.csv, save to labels/labels.csv"
+      ]
+    },
+    "step_2_conversion": {
+      "status": "ready",
+      "action": "Convert labels to training format",
+      "command": "python scripts/convert_labels_for_training.py"
+    },
+    "step_3_training": {
+      "status": "ready",
+      "action": "Train classifier",
+      "command": "python scripts/build_classifier.py"
+    },
+    "step_4_verification": {
+      "status": "ready",
+      "action": "Run tests",
+      "command": "python -m pytest tests/test_classifier_training.py tests/unit/test_rule_based_classifier.py -v"
+    }
+  },
+  "summary": {
+    "code_implementation": "100% complete",
+    "all_scripts_created": true,
+    "all_tests_created": true,
+    "documentation_complete": true,
+    "ready_for_human_labeling": true,
+    "next_action": "Human labelers need to label 200 pages before training can proceed"
+  }
+}
+
