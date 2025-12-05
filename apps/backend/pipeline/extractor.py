@@ -173,7 +173,8 @@ class Extractor:
     """Main extraction orchestrator."""
     
     def __init__(self, db_url: Optional[str] = None, enable_ai: bool = True, 
-                 enable_snapshots: bool = True, shadow_mode: bool = False):
+                 enable_snapshots: bool = True, shadow_mode: bool = False,
+                 enable_storage: Optional[bool] = None):
         self.db_url = db_url
         self.enable_ai = enable_ai
         self.enable_snapshots = enable_snapshots
@@ -186,7 +187,21 @@ class Extractor:
         self.ai_extractor = AIFallbackExtractor() if enable_ai else None
         self.snapshot_manager = SnapshotManager() if enable_snapshots else None
         
-        logger.info(f"Extractor initialized (AI: {enable_ai}, Snapshots: {enable_snapshots}, Shadow: {shadow_mode})")
+        # Initialize DB insertion (optional)
+        self.db_insert = None
+        if db_url and (enable_storage is None or enable_storage):
+            try:
+                from .db_insert import DBInsert
+                self.db_insert = DBInsert(
+                    db_url=db_url,
+                    use_storage=enable_storage,
+                    shadow_mode=shadow_mode
+                )
+                logger.info("DB insertion enabled for extractor")
+            except Exception as e:
+                logger.warning(f"Could not initialize DB insertion: {e}")
+        
+        logger.info(f"Extractor initialized (AI: {enable_ai}, Snapshots: {enable_snapshots}, Shadow: {shadow_mode}, Storage: {self.db_insert is not None})")
     
     async def extract_from_html(self, html: str, url: str, 
                                soup: Optional[BeautifulSoup] = None) -> ExtractionResult:
@@ -288,6 +303,17 @@ class Extractor:
             snapshot_data['manual_review'] = manual_review
             snapshot_data['validation_issues'] = validation_issues
             await self.snapshot_manager.save_snapshot(url, html, snapshot_data)
+        
+        # Optional: Insert into database (if enabled and is_job)
+        if self.db_insert and result.is_job:
+            try:
+                insert_status = self.db_insert.insert_job(result, shadow=self.shadow_mode)
+                if insert_status['success']:
+                    logger.debug(f"Inserted job into database: {insert_status.get('job_id')}")
+                else:
+                    logger.warning(f"Failed to insert job: {insert_status.get('error')}")
+            except Exception as e:
+                logger.error(f"Error inserting job into database: {e}", exc_info=True)
         
         return result
     
@@ -454,9 +480,6 @@ class Extractor:
         return result
 
 
-# Import version from __init__
-try:
-    from . import __version__
-except ImportError:
-    __version__ = "1.0.0"
+# Pipeline version
+__version__ = "1.0.0"
 

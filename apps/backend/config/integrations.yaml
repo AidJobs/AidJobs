@@ -1,0 +1,45 @@
+# Field mapping configuration for pipeline integration
+# Maps ExtractionResult field names to jobs table column names
+
+field_mapping:
+  # Core fields
+  title: title
+  employer: org_name
+  location: location_raw
+  deadline: deadline
+  description: description_snippet
+  application_url: apply_url
+  posted_on: fetched_at
+  requirements: raw_metadata  # Stored as JSONB
+
+# API configuration
+api:
+  # Internal API endpoints (read-only)
+  base_path: "/_internal"
+  jobs_list: "/_internal/jobs"
+  jobs_detail: "/_internal/jobs/{job_id}"
+  
+  # Authentication
+  auth_header: "X-Internal-Api-Key"
+  auth_env_var: "INTERNAL_API_KEY"
+
+# Storage configuration
+storage:
+  # Environment variables
+  use_storage_env: "EXTRACTION_USE_STORAGE"
+  shadow_mode_env: "EXTRACTION_SHADOW_MODE"
+  jobs_table_env: "JOBS_TABLE"
+  
+  # Defaults
+  use_storage_default: false
+  shadow_mode_default: true
+  jobs_table_default: "jobs"
+  shadow_table_suffix: "_side"
+
+# Deduplication
+deduplication:
+  # Method: canonical_hash (MD5 of title + URL)
+  method: "canonical_hash"
+  hash_fields: ["title", "application_url"]
+  hash_separator: "|"
+

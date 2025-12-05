@@ -207,6 +207,14 @@ try:
 except ImportError as e:
     logger.warning(f"[main] Could not import job_management routes: {e}")
 
+# Add pipeline API routes (read-only, internal)
+try:
+    from app.pipeline_api import router as pipeline_api_router
+    app.include_router(pipeline_api_router)
+    logger.info("[main] Pipeline API router loaded")
+except ImportError as e:
+    logger.warning(f"[main] Pipeline API router not available: {e}")
+
 
 
 

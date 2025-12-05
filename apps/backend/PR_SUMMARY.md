@@ -1,119 +1,112 @@
-# PR Summary: Core Extraction Pipeline (Tasks 1-8)
+# Integration: Pipeline Storage & Read-Only API
 
-## Branch
-`fix/robust-extractor-20250105-173044`
+## Summary
 
-## Overview
+This PR integrates the extraction pipeline with database storage and exposes read-only API endpoints for extracted jobs. All changes are **non-invasive** and **opt-in** via environment variables.
 
-This PR implements the core extraction pipeline (tasks 1-8) with a multi-stage fallback strategy, strict schema compliance, and shadow mode support.
+## Audit Findings
+
+See `report/integration-audit.json` for complete details.
+
+### Key Findings
+
+1. **Jobs table exists**: Comprehensive `jobs` table in `infra/supabase.sql` with all needed columns
+2. **Insertion code exists**: `SimpleCrawler.save_jobs()` handles upserts with validation
+3. **Pipeline exists**: `Extractor` class with `extract_from_html/rss/json` methods
+4. **API endpoints exist**: Job search/details endpoints already available
+5. **Missing**: Automatic storage integration and read-only endpoints for extracted jobs
 
 ## Changes
 
-### Core Pipeline Components
+### 1. Database Integration (`pipeline/db_insert.py`)
 
-1. **Extractor** (`pipeline/extractor.py`)
-   - 7-stage extraction chain: classifier → JSON-LD → meta → DOM → heuristics → regex → AI
-   - Strict schema compliance
-   - Per-field confidence scoring
-   - Validation with manual_review flags
+- New module wrapping `save_jobs` logic with shadow mode support
+- Maps `ExtractionResult` fields to `jobs` table columns
+- Respects `EXTRACTION_USE_STORAGE` and `EXTRACTION_SHADOW_MODE` env vars
+- Uses existing `canonical_hash` for deduplication
 
-2. **Classifier** (`pipeline/classifier.py`)
-   - Rule-based job page classification
-   - ML-ready architecture
-   - 20 seed examples (10 job, 10 non-job)
+### 2. Pipeline Integration
 
-3. **JSON-LD Extractor** (`pipeline/jsonld.py`)
-   - Schema.org JobPosting parsing
-   - Handles arrays, nested objects, @graph
-   - Maps validThrough → deadline, jobLocation → location
+- Added optional insertion hook to `Extractor` class
+- Wires `db_insert` after successful extraction
+- Only runs if `EXTRACTION_USE_STORAGE=true`
+- Logs to `extraction_logs` table
 
-4. **Heuristic Extractor** (`pipeline/heuristics.py`)
-   - Label-based extraction (Location:, Deadline:, etc.)
-   - Date parsing with dateutil support
-   - Multiple regex patterns
+### 3. Read-Only API (`app/pipeline_api.py`)
 
-5. **AI Fallback** (`pipeline/ai_fallback.py`)
-   - Deterministic prompts with few-shot examples
-   - Caching to limit API calls
-   - Only used when previous steps fail
+- New endpoints: `GET /_internal/jobs` and `GET /_internal/jobs/:id`
+- Returns `ExtractionResult` schema (not jobs table format)
+- Protected by `INTERNAL_API_KEY` header token
+- Default: disabled (requires env var)
 
-6. **Snapshot Manager** (`pipeline/snapshot.py`)
-   - Saves HTML and metadata to `snapshots/{domain}/{hash}.html`
-   - Includes per-field confidence and sources
-   - Manual review flags in metadata
+### 4. Configuration (`config/integrations.yaml`)
 
-7. **Browser Crawler Enhancement**
-   - Network idle waiting
-   - Error screenshots
-   - Final DOM capture
+- Field mapping: `ExtractionResult` → `jobs` table
+- Example: `application_url` → `apply_url`
+- Allows future customization without code changes
 
-8. **RSS/API Integration**
-   - Updated to use unified pipeline
-   - Maintains backward compatibility
+### 5. Tests
 
-### Tests
+- Unit tests: `tests/test_db_insert.py`
+- Integration tests: `tests/test_pipeline_integration.py`
+- Verifies shadow mode, field mapping, deduplication
 
-- Unit tests for JSON-LD, heuristics, classifier
-- Integration tests with saved HTML fixtures
-- Schema validation tests
+### 6. Documentation (`docs/INTEGRATION_RUNBOOK.md`)
 
-### Configuration
-
-- Domain overrides (`config/domains.yaml`)
-- Shadow mode support
-- AI call limits (200 in dry run)
-
-## Schema Compliance
-
-All extraction results match strict schema:
-```json
-{
-  "url": "string",
-  "canonical_id": "string",
-  "extracted_at": "ISO-8601",
-  "pipeline_version": "string",
-  "fields": {
-    "title": {"value": "...", "source": "...", "confidence": 0.9, "raw_snippet": "..."},
-    ...
-  },
-  "is_job": true,
-  "classifier_score": 0.85,
-  "dedupe_hash": "string"
-}
-```
+- How to enable storage
+- Shadow mode instructions
+- API usage examples
+- Rollback steps
 
 ## Safety
 
-- ✅ Shadow mode (snapshots only, no DB writes)
-- ✅ AI call limits (200 max in dry run)
-- ✅ Caching enabled
-- ✅ Validation flags for manual review
+- **Default**: Storage disabled (`EXTRACTION_USE_STORAGE=false`)
+- **Shadow mode**: Default true (`EXTRACTION_SHADOW_MODE=true`)
+- **Production writes**: Opt-in only
+- **No frontend changes**: All changes backend-only
+- **Backward compatible**: Existing code unchanged
+
+## Environment Variables
+
+```bash
+# Enable storage (default: false)
+EXTRACTION_USE_STORAGE=true
+
+# Shadow mode (default: true)
+EXTRACTION_SHADOW_MODE=true
+
+# Internal API key (required for read endpoints)
+INTERNAL_API_KEY=your-secret-key
+
+# Override jobs table name (optional)
+JOBS_TABLE=jobs
+```
+
+## Verification
+
+### SQL (Shadow Mode)
+```sql
+SELECT COUNT(*) FROM jobs_side WHERE created_at > NOW() - INTERVAL '1 hour';
+```
+
+### API (Read Endpoints)
+```bash
+curl -H "X-Internal-Api-Key: your-key" \
+  https://api.example.com/_internal/jobs?limit=10
+```
 
 ## Testing
 
-Run tests:
 ```bash
-pytest tests/test_pipeline_extractor.py tests/test_pipeline_integration.py -v
+# Unit tests
+pytest tests/test_db_insert.py -v
+
+# Integration tests
+pytest tests/test_pipeline_integration.py -v
 ```
 
-Generate report:
-```bash
-python scripts/generate_initial_report_focused.py
-```
+## Rollback
 
-## Next Steps
-
-1. Run shadow mode for validation
-2. Review snapshots and metadata
-3. Adjust heuristics based on results
-4. Retrain classifier with more labeled data
-
-## Files Changed
-
-- 9 new pipeline components
-- 2 test files (unit + integration)
-- 20 classifier seed examples
-- 2 sample job fixtures
-- Enhanced browser crawler
-- Updated RSS/API crawlers
-- Configuration and scripts
+1. Set `EXTRACTION_USE_STORAGE=false`
+2. Remove `INTERNAL_API_KEY` to disable API
+3. No database changes (uses existing tables)
