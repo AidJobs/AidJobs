@@ -256,7 +256,7 @@ class SimpleAPICrawler:
             jobs = self.extract_jobs_from_json(data, careers_url)
             
             # Save to database
-            counts = self.save_jobs(jobs, source_id, org_name)
+            counts = self.save_jobs(jobs, source_id, org_name, base_url=careers_url)
             
             return {
                 'status': 'ok' if jobs else 'warn',

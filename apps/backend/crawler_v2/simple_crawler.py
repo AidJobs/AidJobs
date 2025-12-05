@@ -411,8 +411,8 @@ class SimpleCrawler:
                         if href and not href.startswith('#') and not href.startswith('javascript:'):
                             job['apply_url'] = urljoin(base_url, href)
                 
-                # Only add if we have title and apply_url
-                if job.get('title') and job.get('apply_url'):
+                # Only add if we have title (apply_url will be set by fallback in save_jobs if still missing)
+                if job.get('title'):
                     jobs.append(job)
                     if len(jobs) >= 100:
                         break
@@ -538,8 +538,8 @@ class SimpleCrawler:
                         job['deadline'] = deadline_cleaned
                         break
             
-            # Only add if we have title and apply_url
-            if job.get('title') and job.get('apply_url'):
+            # Only add if we have title (apply_url will be set by fallback in save_jobs if still missing)
+            if job.get('title'):
                 jobs.append(job)
                 if len(jobs) >= 100:
                     break
@@ -1080,7 +1080,7 @@ class SimpleCrawler:
             if placeholder == "NOW()" and val != "NOW()":
                 raise ValueError(f"{operation} NOW() placeholder at index {i} doesn't match value '{val}'")
     
-    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
+    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:
         """
         Save jobs to database with comprehensive error logging and pre-upsert validation.
         
@@ -1097,12 +1097,31 @@ class SimpleCrawler:
         validation_skipped = 0
         valid_jobs = []
         for job in jobs:
+            # Ensure apply_url exists - use fallback if missing
+            if not job.get('apply_url'):
+                # Try to find URL in job data
+                if job.get('url'):
+                    job['apply_url'] = job['url']
+                elif job.get('detail_url'):
+                    job['apply_url'] = job['detail_url']
+                elif job.get('source_url'):
+                    job['apply_url'] = job['source_url']
+                else:
+                    # Last resort: use base_url if provided, otherwise placeholder
+                    if base_url:
+                        job['apply_url'] = base_url
+                        logger.debug(f"Job missing apply_url, using base_url as fallback: {job.get('title', '')[:50]}")
+                    else:
+                        # Ultimate fallback: placeholder
+                        job['apply_url'] = f"https://placeholder.missing-url/{abs(hash(job.get('title', '')))}"
+                        logger.warning(f"Job missing apply_url and no base_url provided, using placeholder: {job.get('title', '')[:50]}")
+            
             # Only basic checks - must have title and URL
             if job.get('title') and job.get('apply_url') and len(job.get('title', '')) >= 3:
                 valid_jobs.append(job)
             else:
                 validation_skipped += 1
-                logger.warning(f"Skipping job - missing title/URL or too short: {job.get('title', 'None')[:50]}")
+                logger.warning(f"Skipping job - missing title/URL or too short: {job.get('title', 'None')[:50]}, has_url={bool(job.get('apply_url'))}")
         
         jobs = valid_jobs
         
@@ -1997,7 +2016,7 @@ class SimpleCrawler:
                         logger.info(f"Scored quality for {scored_count} job(s)")
                 
                 # Save to database
-                counts = self.save_jobs(jobs, source_id, org_name)
+                counts = self.save_jobs(jobs, source_id, org_name, base_url=careers_url)
                 
                 # Log extraction result (Phase 2)
                 if self.extraction_logger:

@@ -4,7 +4,7 @@ Simple RSS crawler - extracts jobs from RSS feeds.
 
 import logging
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime
 from urllib.parse import urlparse, urljoin
 import httpx
@@ -160,10 +160,24 @@ class SimpleRSSCrawler:
         logger.info(f"Extracted {len(jobs)} jobs from RSS feed")
         return jobs
     
-    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
+    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:
         """Save jobs to database (same logic as HTML crawler)"""
         if not jobs:
             return {'inserted': 0, 'updated': 0, 'skipped': 0}
+        
+        # Ensure apply_url exists - use fallback if missing
+        for job in jobs:
+            if not job.get('apply_url'):
+                if job.get('url'):
+                    job['apply_url'] = job['url']
+                elif job.get('detail_url'):
+                    job['apply_url'] = job['detail_url']
+                elif base_url:
+                    job['apply_url'] = base_url
+                    logger.debug(f"RSS job missing apply_url, using base_url as fallback: {job.get('title', '')[:50]}")
+                else:
+                    job['apply_url'] = f"https://placeholder.missing-url/{abs(hash(job.get('title', '')))}"
+                    logger.warning(f"RSS job missing apply_url and no base_url, using placeholder: {job.get('title', '')[:50]}")
         
         conn = self._get_db_conn()
         inserted = 0
@@ -250,7 +264,7 @@ class SimpleRSSCrawler:
             jobs = self.extract_jobs_from_feed(feed, careers_url)
             
             # Save to database
-            counts = self.save_jobs(jobs, source_id, org_name)
+            counts = self.save_jobs(jobs, source_id, org_name, base_url=careers_url)
             
             return {
                 'status': 'ok' if jobs else 'warn',

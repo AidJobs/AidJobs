@@ -541,7 +541,11 @@ async def fix_undp_urls(admin=Depends(admin_required)):
             
             # Save jobs directly (SimpleCrawler handles normalization internally)
             org_name = source.get('org_name') or 'UNDP'
-            upsert_counts = crawler.save_jobs(extracted_jobs, str(source_id), org_name)
+            # Get careers_url for fallback
+            cursor.execute("SELECT careers_url FROM sources WHERE id::text = %s", (source_id,))
+            source_data = cursor.fetchone()
+            careers_url = source_data.get('careers_url') if source_data else None
+            upsert_counts = crawler.save_jobs(extracted_jobs, str(source_id), org_name, base_url=careers_url)
             
             logger.info(f"[fix-undp-urls] Saved {len(extracted_jobs)} jobs")
             
