@@ -1865,39 +1865,39 @@ class SimpleCrawler:
                 if not use_new_extractor:
                     # Default extraction (existing behavior)
                     if self.use_ai and self.ai_extractor:
-                    try:
-                        logger.info(f"Attempting AI extraction for {org_name}...")
-                        # Use asyncio.wait_for to add overall timeout (2 minutes max)
-                        jobs = await asyncio.wait_for(
-                            self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
-                            timeout=120.0  # 2 minute overall timeout
-                        )
-                        if jobs:
-                            logger.info(f"AI extraction successful: {len(jobs)} jobs found")
-                        else:
-                            logger.info("AI extraction returned no jobs, falling back to rule-based")
+                        try:
+                            logger.info(f"Attempting AI extraction for {org_name}...")
+                            # Use asyncio.wait_for to add overall timeout (2 minutes max)
+                            jobs = await asyncio.wait_for(
+                                self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
+                                timeout=120.0  # 2 minute overall timeout
+                            )
+                            if jobs:
+                                logger.info(f"AI extraction successful: {len(jobs)} jobs found")
+                            else:
+                                logger.info("AI extraction returned no jobs, falling back to rule-based")
+                                jobs = self.extract_jobs_from_html(html, careers_url)
+                        except asyncio.TimeoutError:
+                            logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
                             jobs = self.extract_jobs_from_html(html, careers_url)
-                    except asyncio.TimeoutError:
-                        logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
-                        jobs = self.extract_jobs_from_html(html, careers_url)
-                    except Exception as e:
-                        logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
-                        jobs = self.extract_jobs_from_html(html, careers_url)
-                else:
-                    # Try plugin system first, then fall back to rule-based extraction
-                    try:
-                        from crawler.plugins import get_plugin_registry
-                        registry = get_plugin_registry()
-                        plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
-                        if plugin_result.is_success() and plugin_result.jobs:
-                            logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
-                            jobs = plugin_result.jobs
-                        else:
-                            logger.info(f"Plugin extraction returned no jobs, falling back to rule-based")
+                        except Exception as e:
+                            logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
                             jobs = self.extract_jobs_from_html(html, careers_url)
-                    except Exception as e:
-                        logger.warning(f"Plugin system error: {e}, falling back to rule-based")
-                        jobs = self.extract_jobs_from_html(html, careers_url)
+                    else:
+                        # Try plugin system first, then fall back to rule-based extraction
+                        try:
+                            from crawler.plugins import get_plugin_registry
+                            registry = get_plugin_registry()
+                            plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
+                            if plugin_result.is_success() and plugin_result.jobs:
+                                logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
+                                jobs = plugin_result.jobs
+                            else:
+                                logger.info(f"Plugin extraction returned no jobs, falling back to rule-based")
+                                jobs = self.extract_jobs_from_html(html, careers_url)
+                        except Exception as e:
+                            logger.warning(f"Plugin system error: {e}, falling back to rule-based")
+                            jobs = self.extract_jobs_from_html(html, careers_url)
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
