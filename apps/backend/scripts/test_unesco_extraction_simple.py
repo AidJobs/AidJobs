@@ -16,7 +16,7 @@ if os.path.exists(env_path):
     except ImportError:
         pass
 
-from crawler.html_fetch import HTMLCrawler
+from crawler_v2.simple_crawler import SimpleCrawler
 
 async def test():
     db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
@@ -31,13 +31,15 @@ async def test():
     print("=" * 80)
     print(f"URL: {url}\n")
     
-    crawler = HTMLCrawler(db_url)
+    import os
+    use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
+    crawler = SimpleCrawler(db_url, use_ai=use_ai)
     
     # Step 1: Fetch HTML
     print("Step 1: Fetching HTML...")
-    status, headers, html, size = await crawler.fetch_html(url)
+    status, html = await crawler.fetch_html(url)
     print(f"  Status: {status}")
-    print(f"  Size: {size} bytes")
+    print(f"  Size: {len(html)} bytes")
     
     if status != 200:
         print(f"❌ Failed to fetch: HTTP {status}")
@@ -45,7 +47,7 @@ async def test():
     
     # Step 2: Extract jobs
     print("\nStep 2: Extracting jobs...")
-    jobs = crawler.extract_jobs(html, url, None)
+    jobs = crawler.extract_jobs_from_html(html, url)
     print(f"  Jobs found: {len(jobs)}")
     
     if jobs:

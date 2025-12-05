@@ -1,0 +1,30 @@
+# Domain-specific configuration overrides
+# 
+# This file allows per-domain customization of extraction behavior.
+# 
+# Example:
+# overrides:
+#   example.com:
+#     force_accept: false      # Override robots.txt (accept even if disallowed)
+#     force_reject: true       # Reject even if robots.txt allows
+#     use_browser: true        # Always use browser rendering
+#     max_concurrency: 2       # Limit concurrent requests
+#     wait_selector: ".job-listing"  # CSS selector to wait for
+#     timeout: 60000           # Custom timeout in ms
+
+overrides:
+  # Example: Force browser rendering for JS-heavy sites
+  careers.amnesty.org:
+    use_browser: true
+    wait_selector: ".job-item"
+    max_concurrency: 1
+  
+  # Example: Override robots.txt for known-good domains
+  jobs.undp.org:
+    force_accept: true
+    max_concurrency: 3
+  
+  # Example: Reject problematic domains
+  # spam-site.com:
+  #   force_reject: true
+

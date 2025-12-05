@@ -1,0 +1,14 @@
+{
+  "pages_processed": 0,
+  "pages_failed": 0,
+  "overall_field_success_rate": 0.0,
+  "field_success_rates": {},
+  "classifier_accuracy": 0.0,
+  "job_pages_detected": 0,
+  "top_20_failed_urls": [],
+  "classifier_fp_fn_samples": [],
+  "generated_at": "2025-01-05T17:30:44Z",
+  "pipeline_version": "1.0.0",
+  "note": "This is a placeholder report. Run scripts/generate_initial_report.py with actual sample URLs to generate a real report."
+}
+

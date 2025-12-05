@@ -3,6 +3,7 @@ Browser-based crawler using Playwright for JavaScript-heavy sites.
 """
 import logging
 import re
+import hashlib
 from typing import Optional, List, Dict
 from playwright.async_api import async_playwright, Browser, Page
 
@@ -39,6 +40,7 @@ class BrowserCrawler:
             })
             
             try:
+                # Navigate with networkidle wait
                 await page.goto(url, wait_until='networkidle', timeout=timeout)
                 
                 # Wait for specific selector if provided
@@ -51,12 +53,19 @@ class BrowserCrawler:
                 # Additional wait for dynamic content
                 await page.wait_for_timeout(2000)  # Wait 2 seconds for AJAX
                 
-                # Get rendered HTML
+                # Get rendered HTML (final DOM after all JS execution)
                 html = await page.content()
                 
                 return html
             except Exception as e:
                 logger.error(f"Browser fetch failed for {url}: {e}")
+                # Capture screenshot on error for debugging
+                try:
+                    screenshot_path = f"/tmp/browser_error_{hashlib.sha256(url.encode()).hexdigest()[:8]}.png"
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                    logger.info(f"Screenshot saved: {screenshot_path}")
+                except Exception as screenshot_error:
+                    logger.debug(f"Failed to capture screenshot: {screenshot_error}")
                 return ""
             finally:
                 await browser.close()
