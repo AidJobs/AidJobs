@@ -43,6 +43,98 @@ JOBS_TABLE=jobs
 - **Shadow Mode**: Enabled by default (`EXTRACTION_SHADOW_MODE=true`)
 - **Production Writes**: Opt-in only (must explicitly enable)
 
+## Monitoring & Alerting
+
+### Metrics Collection
+
+The system automatically tracks job insertion metrics for monitoring and alerting.
+
+#### Metrics Mode
+
+**Default (JSON Fallback):**
+- Metrics are written to `/tmp/aidjobs_metrics.json` (configurable via `AIDJOBS_METRICS_FILE`)
+- Tracks: `inserted`, `updated`, `skipped`, `failed` counters
+- Maintains history of last 1000 operations with timestamps
+- No external dependencies required
+
+**Prometheus Mode (Optional):**
+- Install `prometheus_client`: `pip install prometheus-client`
+- Metrics automatically exposed as Prometheus counters:
+  - `aidjobs_jobs_inserted_total`
+  - `aidjobs_jobs_updated_total`
+  - `aidjobs_jobs_skipped_total`
+  - `aidjobs_jobs_failed_total`
+- Expose metrics endpoint in your FastAPI app:
+  ```python
+  from prometheus_client import generate_latest
+  from fastapi.responses import Response
+  
+  @app.get("/metrics")
+  def metrics():
+      return Response(content=generate_latest(), media_type="text/plain")
+  ```
+
+#### Alerting Script
+
+The `check_insert_failure_rate.py` script monitors insertion failure rates and creates incident files when thresholds are exceeded.
+
+**Configuration:**
+- Failure rate threshold: 5% (configurable in script)
+- Minimum total runs: 10 (to avoid false positives)
+- Time window: Last 60 minutes
+
+**Usage:**
+
+```bash
+# Run manually
+python3 apps/backend/scripts/check_insert_failure_rate.py
+
+# Set up cron job (every 5-15 minutes)
+*/10 * * * * cd /path/to/app && python3 apps/backend/scripts/check_insert_failure_rate.py
+```
+
+**Prometheus Alerting (Alternative):**
+
+If using Prometheus, configure Alertmanager rules instead:
+
+```yaml
+groups:
+  - name: aidjobs_alerts
+    rules:
+      - alert: HighJobInsertionFailureRate
+        expr: |
+          rate(aidjobs_jobs_failed_total[5m]) / 
+          (rate(aidjobs_jobs_inserted_total[5m]) + 
+           rate(aidjobs_jobs_updated_total[5m]) + 
+           rate(aidjobs_jobs_skipped_total[5m]) + 
+           rate(aidjobs_jobs_failed_total[5m])) > 0.05
+        for: 5m
+        annotations:
+          summary: "Job insertion failure rate exceeds 5%"
+          description: "{{ $value | humanizePercentage }} of job operations are failing"
+```
+
+**Incident Files:**
+
+When failure rate exceeds threshold, incident files are created in `apps/backend/incidents/`:
+- Format: `new_extractor_insert_failure_YYYYMMDD_HHMMSS.md`
+- Contains: timestamp, failure rate, metrics summary, recommended actions
+- Exit code: 0 (normal), 1 (incident created)
+
+**Verification:**
+
+```bash
+# Check metrics are being collected
+python3 -c "from apps.backend.metrics import get_metrics; print(get_metrics())"
+
+# Test alerting script
+python3 apps/backend/scripts/check_insert_failure_rate.py
+echo $?  # Should be 0 if no incident, 1 if incident created
+
+# View recent incidents
+ls -lt apps/backend/incidents/ | head -5
+```
+
 ## Usage
 
 ### 1. Enable Storage

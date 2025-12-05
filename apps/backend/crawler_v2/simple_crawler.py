@@ -1431,18 +1431,10 @@ class SimpleCrawler:
                                 
                                 # Validation check with strong logging
                                 if len(insert_fields) != len(placeholders):
-                                    logger.error(f"DEBUG_SQL: FIELD/PLACEHOLDER MISMATCH: fields={len(insert_fields)} placeholders={len(placeholders)}")
-                                    logger.error(f"DEBUG_SQL: Fields={insert_fields}")
-                                    logger.error(f"DEBUG_SQL: Placeholders={placeholders}")
-                                    logger.error(f"DEBUG_SQL: ValuesPreview={[str(v)[:80] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
+                                    logger.error(f"FIELD/PLACEHOLDER MISMATCH: fields={len(insert_fields)} placeholders={len(placeholders)}")
+                                    logger.error(f"Fields={insert_fields}")
+                                    logger.error(f"Placeholders={placeholders}")
                                     raise ValueError("Field/placeholder mismatch after reconstruction")
-                                
-                                # DEBUG: Log SQL construction details before validation
-                                logger.error(f"DEBUG_SQL: Field count = {len(insert_fields)} | Value count = {len(insert_values)} | Placeholder count = {len(placeholders)} | SQL value count = {len(sql_values)}")
-                                logger.error(f"DEBUG_SQL: Fields = {insert_fields}")
-                                logger.error(f"DEBUG_SQL: Values preview = {[str(v)[:80] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
-                                logger.error(f"DEBUG_SQL: Placeholders = {placeholders}")
-                                logger.error(f"DEBUG_SQL: SQL values preview = {[str(v)[:80] for v in sql_values]}")
                                 
                                 # CRITICAL: Validate SQL construction before executing
                                 try:
@@ -1452,10 +1444,6 @@ class SimpleCrawler:
                                     logger.error(f"Fields: {insert_fields}")
                                     logger.error(f"Values: {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
                                     raise  # Re-raise to be caught by outer exception handler
-                                
-                                # DEBUG: Log final SQL construction before execution
-                                logger.error(f"DEBUG_SQL: About to execute INSERT with {len(insert_fields)} fields, {len(placeholders)} placeholders, {len(sql_values)} SQL values")
-                                logger.error(f"DEBUG_SQL: SQL statement = INSERT INTO jobs ({', '.join(insert_fields)}) VALUES ({', '.join(placeholders)})")
                                 
                                 cur.execute(f"""
                                     INSERT INTO jobs ({', '.join(insert_fields)})
@@ -1524,6 +1512,16 @@ class SimpleCrawler:
                         payload=failed_job.get('payload'),
                         operation=failed_job.get('operation', 'insert')
                     )
+        
+        # Update metrics for monitoring
+        try:
+            from metrics import incr_inserted, incr_updated, incr_skipped, incr_failed
+            incr_inserted(inserted)
+            incr_updated(updated)
+            incr_skipped(skipped)
+            incr_failed(failed)
+        except Exception as e:
+            logger.warning(f"Failed to update metrics: {e}")
         
         return {
             'inserted': inserted, 
