@@ -1,0 +1,10 @@
+# Development dependencies for classifier training pipeline
+# Install with: pip install -r requirements-dev.txt
+
+# Web UI for labeling (optional)
+flask==3.0.0
+
+# Already in requirements.txt but listed here for clarity
+scikit-learn==1.5.0
+beautifulsoup4==4.12.3
+
