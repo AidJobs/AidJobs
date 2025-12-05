@@ -166,10 +166,24 @@ class SimpleAPICrawler:
         logger.info(f"Extracted {len(jobs)} jobs from JSON API")
         return jobs
     
-    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str) -> Dict:
+    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:
         """Save jobs to database (same logic as HTML crawler)"""
         if not jobs:
             return {'inserted': 0, 'updated': 0, 'skipped': 0}
+        
+        # Ensure apply_url exists - use fallback if missing
+        for job in jobs:
+            if not job.get('apply_url'):
+                if job.get('url'):
+                    job['apply_url'] = job['url']
+                elif job.get('detail_url'):
+                    job['apply_url'] = job['detail_url']
+                elif base_url:
+                    job['apply_url'] = base_url
+                    logger.debug(f"API job missing apply_url, using base_url as fallback: {job.get('title', '')[:50]}")
+                else:
+                    job['apply_url'] = f"https://placeholder.missing-url/{abs(hash(job.get('title', '')))}"
+                    logger.warning(f"API job missing apply_url and no base_url, using placeholder: {job.get('title', '')[:50]}")
         
         conn = self._get_db_conn()
         inserted = 0
