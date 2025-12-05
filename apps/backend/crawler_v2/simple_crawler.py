@@ -1089,6 +1089,9 @@ class SimpleCrawler:
         """
         logger.info(f"save_jobs called: {len(jobs)} jobs, source_id={source_id}, org_name={org_name}")
         
+        # DEBUG: Log extracted jobs before validation
+        logger.info(f"DEBUG: Extracted {len(jobs)} jobs before validation: {[j.get('title', '<no title>')[:80] for j in jobs[:5]]}")
+        
         if not jobs:
             logger.warning("save_jobs called with empty jobs list")
             return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
@@ -1121,7 +1124,7 @@ class SimpleCrawler:
                 valid_jobs.append(job)
             else:
                 validation_skipped += 1
-                logger.warning(f"Skipping job - missing title/URL or too short: {job.get('title', 'None')[:50]}, has_url={bool(job.get('apply_url'))}")
+                logger.warning(f"Skipping job: title_missing={not bool(job.get('title'))}, apply_url_missing={not bool(job.get('apply_url'))}, title_len={len(job.get('title', ''))}")
         
         jobs = valid_jobs
         
@@ -1238,6 +1241,9 @@ class SimpleCrawler:
                         import hashlib
                         canonical_text = f"{title}|{apply_url}".lower()
                         canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
+                        
+                        # DEBUG: Log canonical hash for dedupe diagnosis
+                        logger.debug(f"DEBUG: canonical_hash={canonical_hash} title={title[:80]} apply_url={apply_url[:120]}")
                         
                         # Check if exists (including deleted jobs)
                         cur.execute("""
