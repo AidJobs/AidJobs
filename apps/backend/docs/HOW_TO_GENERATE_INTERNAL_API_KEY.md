@@ -11,7 +11,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 **Example output:**
 ```
-ZhS1CkdacZL_KrOd8Sa2my2jNVT6Jj6O0T0P-6Io0Ws
+your-generated-key-here-32-chars-minimum
 ```
 
 ### Option 2: OpenSSL
@@ -21,7 +21,7 @@ openssl rand -hex 32
 
 **Example output:**
 ```
-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0
 ```
 
 ### Option 3: Online Generator
@@ -34,8 +34,9 @@ Use a secure random string generator (e.g., https://randomkeygen.com/) and choos
 1. Copy the generated key
 2. Add to your `.env` file:
    ```bash
-   INTERNAL_API_KEY=ZhS1CkdacZL_KrOd8Sa2my2jNVT6Jj6O0T0P-6Io0Ws
+   INTERNAL_API_KEY=your-actual-generated-key-here
    ```
+   **⚠️ Never commit your `.env` file to Git!**
 
 ### Render (Production)
 
@@ -54,7 +55,7 @@ Use a secure random string generator (e.g., https://randomkeygen.com/) and choos
 Once set, use the key in API requests:
 
 ```bash
-curl -H "X-Internal-Api-Key: ZhS1CkdacZL_KrOd8Sa2my2jNVT6Jj6O0T0P-6Io0Ws" \
+curl -H "X-Internal-Api-Key: your-actual-key-here" \
   https://your-backend.onrender.com/_internal/jobs
 ```
 
