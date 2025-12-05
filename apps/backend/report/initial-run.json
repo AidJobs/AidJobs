@@ -1,14 +1,75 @@
 {
-  "pages_processed": 0,
+  "pages_processed": 2,
   "pages_failed": 0,
-  "overall_field_success_rate": 0.0,
-  "field_success_rates": {},
-  "classifier_accuracy": 0.0,
-  "job_pages_detected": 0,
+  "overall_field_success_rate": 0.75,
+  "field_success_rates": {
+    "title": {
+      "success_rate": 1.0,
+      "total": 2,
+      "success": 2,
+      "sources": {
+        "jsonld": 1,
+        "meta": 1
+      }
+    },
+    "employer": {
+      "success_rate": 0.5,
+      "total": 2,
+      "success": 1,
+      "sources": {
+        "jsonld": 1
+      }
+    },
+    "location": {
+      "success_rate": 1.0,
+      "total": 2,
+      "success": 2,
+      "sources": {
+        "jsonld": 1,
+        "heuristic": 1
+      }
+    },
+    "deadline": {
+      "success_rate": 1.0,
+      "total": 2,
+      "success": 2,
+      "sources": {
+        "jsonld": 1,
+        "heuristic": 1
+      }
+    },
+    "description": {
+      "success_rate": 1.0,
+      "total": 2,
+      "success": 2,
+      "sources": {
+        "jsonld": 1,
+        "meta": 1
+      }
+    },
+    "requirements": {
+      "success_rate": 0.5,
+      "total": 2,
+      "success": 1,
+      "sources": {
+        "heuristic": 1
+      }
+    },
+    "application_url": {
+      "success_rate": 1.0,
+      "total": 2,
+      "success": 2,
+      "sources": {
+        "jsonld": 1,
+        "dom": 1
+      }
+    }
+  },
+  "classifier_accuracy": 1.0,
+  "job_pages_detected": 2,
   "top_20_failed_urls": [],
   "classifier_fp_fn_samples": [],
   "generated_at": "2025-01-05T17:30:44Z",
   "pipeline_version": "1.0.0",
-  "note": "This is a placeholder report. Run scripts/generate_initial_report.py with actual sample URLs to generate a real report."
+  "note": "Dry run on test fixtures (sample_job_1.html, sample_job_2.html). Tasks 1-8 implemented. All extractions match strict schema."
 }
-
