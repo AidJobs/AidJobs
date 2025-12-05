@@ -1,64 +1,85 @@
-# Job Page Classification Labeling Instructions
+# Labeling Instructions — Job vs Not-job
 
 ## Purpose
 
-Label web pages as **job listings** or **non-job pages** to train a machine learning classifier.
+Label web pages (or page snippets) as `job` if the page contains a job vacancy or job posting for a position to be filled, otherwise label as `not-job`.
 
-## Labeling Guidelines
+## Label values:
 
-### Label: `job` (1)
-A page is a **job** if it contains:
-- A specific job opening or position description
-- Application instructions or "Apply" button
-- Job requirements or qualifications
-- Job title and description
-- Deadline or closing date for applications
+- `job`     — page contains a job posting/vacancy (open role, application link, closing date, requirements).
 
-**Examples:**
-- "Program Officer - Climate Change" with application link
-- "Finance Manager Position" with requirements
-- Job listing pages with multiple positions
+- `not-job` — page does NOT contain a job posting (e.g., blog post, news article, career tips, contact page, event listing).
 
-### Label: `not_job` (0)
-A page is **not a job** if it contains:
-- Homepage or landing page content
-- About us / organization information
-- Login or registration forms
-- News articles or blog posts
-- Contact information
-- FAQ pages
-- Donation pages
-- General program descriptions (without specific job openings)
+## What to look for (positive signals)
 
-**Examples:**
-- "Welcome to our organization"
-- "Candidate Login"
-- "Latest News - January 2025"
-- "About Our Programs"
+- Explicit phrases in title/body: "Job", "Vacancy", "Apply", "Apply by", "Closing date", "Job Posting"
 
-## Labeling Process
+- Structured fields and CTAs: "How to Apply", "Submit application", "Apply online", an email address or link labelled "apply"
 
-1. **Read the HTML snippet** (first 500 characters)
-2. **Check the URL** for context clues
-3. **Determine label**: `job` or `not_job`
-4. **Save your label** in the CSV
+- Presence of schema.org JobPosting JSON-LD or meta tags mentioning job roles
 
-## Quality Checks
+- Sections with "Duties", "Requirements", "Qualifications", "Contract type", "Duty Station" etc.
 
-- Be consistent: similar pages should get the same label
-- When in doubt, check the URL path (e.g., `/jobs/`, `/careers/` suggests job)
-- If a page has both job and non-job content, label based on primary purpose
-- Skip pages that are clearly errors or empty
+## What to avoid (negative signals)
 
-## Common Patterns
+- News articles, blog posts, event pages, product pages, general advice articles
 
-**Job indicators:**
-- URLs with `/job/`, `/position/`, `/vacancy/`, `/career/`
-- Text like "Apply Now", "Submit Application", "Deadline:"
-- Job titles followed by descriptions
+- Pages that mention jobs generically ("we are hiring") but have no specific posting or application details — treat as `not-job` unless there is a clear open role listed
 
-**Non-job indicators:**
-- URLs with `/about/`, `/contact/`, `/login/`, `/news/`
-- Text like "Welcome", "Sign In", "Donate"
-- General organizational information
+- Aggregator index pages that only link to job listings (label depends: if this page is an index listing jobs, treat as `job-listing-index` — for this seed dataset, prefer `not-job` unless the page itself is an actionable job posting)
 
+## Edge cases
+
+- **PDFs linked as the primary job**: If the snippet clearly points to a PDF job description with application instructions, label `job`.
+
+- **Job summary without application link**: If the post lists role, duties and closing date, label `job` even if application link missing.
+
+- **Remote/general "we are hiring" careers landing page**: Label `not-job` unless it contains an explicit job posting entry.
+
+## Labeling fields
+
+Each CSV row includes:
+
+- `url` — page URL
+
+- `raw_html_snippet` — relevant snippet of the page or first 2k chars
+
+- `suggested_label` — prefilled label (rule-based); confirm or correct
+
+- `final_label` — (when labeling) `job` or `not-job`
+
+- `labeled_by` — name/email of labeler
+
+- `labeled_at` — ISO timestamp
+
+## Example rows (CSV)
+
+```
+url,raw_html_snippet,suggested_label
+https://example.org/jobs/123,"<h1>Senior Data Analyst</h1><p>Apply by 15 Dec 2025</p>",job
+https://example.org/news/2025/dec/new-program,"<h1>New program launched</h1><p>Details...</p>",not-job
+```
+
+## Quality guidelines
+
+- Aim for balanced dataset: ~50% job and ~50% not-job in the 200 rows.
+
+- If unsure about a page, mark as `not-job` and add a short note to `labels/labels_notes.csv` explaining ambiguity.
+
+- Two-pass QA: after initial labeling, have a second reviewer check a random 10% sample for agreement; record inter-annotator agreement.
+
+## How to run the lightweight UI
+
+1. Install dependencies: `pip install -r requirements-dev.txt`
+
+2. From repo root:
+   ```bash
+   cd apps/backend/tools/labeling
+   python app.py
+   ```
+
+3. UI opens on localhost:5000 — label rows then click 'Save' to write to `labels/labels.csv`.
+
+## Contact
+
+If you have questions about label definitions, leave a note in `labels/labels_notes.csv` and tag the ML owner for review.
