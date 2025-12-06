@@ -202,21 +202,19 @@ async def save_jobs_to_side_table(db_url: str, jobs: List[Dict], source_id: str,
                         skip_reasons['duplicate_url'] = skip_reasons.get('duplicate_url', 0) + 1
                         continue
                     
-                    # Insert to jobs_side table (without deadline column for compatibility)
+                    # Insert to jobs_side table (minimal schema)
                     cur.execute("""
                         INSERT INTO jobs_side (
                             source_id, org_name, title, apply_url, location_raw,
-                            description_snippet, status, fetched_at, 
-                            last_seen_at, created_at
+                            status, fetched_at, last_seen_at, created_at
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW(), NOW())
+                        VALUES (%s, %s, %s, %s, %s, 'active', NOW(), NOW(), NOW())
                     """, (
                         source_id,
                         org_name,
                         title[:500],  # Limit length
                         apply_url[:500],
-                        job.get('location_raw', '')[:200] or None,
-                        job.get('description_snippet', '')[:1000] or None
+                        job.get('location_raw', '')[:200] or None
                     ))
                     
                     inserted += 1
@@ -315,7 +313,6 @@ async def main():
                     title TEXT,
                     apply_url TEXT,
                     location_raw TEXT,
-                    description_snippet TEXT,
                     status TEXT DEFAULT 'active',
                     fetched_at TIMESTAMPTZ DEFAULT NOW(),
                     last_seen_at TIMESTAMPTZ DEFAULT NOW(),
