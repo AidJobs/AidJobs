@@ -1213,24 +1213,45 @@ class SimpleCrawler:
         validation_skipped = 0
         valid_jobs = []
         for job in jobs:
-            # Filter out mailto links - reject them entirely (no contact_email column in jobs table)
+            # EMERGENCY GUARD: Filter out mailto links - reject them entirely
             apply_url = job.get('apply_url', '').strip()
-            if apply_url and self.use_global_heuristics and hasattr(self, '_is_mailto_link') and self._is_mailto_link(apply_url):
-                email = apply_url.replace('mailto:', '').strip()
-                logger.info(f"HEURISTICS: rejected mailto apply_url {email} for source {source_id} - skipping job (contact info only)")
-                # If no other apply_url available, skip this job (it's just contact info)
-                if not job.get('url') and not job.get('detail_url'):
+            if apply_url:
+                # Check for mailto links
+                if apply_url.lower().startswith('mailto:'):
+                    email = apply_url.replace('mailto:', '').strip()
                     validation_skipped += 1
-                    logger.warning(f"Skipping job with only mailto contact: {email}")
+                    logger.warning(f"EMERGENCY_GUARD: rejected mailto apply_url {email} for source {source_id}, rejected_reason=mailto_link")
                     continue
-                # If there's another URL, use that instead
-                if job.get('url'):
-                    job['apply_url'] = job['url']
-                elif job.get('detail_url'):
-                    job['apply_url'] = job['detail_url']
-                else:
+                
+                # EMERGENCY GUARD: Reject non-job pages (search pages, pagination, root careers pages)
+                import re
+                from urllib.parse import urlparse
+                
+                # Check for search/pagination patterns
+                if re.search(r'[?&](q=|page=|search=|filter=)', apply_url, re.IGNORECASE):
                     validation_skipped += 1
+                    logger.warning(f"EMERGENCY_GUARD: rejected non-job page URL {apply_url[:100]} for source {source_id}, rejected_reason=search_or_pagination_page")
                     continue
+                
+                # Check if it's a root careers page (no path or just /careers, /jobs, etc.)
+                parsed = urlparse(apply_url)
+                path = parsed.path.rstrip('/')
+                if path in ['', '/careers', '/jobs', '/job', '/vacancies', '/opportunities']:
+                    validation_skipped += 1
+                    logger.warning(f"EMERGENCY_GUARD: rejected root careers page {apply_url[:100]} for source {source_id}, rejected_reason=root_careers_page")
+                    continue
+            
+            # EMERGENCY GUARD: Reject very low quality jobs
+            quality_score = job.get('quality_score')
+            if quality_score is not None:
+                try:
+                    score_float = float(quality_score)
+                    if score_float < 0.25:
+                        validation_skipped += 1
+                        logger.warning(f"EMERGENCY_GUARD: rejected low quality job (score={score_float:.2f}) for source {source_id}, rejected_reason=quality_score_too_low")
+                        continue
+                except (ValueError, TypeError):
+                    pass  # If quality_score can't be converted, ignore this check
             
             # Ensure apply_url exists - use fallback if missing
             if not job.get('apply_url'):
