@@ -605,7 +605,7 @@ async def get_logs(
     limit: int = Query(20, le=100),
     admin=Depends(admin_required)
 ):
-    """Get crawl logs"""
+    """Get crawl logs with actual job counts"""
     conn = get_db_conn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -628,6 +628,27 @@ async def get_logs(
                 """, (limit,))
             
             logs = cur.fetchall()
+            
+            # Get actual job counts per source for accuracy
+            source_ids = list(set([str(log['source_id']) for log in logs]))
+            if source_ids:
+                placeholders = ','.join(['%s'] * len(source_ids))
+                cur.execute(f"""
+                    SELECT 
+                        source_id,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL) as actual_job_count
+                    FROM jobs
+                    WHERE source_id::text IN ({placeholders})
+                    GROUP BY source_id
+                """, source_ids)
+                actual_counts = {str(row['source_id']): row['actual_job_count'] for row in cur.fetchall()}
+            else:
+                actual_counts = {}
+            
+            # Add actual counts to each log entry
+            for log in logs:
+                log['actual_job_count'] = actual_counts.get(str(log['source_id']), 0)
+            
     finally:
         conn.close()
     
