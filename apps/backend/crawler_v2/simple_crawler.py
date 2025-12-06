@@ -1366,6 +1366,72 @@ class SimpleCrawler:
                             })
                             continue
                         
+                        # EMERGENCY GUARD: Additional checks before insertion
+                        # Check for mailto links (double-check)
+                        if apply_url.lower().startswith('mailto:'):
+                            reason = f"EMERGENCY_GUARD: mailto link rejected: {apply_url[:50]}"
+                            logger.warning(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100],
+                                'apply_url': apply_url[:200],
+                                'error': reason,
+                                'rejected_reason': 'mailto_link',
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
+                        
+                        # Check for non-job pages
+                        import re
+                        from urllib.parse import urlparse
+                        if re.search(r'[?&](q=|page=|search=|filter=)', apply_url, re.IGNORECASE):
+                            reason = f"EMERGENCY_GUARD: search/pagination page rejected: {apply_url[:50]}"
+                            logger.warning(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100],
+                                'apply_url': apply_url[:200],
+                                'error': reason,
+                                'rejected_reason': 'search_or_pagination_page',
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
+                        
+                        parsed = urlparse(apply_url)
+                        path = parsed.path.rstrip('/')
+                        if path in ['', '/careers', '/jobs', '/job', '/vacancies', '/opportunities']:
+                            reason = f"EMERGENCY_GUARD: root careers page rejected: {apply_url[:50]}"
+                            logger.warning(f"Skipping job: {reason}")
+                            skipped += 1
+                            failed_inserts.append({
+                                'title': title[:100],
+                                'apply_url': apply_url[:200],
+                                'error': reason,
+                                'rejected_reason': 'root_careers_page',
+                                'payload': {k: str(v)[:200] for k, v in job.items()}
+                            })
+                            continue
+                        
+                        # Check quality score
+                        quality_score_val = job.get('quality_score')
+                        if quality_score_val is not None:
+                            try:
+                                score_float = float(quality_score_val)
+                                if score_float < 0.25:
+                                    reason = f"EMERGENCY_GUARD: quality score too low ({score_float:.2f})"
+                                    logger.warning(f"Skipping job: {reason}")
+                                    skipped += 1
+                                    failed_inserts.append({
+                                        'title': title[:100],
+                                        'apply_url': apply_url[:200],
+                                        'error': reason,
+                                        'rejected_reason': 'quality_score_too_low',
+                                        'payload': {k: str(v)[:200] for k, v in job.items()}
+                                    })
+                                    continue
+                            except (ValueError, TypeError):
+                                pass
+                        
                         # Check for invalid URL patterns
                         if apply_url.startswith('#') or apply_url.startswith('javascript:'):
                             reason = f"Invalid URL: {apply_url[:50]}"
@@ -1375,6 +1441,7 @@ class SimpleCrawler:
                                 'title': title[:100],
                                 'apply_url': apply_url[:200],
                                 'error': reason,
+                                'rejected_reason': 'invalid_url_pattern',
                                 'payload': {k: str(v)[:200] for k, v in job.items()}
                             })
                             continue
