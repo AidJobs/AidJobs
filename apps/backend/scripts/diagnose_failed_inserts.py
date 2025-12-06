@@ -91,12 +91,32 @@ def extract_failed_inserts(db_url: str, source_id: str, org_name: str) -> Dict:
             
             extraction_warnings = []
             if extraction_logs_exist:
+                # Check what columns exist
                 cur.execute("""
-                    SELECT url, status, reason, extracted_fields
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'extraction_logs'
+                """)
+                rows = cur.fetchall()
+                columns = [row['column_name'] if isinstance(row, dict) else row[0] for row in rows]
+                
+                # Build query based on available columns
+                select_cols = ['url', 'status', 'reason']
+                if 'extracted_fields' in columns:
+                    select_cols.append('extracted_fields')
+                if 'created_at' in columns:
+                    order_by = 'created_at'
+                elif 'fetched_at' in columns:
+                    order_by = 'fetched_at'
+                else:
+                    order_by = 'id'
+                
+                cur.execute(f"""
+                    SELECT {', '.join(select_cols)}
                     FROM extraction_logs
                     WHERE source_id = %s
                     AND (status != 'OK' OR reason IS NOT NULL)
-                    ORDER BY fetched_at DESC
+                    ORDER BY {order_by} DESC
                     LIMIT 20
                 """, (source_id,))
                 extraction_warnings = cur.fetchall()
