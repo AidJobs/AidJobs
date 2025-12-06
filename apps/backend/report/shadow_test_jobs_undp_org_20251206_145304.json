@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-12-06T14:53:04.150682+00:00",
+  "source": {
+    "id": "0656e003-33d1-443d-8c20-fde5f2d66bd7",
+    "org_name": "UNDP",
+    "careers_url": "https://jobs.undp.org/cj_view_jobs.cfm?_gl=1*e9opwh*_ga*MjQ1MTExNTM1LjE3NjQ0OTI4NjE.*_ga_PBF14M9C6G*czE3NjQ3ODMzMDAkbzEkZzEkdDE3NjQ3ODM0OTAkajU0JGwwJGgw"
+  },
+  "config": {
+    "shadow_mode": true,
+    "global_heuristics": true,
+    "playwright_concurrency": 2
+  },
+  "results": {
+    "source_id": "0656e003-33d1-443d-8c20-fde5f2d66bd7",
+    "org_name": "UNDP",
+    "careers_url": "https://jobs.undp.org/cj_view_jobs.cfm?_gl=1*e9opwh*_ga*MjQ1MTExNTM1LjE3NjQ0OTI4NjE.*_ga_PBF14M9C6G*czE3NjQ3ODMzMDAkbzEkZzEkdDE3NjQ3ODM0OTAkajU0JGwwJGgw",
+    "domain": "jobs_undp_org",
+    "status": "ok",
+    "pages_crawled": 1,
+    "total_links_found": 0,
+    "job_links_identified": 0,
+    "jobs_extracted": 99,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0,
+    "skip_reasons": {},
+    "error": null
+  },
+  "summary": {
+    "pages_crawled": 1,
+    "jobs_found": 99,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0
+  }
+}

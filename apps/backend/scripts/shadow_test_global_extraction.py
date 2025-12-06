@@ -41,12 +41,12 @@ def get_active_sources(db_url: str, limit: int = 5) -> List[Dict]:
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT id, org_name, careers_url, source_type, status, last_run_at
+                SELECT id, org_name, careers_url, source_type, status, next_run_at
                 FROM sources
                 WHERE status = 'active'
                 ORDER BY 
-                    CASE WHEN last_run_at IS NOT NULL THEN 1 ELSE 2 END,
-                    last_run_at DESC NULLS LAST,
+                    CASE WHEN next_run_at IS NOT NULL THEN 1 ELSE 2 END,
+                    next_run_at DESC NULLS LAST,
                     created_at DESC
                 LIMIT %s
             """, (limit,))
@@ -66,7 +66,7 @@ async def run_shadow_crawl(crawler: SimpleCrawler, source: Dict, db_url: str) ->
     
     logger.info(f"\n{'='*80}\nShadow crawling: {org_name} ({careers_url})\n{'='*80}")
     
-        try:
+    try:
         # Run crawl
         source_dict = {
             'id': source_id,
@@ -114,7 +114,7 @@ async def run_shadow_crawl(crawler: SimpleCrawler, source: Dict, db_url: str) ->
             'jobs_saved_to_side_table': saved_count,
             'jobs_skipped': jobs_skipped,
             'jobs_failed': jobs_failed,
-            'skip_reasons': save_results.get('skip_reasons', {}),
+            'skip_reasons': counts.get('skip_reasons', {}),
             'error': result.get('error')
         }
     except Exception as e:

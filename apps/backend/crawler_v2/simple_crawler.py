@@ -45,7 +45,7 @@ class SimpleCrawler:
             try:
                 from core.extraction_heuristics import (
                     filter_and_score_job_links, normalize_url, extract_contact_info,
-                    get_canonical_hash
+                    get_canonical_hash, is_mailto_link
                 )
                 from core.domain_config import get_domain_config
                 self._filter_and_score_job_links = filter_and_score_job_links
@@ -53,6 +53,7 @@ class SimpleCrawler:
                 self._extract_contact_info = extract_contact_info
                 self._get_canonical_hash = get_canonical_hash
                 self._get_domain_config = get_domain_config
+                self._is_mailto_link = is_mailto_link
                 logger.info("Global extraction heuristics enabled")
             except ImportError as e:
                 logger.warning(f"Global heuristics not available: {e}")
@@ -584,13 +585,21 @@ class SimpleCrawler:
                 logger.info(f"Extracted contact info: {len(contact_info.get('emails', []))} emails, {len(contact_info.get('phones', []))} phones")
             
             # Filter and score links using heuristics
-            scored_links = self._filter_and_score_job_links(soup, base_url, max_links=max_links)
+            # Get source_id if available (from context)
+            source_id = getattr(self, '_current_source_id', None)
+            scored_links = self._filter_and_score_job_links(soup, base_url, max_links=max_links, source_id=source_id)
             logger.info(f"Found {len(scored_links)} scored job links (using global heuristics)")
             
             # Process scored links (sorted by score descending)
             for link, score, metadata in scored_links:
                 link_text = link.get_text().strip()
                 href = link.get('href', '').strip()
+                
+                # Double-check: reject mailto links even if they passed scoring
+                if hasattr(self, '_is_mailto_link') and self._is_mailto_link(href):
+                    email = href.replace('mailto:', '').strip()
+                    logger.info(f"HEURISTICS: rejected mailto link {email} in post-processing for source {source_id or 'unknown'}")
+                    continue
                 
                 # Normalize URL
                 full_url = urljoin(base_url, href)
@@ -1204,6 +1213,25 @@ class SimpleCrawler:
         validation_skipped = 0
         valid_jobs = []
         for job in jobs:
+            # Filter out mailto links - reject them entirely (no contact_email column in jobs table)
+            apply_url = job.get('apply_url', '').strip()
+            if apply_url and self.use_global_heuristics and hasattr(self, '_is_mailto_link') and self._is_mailto_link(apply_url):
+                email = apply_url.replace('mailto:', '').strip()
+                logger.info(f"HEURISTICS: rejected mailto apply_url {email} for source {source_id} - skipping job (contact info only)")
+                # If no other apply_url available, skip this job (it's just contact info)
+                if not job.get('url') and not job.get('detail_url'):
+                    validation_skipped += 1
+                    logger.warning(f"Skipping job with only mailto contact: {email}")
+                    continue
+                # If there's another URL, use that instead
+                if job.get('url'):
+                    job['apply_url'] = job['url']
+                elif job.get('detail_url'):
+                    job['apply_url'] = job['detail_url']
+                else:
+                    validation_skipped += 1
+                    continue
+            
             # Ensure apply_url exists - use fallback if missing
             if not job.get('apply_url'):
                 # Try to find URL in job data
@@ -1898,6 +1926,9 @@ class SimpleCrawler:
         org_name = source.get('org_name', 'Unknown')
         careers_url = source['careers_url']
         source_type = source.get('source_type', 'html')
+        
+        # Store source_id for heuristics logging
+        self._current_source_id = source_id
         
         logger.info(f"Crawling {org_name} ({source_type}): {careers_url}")
         

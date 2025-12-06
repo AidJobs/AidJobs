@@ -1,0 +1,46 @@
+{
+  "run_ts": "2025-12-06T14:45:09.071958+00:00",
+  "results": [
+    {
+      "domain": "jobs.undp.org",
+      "pages_crawled": 1,
+      "total_links_found": 0,
+      "job_links_identified": 0,
+      "jobs_extracted": 135,
+      "jobs_saved_to_side_table": 67,
+      "jobs_skipped": 0,
+      "skip_reasons": {},
+      "report_path": "apps/backend/report/shadow_test_jobs_undp_org_20251206_144312.json",
+      "warnings": []
+    },
+    {
+      "domain": "jobs.unicef.org",
+      "pages_crawled": 1,
+      "total_links_found": 0,
+      "job_links_identified": 0,
+      "jobs_extracted": 36,
+      "jobs_saved_to_side_table": 0,
+      "jobs_skipped": 0,
+      "skip_reasons": {},
+      "report_path": "apps/backend/report/shadow_test_jobs_unicef_org_20251206_144412.json",
+      "warnings": [
+        "WARNING: jobs_saved_to_side_table == 0 but jobs_extracted == 36. Jobs may be failing validation or insertion."
+      ]
+    },
+    {
+      "domain": "careers.unesco.org",
+      "pages_crawled": 1,
+      "total_links_found": 0,
+      "job_links_identified": 0,
+      "jobs_extracted": 52,
+      "jobs_saved_to_side_table": 0,
+      "jobs_skipped": 0,
+      "skip_reasons": {},
+      "report_path": "apps/backend/report/shadow_test_careers_unesco_org_20251206_144509.json",
+      "warnings": [
+        "WARNING: jobs_saved_to_side_table == 0 but jobs_extracted == 52. Jobs may be failing validation or insertion."
+      ]
+    }
+  ]
+}
+

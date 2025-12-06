@@ -1,0 +1,287 @@
+{
+  "timestamp": "2025-12-06T12:46:09.254216+00:00",
+  "target_url": "https://jobs.undp.org/cj_view_consultancies.cfm",
+  "domain": "jobs_undp_org",
+  "run_mode": "shadow",
+  "config": {
+    "follow_pagination": false,
+    "use_browser_rendering": true,
+    "force_full_limits": true,
+    "playwright_concurrency": 2
+  },
+  "results": {
+    "pages_crawled": 1,
+    "total_links_found": 150,
+    "total_job_links_identified": 134,
+    "jobs_extracted": 116,
+    "jobs_saved_to_side_table": 67,
+    "jobs_skipped": 49,
+    "jobs_failed": 0,
+    "skip_reasons": {
+      "duplicate_url": 49
+    },
+    "sample_jobs": [
+      {
+        "title": "procurement.my@undp.org",
+        "apply_url": "mailto:procurement.my@undp.org",
+        "deadline": "2025-12-06"
+      },
+      {
+        "title": "GLOBAL",
+        "apply_url": "https://www.undp.org/careers"
+      },
+      {
+        "title": "ls.procurement@undp.org",
+        "apply_url": "mailto:ls.procurement@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "bd.procurement@undp.org",
+        "apply_url": "mailto:bd.procurement@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "bd.procurement@undp.org",
+        "apply_url": "mailto:bd.procurement@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "ana.tabas@undp.org",
+        "apply_url": "mailto:ana.tabas@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "procurement.dg.ua@undp.org",
+        "apply_url": "mailto:procurement.dg.ua@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "procurement.gq@undp.org",
+        "apply_url": "mailto:procurement.gq@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "procurement.gq@undp.org",
+        "apply_url": "mailto:procurement.gq@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "procurement.gq@undp.org",
+        "apply_url": "mailto:procurement.gq@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "bd.procurement@undp.org",
+        "apply_url": "mailto:bd.procurement@undp.org",
+        "deadline": "2025-12-07"
+      },
+      {
+        "title": "undp.kenya.procurement@undp.org",
+        "apply_url": "mailto:undp.kenya.procurement@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "soumissions.desoffres@undp.org",
+        "apply_url": "mailto:soumissions.desoffres@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "procurement-pnud.mr@undp.org",
+        "apply_url": "mailto:procurement-pnud.mr@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "gitiza.erwitie@undp.org",
+        "apply_url": "mailto:gitiza.erwitie@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "syahrul.fauzi@undp.org",
+        "apply_url": "mailto:syahrul.fauzi@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "procurement.tkm@undp.org",
+        "apply_url": "mailto:procurement.tkm@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "procurement.ly@undp.org",
+        "apply_url": "mailto:procurement.ly@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "pakistan.procurement.info@undp.org",
+        "apply_url": "mailto:pakistan.procurement.info@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "servicesachats.gn@undp.org",
+        "apply_url": "mailto:servicesachats.gn@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "jagdish.Singh@undp.org",
+        "apply_url": "mailto:jagdish.Singh@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "Procure.lr@undp.org",
+        "apply_url": "mailto:Procure.lr@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "admin.rs@undp.org",
+        "apply_url": "mailto:admin.rs@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "procurement.tt@undp.org",
+        "apply_url": "mailto:procurement.tt@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "adquisiciones.sv@undp.org",
+        "apply_url": "mailto:adquisiciones.sv@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "adquisiciones.sv@undp.org",
+        "apply_url": "mailto:adquisiciones.sv@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "orgine.renfurm@undp.org",
+        "apply_url": "mailto:orgine.renfurm@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "adquisiciones.bo@undp.org",
+        "apply_url": "mailto:adquisiciones.bo@undp.org",
+        "deadline": "2025-12-08"
+      },
+      {
+        "title": "procurement.armenia@undp.org",
+        "apply_url": "mailto:procurement.armenia@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "pakistan.procurement.info@undp.org",
+        "apply_url": "mailto:pakistan.procurement.info@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "prabhakar.singh@undp.org",
+        "apply_url": "mailto:prabhakar.singh@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "procurement.ws@undp.org",
+        "apply_url": "mailto:procurement.ws@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "algeria.procurement@undp.org",
+        "apply_url": "mailto:algeria.procurement@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "faris.bachari@undp.org",
+        "apply_url": "mailto:faris.bachari@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "etendering.ao@undp.org",
+        "apply_url": "mailto:etendering.ao@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "adquisiciones.sv@undp.org",
+        "apply_url": "mailto:adquisiciones.sv@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "adquisiciones.sv@undp.org",
+        "apply_url": "mailto:adquisiciones.sv@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "adquisiciones.pe@undp.org",
+        "apply_url": "mailto:adquisiciones.pe@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "procurement.rblac.regionalhub@undp.org",
+        "apply_url": "mailto:procurement.rblac.regionalhub@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "apoyo.proveedorescol@undp.org",
+        "apply_url": "mailto:apoyo.proveedorescol@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "licitaciones.ec@undp.org",
+        "apply_url": "mailto:licitaciones.ec@undp.org",
+        "deadline": "2025-12-09"
+      },
+      {
+        "title": "procurement.th@undp.org",
+        "apply_url": "mailto:procurement.th@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "pakistan.procurement.info@undp.org",
+        "apply_url": "mailto:pakistan.procurement.info@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "bd.procurement@undp.org",
+        "apply_url": "mailto:bd.procurement@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "dlovan.zeyad@undp.org",
+        "apply_url": "mailto:dlovan.zeyad@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "procurement.tkm@undp.org",
+        "apply_url": "mailto:procurement.tkm@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "sadjo.indjai@undp.org",
+        "apply_url": "mailto:sadjo.indjai@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "lb.bidding@undp.org",
+        "apply_url": "mailto:lb.bidding@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "apoyo.proveedorescol@undp.org",
+        "apply_url": "mailto:apoyo.proveedorescol@undp.org",
+        "deadline": "2025-12-10"
+      },
+      {
+        "title": "apoyo.proveedorescol@undp.org",
+        "apply_url": "mailto:apoyo.proveedorescol@undp.org",
+        "deadline": "2025-12-10"
+      }
+    ]
+  },
+  "summary": {
+    "pages_crawled": 1,
+    "total_links_found": 150,
+    "total_job_links_identified": 134,
+    "jobs_extracted": 116,
+    "jobs_saved_to_side_table": 67,
+    "jobs_skipped": 49,
+    "jobs_failed": 0
+  },
+  "top_skip_reasons": {
+    "duplicate_url": 49
+  }
+}

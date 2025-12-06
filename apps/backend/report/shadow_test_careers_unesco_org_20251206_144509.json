@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-12-06T14:45:09.071958+00:00",
+  "source": {
+    "id": "12b14bdb-53ea-4082-9ec8-211344115dd0",
+    "org_name": "UNESCO",
+    "careers_url": "https://careers.unesco.org/go/All-jobs-openings/782502/"
+  },
+  "config": {
+    "shadow_mode": true,
+    "global_heuristics": true,
+    "playwright_concurrency": 2
+  },
+  "results": {
+    "source_id": "12b14bdb-53ea-4082-9ec8-211344115dd0",
+    "org_name": "UNESCO",
+    "careers_url": "https://careers.unesco.org/go/All-jobs-openings/782502/",
+    "domain": "careers_unesco_org",
+    "status": "ok",
+    "pages_crawled": 1,
+    "total_links_found": 0,
+    "job_links_identified": 0,
+    "jobs_extracted": 52,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0,
+    "skip_reasons": {},
+    "error": null
+  },
+  "summary": {
+    "pages_crawled": 1,
+    "jobs_found": 52,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0
+  }
+}

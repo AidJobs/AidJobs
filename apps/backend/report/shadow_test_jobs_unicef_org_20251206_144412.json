@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-12-06T14:44:12.086657+00:00",
+  "source": {
+    "id": "d8fb4848-7019-416d-b862-947ac890b69f",
+    "org_name": "Unicef",
+    "careers_url": "https://jobs.unicef.org/en-us/listing/"
+  },
+  "config": {
+    "shadow_mode": true,
+    "global_heuristics": true,
+    "playwright_concurrency": 2
+  },
+  "results": {
+    "source_id": "d8fb4848-7019-416d-b862-947ac890b69f",
+    "org_name": "Unicef",
+    "careers_url": "https://jobs.unicef.org/en-us/listing/",
+    "domain": "jobs_unicef_org",
+    "status": "ok",
+    "pages_crawled": 1,
+    "total_links_found": 0,
+    "job_links_identified": 0,
+    "jobs_extracted": 36,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0,
+    "skip_reasons": {},
+    "error": null
+  },
+  "summary": {
+    "pages_crawled": 1,
+    "jobs_found": 36,
+    "jobs_saved_to_side_table": 0,
+    "jobs_skipped": 0,
+    "jobs_failed": 0
+  }
+}

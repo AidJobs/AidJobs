@@ -93,11 +93,14 @@ def is_blocklisted(link_text: str, href: str) -> bool:
     return False
 
 
-def score_link(link: Tag, base_url: str) -> Tuple[float, Dict[str, any]]:
+def score_link(link: Tag, base_url: str, source_id: Optional[str] = None) -> Tuple[float, Dict[str, any]]:
     """
     Score a link to determine if it's likely a job link.
     Returns (score, metadata) where score > 0 means likely a job link.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     link_text = link.get_text().strip()
     href = link.get('href', '').strip()
     
@@ -106,10 +109,13 @@ def score_link(link: Tag, base_url: str) -> Tuple[float, Dict[str, any]]:
     
     # Reject mailto links
     if is_mailto_link(href):
-        return (0.0, {'reason': 'mailto_link'})
+        email = href.replace('mailto:', '').strip()
+        logger.info(f"HEURISTICS: rejected mailto link {email} for source {source_id or 'unknown'}")
+        return (0.0, {'reason': 'mailto_link', 'rejected_email': email})
     
     # Reject blocklisted links
     if is_blocklisted(link_text, href):
+        logger.info(f"HEURISTICS: rejected generic link {href[:100]} reason=blocklisted for source {source_id or 'unknown'}")
         return (0.0, {'reason': 'blocklisted'})
     
     # Reject anchors and javascript
@@ -226,7 +232,7 @@ def get_canonical_hash(title: str, apply_url: str, reference: Optional[str] = No
     return hashlib.md5(canonical_text.encode()).hexdigest()
 
 
-def filter_and_score_job_links(soup: BeautifulSoup, base_url: str, max_links: int = 500) -> List[Tuple[Tag, float, Dict]]:
+def filter_and_score_job_links(soup: BeautifulSoup, base_url: str, max_links: int = 500, source_id: Optional[str] = None) -> List[Tuple[Tag, float, Dict]]:
     """
     Find and score all potential job links from a page.
     Returns list of (link, score, metadata) tuples, sorted by score descending.
@@ -235,7 +241,7 @@ def filter_and_score_job_links(soup: BeautifulSoup, base_url: str, max_links: in
     scored_links = []
     
     for link in all_links:
-        score, metadata = score_link(link, base_url)
+        score, metadata = score_link(link, base_url, source_id=source_id)
         if score > 0:
             scored_links.append((link, score, metadata))
     

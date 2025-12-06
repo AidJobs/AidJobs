@@ -22,6 +22,27 @@ def test_mailto_link_rejection():
     assert is_mailto_link("  mailto:test@example.com  ") == True
 
 
+def test_mailto_in_detail_page():
+    """Test that mailto links on detail pages are captured as contact_email."""
+    html = """
+    <html>
+        <body>
+            <h1>Job Title</h1>
+            <p>Contact: <a href="mailto:hr@org.org">hr@org.org</a></p>
+            <a href="/apply">Apply Now</a>
+        </body>
+    </html>
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    contact_info = extract_contact_info(soup)
+    
+    assert 'hr@org.org' in contact_info.get('emails', [])
+    # The apply link should not be mailto
+    apply_link = soup.find('a', href='/apply')
+    assert apply_link is not None
+    assert not is_mailto_link(apply_link.get('href', ''))
+
+
 def test_blocklist():
     """Test that blocklisted links are rejected."""
     assert is_blocklisted("More Jobs", "https://example.com/more") == True
