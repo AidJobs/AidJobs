@@ -1647,21 +1647,31 @@ class SimpleCrawler:
                                     append_field_value("quality_scored_at", "NOW()")
                                 
                                 # Construct placeholders and sql_values safely
+                                # Ensure field/placeholder/value alignment: one placeholder per field
                                 placeholders = []
                                 sql_values = []
-                                for v in insert_values:
+                                for i, v in enumerate(insert_values):
                                     if v == "NOW()":
                                         placeholders.append("NOW()")
+                                        # NOW() doesn't go into sql_values
                                     else:
                                         placeholders.append("%s")
                                         sql_values.append(v)
                                 
-                                # Validation check with strong logging
+                                # CRITICAL: Validate field/placeholder count match
                                 if len(insert_fields) != len(placeholders):
-                                    logger.error(f"FIELD/PLACEHOLDER MISMATCH: fields={len(insert_fields)} placeholders={len(placeholders)}")
-                                    logger.error(f"Fields={insert_fields}")
-                                    logger.error(f"Placeholders={placeholders}")
-                                    raise ValueError("Field/placeholder mismatch after reconstruction")
+                                    logger.error(f"FIELD/PLACEHOLDER MISMATCH: {len(insert_fields)} fields, {len(placeholders)} placeholders")
+                                    logger.error(f"Fields: {insert_fields}")
+                                    logger.error(f"Placeholders: {placeholders}")
+                                    logger.error(f"Values: {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
+                                    raise ValueError(f"INSERT field/placeholder mismatch: {len(insert_fields)} fields, {len(placeholders)} placeholders")
+                                
+                                # Validate placeholder/sql_values count (accounting for NOW() placeholders)
+                                now_count = sum(1 for p in placeholders if p == "NOW()")
+                                expected_sql_values = len(insert_values) - now_count
+                                if len(sql_values) != expected_sql_values:
+                                    logger.error(f"PLACEHOLDER/VALUE MISMATCH: {len(placeholders)} placeholders ({now_count} NOW()), {len(insert_values)} total values, {len(sql_values)} SQL values (expected {expected_sql_values})")
+                                    raise ValueError(f"INSERT placeholder/value mismatch: {len(sql_values)} SQL values, expected {expected_sql_values}")
                                 
                                 # CRITICAL: Validate SQL construction before executing
                                 try:
