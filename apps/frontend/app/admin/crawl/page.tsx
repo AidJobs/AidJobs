@@ -29,6 +29,7 @@ type CrawlLog = {
   status: string;
   message: string | null;
   ran_at: string;
+  actual_job_count?: number; // Real count from jobs table
 };
 
 export default function AdminCrawlPage() {
@@ -389,6 +390,12 @@ export default function AdminCrawlPage() {
                       </div>
                       
                       <div className="flex items-center gap-4 mt-2">
+                        {log.actual_job_count !== undefined && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-caption-sm text-[#86868B]">Total Jobs:</span>
+                            <span className="text-body-sm font-semibold text-[#30D158]">{log.actual_job_count}</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5">
                           <span className="text-caption-sm text-[#86868B]">Found:</span>
                           <span className="text-body-sm font-semibold text-[#1D1D1F]">{log.found}</span>
