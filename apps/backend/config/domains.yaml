@@ -16,13 +16,17 @@ overrides:
   # Example: Force browser rendering for JS-heavy sites
   careers.amnesty.org:
     use_browser: true
+    use_playwright: true
     wait_selector: ".job-item"
     max_concurrency: 1
+    max_links_per_page: 500
   
   # Example: Override robots.txt for known-good domains
   jobs.undp.org:
     force_accept: true
     max_concurrency: 3
+    max_links_per_page: 2000
+    use_playwright: true
   
   # Example: Reject problematic domains
   # spam-site.com:

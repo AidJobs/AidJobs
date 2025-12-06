@@ -30,11 +30,33 @@ class SimpleCrawler:
     Now supports AI-powered extraction as primary method with rule-based fallback.
     """
     
-    def __init__(self, db_url: str, use_ai: bool = True):
+    def __init__(self, db_url: str, use_ai: bool = True, shadow_mode: bool = False):
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
         self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
         self.use_ai = use_ai
+        self.shadow_mode = shadow_mode
+        
+        # Check if global heuristics are enabled
+        import os
+        self.use_global_heuristics = os.getenv('EXTRACTION_GLOBAL_HEURISTICS', 'true').lower() == 'true'
+        
+        if self.use_global_heuristics:
+            try:
+                from core.extraction_heuristics import (
+                    filter_and_score_job_links, normalize_url, extract_contact_info,
+                    get_canonical_hash
+                )
+                from core.domain_config import get_domain_config
+                self._filter_and_score_job_links = filter_and_score_job_links
+                self._normalize_url = normalize_url
+                self._extract_contact_info = extract_contact_info
+                self._get_canonical_hash = get_canonical_hash
+                self._get_domain_config = get_domain_config
+                logger.info("Global extraction heuristics enabled")
+            except ImportError as e:
+                logger.warning(f"Global heuristics not available: {e}")
+                self.use_global_heuristics = False
         
         # Initialize AI extractor if available
         self.ai_extractor = None
@@ -550,6 +572,81 @@ class SimpleCrawler:
         """Extract jobs from links with job-like patterns (MSF-style)"""
         jobs = []
         
+        # Use global heuristics if enabled
+        if self.use_global_heuristics:
+            # Get domain config for max_links
+            domain_config = self._get_domain_config(base_url)
+            max_links = domain_config.get('max_links_per_page', 500)
+            
+            # Extract contact info (store separately, not as jobs)
+            contact_info = self._extract_contact_info(soup)
+            if contact_info.get('emails') or contact_info.get('phones'):
+                logger.info(f"Extracted contact info: {len(contact_info.get('emails', []))} emails, {len(contact_info.get('phones', []))} phones")
+            
+            # Filter and score links using heuristics
+            scored_links = self._filter_and_score_job_links(soup, base_url, max_links=max_links)
+            logger.info(f"Found {len(scored_links)} scored job links (using global heuristics)")
+            
+            # Process scored links (sorted by score descending)
+            for link, score, metadata in scored_links:
+                link_text = link.get_text().strip()
+                href = link.get('href', '').strip()
+                
+                # Normalize URL
+                full_url = urljoin(base_url, href)
+                normalized_url = self._normalize_url(full_url)
+                
+                job = {
+                    'title': link_text,
+                    'apply_url': normalized_url,
+                    'extraction_score': score,
+                    'extraction_metadata': metadata
+                }
+                
+                # Try to extract location/deadline from nearby text
+                parent = link.parent
+                if parent:
+                    parent_text = parent.get_text()
+                    next_sibling = parent.find_next_sibling()
+                    if next_sibling:
+                        parent_text += " " + next_sibling.get_text()
+                    
+                    # Look for location
+                    location_patterns = [
+                        r'Location[:\s]+([^\n\r<]+)',
+                        r'Duty Station[:\s]+([^\n\r<]+)',
+                        r'Based in[:\s]+([^\n\r<]+)',
+                    ]
+                    for pattern in location_patterns:
+                        location_match = re.search(pattern, parent_text, re.IGNORECASE)
+                        if location_match:
+                            location = location_match.group(1).strip()
+                            location = re.sub(r'<[^>]+>', '', location)
+                            if 3 <= len(location) < 100:
+                                job['location_raw'] = location
+                                break
+                    
+                    # Look for deadline
+                    deadline_patterns = [
+                        r'Apply by[:\s]+([^\n\r<]+)',
+                        r'Deadline[:\s]+([^\n\r<]+)',
+                        r'Closing[:\s]+([^\n\r<]+)',
+                    ]
+                    for pattern in deadline_patterns:
+                        deadline_match = re.search(pattern, parent_text, re.IGNORECASE)
+                        if deadline_match:
+                            deadline_text = deadline_match.group(1).strip()
+                            deadline_text = re.sub(r'<[^>]+>', '', deadline_text)
+                            deadline_cleaned = self._parse_deadline(deadline_text)
+                            if deadline_cleaned:
+                                job['deadline'] = deadline_cleaned
+                                break
+                
+                jobs.append(job)
+            
+            return jobs
+        
+        # Fallback to original logic if heuristics disabled
         # Find all links
         all_links = soup.find_all('a', href=True)
         
@@ -610,7 +707,14 @@ class SimpleCrawler:
         
         logger.info(f"Found {len(job_links)} job-like links")
         
-        for link in job_links[:150]:  # Limit to first 150
+        # Get domain config for max_links
+        if self.use_global_heuristics:
+            domain_config = self._get_domain_config(base_url)
+            max_links = domain_config.get('max_links_per_page', 500)
+        else:
+            max_links = 150  # Original default
+        
+        for link in job_links[:max_links]:
             link_text = link.get_text().strip()
             href = link.get('href', '').strip()
             
@@ -1119,8 +1223,9 @@ class SimpleCrawler:
                         job['apply_url'] = f"https://placeholder.missing-url/{abs(hash(job.get('title', '')))}"
                         logger.warning(f"Job missing apply_url and no base_url provided, using placeholder: {job.get('title', '')[:50]}")
             
-            # Only basic checks - must have title and URL
-            if job.get('title') and job.get('apply_url') and len(job.get('title', '')) >= 3:
+            # Validation: relaxed in shadow mode
+            min_title_len = 1 if self.shadow_mode else 3
+            if job.get('title') and job.get('apply_url') and len(job.get('title', '')) >= min_title_len:
                 valid_jobs.append(job)
             else:
                 validation_skipped += 1
@@ -1198,8 +1303,9 @@ class SimpleCrawler:
                             continue
                         
                         # Additional validation before insertion
-                        # Check if title is too short or looks invalid
-                        if len(title) < 3:  # Reduced from 5 to 3 to be more lenient
+                        # Check if title is too short or looks invalid (relaxed in shadow mode)
+                        min_title_len = 1 if self.shadow_mode else 3
+                        if len(title) < min_title_len:
                             reason = f"Title too short: {title[:50]}"
                             logger.warning(f"Skipping job: {reason}")
                             skipped += 1
@@ -1237,10 +1343,15 @@ class SimpleCrawler:
                                 if deadline_date and not re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_date):
                                     deadline_date = None  # Don't save unparseable dates
                         
-                        # Create canonical hash (simple hash of title + URL)
+                        # Create canonical hash (normalized if using global heuristics)
                         import hashlib
-                        canonical_text = f"{title}|{apply_url}".lower()
-                        canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
+                        if self.use_global_heuristics:
+                            # Normalize URL before hashing
+                            normalized_url = self._normalize_url(apply_url)
+                            canonical_hash = self._get_canonical_hash(title, normalized_url, job.get('reference'))
+                        else:
+                            canonical_text = f"{title}|{apply_url}".lower()
+                            canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
                         
                         # DEBUG: Log canonical hash for dedupe diagnosis
                         logger.debug(f"DEBUG: canonical_hash={canonical_hash} title={title[:80]} apply_url={apply_url[:120]}")
