@@ -1650,7 +1650,7 @@ class SimpleCrawler:
                                 # Ensure field/placeholder/value alignment: one placeholder per field
                                 placeholders = []
                                 sql_values = []
-                                for i, v in enumerate(insert_values):
+                                for v in insert_values:
                                     if v == "NOW()":
                                         placeholders.append("NOW()")
                                         # NOW() doesn't go into sql_values
