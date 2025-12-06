@@ -645,14 +645,10 @@ async def get_logs(
             else:
                 actual_counts = {}
             
-            # Add actual counts to each log entry
-            for log in logs:
-                log['actual_job_count'] = actual_counts.get(str(log['source_id']), 0)
-            
     finally:
         conn.close()
     
-    # Convert to list of dicts with proper field names
+    # Convert to list of dicts with proper field names and add actual counts
     logs_list = []
     for log in logs:
         logs_list.append({
@@ -668,6 +664,7 @@ async def get_logs(
             'message': log.get('message'),
             'ran_at': log['ran_at'].isoformat() if log.get('ran_at') else None,
             'duration_ms': log.get('duration_ms'),
+            'actual_job_count': actual_counts.get(str(log['source_id']), 0),  # Real count from jobs table
         })
     
     return {
