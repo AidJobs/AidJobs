@@ -199,9 +199,9 @@ class SourceHealthScorer:
                 COUNT(*) as total_jobs,
                 COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls,
                 COUNT(CASE 
-                    WHEN apply_url LIKE '%/jobs%' 
-                    OR apply_url LIKE '%/careers%'
-                    OR apply_url LIKE '%/vacancies%'
+                    WHEN apply_url LIKE '%%/jobs%%' 
+                    OR apply_url LIKE '%%/careers%%'
+                    OR apply_url LIKE '%%/vacancies%%'
                     THEN 1 
                 END) as listing_urls
             FROM jobs
