@@ -11,6 +11,7 @@ from security.admin_auth import (
     clear_admin_cookie,
     get_current_admin,
     check_admin_configured,
+    admin_required,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin-auth"])
@@ -91,7 +92,7 @@ async def admin_session(request: Request):
 
 
 @router.get("/config-check")
-async def admin_config_check():
+async def admin_config_check(admin: str = Depends(admin_required)):
     """
     Diagnostic endpoint to check admin configuration.
     Returns configuration status without exposing sensitive data.
@@ -105,11 +106,9 @@ async def admin_config_check():
     try:
         cookie_secret = get_cookie_secret()
         cookie_secret_set = True
-        cookie_secret_length = len(cookie_secret)
     except ValueError as e:
         logger.warning(f"[config_check] COOKIE_SECRET error: {e}")
         cookie_secret_set = False
-        cookie_secret_length = 0
     
     admin_password = get_admin_password()
     
@@ -129,9 +128,7 @@ async def admin_config_check():
     
     config = {
         "admin_password_set": bool(admin_password),
-        "admin_password_length": len(admin_password) if admin_password else 0,
         "cookie_secret_set": cookie_secret_set,
-        "cookie_secret_length": cookie_secret_length,
         "aidjobs_env": os.getenv("AIDJOBS_ENV", "not set"),
         "is_dev_mode": is_dev,
         "admin_configured": admin_configured,
