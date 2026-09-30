@@ -145,7 +145,7 @@ def verify_admin_password(password: str) -> bool:
     """
     Verify password against ADMIN_PASSWORD.
     Uses constant-time comparison to prevent timing attacks.
-    In dev mode, allows any password if ADMIN_PASSWORD is not set.
+    A configured password is required in every environment.
     """
     admin_password = get_admin_password()
     if not admin_password:
