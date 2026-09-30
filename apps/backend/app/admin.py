@@ -3,12 +3,13 @@ Admin endpoints for taxonomy management (dev-only).
 """
 import os
 from typing import Any, Optional
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from app.db_config import db_config
 from app.normalizer import normalize_job_data
 from app.search import search_service
 from app.analytics import analytics_tracker
+from security.admin_auth import admin_required
 
 try:
     import psycopg2
@@ -18,8 +19,9 @@ except ImportError:
     RealDictCursor = None
 
 
-def require_dev_mode():
-    """Dependency that ensures endpoint is only accessible in dev mode."""
+def require_dev_mode(request: Request):
+    """Require an authenticated admin session before allowing dev-only routes."""
+    admin_required(request)
     aidjobs_env = os.getenv("AIDJOBS_ENV", "").lower()
     if aidjobs_env != "dev":
         raise HTTPException(
