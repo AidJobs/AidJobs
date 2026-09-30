@@ -115,16 +115,7 @@ async def admin_config_check(admin: str = Depends(admin_required)):
     is_dev = is_dev_mode()
     admin_configured = check_admin_configured()
     
-    # Determine status
-    if cookie_secret_set and admin_configured:
-        if is_dev and not admin_password:
-            status = "ok_dev_mode"  # Dev mode without password is OK
-        elif admin_password:
-            status = "ok_production"  # Production mode with password
-        else:
-            status = "ok_dev_mode"  # Dev mode (shouldn't happen, but safe)
-    else:
-        status = "missing_config"
+    status = "ok" if cookie_secret_set and admin_configured else "missing_config"
     
     config = {
         "admin_password_set": bool(admin_password),
@@ -136,14 +127,11 @@ async def admin_config_check(admin: str = Depends(admin_required)):
         "recommendations": []
     }
     
-    # Add recommendations (only for production or if something is missing)
     if not cookie_secret_set:
         config["recommendations"].append("Set COOKIE_SECRET environment variable")
-    if not is_dev and not admin_password:
-        config["recommendations"].append("Set ADMIN_PASSWORD environment variable (required in production)")
-    elif is_dev and not admin_password:
-        config["recommendations"].append("Optional: Set ADMIN_PASSWORD for password protection in dev mode")
-    elif is_dev and admin_password:
-        config["recommendations"].append("Consider setting AIDJOBS_ENV=production for production deployment")
+    if not admin_password:
+        config["recommendations"].append("Set ADMIN_PASSWORD environment variable")
+    if is_dev:
+        config["recommendations"].append("Set AIDJOBS_ENV=production for production deployment")
     
     return config
