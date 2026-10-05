@@ -12,8 +12,11 @@ import logging
 import asyncio
 import re
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
+
+from contracts.persist import persist_candidate
+from app.search_projection import commit_and_schedule
 import httpx
 from bs4 import BeautifulSoup
 import psycopg2
@@ -1316,6 +1319,7 @@ class SimpleCrawler:
         try:
             conn = self._get_db_conn()
             with conn.cursor() as cur:
+                recorded = []
                 for job in jobs:
                     try:
                         title = job.get('title', '').strip()
@@ -1366,72 +1370,6 @@ class SimpleCrawler:
                             })
                             continue
                         
-                        # EMERGENCY GUARD: Additional checks before insertion
-                        # Check for mailto links (double-check)
-                        if apply_url.lower().startswith('mailto:'):
-                            reason = f"EMERGENCY_GUARD: mailto link rejected: {apply_url[:50]}"
-                            logger.warning(f"Skipping job: {reason}")
-                            skipped += 1
-                            failed_inserts.append({
-                                'title': title[:100],
-                                'apply_url': apply_url[:200],
-                                'error': reason,
-                                'rejected_reason': 'mailto_link',
-                                'payload': {k: str(v)[:200] for k, v in job.items()}
-                            })
-                            continue
-                        
-                        # Check for non-job pages
-                        import re
-                        from urllib.parse import urlparse
-                        if re.search(r'[?&](q=|page=|search=|filter=)', apply_url, re.IGNORECASE):
-                            reason = f"EMERGENCY_GUARD: search/pagination page rejected: {apply_url[:50]}"
-                            logger.warning(f"Skipping job: {reason}")
-                            skipped += 1
-                            failed_inserts.append({
-                                'title': title[:100],
-                                'apply_url': apply_url[:200],
-                                'error': reason,
-                                'rejected_reason': 'search_or_pagination_page',
-                                'payload': {k: str(v)[:200] for k, v in job.items()}
-                            })
-                            continue
-                        
-                        parsed = urlparse(apply_url)
-                        path = parsed.path.rstrip('/')
-                        if path in ['', '/careers', '/jobs', '/job', '/vacancies', '/opportunities']:
-                            reason = f"EMERGENCY_GUARD: root careers page rejected: {apply_url[:50]}"
-                            logger.warning(f"Skipping job: {reason}")
-                            skipped += 1
-                            failed_inserts.append({
-                                'title': title[:100],
-                                'apply_url': apply_url[:200],
-                                'error': reason,
-                                'rejected_reason': 'root_careers_page',
-                                'payload': {k: str(v)[:200] for k, v in job.items()}
-                            })
-                            continue
-                        
-                        # Check quality score
-                        quality_score_val = job.get('quality_score')
-                        if quality_score_val is not None:
-                            try:
-                                score_float = float(quality_score_val)
-                                if score_float < 0.25:
-                                    reason = f"EMERGENCY_GUARD: quality score too low ({score_float:.2f})"
-                                    logger.warning(f"Skipping job: {reason}")
-                                    skipped += 1
-                                    failed_inserts.append({
-                                        'title': title[:100],
-                                        'apply_url': apply_url[:200],
-                                        'error': reason,
-                                        'rejected_reason': 'quality_score_too_low',
-                                        'payload': {k: str(v)[:200] for k, v in job.items()}
-                                    })
-                                    continue
-                            except (ValueError, TypeError):
-                                pass
-                        
                         # Check for invalid URL patterns
                         if apply_url.startswith('#') or apply_url.startswith('javascript:'):
                             reason = f"Invalid URL: {apply_url[:50]}"
@@ -1459,251 +1397,80 @@ class SimpleCrawler:
                                 if deadline_date and not re.match(r'^\d{4}-\d{2}-\d{2}$', deadline_date):
                                     deadline_date = None  # Don't save unparseable dates
                         
-                        # Create canonical hash (normalized if using global heuristics)
-                        import hashlib
-                        if self.use_global_heuristics:
-                            # Normalize URL before hashing
-                            normalized_url = self._normalize_url(apply_url)
-                            canonical_hash = self._get_canonical_hash(title, normalized_url, job.get('reference'))
+                        observed_at = datetime.now(timezone.utc)
+                        candidate = {
+                            "title": title,
+                            "apply_url": apply_url,
+                            "source_id": source_id,
+                            "org_name": org_name,
+                        }
+                        if "location_raw" in job:
+                            candidate["location_raw"] = location
+                        if "description_snippet" in job:
+                            candidate["description_snippet"] = job.get("description_snippet")
+                        if deadline_date:
+                            candidate["deadline"] = deadline_date
+                        elif "deadline" in job and not deadline_str:
+                            candidate["deadline"] = None
+                        if "country" in job:
+                            candidate["country"] = country
+                        if "country_iso" in job:
+                            candidate["country_iso"] = country_iso
+                        if "city" in job:
+                            candidate["city"] = city
+                        if "is_remote" in job:
+                            candidate["is_remote"] = is_remote
+                        for field_name in (
+                            "latitude",
+                            "longitude",
+                            "geocoding_source",
+                            "quality_score",
+                            "quality_grade",
+                            "quality_factors",
+                            "quality_issues",
+                            "needs_review",
+                        ):
+                            if field_name in job and job[field_name] is not None:
+                                candidate[field_name] = job[field_name]
+                        if any(name in candidate for name in ("latitude", "longitude", "geocoding_source")):
+                            candidate["geocoded_at"] = observed_at
+                        if any(
+                            name in candidate
+                            for name in (
+                                "quality_score",
+                                "quality_grade",
+                                "quality_factors",
+                                "quality_issues",
+                                "needs_review",
+                            )
+                        ):
+                            candidate["quality_scored_at"] = observed_at
+                        outcome = persist_candidate(
+                            cur,
+                            candidate,
+                            observed_at=observed_at,
+                            heuristics=self.use_global_heuristics,
+                            reference=job.get("reference"),
+                            source_id=source_id,
+                            org_name=org_name,
+                            recorded=recorded,
+                        )
+                        if outcome == "created":
+                            inserted += 1
+                        elif outcome == "updated":
+                            updated += 1
+                        elif outcome == "unchanged":
+                            logger.debug("Job unchanged, last_seen_at only: %s", title[:80])
                         else:
-                            canonical_text = f"{title}|{apply_url}".lower()
-                            canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
-                        
-                        # DEBUG: Log canonical hash for dedupe diagnosis
-                        logger.debug(f"DEBUG: canonical_hash={canonical_hash} title={title[:80]} apply_url={apply_url[:120]}")
-                        
-                        # Check if exists (including deleted jobs)
-                        cur.execute("""
-                            SELECT id, deleted_at FROM jobs WHERE canonical_hash = %s
-                        """, (canonical_hash,))
-                        
-                        existing = cur.fetchone()
-                        
-                        if existing:
-                            # Check if job was deleted
-                            is_deleted = existing[1] is not None
-                            
-                            # Update (and restore if deleted)
-                            try:
-                                # Build update fields dynamically
-                                update_fields = [
-                                    "title = %s",
-                                    "apply_url = %s",
-                                    "location_raw = %s",
-                                    "deleted_at = NULL",
-                                    "deleted_by = NULL",
-                                    "deletion_reason = NULL",
-                                    "status = 'active'",
-                                    "last_seen_at = NOW()",
-                                    "updated_at = NOW()"
-                                ]
-                                update_values = [title, apply_url, location]
-                                
-                                if deadline_date:
-                                    update_fields.append("deadline = %s::DATE")
-                                    update_values.append(deadline_date)
-                                
-                                # Add geocoding fields (Phase 4)
-                                if latitude is not None:
-                                    update_fields.append("latitude = %s")
-                                    update_values.append(latitude)
-                                    update_fields.append("geocoded_at = NOW()")
-                                if longitude is not None:
-                                    update_fields.append("longitude = %s")
-                                    update_values.append(longitude)
-                                if geocoding_source:
-                                    update_fields.append("geocoding_source = %s")
-                                    update_values.append(geocoding_source)
-                                if is_remote is not None:
-                                    update_fields.append("is_remote = %s")
-                                    update_values.append(is_remote)
-                                if country:
-                                    update_fields.append("country = %s")
-                                    update_values.append(country)
-                                if country_iso:
-                                    update_fields.append("country_iso = %s")
-                                    update_values.append(country_iso)
-                                if city:
-                                    update_fields.append("city = %s")
-                                    update_values.append(city)
-                                
-                                # Add quality scoring fields (Phase 4)
-                                if quality_score is not None:
-                                    update_fields.append("quality_score = %s")
-                                    update_values.append(quality_score)
-                                    update_fields.append("quality_scored_at = NOW()")
-                                if quality_grade:
-                                    update_fields.append("quality_grade = %s")
-                                    update_values.append(quality_grade)
-                                if quality_factors:
-                                    import json
-                                    update_fields.append("quality_factors = %s::jsonb")
-                                    update_values.append(json.dumps(quality_factors))
-                                if quality_issues:
-                                    update_fields.append("quality_issues = %s")
-                                    update_values.append(quality_issues)
-                                if needs_review is not None:
-                                    update_fields.append("needs_review = %s")
-                                    update_values.append(needs_review)
-                                
-                                update_values.append(canonical_hash)
-                                
-                                cur.execute(f"""
-                                    UPDATE jobs
-                                    SET {', '.join(update_fields)}
-                                    WHERE canonical_hash = %s
-                                """, update_values)
-                                
-                                if is_deleted:
-                                    logger.info(f"Restored deleted job: {title[:50]}...")
-                                    inserted += 1  # Count restored jobs as inserted
-                                else:
-                                    updated += 1
-                            except Exception as e:
-                                error_msg = f"DB update error: {str(e)}"
-                                logger.error(f"Failed to update job '{title[:50]}...': {error_msg}")
-                                failed += 1
-                                failed_inserts.append({
-                                    'title': title[:100],
-                                    'apply_url': apply_url[:200],
-                                    'error': error_msg,
-                                    'payload': {k: str(v)[:200] for k, v in job.items()},
-                                    'operation': 'update'
-                                })
-                        else:
-                            # Insert
-                            try:
-                                # Build insert fields and values using unified helper to ensure alignment
-                                insert_fields = []
-                                insert_values = []
-                                
-                                def append_field_value(field_name, value):
-                                    """Helper to ensure field/value pairs stay aligned."""
-                                    insert_fields.append(field_name)
-                                    insert_values.append(value)
-                                
-                                # Required fields
-                                append_field_value("source_id", source_id)
-                                append_field_value("org_name", org_name)
-                                append_field_value("title", title)
-                                append_field_value("apply_url", apply_url)
-                                append_field_value("location_raw", location)
-                                append_field_value("canonical_hash", canonical_hash)
-                                append_field_value("status", "active")
-                                append_field_value("fetched_at", "NOW()")
-                                append_field_value("last_seen_at", "NOW()")
-                                
-                                # Optional deadline
-                                if deadline_date:
-                                    append_field_value("deadline", deadline_date)
-                                
-                                # Geocoding fields (Phase 4)
-                                has_geocoding = False
-                                if latitude is not None:
-                                    append_field_value("latitude", latitude)
-                                    has_geocoding = True
-                                if longitude is not None:
-                                    append_field_value("longitude", longitude)
-                                    has_geocoding = True
-                                if geocoding_source:
-                                    append_field_value("geocoding_source", geocoding_source)
-                                    has_geocoding = True
-                                if is_remote is not None:
-                                    append_field_value("is_remote", is_remote)
-                                    has_geocoding = True
-                                if country:
-                                    append_field_value("country", country)
-                                    has_geocoding = True
-                                if country_iso:
-                                    append_field_value("country_iso", country_iso)
-                                    has_geocoding = True
-                                if city:
-                                    append_field_value("city", city)
-                                    has_geocoding = True
-                                # Add geocoded_at only if we have any geocoding data
-                                if has_geocoding:
-                                    append_field_value("geocoded_at", "NOW()")
-                                
-                                # Quality scoring fields (Phase 4)
-                                has_quality = False
-                                if quality_score is not None:
-                                    append_field_value("quality_score", quality_score)
-                                    has_quality = True
-                                if quality_grade:
-                                    append_field_value("quality_grade", quality_grade)
-                                    has_quality = True
-                                if quality_factors:
-                                    import json
-                                    append_field_value("quality_factors", json.dumps(quality_factors))
-                                    has_quality = True
-                                if quality_issues:
-                                    append_field_value("quality_issues", quality_issues)
-                                    has_quality = True
-                                if needs_review is not None:
-                                    append_field_value("needs_review", needs_review)
-                                    has_quality = True
-                                # Add quality_scored_at only if we have any quality data
-                                if has_quality:
-                                    append_field_value("quality_scored_at", "NOW()")
-                                
-                                # Construct placeholders and sql_values safely
-                                # Ensure field/placeholder/value alignment: one placeholder per field
-                                placeholders = []
-                                sql_values = []
-                                for v in insert_values:
-                                    if v == "NOW()":
-                                        placeholders.append("NOW()")
-                                        # NOW() doesn't go into sql_values
-                                    else:
-                                        placeholders.append("%s")
-                                        sql_values.append(v)
-                                
-                                # CRITICAL: Validate field/placeholder count match
-                                if len(insert_fields) != len(placeholders):
-                                    logger.error(f"FIELD/PLACEHOLDER MISMATCH: {len(insert_fields)} fields, {len(placeholders)} placeholders")
-                                    logger.error(f"Fields: {insert_fields}")
-                                    logger.error(f"Placeholders: {placeholders}")
-                                    logger.error(f"Values: {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
-                                    raise ValueError(f"INSERT field/placeholder mismatch: {len(insert_fields)} fields, {len(placeholders)} placeholders")
-                                
-                                # Validate placeholder/sql_values count (accounting for NOW() placeholders)
-                                now_count = sum(1 for p in placeholders if p == "NOW()")
-                                expected_sql_values = len(insert_values) - now_count
-                                if len(sql_values) != expected_sql_values:
-                                    logger.error(f"PLACEHOLDER/VALUE MISMATCH: {len(placeholders)} placeholders ({now_count} NOW()), {len(insert_values)} total values, {len(sql_values)} SQL values (expected {expected_sql_values})")
-                                    raise ValueError(f"INSERT placeholder/value mismatch: {len(sql_values)} SQL values, expected {expected_sql_values}")
-                                
-                                # CRITICAL: Validate SQL construction before executing
-                                try:
-                                    self._validate_sql_construction(insert_fields, insert_values, placeholders, sql_values, "INSERT")
-                                except ValueError as ve:
-                                    logger.error(f"SQL construction validation failed: {ve}")
-                                    logger.error(f"Fields: {insert_fields}")
-                                    logger.error(f"Values: {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
-                                    raise  # Re-raise to be caught by outer exception handler
-                                
-                                cur.execute(f"""
-                                    INSERT INTO jobs ({', '.join(insert_fields)})
-                                    VALUES ({', '.join(placeholders)})
-                                """, sql_values)
-                                inserted += 1
-                                logger.debug(f"Inserted job: {title[:50]}...")
-                            except Exception as e:
-                                error_msg = f"DB insert error: {str(e)}"
-                                logger.error(f"Failed to insert job '{title[:50]}...': {error_msg}", exc_info=True)
-                                logger.error(f"Job data: title={title[:50]}, url={apply_url[:100]}")
-                                logger.error(f"Insert fields ({len(insert_fields)}): {insert_fields}")
-                                logger.error(f"Insert values ({len(insert_values)}): {[str(v)[:50] if v != 'NOW()' else 'NOW()' for v in insert_values]}")
-                                logger.error(f"Placeholders ({len(placeholders)}): {placeholders}")
-                                logger.error(f"SQL values ({len(sql_values)}): {[str(v)[:50] for v in sql_values]}")
-                                failed += 1
-                                failed_inserts.append({
-                                    'title': title[:100],
-                                    'apply_url': apply_url[:200],
-                                    'error': error_msg,
-                                    'payload': {k: str(v)[:200] for k, v in job.items()},
-                                    'operation': 'insert'
-                                })
+                            skipped += 1
+                            failed_inserts.append({
+                                "title": title[:100],
+                                "apply_url": apply_url[:200],
+                                "error": outcome,
+                                "payload": {k: str(v)[:200] for k, v in job.items()},
+                                "operation": outcome,
+                            })
+
                     except Exception as e:
                         # Catch any unexpected errors during job processing
                         error_msg = f"Unexpected error processing job: {str(e)}"
@@ -1717,7 +1484,7 @@ class SimpleCrawler:
                             'operation': 'process'
                         })
                 
-                conn.commit()
+                commit_and_schedule(conn, recorded)
                 logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {skipped} skipped, {failed} failed")
         
         except Exception as e:
@@ -2109,7 +1876,8 @@ class SimpleCrawler:
                         pipeline_adapter = PipelineAdapter(
                             db_url=self.db_url,
                             enable_ai=self.use_ai,
-                            shadow_mode=rollout_config.is_shadow_mode()
+                            shadow_mode=False,
+                            enable_storage=False,
                         )
                         jobs = await pipeline_adapter.extract_jobs_from_html(html, careers_url)
                         logger.info(f"New pipeline extractor found {len(jobs)} jobs for {org_name}")

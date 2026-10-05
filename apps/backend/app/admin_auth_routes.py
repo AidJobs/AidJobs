@@ -2,15 +2,16 @@
 Admin authentication endpoints.
 Provides login, logout, and session status routes.
 """
-from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
-from app.rate_limit import limiter, RATE_LIMIT_LOGIN
+
+from app.rate_limit import RATE_LIMIT_LOGIN, limiter
 from security.admin_auth import (
-    verify_admin_password,
-    set_admin_cookie,
+    check_admin_configured,
     clear_admin_cookie,
     get_current_admin,
-    check_admin_configured,
+    set_admin_cookie,
+    verify_admin_password,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin-auth"])
@@ -90,63 +91,3 @@ async def admin_session(request: Request):
     return {"authenticated": admin is not None}
 
 
-@router.get("/config-check")
-async def admin_config_check():
-    """
-    Diagnostic endpoint to check admin configuration.
-    Returns configuration status without exposing sensitive data.
-    """
-    import os
-    import logging
-    from security.admin_auth import get_admin_password, is_dev_mode, get_cookie_secret
-    
-    logger = logging.getLogger(__name__)
-    
-    try:
-        cookie_secret = get_cookie_secret()
-        cookie_secret_set = True
-        cookie_secret_length = len(cookie_secret)
-    except ValueError as e:
-        logger.warning(f"[config_check] COOKIE_SECRET error: {e}")
-        cookie_secret_set = False
-        cookie_secret_length = 0
-    
-    admin_password = get_admin_password()
-    
-    is_dev = is_dev_mode()
-    admin_configured = check_admin_configured()
-    
-    # Determine status
-    if cookie_secret_set and admin_configured:
-        if is_dev and not admin_password:
-            status = "ok_dev_mode"  # Dev mode without password is OK
-        elif admin_password:
-            status = "ok_production"  # Production mode with password
-        else:
-            status = "ok_dev_mode"  # Dev mode (shouldn't happen, but safe)
-    else:
-        status = "missing_config"
-    
-    config = {
-        "admin_password_set": bool(admin_password),
-        "admin_password_length": len(admin_password) if admin_password else 0,
-        "cookie_secret_set": cookie_secret_set,
-        "cookie_secret_length": cookie_secret_length,
-        "aidjobs_env": os.getenv("AIDJOBS_ENV", "not set"),
-        "is_dev_mode": is_dev,
-        "admin_configured": admin_configured,
-        "status": status,
-        "recommendations": []
-    }
-    
-    # Add recommendations (only for production or if something is missing)
-    if not cookie_secret_set:
-        config["recommendations"].append("Set COOKIE_SECRET environment variable")
-    if not is_dev and not admin_password:
-        config["recommendations"].append("Set ADMIN_PASSWORD environment variable (required in production)")
-    elif is_dev and not admin_password:
-        config["recommendations"].append("Optional: Set ADMIN_PASSWORD for password protection in dev mode")
-    elif is_dev and admin_password:
-        config["recommendations"].append("Consider setting AIDJOBS_ENV=production for production deployment")
-    
-    return config

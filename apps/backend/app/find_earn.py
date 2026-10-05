@@ -3,19 +3,18 @@ Find & Earn API endpoints.
 
 Public endpoint for submitting career pages and admin endpoints for moderation.
 """
-import os
 import logging
 from typing import Optional
 from urllib.parse import urlparse
-import requests
-from fastapi import APIRouter, HTTPException, Request, Depends
-from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from psycopg2.extras import RealDictCursor
+from pydantic import BaseModel
 
 from app.admin import require_dev_mode
 from app.db_config import db_config
+from app.rate_limit import RATE_LIMIT_SUBMIT, limiter
 from security.admin_auth import admin_required
-from app.rate_limit import limiter, RATE_LIMIT_SUBMIT
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ def validate_url(url: str) -> bool:
     """Validate URL format and reachability."""
     try:
         parsed = urlparse(url)
-        if not parsed.scheme in ['http', 'https']:
+        if parsed.scheme not in ['http', 'https']:
             return False
         if not parsed.netloc:
             return False
@@ -44,35 +43,14 @@ def validate_url(url: str) -> bool:
         return False
 
 
-def detect_jobs_count(url: str) -> int:
-    """
-    Light page scan to roughly estimate job count.
-    Just does a HEAD/GET request and looks for basic indicators.
-    """
-    try:
-        response = requests.head(url, timeout=5, allow_redirects=True)
-        if response.status_code != 200:
-            # Try GET if HEAD fails
-            response = requests.get(url, timeout=10, allow_redirects=True)
-        
-        if response.status_code == 200:
-            # Very rough estimation - just check if it's accessible
-            # Could be enhanced to parse HTML for job listings
-            return 1  # Placeholder: assume at least 1 job if page loads
-        return 0
-    except Exception as e:
-        logger.warning(f"Failed to scan URL {url}: {e}")
-        return 0
-
-
 @router.post("/api/find-earn/submit")
 @limiter.limit(RATE_LIMIT_SUBMIT)
 async def submit_url(http_request: Request, request: SubmitRequest) -> dict:
     """
     Public endpoint to submit a careers page URL.
     
-    Validates URL, checks for duplicates in sources and find_earn_submissions,
-    does light page scan for job detection, and creates pending submission.
+    Validates URL format, checks for duplicates in sources and find_earn_submissions,
+    and creates a pending submission. This endpoint does not fetch the submitted URL.
     """
     try:
         import psycopg2
@@ -116,8 +94,8 @@ async def submit_url(http_request: Request, request: SubmitRequest) -> dict:
                 detail=f"This URL was already submitted (status: {existing['status']})"
             )
         
-        # Light page scan to detect jobs
-        detected_jobs = detect_jobs_count(request.url)
+        # No server-side fetch. detected_jobs stays unset until a later review.
+        detected_jobs = None
         
         # Insert submission
         cursor.execute(

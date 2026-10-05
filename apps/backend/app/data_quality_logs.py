@@ -5,13 +5,13 @@ Provides endpoints to view data quality logs and statistics for debugging.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg2.extras import RealDictCursor
-import psycopg2
 
 from app.db import get_db_conn
-from app.auth import admin_required
+from security.admin_auth import admin_required
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -133,9 +133,18 @@ async def get_data_quality_stats(
                 MIN(data_quality_score) as min_score,
                 MAX(data_quality_score) as max_score,
                 COUNT(CASE WHEN data_quality_score >= 80 THEN 1 END) as high_quality,
-                COUNT(CASE WHEN data_quality_score >= 60 AND data_quality_score < 80 THEN 1 END) as medium_quality,
+                COUNT(
+                    CASE
+                        WHEN data_quality_score >= 60 AND data_quality_score < 80 THEN 1
+                    END
+                ) as medium_quality,
                 COUNT(CASE WHEN data_quality_score < 60 THEN 1 END) as low_quality,
-                COUNT(CASE WHEN data_quality_issues IS NOT NULL AND jsonb_array_length(data_quality_issues) > 0 THEN 1 END) as jobs_with_issues
+                COUNT(
+                    CASE
+                        WHEN data_quality_issues IS NOT NULL
+                        AND jsonb_array_length(data_quality_issues) > 0 THEN 1
+                    END
+                ) as jobs_with_issues
             FROM jobs
             {where_clause}
         """
@@ -220,7 +229,10 @@ async def get_rejected_jobs(
                 "page": page,
                 "size": size,
                 "pages": (total + size - 1) // size,
-                "note": "These are jobs with score 0 or NULL. Actual rejected jobs are not stored in the database."
+                "note": (
+                    "These are jobs with score 0 or NULL. "
+                    "Actual rejected jobs are not stored in the database."
+                )
             }
         }
     except Exception as e:

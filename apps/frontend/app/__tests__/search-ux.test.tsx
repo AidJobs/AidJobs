@@ -128,8 +128,9 @@ describe('Search UX Improvements', () => {
       const international = false;
       const missionTags: string[] = [];
 
-      const hasAnyFilters =
-        searchQuery || country || level || international || missionTags.length > 0;
+      const hasAnyFilters = Boolean(
+        searchQuery || country || level || international || missionTags.length > 0
+      );
 
       expect(hasAnyFilters).toBe(true);
     });
@@ -141,8 +142,9 @@ describe('Search UX Improvements', () => {
       const international = false;
       const missionTags: string[] = [];
 
-      const hasAnyFilters =
-        searchQuery || country || level || international || missionTags.length > 0;
+      const hasAnyFilters = Boolean(
+        searchQuery || country || level || international || missionTags.length > 0
+      );
 
       expect(hasAnyFilters).toBe(false);
     });

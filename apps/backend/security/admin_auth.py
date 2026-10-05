@@ -2,12 +2,13 @@
 Admin authentication with httpOnly cookie session.
 Uses HMAC-signed session tokens with 8-hour expiry.
 """
-import os
-import hmac
 import hashlib
+import hmac
+import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+
 from fastapi import HTTPException, Request, Response
 
 COOKIE_NAME = "aidjobs_admin_session"
@@ -115,9 +116,6 @@ def get_current_admin(request: Request) -> Optional[str]:
     Get current admin username from session cookie.
     Returns None if not authenticated.
     """
-    if is_dev_mode() and request.headers.get("X-Dev-Bypass") == "1":
-        return "dev-admin"
-    
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
@@ -148,15 +146,8 @@ def verify_admin_password(password: str) -> bool:
     """
     Verify password against ADMIN_PASSWORD.
     Uses constant-time comparison to prevent timing attacks.
-    In dev mode, allows any password if ADMIN_PASSWORD is not set.
+    A missing password denies login in every environment.
     """
-    # Dev mode bypass: if no password is set, allow any password
-    if is_dev_mode():
-        admin_password = get_admin_password()
-        if not admin_password:
-            # Dev mode + no password = allow any password (even empty)
-            return True
-    
     admin_password = get_admin_password()
     if not admin_password:
         return False
@@ -165,17 +156,6 @@ def verify_admin_password(password: str) -> bool:
 
 
 def check_admin_configured() -> bool:
-    """Check if admin authentication is properly configured."""
-    # In dev mode, always allow (even if no password set)
-    # But still require COOKIE_SECRET for session cookies
-    if is_dev_mode():
-        # Check if COOKIE_SECRET is set (required for cookies)
-        try:
-            get_cookie_secret()
-            return True
-        except ValueError:
-            # No COOKIE_SECRET - can't create cookies
-            return False
-    
+    """Admin login requires ADMIN_PASSWORD in every environment."""
     password = get_admin_password()
     return password is not None and len(password) > 0

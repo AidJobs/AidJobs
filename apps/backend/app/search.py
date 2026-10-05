@@ -12,6 +12,7 @@ from app.normalizer import Normalizer
 from app.analytics import analytics_tracker
 from app.rerank import rerank_results
 from core import normalize
+from app.search_projection import compose_public_page, stale_document_ids
 
 if TYPE_CHECKING:
     import psycopg2
@@ -460,16 +461,35 @@ class SearchService:
             experience_level=experience_level,
         )
 
-        result = None
-        
+        meili_result = None
+        sql_result = None
         if self.meili_enabled:
-            result = await self._search_meilisearch(q, page, size, normalized_filters, sort)
+            meili_result = await self._search_meilisearch(q, page, size, normalized_filters, sort)
+        if self.db_enabled:
+            sql_result = await self._search_database(q, page, size, normalized_filters, sort)
+
+        if meili_result is None:
+            result = sql_result
             if result is not None:
-                result["source"] = "meili"
-        
-        if result is None and self.db_enabled:
-            result = await self._search_database(q, page, size, normalized_filters, sort)
-            result["source"] = "db"
+                result["source"] = "db"
+        else:
+            hits = meili_result.get("items") or []
+            hit_ids = [hit.get("id") for hit in hits if hit.get("id")]
+            eligible_ids = await self._eligible_ids(hit_ids) if hit_ids else set()
+            page_items = compose_public_page(
+                hits,
+                eligible_ids,
+                (sql_result or {}).get("items") or [],
+                size,
+            )
+            result = {
+                "items": page_items,
+                "total": (sql_result or {}).get("total", len(page_items)),
+                "page": page,
+                "size": size,
+                "source": "db" if eligible_ids is None else "meili",
+                "facets": meili_result.get("facets") or {},
+            }
         
         if result is None:
             result = {
@@ -660,59 +680,16 @@ class SearchService:
                     search_params["sort"] = ["deadline:asc"]
                 
                 results = index.search(q or "", search_params)
-                
-                # Attach reasons to each result and filter out deleted jobs
                 items = []
-                hit_ids = [hit.get('id') for hit in results.get("hits", []) if hit.get('id')]
-                
-                # Safety check: Verify jobs aren't deleted in database
-                # This ensures deleted jobs don't appear even if Meilisearch deletion failed
-                if hit_ids and psycopg2:
-                    try:
-                        conn_params = db_config.get_connection_params()
-                        if conn_params:
-                            conn = psycopg2.connect(**conn_params, connect_timeout=1)
-                            cursor = conn.cursor(cursor_factory=RealDictCursor)
-                            try:
-                                # Check which job IDs are not deleted
-                                placeholders = ','.join(['%s'] * len(hit_ids))
-                                cursor.execute(
-                                    f"SELECT id::text FROM jobs WHERE id::text = ANY(ARRAY[{placeholders}]::text[]) AND deleted_at IS NULL",
-                                    hit_ids
-                                )
-                                valid_ids = {row['id'] for row in cursor.fetchall()}
-                                
-                                # Only include jobs that exist and aren't deleted
-                                for hit in results.get("hits", []):
-                                    if hit.get('id') in valid_ids:
-                                        hit['reasons'] = self._compute_reasons(hit, q, filters)
-                                        items.append(hit)
-                            finally:
-                                cursor.close()
-                                conn.close()
-                        else:
-                            # If DB check fails, include all results (fallback)
-                            for hit in results.get("hits", []):
-                                hit['reasons'] = self._compute_reasons(hit, q, filters)
-                                items.append(hit)
-                    except Exception as db_check_error:
-                        logger.warning(f"[aidjobs] Failed to verify Meilisearch results against database: {db_check_error}")
-                        # Fallback: include all results if DB check fails
-                        for hit in results.get("hits", []):
-                            hit['reasons'] = self._compute_reasons(hit, q, filters)
-                            items.append(hit)
-                else:
-                    # No IDs or no DB - include all results
-                    for hit in results.get("hits", []):
-                        hit['reasons'] = self._compute_reasons(hit, q, filters)
-                        items.append(hit)
-                
-                # Success - reset retry count
+                for hit in results.get("hits", []):
+                    hit["reasons"] = self._compute_reasons(hit, q, filters)
+                    items.append(hit)
+
                 self._connection_retry_count = 0
-                
+
                 return {
                     "items": items,
-                    "total": len(items),  # Use filtered count, not Meilisearch estimate
+                    "total": results.get("estimatedTotalHits", len(items)),
                     "page": page,
                     "size": size,
                     "facets": {},
@@ -1394,6 +1371,253 @@ class SearchService:
                 "error": str(e)
             }
     
+    async def _eligible_ids(self, hit_ids):
+        """Ids that pass the public eligibility predicate. None means the check failed."""
+        if not hit_ids:
+            return set()
+        if not psycopg2:
+            return None
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return None
+        conn = None
+        cursor = None
+        try:
+            conn = psycopg2.connect(**conn_params, connect_timeout=1)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id::text FROM jobs
+                WHERE id::text = ANY(%s)
+                AND status = 'active'
+                AND deleted_at IS NULL
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+                """,
+                ([str(job_id) for job_id in hit_ids],),
+            )
+            return {row[0] for row in cursor.fetchall()}
+        except Exception as exc:
+            logger.warning("eligibility check failed: %s", exc)
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    async def project_committed(self, project_ids, remove_ids) -> None:
+        """Read committed rows and update Meilisearch. This does not write jobs."""
+        if not self.meili_enabled or not self.meili_client:
+            return
+        index = self.meili_client.index(self.meili_index_name)
+        remove = [str(job_id) for job_id in (remove_ids or [])]
+        if remove:
+            index.delete_documents(remove)
+        ids = [str(job_id) for job_id in (project_ids or [])]
+        if not ids or not psycopg2:
+            return
+        conn_params = db_config.get_connection_params()
+        if not conn_params:
+            return
+        conn = None
+        cursor = None
+        try:
+            conn = psycopg2.connect(**conn_params, connect_timeout=5)
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(
+                """
+                SELECT
+                    id, org_name, title, location_raw, country, country_iso,
+                    level_norm, deadline, apply_url, last_seen_at,
+                    mission_tags, international_eligible, status,
+                    work_modality, benefits, policy_flags, donor_context,
+                    crisis_type, response_phase, humanitarian_cluster,
+                    contract_urgency, contract_duration_months,
+                    compensation_visible, compensation_type,
+                    compensation_min_usd, compensation_max_usd,
+                    compensation_currency, compensation_confidence,
+                    raw_metadata,
+                    impact_domain, impact_confidences, functional_role, functional_confidences,
+                    experience_level, estimated_experience_years, experience_confidence,
+                    sdgs, sdg_confidences, sdg_explanation, matched_keywords,
+                    confidence_overall, low_confidence, low_confidence_reason
+                FROM jobs
+                WHERE id::text = ANY(%s)
+                AND status = 'active'
+                AND deleted_at IS NULL
+                AND (deadline IS NULL OR deadline >= CURRENT_DATE)
+                """,
+                (ids,),
+            )
+            rows = list(cursor.fetchall())
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+        eligible = {str(row["id"]) for row in rows}
+        documents, _skipped = self._documents_from_rows(rows)
+        if documents:
+            index.add_documents(documents, primary_key="id")
+        dropped = [job_id for job_id in ids if job_id not in eligible]
+        if dropped:
+            index.delete_documents(dropped)
+
+    def _remove_stale_documents(self, index, eligible_ids) -> int:
+        """Delete index ids that are not eligible. Does not wipe the index first."""
+        listed = []
+        offset = 0
+        try:
+            while True:
+                page = index.get_documents({"limit": 1000, "offset": offset, "fields": ["id"]})
+                results = getattr(page, "results", None)
+                if results is None and isinstance(page, dict):
+                    results = page.get("results", [])
+                if not results:
+                    break
+                for doc in results:
+                    doc_id = getattr(doc, "id", None)
+                    if doc_id is None and isinstance(doc, dict):
+                        doc_id = doc.get("id")
+                    if doc_id is not None:
+                        listed.append(str(doc_id))
+                if len(results) < 1000:
+                    break
+                offset += 1000
+            stale = stale_document_ids(listed, eligible_ids)
+            if stale:
+                index.delete_documents(stale)
+            return len(stale)
+        except Exception:
+            logger.exception("stale document removal failed")
+            return 0
+
+    def _documents_from_rows(self, rows):
+        """Build Meilisearch documents from eligible job rows."""
+        documents = []
+        skipped_count = 0
+        
+        for row in rows:
+            raw_doc = dict(row)
+            
+            # Normalize using comprehensive normalizer
+            country_iso = normalize.to_iso_country(raw_doc.get('country'))
+            if not country_iso:
+                country_iso = raw_doc.get('country_iso')
+            
+            level_norm = normalize.norm_level(raw_doc.get('level_norm'))
+            
+            mission_tags = normalize.norm_tags(raw_doc.get('mission_tags'))
+            
+            international_eligible = normalize.to_bool(raw_doc.get('international_eligible'))
+            
+            work_modality = normalize.norm_modality(raw_doc.get('work_modality'))
+            
+            benefits = normalize.norm_benefits(raw_doc.get('benefits'))
+            
+            policy_flags = normalize.norm_policy(raw_doc.get('policy_flags'))
+            
+            donor_context = normalize.norm_donors(raw_doc.get('donor_context'))
+            
+            # Parse contract duration if string
+            contract_duration = raw_doc.get('contract_duration_months')
+            if contract_duration is None and raw_doc.get('contract_urgency'):
+                contract_duration = normalize.parse_contract_duration(raw_doc.get('contract_urgency'))
+            
+            # Track unknowns
+            unknowns = []
+            
+            # Capture unknown mission tags
+            raw_tags = raw_doc.get('mission_tags', [])
+            if raw_tags and isinstance(raw_tags, list):
+                for tag in raw_tags:
+                    if tag and tag not in mission_tags:
+                        unknowns.append({'field': 'mission_tags', 'value': tag})
+            
+            # Capture unknown benefits
+            raw_benefits = raw_doc.get('benefits', [])
+            if raw_benefits and isinstance(raw_benefits, list):
+                for benefit in raw_benefits:
+                    if benefit and benefit not in benefits:
+                        unknowns.append({'field': 'benefits', 'value': benefit})
+            
+            # Capture unknown policy flags
+            raw_policies = raw_doc.get('policy_flags', [])
+            if raw_policies and isinstance(raw_policies, list):
+                for policy in raw_policies:
+                    if policy and policy not in policy_flags:
+                        unknowns.append({'field': 'policy_flags', 'value': policy})
+            
+            # Capture unknown donors
+            raw_donors = raw_doc.get('donor_context', [])
+            if raw_donors and isinstance(raw_donors, list):
+                for donor in raw_donors:
+                    if donor and donor not in donor_context:
+                        unknowns.append({'field': 'donor_context', 'value': donor})
+            
+            # Merge with existing raw_metadata.unknown
+            existing_metadata = raw_doc.get('raw_metadata', {})
+            if isinstance(existing_metadata, dict):
+                existing_unknowns = existing_metadata.get('unknown', [])
+                if isinstance(existing_unknowns, list):
+                    unknowns.extend(existing_unknowns)
+            
+            deadline = raw_doc.get('deadline')
+            last_seen_at = raw_doc.get('last_seen_at')
+            
+            # Extract enrichment fields
+            impact_domain = raw_doc.get('impact_domain', []) or []
+            functional_role = raw_doc.get('functional_role', []) or []
+            experience_level = raw_doc.get('experience_level')
+            sdgs = raw_doc.get('sdgs', []) or []
+            matched_keywords = raw_doc.get('matched_keywords', []) or []
+            
+            normalized_doc = {
+                'id': str(raw_doc['id']) if raw_doc.get('id') else None,
+                'org_name': raw_doc.get('org_name'),
+                'title': raw_doc.get('title'),
+                'location_raw': raw_doc.get('location_raw'),
+                'country_iso': country_iso,
+                'level_norm': level_norm,
+                'deadline': deadline.isoformat() if deadline else None,
+                'apply_url': raw_doc.get('apply_url'),
+                'last_seen_at': last_seen_at.isoformat() if last_seen_at else None,
+                'mission_tags': mission_tags if mission_tags else [],
+                'international_eligible': international_eligible,
+                'work_modality': work_modality,
+                'benefits': benefits if benefits else [],
+                'policy_flags': policy_flags if policy_flags else [],
+                'donor_context': donor_context if donor_context else [],
+                'crisis_type': raw_doc.get('crisis_type', []),
+                'response_phase': raw_doc.get('response_phase'),
+                'humanitarian_cluster': raw_doc.get('humanitarian_cluster', []),
+                'contract_urgency': raw_doc.get('contract_urgency'),
+                'contract_duration_months': contract_duration,
+                'compensation_visible': raw_doc.get('compensation_visible', False),
+                'compensation_type': raw_doc.get('compensation_type'),
+                'compensation_min_usd': raw_doc.get('compensation_min_usd'),
+                'compensation_max_usd': raw_doc.get('compensation_max_usd'),
+                'compensation_currency': raw_doc.get('compensation_currency'),
+                'status': raw_doc.get('status', 'active'),
+                'impact_domain': impact_domain,
+                'functional_role': functional_role,
+                'experience_level': experience_level,
+                'sdgs': sdgs,
+                'matched_keywords': matched_keywords,
+                'low_confidence': raw_doc.get('low_confidence', False),
+                'raw_metadata': {
+                    'unknown': unknowns
+                }
+            }
+            
+            if not normalized_doc.get('id') or not normalized_doc.get('title'):
+                skipped_count += 1
+                continue
+            
+            documents.append(normalized_doc)
+        
+        return documents, skipped_count
+
     async def reindex_jobs(self) -> dict[str, Any]:
         """Reindex all active jobs from database to Meilisearch"""
         if not self.meili_enabled or not self.meili_client:
@@ -1454,136 +1678,7 @@ class SearchService:
             
             rows = cursor.fetchall()
             
-            if not rows:
-                duration_ms = int((time.time() - start_time) * 1000)
-                return {
-                    "indexed": 0,
-                    "skipped": 0,
-                    "duration_ms": duration_ms
-                }
-            
-            documents = []
-            skipped_count = 0
-            
-            for row in rows:
-                raw_doc = dict(row)
-                
-                # Normalize using comprehensive normalizer
-                country_iso = normalize.to_iso_country(raw_doc.get('country'))
-                if not country_iso:
-                    country_iso = raw_doc.get('country_iso')
-                
-                level_norm = normalize.norm_level(raw_doc.get('level_norm'))
-                
-                mission_tags = normalize.norm_tags(raw_doc.get('mission_tags'))
-                
-                international_eligible = normalize.to_bool(raw_doc.get('international_eligible'))
-                
-                work_modality = normalize.norm_modality(raw_doc.get('work_modality'))
-                
-                benefits = normalize.norm_benefits(raw_doc.get('benefits'))
-                
-                policy_flags = normalize.norm_policy(raw_doc.get('policy_flags'))
-                
-                donor_context = normalize.norm_donors(raw_doc.get('donor_context'))
-                
-                # Parse contract duration if string
-                contract_duration = raw_doc.get('contract_duration_months')
-                if contract_duration is None and raw_doc.get('contract_urgency'):
-                    contract_duration = normalize.parse_contract_duration(raw_doc.get('contract_urgency'))
-                
-                # Track unknowns
-                unknowns = []
-                
-                # Capture unknown mission tags
-                raw_tags = raw_doc.get('mission_tags', [])
-                if raw_tags and isinstance(raw_tags, list):
-                    for tag in raw_tags:
-                        if tag and tag not in mission_tags:
-                            unknowns.append({'field': 'mission_tags', 'value': tag})
-                
-                # Capture unknown benefits
-                raw_benefits = raw_doc.get('benefits', [])
-                if raw_benefits and isinstance(raw_benefits, list):
-                    for benefit in raw_benefits:
-                        if benefit and benefit not in benefits:
-                            unknowns.append({'field': 'benefits', 'value': benefit})
-                
-                # Capture unknown policy flags
-                raw_policies = raw_doc.get('policy_flags', [])
-                if raw_policies and isinstance(raw_policies, list):
-                    for policy in raw_policies:
-                        if policy and policy not in policy_flags:
-                            unknowns.append({'field': 'policy_flags', 'value': policy})
-                
-                # Capture unknown donors
-                raw_donors = raw_doc.get('donor_context', [])
-                if raw_donors and isinstance(raw_donors, list):
-                    for donor in raw_donors:
-                        if donor and donor not in donor_context:
-                            unknowns.append({'field': 'donor_context', 'value': donor})
-                
-                # Merge with existing raw_metadata.unknown
-                existing_metadata = raw_doc.get('raw_metadata', {})
-                if isinstance(existing_metadata, dict):
-                    existing_unknowns = existing_metadata.get('unknown', [])
-                    if isinstance(existing_unknowns, list):
-                        unknowns.extend(existing_unknowns)
-                
-                deadline = raw_doc.get('deadline')
-                last_seen_at = raw_doc.get('last_seen_at')
-                
-                # Extract enrichment fields
-                impact_domain = raw_doc.get('impact_domain', []) or []
-                functional_role = raw_doc.get('functional_role', []) or []
-                experience_level = raw_doc.get('experience_level')
-                sdgs = raw_doc.get('sdgs', []) or []
-                matched_keywords = raw_doc.get('matched_keywords', []) or []
-                
-                normalized_doc = {
-                    'id': str(raw_doc['id']) if raw_doc.get('id') else None,
-                    'org_name': raw_doc.get('org_name'),
-                    'title': raw_doc.get('title'),
-                    'location_raw': raw_doc.get('location_raw'),
-                    'country_iso': country_iso,
-                    'level_norm': level_norm,
-                    'deadline': deadline.isoformat() if deadline else None,
-                    'apply_url': raw_doc.get('apply_url'),
-                    'last_seen_at': last_seen_at.isoformat() if last_seen_at else None,
-                    'mission_tags': mission_tags if mission_tags else [],
-                    'international_eligible': international_eligible,
-                    'work_modality': work_modality,
-                    'benefits': benefits if benefits else [],
-                    'policy_flags': policy_flags if policy_flags else [],
-                    'donor_context': donor_context if donor_context else [],
-                    'crisis_type': raw_doc.get('crisis_type', []),
-                    'response_phase': raw_doc.get('response_phase'),
-                    'humanitarian_cluster': raw_doc.get('humanitarian_cluster', []),
-                    'contract_urgency': raw_doc.get('contract_urgency'),
-                    'contract_duration_months': contract_duration,
-                    'compensation_visible': raw_doc.get('compensation_visible', False),
-                    'compensation_type': raw_doc.get('compensation_type'),
-                    'compensation_min_usd': raw_doc.get('compensation_min_usd'),
-                    'compensation_max_usd': raw_doc.get('compensation_max_usd'),
-                    'compensation_currency': raw_doc.get('compensation_currency'),
-                    'status': raw_doc.get('status', 'active'),
-                    'impact_domain': impact_domain,
-                    'functional_role': functional_role,
-                    'experience_level': experience_level,
-                    'sdgs': sdgs,
-                    'matched_keywords': matched_keywords,
-                    'low_confidence': raw_doc.get('low_confidence', False),
-                    'raw_metadata': {
-                        'unknown': unknowns
-                    }
-                }
-                
-                if not normalized_doc.get('id') or not normalized_doc.get('title'):
-                    skipped_count += 1
-                    continue
-                
-                documents.append(normalized_doc)
-            
+            documents, skipped_count = self._documents_from_rows(rows)
             index = self.meili_client.index(self.meili_index_name)
             
             batch_size = 500
@@ -1593,6 +1688,9 @@ class SearchService:
                 batch = documents[i:i + batch_size]
                 index.add_documents(batch, primary_key='id')
                 indexed_count += len(batch)
+
+            eligible_ids = [str(row["id"]) for row in rows if row.get("id")]
+            self._remove_stale_documents(index, eligible_ids)
             
             duration_ms = int((time.time() - start_time) * 1000)
             

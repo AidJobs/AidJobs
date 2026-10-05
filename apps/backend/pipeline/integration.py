@@ -17,13 +17,14 @@ logger = logging.getLogger(__name__)
 class PipelineAdapter:
     """Adapts new pipeline to existing crawler interface."""
     
-    def __init__(self, db_url: Optional[str] = None, enable_ai: bool = True, 
-                 shadow_mode: bool = False):
+    def __init__(self, db_url: Optional[str] = None, enable_ai: bool = True,
+                 shadow_mode: bool = False, enable_storage: Optional[bool] = None):
         self.extractor = Extractor(
             db_url=db_url,
             enable_ai=enable_ai,
             enable_snapshots=True,
-            shadow_mode=shadow_mode
+            shadow_mode=shadow_mode,
+            enable_storage=enable_storage,
         )
         self.shadow_mode = shadow_mode
     

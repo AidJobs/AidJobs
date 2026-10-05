@@ -9,7 +9,7 @@ import logging
 import traceback
 from pydantic import BaseModel
 
-from app.config import Capabilities, get_env_presence
+from app.config import Capabilities
 from app.search import search_service
 from app.normalizer import normalize_job_data
 from app.validator import validator
@@ -290,11 +290,6 @@ async def db_status():
         }
 
 
-@app.get("/admin/config/env")
-async def config_env():
-    return get_env_presence()
-
-
 @app.get("/api/search/query")
 @limiter.limit(RATE_LIMIT_SEARCH)
 async def search_query(
@@ -477,10 +472,9 @@ async def admin_search_init(admin: str = Depends(admin_required)):
         }
 
 
-@app.get("/admin/search/reindex")
 @app.post("/admin/search/reindex")
 async def admin_search_reindex(admin: str = Depends(admin_required)):
-    """Reindex jobs to search engine (admin-only, supports GET and POST)"""
+    """Reindex jobs to search engine (admin-only POST)"""
     return await search_service.reindex_jobs()
 
 
