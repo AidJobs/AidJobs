@@ -1431,14 +1431,7 @@ export default function AdminSourcesPage() {
                             </span>
                           </button>
                           <button
-                            onClick={async () => {
-                              // Set source and open drawer immediately
-                              console.log(`[CrawlDetails] Opening drawer for source ${source.id}`);
-                              setSelectedSourceForDetails(source);
-                              setShowCrawlDetails(true);
-                              // refreshCrawlDetails will be called by useEffect, but we can trigger it immediately too
-                              // The useEffect will handle the auto-refresh setup
-                            }}
+                            onClick={() => router.push(`/admin/sources/${source.id}`)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
                             title="View crawl details"
                           >

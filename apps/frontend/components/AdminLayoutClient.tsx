@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Database, Search, FileText, Settings, Network, DollarSign, LogOut, Menu, ChevronLeft, BarChart3, Activity, Shield, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Database, FileText, Settings, Network, LogOut, Menu, ChevronLeft, Shield, Briefcase } from 'lucide-react';
 
 type MenuItem = {
   id: string;
@@ -13,15 +13,12 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/admin' },
+  { id: 'organisations', label: 'Organisations', icon: <Briefcase className="w-5 h-5" />, path: '/admin/organisations' },
   { id: 'sources', label: 'Sources', icon: <Database className="w-5 h-5" />, path: '/admin/sources' },
-  { id: 'jobs', label: 'Job Management', icon: <Briefcase className="w-5 h-5" />, path: '/admin/jobs' },
-  { id: 'crawl', label: 'Crawler', icon: <Network className="w-5 h-5" />, path: '/admin/crawl' },
-  { id: 'analytics', label: 'Analytics', icon: <Activity className="w-5 h-5" />, path: '/admin/analytics' },
+  { id: 'jobs', label: 'Jobs', icon: <FileText className="w-5 h-5" />, path: '/admin/jobs' },
+  { id: 'crawls', label: 'Crawls', icon: <Network className="w-5 h-5" />, path: '/admin/crawl' },
   { id: 'data-quality', label: 'Data Quality', icon: <Shield className="w-5 h-5" />, path: '/admin/data-quality' },
-  { id: 'enrichment', label: 'Enrichment', icon: <BarChart3 className="w-5 h-5" />, path: '/admin/enrichment' },
-  { id: 'find-earn', label: 'Find & Earn', icon: <DollarSign className="w-5 h-5" />, path: '/admin/find-earn' },
-  { id: 'taxonomy', label: 'Taxonomy', icon: <FileText className="w-5 h-5" />, path: '/admin/taxonomy' },
-  { id: 'setup', label: 'Setup', icon: <Settings className="w-5 h-5" />, path: '/admin/setup' },
+  { id: 'setup', label: 'Settings', icon: <Settings className="w-5 h-5" />, path: '/admin/setup' },
 ];
 
 function MenuItemWithTooltip({ 
@@ -209,10 +206,46 @@ export default function AdminLayoutClient({
   const router = useRouter();
   const isLoginPage = pathname === '/admin/login';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [session, setSession] = useState<'pending' | 'ok' | 'no'>('pending');
 
-  // Don't render sidebar on login page
+  useEffect(() => {
+    if (isLoginPage) {
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/admin/session', { credentials: 'include' })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({ authenticated: false }));
+        if (!cancelled) {
+          setSession(response.ok && body.authenticated ? 'ok' : 'no');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSession('no');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoginPage]);
+
+  useEffect(() => {
+    if (!isLoginPage && session === 'no') {
+      router.push('/admin/login');
+    }
+  }, [isLoginPage, session, router]);
+
   if (isLoginPage) {
     return <>{children}</>;
+  }
+
+  if (session !== 'ok') {
+    return (
+      <div className="h-screen flex items-center justify-center text-sm text-[#86868B]">
+        Checking session
+      </div>
+    );
   }
 
   const handleLogout = async () => {

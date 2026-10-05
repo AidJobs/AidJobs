@@ -21,10 +21,12 @@ export default function AdminTopBar() {
 
   const navItems = [
     { href: '/admin', label: 'Dashboard' },
+    { href: '/admin/organisations', label: 'Organisations' },
     { href: '/admin/sources', label: 'Sources' },
-    { href: '/admin/crawl', label: 'Crawler' },
-    { href: '/admin/find-earn', label: 'Find & Earn' },
-    { href: '/admin/setup', label: 'Setup' },
+    { href: '/admin/jobs', label: 'Jobs' },
+    { href: '/admin/crawl', label: 'Crawls' },
+    { href: '/admin/data-quality', label: 'Data Quality' },
+    { href: '/admin/setup', label: 'Settings' },
   ];
 
   return (

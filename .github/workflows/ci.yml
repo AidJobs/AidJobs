@@ -33,15 +33,16 @@ jobs:
           tests/test_gate6_lifecycle.py
           tests/test_gate7_search.py
           tests/test_gate8_organisations.py
+          tests/test_gate9_admin.py
+          tests/test_gate10_legacy.py
           app/search_projection.py
           contracts
           security/admin_auth.py
-          app/find_earn.py
           app/data_quality_logs.py
           app/admin_auth_routes.py
 
       - name: Executed backend tests
-        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py -q
+        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py -q
 
   frontend:
     runs-on: ubuntu-latest

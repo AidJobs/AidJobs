@@ -374,10 +374,10 @@ def test_crawlers_persist_through_the_single_helper():
         assert "from contracts.persist import persist_candidate" in text
         assert "from contracts.upsert" not in text
         assert "from contracts.validate" not in text
-    for name in ("crawler_v2/orchestrator.py", "orchestrator.py"):
-        text = (root / name).read_text(encoding="utf-8")
-        assert "from contracts" not in text
-        assert "import contracts" not in text
+    assert not (root / "crawler_v2" / "orchestrator.py").exists()
+    text = (root / "orchestrator.py").read_text(encoding="utf-8")
+    assert "from contracts" not in text
+    assert "import contracts" not in text
 
 
 def test_package_does_not_mention_a_key_version():

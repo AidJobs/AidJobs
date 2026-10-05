@@ -55,7 +55,8 @@ class DBInsert:
         self.use_storage = use_storage if use_storage is not None else DEFAULT_USE_STORAGE
         self.shadow_mode = shadow_mode if shadow_mode is not None else DEFAULT_SHADOW_MODE
         self.jobs_table = jobs_table or DEFAULT_JOBS_TABLE
-        self.shadow_table = f"{self.jobs_table}_side" if self.shadow_mode else self.jobs_table
+        # The side catalogue is not a writer. Never select or create it.
+        self.shadow_table = self.jobs_table
         
         logger.info(
             f"DBInsert initialized: use_storage={self.use_storage}, "
@@ -172,16 +173,6 @@ class DBInsert:
         
         return None
     
-    def _ensure_shadow_table(self, cursor):
-        """Ensure shadow table exists (create if not)."""
-        try:
-            cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS {self.shadow_table} (LIKE {self.jobs_table} INCLUDING ALL)
-            """)
-            logger.debug(f"Ensured shadow table {self.shadow_table} exists")
-        except Exception as e:
-            logger.warning(f"Could not create shadow table (may already exist): {e}")
-    
     def insert_job(self, result: ExtractionResult, source_id: Optional[str] = None,
                    org_name: Optional[str] = None, shadow: Optional[bool] = None) -> Dict[str, Any]:
         """
@@ -199,9 +190,11 @@ class DBInsert:
         if not self.use_storage:
             logger.debug("Storage disabled, skipping insertion")
             return {'success': False, 'job_id': None, 'error': 'Storage disabled'}
-        
+
         shadow_mode = shadow if shadow is not None else self.shadow_mode
-        table_name = f"{self.jobs_table}_side" if shadow_mode else self.jobs_table
+        if shadow_mode:
+            return {'success': False, 'job_id': None, 'error': 'Shadow catalogue is disabled'}
+        table_name = self.jobs_table
         
         # Convert to job dict
         try:
@@ -241,11 +234,7 @@ class DBInsert:
                             update_values.append(value)
                     
                     update_values.append(canonical_hash)
-                    
-                    # Ensure shadow table exists
-                    if shadow_mode:
-                        self._ensure_shadow_table(cur)
-                    
+
                     cur.execute(
                         f"""
                         UPDATE {table_name}
@@ -259,10 +248,6 @@ class DBInsert:
                     logger.debug(f"Updated job {job_id} in {table_name}")
                     return {'success': True, 'job_id': str(job_id), 'error': None, 'action': 'updated'}
                 else:
-                    # Ensure shadow table exists
-                    if shadow_mode:
-                        self._ensure_shadow_table(cur)
-                    
                     # Insert new
                     insert_fields = list(job.keys())
                     insert_placeholders = ['%s'] * len(insert_fields)

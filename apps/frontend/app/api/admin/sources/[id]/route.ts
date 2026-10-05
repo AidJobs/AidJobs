@@ -4,6 +4,27 @@ export const dynamic = 'force-dynamic';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
+      method: 'GET',
+      headers: {
+        Cookie: request.headers.get('cookie') || '',
+      },
+      credentials: 'include',
+    });
+    const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Source detail proxy error:', error);
+    return NextResponse.json({ status: 'error', error: 'Proxy error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -13,9 +34,9 @@ export async function PATCH(
     
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    console.log(`[proxy] PATCH ${backendUrl}/admin/sources/${params.id}`);
+    console.log(`[proxy] PATCH ${backendUrl}/api/admin/sources/${params.id}`);
     
-    const response = await fetch(`${backendUrl}/admin/sources/${params.id}`, {
+    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -72,9 +93,9 @@ export async function DELETE(
   try {
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    console.log(`[proxy] DELETE ${backendUrl}/admin/sources/${params.id}`);
+    console.log(`[proxy] DELETE ${backendUrl}/api/admin/sources/${params.id}`);
     
-    const response = await fetch(`${backendUrl}/admin/sources/${params.id}`, {
+    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
       method: 'DELETE',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

@@ -6,7 +6,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${BACKEND_URL}/admin/presets/sources`, {
+    const response = await fetch(`${BACKEND_URL}/api/admin/presets/sources`, {
       method: 'GET',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

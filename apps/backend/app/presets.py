@@ -142,7 +142,7 @@ PRESETS = [
 ]
 
 
-@router.get("/admin/presets/sources")
+@router.get("/api/admin/presets/sources")
 def get_source_presets(admin: str = Depends(admin_required)):
     """
     Get list of available source presets.
@@ -171,7 +171,7 @@ def get_source_presets(admin: str = Depends(admin_required)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/admin/presets/sources/{preset_name}")
+@router.get("/api/admin/presets/sources/{preset_name}")
 def get_source_preset(preset_name: str, admin: str = Depends(admin_required)):
     """
     Get a specific preset by name.

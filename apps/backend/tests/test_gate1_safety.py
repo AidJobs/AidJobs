@@ -27,7 +27,6 @@ from security.admin_auth import (
 )
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-FIND_EARN_SOURCE = (BACKEND_ROOT / "app" / "find_earn.py").read_text(encoding="utf-8")
 
 
 def _request(headers: dict[str, str] | None = None) -> Request:
@@ -91,11 +90,11 @@ def test_data_quality_uses_canonical_admin_dependency():
     assert data_quality_logs.admin_required is admin_auth.admin_required
 
 
-def test_find_earn_submit_does_not_fetch():
-    assert "requests.head" not in FIND_EARN_SOURCE
-    assert "requests.get" not in FIND_EARN_SOURCE
-    assert "import requests" not in FIND_EARN_SOURCE
-    assert "detect_jobs_count" not in FIND_EARN_SOURCE
+def test_find_earn_submit_route_is_gone():
+    assert not (BACKEND_ROOT / "app" / "find_earn.py").exists()
+    client = TestClient(app)
+    response = client.post("/api/find-earn/submit", json={"url": "https://example.org/careers"})
+    assert response.status_code == 404
 
 
 def test_status_and_migration_do_not_change_schema():
@@ -126,7 +125,7 @@ def test_removed_and_disabled_routes(monkeypatch):
         assert "admin_password_length" not in body
 
     reindex = client.get("/admin/search/reindex")
-    assert reindex.status_code == 405
+    assert reindex.status_code == 404
 
     login = client.post("/api/admin/login", json={"password": "gate1-test-password"})
     assert login.status_code == 200

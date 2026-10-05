@@ -4,10 +4,12 @@ Integration tests for pipeline storage integration.
 Tests the full flow: extraction -> database insertion -> API retrieval.
 """
 
-import pytest
 import os
+from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+
+import pytest
 
 from pipeline.extractor import Extractor, ExtractionResult
 from pipeline.db_insert import DBInsert
@@ -130,24 +132,17 @@ class TestPipelineStorageIntegration:
             # Should not call insert_job for non-job pages
             mock_insert.assert_not_called()
     
-    def test_shadow_mode_table_creation(self, mock_db_url):
-        """Test shadow mode table creation."""
+    def test_shadow_mode_does_not_write(self, mock_db_url):
+        """Shadow mode must not create or write a side catalogue."""
         insert = DBInsert(mock_db_url, use_storage=True, shadow_mode=True)
-        
         with patch('pipeline.db_insert.psycopg2.connect') as mock_connect:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
-            mock_connect.return_value = mock_conn
-            
-            # Test _ensure_shadow_table
-            insert._ensure_shadow_table(mock_cursor)
-            
-            # Should attempt to create table
-            mock_cursor.execute.assert_called()
-            call_args = mock_cursor.execute.call_args[0][0]
-            assert 'CREATE TABLE IF NOT EXISTS' in call_args
-            assert 'jobs_side' in call_args
+            status = insert.insert_job(None)
+        mock_connect.assert_not_called()
+        assert status['success'] is False
+        assert status['error'] == 'Shadow catalogue is disabled'
+        source = Path(__file__).resolve().parents[1].joinpath('pipeline', 'db_insert.py').read_text(encoding='utf-8')
+        assert 'jobs_side' not in source
+        assert 'CREATE TABLE' not in source
 
 
 class TestFieldMappingIntegration:
