@@ -162,6 +162,29 @@ def test_identity_conflict_writes_nothing():
     assert _writes(cursor) == []
 
 
+def test_removed_html_prefilter_cases_are_rejected_without_sql():
+    """The HTML emergency filter is gone. These cases reach persist and stop there."""
+    source = (ROOT / "crawler_v2" / "simple_crawler.py").read_text(encoding="utf-8")
+    assert "EMERGENCY_GUARD" not in source
+    cases = (
+        {"apply_url": "mailto:jobs@example.org"},
+        {"apply_url": "https://example.org/jobs?page=2"},
+        {"apply_url": "https://example.org/careers"},
+        {"quality_score": 0.24},
+    )
+    for overrides in cases:
+        cursor = FakeCursor([])
+        outcome = persist_candidate(
+            cursor,
+            _candidate(**overrides),
+            observed_at=WHEN,
+            heuristics=True,
+            reference=REFERENCE,
+        )
+        assert outcome == "rejected"
+        assert cursor.statements == []
+
+
 def test_placeholder_is_rejected_without_insert():
     cursor = FakeCursor([])
     outcome = persist_candidate(
