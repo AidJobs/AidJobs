@@ -11,9 +11,9 @@ export async function POST(
   try {
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    console.log(`[proxy] POST ${backendUrl}/admin/sources/${params.id}/simulate_extract`);
+    console.log(`[proxy] POST ${backendUrl}/api/admin/sources/${params.id}/simulate_extract`);
     
-    const response = await fetch(`${backendUrl}/admin/sources/${params.id}/simulate_extract`, {
+    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}/simulate_extract`, {
       method: 'POST',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

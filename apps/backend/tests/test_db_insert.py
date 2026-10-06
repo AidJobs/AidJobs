@@ -42,7 +42,8 @@ class TestDBInsert:
             assert insert.use_storage == False
             assert insert.shadow_mode == True
             assert insert.jobs_table == "jobs"
-            assert insert.shadow_table == "jobs_side"
+            assert insert.shadow_table == "jobs"
+            assert "jobs_side" not in insert.shadow_table
     
     def test_init_with_env_vars(self, mock_db_url):
         """Test initialization with environment variables."""
@@ -111,8 +112,8 @@ class TestDBInsert:
         result = ExtractionResult("https://example.com/job/123")
         result.is_job = True
         
-        insert = DBInsert(mock_db_url, use_storage=True)
-        
+        insert = DBInsert(mock_db_url, use_storage=True, shadow_mode=False)
+
         with patch.object(insert, '_get_db_conn'):
             status = insert.insert_job(result)
             assert status['success'] == False

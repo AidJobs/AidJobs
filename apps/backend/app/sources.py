@@ -64,7 +64,7 @@ class Source(BaseModel):
     updated_at: str
 
 
-@router.get("/admin/sources")
+@router.get("/api/admin/sources")
 def list_sources(
     request: Request,
     page: int = 1,
@@ -150,7 +150,81 @@ def list_sources(
             conn.close()
 
 
-@router.post("/admin/sources")
+@router.get("/api/admin/organisations")
+def list_organisations(admin: str = Depends(admin_required)):
+    """Distinct trimmed source names. This does not read or write organisation rows."""
+    if not psycopg2:
+        raise HTTPException(status_code=503, detail="Database driver not available")
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    conn = None
+    cursor = None
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT btrim(org_name) AS name, COUNT(*) AS source_count
+            FROM sources
+            WHERE btrim(coalesce(org_name, '')) <> ''
+            GROUP BY btrim(org_name)
+            ORDER BY btrim(org_name)
+            """
+        )
+        items = [dict(row) for row in cursor.fetchall()]
+        return {"status": "ok", "data": {"items": items}, "error": None}
+    except Exception as e:
+        logger.error(f"Failed to list organisations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.get("/api/admin/sources/{source_id}")
+def get_source(source_id: str, admin: str = Depends(admin_required)):
+    """One source for the detail page."""
+    if not psycopg2:
+        raise HTTPException(status_code=503, detail="Database driver not available")
+    conn_params = db_config.get_connection_params()
+    if not conn_params:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    conn = None
+    cursor = None
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT
+                id::text, org_name, careers_url, source_type, org_type, status,
+                crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
+                last_crawl_message, consecutive_failures
+            FROM sources
+            WHERE id::text = %s
+            """,
+            (source_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Source not found")
+        return {"status": "ok", "data": dict(row), "error": None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load source: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+@router.post("/api/admin/sources")
 def create_source(
     request: Request,
     source: SourceCreate,
@@ -277,7 +351,7 @@ def create_source(
             conn.close()
 
 
-@router.patch("/admin/sources/{source_id}")
+@router.patch("/api/admin/sources/{source_id}")
 def update_source(
     request: Request,
     source_id: str,
@@ -383,7 +457,7 @@ def update_source(
             conn.close()
 
 
-@router.delete("/admin/sources/{source_id}")
+@router.delete("/api/admin/sources/{source_id}")
 def delete_source(
     request: Request,
     source_id: str,
@@ -464,7 +538,7 @@ def delete_source(
             conn.close()
 
 
-@router.delete("/admin/sources/{source_id}/permanent")
+@router.delete("/api/admin/sources/{source_id}/permanent")
 def permanently_delete_source(
     request: Request,
     source_id: str,
@@ -498,7 +572,7 @@ def permanently_delete_source(
             raise HTTPException(status_code=404, detail="Source not found")
         
         if source['status'] != 'deleted':
-            raise HTTPException(status_code=400, detail="Source must be deleted before permanent deletion. Use DELETE /admin/sources/{id} first.")
+            raise HTTPException(status_code=400, detail="Source must be deleted before permanent deletion. Use DELETE /api/admin/sources/{id} first.")
         
         logger.info(f"[sources] Permanently deleting source {source_id}")
         
@@ -542,7 +616,7 @@ def permanently_delete_source(
             conn.close()
 
 
-@router.post("/admin/sources/{source_id}/test")
+@router.post("/api/admin/sources/{source_id}/test")
 async def test_source(
     request: Request,
     source_id: str,
@@ -728,7 +802,7 @@ async def test_source(
             conn.close()
 
 
-@router.get("/admin/sources/{source_id}/export")
+@router.get("/api/admin/sources/{source_id}/export")
 def export_source(
     request: Request,
     source_id: str,
@@ -797,7 +871,7 @@ def export_source(
             conn.close()
 
 
-@router.post("/admin/sources/import")
+@router.post("/api/admin/sources/import")
 def import_source(
     request: Request,
     source: SourceCreate,
@@ -893,7 +967,7 @@ def import_source(
             conn.close()
 
 
-@router.post("/admin/sources/{source_id}/simulate_extract")
+@router.post("/api/admin/sources/{source_id}/simulate_extract")
 async def simulate_extract(
     request: Request,
     source_id: str,

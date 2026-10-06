@@ -2,12 +2,13 @@
 Admin authentication with httpOnly cookie session.
 Uses HMAC-signed session tokens with 8-hour expiry.
 """
-import os
-import hmac
 import hashlib
+import hmac
+import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+
 from fastapi import HTTPException, Request, Response
 
 COOKIE_NAME = "aidjobs_admin_session"
@@ -145,7 +146,7 @@ def verify_admin_password(password: str) -> bool:
     """
     Verify password against ADMIN_PASSWORD.
     Uses constant-time comparison to prevent timing attacks.
-    A configured password is required in every environment.
+    A missing password denies login in every environment.
     """
     admin_password = get_admin_password()
     if not admin_password:
@@ -155,11 +156,6 @@ def verify_admin_password(password: str) -> bool:
 
 
 def check_admin_configured() -> bool:
-    """Check if admin authentication is properly configured."""
-    try:
-        get_cookie_secret()
-    except ValueError:
-        return False
-
+    """Admin login requires ADMIN_PASSWORD in every environment."""
     password = get_admin_password()
     return password is not None and len(password) > 0

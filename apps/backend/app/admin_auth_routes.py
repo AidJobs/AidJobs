@@ -2,16 +2,16 @@
 Admin authentication endpoints.
 Provides login, logout, and session status routes.
 """
-from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
-from app.rate_limit import limiter, RATE_LIMIT_LOGIN
+
+from app.rate_limit import RATE_LIMIT_LOGIN, limiter
 from security.admin_auth import (
-    verify_admin_password,
-    set_admin_cookie,
+    check_admin_configured,
     clear_admin_cookie,
     get_current_admin,
-    check_admin_configured,
-    admin_required,
+    set_admin_cookie,
+    verify_admin_password,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin-auth"])
@@ -91,47 +91,3 @@ async def admin_session(request: Request):
     return {"authenticated": admin is not None}
 
 
-@router.get("/config-check")
-async def admin_config_check(admin: str = Depends(admin_required)):
-    """
-    Diagnostic endpoint to check admin configuration.
-    Returns configuration status without exposing sensitive data.
-    """
-    import os
-    import logging
-    from security.admin_auth import get_admin_password, is_dev_mode, get_cookie_secret
-    
-    logger = logging.getLogger(__name__)
-    
-    try:
-        cookie_secret = get_cookie_secret()
-        cookie_secret_set = True
-    except ValueError as e:
-        logger.warning(f"[config_check] COOKIE_SECRET error: {e}")
-        cookie_secret_set = False
-    
-    admin_password = get_admin_password()
-    
-    is_dev = is_dev_mode()
-    admin_configured = check_admin_configured()
-    
-    status = "ok" if cookie_secret_set and admin_configured else "missing_config"
-    
-    config = {
-        "admin_password_set": bool(admin_password),
-        "cookie_secret_set": cookie_secret_set,
-        "aidjobs_env": os.getenv("AIDJOBS_ENV", "not set"),
-        "is_dev_mode": is_dev,
-        "admin_configured": admin_configured,
-        "status": status,
-        "recommendations": []
-    }
-    
-    if not cookie_secret_set:
-        config["recommendations"].append("Set COOKIE_SECRET environment variable")
-    if not admin_password:
-        config["recommendations"].append("Set ADMIN_PASSWORD environment variable")
-    if is_dev:
-        config["recommendations"].append("Set AIDJOBS_ENV=production for production deployment")
-    
-    return config

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type AdminView = 'dashboard' | 'sources' | 'crawl' | 'find-earn' | 'taxonomy' | 'setup';
+export type AdminView = 'dashboard' | 'sources' | 'crawl' | 'setup';
 
 type AdminViewContextType = {
   currentView: AdminView;

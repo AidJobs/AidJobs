@@ -11,9 +11,9 @@ export async function GET(
   try {
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    console.log(`[proxy] GET ${backendUrl}/admin/sources/${params.id}/export`);
+    console.log(`[proxy] GET ${backendUrl}/api/admin/sources/${params.id}/export`);
     
-    const response = await fetch(`${backendUrl}/admin/sources/${params.id}/export`, {
+    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}/export`, {
       method: 'GET',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

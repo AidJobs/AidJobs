@@ -12,7 +12,7 @@ export async function DELETE(
     const { id } = params;
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/sources/${id}/permanent`;
+    const url = `${backendUrl}/api/admin/sources/${id}/permanent`;
     console.log(`[proxy] DELETE ${url}`);
     
     const res = await fetch(url, {

@@ -5,11 +5,15 @@ Simple RSS crawler - extracts jobs from RSS feeds.
 import logging
 import re
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 import httpx
 import feedparser
 import psycopg2
+
+from contracts.identity import heuristics_enabled
+from contracts.persist import persist_candidate
+from app.search_projection import commit_and_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,7 @@ class SimpleRSSCrawler:
         # Use pipeline extractor for unified schema
         try:
             from pipeline.extractor import Extractor
-            extractor = Extractor(enable_ai=False, enable_snapshots=False, shadow_mode=True)
+            extractor = Extractor(enable_ai=False, enable_snapshots=False, shadow_mode=False)
         except ImportError:
             # Fallback to simple extraction if pipeline not available
             extractor = None
@@ -186,52 +190,45 @@ class SimpleRSSCrawler:
         
         try:
             with conn.cursor() as cur:
+                recorded = []
                 for job in jobs:
                     title = job.get('title', '').strip()
                     apply_url = job.get('apply_url', '').strip()
-                    location = job.get('location_raw', '').strip()
-                    
+
                     if not title or not apply_url:
                         skipped += 1
                         continue
-                    
-                    # Create canonical hash
-                    import hashlib
-                    canonical_text = f"{title}|{apply_url}".lower()
-                    canonical_hash = hashlib.md5(canonical_text.encode()).hexdigest()
-                    
-                    # Check if exists
-                    cur.execute("""
-                        SELECT id FROM jobs WHERE canonical_hash = %s
-                    """, (canonical_hash,))
-                    
-                    existing = cur.fetchone()
-                    
-                    if existing:
-                        # Update
-                        cur.execute("""
-                            UPDATE jobs
-                            SET title = %s,
-                                apply_url = %s,
-                                location_raw = %s,
-                                last_seen_at = NOW(),
-                                updated_at = NOW()
-                            WHERE canonical_hash = %s
-                        """, (title, apply_url, location, canonical_hash))
-                        updated += 1
-                    else:
-                        # Insert
-                        cur.execute("""
-                            INSERT INTO jobs (
-                                source_id, org_name, title, apply_url,
-                                location_raw, canonical_hash,
-                                status, fetched_at, last_seen_at
-                            )
-                            VALUES (%s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
-                        """, (source_id, org_name, title, apply_url, location, canonical_hash))
+
+                    candidate = {
+                        "title": title,
+                        "apply_url": apply_url,
+                    }
+                    if "location_raw" in job:
+                        raw_location = job.get("location_raw") or ""
+                        candidate["location_raw"] = (
+                            raw_location.strip() if isinstance(raw_location, str) else raw_location
+                        )
+                    observed_at = datetime.now(timezone.utc)
+                    outcome = persist_candidate(
+                        cur,
+                        candidate,
+                        observed_at=observed_at,
+                        heuristics=heuristics_enabled(),
+                        reference=job.get("reference"),
+                        source_id=source_id,
+                        org_name=org_name,
+                        recorded=recorded,
+                    )
+                    if outcome == "created":
                         inserted += 1
+                    elif outcome == "updated":
+                        updated += 1
+                    elif outcome == "unchanged":
+                        logger.debug("RSS job unchanged, last_seen_at only: %s", title[:80])
+                    else:
+                        skipped += 1
                 
-                conn.commit()
+                commit_and_schedule(conn, recorded)
         
         except Exception as e:
             logger.error(f"Error saving jobs: {e}")

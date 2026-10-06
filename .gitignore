@@ -21,5 +21,9 @@ frontend/.env.local
 # Meilisearch data
 _meili_data/
 
+# Crawl output and diagnostic dumps. Not product source.
+/raw-html/
+apps/backend/report/
+
 apps/backend/.env
 apps/frontend/.env.local

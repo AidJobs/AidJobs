@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const queryString = searchParams.toString();
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/sources${queryString ? `?${queryString}` : ''}`;
+    const url = `${backendUrl}/api/admin/sources${queryString ? `?${queryString}` : ''}`;
     console.log(`[proxy] GET ${url}`);
     
     const response = await fetch(url, {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/sources`;
+    const url = `${backendUrl}/api/admin/sources`;
     console.log(`[proxy] POST ${url}`);
     
     const response = await fetch(url, {

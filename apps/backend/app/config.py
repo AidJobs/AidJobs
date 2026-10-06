@@ -125,9 +125,9 @@ class Capabilities:
     def get_capabilities(cls) -> dict:
         return {
             "search": cls.is_search_enabled(),
-            "cv": cls.is_cv_enabled(),
-            "payments": cls.is_payments_enabled(),
-            "findearn": cls.is_findearn_enabled(),
+            "cv": False,
+            "payments": False,
+            "findearn": False,
         }
 
 

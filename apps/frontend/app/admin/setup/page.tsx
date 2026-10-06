@@ -1,41 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info, Database } from 'lucide-react';
-import { toast } from 'sonner';
+import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react';
 
 type ProviderStatus = 'ok' | 'warn' | 'fail';
 
 type SetupStatus = {
   supabase: ProviderStatus;
   meili: ProviderStatus;
-  payments: {
-    paypal: boolean;
-    razorpay: boolean;
-  };
   ai: boolean;
   timestamp: string;
-  versions: {
-    python: string;
-    fastapi: string;
-  };
-  env_vars: {
-    supabase: string[];
-    meilisearch: string[];
-    payments: {
-      paypal: string[];
-      razorpay: string[];
-    };
-    ai: string[];
-  };
 };
 
 export default function AdminSetupPage() {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [runningMigration, setRunningMigration] = useState(false);
-
   useEffect(() => {
     fetchStatus();
   }, []);
@@ -44,9 +24,7 @@ export default function AdminSetupPage() {
     setLoading(true);
     setError(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000');
-      console.log('[Setup] Fetching from:', `${apiUrl}/admin/setup/status`);
-      const res = await fetch(`${apiUrl}/admin/setup/status`);
+      const res = await fetch('/api/admin/setup/status', { credentials: 'include' });
       
       console.log('[Setup] Response:', res.status, res.ok);
       
@@ -91,44 +69,6 @@ export default function AdminSetupPage() {
     if (status === 'ok' || status === true) return 'border-green-200 bg-green-50';
     if (status === 'warn') return 'border-orange-200 bg-orange-50';
     return 'border-gray-200 bg-gray-50';
-  };
-
-  const handleRunMigration = async () => {
-    if (!confirm('Run the job deletion audit migration? This will create the audit table, soft delete columns, and impact function.')) {
-      return;
-    }
-
-    setRunningMigration(true);
-    try {
-      const res = await fetch('/api/admin/crawl/run-migration', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (res.status === 401) {
-        toast.error('Authentication required');
-        return;
-      }
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.detail || 'Failed to run migration');
-      }
-
-      const data = await res.json();
-      if (data.status === 'ok') {
-        toast.success('Migration completed successfully!');
-        console.log('Migration steps:', data.steps);
-        console.log('Verification:', data.verification);
-      } else {
-        throw new Error(data.error || 'Migration failed');
-      }
-    } catch (error) {
-      console.error('Migration error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to run migration');
-    } finally {
-      setRunningMigration(false);
-    }
   };
 
   if (loading) {
@@ -184,18 +124,8 @@ export default function AdminSetupPage() {
             <h2 className="text-lg font-semibold">Supabase</h2>
             {getStatusIcon(status.supabase)}
           </div>
-          <div className="mb-2">
+          <div>
             <span className="font-medium">Status:</span> {getStatusText(status.supabase)}
-          </div>
-          <div className="mt-4">
-            <div className="text-sm font-medium mb-2">Required environment variables:</div>
-            <ul className="text-sm text-gray-700 space-y-1">
-              {status.env_vars.supabase.map((envVar) => (
-                <li key={envVar} className="font-mono text-xs bg-white px-2 py-1 rounded">
-                  {envVar}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
 
@@ -204,83 +134,18 @@ export default function AdminSetupPage() {
             <h2 className="text-lg font-semibold">Meilisearch</h2>
             {getStatusIcon(status.meili)}
           </div>
-          <div className="mb-2">
+          <div>
             <span className="font-medium">Status:</span> {getStatusText(status.meili)}
-          </div>
-          <div className="mt-4">
-            <div className="text-sm font-medium mb-2">Required environment variables:</div>
-            <ul className="text-sm text-gray-700 space-y-1">
-              {status.env_vars.meilisearch.map((envVar) => (
-                <li key={envVar} className="font-mono text-xs bg-white px-2 py-1 rounded">
-                  {envVar}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        <div className={`border rounded-lg p-6 ${
-          (status.payments.paypal && status.payments.razorpay) ? 'border-green-200 bg-green-50' :
-          (status.payments.paypal || status.payments.razorpay) ? 'border-orange-200 bg-orange-50' :
-          'border-gray-200 bg-gray-50'
-        }`}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Payment Providers</h2>
-            {(status.payments.paypal && status.payments.razorpay) ? getStatusIcon('ok') :
-             (status.payments.paypal || status.payments.razorpay) ? getStatusIcon('warn') :
-             getStatusIcon('fail')}
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                {getStatusIcon(status.payments.paypal)}
-                <span className="font-medium">PayPal:</span>
-                <span className="text-sm">{getStatusText(status.payments.paypal)}</span>
-              </div>
-              <ul className="text-sm text-gray-700 space-y-1 ml-7">
-                {status.env_vars.payments.paypal.map((envVar) => (
-                  <li key={envVar} className="font-mono text-xs bg-white px-2 py-1 rounded">
-                    {envVar}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                {getStatusIcon(status.payments.razorpay)}
-                <span className="font-medium">Razorpay:</span>
-                <span className="text-sm">{getStatusText(status.payments.razorpay)}</span>
-              </div>
-              <ul className="text-sm text-gray-700 space-y-1 ml-7">
-                {status.env_vars.payments.razorpay.map((envVar) => (
-                  <li key={envVar} className="font-mono text-xs bg-white px-2 py-1 rounded">
-                    {envVar}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </div>
 
         <div className={`border rounded-lg p-6 ${getStatusColor(status.ai)}`}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">AI Providers</h2>
+            <h2 className="text-lg font-semibold">AI</h2>
             {getStatusIcon(status.ai)}
           </div>
-          <div className="mb-2">
+          <div>
             <span className="font-medium">Status:</span> {getStatusText(status.ai)}
-          </div>
-          <div className="mt-4">
-            <div className="text-sm font-medium mb-2">Optional environment variables:</div>
-            <ul className="text-sm text-gray-700 space-y-1">
-              {status.env_vars.ai.map((envVar) => (
-                <li key={envVar} className="font-mono text-xs bg-white px-2 py-1 rounded">
-                  {envVar}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </div>
@@ -299,41 +164,6 @@ export default function AdminSetupPage() {
         </div>
       </div>
 
-      <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-2 flex-1">
-            <Database className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-900">
-              <p className="font-medium mb-1">Database Migration</p>
-              <p className="mb-3">
-                Run the job deletion audit migration to enable enterprise-grade job deletion features.
-                This will create the audit table, soft delete columns, and impact analysis function.
-              </p>
-              <button
-                onClick={handleRunMigration}
-                disabled={runningMigration}
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
-              >
-                {runningMigration ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Running Migration...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    Run Migration
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 text-xs text-gray-500">
-        Python {status.versions.python} • FastAPI {status.versions.fastapi}
-      </div>
     </div>
   );
 }
