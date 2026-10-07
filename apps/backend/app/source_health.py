@@ -253,7 +253,7 @@ class SourceHealthScorer:
             base_priority -= 1
         
         # Boost priority for UN/INGO sources (typically more valuable)
-        org_type = source_data.get('org_type', '').lower()
+        org_type = (source_data.get('org_type') or '').lower()
         if org_type in ['un', 'ingo']:
             base_priority += 1
         

@@ -45,3 +45,10 @@ def test_quality_query_has_one_bound_placeholder():
     assert "LIKE '%%/careers%%'" in cursor.query
     assert "LIKE '%%/vacancies%%'" in cursor.query
     assert "source_id::text = %s" in cursor.query
+
+
+def test_null_org_type_does_not_raise_in_priority():
+    """SQL NULL arrives as None. A missing type gets no UN/INGO boost."""
+    scorer = SourceHealthScorer("postgres://unused")
+    priority = scorer._calculate_priority(50, {"org_type": None}, 50)
+    assert priority == 5
