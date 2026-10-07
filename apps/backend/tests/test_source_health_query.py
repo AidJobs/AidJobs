@@ -52,3 +52,14 @@ def test_null_org_type_does_not_raise_in_priority():
     scorer = SourceHealthScorer("postgres://unused")
     priority = scorer._calculate_priority(50, {"org_type": None}, 50)
     assert priority == 5
+
+
+def test_aware_next_run_at_overdue_hours():
+    """TIMESTAMPTZ comes back timezone-aware. Subtracting a naive utcnow() raises."""
+    from datetime import datetime, timezone
+
+    from orchestrator import overdue_hours
+
+    next_run_at = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
+    assert overdue_hours(next_run_at, now=now) == 48

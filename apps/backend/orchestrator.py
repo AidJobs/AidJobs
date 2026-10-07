@@ -7,7 +7,7 @@ import asyncio
 import random
 import time
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -38,6 +38,13 @@ def _row_id(row):
     if isinstance(row, dict):
         return row.get("id")
     return row[0]
+
+
+def overdue_hours(next_run_at, *, now=None):
+    """Hours since a TIMESTAMPTZ next_run_at. The database value is timezone-aware."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    return (now - next_run_at).total_seconds() / 3600
 
 
 class CrawlerOrchestrator:
@@ -302,8 +309,7 @@ class CrawlerOrchestrator:
                     
                     # Boost priority for overdue sources
                     if source.get('next_run_at'):
-                        overdue_hours = (datetime.utcnow() - source['next_run_at']).total_seconds() / 3600
-                        priority_score += min(50, overdue_hours / 24)  # Max 50 point boost
+                        priority_score += min(50, overdue_hours(source['next_run_at']) / 24)  # Max 50 point boost
                     else:
                         priority_score += 100  # Never crawled = highest priority
                     
