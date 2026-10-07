@@ -1,4 +1,5 @@
 """Gate 4 persistence. A fake cursor, no database connection."""
+import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -293,6 +294,45 @@ def test_tuple_row_matches_without_rewriting_hash():
     )
     assert outcome == "unchanged"
     assert "canonical_hash" not in _writes(cursor)[0][0]
+
+
+def _bound(sql: str, params) -> dict:
+    if sql.startswith("INSERT"):
+        columns = sql.split("(", 1)[1].split(")", 1)[0].split(", ")
+        return dict(zip(columns, params))
+    set_clause = sql.split(" SET ", 1)[1].split(" WHERE ", 1)[0]
+    names = [part.split(" = ", 1)[0] for part in set_clause.split(", ")]
+    return dict(zip(names, params))
+
+
+def test_quality_issues_stay_a_list_on_insert_and_update():
+    """TEXT[] must not be JSON-encoded. JSONB factors stay serialized."""
+    factors = {"description": 0.0, "org_name": 0.0, "country": 0.0}
+    created = FakeCursor([])
+    assert persist_candidate(
+        created,
+        _candidate(quality_factors=factors, quality_issues=[], needs_review=True),
+        observed_at=WHEN,
+        heuristics=True,
+        reference=REFERENCE,
+    ) == "created"
+    inserted = _bound(*_writes(created)[0])
+    assert inserted["quality_issues"] == []
+    assert isinstance(inserted["quality_issues"], list)
+    assert inserted["quality_factors"] == json.dumps(factors)
+
+    issues = ["Location present but country missing"]
+    updated = FakeCursor([_stored(city="Nairobi")])
+    assert persist_candidate(
+        updated,
+        _candidate(city="Mombasa", quality_issues=issues),
+        observed_at=WHEN,
+        heuristics=True,
+        reference=REFERENCE,
+    ) == "updated"
+    changed = _bound(*_writes(updated)[0])
+    assert changed["quality_issues"] == issues
+    assert isinstance(changed["quality_issues"], list)
 
 
 def test_persist_source_has_no_second_writer():

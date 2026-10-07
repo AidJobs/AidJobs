@@ -51,7 +51,7 @@ SUPPLEMENTARY_FIELDS = (
     "quality_scored_at",
 )
 
-_JSON_FIELDS = frozenset({"quality_factors", "quality_issues"})
+_JSON_FIELDS = frozenset({"quality_factors"})
 
 
 def persist_candidate(
