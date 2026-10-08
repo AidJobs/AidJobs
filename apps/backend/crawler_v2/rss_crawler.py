@@ -11,6 +11,7 @@ import httpx
 import feedparser
 import psycopg2
 
+from contracts.admission import admit_batch, extraction_logger_for, log_admission_rejections
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
@@ -208,6 +209,8 @@ class SimpleRSSCrawler:
                         candidate["location_raw"] = (
                             raw_location.strip() if isinstance(raw_location, str) else raw_location
                         )
+                    if job.get("admitted") is True:
+                        candidate["admitted"] = True
                     observed_at = datetime.now(timezone.utc)
                     outcome = persist_candidate(
                         cur,
@@ -260,8 +263,10 @@ class SimpleRSSCrawler:
             # Extract jobs
             jobs = self.extract_jobs_from_feed(feed, careers_url)
             
-            # Save to database
-            counts = self.save_jobs(jobs, source_id, org_name, base_url=careers_url)
+            # Save to database. Admission sees the finished list and does not fetch.
+            admitted, rejected = admit_batch(jobs, "rss")
+            log_admission_rejections(extraction_logger_for(self.db_url), rejected, source_id)
+            counts = self.save_jobs(admitted, source_id, org_name, base_url=careers_url)
             
             return {
                 'status': 'ok' if jobs else 'warn',

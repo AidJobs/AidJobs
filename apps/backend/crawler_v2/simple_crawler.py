@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
+from contracts.admission import admit_batch, log_admission_rejections
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
 import httpx
@@ -23,55 +24,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
-
-_NUMERIC_ID = re.compile(r"^\d+$")
-_REPEATED_TEMPLATE_MIN = 2
-
-
-def detail_path_template(url: str) -> str | None:
-    """Collapse a numeric vacancy path to its shared shape.
-
-    Segments before the id stay literal. The id and everything after it collapse,
-    so unique slugs on the same board share one template. Paths with no numeric
-    id are not templates.
-    """
-    segments = [segment for segment in urlparse(url).path.split("/") if segment]
-    if not any(_NUMERIC_ID.match(segment) for segment in segments):
-        return None
-    normalized: List[str] = []
-    seen_id = False
-    collapsed_rest = False
-    for segment in segments:
-        if _NUMERIC_ID.match(segment):
-            normalized.append("{id}")
-            seen_id = True
-        elif seen_id:
-            if not collapsed_rest:
-                normalized.append("{rest}")
-                collapsed_rest = True
-        else:
-            normalized.append(segment.lower())
-    return "/".join(normalized)
-
-
-def restrict_to_repeated_detail_templates(jobs: List[Dict]) -> List[Dict]:
-    """Keep links that match a numeric detail template seen more than once.
-
-    A listing with no repeated id template is returned unchanged. Every repeated
-    template is kept, so two vacancy shapes on one page both survive.
-    """
-    templates = [detail_path_template(str(job.get("apply_url") or "")) for job in jobs]
-    counts: Dict[str, int] = {}
-    for template in templates:
-        if template is None:
-            continue
-        counts[template] = counts.get(template, 0) + 1
-    repeated = {
-        template for template, count in counts.items() if count >= _REPEATED_TEMPLATE_MIN
-    }
-    if not repeated:
-        return jobs
-    return [job for job, template in zip(jobs, templates) if template in repeated]
 
 
 class SimpleCrawler:
@@ -705,7 +657,7 @@ class SimpleCrawler:
                 
                 jobs.append(job)
             
-            return restrict_to_repeated_detail_templates(jobs)
+            return jobs
         
         # Fallback to original logic if heuristics disabled
         # Find all links
@@ -835,7 +787,7 @@ class SimpleCrawler:
             
             jobs.append(job)
         
-        return restrict_to_repeated_detail_templates(jobs)
+        return jobs
     
     def _extract_from_structured_data(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
         """Extract jobs from structured data (JSON-LD, microdata)"""
@@ -1004,6 +956,7 @@ class SimpleCrawler:
         
         # Validate required fields
         if job.get('title') and job.get('apply_url'):
+            job['record_class'] = 'job_posting'
             return job
         
         return None
@@ -1454,6 +1407,8 @@ class SimpleCrawler:
                             )
                         ):
                             candidate["quality_scored_at"] = observed_at
+                        if job.get("admitted") is True:
+                            candidate["admitted"] = True
                         outcome = persist_candidate(
                             cur,
                             candidate,
@@ -2081,8 +2036,10 @@ class SimpleCrawler:
                     if scored_count > 0:
                         logger.info(f"Scored quality for {scored_count} job(s)")
                 
-                # Save to database
-                counts = self.save_jobs(jobs, source_id, org_name, base_url=careers_url)
+                # Save to database. Admission sees the finished list and does not fetch.
+                admitted, rejected = admit_batch(jobs, "html")
+                log_admission_rejections(self.extraction_logger, rejected, source_id)
+                counts = self.save_jobs(admitted, source_id, org_name, base_url=careers_url)
                 
                 # Log extraction result (Phase 2)
                 if self.extraction_logger:

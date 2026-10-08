@@ -60,7 +60,7 @@ def _sql(cursor) -> str:
 
 
 def _candidate(**overrides):
-    payload = {"title": TITLE, "apply_url": URL}
+    payload = {"title": TITLE, "apply_url": URL, "admitted": True}
     payload.update(overrides)
     return payload
 
@@ -128,6 +128,19 @@ def test_apply_url_change_does_not_replace_stored_hash():
     assert stored_hash not in params
     assert algorithm_a(TITLE, clean) not in params
     assert "deleted_at" not in sql
+
+
+def test_unstamped_candidate_is_rejected_before_sql():
+    cursor = FakeCursor([])
+    outcome = persist_candidate(
+        cursor,
+        {"title": TITLE, "apply_url": URL},
+        observed_at=WHEN,
+        heuristics=True,
+        reference=REFERENCE,
+    )
+    assert outcome == "rejected"
+    assert cursor.statements == []
 
 
 def test_suppressed_row_is_not_reactivated():

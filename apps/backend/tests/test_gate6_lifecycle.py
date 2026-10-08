@@ -107,14 +107,14 @@ def test_persist_sql_does_not_expire_or_reactivate():
     created = FakeCursor([])
     persist_candidate(
         created,
-        {"title": TITLE, "apply_url": URL},
+        {"title": TITLE, "apply_url": URL, "admitted": True},
         observed_at=WHEN,
         heuristics=False,
     )
     suppressed = FakeCursor([_stored(deleted_at=WHEN, status="suppressed")])
     outcome = persist_candidate(
         suppressed,
-        {"title": TITLE, "apply_url": URL, "city": "Mombasa"},
+        {"title": TITLE, "apply_url": URL, "city": "Mombasa", "admitted": True},
         observed_at=WHEN,
         heuristics=False,
     )

@@ -657,6 +657,12 @@ Only after callers are gone and replacement tests have been run:
 
 Then stop.
 
+### Gate 11 — Unified admission controller
+
+Implementation is complete. Verification passed. The implementation is staged as one atomic change. The authoritative implementation record remains `docs/architecture/gate-11-unified-admission.md`.
+
+One admission function, three existing adapter call sites, one writer. HTML calls `admit_batch(jobs, "html")`. RSS calls `admit_batch(jobs, "rss")`. API calls `admit_batch(jobs, "api")`. JSON-LD marks `record_class="job_posting"` on the HTML path. `persist_candidate` remains the writer and rejects an in-memory dict that lacks `admitted=True`. Admission is not moved into `CrawlerOrchestrator.crawl_source`.
+
 ---
 
 ## 18. Rules that override convenience

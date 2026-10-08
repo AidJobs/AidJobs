@@ -47,7 +47,8 @@ def _non_vacancy_destination(url: str) -> str | None:
     return None
 
 
-def rejection_reason(job: dict) -> str | None:
+def destination_rejection(job: dict) -> str | None:
+    """URL and identity denies. The quality floor is not an admission signal."""
     title = str(job.get("title") or "").strip()
     apply_url = str(job.get("apply_url") or "").strip()
     if not title:
@@ -64,9 +65,13 @@ def rejection_reason(job: dict) -> str | None:
     path = urlparse(apply_url).path.rstrip("/")
     if path in _ROOT_PATHS:
         return "root_careers_page"
-    destination = _non_vacancy_destination(apply_url)
-    if destination is not None:
-        return destination
+    return _non_vacancy_destination(apply_url)
+
+
+def rejection_reason(job: dict) -> str | None:
+    reason = destination_rejection(job)
+    if reason is not None:
+        return reason
     score = job.get("quality_score")
     if score is not None:
         try:

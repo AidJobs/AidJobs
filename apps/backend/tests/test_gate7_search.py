@@ -66,7 +66,7 @@ def _stored(**overrides):
 
 
 def _candidate(**overrides):
-    payload = {"title": TITLE, "apply_url": URL}
+    payload = {"title": TITLE, "apply_url": URL, "admitted": True}
     payload.update(overrides)
     return payload
 

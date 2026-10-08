@@ -66,10 +66,13 @@ def persist_candidate(
     recorded: list | None = None,
 ) -> str:
     """Validate, decide with the contract upsert, then write that decision."""
+    if candidate.get("admitted") is not True:
+        return "rejected"
     if rejection_reason(candidate):
         return "rejected"
 
     payload = dict(candidate)
+    payload.pop("admitted", None)
     if source_id is not None and "source_id" not in payload:
         payload["source_id"] = source_id
     if org_name is not None and "org_name" not in payload:
