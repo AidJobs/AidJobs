@@ -171,6 +171,13 @@ def test_removed_html_prefilter_cases_are_rejected_without_sql():
         {"apply_url": "mailto:jobs@example.org"},
         {"apply_url": "https://example.org/jobs?page=2"},
         {"apply_url": "https://example.org/careers"},
+        {"apply_url": "https://www.unicef.org/careers"},
+        {"apply_url": "https://www.unicef.org"},
+        {"apply_url": "https://twitter.com/unicef"},
+        {"apply_url": "https://www.linkedin.com/company/unicef/life"},
+        {"apply_url": "https://www.youtube.com/c/UNICEFCareers"},
+        {"apply_url": "https://www.facebook.com/UNICEFCareers"},
+        {"apply_url": "https://www.pageuppeople.com/powered-by-pageup"},
         {"quality_score": 0.24},
     )
     for overrides in cases:

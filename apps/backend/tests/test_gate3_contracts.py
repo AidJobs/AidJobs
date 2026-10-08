@@ -346,23 +346,81 @@ def test_normalize_collapses_title_whitespace_and_does_not_invent_a_deadline():
 
 def test_validate_rejections_are_recorded_on_the_crawl():
     crawl = _crawl()
-    cases = {
-        "missing_title": {"title": "  ", "apply_url": URL},
-        "missing_apply_url": {"title": TITLE, "apply_url": ""},
-        "mailto": {"title": TITLE, "apply_url": "mailto:jobs@example.org"},
-        "placeholder": {
-            "title": TITLE,
-            "apply_url": "https://placeholder.missing-url/abc",
-        },
-        "search_or_pagination": {"title": TITLE, "apply_url": f"{URL}?page=2"},
-        "root_careers_page": {"title": TITLE, "apply_url": "https://example.org/careers"},
-        "quality_score_too_low": {"title": TITLE, "apply_url": URL, "quality_score": 0.24},
-    }
-    for reason, job in cases.items():
+    cases = [
+        ("missing_title", {"title": "  ", "apply_url": URL}),
+        ("missing_apply_url", {"title": TITLE, "apply_url": ""}),
+        ("mailto", {"title": TITLE, "apply_url": "mailto:jobs@example.org"}),
+        (
+            "placeholder",
+            {"title": TITLE, "apply_url": "https://placeholder.missing-url/abc"},
+        ),
+        ("search_or_pagination", {"title": TITLE, "apply_url": f"{URL}?page=2"}),
+        ("root_careers_page", {"title": TITLE, "apply_url": "https://example.org/careers"}),
+        (
+            "root_careers_page",
+            {"title": "Unicef default logo", "apply_url": "https://www.unicef.org/careers"},
+        ),
+        (
+            "root_careers_page",
+            {"title": "Visit UNICEF Global", "apply_url": "https://www.unicef.org"},
+        ),
+        (
+            "social_profile",
+            {
+                "title": "Visit us on Twitter",
+                "apply_url": "https://twitter.com/unicef",
+                "quality_score": 0.4,
+            },
+        ),
+        (
+            "social_profile",
+            {
+                "title": "Visit us on LinkedIn",
+                "apply_url": "https://www.linkedin.com/company/unicef/life",
+                "quality_score": 0.4,
+            },
+        ),
+        (
+            "social_profile",
+            {
+                "title": "Visit us on YouTube",
+                "apply_url": "https://www.youtube.com/c/UNICEFCareers",
+                "quality_score": 0.4,
+            },
+        ),
+        (
+            "social_profile",
+            {
+                "title": "Visit us on Facebook",
+                "apply_url": "https://www.facebook.com/UNICEFCareers",
+                "quality_score": 0.4,
+            },
+        ),
+        (
+            "vendor_badge",
+            {
+                "title": "Powered by PageUp",
+                "apply_url": "https://www.pageuppeople.com/powered-by-pageup",
+                "quality_score": 0.4,
+            },
+        ),
+        ("quality_score_too_low", {"title": TITLE, "apply_url": URL, "quality_score": 0.24}),
+    ]
+    for reason, job in cases:
         assert consider(job, crawl) == reason
     assert crawl.rejected == len(cases)
     accepted = {"title": TITLE, "apply_url": f"{URL}/analyst", "quality_score": 0.25}
     assert consider(accepted, crawl) is None
+    job_root = "https://jobs.unicef.org/en-us/job/"
+    vacancies = [
+        job_root + "596176/child-protection-specialist-p3-ft-137773-gaza",
+        job_root + "596164/national-communication-and-advocacy-intern",
+        job_root + "596152/consultoria-lineamientos-tecnicos",
+        "https://www.linkedin.com/jobs/view/123456",
+    ]
+    for apply_url in vacancies:
+        accepted_job = {"title": TITLE, "apply_url": apply_url, "quality_score": 0.4}
+        assert consider(accepted_job, crawl) is None
     assert crawl.rejected == len(cases)
 
 

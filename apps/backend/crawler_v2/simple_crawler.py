@@ -24,6 +24,55 @@ from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
+_NUMERIC_ID = re.compile(r"^\d+$")
+_REPEATED_TEMPLATE_MIN = 2
+
+
+def detail_path_template(url: str) -> str | None:
+    """Collapse a numeric vacancy path to its shared shape.
+
+    Segments before the id stay literal. The id and everything after it collapse,
+    so unique slugs on the same board share one template. Paths with no numeric
+    id are not templates.
+    """
+    segments = [segment for segment in urlparse(url).path.split("/") if segment]
+    if not any(_NUMERIC_ID.match(segment) for segment in segments):
+        return None
+    normalized: List[str] = []
+    seen_id = False
+    collapsed_rest = False
+    for segment in segments:
+        if _NUMERIC_ID.match(segment):
+            normalized.append("{id}")
+            seen_id = True
+        elif seen_id:
+            if not collapsed_rest:
+                normalized.append("{rest}")
+                collapsed_rest = True
+        else:
+            normalized.append(segment.lower())
+    return "/".join(normalized)
+
+
+def restrict_to_repeated_detail_templates(jobs: List[Dict]) -> List[Dict]:
+    """Keep links that match a numeric detail template seen more than once.
+
+    A listing with no repeated id template is returned unchanged. Every repeated
+    template is kept, so two vacancy shapes on one page both survive.
+    """
+    templates = [detail_path_template(str(job.get("apply_url") or "")) for job in jobs]
+    counts: Dict[str, int] = {}
+    for template in templates:
+        if template is None:
+            continue
+        counts[template] = counts.get(template, 0) + 1
+    repeated = {
+        template for template, count in counts.items() if count >= _REPEATED_TEMPLATE_MIN
+    }
+    if not repeated:
+        return jobs
+    return [job for job, template in zip(jobs, templates) if template in repeated]
+
 
 class SimpleCrawler:
     """
@@ -656,7 +705,7 @@ class SimpleCrawler:
                 
                 jobs.append(job)
             
-            return jobs
+            return restrict_to_repeated_detail_templates(jobs)
         
         # Fallback to original logic if heuristics disabled
         # Find all links
@@ -786,7 +835,7 @@ class SimpleCrawler:
             
             jobs.append(job)
         
-        return jobs
+        return restrict_to_repeated_detail_templates(jobs)
     
     def _extract_from_structured_data(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
         """Extract jobs from structured data (JSON-LD, microdata)"""
