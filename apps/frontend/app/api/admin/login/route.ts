@@ -20,18 +20,13 @@ export async function POST(req: NextRequest) {
     });
 
     const data = await res.json();
-    
-    // Forward Set-Cookie header from backend
-    const setCookieHeader = res.headers.get('set-cookie');
-    const responseHeaders: HeadersInit = {};
-    if (setCookieHeader) {
-      responseHeaders['Set-Cookie'] = setCookieHeader;
+    const response = NextResponse.json(data, { status: res.status });
+    // get('set-cookie') joins every cookie into one header. A second cookie
+    // with an Expires date makes that header illegal, so the browser drops it.
+    for (const cookie of res.headers.getSetCookie()) {
+      response.headers.append('set-cookie', cookie);
     }
-    
-    return NextResponse.json(data, { 
-      status: res.status,
-      headers: responseHeaders
-    });
+    return response;
   } catch (error) {
     console.error('Login proxy error:', error);
     return NextResponse.json(

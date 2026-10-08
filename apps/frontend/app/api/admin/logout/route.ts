@@ -14,16 +14,13 @@ export async function POST(req: NextRequest) {
     });
 
     const data = await res.json();
-    
-    // Clear cookie by setting it to empty with expired date
-    const responseHeaders: HeadersInit = {
-      'Set-Cookie': 'aidjobs_admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
-    };
-    
-    return NextResponse.json(data, { 
-      status: res.status,
-      headers: responseHeaders
-    });
+    const response = NextResponse.json(data, { status: res.status });
+    // Append after the response exists so the clear is one Set-Cookie header.
+    response.headers.append(
+      'set-cookie',
+      'aidjobs_admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
+    );
+    return response;
   } catch (error) {
     console.error('Logout proxy error:', error);
     return NextResponse.json(
