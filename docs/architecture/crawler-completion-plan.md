@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. This is not permission to start B2.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit is recorded below. Cross-site coverage is not established. This is not permission to start B3 or to change admission.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -61,7 +61,7 @@ This track does not have to finish before Track B1 starts.
 
 ### B1. Outbound fetch policy
 
-Committed locally on 10 October 2026 as `faf00d1` and verified against the approved plan. The verification record below is part of this plan. Unverified items stay unverified until a later check records them. They do not by themselves expand B1. B2 still needs its own preflight and approval.
+Committed locally on 10 October 2026 as `faf00d1` and verified against the approved plan. The verification record below is part of this plan. Unverified items stay unverified until a later check records them. They do not by themselves expand B1. The B2 contract audit is recorded below and does not approve an admission change.
 
 One change, not two. Wire the existing `contracts/fetch.py` policy into the HTML, RSS, and API fetchers, and include all of the following in that same gate:
 
@@ -142,6 +142,18 @@ Check representative sources with fixtures. Separate genuine vacancies from land
 Do not run production crawls in this audit.
 
 Exit: a record of what was checked, what passed, and any defect. A defect gets its own approved fix. The audit itself does not retune admission.
+
+#### B2 verification record
+
+Recorded 11 October 2026 from a read-only preflight of the local tree through `e383627`, including unpushed `faf00d1`. No production crawl, live source request, reindex, or data change was run. The deployed backend was not checked.
+
+The local extraction and admission implementation follows the current contract. From `apps/backend`, `tests/test_link_admission.py` passed: `17 passed in 0.14s`. HTML, RSS, and API each call `admit_batch` once, before `save_jobs`. No new B2 code defect was found. The pipeline extractor import failure is the parked Issue #4 circular import. RSS and API catch it and use their simple fallbacks. It does not open an admission or extraction-order change.
+
+This audit does not show that the generic crawler supports most independent organisation career pages. An ordinary HTML link is admitted only when its URL family repeats: two or more numeric IDs under a vacancy-like path, or two or more UUID paths. A title, employer, location, or deadline does not admit that link. JSON-LD candidates marked `job_posting` can qualify on one structured field. RSS needs a deadline. An API candidate needs a deadline or a location. Existing fixtures do not cover a representative range of independent listing pages.
+
+Admission thresholds stay as they are. Do not retune admission from this record.
+
+B3, identity and upsert, remains the next contract gate. B3 does not answer coverage. The next product check is a read-only coverage map from existing code and offline fixtures. A live sample of independent career sites needs its own approval.
 
 ### B3. Identity and upsert audit
 
