@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. Not permission to start the next gate.
+**Status:** Recorded execution plan. B1 is implemented in the working tree and its verification is recorded below. B1 is not committed or deployed. This is not permission to start B2.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render).
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -61,7 +61,7 @@ This track does not have to finish before Track B1 starts.
 
 ### B1. Outbound fetch policy
 
-This is the next crawler implementation gate.
+Implemented in the working tree on 10 October 2026 and verified against the approved plan. The verification record below is part of this plan. Unverified items stay unverified until a later check records them. They do not by themselves expand B1. B2 still needs its own preflight and approval.
 
 One change, not two. Wire the existing `contracts/fetch.py` policy into the HTML, RSS, and API fetchers, and include all of the following in that same gate:
 
@@ -81,6 +81,53 @@ Confirm the public Find & Earn arbitrary-URL fetch is still gone. That is a chec
 Preflight before any edit. Do not change admission, persistence, extraction, identity, lifecycle, or Meilisearch in this gate.
 
 Exit: the three live fetchers call the policy, a blocked address never connects, a redirect to a blocked address fails, oversized and timed-out responses fail closed, and tests cover those cases.
+
+#### B1 verification record
+
+Recorded 10 October 2026 from a read-only review of the working tree. No production crawl, reindex, or data change was run. The implementation is uncommitted.
+
+Changed files, and only these, belong to B1:
+
+- `.github/workflows/ci.yml`
+- `apps/backend/app/sources.py`
+- `apps/backend/contracts/fetch.py`
+- `apps/backend/contracts/outbound.py` (new)
+- `apps/backend/crawler_v2/api_crawler.py`
+- `apps/backend/crawler_v2/rss_crawler.py`
+- `apps/backend/crawler_v2/simple_crawler.py`
+- `apps/backend/tests/test_outbound_fetch.py` (new)
+
+Verified from the implementation and from `apps/backend` test output `41 passed, 7 warnings in 66.07s` for `tests/test_outbound_fetch.py`, `tests/test_gate3_contracts.py`, and `tests/test_gate1_safety.py`:
+
+- The TCP connection target and the TLS hostname are demonstrated separately. The test records a connect to the pinned address `8.8.8.8` and `start_tls` `server_hostname` `jobs.example`.
+- A prohibited DNS answer, an empty answer list, a resolver error, and a blocked hostname do not connect.
+- Each hop uses its own pool. Success, a two-hop redirect, the redirect limit, a private redirect, a chunked size failure, a connect timeout, and an unexpected exception close the pool. Redirect-limit and chunked size-failure cases also record stream close.
+- The initial request is not a redirect. Exactly 20 redirects are followed. A further redirect is not connected.
+- A HEAD redirect stays HEAD.
+- `Authorization` is sent on the first host and omitted after a cross-host redirect.
+- The body is counted from streamed chunks. A declared `Content-Length` does not replace that count. Tests use small `max_bytes` overrides. The implementation cap is `MAX_RESPONSE_BYTES` = 5 MiB.
+- A connect timeout becomes a fetch failure and closes the pool.
+- `fetch_html` does not call `BrowserCrawler`. The browser argument is ignored.
+- RSS, API, and admin HEAD go through the shared fetch. Find & Earn public arbitrary-URL fetch remains absent.
+- CI ruff and pytest lists include `tests/test_outbound_fetch.py`. `contracts/` was already in the ruff list, so `fetch.py` and `outbound.py` are linted with it.
+
+Explicitly unverified. Do not treat these as demonstrated:
+
+- The GitHub Actions job was not executed. Only the local pytest command above was run, plus an earlier ruff check of `contracts/fetch.py`, `contracts/outbound.py`, and `tests/test_outbound_fetch.py`.
+- No live TLS handshake was performed. The test records the hostname passed to `start_tls`. It does not show a certificate check against a real server.
+- The streaming cap is tested with small limits. A 5 MiB body was not sent.
+- The first size-limit case does not itself assert that the response and pool were closed. Cleanup for a size failure is asserted on the separate chunked case.
+- Read timeout is implemented on the read path. The executed timeout test is a connect timeout.
+- `Cookie` and `Proxy-Authorization` are removed in the cross-host redirect code. The executed test asserts that only for `Authorization`.
+
+Before a production deployment of B1, add focused tests for the read timeout and for cross-host removal of `Cookie` and `Proxy-Authorization`. Those tests do not reopen the rest of B1. Deployed behaviour remains unchecked until B5, or until a separate deploy check is recorded.
+
+#### Files that must stay outside B1
+
+These two working-tree files were already modified before B1. Their remaining diff is only Pyright ignore comments. Do not stage, commit, revert, or fold them into a B1 change.
+
+- `apps/backend/scripts/diagnose_enrichment_bias.py`: `# pyright: ignore[reportMissingModuleSource]` on the `psycopg2` and `RealDictCursor` imports.
+- `tests/test_link_heuristics.py`: `# pyright: ignore[reportMissingImports]` on `pytest` and `core.extraction_heuristics`; `# pyright: ignore[reportMissingModuleSource]` on `bs4`; `# pyright: ignore[reportUndefinedVariable]` on `extract_contact_info`.
 
 ### B2. Extraction and admission audit
 
@@ -161,4 +208,4 @@ Discovery Fabric remains later: Scout, Mapper, Frontier, Source Profiles, and Dr
 - A new normalisation stage.
 - Playwright, broader AI extraction, or detail-page fetching.
 - Issue #4 test-suite cleanup, except where a crawler gate needs a test it directly owns.
-- The two unrelated local files: `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py`.
+- The two unrelated local files recorded under B1: `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py`. Leave their Pyright-ignore diffs untouched and out of every crawler commit.
