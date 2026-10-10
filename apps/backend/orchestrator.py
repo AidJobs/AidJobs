@@ -479,7 +479,7 @@ class CrawlerOrchestrator:
                         "[orchestrator] Missing duration_ms for %s, using 0",
                         source.get("org_name"),
                     )
-                if result.get("status") == "fail":
+                if result.get("status") in {"fail", "failed"}:
                     consecutive_failures = (source.get("consecutive_failures") or 0) + 1
                     consecutive_nochange = 0
                 else:

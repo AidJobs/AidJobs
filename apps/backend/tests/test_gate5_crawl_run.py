@@ -291,26 +291,57 @@ def test_finish_run_updates_the_same_row_and_keeps_ok():
     assert "canonical_hash" not in log_sql
 
 
-def test_crawler_failed_does_not_increment_failures_but_fail_does():
-    def failures_for(status):
-        cursor = RecordingCursor()
-        orch = CrawlerOrchestrator("postgresql://example")
-        orch._get_db_conn = lambda: RecordingConn(cursor)
-        orch.compute_next_run = lambda *args, **kwargs: datetime(2026, 10, 6)
-        result = {
-            "status": status,
-            "message": "nope",
-            "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
-            "duration_ms": 4,
-        }
-        asyncio.run(orch.finish_run(_source(), "run-9", result))
-        _sql, params = next(
-            item for item in cursor.statements if item[0].startswith("UPDATE sources")
-        )
-        return params[2]
+def _finish(status, source=None, counts=None):
+    cursor = RecordingCursor()
+    orch = CrawlerOrchestrator("postgresql://example")
+    orch._get_db_conn = lambda: RecordingConn(cursor)
+    orch.compute_next_run = lambda *args, **kwargs: datetime(2026, 10, 6)
+    result = {
+        "status": status,
+        "message": "nope",
+        "counts": counts or {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
+        "duration_ms": 4,
+    }
+    asyncio.run(orch.finish_run(source or _source(), "run-9", result))
+    source_sql, source_params = next(
+        item for item in cursor.statements if item[0].startswith("UPDATE sources")
+    )
+    log_sql, log_params = next(
+        item for item in cursor.statements if "UPDATE crawl_logs" in item[0]
+    )
+    return source_sql, source_params, log_sql, log_params
 
-    assert failures_for("failed") == 0
-    assert failures_for("fail") == 1
+
+def test_failed_and_fail_both_increment_failures():
+    for status in ("failed", "fail"):
+        _sql, params, _log_sql, _log_params = _finish(status)
+        assert params[2] == 1
+
+
+def test_ok_and_warn_clear_consecutive_failures():
+    for status in ("ok", "warn"):
+        source = _source()
+        source["consecutive_failures"] = 2
+        _sql, params, _log_sql, _log_params = _finish(status, source)
+        assert params[2] == 0
+
+
+def test_failed_resets_consecutive_nochange_and_keeps_status_string():
+    source = _source()
+    source["consecutive_nochange"] = 3
+    _sql, params, _log_sql, log_params = _finish("failed", source)
+    assert params[0] == "failed"
+    assert params[3] == 0
+    assert log_params[5] == "failed"
+
+
+def test_fifth_failure_pauses_when_status_is_failed():
+    source = _source()
+    source["consecutive_failures"] = 4
+    _sql, params, _log_sql, log_params = _finish("failed", source)
+    assert params[2] == 5
+    assert params[5] == "paused"
+    assert log_params[5] == "failed"
 
 
 def test_scheduler_uses_the_shared_runner_and_caps_stay():

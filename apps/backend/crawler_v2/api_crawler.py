@@ -244,6 +244,7 @@ class SimpleAPICrawler:
         except Exception as e:
             logger.error(f"Error saving jobs: {e}")
             conn.rollback()
+            raise
         finally:
             conn.close()
         
