@@ -11,6 +11,7 @@ import httpx
 import psycopg2
 
 from contracts.admission import admit_batch, extraction_logger_for, log_admission_rejections
+from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
@@ -37,14 +38,18 @@ class SimpleAPICrawler:
             if headers:
                 request_headers.update(headers)
             
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                response = await client.get(url, headers=request_headers)
-                
-                if response.status_code != 200:
-                    logger.error(f"API fetch failed: HTTP {response.status_code}")
-                    return None
-                
-                return response.json()
+            result = await fetch_url(
+                url,
+                headers=request_headers,
+                timeout=float(self.timeout.connect or 30.0),
+            )
+            if result.status_code != 200:
+                logger.error(f"API fetch failed: HTTP {result.status_code}")
+                return None
+            return json.loads(result.body.decode("utf-8"))
+        except FetchError as exc:
+            logger.error(f"Error fetching API {url}: {exc}")
+            return None
         except Exception as e:
             logger.error(f"Error fetching API {url}: {e}")
             return None

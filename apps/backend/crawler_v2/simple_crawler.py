@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
 from contracts.admission import admit_batch, log_admission_rejections
+from contracts.outbound import FetchError, fetch_url
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
 import httpx
@@ -136,72 +137,37 @@ class SimpleCrawler:
         return psycopg2.connect(self.db_url)
     
     async def fetch_html(self, url: str, retry_count: int = 0, use_browser: bool = False) -> Tuple[int, str]:
-        """
-        Fetch HTML from URL with retry logic for 403 errors.
-        
-        Args:
-            url: URL to fetch
-            retry_count: Number of retries attempted
-            use_browser: If True, use browser rendering for JavaScript-heavy sites
-        
-        Returns:
-            (status_code, html_content)
-        """
-        # Check if browser rendering is needed
-        if use_browser:
-            try:
-                from crawler.browser_crawler import BrowserCrawler
-                browser_crawler = BrowserCrawler()
-                html = await browser_crawler.fetch_html(url, timeout=30000)
-                if html:
-                    return 200, html
-                else:
-                    logger.warning(f"Browser rendering returned no HTML for {url}")
-            except ImportError:
-                logger.warning("Playwright not installed - browser rendering unavailable")
-            except Exception as e:
-                logger.warning(f"Browser rendering failed: {e}, falling back to HTTP")
-        
+        """Fetch HTML. Browser rendering is not used; the HTTP result is returned."""
+        del use_browser
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Cache-Control": "max-age=0",
+        }
+        if retry_count:
+            headers["User-Agent"] = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                # Use more realistic headers to avoid 403 blocks
-                headers = {
-                    "User-Agent": self.user_agent,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Accept-Encoding": "gzip, deflate, br",
-                    "Connection": "keep-alive",
-                    "Upgrade-Insecure-Requests": "1",
-                    "Sec-Fetch-Dest": "document",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-Site": "none",
-                    "Cache-Control": "max-age=0"
-                }
-                response = await client.get(url, headers=headers)
-                
-                # If 403 and we haven't retried, try with different User-Agent
-                if response.status_code == 403 and retry_count < 2:
-                    import asyncio
-                    await asyncio.sleep(2)  # Wait before retry
-                    # Try with a different, more common User-Agent
-                    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    logger.info(f"Retrying {url} with different User-Agent (attempt {retry_count + 1})")
-                    return await self.fetch_html(url, retry_count + 1)
-                
-                # Check if page requires JavaScript (common indicators)
-                html_text = response.text.lower()
-                if any(indicator in html_text for indicator in [
-                    'unsupported browser', 'javascript required', 'enable javascript',
-                    'loading...', 'please wait', 'pageup', 'ultipro'
-                ]):
-                    logger.info(f"Page appears to require JavaScript, attempting browser rendering for {url}")
-                    # Try browser rendering as fallback
-                    if not use_browser:
-                        return await self.fetch_html(url, retry_count, use_browser=True)
-                
-                return response.status_code, response.text
-        except Exception as e:
-            logger.error(f"Error fetching {url}: {e}")
+            result = await fetch_url(url, headers=headers, timeout=float(self.timeout.connect or 30.0))
+            if result.status_code == 403 and retry_count < 2:
+                await asyncio.sleep(2)
+                logger.info("Retrying %s with a different User-Agent (attempt %s)", url, retry_count + 1)
+                return await self.fetch_html(url, retry_count + 1)
+            return result.status_code, result.text
+        except FetchError as exc:
+            logger.error("Error fetching %s: %s", url, exc)
+            return 0, ""
+        except Exception as exc:
+            logger.error("Error fetching %s: %s", url, exc)
             return 0, ""
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:

@@ -12,6 +12,7 @@ import feedparser
 import psycopg2
 
 from contracts.admission import admit_batch, extraction_logger_for, log_admission_rejections
+from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
@@ -34,19 +35,18 @@ class SimpleRSSCrawler:
     async def fetch_feed(self, url: str) -> feedparser.FeedParserDict:
         """Fetch and parse RSS feed"""
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": self.user_agent}
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"RSS fetch failed: HTTP {response.status_code}")
-                    return None
-                
-                # Parse feed
-                feed = feedparser.parse(response.text)
-                return feed
+            result = await fetch_url(
+                url,
+                headers={"User-Agent": self.user_agent},
+                timeout=float(self.timeout.connect or 30.0),
+            )
+            if result.status_code != 200:
+                logger.error(f"RSS fetch failed: HTTP {result.status_code}")
+                return None
+            return feedparser.parse(result.text)
+        except FetchError as exc:
+            logger.error(f"Error fetching RSS feed {url}: {exc}")
+            return None
         except Exception as e:
             logger.error(f"Error fetching RSS feed {url}: {e}")
             return None
