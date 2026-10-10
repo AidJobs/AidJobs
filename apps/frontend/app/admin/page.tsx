@@ -74,7 +74,7 @@ export default function AdminPage() {
       const data = await response.json();
       
       if (!data.authenticated) {
-        router.push('/admin/login');
+        router.replace('/admin/login?reason=session');
         return false;
       }
       
@@ -82,7 +82,7 @@ export default function AdminPage() {
       return true;
     } catch (error) {
       console.error('Auth check failed:', error);
-      router.push('/admin/login');
+      router.replace('/admin/login?reason=session');
       return false;
     }
   }, [router]);

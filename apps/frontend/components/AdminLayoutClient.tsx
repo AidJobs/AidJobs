@@ -232,7 +232,7 @@ export default function AdminLayoutClient({
 
   useEffect(() => {
     if (!isLoginPage && session === 'no') {
-      router.push('/admin/login');
+      router.replace('/admin/login?reason=session');
     }
   }, [isLoginPage, session, router]);
 

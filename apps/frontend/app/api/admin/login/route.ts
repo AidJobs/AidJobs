@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readMintedSession, sessionCookieOptions, sessionCookieSecure, ADMIN_SESSION_COOKIE } from '@/lib/adminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,25 +8,39 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    
+
     const res = await fetch(`${backendUrl}/api/admin/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include',
+      cache: 'no-store',
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    // get('set-cookie') joins every cookie into one header. A second cookie
-    // with an Expires date makes that header illegal, so the browser drops it.
-    for (const cookie of res.headers.getSetCookie()) {
-      response.headers.append('set-cookie', cookie);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return NextResponse.json(
+        { detail: data.detail || data.error || 'Invalid credentials' },
+        { status: res.status }
+      );
     }
+
+    const token = readMintedSession(res.headers);
+    if (!token) {
+      return NextResponse.json(
+        { detail: 'Login failed. The session was not created.' },
+        { status: 502 }
+      );
+    }
+
+    const response = NextResponse.json({ authenticated: true });
+    response.cookies.set(
+      ADMIN_SESSION_COOKIE,
+      token,
+      sessionCookieOptions(sessionCookieSecure(req.nextUrl.protocol))
+    );
     return response;
   } catch (error) {
     console.error('Login proxy error:', error);
@@ -35,4 +50,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -12,6 +12,9 @@ from typing import Optional
 from fastapi import HTTPException, Request, Response
 
 COOKIE_NAME = "aidjobs_admin_session"
+# Server-to-server only. The admin UI proxy reads this and sets the browser
+# cookie itself. Browsers do not receive it as a script-readable value.
+SESSION_HEADER = "X-Aidjobs-Admin-Session"
 SESSION_DURATION_HOURS = 8
 SESSION_MAX_AGE = SESSION_DURATION_HOURS * 3600
 
@@ -104,11 +107,18 @@ def set_admin_cookie(response: Response, username: str):
         path="/",
         max_age=SESSION_MAX_AGE,
     )
+    response.headers[SESSION_HEADER] = token
 
 
 def clear_admin_cookie(response: Response):
-    """Clear session cookie."""
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    """Clear session cookie with the same attributes used when it was set."""
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        secure=not is_dev_mode(),
+        httponly=True,
+        samesite="lax",
+    )
 
 
 def get_current_admin(request: Request) -> Optional[str]:

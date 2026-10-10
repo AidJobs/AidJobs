@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ADMIN_SESSION_COOKIE, sessionCookieOptions, sessionCookieSecure } from '@/lib/adminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,20 +7,20 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function POST(req: NextRequest) {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/admin/logout`, {
+    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
+    await fetch(`${backendUrl}/api/admin/logout`, {
       method: 'POST',
       headers: {
-        'Cookie': req.headers.get('cookie') || '',
+        Cookie: req.headers.get('cookie') || '',
       },
+      cache: 'no-store',
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    // Append after the response exists so the clear is one Set-Cookie header.
-    response.headers.append(
-      'set-cookie',
-      'aidjobs_admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
-    );
+    const response = NextResponse.json({ authenticated: false });
+    response.cookies.set(ADMIN_SESSION_COOKIE, '', {
+      ...sessionCookieOptions(sessionCookieSecure(req.nextUrl.protocol)),
+      maxAge: 0,
+    });
     return response;
   } catch (error) {
     console.error('Logout proxy error:', error);
@@ -29,4 +30,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

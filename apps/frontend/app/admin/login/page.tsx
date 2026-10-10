@@ -1,15 +1,22 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'session') {
+      setError('Your session was not accepted. Sign in again.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,7 +34,16 @@ export default function AdminLoginPage() {
       });
 
       if (response.ok) {
-        router.push('/admin');
+        const session = await fetch('/api/admin/session', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        const sessionBody = await session.json().catch(() => ({ authenticated: false }));
+        if (session.ok && sessionBody.authenticated) {
+          router.push('/admin');
+          return;
+        }
+        setError('Login succeeded, but the browser did not keep the session. Allow cookies for this site and try again.');
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || errorData.error || 'Invalid password';
@@ -232,5 +248,13 @@ export default function AdminLoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
   );
 }
