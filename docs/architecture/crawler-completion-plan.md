@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit is recorded below. Cross-site coverage is not established. This is not permission to start B3 or to change admission.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit and the offline coverage map are recorded below. Cross-site coverage is not established. A live career-site sample is not approved. This is not permission to start B3 or to change admission.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -153,7 +153,25 @@ This audit does not show that the generic crawler supports most independent orga
 
 Admission thresholds stay as they are. Do not retune admission from this record.
 
-B3, identity and upsert, remains the next contract gate. B3 does not answer coverage. The next product check is a read-only coverage map from existing code and offline fixtures. A live sample of independent career sites needs its own approval.
+B3, identity and upsert, remains the next contract gate. B3 does not answer coverage.
+
+#### Generic coverage map
+
+Recorded 12 October 2026 from the local code and offline tests. No live career site was fetched. Detail-page enrichment was not run, because it fetches a URL. Source-specific plugins are not generic coverage. The pipeline fixture tests were not collected because of the parked Issue #4 circular import.
+
+The generic HTML path accepts three shapes through `admit_batch`:
+
+- A repeated numeric URL family: at least two IDs under one path that contains `job`, `jobs`, `vacancy`, `vacancies`, `position`, `positions`, `requisition`, `requisitions`, `opening`, or `openings`. One matching URL is rejected.
+- A repeated hyphenated UUID family. No vacancy word is required. A 32-character hex string is not a UUID.
+- A JSON-LD candidate marked `job_posting` with a title, an apply URL, and one of `location_raw`, `deadline`, or `employment_type`. `employer` is not an admission field.
+
+RSS is separate: a deadline is required. An API candidate is separate: a deadline or `location_raw` is required. Identifiers alone do not qualify.
+
+An ordinary HTML link with a title, employer, location, or deadline is rejected with `no_qualifying_family` when its numeric or UUID family does not repeat. That is the current rule. The tests demonstrate plausible URL shapes, not saved pages from independent organisations. Existing fixtures do not show whether those sites repeat a qualifying family or publish JSON-LD.
+
+From `apps/backend`, `tests/test_link_admission.py` and `test_validate_rejections_are_recorded_on_the_crawl` passed: `18 passed in 0.36s`.
+
+Admission thresholds stay as they are. Do not retune admission from this map. The next product step is a separate plan for a live sample of independent career sites, counting vacancies missed and irrelevant pages admitted. That sample needs its own approval before any fetch.
 
 ### B3. Identity and upsert audit
 
