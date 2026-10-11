@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit and the offline coverage map are recorded below. Cross-site coverage is not established. The career-site coverage evaluation plan is approved as a plan. Live fetching is not approved. This is not permission to start B3 or to change admission.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit, the offline coverage map, and the career-site coverage evaluation are recorded below. Cross-site coverage is not established. Admission is unchanged. This is not permission to start B3, to decode stored responses, or to change the family rule.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan recorded 12 October 2026. Labelling rules recorded the same day.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -208,7 +208,7 @@ The sample has seven listing URLs. Two were already in `infra/seed.sql`. Five we
 | Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | User-supplied careers home. The supplied copy shows search, category counts, and a short job list | Whether category and search links are individual vacancies, and the vacancy URL shape |
 | DevNetJobsIndia | `https://www.devnetjobsindia.org/` | User-supplied job board. The supplied copy mixes job links, jobseeker profiles, membership links, tenders, and events. Some job links use `jobdescription.aspx?job_id=` | Whether the raw response contains those links. Under the current `family_key`, that query shape is not a numeric family. Profile, membership, tender, and event links are candidates for the irrelevant count |
 
-Fetching still needs its own approval, in two steps.
+The two fetch approvals were given and executed once. The procedure was:
 
 1. Approve the exact listing URLs. These seven are the proposed set. Fetch each once through the local outbound fetch policy, with the existing timeout and 5 MiB cap. Do not use a browser. Save the response, final URL, status, content type, redirect chain, and fetch time outside the jobs database. Do not commit response bodies.
 2. From each saved listing, propose at most three vacancy URLs visible in that response. Fetch those only after a second approval, and use them for ground truth only.
@@ -216,6 +216,35 @@ Fetching still needs its own approval, in two steps.
 Do not refetch a page to fill a gap. Label it unknown. This measures the local tree, not the deployed backend. Do not write to the jobs database.
 
 The per-site table records the listing extraction result, confirmed vacancies, the number admitted, both counts with denominators, extraction misses, each rejection with `admitted` and `rejection_reason`, and unknown cases with the reason. The evaluation is complete when all seven sites have that table, or when a shortfall is recorded because an approved response could not be saved. Completion is not a coverage percentage and does not retune admission.
+
+#### Coverage evaluation results
+
+Recorded 12 October 2026 from the local tree. Listing responses were fetched once at 19:31–19:32 UTC on 11 October 2026. Six vacancy pages were fetched once after that, the same day. Each request used the local outbound policy, the 30-second timeout, and the 5 MiB cap. No request redirected. Response bodies stay in gitignored `raw-html/career-coverage/` and were not committed. Nothing was written to the jobs database. This does not describe the deployed backend.
+
+Each listing was passed to `extract_jobs_from_html` as the crawler would see it: the transfer bytes decoded as UTF-8, without content-encoding decompression. One `admit_batch` call with class `html` followed. Vacancy pages were ground truth only and were not added to those batches. Admission thresholds, extraction order, and admission predicates were not changed.
+
+Organisation career pages:
+
+| Site | Confirmed roles | Missed | Irrelevant admitted | Result |
+| --- | --- | --- | --- | --- |
+| Médecins Sans Frontières | 0 | 0/0 | 0/0 | HTTP 404, brotli body. No role could be labelled. Unknown. |
+| Global Partnership for Education | 0 | 0/0 | 0/0 | HTTP 200, gzip body. The crawler text is not HTML. Unknown. |
+| ICRC | 12 | 12/12 | 0/19 | All 12 were extracted and rejected with `no_qualifying_family`. Two other candidates were `root_careers_page`. |
+| International Rescue Committee | 0 | 0/0 | 0/0 | HTTP 200, gzip body. The crawler text is not HTML. Unknown. |
+| Oxfam GB | 6 | 6/6 | 0/12 | All 6 were extracted and rejected with `no_qualifying_family`. |
+
+Three of the twelve ICRC roles and three of the six Oxfam roles were checked on their own saved pages. Each of those six pages shows the one expected role. The other confirmed rows come from a visible title and a job destination on the saved listing. ICRC also had 11 unlabelled listing links, and none were admitted.
+
+Job boards:
+
+| Site | Confirmed roles | Missed | Irrelevant admitted | Result |
+| --- | --- | --- | --- | --- |
+| ReliefWeb | 0 | 0/0 | 0/0 | HTTP 202 challenge page with no job links. Roles outside that body are unknown. |
+| DevNetJobsIndia | 0 | 0/0 | 0/0 | HTTP 200, brotli body. The crawler text is not HTML. Unknown. |
+
+No irrelevant page was admitted. These listing batches did not produce a repeated numeric family, a repeated UUID family, or a qualifying JSON-LD `job_posting`. On ICRC and Oxfam, each vacancy URL is its own family, so a title, location, or deadline does not admit it. That is the current ordinary-HTML rule.
+
+The gzip and brotli responses are a measurement gap. They do not support a coverage claim for those four sites. Do not average the seven sites. Do not retune admission from this sample. A change to the family rule, and a change to response decoding, each need a separate plan. B3 remains the next contract gate and is not this evaluation.
 
 ### B3. Identity and upsert audit
 
