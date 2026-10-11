@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,18 +9,13 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(`${BACKEND_URL}/api/admin/presets/sources`, {
       method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
+      headers: adminAuthHeaders(request),
     });
 
     const data = await response.json();
     
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Set-Cookie': response.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('API proxy error:', error);

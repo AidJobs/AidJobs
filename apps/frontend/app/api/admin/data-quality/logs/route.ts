@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +10,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(`${backendUrl}/api/admin/data-quality/logs?${searchParams.toString()}`, {
       method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
 
     if (!response.ok) {

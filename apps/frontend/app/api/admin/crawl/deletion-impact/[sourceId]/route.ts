@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,9 @@ export async function GET(
       `${apiUrl}/api/admin/crawl/deletion-impact/${sourceId}`,
       {
         method: 'GET',
-        headers: {
+        headers: adminAuthHeaders(request, {
           'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+        }),
       }
     );
 

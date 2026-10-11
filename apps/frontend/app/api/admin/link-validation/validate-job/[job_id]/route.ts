@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,7 @@ export async function POST(
 
     const response = await fetch(`${backendUrl}/api/admin/link-validation/validate-job/${job_id}`, {
       method: 'POST',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
 
     if (!response.ok) {

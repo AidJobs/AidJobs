@@ -70,3 +70,7 @@ def test_v1_navigation_and_session_guard():
         assert "/admin/sources" not in text.replace("/api/admin/sources", "")
         assert "/admin/search/reindex" not in text.replace("/api/admin/search/reindex", "")
         assert "/admin/presets" not in text.replace("/api/admin/presets", "")
+        lowered = text.lower()
+        assert ".get('cookie')" not in lowered
+        assert '.get("cookie")' not in lowered
+        assert "set-cookie" not in lowered

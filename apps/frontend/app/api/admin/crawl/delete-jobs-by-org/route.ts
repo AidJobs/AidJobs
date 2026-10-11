@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +18,7 @@ export async function POST(request: NextRequest) {
     const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
     const response = await fetch(`${backendUrl}/api/admin/crawl/delete-jobs-by-org?org_name=${encodeURIComponent(orgName)}`, {
       method: 'POST',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
 
     if (!response.ok) {

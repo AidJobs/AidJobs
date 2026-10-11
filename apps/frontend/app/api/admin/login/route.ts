@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readMintedSession, sessionCookieOptions, sessionCookieSecure, ADMIN_SESSION_COOKIE } from '@/lib/adminSession';
+import { adminBackendOrigin } from '@/lib/adminBackend';
+import {
+  readMintedSession,
+  sessionCookieName,
+  sessionCookieOptions,
+  sessionRequestSecure,
+} from '@/lib/adminSession';
 
 export const dynamic = 'force-dynamic';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
 
-    const res = await fetch(`${backendUrl}/api/admin/login`, {
+    const res = await fetch(`${adminBackendOrigin()}/api/admin/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
+      redirect: 'manual',
       body: JSON.stringify(body),
     });
 
@@ -35,12 +39,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const secure = sessionRequestSecure(req);
     const response = NextResponse.json({ authenticated: true });
-    response.cookies.set(
-      ADMIN_SESSION_COOKIE,
-      token,
-      sessionCookieOptions(sessionCookieSecure(req.nextUrl.protocol))
-    );
+    response.cookies.set(sessionCookieName(secure), token, sessionCookieOptions(secure));
     return response;
   } catch (error) {
     console.error('Login proxy error:', error);

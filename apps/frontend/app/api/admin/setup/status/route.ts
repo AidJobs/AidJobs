@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +10,7 @@ export async function GET(request: NextRequest) {
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
     const response = await fetch(`${backendUrl}/api/admin/setup/status`, {
       method: 'GET',
-      headers: {
-        Cookie: request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
     const data = await response.json().catch(() => ({ error: 'Unknown error' }));
     return NextResponse.json(data, { status: response.status });
