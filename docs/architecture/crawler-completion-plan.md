@@ -2,7 +2,7 @@
 
 **Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit and the offline coverage map are recorded below. Cross-site coverage is not established. The career-site coverage evaluation plan is approved as a plan. Live fetching is not approved. This is not permission to start B3 or to change admission.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan recorded 12 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan recorded 12 October 2026. Labelling rules recorded the same day.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -186,6 +186,16 @@ Two counts stay separate, each with its denominator. Unknown items stay out of b
 
 One saved listing is one admission batch. Do not merge pages to create a repeated family. A vacancy page can confirm one role and is not a second admission batch. A JavaScript shell with no vacancy links is an extraction miss. The current extractor returns JSON-LD postings before link extraction; roles hidden by that return are extraction misses. An ordinary HTML link with a title, employer, location, or deadline remains a miss when its numeric or UUID family does not repeat.
 
+Labelling rules, recorded 12 October 2026. These rules govern the counts. They do not change admission.
+
+- `family_key` collapses numeric segments and hyphenated UUIDs in the path only. A query parameter such as `job_id=` does not create `{id}`. Repeating `jobdescription.aspx?job_id=` in one batch cannot satisfy the numeric-family rule. That parameter is also outside the search-or-pagination pattern (`q=`, `page=`, `search=`, `filter=`).
+- Ground truth follows the link destination. A visible role whose href is a membership, profile, tender, or event page is that kind of page. The role is unknown unless the same saved page also contains a job destination for it.
+- A rejected irrelevant link stays in the rejection list with `admitted` and `rejection_reason`. It enters the irrelevant-admitted numerator only when the listing batch admits it.
+- The denominator is the saved listing body. Roles on later pages, behind “view all”, or beyond a truncated 5 MiB body are out of scope. A listing row with one visible role and a job destination can be confirmed from that listing. At most three later vacancy fetches check individual rows. A row that cannot be confirmed stays unknown.
+- Browser-rendered titles are not the saved response. If the raw body has no vacancy links, the list is an extraction miss.
+- Report organisation career pages and job boards separately. Do not average the seven sites. The organisation pages are Médecins Sans Frontières, the Global Partnership for Education, ICRC, the International Rescue Committee, and Oxfam GB. The boards are ReliefWeb and DevNetJobsIndia.
+- An exact `/careers` or `/jobs` apply URL rejected as `root_careers_page` is a rejection of that URL. Child links on the page are judged on their own. An empty vacancy denominator is reported as none observed.
+
 The sample has seven listing URLs. Two were already in `infra/seed.sql`. Five were supplied for this plan and are not repository records. Every URL is unconfirmed until its approved response is saved. Seed job rows under the first two sources are fixture URLs and are not ground truth. Copies of pages seen while choosing these targets are not the evaluation dataset.
 
 | Site | Listing URL | Why it is included | Unconfirmed |
@@ -196,7 +206,7 @@ The sample has seven listing URLs. Two were already in `infra/seed.sql`. Five we
 | International Rescue Committee | `https://careers.rescue.org/en/index.html` | User-supplied careers landing page. The supplied copy leads to search entry points and employee stories | Whether any individual vacancy link is in the raw HTML |
 | ReliefWeb | `https://reliefweb.int/jobs` | User-supplied HTML jobs list, included as an aggregator. The supplied copy shows search, pagination, vacancies, and a tender | Vacancy URL shape. Do not fetch the RSS or API links on that page |
 | Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | User-supplied careers home. The supplied copy shows search, category counts, and a short job list | Whether category and search links are individual vacancies, and the vacancy URL shape |
-| DevNetJobsIndia | `https://www.devnetjobsindia.org/` | User-supplied job board. The supplied copy mixes job links, jobseeker profiles, membership links, tenders, and events. Some job links use `jobdescription.aspx?job_id=` | Whether that query shape is a qualifying family. Profile, membership, tender, and event links are candidates for the irrelevant count |
+| DevNetJobsIndia | `https://www.devnetjobsindia.org/` | User-supplied job board. The supplied copy mixes job links, jobseeker profiles, membership links, tenders, and events. Some job links use `jobdescription.aspx?job_id=` | Whether the raw response contains those links. Under the current `family_key`, that query shape is not a numeric family. Profile, membership, tender, and event links are candidates for the irrelevant count |
 
 Fetching still needs its own approval, in two steps.
 
