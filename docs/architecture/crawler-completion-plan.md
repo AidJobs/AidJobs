@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit and the offline coverage map are recorded below. Cross-site coverage is not established. A live career-site sample is not approved. This is not permission to start B3 or to change admission.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit and the offline coverage map are recorded below. Cross-site coverage is not established. The career-site coverage evaluation plan is approved as a plan. Live fetching is not approved. This is not permission to start B3 or to change admission.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan recorded 12 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -171,7 +171,41 @@ An ordinary HTML link with a title, employer, location, or deadline is rejected 
 
 From `apps/backend`, `tests/test_link_admission.py` and `test_validate_rejections_are_recorded_on_the_crawl` passed: `18 passed in 0.36s`.
 
-Admission thresholds stay as they are. Do not retune admission from this map. The next product step is a separate plan for a live sample of independent career sites, counting vacancies missed and irrelevant pages admitted. That sample needs its own approval before any fetch.
+Admission thresholds stay as they are. Do not retune admission from this map. The coverage evaluation plan is recorded below. It does not authorise a fetch.
+
+#### Career-site coverage evaluation
+
+Approved 12 October 2026 as a plan. No site has been fetched for this evaluation. Admission thresholds, extraction order, and admission predicates stay as they are. B3 remains the next contract gate and is not part of this evaluation.
+
+The measurement is the current generic HTML path only: `extract_jobs_from_html` on one saved listing response, then one `admit_batch` call with class `html`. Do not call `crawl_source`, a source plugin, detail-page enrichment, the AI extractor, or `save_jobs`. UNICEF, UNDP, UNESCO, Amnesty, and Save the Children stay out. ReliefWeb’s API preset is not this sample. RSS and API admission stay out.
+
+Two counts stay separate, each with its denominator. Unknown items stay out of both.
+
+- Genuine vacancies missed / confirmed genuine vacancies assessed. A confirmed vacancy needs visible evidence of one open role. A miss is a confirmed role that the listing batch does not admit. Split the numerator into roles with no candidate and roles rejected by admission.
+- Irrelevant pages admitted / irrelevant pages assessed. Irrelevant means a landing page, search page, pagination page, news or profile page, tender, membership page, or application instructions. It counts as admitted only when that same listing batch admits it.
+
+One saved listing is one admission batch. Do not merge pages to create a repeated family. A vacancy page can confirm one role and is not a second admission batch. A JavaScript shell with no vacancy links is an extraction miss. The current extractor returns JSON-LD postings before link extraction; roles hidden by that return are extraction misses. An ordinary HTML link with a title, employer, location, or deadline remains a miss when its numeric or UUID family does not repeat.
+
+The sample has seven listing URLs. Two were already in `infra/seed.sql`. Five were supplied for this plan and are not repository records. Every URL is unconfirmed until its approved response is saved. Seed job rows under the first two sources are fixture URLs and are not ground truth. Copies of pages seen while choosing these targets are not the evaluation dataset.
+
+| Site | Listing URL | Why it is included | Unconfirmed |
+| --- | --- | --- | --- |
+| Médecins Sans Frontières | `https://www.msf.org/careers` | Sample HTML source in `infra/seed.sql` | Whether the live page lists vacancies, and the URL shape |
+| Global Partnership for Education | `https://www.globalpartnership.org/careers` | Sample HTML source in `infra/seed.sql`, status `pending_validation` | Same |
+| ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | User-supplied field-opportunities page. The supplied copy shows a search form, a “Loading...” list, and SAP session cookies | Whether the raw response contains vacancy links or only a script shell. The numeric segment is on the listing URL |
+| International Rescue Committee | `https://careers.rescue.org/en/index.html` | User-supplied careers landing page. The supplied copy leads to search entry points and employee stories | Whether any individual vacancy link is in the raw HTML |
+| ReliefWeb | `https://reliefweb.int/jobs` | User-supplied HTML jobs list, included as an aggregator. The supplied copy shows search, pagination, vacancies, and a tender | Vacancy URL shape. Do not fetch the RSS or API links on that page |
+| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | User-supplied careers home. The supplied copy shows search, category counts, and a short job list | Whether category and search links are individual vacancies, and the vacancy URL shape |
+| DevNetJobsIndia | `https://www.devnetjobsindia.org/` | User-supplied job board. The supplied copy mixes job links, jobseeker profiles, membership links, tenders, and events. Some job links use `jobdescription.aspx?job_id=` | Whether that query shape is a qualifying family. Profile, membership, tender, and event links are candidates for the irrelevant count |
+
+Fetching still needs its own approval, in two steps.
+
+1. Approve the exact listing URLs. These seven are the proposed set. Fetch each once through the local outbound fetch policy, with the existing timeout and 5 MiB cap. Do not use a browser. Save the response, final URL, status, content type, redirect chain, and fetch time outside the jobs database. Do not commit response bodies.
+2. From each saved listing, propose at most three vacancy URLs visible in that response. Fetch those only after a second approval, and use them for ground truth only.
+
+Do not refetch a page to fill a gap. Label it unknown. This measures the local tree, not the deployed backend. Do not write to the jobs database.
+
+The per-site table records the listing extraction result, confirmed vacancies, the number admitted, both counts with denominators, extraction misses, each rejection with `admitted` and `rejection_reason`, and unknown cases with the reason. The evaluation is complete when all seven sites have that table, or when a shortfall is recorded because an approved response could not be saved. Completion is not a coverage percentage and does not retune admission.
 
 ### B3. Identity and upsert audit
 
