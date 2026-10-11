@@ -38,12 +38,16 @@ function AdminLoginForm() {
           credentials: 'include',
           cache: 'no-store',
         });
-        const sessionBody = await session.json().catch(() => ({ authenticated: false }));
+        const sessionBody = await session.json().catch(() => ({ authenticated: false, reason: 'invalid' }));
         if (session.ok && sessionBody.authenticated) {
           router.push('/admin');
           return;
         }
-        setError('Login succeeded, but the browser did not keep the session. Allow cookies for this site and try again.');
+        if (sessionBody.reason === 'missing') {
+          setError('Login succeeded, but the browser did not keep the session. Allow cookies for this site and try again.');
+        } else {
+          setError('Login succeeded, but the session could not be verified. Try again in a moment.');
+        }
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || errorData.error || 'Invalid password';

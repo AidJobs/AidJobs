@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,9 +8,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/admin/config-check`, {
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
+      headers: adminAuthHeaders(req),
     });
 
     const data = await res.json();

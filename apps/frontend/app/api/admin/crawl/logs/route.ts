@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,7 @@ export async function GET(req: NextRequest) {
     console.log(`[proxy] GET ${url}`);
     
     const res = await fetch(url, {
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(req),
       cache: 'no-store', // Always fetch fresh data, never cache
     });
 
@@ -41,9 +39,6 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data, { 
       status: res.status,
-      headers: {
-        'Set-Cookie': res.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('Crawl logs proxy error:', error);

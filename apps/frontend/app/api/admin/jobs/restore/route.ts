@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,11 +10,9 @@ export async function POST(request: NextRequest) {
     
     const response = await fetch(`${backendUrl}/api/admin/jobs/restore`, {
       method: 'POST',
-      headers: {
+      headers: adminAuthHeaders(request, {
         'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      }),
       body: JSON.stringify(body),
     });
 

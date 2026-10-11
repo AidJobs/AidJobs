@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,7 @@ export async function GET(
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
     const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
       method: 'GET',
-      headers: {
-        Cookie: request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
     const data = await response.json().catch(() => ({ error: 'Unknown error' }));
     return NextResponse.json(data, { status: response.status });
@@ -38,11 +36,9 @@ export async function PATCH(
     
     const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
       method: 'PATCH',
-      headers: {
+      headers: adminAuthHeaders(request, {
         'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      }),
       body: JSON.stringify(body),
     });
 
@@ -72,9 +68,6 @@ export async function PATCH(
     
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Set-Cookie': response.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('API proxy error:', error);
@@ -97,10 +90,7 @@ export async function DELETE(
     
     const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}`, {
       method: 'DELETE',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
 
     // Handle 401 - redirect to login
@@ -129,9 +119,6 @@ export async function DELETE(
     
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Set-Cookie': response.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('API proxy error:', error);
