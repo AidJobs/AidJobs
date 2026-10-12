@@ -9,10 +9,12 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import socket
+import zlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
+import brotli
 import httpcore
 
 from contracts.fetch import hostname_permitted, pin_address, scheme_permitted
@@ -179,6 +181,81 @@ async def _read_capped(stream, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
+def _encoding_name(headers: dict[str, str]) -> str:
+    return headers.get("content-encoding", "").strip().lower()
+
+
+def _inflate(body: bytes, wbits: int, max_decoded: int) -> bytes:
+    """Decode a zlib stream. Stop once the output passes max_decoded."""
+    decoder = zlib.decompressobj(wbits)
+    pending = body
+    parts: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            room = max_decoded - total + 1
+            piece = decoder.decompress(pending, max(room, 1))
+            pending = decoder.unconsumed_tail
+            total += len(piece)
+            if total > max_decoded:
+                raise FetchError("response exceeds size limit")
+            if piece:
+                parts.append(piece)
+            if decoder.eof:
+                break
+            if not pending:
+                raise FetchError("content encoding failed")
+        trailer = decoder.flush()
+    except zlib.error as exc:
+        raise FetchError("content encoding failed") from exc
+    total += len(trailer)
+    if total > max_decoded:
+        raise FetchError("response exceeds size limit")
+    if trailer:
+        parts.append(trailer)
+    return b"".join(parts)
+
+
+def _inflate_brotli(body: bytes, max_decoded: int) -> bytes:
+    """Decode brotli. Each output buffer stops at the decoded cap."""
+    decoder = brotli.Decompressor()
+    pending = body
+    parts: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            piece = decoder.process(pending, output_buffer_limit=max_decoded + 1)
+            pending = b""
+            total += len(piece)
+            if total > max_decoded:
+                raise FetchError("response exceeds size limit")
+            if piece:
+                parts.append(piece)
+            if decoder.is_finished():
+                break
+            if decoder.can_accept_more_data():
+                raise FetchError("content encoding failed")
+    except brotli.error as exc:
+        raise FetchError("content encoding failed") from exc
+    return b"".join(parts)
+
+
+def _decode_content(body: bytes, headers: dict[str, str], max_decoded: int) -> bytes:
+    """Return the decoded entity. An empty body is unchanged."""
+    if not body:
+        return body
+    encoding = _encoding_name(headers)
+    if not encoding or encoding == "identity":
+        return body
+    if "," in encoding or encoding not in {"gzip", "deflate", "br"}:
+        raise FetchError("content encoding is not permitted")
+    if encoding == "gzip":
+        return _inflate(body, 16 + zlib.MAX_WBITS, max_decoded)
+    if encoding == "deflate":
+        return _inflate(body, zlib.MAX_WBITS, max_decoded)
+    return _inflate_brotli(body, max_decoded)
+
+
 async def _hop(
     url: str,
     method: str,
@@ -268,7 +345,8 @@ async def fetch_url(
             pools,
         )
         if location is None:
-            return FetchResult(status, mapped, body or b"", current)
+            decoded = _decode_content(body or b"", mapped, max_bytes)
+            return FetchResult(status, mapped, decoded, current)
         followed += 1
         if followed > max_redirects:
             raise FetchError("redirect limit")

@@ -1,8 +1,11 @@
 """Outbound fetch policy. Fake DNS and a fake transport. No live network."""
 import ast
 import asyncio
+import gzip
 import inspect
+import zlib
 
+import brotli
 import httpcore
 import pytest
 
@@ -368,6 +371,146 @@ def test_size_limit_ignores_content_length_and_closes():
         )
     assert events.count(("stream-close",)) == 1
     assert events.count(("pool-close",)) == 1
+
+
+def _fetch_body(response: bytes, max_bytes: int = 1024) -> bytes:
+    _events, resolver, backend_factory, pool_factory = _world([response])
+    result = asyncio.run(
+        fetch_url(
+            "https://jobs.example/",
+            max_bytes=max_bytes,
+            resolver=resolver,
+            backend_factory=backend_factory,
+            pool_factory=pool_factory,
+        )
+    )
+    return result.body
+
+
+def test_gzip_and_brotli_bodies_are_decoded():
+    page = b"<html>one job</html>"
+    gzip_body = _fetch_body(
+        _response(200, gzip.compress(page), {"Content-Encoding": "gzip"})
+    )
+    brotli_body = _fetch_body(
+        _response(200, brotli.compress(page), {"Content-Encoding": "br"})
+    )
+    deflate_body = _fetch_body(
+        _response(
+            200,
+            zlib.compress(page),
+            {"Content-Encoding": "deflate"},
+        )
+    )
+    assert gzip_body == page
+    assert brotli_body == page
+    assert deflate_body == page
+
+
+def test_empty_encoded_body_stays_empty():
+    body = _fetch_body(_response(200, b"", {"Content-Encoding": "gzip"}))
+    assert body == b""
+
+
+def test_plain_body_without_encoding_is_unchanged():
+    page = b"<html>plain</html>"
+    assert _fetch_body(_response(200, page)) == page
+
+
+def test_corrupt_and_stacked_encodings_fail_closed():
+    events, resolver, backend_factory, pool_factory = _world(
+        [_response(200, b"not-gzip", {"Content-Encoding": "gzip"})]
+    )
+    with pytest.raises(FetchError, match="content encoding"):
+        asyncio.run(
+            fetch_url(
+                "https://jobs.example/",
+                resolver=resolver,
+                backend_factory=backend_factory,
+                pool_factory=pool_factory,
+            )
+        )
+    stacked = _response(200, b"abc", {"Content-Encoding": "gzip, br"})
+    events, resolver, backend_factory, pool_factory = _world([stacked])
+    with pytest.raises(FetchError, match="content encoding"):
+        asyncio.run(
+            fetch_url(
+                "https://jobs.example/",
+                resolver=resolver,
+                backend_factory=backend_factory,
+                pool_factory=pool_factory,
+            )
+        )
+
+
+def test_decoded_body_over_the_cap_fails_closed():
+    page = b"a" * 4000
+    payload = gzip.compress(page)
+    assert len(payload) < 200
+    events, resolver, backend_factory, pool_factory = _world(
+        [_response(200, payload, {"Content-Encoding": "gzip"})]
+    )
+    with pytest.raises(FetchError, match="size"):
+        asyncio.run(
+            fetch_url(
+                "https://jobs.example/",
+                max_bytes=200,
+                resolver=resolver,
+                backend_factory=backend_factory,
+                pool_factory=pool_factory,
+            )
+        )
+    brotli_payload = brotli.compress(page)
+    assert len(brotli_payload) < 200
+    events, resolver, backend_factory, pool_factory = _world(
+        [_response(200, brotli_payload, {"Content-Encoding": "br"})]
+    )
+    with pytest.raises(FetchError, match="size"):
+        asyncio.run(
+            fetch_url(
+                "https://jobs.example/",
+                max_bytes=200,
+                resolver=resolver,
+                backend_factory=backend_factory,
+                pool_factory=pool_factory,
+            )
+        )
+
+
+def test_decoded_cap_allows_exact_length_and_rejects_one_extra_byte():
+    cap = 64
+    page = b"a" * cap
+    over = b"a" * (cap + 1)
+    codecs = (
+        ("gzip", gzip.compress),
+        ("deflate", zlib.compress),
+        ("br", brotli.compress),
+    )
+    for encoding, compress in codecs:
+        exact_payload = compress(page)
+        over_payload = compress(over)
+        assert len(exact_payload) < cap
+        assert len(over_payload) < cap
+        assert (
+            _fetch_body(
+                _response(200, exact_payload, {"Content-Encoding": encoding}),
+                max_bytes=cap,
+            )
+            == page
+        )
+        _events, resolver, backend_factory, pool_factory = _world(
+            [_response(200, over_payload, {"Content-Encoding": encoding})]
+        )
+        with pytest.raises(FetchError, match="size"):
+            asyncio.run(
+                fetch_url(
+                    "https://jobs.example/",
+                    max_bytes=cap,
+                    resolver=resolver,
+                    backend_factory=backend_factory,
+                    pool_factory=pool_factory,
+                )
+            )
 
 
 def test_timeout_and_exception_close_the_pool():
