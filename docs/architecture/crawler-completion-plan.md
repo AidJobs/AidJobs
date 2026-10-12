@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit, the offline coverage map, and the career-site coverage evaluation are recorded below. Cross-site coverage is not established. Admission is unchanged. This is not permission to start B3, to decode stored responses, or to change the family rule.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit, the offline coverage map, the career-site coverage evaluation, and the C1–C5 coverage implementation contract are recorded below. Cross-site coverage is not established. Admission is unchanged. C1 has not had its preflight. This is not permission to decode responses, change admission, fetch, or start B3.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026. C1–C5 coverage implementation contract recorded 12 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -244,7 +244,81 @@ Job boards:
 
 No irrelevant page was admitted. These listing batches did not produce a repeated numeric family, a repeated UUID family, or a qualifying JSON-LD `job_posting`. On ICRC and Oxfam, each vacancy URL is its own family, so a title, location, or deadline does not admit it. That is the current ordinary-HTML rule.
 
-The gzip and brotli responses are a measurement gap. They do not support a coverage claim for those four sites. Do not average the seven sites. Do not retune admission from this sample. A change to the family rule, and a change to response decoding, each need a separate plan. B3 remains the next contract gate and is not this evaluation.
+The gzip and brotli responses are a measurement gap. They do not support a coverage claim for those four sites. Do not average the seven sites. The implementation contract for decoding and for the family-rule amendment is C1–C5 below. B3 stays a read-only identity audit and runs before C3. B3 does not answer coverage.
+
+### Coverage implementation contract, C1–C5
+
+Recorded 12 October 2026. This is the implementation contract for the coverage failures above. It does not start code. C1 still needs a read-only preflight and a separate approval before any edit or test run. No fetch, database write, push, or deploy is part of recording this contract.
+
+C1–C5 sit after this evaluation and before any B3 code change. Track A stays independent. ReliefWeb HTML stays a challenge. Production crawls stay forbidden while B1 is undeployed. `canonical_hash`, plugins, AI order, Issue #4, and Issue #5 stay untouched. `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py` stay out of every commit.
+
+| Order | Gate | Allowed work |
+| --- | --- | --- |
+| 1 | C1 preflight, approval, then decode | Response decoding only |
+| 2 | C2 | Offline scoring and labels. No admission change |
+| 3 | B3 read-only audit | Identity facts only. Recorded before C3 |
+| 4 | C3 | Admission amendment, after B3 is recorded clean |
+| 5 | C4 | Thin-row confirmation inside the one admission batch |
+| 6 | C5 | Six-site table, then stop |
+| 7 | B4, then B5 | Unchanged |
+
+#### C1. Decode the response
+
+In `apps/backend/contracts/outbound.py`, decompress after the transfer is read and before `FetchResult` is returned. `gzip` and `deflate` use the standard library. `br` needs a brotli dependency, because the crawler already requests it and DevNetJobsIndia responded with it. Count decoded bytes while decoding. Stop at the same 5 MiB ceiling as the transfer cap. A body that exceeds that ceiling, or that claims an encoding and does not decode, raises `FetchError`. The extractor never sees compressed bytes or a partial page.
+
+Tests are compressed fixtures in `apps/backend/tests/test_outbound_fetch.py`. No live network. This is a new gate, not a reopening of B1.
+
+#### C2. Label the saved pages
+
+Decompress the bodies already in `raw-html/career-coverage/`. Do not fetch. Run the current extractor and the current `admit_batch`. For every candidate record the title, apply URL, location, deadline, employment type, `admitted`, and `rejection_reason`.
+
+Each of the seven extra ICRC candidates receives one recorded label: genuine, junk, or unknown. Unknown stays unknown. It is not treated as junk and not treated as a vacancy. C2 is complete when all seven labels are recorded. C3 does not start while any of the seven is unlabelled.
+
+An unknown URL must not be newly admitted. If the C3 family rule or the structured-field rule would admit an unknown URL, C3 stops. The rule is narrowed, or that URL is later labelled genuine or junk.
+
+Copy the decisive URL shapes into small fixtures under `apps/backend/tests/`. The full saved pages stay investigation material. They do not become a test dependency.
+
+#### C3. Amend admission
+
+This amends Gate 11’s rule that ordinary HTML receives no structured credit. `destination_rejection` stays unchanged. Search, pagination, an exact careers or jobs root, and social links still fail first.
+
+After those denials:
+
+- Admit an HTML candidate that has a title and a non-blank location, deadline, or employment type, even when its family does not repeat.
+- Collapse only the slug after a vacancy token and before the first numeric id. `/job/pashto-interpreter/1425552433` becomes `job/{id}`. `/jobs/vacancy/finance-manager-int11888/25150/description` becomes `jobs/vacancy/{id}/{rest}`. Trailing segments, including `description`, stay one `{rest}`. Two members of that key are required. `all-jobs` is not the token `jobs`. A query `job_id=` does not create `{id}`.
+- A title and URL with none of those fields, and with no repeated family, stays `no_qualifying_family`.
+
+Ship only when fixtures for all 18 confirmed ICRC and Oxfam roles are admitted and every link labelled irrelevant still fails. If the collapse would admit a labelled junk link, or an unknown URL, stop.
+
+C3 waits until the B3 read-only audit is recorded and has found no identity defect that would duplicate or drop these URL shapes. C3 does not change `canonical_hash`.
+
+#### C4. Confirm a thin row
+
+This is the only allowed detail-page fetch beyond behaviour already in `crawl_source`, and only after C4’s own approval. It preserves the one-batch contract.
+
+In `crawl_source`, after listing extraction and before the single `admit_batch`:
+
+- Do not fetch a row that C3 would already admit.
+- Fetch a title-and-URL row once, through the existing outbound client. The cap is 50 detail fetches for that one listing.
+- HTTP 200 is not evidence. A description paragraph is not evidence. The detail page must produce a title plus a non-blank location, deadline, or employment type, or a JSON-LD `JobPosting` with one of those fields.
+- A row that gains that evidence joins the same candidate list. The single `admit_batch` then decides it.
+- A failed or inconclusive row is removed from that list and logged with the existing extraction logger as `detail_unconfirmed`. It is not passed to `save_jobs` and not written by any other path. There is no quarantine job table.
+- Keep the UNICEF skip and the UNDP detail behaviour.
+
+The six vacancy pages already saved are the offline reader check. Any new detail URL needs its own fetch approval.
+
+#### C5. Exit on the six sites
+
+| Site | Done when |
+| --- | --- |
+| ICRC | 12 confirmed roles admitted, irrelevant links rejected |
+| Oxfam GB | 6 confirmed roles admitted, category and search links rejected |
+| DevNetJobsIndia | Decoded listing: each extracted row is admitted, rejected, or `detail_unconfirmed` |
+| Global Partnership for Education | Same |
+| International Rescue Committee | Same |
+| Médecins Sans Frontières | One separately approved fetch of `https://www.msf.org/jobs`, then the same cascade. `/careers` remains the 404 already fetched |
+
+A hold is not a saved job. A decoded page with no vacancy links is unsupported. ReliefWeb HTML stays out. Then stop. Later career links use this cascade and do not imply another rule change. B4 and B5 follow.
 
 ### B3. Identity and upsert audit
 
@@ -289,7 +363,7 @@ The crawler is complete for this plan only when the completion criteria below ar
 
 - Every live fetch path uses the outbound policy, including redirects and DNS, and fails closed when it cannot.
 - Timeouts and response-size limits are enforced on those paths.
-- Genuine vacancies are admitted and obvious junk is rejected under the current Gate 11 rules.
+- Genuine vacancies are admitted and obvious junk is rejected. Until C3 is verified, that means the current Gate 11 rules. After C3 is verified, it means the C3 amendment recorded above.
 - HTML, RSS, and API use the same admission and persistence contract.
 - Job identity is unchanged, upserts stay on the one writer, and suppression survives recrawl.
 - Failed or partial crawls cannot expire or delete jobs.
@@ -311,6 +385,6 @@ Discovery Fabric remains later: Scout, Mapper, Frontier, Source Profiles, and Dr
 - Raising admission thresholds to make a fixture pass.
 - An identity, canonical-key, or expiry redesign.
 - A new normalisation stage.
-- Playwright, broader AI extraction, or detail-page fetching.
+- Playwright or broader AI extraction. Detail-page fetching stays limited to the behaviour already in `crawl_source` until C4 is separately approved. C4 is the only added detail fetch, and it stays inside the one `admit_batch`.
 - Issue #4 test-suite cleanup, except where a crawler gate needs a test it directly owns.
 - The two unrelated local files recorded under B1: `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py`. Leave their Pyright-ignore diffs untouched and out of every crawler commit.
