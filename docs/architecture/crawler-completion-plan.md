@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. The B2 contract audit, the offline coverage map, the career-site coverage evaluation, and the C1–C5 coverage implementation contract are recorded below. Cross-site coverage is not established. Admission is unchanged. C1 has not had its preflight. This is not permission to decode responses, change admission, fetch, or start B3.
+**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. C1 decoding is committed locally as `cd6d63c` and is not pushed or deployed. The C2 offline scoring is done, and the seven extra ICRC candidates are recorded below as junk. The blanket rule that would admit ordinary HTML from a title plus a location or deadline is withdrawn. Admission code is unchanged. Cross-site coverage is not established. This is not permission to change admission, fetch, write C3, or start the B3 audit. The next gate is the read-only B3 identity preflight.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026. C1–C5 coverage implementation contract recorded 12 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026. C1–C5 coverage implementation contract recorded 12 October 2026. C1 decoding committed locally the same day as `cd6d63c`. C2 labels recorded the same day, and the blanket structured-field rule was withdrawn.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -248,16 +248,16 @@ The gzip and brotli responses are a measurement gap. They do not support a cover
 
 ### Coverage implementation contract, C1–C5
 
-Recorded 12 October 2026. This is the implementation contract for the coverage failures above. It does not start code. C1 still needs a read-only preflight and a separate approval before any edit or test run. No fetch, database write, push, or deploy is part of recording this contract.
+Recorded 12 October 2026. C1 decoding is committed locally as `cd6d63c`. C2 labels are recorded below. The blanket structured-field sentence in C3 is withdrawn. No C3 code is permitted until the B3 identity preflight has been reviewed and a narrowed C3 contract has been recorded. No fetch, database write, push, or deploy is part of this record.
 
 C1–C5 sit after this evaluation and before any B3 code change. Track A stays independent. ReliefWeb HTML stays a challenge. Production crawls stay forbidden while B1 is undeployed. `canonical_hash`, plugins, AI order, Issue #4, and Issue #5 stay untouched. `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py` stay out of every commit.
 
 | Order | Gate | Allowed work |
 | --- | --- | --- |
 | 1 | C1 preflight, approval, then decode | Response decoding only |
-| 2 | C2 | Offline scoring and labels. No admission change |
-| 3 | B3 read-only audit | Identity facts only. Recorded before C3 |
-| 4 | C3 | Admission amendment, after B3 is recorded clean |
+| 2 | C2 | Offline scoring and labels. Recorded. No admission change |
+| 3 | B3 read-only audit | Identity facts only. Not started. Required before the narrowed C3 contract |
+| 4 | C3 | Narrowed admission amendment, recorded only after B3 is reviewed. The blanket structured-field rule is withdrawn |
 | 5 | C4 | Thin-row confirmation inside the one admission batch |
 | 6 | C5 | Six-site table, then stop |
 | 7 | B4, then B5 | Unchanged |
@@ -276,21 +276,55 @@ Each of the seven extra ICRC candidates receives one recorded label: genuine, ju
 
 An unknown URL must not be newly admitted. If the C3 family rule or the structured-field rule would admit an unknown URL, C3 stops. The rule is narrowed, or that URL is later labelled genuine or junk.
 
-Copy the decisive URL shapes into small fixtures under `apps/backend/tests/`. The full saved pages stay investigation material. They do not become a test dependency.
+Copy the decisive URL shapes into small fixtures under `apps/backend/tests/` only when the narrowed C3 contract is recorded. The full saved pages stay investigation material. They do not become a test dependency. Fixtures are not written against the withdrawn blanket rule.
+
+#### C2 labels
+
+Recorded 12 October 2026 from the saved bodies. Decoding used each row’s saved `content-encoding` and the C1 decoder. No fetch, admission edit, fixture, database write, or commit of response bodies.
+
+The seven extra ICRC candidates are the extracted rows left after removing the 12 confirmed `/job/` role URLs and the two `root_careers_page` locale rows. All seven are junk. The label is ground truth. It does not replace the admission result. Each was rejected with `no_qualifying_family`, and location, deadline, and employment type were blank.
+
+| Title | Apply URL | Label |
+| --- | --- | --- |
+| Open Jobs | `https://careers.icrc.org/go/All-Jobs/3807301/` | junk |
+| How to Apply | `https://careers.icrc.org/content/application/?locale=en_GB` | junk |
+| Opportunities and Benefits | `https://careers.icrc.org/content/opportunities-benefits/?locale=en_GB` | junk |
+| local opportunities page | `https://careers.icrc.org/go/LOCAL-OPPORTUNITIES/9002901/` | junk |
+| Our job categories | `https://careers.icrc.org/content/job-categories/?locale=en_GB` | junk |
+| Before you apply | `https://careers.icrc.org/content/Prepare-Your-Application/?locale=en_GB` | junk |
+| Our recruitment process | `https://careers.icrc.org/content/Our-Recruitment-Process/?locale=en_GB` | junk |
+
+The evidence is the saved link text and destination path. Open Jobs and the local-opportunities URL are list pages. The other five are information pages. None is one role. None is unknown.
+
+Eleven listing links stay a separate unlabelled set. They were not extracted as candidates: a `javascript:void(0)` control, a medical-standards PDF, five social profiles, the career newsletter, and three Google policy links. The bare `https://careers.icrc.org/` link is the locale root already counted in the two `root_careers_page` rows, not a twelfth unknown link.
+
+The same pass left these findings in place. A later C3 result does not close them.
+
+- The 12 confirmed ICRC roles and the 6 confirmed Oxfam roles were extracted and rejected with `no_qualifying_family`. On every one of those 18 listing rows, location, deadline, and employment type were blank. Place and date on the Oxfam cards are inside the title string, not in those fields.
+- DevNetJobsIndia produced 150 candidates, all rejected with `no_qualifying_family`. Sixty-four `jobdescription.aspx?job_id=` rows and 46 `valuemembership.aspx` rows both have location and deadline. Thirty `myProfile.aspx` rows do not. Ten further rows are post, payment, advertising, event, and list controls.
+- Global Partnership for Education decoded to HTML. The extractor returned no candidates. The page contains 11 role-titled links to other employers. That is an extraction miss.
+- The International Rescue Committee decoded to a careers landing page. The extractor returned one candidate, “Jobs in Syria”, with no evidence fields. Search and Workday entry links were not candidates.
+- Médecins Sans Frontières `/careers` remains the saved HTTP 404. `https://www.msf.org/jobs` has not been fetched.
+- ReliefWeb remains the saved HTTP 202 challenge page.
+
+C2 is complete for the seven labels. C3 does not start from the blanket rule below.
 
 #### C3. Amend admission
 
-This amends Gate 11’s rule that ordinary HTML receives no structured credit. `destination_rejection` stays unchanged. Search, pagination, an exact careers or jobs root, and social links still fail first.
+`destination_rejection` stays unchanged. Search, pagination, an exact careers or jobs root, and social links still fail first. C3 does not change `canonical_hash`.
 
-After those denials:
+The following blanket rule is withdrawn and must not be implemented: admit an HTML candidate that has a title and a non-blank location, deadline, or employment type, even when its family does not repeat. A location or deadline describes a job. It does not show that the URL is a job. On the decoded DevNetJobsIndia listing that rule would admit the 64 job-description rows and the 46 membership rows.
 
-- Admit an HTML candidate that has a title and a non-blank location, deadline, or employment type, even when its family does not repeat.
-- Collapse only the slug after a vacancy token and before the first numeric id. `/job/pashto-interpreter/1425552433` becomes `job/{id}`. `/jobs/vacancy/finance-manager-int11888/25150/description` becomes `jobs/vacancy/{id}/{rest}`. Trailing segments, including `description`, stay one `{rest}`. Two members of that key are required. `all-jobs` is not the token `jobs`. A query `job_id=` does not create `{id}`.
-- A title and URL with none of those fields, and with no repeated family, stays `no_qualifying_family`.
+The narrowed C3 contract is not recorded yet. Record it only after the B3 read-only preflight has been reviewed. No C3 code until that contract is recorded. The contract must include all of the following.
 
-Ship only when fixtures for all 18 confirmed ICRC and Oxfam roles are admitted and every link labelled irrelevant still fails. If the collapse would admit a labelled junk link, or an unknown URL, stop.
+- Non-vacancy destinations are denied first, from the destination path and URL structure, not from the extracted title. Membership, profile, account, payment, advertising, and event-submission destinations are rejected before location, deadline, or employment type are read. Tests cover those destinations with a plausible title and populated fields. The 46 `valuemembership.aspx` rows stay rejected.
+- A numeric `job_id` query can mark an otherwise eligible path as a vacancy destination. It does not override a non-vacancy classification. An arbitrary query parameter does not make a page a vacancy. Tests cover a missing `job_id`, an empty `job_id`, and a non-numeric `job_id`.
+- A vacancy-shaped URL is not proof of a job. C3 can admit a title plus a recognised vacancy destination plus qualifying evidence. A title and a vacancy URL with location, deadline, and employment type blank is a thin row for C4. A failed or inconclusive confirmation is not saved.
+- The 18 confirmed ICRC and Oxfam listing rows are thin rows. Their evidence fields are blank, so C3 does not admit them on path shape. Admitting those 18 is a cascade result after C4 supplies qualifying evidence. The six vacancy pages already saved are the offline check for the six rows that were fetched. The other 12 confirmed rows have no saved detail page.
+- The seven junk ICRC candidates stay rejected. Profile, account, and the other known irrelevant destinations stay rejected. An unknown URL is not newly admitted.
+- Slug collapse remains the intended vacancy-path normalisation, subject to what B3 records: `/job/pashto-interpreter/1425552433` becomes `job/{id}`, and `/jobs/vacancy/finance-manager-int11888/25150/description` becomes `jobs/vacancy/{id}/{rest}`. Trailing segments, including `description`, stay one `{rest}`. `all-jobs` is not the token `jobs`.
 
-C3 waits until the B3 read-only audit is recorded and has found no identity defect that would duplicate or drop these URL shapes. C3 does not change `canonical_hash`.
+The Global Partnership for Education extraction miss, the International Rescue Committee landing link, the Médecins Sans Frontières `/careers` 404, and the ReliefWeb challenge stay explicit findings. A passing C3 does not close them.
 
 #### C4. Confirm a thin row
 
@@ -322,9 +356,11 @@ A hold is not a saved job. A decoded page with no vacancy links is unsupported. 
 
 ### B3. Identity and upsert audit
 
-Read-only unless a preflight proves a specific defect.
+Read-only unless a preflight proves a specific defect. This audit has not started. It is the next gate, and it stays read-only until its own record is reviewed.
 
 Record which identity algorithm production uses. Do not change `canonical_hash` or assign a canonical key version.
+
+The preflight must say how that algorithm treats `/job/{slug}/{id}`, `/jobs/vacancy/{slug}/{id}/description`, `jobdescription.aspx?job_id=`, and `valuemembership.aspx`. It must also say whether two URLs that differ only by irrelevant query parameters are duplicates under the current identity contract.
 
 Confirm a repeat crawl yields stable `created`, `updated`, and `unchanged` outcomes, and a suppressed row returns `seen_again` with `deleted_at` unchanged.
 
@@ -363,7 +399,7 @@ The crawler is complete for this plan only when the completion criteria below ar
 
 - Every live fetch path uses the outbound policy, including redirects and DNS, and fails closed when it cannot.
 - Timeouts and response-size limits are enforced on those paths.
-- Genuine vacancies are admitted and obvious junk is rejected. Until C3 is verified, that means the current Gate 11 rules. After C3 is verified, it means the C3 amendment recorded above.
+- Genuine vacancies are admitted and obvious junk is rejected. Until the narrowed C3 contract is verified, that means the current Gate 11 rules. The withdrawn blanket structured-field rule is not that amendment. After the narrowed contract is verified, the completion line means that contract.
 - HTML, RSS, and API use the same admission and persistence contract.
 - Job identity is unchanged, upserts stay on the one writer, and suppression survives recrawl.
 - Failed or partial crawls cannot expire or delete jobs.
