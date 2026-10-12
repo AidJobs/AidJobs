@@ -473,9 +473,9 @@ export default function HomeClient() {
   const internationalCount = (intlMap && intlMap['true']) ? Number(intlMap['true']) : 0;
 
   return (
-    <>
+    <div className="flex min-h-screen w-full min-w-0">
       <CollectionsNav />
-      <main className="min-h-screen bg-gray-50 pl-56">
+      <main className="min-h-screen min-w-0 flex-1 bg-gray-50 max-md:pl-16">
         {showFallbackBanner && (
           <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -873,7 +873,7 @@ export default function HomeClient() {
         />
       )}
       </main>
-    </>
+    </div>
   );
 }
 

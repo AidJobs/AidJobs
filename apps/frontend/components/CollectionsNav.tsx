@@ -1,125 +1,182 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { collections } from '@/lib/collections';
 import { getShortlist } from '@/lib/shortlist';
 
+const menuButtonClass =
+  'fixed left-4 top-4 z-40 p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm';
+
 export default function CollectionsNav() {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [desktopExpanded, setDesktopExpanded] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const [savedCount, setSavedCount] = useState(0);
-  
+  const mobileOpenButtonRef = useRef<HTMLButtonElement>(null);
+  const desktopOpenButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<'mobile' | 'desktop' | null>(null);
+
   const collectionList = Object.values(collections);
-  
+  const showPanel = desktopExpanded || mobileOpen;
+
   useEffect(() => {
     const updateCount = () => {
       setSavedCount(getShortlist().length);
     };
-    
+
     updateCount();
-    
+
     window.addEventListener('storage', updateCount);
     const interval = setInterval(updateCount, 1000);
-    
+
     return () => {
       window.removeEventListener('storage', updateCount);
       clearInterval(interval);
     };
   }, []);
-  
-  if (!isExpanded) {
-    return (
+
+  useEffect(() => {
+    if (pendingFocus.current === 'mobile') {
+      mobileOpenButtonRef.current?.focus();
+    } else if (pendingFocus.current === 'desktop') {
+      desktopOpenButtonRef.current?.focus();
+    }
+    pendingFocus.current = null;
+  }, [mobileOpen, desktopExpanded]);
+
+  const closeMenu = () => {
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    if (desktop) {
+      pendingFocus.current = 'desktop';
+      setDesktopExpanded(false);
+      return;
+    }
+    pendingFocus.current = 'mobile';
+    setMobileOpen(false);
+  };
+
+  const panelClass = [
+    'w-56 max-w-full shrink-0 overflow-y-auto border-r border-gray-200 bg-white',
+    mobileOpen
+      ? 'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:h-screen'
+      : 'max-md:hidden',
+    desktopExpanded ? 'md:sticky md:top-0 md:h-screen' : 'md:hidden',
+  ].join(' ');
+
+  return (
+    <>
       <button
-        onClick={() => setIsExpanded(true)}
-        className="fixed left-4 top-4 z-30 p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
+        ref={mobileOpenButtonRef}
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className={`${menuButtonClass} ${mobileOpen ? 'hidden' : 'md:hidden'}`}
         aria-label="Open collections menu"
+        aria-expanded={mobileOpen}
+        aria-controls="collections-nav"
       >
         <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-    );
-  }
-  
-  return (
-    <div className="fixed left-0 top-0 h-full w-56 bg-white border-r border-gray-200 z-30 overflow-y-auto">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <Link 
-            href="/"
-            className="text-lg font-bold text-gray-900 hover:text-gray-700"
-          >
-            AidJobs
-          </Link>
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="p-1 hover:bg-gray-100 rounded"
-            aria-label="Collapse menu"
-          >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="mb-4 space-y-1">
-          <Link
-            href="/"
-            className={`block px-3 py-2 rounded text-sm transition-colors ${
-              pathname === '/'
-                ? 'bg-blue-50 text-blue-700 font-medium'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            All Jobs
-          </Link>
-          <Link
-            href="/saved"
-            className={`flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
-              pathname === '/saved'
-                ? 'bg-blue-50 text-blue-700 font-medium'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <span>Saved</span>
-            {savedCount > 0 && (
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                pathname === '/saved'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}>
-                {savedCount}
-              </span>
-            )}
-          </Link>
-        </div>
-        
-        <div className="mb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Collections
-        </div>
-        
-        <nav className="space-y-1">
-          {collectionList.map((collection) => {
-            const isActive = pathname === `/collections/${collection.slug}`;
-            
-            return (
+
+      {!desktopExpanded && (
+        <button
+          ref={desktopOpenButtonRef}
+          type="button"
+          onClick={() => setDesktopExpanded(true)}
+          className={`${menuButtonClass} hidden md:inline-flex`}
+          aria-label="Open collections menu"
+          aria-expanded={false}
+          aria-controls="collections-nav"
+        >
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
+
+      {showPanel && (
+        <div id="collections-nav" className={panelClass}>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
               <Link
-                key={collection.slug}
-                href={`/collections/${collection.slug}`}
+                href="/"
+                className="text-lg font-bold text-gray-900 hover:text-gray-700"
+              >
+                AidJobs
+              </Link>
+              <button
+                type="button"
+                onClick={closeMenu}
+                className="p-1 hover:bg-gray-100 rounded"
+                aria-label="Collapse menu"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4 space-y-1">
+              <Link
+                href="/"
                 className={`block px-3 py-2 rounded text-sm transition-colors ${
-                  isActive
+                  pathname === '/'
                     ? 'bg-blue-50 text-blue-700 font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {collection.title}
+                All Jobs
               </Link>
-            );
-          })}
-        </nav>
-      </div>
-    </div>
+              <Link
+                href="/saved"
+                className={`flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
+                  pathname === '/saved'
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <span>Saved</span>
+                {savedCount > 0 && (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    pathname === '/saved'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {savedCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+
+            <div className="mb-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Collections
+            </div>
+
+            <nav className="space-y-1">
+              {collectionList.map((collection) => {
+                const isActive = pathname === `/collections/${collection.slug}`;
+
+                return (
+                  <Link
+                    key={collection.slug}
+                    href={`/collections/${collection.slug}`}
+                    className={`block px-3 py-2 rounded text-sm transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {collection.title}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

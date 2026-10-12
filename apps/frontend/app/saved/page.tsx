@@ -114,10 +114,10 @@ export default function SavedPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen w-full min-w-0 bg-gray-50">
       <CollectionsNav />
       
-      <div className="ml-56 p-8">
+      <div className="min-w-0 flex-1 py-8 pl-16 pr-8 md:px-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Saved Jobs</h1>

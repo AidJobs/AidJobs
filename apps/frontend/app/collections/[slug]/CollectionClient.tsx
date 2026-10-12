@@ -288,9 +288,9 @@ export default function CollectionClient() {
   }
 
   return (
-    <>
+    <div className="flex min-h-screen w-full min-w-0">
       <CollectionsNav />
-      <main className="min-h-screen bg-gray-50 pl-56">
+      <main className="min-h-screen min-w-0 flex-1 bg-gray-50 max-md:pl-16">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -328,8 +328,8 @@ export default function CollectionClient() {
           </div>
         )}
 
-        <div className="flex gap-6">
-          <div className="w-64 flex-shrink-0 space-y-4">
+        <div className="flex flex-col gap-6 md:flex-row">
+          <div className="w-full space-y-4 md:w-64 md:flex-shrink-0">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Country</h3>
               {facetsLoading ? (
@@ -434,7 +434,7 @@ export default function CollectionClient() {
             </div>
           </div>
 
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {searching && page === 1 ? (
               <div className="text-center py-12 text-gray-500">Searching...</div>
             ) : results.length === 0 ? (
@@ -561,7 +561,7 @@ export default function CollectionClient() {
           />
         )}
       </main>
-    </>
+    </div>
   );
 }
 
