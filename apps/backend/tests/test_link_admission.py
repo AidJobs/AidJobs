@@ -1,4 +1,4 @@
-"""Listing-link admission. Repeated numeric detail templates drop one-off pages."""
+"""Listing-link admission. A vacancy shape still needs evidence fields."""
 from pathlib import Path
 
 from contracts.admission import admit_batch
@@ -48,9 +48,12 @@ def _jobs(pairs):
     return [{"title": title, "apply_url": url, "listing": _LISTING} for title, url in pairs]
 
 
-def test_repeated_unicef_detail_template_drops_one_off_pages():
-    admitted, _rejected = admit_batch(_jobs(_VACANCIES + _JUNK), "html")
-    assert [job["apply_url"] for job in admitted] == [url for _title, url in _VACANCIES]
+def test_repeated_unicef_detail_template_without_evidence_is_thin():
+    admitted, rejected = admit_batch(_jobs(_VACANCIES + _JUNK), "html")
+    assert admitted == []
+    reasons = {job["apply_url"]: reason for job, reason in rejected}
+    for _title, url in _VACANCIES:
+        assert reasons[url] == "thin_vacancy"
 
 
 def test_two_repeated_detail_templates_are_both_kept():
@@ -63,8 +66,12 @@ def test_two_repeated_detail_templates_are_both_kept():
         ("Post B", "https://boards.example.org/vacancy/21/post-b"),
     ]
     junk = [("About", "https://example.org/careers/about")]
-    admitted, _rejected = admit_batch(_jobs(first + second + junk), "html")
-    assert [job["apply_url"] for job in admitted] == [url for _title, url in first + second]
+    admitted, rejected = admit_batch(_jobs(first + second + junk), "html")
+    assert admitted == []
+    reasons = {job["apply_url"]: reason for job, reason in rejected}
+    for _title, url in first + second:
+        assert reasons[url] == "thin_vacancy"
+    assert reasons[junk[0][1]] == "no_qualifying_family"
 
 
 def test_listing_without_a_repeated_detail_template_admits_nothing():
@@ -110,9 +117,12 @@ def test_admit_batch_keeps_repeated_numeric_vacancy_family():
         ),
     ]
     admitted, rejected = admit_batch(_batch(vacancies + junk), "html")
-    assert _urls(admitted) == [url for _title, url in vacancies]
-    assert all(job["admitted"] is True for job in admitted)
-    assert set(_reasons(rejected)) == {"no_qualifying_family"}
+    assert admitted == []
+    reasons = {job["apply_url"]: reason for job, reason in rejected}
+    for _title, url in vacancies:
+        assert reasons[url] == "thin_vacancy"
+    for _title, url in junk:
+        assert reasons[url] == "no_qualifying_family"
 
 
 def test_admit_batch_keeps_every_qualifying_family():
@@ -125,8 +135,8 @@ def test_admit_batch_keeps_every_qualifying_family():
         ("Post B", "https://boards.example.org/vacancy/21/post-b"),
     ]
     admitted, rejected = admit_batch(_batch(first + second), "html")
-    assert _urls(admitted) == [url for _title, url in first + second]
-    assert rejected == []
+    assert admitted == []
+    assert _reasons(rejected) == ["thin_vacancy"] * 4
 
 
 def test_admit_batch_rejects_a_single_numeric_vacancy_and_slugs():
@@ -137,7 +147,11 @@ def test_admit_batch_rejects_a_single_numeric_vacancy_and_slugs():
     ]
     admitted, rejected = admit_batch(_batch(pairs), "html")
     assert admitted == []
-    assert _reasons(rejected) == ["no_qualifying_family"] * 3
+    assert _reasons(rejected) == [
+        "thin_vacancy",
+        "no_qualifying_family",
+        "no_qualifying_family",
+    ]
 
 
 def test_admit_batch_rejects_path_pagination_and_non_vacancy_numbers():
@@ -213,6 +227,163 @@ def test_admit_batch_ignores_extracted_by():
     ai_admitted, _ai_rejected = admit_batch(ai, "html")
     html_admitted, _html_rejected = admit_batch(html, "html")
     assert _urls(ai_admitted) == _urls(html_admitted)
+
+
+def test_vacancy_shape_with_evidence_admits_one_url():
+    jobs = [
+        {
+            "title": "Pashto Interpreter",
+            "apply_url": (
+                "https://careers.icrc.org/job/"
+                "Geneva-Pashto-Interpreter-32910/1425552433/"
+            ),
+            "location_raw": "Geneva",
+        },
+        {
+            "title": "Finance Manager",
+            "apply_url": (
+                "https://jobs.oxfam.org.uk/jobs/vacancy/"
+                "finance-manager-int11888/25150/description/"
+            ),
+            "deadline": "2026-10-26",
+        },
+        {
+            "title": "Admin Assistant",
+            "apply_url": "https://devnetjobsindia.org/jobdescription.aspx?job_id=304752",
+            "location_raw": "Ranchi",
+            "deadline": "2026-11-08",
+        },
+    ]
+    admitted, rejected = admit_batch(jobs, "html")
+    assert _urls(admitted) == [job["apply_url"] for job in jobs]
+    assert rejected == []
+
+
+def test_blank_vacancy_evidence_is_thin_vacancy():
+    jobs = _batch(
+        [
+            (
+                "Finance ManagerSyria - Damascus - Head office26 October 2026",
+                "https://jobs.oxfam.org.uk/jobs/vacancy/"
+                "finance-manager-int11888/25150/description/",
+            ),
+            (
+                "Pashto Interpreter",
+                "https://careers.icrc.org/job/"
+                "Geneva-Pashto-Interpreter-32910/1425552433/",
+            ),
+        ]
+    )
+    admitted, rejected = admit_batch(jobs, "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["thin_vacancy", "thin_vacancy"]
+
+
+def test_membership_profile_and_icrc_junk_stay_rejected():
+    filled = [
+        {
+            "title": "Admin Assistant",
+            "apply_url": "https://www.devnetjobsindia.org/valuemembership.aspx?job_id=304752",
+            "location_raw": "Ranchi",
+            "deadline": "2026-11-08",
+        },
+        {
+            "title": "A Person",
+            "apply_url": "https://www.devnetjobsindia.org/myProfile.aspx?Can_Id=99",
+            "location_raw": "Delhi",
+        },
+        {
+            "title": "Subscribe",
+            "apply_url": "https://www.devnetjobsindia.org/jobseeker_payment_new.aspx",
+            "deadline": "2026-11-08",
+        },
+        {
+            "title": "Display your box banner here",
+            "apply_url": "https://www.devnetjobsindia.org/advertise.aspx",
+            "location_raw": "India",
+        },
+        {
+            "title": "Post your Events and Notices here",
+            "apply_url": "https://www.devnetjobsindia.org/EventSubmissionInfo.aspx",
+            "deadline": "2026-11-08",
+        },
+    ]
+    junk = _batch(
+        [
+            ("Open Jobs", "https://careers.icrc.org/go/All-Jobs/3807301/"),
+            (
+                "How to Apply",
+                "https://careers.icrc.org/content/application/?locale=en_GB",
+            ),
+            (
+                "Opportunities and Benefits",
+                "https://careers.icrc.org/content/opportunities-benefits/?locale=en_GB",
+            ),
+            (
+                "local opportunities page",
+                "https://careers.icrc.org/go/LOCAL-OPPORTUNITIES/9002901/",
+            ),
+            (
+                "Our job categories",
+                "https://careers.icrc.org/content/job-categories/?locale=en_GB",
+            ),
+            (
+                "Before you apply",
+                "https://careers.icrc.org/content/Prepare-Your-Application/?locale=en_GB",
+            ),
+            (
+                "Our recruitment process",
+                "https://careers.icrc.org/content/Our-Recruitment-Process/?locale=en_GB",
+            ),
+        ]
+    )
+    admitted, rejected = admit_batch(filled + junk, "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["non_vacancy_destination"] * 5 + [
+        "no_qualifying_family"
+    ] * 7
+
+
+def test_job_id_without_one_numeric_value_does_not_qualify():
+    base = "https://devnetjobsindia.org/jobdescription.aspx"
+    rows = [
+        {"title": "A", "apply_url": base, "location_raw": "Delhi"},
+        {"title": "B", "apply_url": base + "?job_id=", "location_raw": "Delhi"},
+        {"title": "C", "apply_url": base + "?job_id=abc", "deadline": "2026-01-01"},
+        {
+            "title": "D",
+            "apply_url": base + "?job_id=304752&job_id=304753",
+            "location_raw": "Delhi",
+        },
+        {
+            "title": "E",
+            "apply_url": "https://devnetjobsindia.org/valuemembership.aspx?job_id=304752",
+            "location_raw": "Delhi",
+            "deadline": "2026-01-01",
+        },
+    ]
+    admitted, rejected = admit_batch(rows, "html")
+    assert admitted == []
+    reasons = {job["apply_url"]: reason for job, reason in rejected}
+    assert reasons[base] == "no_qualifying_family"
+    assert reasons[base + "?job_id="] == "no_qualifying_family"
+    assert reasons[base + "?job_id=abc"] == "no_qualifying_family"
+    assert reasons[base + "?job_id=304752&job_id=304753"] == "no_qualifying_family"
+    assert (
+        reasons["https://devnetjobsindia.org/valuemembership.aspx?job_id=304752"]
+        == "non_vacancy_destination"
+    )
+
+
+def test_non_vacancy_path_does_not_change_rss():
+    job = {
+        "title": "Note",
+        "apply_url": "https://example.org/membership/1",
+        "deadline": "2026-01-01",
+    }
+    admitted, rejected = admit_batch([job], "rss")
+    assert _urls(admitted) == [job["apply_url"]]
+    assert rejected == []
 
 
 def test_admit_batch_html_location_and_deadline_do_not_admit_a_slug():
