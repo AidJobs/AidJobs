@@ -1,6 +1,6 @@
 """Batch admission. One function, no family counting inside the writer."""
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from contracts.validate import destination_rejection
 
@@ -27,6 +27,21 @@ _VACANCY_TOKENS = frozenset(
 _JOB_POSTING_FIELDS = ("location_raw", "deadline", "employment_type")
 _RSS_FIELDS = ("deadline",)
 _API_FIELDS = ("deadline", "location_raw")
+_NON_VACANCY_WORDS = frozenset(
+    {
+        "membership",
+        "profile",
+        "myprofile",
+        "account",
+        "accounts",
+        "payment",
+        "payments",
+        "advertise",
+        "advertising",
+        "advertisement",
+        "advertisements",
+    }
+)
 
 
 def _segments(url: str) -> list[str]:
@@ -68,6 +83,55 @@ def _present(job: dict, names: tuple[str, ...]) -> bool:
     return False
 
 
+def _segment_words(segment: str) -> list[str]:
+    stem = segment.rsplit(".", 1)[0]
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", stem)
+    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+    return [word.lower() for word in re.split(r"[^A-Za-z0-9]+", spaced) if word]
+
+
+def _non_vacancy_path(url: str) -> bool:
+    """Membership, profile, account, payment, advertising, and event-submission paths."""
+    for segment in _segments(url):
+        words = _segment_words(segment)
+        compact = "".join(words)
+        if any(word in _NON_VACANCY_WORDS for word in words):
+            return True
+        if compact.endswith("membership") or compact in {"profile", "myprofile"}:
+            return True
+        if "eventsubmission" in compact or ("event" in words and "submission" in words):
+            return True
+    return False
+
+
+def _numeric_job_id(url: str) -> bool:
+    """A single numeric job_id counts only on jobdescription.aspx."""
+    segments = _segments(url)
+    if not segments:
+        return False
+    stem = segments[-1].rsplit(".", 1)[0].lower()
+    if stem != "jobdescription":
+        return False
+    values: list[str] = []
+    for key, items in parse_qs(urlparse(url).query, keep_blank_values=True).items():
+        if key.lower() == "job_id":
+            values.extend(items)
+    return len(values) == 1 and bool(_NUMERIC_ID.match(values[0]))
+
+
+def _vacancy_shape(url: str) -> bool:
+    """One vacancy URL. The slug collapse is classification only."""
+    if _numeric_job_id(url):
+        return True
+    segments = _segments(url)
+    for index, segment in enumerate(segments):
+        if segment.lower() not in _VACANCY_TOKENS:
+            continue
+        if any(_NUMERIC_ID.match(later) for later in segments[index + 1 :]):
+            return True
+    return False
+
+
 def _structured(job: dict, record_class: str) -> bool:
     if record_class == "job_posting":
         return _present(job, _JOB_POSTING_FIELDS)
@@ -88,6 +152,10 @@ def admit_batch(jobs: list[dict], record_class: str) -> tuple[list[dict], list[t
         segments = _segments(str(job.get("apply_url") or ""))
         if reason is None and any(segment.lower() in _PAGE_SEGMENTS for segment in segments):
             reason = "pagination_path"
+        klass = str(job.get("record_class") or record_class)
+        apply_url = str(job.get("apply_url") or "")
+        if reason is None and klass == "html" and _non_vacancy_path(apply_url):
+            reason = "non_vacancy_destination"
         if reason is not None:
             rejected.append((job, reason))
         else:
@@ -107,6 +175,13 @@ def admit_batch(jobs: list[dict], record_class: str) -> tuple[list[dict], list[t
         family = groups.get(key or "", [])
         repeated = key is not None and len(family) >= _REPEAT_MIN
         segments = _segments(str(job.get("apply_url") or ""))
+        if klass == "html" and _vacancy_shape(str(job.get("apply_url") or "")):
+            if _present(job, _JOB_POSTING_FIELDS):
+                job["admitted"] = True
+                admitted.append(job)
+            else:
+                rejected.append((job, "thin_vacancy"))
+            continue
         numeric = (
             repeated
             and key is not None

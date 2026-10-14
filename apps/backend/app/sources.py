@@ -616,6 +616,28 @@ def permanently_delete_source(
             conn.close()
 
 
+async def _policy_head(url: str) -> dict:
+    """HEAD a stored source URL through the shared outbound policy."""
+    from contracts.outbound import FetchError, fetch_url
+
+    try:
+        result = await fetch_url(
+            url,
+            method="HEAD",
+            headers={"User-Agent": "AidJobsBot/1.0 (+contact@aidjobs.app)"},
+            timeout=10.0,
+        )
+    except FetchError as exc:
+        return {"ok": False, "status": 0, "error": str(exc)}
+    return {
+        "ok": result.status_code < 400,
+        "status": result.status_code,
+        "size": result.headers.get("content-length"),
+        "etag": result.headers.get("etag"),
+        "last_modified": result.headers.get("last-modified"),
+    }
+
+
 @router.post("/api/admin/sources/{source_id}/test")
 async def test_source(
     request: Request,
@@ -712,18 +734,9 @@ async def test_source(
                         "message": f"Successfully fetched {len(jobs)} jobs"
                     }
                 else:
-                    # Legacy format - use HEAD request
-                    import httpx
-                    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                        response = await client.head(url, headers={
-                            "User-Agent": "AidJobsBot/1.0 (+contact@aidjobs.app)"
-                        })
-                    
-                    return {
-                        "ok": response.status_code < 400,
-                        "status": response.status_code,
-                        "host": host
-                    }
+                    headed = await _policy_head(url)
+                    headed["host"] = host
+                    return headed
             except json.JSONDecodeError as e:
                 return {
                     "ok": False,
@@ -747,21 +760,9 @@ async def test_source(
                     "host": host
                 }
         else:
-            # For HTML/RSS sources, use HEAD request
-            import httpx
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                response = await client.head(url, headers={
-                    "User-Agent": "AidJobsBot/1.0 (+contact@aidjobs.app)"
-                })
-            
-            return {
-                "ok": response.status_code < 400,
-                "status": response.status_code,
-                "size": response.headers.get("content-length"),
-                "etag": response.headers.get("etag"),
-                "last_modified": response.headers.get("last-modified"),
-                "host": host
-            }
+            headed = await _policy_head(url)
+            headed["host"] = host
+            return headed
         
     except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
         logger.error(f"Failed to test source {source_id}: {e}")
