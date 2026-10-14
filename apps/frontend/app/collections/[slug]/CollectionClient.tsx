@@ -441,7 +441,7 @@ export default function CollectionClient() {
               <div className="text-center py-12 text-gray-500">
                 {searchQuery || country || level || missionTags.length > 0
                   ? 'No jobs found matching your criteria'
-                  : 'Loading jobs...'}
+                  : 'No jobs found'}
               </div>
             ) : (
               <>

@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import JobInspector from '@/components/JobInspector';
 import SavedJobsPanel from '@/components/SavedJobsPanel';
 import Toast from '@/components/Toast';
 import CollectionsNav from '@/components/CollectionsNav';
-import TrinitySearchBar from '@/components/TrinitySearchBar';
 import { getShortlist, toggleShortlist, isInShortlist } from '@/lib/shortlist';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 
@@ -62,7 +61,6 @@ type FacetsResponse = {
 };
 
 export default function HomeClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
@@ -77,7 +75,9 @@ export default function HomeClient() {
   const [results, setResults] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [queryDraft, setQueryDraft] = useState(searchParams.get('q') || '');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchSource, setSearchSource] = useState<string>('');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'relevance');
@@ -98,8 +98,10 @@ export default function HomeClient() {
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const queryCommitTimerRef = useRef<NodeJS.Timeout | null>(null);
   const facetsCacheRef = useRef<{ data: FacetsResponse['facets']; timestamp: number } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const requestSerialRef = useRef(0);
   const [previouslyFocusedElement, setPreviouslyFocusedElement] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -169,31 +171,17 @@ export default function HomeClient() {
     }
   }, []);
 
-  const updateURLParams = useCallback(() => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (sortBy && sortBy !== 'relevance') params.set('sort', sortBy);
-    if (country) params.set('country', country);
-    if (level) params.set('level_norm', level);
-    if (international) params.set('international_eligible', 'true');
-    missionTags.forEach(tag => params.append('mission_tags', tag));
-    
-    const newQuery = params.toString();
-    const currentQuery = searchParams.toString();
-    
-    if (newQuery !== currentQuery) {
-      router.replace(newQuery ? `?${newQuery}` : '/', { scroll: false });
-    }
-  }, [searchQuery, sortBy, country, level, international, missionTags, router, searchParams]);
-
   const performSearch = useCallback(async (searchPage: number = 1, append: boolean = false) => {
+    const requestSerial = ++requestSerialRef.current;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
-    abortControllerRef.current = new AbortController();
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     setSearching(true);
-    
+    setSearchError(null);
+
     const params = new URLSearchParams();
     if (searchQuery) params.append('q', searchQuery);
     params.append('page', searchPage.toString());
@@ -206,31 +194,40 @@ export default function HomeClient() {
 
     try {
       const response = await fetch(`/api/search/query?${params.toString()}`, {
-        signal: abortControllerRef.current.signal,
+        signal: abortController.signal,
       });
+      if (requestSerial !== requestSerialRef.current) return;
+      if (!response.ok) {
+        throw new Error(`Search failed (${response.status})`);
+      }
       const data: SearchResponse = await response.json();
-      
+      if (requestSerial !== requestSerialRef.current) return;
+      if (!data?.data || !Array.isArray(data.data.items)) {
+        throw new Error('Search failed');
+      }
+
       if (append) {
         setResults(prev => [...prev, ...data.data.items]);
       } else {
         setResults(data.data.items);
       }
-      
+
       setTotal(data.data.total);
       setPage(searchPage);
       setSearchSource(data.data.source || '');
-      
+
       if (searchPage === 1) {
         fetchFacets();
       }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Search error:', error);
-        setResults([]);
-        setTotal(0);
-      }
+    } catch (error: unknown) {
+      if (requestSerial !== requestSerialRef.current) return;
+      if (error instanceof Error && error.name === 'AbortError') return;
+      console.error('Search error:', error);
+      setSearchError('Search failed.');
     } finally {
-      setSearching(false);
+      if (requestSerial === requestSerialRef.current) {
+        setSearching(false);
+      }
     }
   }, [searchQuery, sortBy, country, level, international, missionTags, fetchFacets]);
 
@@ -247,20 +244,21 @@ export default function HomeClient() {
     }, 250);
   };
 
-  const handleFilterChange = useCallback(() => {
-    setPage(1);
-    updateURLParams();
-    performSearch(1, false);
-  }, [performSearch, updateURLParams]);
-
   useEffect(() => {
-    handleFilterChange();
-  }, [country, level, international, missionTags, sortBy, handleFilterChange]);
+    return () => {
+      if (queryCommitTimerRef.current) {
+        clearTimeout(queryCommitTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchFacets();
+  }, [fetchFacets]);
+
+  useEffect(() => {
     performSearch(1, false);
-  }, [fetchFacets, performSearch]);
+  }, [searchQuery, sortBy, country, level, international, missionTags, performSearch]);
 
   const handleLoadMore = () => {
     // Use intersection observer for infinite scroll (optional enhancement)
@@ -415,10 +413,15 @@ export default function HomeClient() {
   };
 
   const clearFilters = () => {
+    if (queryCommitTimerRef.current) {
+      clearTimeout(queryCommitTimerRef.current);
+      queryCommitTimerRef.current = null;
+    }
     setCountry('');
     setLevel('');
     setInternational(false);
     setMissionTags([]);
+    setQueryDraft('');
     setSearchQuery('');
     setSortBy('relevance');
   };
@@ -524,69 +527,35 @@ export default function HomeClient() {
           </div>
           
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-            <TrinitySearchBar
-              onSearch={async (filters, freeText) => {
-                // Update search query state
-                setSearchQuery(freeText || Object.values(filters).filter(v => v).join(' ') || '');
-                
-                // Build search params from parsed filters
-                const params = new URLSearchParams();
-                if (freeText) params.set('q', freeText);
-                if (filters.impact_domain?.length) {
-                  filters.impact_domain.forEach(d => params.append('impact_domain', d));
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (queryCommitTimerRef.current) {
+                  clearTimeout(queryCommitTimerRef.current);
+                  queryCommitTimerRef.current = null;
                 }
-                if (filters.functional_role?.length) {
-                  filters.functional_role.forEach(r => params.append('functional_role', r));
-                }
-                if (filters.experience_level) params.set('experience_level', filters.experience_level);
-                if (filters.location) {
-                  // Try to match location to country filter
-                  setCountry(filters.location);
-                  params.set('country', filters.location);
-                }
-                if (filters.is_remote) {
-                  params.set('work_modality', 'remote');
-                }
-                
-                // Update URL params
-                updateURLParams();
-                
-                // Trigger search with new params
-                setPage(1);
-                if (abortControllerRef.current) {
-                  abortControllerRef.current.abort();
-                }
-                abortControllerRef.current = new AbortController();
-                setSearching(true);
-                
-                params.append('page', '1');
-                params.append('size', '20');
-                if (sortBy && sortBy !== 'relevance') params.append('sort', sortBy);
-                
-                try {
-                  const response = await fetch(`/api/search/query?${params.toString()}`, {
-                    signal: abortControllerRef.current.signal,
-                  });
-                  const data: SearchResponse = await response.json();
-                  
-                  setResults(data.data.items);
-                  setTotal(data.data.total);
-                  setPage(1);
-                  setSearchSource(data.data.source || '');
-                  
-                  fetchFacets();
-                } catch (error: any) {
-                  if (error.name !== 'AbortError') {
-                    console.error('Search error:', error);
-                    setResults([]);
-                    setTotal(0);
-                  }
-                } finally {
-                  setSearching(false);
-                }
+                setSearchQuery(queryDraft);
               }}
-              initialQuery={searchQuery}
-            />
+            >
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={queryDraft}
+                aria-label="Search jobs"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setQueryDraft(value);
+                  if (queryCommitTimerRef.current) {
+                    clearTimeout(queryCommitTimerRef.current);
+                  }
+                  queryCommitTimerRef.current = setTimeout(() => {
+                    setSearchQuery(value);
+                  }, 250);
+                }}
+                placeholder="Search roles, orgs, or skills... (Press / to focus)"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </form>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -728,8 +697,13 @@ export default function HomeClient() {
 
           <div className="flex gap-6">
             <div className="flex-1">
-            {searching && page === 1 ? (
-              <div className="space-y-2">
+            {searchError && (
+              <p role="alert" className="mb-4 text-sm text-red-700">
+                Search failed.
+              </p>
+            )}
+            {searching && results.length === 0 ? (
+              <div className="space-y-2" aria-busy="true">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
                     <div className="flex justify-between items-start gap-4">
@@ -747,7 +721,7 @@ export default function HomeClient() {
                   </div>
                 ))}
               </div>
-            ) : results.length === 0 ? (
+            ) : results.length === 0 && !searchError ? (
               <div className="text-center py-12">
                 {hasAnyFilters ? (
                   <div className="max-w-md mx-auto">
@@ -782,8 +756,12 @@ export default function HomeClient() {
                       {missionTags.length === 0 && !searchQuery.toLowerCase().includes('remote') && (
                         <button
                           onClick={() => {
+                            if (queryCommitTimerRef.current) {
+                              clearTimeout(queryCommitTimerRef.current);
+                              queryCommitTimerRef.current = null;
+                            }
+                            setQueryDraft('remote');
                             setSearchQuery('remote');
-                            performSearch(1, false);
                           }}
                           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                         >
@@ -801,11 +779,14 @@ export default function HomeClient() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-gray-500">Loading jobs...</p>
+                  <p className="text-gray-500">No jobs found</p>
                 )}
               </div>
-            ) : (
+            ) : results.length > 0 ? (
               <>
+                {searching && (
+                  <p className="mb-4 text-sm text-gray-500">Searching...</p>
+                )}
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-sm font-medium text-gray-700">
                     {total} role{total !== 1 ? 's' : ''}
@@ -850,7 +831,7 @@ export default function HomeClient() {
                   </button>
                 )}
               </>
-            )}
+            ) : null}
             </div>
           </div>
         </div>
