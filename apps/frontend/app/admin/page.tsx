@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
 
 type DbStatus = {
@@ -46,8 +45,6 @@ type Toast = {
 };
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,27 +62,6 @@ export default function AdminPage() {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
   };
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/session', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      
-      if (!data.authenticated) {
-        router.replace('/admin/login?reason=session');
-        return false;
-      }
-      
-      setAuthenticated(true);
-      return true;
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.replace('/admin/login?reason=session');
-      return false;
-    }
-  }, [router]);
 
   // Helper to avoid dumping full HTML/error pages into the UI
   const sanitizeErrorText = (status: number, raw: string | null | undefined) => {
@@ -270,16 +246,10 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    const init = async () => {
-      const isAuth = await checkAuth();
-      if (isAuth) {
-        await fetchStatus();
-      }
-    };
-    init();
-  }, [checkAuth, fetchStatus]);
+    fetchStatus();
+  }, [fetchStatus]);
 
-  if (authenticated === null || loading) {
+  if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-[#86868B] text-body">Loading admin panel...</div>

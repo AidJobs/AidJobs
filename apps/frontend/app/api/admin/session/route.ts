@@ -4,26 +4,26 @@ import { readBrowserSession } from '@/lib/adminSession';
 
 export const dynamic = 'force-dynamic';
 
+function sessionJson(body: unknown, status = 200) {
+  const response = NextResponse.json(body, { status });
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
+}
+
 export async function GET(req: NextRequest) {
   if (!readBrowserSession(req.cookies)) {
-    return NextResponse.json({ authenticated: false, reason: 'missing' });
+    return sessionJson({ authenticated: false, reason: 'missing' });
   }
 
   try {
     const res = await adminBackendFetch(req, '/api/admin/session');
     const data = await res.json().catch(() => ({ authenticated: false }));
     if (res.ok && data.authenticated === true) {
-      return NextResponse.json({ authenticated: true });
+      return sessionJson({ authenticated: true });
     }
-    return NextResponse.json(
-      { authenticated: false, reason: 'invalid' },
-      { status: 500 }
-    );
+    return sessionJson({ authenticated: false, reason: 'invalid' }, 401);
   } catch (error) {
     console.error('Session check proxy error:', error);
-    return NextResponse.json(
-      { authenticated: false, reason: 'invalid' },
-      { status: 500 }
-    );
+    return sessionJson({ authenticated: false, reason: 'invalid' }, 500);
   }
 }

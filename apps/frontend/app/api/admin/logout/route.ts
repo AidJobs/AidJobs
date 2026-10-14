@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
 
   const secure = sessionRequestSecure(req);
   const response = NextResponse.json({ authenticated: false });
+  response.headers.set('Cache-Control', 'private, no-store');
   response.cookies.set(ADMIN_SESSION_HOST_COOKIE, '', clearedSessionCookieOptions(true));
   response.cookies.set(ADMIN_SESSION_COOKIE, '', clearedSessionCookieOptions(secure));
   return response;

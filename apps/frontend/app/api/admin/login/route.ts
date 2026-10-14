@@ -9,6 +9,12 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+function loginJson(body: unknown, status = 200) {
+  const response = NextResponse.json(body, { status });
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -25,29 +31,29 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return NextResponse.json(
+      return loginJson(
         { detail: data.detail || data.error || 'Invalid credentials' },
-        { status: res.status }
+        res.status
       );
     }
 
     const token = readMintedSession(res.headers);
     if (!token) {
-      return NextResponse.json(
+      return loginJson(
         { detail: 'Login failed. The session was not created.' },
-        { status: 502 }
+        502
       );
     }
 
     const secure = sessionRequestSecure(req);
-    const response = NextResponse.json({ authenticated: true });
+    const response = loginJson({ authenticated: true });
     response.cookies.set(sessionCookieName(secure), token, sessionCookieOptions(secure));
     return response;
   } catch (error) {
     console.error('Login proxy error:', error);
-    return NextResponse.json(
-      { detail: 'Login failed. Please try again.' },
-      { status: 500 }
+    return loginJson(
+      { detail: 'Login failed. The admin service could not be reached.' },
+      500
     );
   }
 }
