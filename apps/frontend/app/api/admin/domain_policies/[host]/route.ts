@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,7 @@ export async function GET(
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
     const res = await fetch(`${backendUrl}/api/admin/domain_policies/${params.host}`, {
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(req),
     });
 
     const data = await res.json();
@@ -40,11 +38,9 @@ export async function POST(
     
     const res = await fetch(`${backendUrl}/api/admin/domain_policies/${params.host}`, {
       method: 'POST',
-      headers: {
+      headers: adminAuthHeaders(req, {
         'Content-Type': 'application/json',
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      }),
       body: JSON.stringify(body),
     });
 

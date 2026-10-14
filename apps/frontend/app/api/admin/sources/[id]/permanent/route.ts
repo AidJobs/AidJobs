@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +18,7 @@ export async function DELETE(
     
     const res = await fetch(url, {
       method: 'DELETE',
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(req),
     });
 
     // Handle 401 - redirect to login

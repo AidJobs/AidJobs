@@ -1,28 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminBackendFetch } from '@/lib/adminBackend';
+import { readBrowserSession } from '@/lib/adminSession';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export async function GET(req: NextRequest) {
-  try {
-    // Ensure BACKEND_URL doesn't have trailing /api
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const res = await fetch(`${backendUrl}/api/admin/session`, {
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
-    });
+  if (!readBrowserSession(req.cookies)) {
+    return NextResponse.json({ authenticated: false, reason: 'missing' });
+  }
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await adminBackendFetch(req, '/api/admin/session');
+    const data = await res.json().catch(() => ({ authenticated: false }));
+    if (res.ok && data.authenticated === true) {
+      return NextResponse.json({ authenticated: true });
+    }
+    return NextResponse.json(
+      { authenticated: false, reason: 'invalid' },
+      { status: 500 }
+    );
   } catch (error) {
     console.error('Session check proxy error:', error);
     return NextResponse.json(
-      { authenticated: false },
+      { authenticated: false, reason: 'invalid' },
       { status: 500 }
     );
   }
 }
-

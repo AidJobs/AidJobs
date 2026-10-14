@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +16,7 @@ export async function GET(request: NextRequest) {
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(request),
     });
 
     // Handle 401 - redirect to login
@@ -48,9 +46,6 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Set-Cookie': response.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('API proxy error:', error);
@@ -72,11 +67,9 @@ export async function POST(request: NextRequest) {
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
+      headers: adminAuthHeaders(request, {
         'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      }),
       body: JSON.stringify(body),
     });
 
@@ -107,9 +100,6 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(data, { 
       status: response.status,
-      headers: {
-        'Set-Cookie': response.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('API proxy error:', error);

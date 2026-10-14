@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +14,7 @@ export async function POST(req: NextRequest) {
     
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      headers: adminAuthHeaders(req),
     });
 
     // Handle 401 - redirect to login
@@ -47,9 +45,6 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data, { 
       status: res.status,
-      headers: {
-        'Set-Cookie': res.headers.get('set-cookie') || '',
-      },
     });
   } catch (error) {
     console.error('Cleanup expired proxy error:', error);

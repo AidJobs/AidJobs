@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/admin/search/init`, {
       method: 'POST',
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
+      headers: adminAuthHeaders(req),
     });
 
     const data = await res.json();

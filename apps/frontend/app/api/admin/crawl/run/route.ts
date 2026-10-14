@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -12,11 +13,9 @@ export async function POST(req: NextRequest) {
     
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
+      headers: adminAuthHeaders(req, {
         'Content-Type': 'application/json',
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
+      }),
       body: JSON.stringify(body),
     });
 

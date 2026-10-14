@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,9 @@ export async function GET(request: NextRequest) {
     cleanParams.delete('_t');
     
     const response = await fetch(`${backendUrl}/api/admin/jobs/search?${cleanParams.toString()}`, {
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
+      headers: adminAuthHeaders(request, {
         'Cache-Control': 'no-cache',
-      },
-      credentials: 'include',
+      }),
       cache: 'no-store',  // Prevent caching
     });
 
