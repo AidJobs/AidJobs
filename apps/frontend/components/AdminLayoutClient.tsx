@@ -207,13 +207,21 @@ export default function AdminLayoutClient({
   const isLoginPage = pathname === '/admin/login';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [session, setSession] = useState<'pending' | 'ok' | 'no'>('pending');
+  const wasLoginPage = useRef(isLoginPage);
+  // A failed check leaves session as "no". The layout does not remount on the
+  // way back from login, so that stale "no" would bounce a successful sign-in
+  // before the new check finishes. Clear it during render, before the redirect.
+  if (wasLoginPage.current && !isLoginPage && session === 'no') {
+    setSession('pending');
+  }
+  wasLoginPage.current = isLoginPage;
 
   useEffect(() => {
     if (isLoginPage) {
       return;
     }
     let cancelled = false;
-    fetch('/api/admin/session', { credentials: 'include' })
+    fetch('/api/admin/session', { credentials: 'include', cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json().catch(() => ({ authenticated: false }));
         if (!cancelled) {
