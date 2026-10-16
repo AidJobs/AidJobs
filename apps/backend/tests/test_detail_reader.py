@@ -344,7 +344,7 @@ def test_generic_branch_uses_the_reader_and_keeps_unicef_and_undp():
             "<div>Duty Station:</div><div>Nairobi</div><p>Deadline: 10 Dec 2025</p>"
         ),
         "https://jobs.undp.org/role/1": (
-            "<span>DEADLINE:</span><span>03-Dec-25</span>"
+            "<span>DEADLINE:</span><span>03-Dec-2025</span>"
             "<span>OFFICE: UNDP-COL - COLOMBIA</span>"
         ),
         "https://www.icrc.org/job/pashto/1": (
