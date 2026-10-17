@@ -1,8 +1,8 @@
 # AidJobs — Crawler completion plan
 
-**Status:** Recorded execution plan. B1 is committed locally as `faf00d1` and is not pushed or deployed. C1 decoding is committed locally as `cd6d63c` and is not pushed or deployed. C2 labels are recorded. The B3 identity preflight is recorded as a repository reading, and the keys stored on production rows are not verified. The narrowed C3 contract is recorded below and is committed locally as `99f4d2a`. It is not pushed or deployed. The C4 reader contract is recorded below. Cross-site coverage is not established. This record is not permission to implement the C4 reader, change `crawl_source`, fetch, or write to the jobs database.
+**Status:** Recorded execution plan. B1, C1, C3, and the C4 reader are on `main` and deployed to Render. PR #7 (`0475b28`) carried B1, C1, C3, and the unwired reader. PR #8 (`818e569`) replaced the generic detail regex with the reader. PR #9 (`6c453c8`) reads a reader deadline day-first. C2 labels are recorded. The B3 identity preflight is recorded as a repository reading, and the keys stored on production rows are not verified. ICRC passed a live check on 17 October 2026; see C4 status. The C4 confirmation fetch is re-scoped below and is not implemented. Coverage beyond ICRC is not established. This record is not permission to implement the confirmation fetch, change UNICEF handling, or write to the jobs database.
 **Contract:** `docs/architecture/aidjobs-migration-contract.md`
-**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026. C1–C5 coverage implementation contract recorded 12 October 2026. C1 decoding committed locally the same day as `cd6d63c`. C2 labels recorded the same day, and the blanket structured-field rule was withdrawn. The B3 repository identity preflight and the narrowed C3 contract were recorded the same day. C3 admission was committed locally on 12 October 2026 as `99f4d2a`. The C4 reader contract was recorded 13 October 2026. Its JSON-LD shape, empty-value, and label-pairing rules were recorded 14 October 2026.
+**Recorded:** 10 October 2026, after Gate 11 (`9d5666b`) and the reliability fix (`28b9efc` on Render). B1 verification recorded the same day. B1 commit status updated the same day. B2 contract audit recorded 11 October 2026. Offline coverage map recorded 12 October 2026. Coverage evaluation plan and labelling rules recorded the same day. Coverage evaluation results recorded 12 October 2026. C1–C5 coverage implementation contract recorded 12 October 2026. C1 decoding committed locally the same day as `cd6d63c`. C2 labels recorded the same day, and the blanket structured-field rule was withdrawn. The B3 repository identity preflight and the narrowed C3 contract were recorded the same day. C3 admission was committed locally on 12 October 2026 as `99f4d2a`. The C4 reader contract was recorded 13 October 2026. Its JSON-LD shape, empty-value, and label-pairing rules were recorded 14 October 2026. PR #7 merged 14 October 2026 as `0475b28`. PR #8 merged 17 October 2026 as `818e569`, and PR #9 the same day as `6c453c8`. Each deployed to Render. The ICRC live check, the confirmation-fetch re-scope, and the open findings after C4 integration were recorded 18 October 2026.
 
 This is the crawler-specific hardening roadmap. It is not the entire architecture reset. Follow it until the completion criteria are marked. Do not start a gate until its preflight is approved. Do not start the next crawler gate until the current gate’s verification is recorded.
 
@@ -258,7 +258,7 @@ C1–C5 sit after this evaluation and before any B3 code change. Track A stays i
 | 2 | C2 | Offline scoring and labels. Recorded. No admission change |
 | 3 | B3 read-only audit | Repository identity facts recorded. Production keys are not verified. No identity code |
 | 4 | C3 | Narrowed admission contract recorded. Implementation waits for its own approval |
-| 5 | C4 | Thin-row confirmation inside the one admission batch |
+| 5 | C4 | Reader integrated and deployed. Confirmation fetch re-scoped and not implemented |
 | 6 | C5 | Six-site table, then stop |
 | 7 | B4, then B5 | Unchanged |
 
@@ -357,6 +357,26 @@ The six saved bodies showed a title plus a real location, deadline, or contract 
 
 Any new detail URL needs its own fetch approval.
 
+##### C4 status
+
+Recorded 18 October 2026.
+
+PR #8 replaced the generic branch of `enrich_job_from_detail_page` with the reader. The UNICEF skip and the UNDP branch are unchanged. `apply_detail_reading` uses the reader only when it returns exactly one result. It fills a blank `location_raw`, `deadline`, or `employment_type` with the first non-blank value in reader order. It never writes the title, apply URL, or reference. Several results, an empty read, or a reader error leave the row unchanged.
+
+The reader returns dates as written. In production the AI normaliser's local date parser reads a numeric date month-first, so ICRC's `06/11/2026` was stored as `2026-06-11`. Search hides a job whose deadline has passed. PR #9 passes a deadline the reader filled through the crawler's day-first `_parse_deadline` before the normaliser sees it. A value it cannot read stays as written, and the save step drops it. A deadline from the listing is not reparsed. The normaliser is unchanged; see the open findings below.
+
+ICRC live check. Source `https://careers.icrc.org/go/Global-Opportunities/8821501/`, crawled 17 October 2026 at 14:22 and 18:40 UTC:
+
+- 34 candidates, 14 saved, 20 rejected. No `thin_vacancy`.
+- Every saved row is an ICRC `/job/{slug}/{id}` role with a location read from its page, such as `Afghanistan, various sites`. No row carries script text.
+- First Aid and Pre-Hospital Emergency Care Delegate has the only deadline. The 18:40 crawl updated it from `2026-06-11` to `2026-11-06` through the normal update path. There was no manual database change.
+- The 17 `no_qualifying_family` rejections are 11 `/content/…` information pages, 5 `/go/…` job lists, and one PDF. Two `root_careers_page` rows and one `social_profile` row complete the 20. None is a role. Both crawls rejected the same 17.
+- The second crawl updated one row and inserted none.
+
+AI credits are exhausted. In that state AI extraction fails and `crawl_source` falls back to the rule-based extractor, the one used in the offline evaluation. Render logs were not read to confirm which extractor produced these 34 candidates.
+
+Re-scope of the confirmation fetch. `crawl_source` already fetches every detail page when a listing has 1–50 candidates and is not UNICEF, and the reader now reads those pages. A thin row from such a listing is rejected as `thin_vacancy`, not `detail_unconfirmed`. The confirmation fetch therefore adds work only for a listing above 50 candidates that is not UNDP or UNICEF, and for recording `detail_unconfirmed`. Its rules above still hold when it is built: thin rows only, a cap of 50, the existing outbound client, and one `admit_batch`. It is not implemented and needs its own approval.
+
 #### C5. Exit on the six sites
 
 | Site | Done when |
@@ -369,6 +389,21 @@ Any new detail URL needs its own fetch approval.
 | Médecins Sans Frontières | One separately approved fetch of `https://www.msf.org/jobs`, then the same cascade. `/careers` remains the 404 already fetched |
 
 A hold is not a saved job. A decoded page with no vacancy links is unsupported. ReliefWeb HTML stays out. Then stop. Later career links use this cascade and do not imply another rule change. B4 and B5 follow.
+
+ICRC met its row on 17 October 2026; see C4 status. The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates and Students lists. Each would be its own source.
+
+#### Open findings after C4 integration
+
+Recorded 18 October 2026. Each needs its own approval. None is part of C5.
+
+- UNICEF detail pages are skipped. `crawl_source` skips detail enrichment for any `unicef.org` job. Its code comment marks the skip as temporary and gives HTTP 403 responses as the reason. No record of those responses was found, they predate the B1 client, and they have not been re-tested.
+- The UNICEF listing plugin does not run. The orchestrator turns on `use_ai` whenever `OPENROUTER_API_KEY` is set, whether or not credits remain. AI extraction then fails, and `crawl_source` falls back to the rule-based extractor, not to the plugin registry. Plugins run only when AI is off. The UNICEF plugin reads location and deadline from the listing and parses its own deadlines to `YYYY-MM-DD`.
+- `fetch_html` ignores `use_browser`. UNICEF is flagged for a browser. If its listing is built by script, the crawler receives less of it. That is not verified.
+- Removing the OpenRouter key is not the UNICEF fix. It would move every HTML source to the plugin path, including the verified ICRC path.
+- `_parse_deadline` reads a two-digit year forward under `PREFER_DATES_FROM: 'future'`. `03-Dec-25` becomes `2125-12-03`. This predates PR #8.
+- `normalize_deadline` in the AI normaliser calls `dateparser` without `DATE_ORDER`, so a numeric date is read month-first. PR #9 keeps reader deadlines away from it. Other non-ISO deadlines can still reach it.
+
+UNICEF order: run the UNICEF plugin offline on the saved December 2025 listing, then make one approved live request to one UNICEF detail page, then propose code.
 
 ### B3. Identity and upsert audit
 
