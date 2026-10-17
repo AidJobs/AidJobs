@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
 from contracts.admission import admit_batch, log_admission_rejections
+from contracts.detail_reader import apply_detail_reading, read_detail_page
 from contracts.outbound import FetchError, fetch_url
 from contracts.persist import persist_candidate
 from app.search_projection import commit_and_schedule
@@ -1670,37 +1671,15 @@ class SimpleCrawler:
                         if grade:
                             job['grade'] = grade
             
-            # Generic extraction patterns (for other sites)
             else:
-                # Look for common deadline patterns
-                deadline_patterns = [
-                    r'Deadline[:\s]+([^\n\r<]+)',
-                    r'Apply by[:\s]+([^\n\r<]+)',
-                    r'Apply Before[:\s]+([^\n\r<]+)',
-                    r'Closing[:\s]+([^\n\r<]+)',
-                ]
-                for pattern in deadline_patterns:
-                    deadline_match = re.search(pattern, html, re.IGNORECASE)
-                    if deadline_match:
-                        deadline_text = deadline_match.group(1).strip()
-                        deadline_cleaned = self._parse_deadline(deadline_text)
-                        if deadline_cleaned:
-                            job['deadline'] = deadline_cleaned
-                            break
-                
-                # Look for common location patterns
-                location_patterns = [
-                    r'Location[:\s]+([^\n\r<]+)',
-                    r'Duty Station[:\s]+([^\n\r<]+)',
-                    r'Office[:\s]+([^\n\r<]+)',
-                ]
-                for pattern in location_patterns:
-                    location_match = re.search(pattern, html, re.IGNORECASE)
-                    if location_match:
-                        location = location_match.group(1).strip()
-                        if location and len(location) >= 3 and len(location) < 100:
-                            job['location_raw'] = location
-                            break
+                try:
+                    job = apply_detail_reading(job, read_detail_page(html))
+                except Exception as reader_error:
+                    logger.warning(
+                        "Detail reader left %s unchanged: %s",
+                        job.get("apply_url"),
+                        reader_error,
+                    )
             
         except Exception as e:
             logger.warning(f"Error enriching job from detail page {job.get('apply_url')}: {e}")

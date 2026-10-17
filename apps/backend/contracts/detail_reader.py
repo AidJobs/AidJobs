@@ -1,4 +1,7 @@
-"""Read evidence from one saved detail page. No fetch, log, or admission."""
+"""Read evidence from one saved detail page. No fetch, log, or admission.
+
+apply_detail_reading fills blank listing fields from exactly one reader result.
+"""
 import json
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
@@ -197,3 +200,52 @@ def _plain(value) -> str | None:
 
 def _clean(value: str) -> str:
     return " ".join(value.split())
+
+
+_LISTING_FIELDS = (
+    ("location_raw", "locations"),
+    ("deadline", "deadlines"),
+    ("employment_type", "employment_types"),
+)
+
+
+def apply_detail_reading(job: dict, results: list) -> dict:
+    """Return the listing row, filling blank evidence from one reader result.
+
+    Several results leave the row unchanged. Title, apply URL, and reference
+    are never written. The stored value is the first non-blank item in the
+    order read_detail_page returned it.
+    """
+    if not isinstance(job, dict):
+        return {}
+    updated = dict(job)
+    if not isinstance(results, list) or len(results) != 1 or not isinstance(results[0], dict):
+        return updated
+    row = results[0]
+    for field, source in _LISTING_FIELDS:
+        if not _blank_listing(updated.get(field)):
+            continue
+        value = _first_nonblank(row.get(source))
+        if value is not None:
+            updated[field] = value
+    return updated
+
+
+def _blank_listing(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def _first_nonblank(values) -> str | None:
+    if isinstance(values, str):
+        return _plain(values)
+    if not isinstance(values, list):
+        return None
+    for item in values:
+        text = _plain(item)
+        if text is not None:
+            return text
+    return None
