@@ -391,6 +391,47 @@ def test_generic_branch_uses_the_reader_and_keeps_unicef_and_undp():
         assert row["reference"] == "keep-me"
 
 
+def _enrich_generic(html, **listing):
+    from crawler_v2.simple_crawler import SimpleCrawler
+
+    async def fake_fetch(url, use_browser=False):
+        return 200, html
+
+    crawler = SimpleCrawler("postgresql://example")
+    crawler.fetch_html = fake_fetch
+    return asyncio.run(
+        crawler.enrich_job_from_detail_page(
+            _listing(apply_url="https://careers.icrc.org/job/delegate/1444751333", **listing),
+            "https://careers.icrc.org/go/Global-Opportunities/8821501/",
+        )
+    )
+
+
+def test_generic_branch_reads_a_reader_deadline_day_first():
+    html = (
+        "<h1>First Aid Delegate</h1>"
+        "<strong>Application Deadline:</strong> <span>06/11/2026</span>"
+    )
+    job = _enrich_generic(html)
+    assert job["deadline"] == "2026-11-06"
+    assert job["title"] == "Listing title"
+
+
+def test_generic_branch_keeps_an_unparseable_reader_deadline_as_written():
+    html = "<h1>Delegate</h1><span>Closing Date: Rolling</span>"
+    job = _enrich_generic(html)
+    assert job["deadline"] == "Rolling"
+
+
+def test_generic_branch_does_not_reparse_a_listing_deadline():
+    html = (
+        "<h1>Delegate</h1>"
+        "<strong>Application Deadline:</strong> <span>06/11/2026</span>"
+    )
+    job = _enrich_generic(html, deadline="11/06/2026")
+    assert job["deadline"] == "11/06/2026"
+
+
 def test_reader_exception_leaves_the_generic_candidate_unchanged(monkeypatch):
     from crawler_v2.simple_crawler import SimpleCrawler
 
