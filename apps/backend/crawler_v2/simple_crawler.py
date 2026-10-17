@@ -1673,7 +1673,14 @@ class SimpleCrawler:
             
             else:
                 try:
+                    listing_deadline = job.get('deadline')
                     job = apply_detail_reading(job, read_detail_page(html))
+                    read_deadline = job.get('deadline')
+                    # Day-first here, before the month-first AI normaliser sees the raw value.
+                    if read_deadline and read_deadline != listing_deadline:
+                        parsed_deadline = self._parse_deadline(read_deadline)
+                        if parsed_deadline:
+                            job['deadline'] = parsed_deadline
                 except Exception as reader_error:
                     logger.warning(
                         "Detail reader left %s unchanged: %s",
