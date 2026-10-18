@@ -117,7 +117,7 @@ Each item needs its own approval. Agreed order on 18 October 2026: W-01, then th
 ### Now
 
 **W-01. Revoke the leaked OpenRouter key.** User action.
-GitHub has one open secret-scanning alert: an OpenRouter API key committed to this repository on 21 November 2025. Anyone with read access to the repository history can use it. Revoke the key in the OpenRouter dashboard, create a new key only if AI is wanted (see W-14), store it only in Render, and close the alert in GitHub under *Security → Secret scanning*. Deleting the line from the file does not remove the key from git history; revoking it does.
+GitHub has one open secret-scanning alert: an OpenRouter API key committed to this repository on 21 November 2025. The repository is public, so anyone on the internet can read that key in the git history. Check the OpenRouter activity log for use you do not recognise: the credits ran out, and use of the leaked key is one possible reason (not verified). Revoke the key in the OpenRouter dashboard, create a new key only if AI is wanted (see W-14), store it only in Render, and close the alert in GitHub under *Security → Secret scanning* with the reason "revoked". Deleting the line from the file does not remove the key from git history; revoking it does.
 
 **W-02. Inspect the stale UNICEF rows from 6 December 2025.** Read-only. Do not hide them yet.
 Sixteen active UNICEF rows created on 6 December 2025 have no deadline, so search shows them indefinitely. Age alone is not proof they are closed. Inspect the records first. Nothing is hidden or retired until the W-06 rule is agreed and validated.
