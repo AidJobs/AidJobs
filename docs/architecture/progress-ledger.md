@@ -40,7 +40,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | Frontend | Vercel; Netlify builds pull-request previews | Verified from pull-request checks |
 | Live sources | Two: UNICEF and ICRC | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work | Verified by the user: new jobs are found by search |
-| AI extraction | `OPENROUTER_API_KEY` is set, but the account has no credits. Every crawl tries AI, the call fails, and the rule-based path runs | User report; the fallback behaviour is Repository |
+| AI extraction | `OPENROUTER_API_KEY` may still be set in Render, but every OpenRouter key was revoked on 18 October 2026 and the account had no credits. Every crawl tries AI, the call fails, and the rule-based path runs | User report; the fallback behaviour is Repository |
 
 ### Live sources
 
@@ -116,8 +116,8 @@ Each item needs its own approval. Agreed order on 18 October 2026: W-01, then th
 
 ### Now
 
-**W-01. Revoke the leaked OpenRouter key.** User action.
-GitHub has one open secret-scanning alert: an OpenRouter API key committed to this repository on 21 November 2025. The repository is public, so anyone on the internet can read that key in the git history. Check the OpenRouter activity log for use you do not recognise: the credits ran out, and use of the leaked key is one possible reason (not verified). Revoke the key in the OpenRouter dashboard, create a new key only if AI is wanted (see W-14), store it only in Render, and close the alert in GitHub under *Security → Secret scanning* with the reason "revoked". Deleting the line from the file does not remove the key from git history; revoking it does.
+**W-01. Revoke the leaked OpenRouter key.** Done 18 October 2026. The user deleted every OpenRouter key and closed the GitHub alert; GitHub shows it resolved as revoked, with no open secret-scanning alerts (Verified). Whether the activity log showed unrecognised use was not reported. Render may still hold the old, now invalid, key; AI calls fail into the same fallback as before. A new key is a W-14 decision.
+Background: an OpenRouter API key was committed to this repository on 21 November 2025. The repository is public, so anyone on the internet could read it in the git history. Deleting the line from a file does not remove a key from git history; revoking it does. Any future key goes only into Render's environment, never into a file.
 
 **W-02. Inspect the stale UNICEF rows from 6 December 2025.** Read-only. Do not hide them yet.
 Sixteen active UNICEF rows created on 6 December 2025 have no deadline, so search shows them indefinitely. Age alone is not proof they are closed. Inspect the records first. Nothing is hidden or retired until the W-06 rule is agreed and validated.
@@ -168,7 +168,7 @@ Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave a
 
 **W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare.
 
-**W-14. Decide the OpenRouter setup.** With no credits, every crawl spends time on a failed AI call. Either add credits or remove the key. Removing the key sends every HTML source down the plugin path, which needs W-11 first and changes the verified ICRC path. Do W-01 regardless.
+**W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source down the plugin path, which needs W-11 first and changes the verified ICRC path.
 
 **W-15. Issue #5, parked.** HTML can report `ok` when every row failed to save. "Failed persistence can still advance next_run_at."
 
@@ -206,7 +206,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 
 | Decision | Item |
 | --- | --- |
-| Revoke the leaked OpenRouter key, and whether to keep AI at all | W-01, W-14 |
+| Whether to set up AI again with a new key, or remove the setting from Render | W-14 |
 | Whether to hide the December 2025 UNICEF rows, after inspection and the W-06 rule | W-02 |
 | Approve one request to find UNICEF's page links | W-04 |
 | The expiry trust policy and missing-crawl threshold | W-06 |
