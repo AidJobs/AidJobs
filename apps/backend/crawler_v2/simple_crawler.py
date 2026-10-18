@@ -28,6 +28,24 @@ from psycopg2.extras import RealDictCursor
 logger = logging.getLogger(__name__)
 
 
+def _is_unicef_listing(url: str) -> bool:
+    host = (urlparse(url or '').hostname or '').lower()
+    return host == 'unicef.org' or host.endswith('.unicef.org')
+
+
+def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
+    """Keep the first row for each apply_url, compared exactly as built."""
+    seen = set()
+    kept = []
+    for job in jobs:
+        link = job.get('apply_url')
+        if link in seen:
+            continue
+        seen.add(link)
+        kept.append(job)
+    return kept
+
+
 class SimpleCrawler:
     """
     Simple crawler that fetches HTML, extracts jobs, and saves to database.
@@ -1693,6 +1711,40 @@ class SimpleCrawler:
         
         return job
     
+    async def _ai_listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
+        """AI listing extraction. No jobs, a timeout, or an error falls back without AI."""
+        try:
+            logger.info(f"Attempting AI extraction for {org_name}...")
+            # Use asyncio.wait_for to add overall timeout (2 minutes max)
+            jobs = await asyncio.wait_for(
+                self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
+                timeout=120.0  # 2 minute overall timeout
+            )
+            if jobs:
+                logger.info(f"AI extraction successful: {len(jobs)} jobs found")
+                return jobs
+            logger.info("AI extraction returned no jobs, falling back to rule-based")
+        except asyncio.TimeoutError:
+            logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
+        except Exception as e:
+            logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
+        return self._listing_jobs_without_ai(html, careers_url)
+
+    def _listing_jobs_without_ai(self, html: str, careers_url: str) -> List[Dict]:
+        """UNICEF listings use the UNICEF reader first. Every other source goes to the rule-based reader."""
+        if _is_unicef_listing(careers_url):
+            try:
+                # Imported directly: building the plugin registry fails while unesco.py does not compile.
+                from crawler.plugins.unicef import UNICEFPlugin
+                jobs = _first_row_per_link(UNICEFPlugin().extract(html, careers_url).jobs or [])
+                if jobs:
+                    logger.info(f"UNICEF reader found {len(jobs)} jobs after AI extraction produced none")
+                    return jobs
+                logger.info("UNICEF reader returned no jobs, falling back to rule-based")
+            except Exception as e:
+                logger.warning(f"UNICEF reader failed: {e}, falling back to rule-based")
+        return self.extract_jobs_from_html(html, careers_url)
+
     async def crawl_source(self, source: Dict) -> Dict:
         """
         Crawl a single source.
@@ -1804,24 +1856,7 @@ class SimpleCrawler:
                 if not use_new_extractor:
                     # Default extraction (existing behavior)
                     if self.use_ai and self.ai_extractor:
-                        try:
-                            logger.info(f"Attempting AI extraction for {org_name}...")
-                            # Use asyncio.wait_for to add overall timeout (2 minutes max)
-                            jobs = await asyncio.wait_for(
-                                self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
-                                timeout=120.0  # 2 minute overall timeout
-                            )
-                            if jobs:
-                                logger.info(f"AI extraction successful: {len(jobs)} jobs found")
-                            else:
-                                logger.info("AI extraction returned no jobs, falling back to rule-based")
-                                jobs = self.extract_jobs_from_html(html, careers_url)
-                        except asyncio.TimeoutError:
-                            logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
-                            jobs = self.extract_jobs_from_html(html, careers_url)
-                        except Exception as e:
-                            logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
-                            jobs = self.extract_jobs_from_html(html, careers_url)
+                        jobs = await self._ai_listing_jobs(html, careers_url, org_name)
                     else:
                         # Try plugin system first, then fall back to rule-based extraction
                         try:
