@@ -13,7 +13,7 @@ import asyncio
 import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
-from urllib.parse import urlparse, urljoin
+from urllib.parse import parse_qs, urlparse, urljoin
 
 from contracts.admission import admit_batch, log_admission_rejections
 from contracts.detail_reader import apply_detail_reading, read_detail_page
@@ -44,6 +44,48 @@ def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
         seen.add(link)
         kept.append(job)
     return kept
+
+
+_UNICEF_PAGE_CAP = 30
+_UNICEF_PAGE_DELAY = 1.0
+
+
+def _page_number(query: str) -> Optional[int]:
+    values = parse_qs(query).get('page') or []
+    if len(values) != 1 or not values[0].isdigit():
+        return None
+    return int(values[0])
+
+
+def _next_unicef_page(html: str, page_url: str, careers_url: str) -> Optional[str]:
+    """The More Jobs link, only when it stays on the listing path and asks for a later page."""
+    link = BeautifulSoup(html, 'html.parser').select_one('a.more-link[href]')
+    if link is None:
+        return None
+    target = urljoin(page_url, link['href'])
+    start, here, there = urlparse(careers_url), urlparse(page_url), urlparse(target)
+    if there.scheme not in ('http', 'https'):
+        return None
+    if (there.hostname or '').lower() != (start.hostname or '').lower():
+        return None
+    if there.path.rstrip('/').lower() != start.path.rstrip('/').lower():
+        return None
+    if 'subscribe' in parse_qs(there.query):
+        return None
+    wanted = _page_number(there.query)
+    current = _page_number(here.query) or 1
+    if wanted is None or wanted <= current:
+        return None
+    return target
+
+
+def _more_jobs_remaining(html: str) -> Optional[int]:
+    """Jobs after this page, from the More Jobs button text, such as 'More Jobs 177'."""
+    link = BeautifulSoup(html, 'html.parser').select_one('a.more-link')
+    if link is None:
+        return None
+    digits = re.findall(r'\d+', link.get_text(' '))
+    return int(digits[-1]) if digits else None
 
 
 class SimpleCrawler:
@@ -1711,6 +1753,25 @@ class SimpleCrawler:
         
         return job
     
+    async def _listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
+        """Default listing extraction: AI when enabled, otherwise the UNICEF pages or the plugin registry."""
+        if self.use_ai and self.ai_extractor:
+            return await self._ai_listing_jobs(html, careers_url, org_name)
+        if _is_unicef_listing(careers_url):
+            return await self._listing_jobs_without_ai(html, careers_url)
+        # Try plugin system first, then fall back to rule-based extraction
+        try:
+            from crawler.plugins import get_plugin_registry
+            registry = get_plugin_registry()
+            plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
+            if plugin_result.is_success() and plugin_result.jobs:
+                logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
+                return plugin_result.jobs
+            logger.info("Plugin extraction returned no jobs, falling back to rule-based")
+        except Exception as e:
+            logger.warning(f"Plugin system error: {e}, falling back to rule-based")
+        return self.extract_jobs_from_html(html, careers_url)
+
     async def _ai_listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
         """AI listing extraction. No jobs, a timeout, or an error falls back without AI."""
         try:
@@ -1728,22 +1789,65 @@ class SimpleCrawler:
             logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
         except Exception as e:
             logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
-        return self._listing_jobs_without_ai(html, careers_url)
+        return await self._listing_jobs_without_ai(html, careers_url)
 
-    def _listing_jobs_without_ai(self, html: str, careers_url: str) -> List[Dict]:
+    async def _listing_jobs_without_ai(self, html: str, careers_url: str) -> List[Dict]:
         """UNICEF listings use the UNICEF reader first. Every other source goes to the rule-based reader."""
         if _is_unicef_listing(careers_url):
             try:
-                # Imported directly: building the plugin registry fails while unesco.py does not compile.
-                from crawler.plugins.unicef import UNICEFPlugin
-                jobs = _first_row_per_link(UNICEFPlugin().extract(html, careers_url).jobs or [])
+                jobs = await self._unicef_listing_jobs(html, careers_url)
                 if jobs:
-                    logger.info(f"UNICEF reader found {len(jobs)} jobs after AI extraction produced none")
+                    logger.info(f"UNICEF reader found {len(jobs)} jobs without AI extraction")
                     return jobs
                 logger.info("UNICEF reader returned no jobs, falling back to rule-based")
             except Exception as e:
                 logger.warning(f"UNICEF reader failed: {e}, falling back to rule-based")
         return self.extract_jobs_from_html(html, careers_url)
+
+    async def _unicef_listing_jobs(self, first_html: str, careers_url: str) -> List[Dict]:
+        """Read page one, then follow the More Jobs link page by page. All pages form one batch.
+
+        A failed later page keeps the jobs already read. Pages after the first use job cards only.
+        """
+        # Imported directly: building the plugin registry fails while unesco.py does not compile.
+        from crawler.plugins.unicef import UNICEFPlugin
+        reader = UNICEFPlugin()
+        jobs = _first_row_per_link(reader.extract(first_html, careers_url).jobs or [])
+        if not jobs:
+            return []
+        seen = {job.get('apply_url') for job in jobs}
+        remaining = _more_jobs_remaining(first_html)
+        expected = len(jobs) + remaining if remaining is not None else None
+        page_html, page_url, pages = first_html, careers_url, 1
+        stop = 'no More Jobs link'
+        while True:
+            next_url = _next_unicef_page(page_html, page_url, careers_url)
+            if next_url is None:
+                break
+            if pages >= _UNICEF_PAGE_CAP:
+                stop = f'page cap {_UNICEF_PAGE_CAP}'
+                break
+            await asyncio.sleep(_UNICEF_PAGE_DELAY)
+            status, page_html = await self.fetch_html(next_url)
+            if status != 200 or not page_html:
+                stop = f'HTTP {status} on {next_url}'
+                break
+            page_url = next_url
+            pages += 1
+            new_jobs = [
+                job for job in _first_row_per_link(reader.read_job_cards(page_html, page_url))
+                if job.get('apply_url') not in seen
+            ]
+            if not new_jobs:
+                stop = f'page {pages} added no new jobs'
+                break
+            seen.update(job.get('apply_url') for job in new_jobs)
+            jobs.extend(new_jobs)
+        logger.info(
+            "UNICEF listing: %s pages, %s jobs, expected %s, stopped: %s",
+            pages, len(jobs), expected if expected is not None else 'unknown', stop,
+        )
+        return jobs
 
     async def crawl_source(self, source: Dict) -> Dict:
         """
@@ -1854,24 +1958,7 @@ class SimpleCrawler:
                         use_new_extractor = False  # Fall through to default
                 
                 if not use_new_extractor:
-                    # Default extraction (existing behavior)
-                    if self.use_ai and self.ai_extractor:
-                        jobs = await self._ai_listing_jobs(html, careers_url, org_name)
-                    else:
-                        # Try plugin system first, then fall back to rule-based extraction
-                        try:
-                            from crawler.plugins import get_plugin_registry
-                            registry = get_plugin_registry()
-                            plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
-                            if plugin_result.is_success() and plugin_result.jobs:
-                                logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
-                                jobs = plugin_result.jobs
-                            else:
-                                logger.info(f"Plugin extraction returned no jobs, falling back to rule-based")
-                                jobs = self.extract_jobs_from_html(html, careers_url)
-                        except Exception as e:
-                            logger.warning(f"Plugin system error: {e}, falling back to rule-based")
-                            jobs = self.extract_jobs_from_html(html, careers_url)
+                    jobs = await self._listing_jobs(html, careers_url, org_name)
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
