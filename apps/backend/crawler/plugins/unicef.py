@@ -26,6 +26,14 @@ class UNICEFPlugin(ExtractionPlugin):
     def extract(self, html: str, base_url: str, config: Optional[Dict] = None) -> PluginResult:
         """Extract UNICEF jobs, filtering out category pages"""
         soup = self.get_soup(html)
+        card_jobs = self._extract_job_cards(soup, base_url)
+        if card_jobs:
+            logger.info(f"UNICEF extraction found {len(card_jobs)} jobs from job cards")
+            return PluginResult(
+                jobs=card_jobs,
+                confidence=0.9,
+                message=f"Extracted {len(card_jobs)} UNICEF jobs"
+            )
         jobs = []
         
         # Category pages to exclude (comprehensive list)
@@ -291,6 +299,40 @@ class UNICEFPlugin(ExtractionPlugin):
             message=f"Extracted {len(jobs)} UNICEF jobs"
         )
     
+    def _extract_job_cards(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
+        """One row per listing card that holds exactly one job link. Exclusion words do not apply.
+
+        The listing renders each card twice; the first card for a link wins.
+        A missing location or deadline is left out, not set to None: save_jobs strips both.
+        """
+        jobs = []
+        seen = set()
+        for card in soup.select('div.list-view--item'):
+            links = card.select('a.job-link[href]')
+            if len(links) != 1:
+                continue
+            href = links[0].get('href', '')
+            if not href or href.startswith('#') or href.startswith('javascript:'):
+                continue
+            apply_url = urljoin(base_url, href)
+            if apply_url in seen:
+                continue
+            title = ' '.join(links[0].get_text(' ').split())
+            if not title:
+                continue
+            seen.add(apply_url)
+            job = {'title': title, 'apply_url': apply_url}
+            place = card.select_one('span.location')
+            location = ' '.join(place.get_text(' ').split()) if place else ''
+            if location:
+                job['location_raw'] = location
+            close = card.select_one('span.close-date')
+            deadline = self._parse_deadline(' '.join(close.get_text(' ').split())) if close else None
+            if deadline:
+                job['deadline'] = deadline
+            jobs.append(job)
+        return jobs
+
     def _parse_deadline(self, text: str) -> Optional[str]:
         """Parse deadline text to YYYY-MM-DD format"""
         if not text:
