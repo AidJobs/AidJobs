@@ -299,6 +299,10 @@ class UNICEFPlugin(ExtractionPlugin):
             message=f"Extracted {len(jobs)} UNICEF jobs"
         )
     
+    def read_job_cards(self, html: str, base_url: str) -> List[Dict]:
+        """Job cards only, without the fallback strategies."""
+        return self._extract_job_cards(self.get_soup(html), base_url)
+
     def _extract_job_cards(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
         """One row per listing card that holds exactly one job link. Exclusion words do not apply.
 

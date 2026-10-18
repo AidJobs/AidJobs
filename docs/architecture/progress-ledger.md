@@ -134,8 +134,17 @@ The menu rows hidden on 8 October used the soft action and have stayed hidden.
 
 ### Crawler plan, in order
 
-**W-04. Read every page of the UNICEF listing.**
-The UNICEF listing shows 20 jobs per page, and the crawler reads only the first page. First find how UNICEF's pages link to each other: an offline look at the saved page, then one approved request. Then propose code. Reading all pages also refreshes the 8 and 12 October rows, which will gain a location and deadline through the normal update. The contract treats a crawl that missed pages as partial (§5), so this must land before any expiry rule.
+**W-04. Read every page of the UNICEF listing.** Implemented on branch `unicef-listing-pages`, not merged.
+The UNICEF listing shows 20 jobs per page, and the crawler read only the first page. Evidence, 18 October 2026:
+- The saved December 2025 page has a "More Jobs 160" link to `/en-us/listing/?page=2&page-items=20`. The number is the jobs remaining after that page.
+- One approved request for page 2 (18:33 UTC) returned HTTP 200 with the same job cards: 20 distinct jobs, all with a location and a deadline, all admitted. Its link reads "More Jobs 177" and points to `page=3`, so the live listing held about 217 jobs in about 11 pages. Page 2 also links to a job-alert signup, `/en-us/Listing/?page=2&page-items=20&subscribe=true`, which must not be followed.
+- One approved request for the RSS feed over HTTPS, `https://careers.pageuppeople.com/671/cw/en/rss`, failed to connect. Plain HTTP was not tried. RSS was not adopted.
+
+The change: after page 1, the crawler follows the "More Jobs" link only when it stays on the listing host and path and asks for a later page. It fetches each page through `fetch_html`, one second apart, reads job cards, keeps the first row per link, and stops on no link, a non-200 page, a page with no new jobs, or 30 pages. All pages form one admission batch. A failed later page keeps the jobs already read.
+
+Completeness is reported on the crawl itself. The expected total is read from the live first page (its jobs plus its "More Jobs" count). Only a walk that ran out of "More Jobs" links is complete: the crawl status stays `ok` and the message reads, for example, `Found 217 jobs; listing complete: 11 pages, expected 217`. A failed page, the 30-page cap, or a page with no new jobs is partial: the status is `warn`, which still resets the failure count, and the message names the pages read, the expected total, and the stop reason. The same facts are written to `extraction_logs` as `listing_pages`, `listing_expected`, `listing_complete`, and `listing_stop`, so W-06 can tell a trustworthy crawl from a partial one. Other sources keep today's message. With AI off, UNICEF takes the same path instead of the broken registry, so removing the OpenRouter key would not stop UNICEF ingestion.
+
+After merge, one manual UNICEF crawl must show: found close to the expected total, October rows still listed updated with a location and deadline, no `thin_vacancy`, no duplicate links, and ICRC unchanged. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
 
 **W-05. B4 failure and lifecycle audit.** Read-only.
 Mark each B4 rule verified or defective. Production evidence already collected:
@@ -168,7 +177,7 @@ Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave a
 
 **W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare.
 
-**W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source down the plugin path, which needs W-11 first and changes the verified ICRC path.
+**W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source except UNICEF down the plugin path, which needs W-11 first and changes the verified ICRC path. Once W-04 is merged, UNICEF takes its own reader with AI off.
 
 **W-15. Issue #5, parked.** HTML can report `ok` when every row failed to save. "Failed persistence can still advance next_run_at."
 
