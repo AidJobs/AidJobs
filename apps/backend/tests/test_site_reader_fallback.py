@@ -9,7 +9,7 @@ from contracts.admission import admit_batch
 from contracts.identity import both_keys
 from crawler.plugins.base import PluginResult
 from crawler.plugins.unicef import UNICEFPlugin
-from crawler_v2.simple_crawler import SimpleCrawler
+from crawler_v2.simple_crawler import SimpleCrawler, _listing_outcome
 
 _UNICEF_LISTING = "https://jobs.unicef.org/en-us/listing/"
 _ICRC_LISTING = "https://careers.icrc.org/go/Global-Opportunities/8821501/"
@@ -492,6 +492,85 @@ def test_icrc_never_paginates(monkeypatch):
     html = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 5)
     jobs = asyncio.run(crawler._ai_listing_jobs(html, _ICRC_LISTING, "ICRC"))
     assert jobs == _sentinel
+
+
+def test_a_walk_that_runs_out_of_links_is_complete(monkeypatch):
+    first = _listing_page(["1", "2"], "/en-us/listing/?page=2&page-items=20", 3)
+    second = _listing_page(["3"], "/en-us/listing/?page=3&page-items=20", 2)
+    pages = {
+        _PAGE.format(2): (200, second),
+        _PAGE.format(3): (200, _listing_page(["4", "5"])),
+    }
+    crawler, _asked = _paged_crawler(monkeypatch, pages)
+    _read_listing(crawler, first)
+    assert crawler._listing_report == {
+        "pages": 3,
+        "expected": 5,
+        "complete": True,
+        "stop": "no More Jobs link",
+    }
+    assert _listing_outcome(5, crawler._listing_report) == (
+        "ok",
+        "Found 5 jobs; listing complete: 3 pages, expected 5",
+    )
+
+
+def test_a_failed_page_makes_the_crawl_partial(monkeypatch):
+    first = _listing_page(["1", "2"], "/en-us/listing/?page=2&page-items=20", 3)
+    second = _listing_page(["3"], "/en-us/listing/?page=3&page-items=20", 2)
+    pages = {_PAGE.format(2): (200, second), _PAGE.format(3): (0, "")}
+    crawler, _asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    report = crawler._listing_report
+    assert report["complete"] is False
+    assert report["pages"] == 2
+    assert report["stop"] == f"HTTP 0 on {_PAGE.format(3)}"
+    status, message = _listing_outcome(3, report)
+    assert status == "warn"
+    assert message == (
+        "Found 3 jobs; listing partial: 2 pages, expected 5, "
+        f"stopped: HTTP 0 on {_PAGE.format(3)}"
+    )
+
+
+def test_the_page_cap_and_a_repeated_page_are_partial(monkeypatch):
+    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_CAP", 2)
+    first = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 9)
+    endless = _listing_page(["2"], "/en-us/listing/?page=3&page-items=20", 8)
+    crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, endless)})
+    _read_listing(crawler, first)
+    assert crawler._listing_report["complete"] is False
+    assert crawler._listing_report["stop"] == "page cap 2"
+
+    repeat = _listing_page(["1"], "/en-us/listing/?page=3&page-items=20", 8)
+    crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, repeat)})
+    _read_listing(crawler, first)
+    assert crawler._listing_report["complete"] is False
+    assert crawler._listing_report["stop"] == "page 2 added no new jobs"
+
+
+def test_sources_without_a_paged_listing_keep_the_plain_message(monkeypatch):
+    crawler, _sentinel = _crawler(RuntimeError("no credits"), monkeypatch)
+    asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING, "ICRC"))
+    assert crawler._listing_report is None
+    assert _listing_outcome(14, None) == ("ok", "Found 14 jobs")
+    assert _listing_outcome(0, None) == ("warn", "No jobs found")
+
+
+def test_unknown_expected_total_is_reported_as_unknown():
+    report = {"pages": 1, "expected": None, "complete": True, "stop": "no More Jobs link"}
+    assert _listing_outcome(20, report) == (
+        "ok",
+        "Found 20 jobs; listing complete: 1 page, expected unknown",
+    )
+
+
+def test_crawl_source_reports_the_listing_outcome():
+    import inspect
+
+    source = inspect.getsource(SimpleCrawler.crawl_source)
+    assert "_listing_outcome(len(jobs), self._listing_report)" in source
+    assert "extracted_fields['listing_complete']" in source
 
 
 _SAVED_PAGE2 = _ROOT / "unicef-pagination" / "page2.body"

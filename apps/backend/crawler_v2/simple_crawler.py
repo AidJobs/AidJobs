@@ -79,6 +79,25 @@ def _next_unicef_page(html: str, page_url: str, careers_url: str) -> Optional[st
     return target
 
 
+_LISTING_COMPLETE_STOP = 'no More Jobs link'
+
+
+def _listing_outcome(job_count: int, report: Optional[Dict]) -> Tuple[str, str]:
+    """Crawl status and message. A paged listing that stopped early is partial and reports warn."""
+    if not job_count:
+        return 'warn', 'No jobs found'
+    message = f'Found {job_count} jobs'
+    if not report:
+        return 'ok', message
+    expected = report['expected'] if report['expected'] is not None else 'unknown'
+    pages = f"{report['pages']} page{'' if report['pages'] == 1 else 's'}"
+    if report['complete']:
+        return 'ok', f"{message}; listing complete: {pages}, expected {expected}"
+    return 'warn', (
+        f"{message}; listing partial: {pages}, expected {expected}, stopped: {report['stop']}"
+    )
+
+
 def _more_jobs_remaining(html: str) -> Optional[int]:
     """Jobs after this page, from the More Jobs button text, such as 'More Jobs 177'."""
     link = BeautifulSoup(html, 'html.parser').select_one('a.more-link')
@@ -102,6 +121,7 @@ class SimpleCrawler:
         self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
         self.use_ai = use_ai
         self.shadow_mode = shadow_mode
+        self._listing_report: Optional[Dict] = None
         
         # Check if global heuristics are enabled
         import os
@@ -1755,6 +1775,7 @@ class SimpleCrawler:
     
     async def _listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
         """Default listing extraction: AI when enabled, otherwise the UNICEF pages or the plugin registry."""
+        self._listing_report = None
         if self.use_ai and self.ai_extractor:
             return await self._ai_listing_jobs(html, careers_url, org_name)
         if _is_unicef_listing(careers_url):
@@ -1808,7 +1829,9 @@ class SimpleCrawler:
         """Read page one, then follow the More Jobs link page by page. All pages form one batch.
 
         A failed later page keeps the jobs already read. Pages after the first use job cards only.
+        The walk is recorded in self._listing_report; only a walk that ran out of links is complete.
         """
+        self._listing_report = None
         # Imported directly: building the plugin registry fails while unesco.py does not compile.
         from crawler.plugins.unicef import UNICEFPlugin
         reader = UNICEFPlugin()
@@ -1819,7 +1842,7 @@ class SimpleCrawler:
         remaining = _more_jobs_remaining(first_html)
         expected = len(jobs) + remaining if remaining is not None else None
         page_html, page_url, pages = first_html, careers_url, 1
-        stop = 'no More Jobs link'
+        stop = _LISTING_COMPLETE_STOP
         while True:
             next_url = _next_unicef_page(page_html, page_url, careers_url)
             if next_url is None:
@@ -1847,6 +1870,12 @@ class SimpleCrawler:
             "UNICEF listing: %s pages, %s jobs, expected %s, stopped: %s",
             pages, len(jobs), expected if expected is not None else 'unknown', stop,
         )
+        self._listing_report = {
+            'pages': pages,
+            'expected': expected,
+            'complete': stop == _LISTING_COMPLETE_STOP,
+            'stop': stop,
+        }
         return jobs
 
     async def crawl_source(self, source: Dict) -> Dict:
@@ -1866,6 +1895,7 @@ class SimpleCrawler:
         
         # Store source_id for heuristics logging
         self._current_source_id = source_id
+        self._listing_report = None
         
         logger.info(f"Crawling {org_name} ({source_type}): {careers_url}")
         
@@ -2143,6 +2173,11 @@ class SimpleCrawler:
                         extracted_fields['sample_title'] = sample_job.get('title', '')[:100]
                         extracted_fields['has_location'] = bool(sample_job.get('location_raw'))
                         extracted_fields['has_deadline'] = bool(sample_job.get('deadline'))
+                    if self._listing_report:
+                        extracted_fields['listing_pages'] = self._listing_report['pages']
+                        extracted_fields['listing_expected'] = self._listing_report['expected']
+                        extracted_fields['listing_complete'] = self._listing_report['complete']
+                        extracted_fields['listing_stop'] = self._listing_report['stop']
                     
                     self.extraction_logger.log_extraction(
                         url=careers_url,
@@ -2154,9 +2189,10 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
+                crawl_status, crawl_message = _listing_outcome(len(jobs), self._listing_report)
                 return {
-                    'status': 'ok' if jobs else 'warn',
-                    'message': f'Found {len(jobs)} jobs' if jobs else 'No jobs found',
+                    'status': crawl_status,
+                    'message': crawl_message,
                     'validation_info': {
                         'total_extracted': len(jobs),
                         'validated': counts.get('validated', 0),
