@@ -46,6 +46,24 @@ def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
     return kept
 
 
+_ISO_DATE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$')
+
+
+def _iso_calendar_date(text: str) -> Tuple[bool, Optional[str]]:
+    """(True, 'YYYY-MM-DD') for an ISO date or datetime, as written; (True, None) if impossible.
+
+    The calendar date is kept as written; a time or zone after it is ignored, not converted.
+    """
+    match = _ISO_DATE.match(text)
+    if not match:
+        return False, None
+    try:
+        day = datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return True, None
+    return True, day.strftime('%Y-%m-%d')
+
+
 _UNICEF_PAGE_CAP = 30
 _UNICEF_PAGE_DELAY = 5.0
 _UNICEF_RETRY_DELAY = 30.0
@@ -1177,7 +1195,12 @@ class SimpleCrawler:
         for prefix in prefixes:
             if text.lower().startswith(prefix):
                 text = text[len(prefix):].strip()
-        
+
+        # ISO first: dateparser with DATE_ORDER DMY misreads 2026-10-29 as 2029-10-26.
+        is_iso, iso_date = _iso_calendar_date(text)
+        if is_iso:
+            return iso_date
+
         # Remove time components if present (e.g., "2025-12-31T23:59:59Z" -> "2025-12-31")
         if 'T' in text:
             text = text.split('T')[0]

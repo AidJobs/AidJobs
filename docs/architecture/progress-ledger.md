@@ -38,7 +38,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | --- | --- | --- |
 | Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `bcdadd3` (PR #15) not yet confirmed | Verified by the user and the Render log, 19 October 2026 |
 | Frontend | Vercel; Netlify builds pull-request previews | Verified from pull-request checks |
-| Live sources | Two: UNICEF and ICRC. Oxfam GB is approved to add (W-07) | Verified from production queries |
+| Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07) | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
 | AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
 | Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October. PR #15 pauses Nominatim for an hour after a refusal and stops repeating failed lookups (W-21) | Verified from the Render log |
@@ -51,6 +51,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | --- | --- | --- | --- |
 | UNICEF | `https://jobs.unicef.org/en-us/listing/` | 19 October 2026, 09:58 UTC | `warn`: 120 of 209 jobs, 6 pages, stopped by an AWS WAF challenge on page 7 after one retry. Earlier the same day 120 were saved (99 inserted, 20 updated), every row with a location and a deadline, no rejections, no duplicate links. Verified |
 | ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 17 October 2026, 18:40 UTC | 34 found, 14 saved, 20 correctly rejected, no `thin_vacancy`. One deadline corrected to `2026-11-06` by the normal update. Verified |
+| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 19 October 2026, 10:08 UTC | `ok`: 5 found, 5 inserted, no rejections, no duplicate links; all five link to `/jobs/vacancy/…/description/`. Four locations from the job pages; one (Nepal) has none. All five deadlines stored wrong (W-25) and titles carry glued place and date (W-24). Verified |
 
 Two UNICEF crawls failed on page 1 with `HTTP 0`, meaning no response: 18 October at 09:21 UTC (cause not read) and 19 October at 08:51 UTC, where the Render log reads `Error fetching https://jobs.unicef.org/en-us/listing/: timeout` (Verified). Each next crawl succeeded. No job changed.
 
@@ -142,7 +143,7 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 
 Each item needs its own approval. Agreed order on 18 October 2026: W-01, then the documentation pull request (W-03), then W-04, W-05, W-06, and W-07. W-02 is an inspection only: no job is hidden or retired until the W-06 rule is agreed and validated.
 
-Status on 19 October 2026: W-01 and W-03 are done, and W-21 is merged. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval), and the Oxfam test (W-07), which does not depend on it. Then W-05 and W-06.
+Status on 19 October 2026: W-01 and W-03 are done, and W-21 is merged. Oxfam is live (W-07) and exposed the ISO deadline bug (W-25), whose fix comes first. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06.
 
 ### Now
 
@@ -202,6 +203,8 @@ Agreed rule (18 October 2026): absence from a listing counts as evidence only af
 **W-07. Oxfam GB as a live source.** C5.
 Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Approved on 19 October 2026: add it as an HTML source and check one crawl the way ICRC was checked. Creating a source sets its next run to now (`POST /api/admin/sources`), so the scheduler crawls it within about five minutes; that automatic crawl is the single test, and Crawl is not pressed. Check: crawl status and counts, saved titles, locations, and deadlines, rejection reasons, links to real vacancies, and no duplicates.
 
+Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no rejections, no duplicates, every link an individual vacancy. Locations came from the job pages' structured data, for example `Renk County, Uppernile State, South Sudan`; the Nepal role has no location on its page and was admitted on its deadline. Two defects: every deadline was stored wrong (W-25), and titles carry the card's place and date run together (W-24). Not complete until the next crawl after the W-25 fix shows correct deadlines.
+
 **W-08. The rest of C5.**
 - DevNetJobsIndia: about 150 candidates, above the 50-job detail limit. Needs W-09 or listing-level fields.
 - Global Partnership for Education: its links are not extracted.
@@ -229,6 +232,12 @@ Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave a
 
 **W-21. Geocoding refused by Nominatim.** Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Check the next crawl's log: after one `Nominatim refused geocoding (HTTP 429)` warning, no further Nominatim requests for an hour.
 The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
+
+**W-25. ISO deadlines misread as day-first.** Fix on branch `iso-deadline-fix`, not merged.
+PR #9 sends every deadline the detail-page reader fills through `_parse_deadline`, which calls `dateparser` with `DATE_ORDER: DMY`. For an ISO date that reads the parts in the wrong order: `2026-10-29` became `2029-10-26` and `2026-11-13` became `2013-11-26` (Verified on the five Oxfam rows and reproduced locally). The Oxfam job with a 2013 deadline is hidden from search as closed; the other four would stay visible after closing. ICRC (`06/11/2026`) and UNICEF (its own parser) were not affected; the save step already keeps ISO dates. The PR #9 review missed this because its tests used only `06/11/2026`. The fix returns a valid `YYYY-MM-DD` date, or the date part of an ISO datetime as written, before `dateparser` runs, and rejects an impossible one such as `2026-02-30`. No manual database edit: the next normal Oxfam crawl after the deploy should correct the five deadlines through the update path, and that must be verified with a query.
+
+**W-24. Oxfam titles carry the listing card's place and date.** Record; not scheduled.
+Saved titles read, for example, `Finance OfficerSouth Sudan - Renk29 October 2026` (Verified). The listing reader takes the whole card text as the title. The title is part of job identity, so cleaning it would create new rows for existing jobs. Handle with an Oxfam platform reader (W-19) or a decision on title changes, not as a quick edit.
 
 **W-23. Dormant extraction rollout settings.** Record; not scheduled.
 Render sets `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, and `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org` (Verified by the user, 19 October 2026). `core/rollout_config.py` compares the source host with the list exactly after removing `www.`, so `jobs.unicef.org`, `careers.icrc.org`, `jobs.undp.org`, and `careers.unesco.org` do not match, and the pipeline extractor never runs for current sources. The UNICEF crawl log shows no "Using NEW pipeline extractor" line. A source whose host is exactly one of the three, such as `https://www.unicef.org/careers`, would go through it; it carries the Issue #4 import problem and falls back to the normal reader on failure. `EXTRACTION_SHADOW_MODE` is read by `pipeline/db_insert.py`, but the crawler passes `enable_storage=False` to the pipeline extractor, and `tests/test_gate4_persist.py` and `tests/test_gate10_legacy.py` check that no `jobs_side` write is possible (Repository). Cleanup, as its own decision: set `EXTRACTION_USE_NEW_EXTRACTOR=false` or remove these variables in Render, then remove the dormant code once confirmed unused.
@@ -279,7 +288,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 
-Approved and waiting on the user's admin action: add Oxfam GB as a source (W-07).
+Approved and in progress: the ISO deadline fix (W-25), as its own pull request.
 
 ## Terms used in this project
 
