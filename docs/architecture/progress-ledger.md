@@ -5,14 +5,14 @@
 - `docs/architecture/aidjobs-migration-contract.md` — the architecture contract.
 - `docs/architecture/crawler-completion-plan.md` — the crawler gates (B1–B5, C1–C5) and their records.
 
-**Last verified:** 18 October 2026. `main` is `4947d44` (merge of PR #11). Render runs `4947d44`; the user confirmed that deploy the same day.
+**Last verified:** 19 October 2026. `main` is `bcdadd3` (merge of PR #15). The user confirmed the Render deploy of `9d6fd99` (PR #14); the deploy of `bcdadd3` was not yet confirmed when this was written.
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
 ## How to resume
 
 1. Read this file, then the "Open work" list. Take the lowest-numbered item that is not blocked.
-2. Check the current state before acting: `git status -sb`, `git log -1 origin/main`, and `gh pr list --state open`. If `main` has moved past `4947d44`, find out why before trusting this file.
+2. Check the current state before acting: `git status -sb`, `git log -1 origin/main`, and `gh pr list --state open`. If `main` has moved past the commit named under "Last verified", find out why before trusting this file.
 3. Follow the operating conventions below.
 4. When an item is finished, update this file in the same pull request as the work, or in the next docs pull request.
 
@@ -36,26 +36,49 @@ These describe how the work is run. The architecture rules are in the contract.
 
 | Item | State | Evidence |
 | --- | --- | --- |
-| Backend | Render, auto-deploys from `main`, running `4947d44` | Verified by the user, 18 October 2026 |
+| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `bcdadd3` (PR #15) not yet confirmed | Verified by the user and the Render log, 19 October 2026 |
 | Frontend | Vercel; Netlify builds pull-request previews | Verified from pull-request checks |
-| Live sources | Two: UNICEF and ICRC | Verified from production queries |
-| Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work | Verified by the user: new jobs are found by search |
-| AI extraction | `OPENROUTER_API_KEY` may still be set in Render, but every OpenRouter key was revoked on 18 October 2026 and the account had no credits. Every crawl tries AI, the call fails, and the rule-based path runs | User report; the fallback behaviour is Repository |
+| Live sources | Two: UNICEF and ICRC. Oxfam GB is approved to add (W-07) | Verified from production queries |
+| Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
+| AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
+| Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October. PR #15 pauses Nominatim for an hour after a refusal and stops repeating failed lookups (W-21) | Verified from the Render log |
+| `AIDJOBS_ENV` | `dev` in production; startup reads `dev-only admin routes enabled` (W-22) | Verified from the Render log |
+| Extraction rollout variables | `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org`. Dormant: no current source matches (W-23) | Verified by the user from Render's Environment page |
 
 ### Live sources
 
 | Source | Listing URL | Latest crawl | Result |
 | --- | --- | --- | --- |
-| UNICEF | `https://jobs.unicef.org/en-us/listing/` | 18 October 2026, 09:30 UTC | 20 found, 20 inserted. All 20 have a location and a deadline (20–31 October). No rejections. No duplicate links. Verified |
+| UNICEF | `https://jobs.unicef.org/en-us/listing/` | 19 October 2026, 09:58 UTC | `warn`: 120 of 209 jobs, 6 pages, stopped by an AWS WAF challenge on page 7 after one retry. Earlier the same day 120 were saved (99 inserted, 20 updated), every row with a location and a deadline, no rejections, no duplicate links. Verified |
 | ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 17 October 2026, 18:40 UTC | 34 found, 14 saved, 20 correctly rejected, no `thin_vacancy`. One deadline corrected to `2026-11-06` by the normal update. Verified |
 
-The UNICEF crawl at 09:21 UTC on 18 October failed with `HTTP 0`, meaning no response was received. The next crawl succeeded. The cause is in the Render log (`Error fetching https://jobs.unicef.org`), which was not read. Not verified.
+Two UNICEF crawls failed on page 1 with `HTTP 0`, meaning no response: 18 October at 09:21 UTC (cause not read) and 19 October at 08:51 UTC, where the Render log reads `Error fetching https://jobs.unicef.org/en-us/listing/: timeout` (Verified). Each next crawl succeeded. No job changed.
 
 ### Search
 
 - `SearchService.search_query` in `apps/backend/app/search.py` queries Meilisearch when it is configured, and always queries PostgreSQL. When Meilisearch returns nothing usable, the PostgreSQL result is served. That is why users find jobs. Repository, with the user's confirmation that search works.
 - The PostgreSQL query is a plain `ILIKE` match. The schema already has a full-text column and index (`search_tsv`, GIN, with a trigger) and the `pg_trgm` extension in `infra/supabase.sql`. Search does not use them. Repository.
 - The contract (§3 and §13) already requires SQL search to keep working when Meilisearch is down. No document records a decision to replace Meilisearch. The plan defers the search-architecture decision until after the crawler plan.
+
+### How the crawler is built today
+
+Recorded 19 October 2026 from the repository and the Render log.
+
+There is one crawler. The scheduler and the admin Crawl button both enter `CrawlerOrchestrator` in `apps/backend/orchestrator.py`. Each source type has one crawler (HTML, RSS, API), and all three use the one `admit_batch` and the one writer, `persist_candidate`. That matches the contract.
+
+Inside the HTML crawler, a listing page is read by the first of these that produces jobs (`SimpleCrawler._listing_jobs` and `crawl_source`, `crawler_v2/simple_crawler.py`):
+
+1. The pipeline extractor, only when `core/rollout_config.py` selects the source. Dormant: see W-23.
+2. AI extraction. Fails on every crawl while the OpenRouter key is revoked (W-14).
+3. The UNICEF reader, then paging through "More Jobs". UNICEF only, chosen by the `unicef.org` host (PRs #11, #13, #14).
+4. With AI off only: the plugin registry (UNDP, UNESCO, Amnesty, Save the Children, generic). It cannot be built while `unesco.py` does not compile (W-11).
+5. The general rule-based reader. Every other source, including ICRC.
+
+Job pages, for a listing of 1–50 candidates or any UNDP listing (`enrich_job_from_detail_page`): UNICEF is skipped, UNDP has its own rules, and every other site uses the detail-page reader (PRs #8, #9).
+
+The organisation-specific exceptions (UNICEF and UNDP, chosen by web address) are the part that does not scale. The direction is platform readers chosen by what the page shows, not by organisation (W-19).
+
+Rule, agreed 19 October 2026: do not edit a source's URL to work around one site's behaviour. Knowledge such as a platform's page size or paging belongs once in that platform's reader, and sources keep their normal listing URLs. The earlier suggestion to change the UNICEF source URL to `?page-items=50` was withdrawn for this reason.
 
 ## Done
 
@@ -74,6 +97,11 @@ The UNICEF crawl at 09:21 UTC on 18 October failed with `HTTP 0`, meaning no res
 | Plan updated with C4 status and open findings | PR #10, `31ee357` | 18 Oct 2026 | Merged |
 | UNICEF job-card reader used when AI produces nothing | PR #11, `4947d44` | 18 Oct 2026 | Merged, deployed, verified live (20 jobs) |
 | Superseded scheduler draft closed | PR #1 | 18 Oct 2026 | Closed with a comment |
+| Leaked OpenRouter key revoked (W-01) | User action | 18 Oct 2026 | GitHub alert resolved as revoked; Render log shows `401 User not found` |
+| Progress ledger, `AGENTS.md`, UNICEF fix recorded | PR #12, `15d6e4e` | 18 Oct 2026 | Merged |
+| UNICEF "More Jobs" paging and completeness reporting | PR #13, `d7da048` | 18 Oct 2026 | Merged, deployed; live crawl read 6 pages, 120 jobs, reported partial |
+| UNICEF page pacing, one retry, safe refusal diagnostics | PR #14, `9d6fd99` | 19 Oct 2026 | Merged, deployed; identified an AWS WAF challenge at the seventh request |
+| Nominatim pause after refusal; failed lookups not repeated | PR #15, `bcdadd3` | 19 Oct 2026 | Merged, CI green; deploy not yet confirmed |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -92,7 +120,7 @@ PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as
 | C3, admission amendment | Done and deployed | None. Its UNICEF regression was fixed by PR #11 |
 | C4, reader | Done and deployed (PR #8, #9) | None |
 | C4, confirmation fetch | Re-scoped, not built | Only listings above 50 candidates, plus `detail_unconfirmed` logging (W-09) |
-| C5, six sites | ICRC met | Oxfam, DevNetJobsIndia, Global Partnership for Education, International Rescue Committee, Médecins Sans Frontières (W-07, W-08) |
+| C5, six sites | ICRC met | Oxfam, DevNetJobsIndia, Global Partnership for Education, International Rescue Committee, Médecins Sans Frontières (W-07, W-08). UNICEF is live but partial (W-04) |
 
 ## Completion criteria
 
@@ -108,11 +136,13 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 | Failed or partial crawls cannot expire or delete jobs | Repository. Live: the failed UNICEF crawl on 18 October changed no jobs |
 | Adapter persistence failures counted; RSS/API save failures not swallowed | Repository (`28b9efc`). The HTML all-rows-fail case is parked (Issue #5) |
 | A search-projection failure does not undo a PostgreSQL commit | Repository (Gate 7 test) |
-| Relevant tests pass, and the fetch policy is checked on the deployed backend | Tests pass (CI on `4947d44`). The deployed check is not done |
+| Relevant tests pass, and the fetch policy is checked on the deployed backend | Tests pass (CI on `bcdadd3`). The deployed check is not done |
 
 ## Open work
 
 Each item needs its own approval. Agreed order on 18 October 2026: W-01, then the documentation pull request (W-03), then W-04, W-05, W-06, and W-07. W-02 is an inspection only: no job is hidden or retired until the W-06 rule is agreed and validated.
+
+Status on 19 October 2026: W-01 and W-03 are done, and W-21 is merged. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval), and the Oxfam test (W-07), which does not depend on it. Then W-05 and W-06.
 
 ### Now
 
@@ -134,7 +164,7 @@ The menu rows hidden on 8 October used the soft action and have stayed hidden.
 
 ### Crawler plan, in order
 
-**W-04. Read every page of the UNICEF listing.** In progress. Pagination merged as PR #13 (`d7da048`) and the pacing change as PR #14 (`9d6fd99`). Next: change the UNICEF source URL to `page-items=50` (see the end of this item).
+**W-04. Read every page of the UNICEF listing.** In progress. Pagination merged as PR #13 (`d7da048`) and the pacing change as PR #14 (`9d6fd99`). Next: the Clinch platform-reader plan (see the end of this item). The source URL is not edited.
 The UNICEF listing shows 20 jobs per page, and the crawler read only the first page. Evidence, 18 October 2026:
 - The saved December 2025 page has a "More Jobs 160" link to `/en-us/listing/?page=2&page-items=20`. The number is the jobs remaining after that page.
 - One approved request for page 2 (18:33 UTC) returned HTTP 200 with the same job cards: 20 distinct jobs, all with a location and a deadline, all admitted. Its link reads "More Jobs 177" and points to `page=3`, so the live listing held about 217 jobs in about 11 pages. Page 2 also links to a job-alert signup, `/en-us/Listing/?page=2&page-items=20&subscribe=true`, which must not be followed.
@@ -153,7 +183,9 @@ Results after PR #14, 19 October 2026 (Verified):
 - 09:58 UTC: `Found 120 jobs; listing partial: 6 pages, expected 209, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`. Both page-7 responses were `server: CloudFront`, `x-amzn-waf-action: challenge`, with an AWS WAF JavaScript challenge naming `clinchtalent.com` and `career-pages.com`. The UNICEF listing is hosted by Clinch; PageUp handles applications. Pacing did not help: the challenge starts at the seventh request from one address with 1-second and with 5-second gaps. The challenge must not be solved or bypassed.
 - Two approved test requests from a local address with no prior requests that day, 10:21 UTC: page 7 requested first returned HTTP 200 with 20 admitted jobs and "More Jobs 69", so page 7 itself is not blocked. Page 1 with `page-items=50` returned HTTP 200 with 50 jobs, all with a location and a deadline, all admitted, and "More Jobs 159"; its link keeps `page-items=50`. Both agree with 209 jobs.
 
-Next step, no code: change the UNICEF source URL in the admin to `https://jobs.unicef.org/en-us/listing/?page-items=50`. The whole listing is then 5 requests, below the seventh request where the challenge starts. Editing a source does not queue a crawl (`PATCH /api/admin/sources/{id}`); creating one does. Then one manual crawl, after a quiet period. If it is complete, check: found close to the expected total, October rows still listed updated, no `thin_vacancy`, no duplicate links, and ICRC unchanged. If it is still partial, stop; a multi-crawl approach needs its own approval. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
+Withdrawn 19 October 2026: changing the UNICEF source URL to `?page-items=50` in the admin. Per-site URL edits do not scale (see "How the crawler is built today"). Do not make that edit.
+
+Next step, plan first: turn the UNICEF reader into a Clinch platform reader. It is chosen by the Clinch page structure (`div.list-view--item` cards with one `a.job-link`) instead of the `unicef.org` host, and it requests `page-items=50` itself, so the whole 209-job listing is 5 requests, below the seventh request where the challenge starts. The source keeps `https://jobs.unicef.org/en-us/listing/`. The plan must cover detection, the page-size request, the existing paging and completeness rules, ICRC and other sources unchanged, and tests. No code until the plan is approved. Then one manual crawl, after a quiet period. If it is complete, check: found close to the expected total, October rows still listed updated, no `thin_vacancy`, no duplicate links, and ICRC unchanged. If it is still partial, stop; a multi-crawl approach needs its own approval. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
 
 **W-05. B4 failure and lifecycle audit.** Read-only.
 Mark each B4 rule verified or defective. Production evidence already collected:
@@ -168,7 +200,7 @@ Closed jobs with no deadline never leave search. The contract (§6) forbids expi
 Agreed rule (18 October 2026): absence from a listing counts as evidence only after a crawl whose `extraction_logs.extracted_fields.listing_complete` is true. The crawl status (`ok`, `warn`, `failed`) and the failure counter must not be used for that decision: `warn` resets the failure counter but marks a partial listing. Sources without a paged-listing report need their own completeness rule before they can expire anything. Today no code expires, hides, or changes a job's status after a crawl (Repository).
 
 **W-07. Oxfam GB as a live source.** C5.
-Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Add it, crawl once, and check it the way ICRC was checked.
+Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Approved on 19 October 2026: add it as an HTML source and check one crawl the way ICRC was checked. Creating a source sets its next run to now (`POST /api/admin/sources`), so the scheduler crawls it within about five minutes; that automatic crawl is the single test, and Crawl is not pressed. Check: crawl status and counts, saved titles, locations, and deadlines, rejection reasons, links to real vacancies, and no duplicates.
 
 **W-08. The rest of C5.**
 - DevNetJobsIndia: about 150 candidates, above the 50-job detail limit. Needs W-09 or listing-level fields.
@@ -195,8 +227,11 @@ Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave a
 
 **W-16. Issue #4, parked.** Test-suite cleanup, including the JSON-LD circular import that stops `tests/test_pipeline_extractor.py` and `tests/test_pipeline_integration.py` from being collected.
 
-**W-21. Geocoding refused by Nominatim.** Fix on branch `geocoder-backoff`, not merged.
+**W-21. Geocoding refused by Nominatim.** Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Check the next crawl's log: after one `Nominatim refused geocoding (HTTP 429)` warning, no further Nominatim requests for an hour.
 The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
+
+**W-23. Dormant extraction rollout settings.** Record; not scheduled.
+Render sets `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, and `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org` (Verified by the user, 19 October 2026). `core/rollout_config.py` compares the source host with the list exactly after removing `www.`, so `jobs.unicef.org`, `careers.icrc.org`, `jobs.undp.org`, and `careers.unesco.org` do not match, and the pipeline extractor never runs for current sources. The UNICEF crawl log shows no "Using NEW pipeline extractor" line. A source whose host is exactly one of the three, such as `https://www.unicef.org/careers`, would go through it; it carries the Issue #4 import problem and falls back to the normal reader on failure. `EXTRACTION_SHADOW_MODE` is read by `pipeline/db_insert.py`, but the crawler passes `enable_storage=False` to the pipeline extractor, and `tests/test_gate4_persist.py` and `tests/test_gate10_legacy.py` check that no `jobs_side` write is possible (Repository). Cleanup, as its own decision: set `EXTRACTION_USE_NEW_EXTRACTOR=false` or remove these variables in Render, then remove the dormant code once confirmed unused.
 
 **W-22. Production runs with `AIDJOBS_ENV=dev`.** Record; not scheduled.
 The Render startup log reads `AIDJOBS_ENV=dev (dev-only admin routes enabled)` (Verified, 19 October 2026). The two named login bypasses were removed in PR #2, so admin login is still required. Which development-only routes are enabled, and whether Render should use a production value, need their own review.
@@ -213,6 +248,8 @@ Track A explains why Meilisearch fails. Evidence, 19 October 2026: at startup an
 
 **W-19. Platform readers.** Proposal, not approved. Stays a proposal until each platform is verified against the real source systems.
 Many organisations publish jobs through the same few recruitment systems. One reader per system can cover many sites, where one reader per site cannot scale. Evidence so far: the UNICEF listing is hosted by Clinch (`clinchtalent.com`, `career-pages.com`, from its AWS WAF challenge page) and links to "Powered by PageUp" for applications (observed). Offline, a saved December 2025 UNDP listing links to Oracle Cloud (`estm.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/…/job/{id}`); the general reader admits 94 rows whose location is the table heading "Job Title", so UNDP must not be added until it has a working reader. A saved UNESCO listing uses SuccessFactors-style `/go/…` paths like ICRC; its 25 job links are rejected as `thin_vacancy` because the listing has 52 candidates, above the 50-job detail limit (W-09). ICRC's `/go/…` and `/job/…/{id}` paths and SAP session cookies point to SAP SuccessFactors (likely, not verified). The plan for this would:
+
+Platform readers are chosen by what the page shows, for example Clinch job cards, SuccessFactors `/go/…/job/{id}` links, Oracle `CandidateExperience` links, or Workday `myworkdayjobs.com`, never by organisation name or by editing source URLs. Sites on no known platform use the general reader. The first is Clinch (UNICEF), which also finishes W-04; SuccessFactors (ICRC, UNESCO) and Oracle (UNDP) follow. As platform readers replace them, the UNICEF and UNDP address checks and the dormant routes (W-11, W-23) are removed, each once it is confirmed unused.
 
 1. finish the six-site gate first;
 2. survey the sources to be added and group them by recruitment system;
@@ -235,11 +272,14 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | --- | --- |
 | Whether to set up AI again with a new key, or remove the setting from Render | W-14 |
 | Whether to hide the December 2025 UNICEF rows, after inspection and the W-06 rule | W-02 |
-| Approve one request to find UNICEF's page links | W-04 |
+| Approve the Clinch platform-reader plan, then its implementation | W-04, W-19 |
 | The expiry trust policy and missing-crawl threshold | W-06 |
-| Add Oxfam GB as a source | W-07 |
 | Add ICRC's other lists | W-20 |
-| Whether to plan platform readers | W-19 |
+| Whether to switch off or remove the dormant extraction rollout settings in Render | W-23 |
+| Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
+| Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
+
+Approved and waiting on the user's admin action: add Oxfam GB as a source (W-07).
 
 ## Terms used in this project
 
