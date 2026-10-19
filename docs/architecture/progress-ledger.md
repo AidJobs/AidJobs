@@ -134,7 +134,7 @@ The menu rows hidden on 8 October used the soft action and have stayed hidden.
 
 ### Crawler plan, in order
 
-**W-04. Read every page of the UNICEF listing.** Implemented on branch `unicef-listing-pages`, not merged.
+**W-04. Read every page of the UNICEF listing.** In progress. Pagination merged as PR #13 (`d7da048`); the pacing change is on branch `unicef-listing-pacing`, not merged.
 The UNICEF listing shows 20 jobs per page, and the crawler read only the first page. Evidence, 18 October 2026:
 - The saved December 2025 page has a "More Jobs 160" link to `/en-us/listing/?page=2&page-items=20`. The number is the jobs remaining after that page.
 - One approved request for page 2 (18:33 UTC) returned HTTP 200 with the same job cards: 20 distinct jobs, all with a location and a deadline, all admitted. Its link reads "More Jobs 177" and points to `page=3`, so the live listing held about 217 jobs in about 11 pages. Page 2 also links to a job-alert signup, `/en-us/Listing/?page=2&page-items=20&subscribe=true`, which must not be followed.
@@ -144,7 +144,11 @@ The change: after page 1, the crawler follows the "More Jobs" link only when it 
 
 Completeness is reported on the crawl itself. The expected total is read from the live first page (its jobs plus its "More Jobs" count). Only a walk that ran out of "More Jobs" links is complete: the crawl status stays `ok` and the message reads, for example, `Found 217 jobs; listing complete: 11 pages, expected 217`. A failed page, the 30-page cap, or a page with no new jobs is partial: the status is `warn`, which still resets the failure count, and the message names the pages read, the expected total, and the stop reason. The same facts are written to `extraction_logs` as `listing_pages`, `listing_expected`, `listing_complete`, and `listing_stop`, so W-06 can tell a trustworthy crawl from a partial one. Other sources keep today's message. With AI off, UNICEF takes the same path instead of the broken registry, so removing the OpenRouter key would not stop UNICEF ingestion.
 
-After merge, one manual UNICEF crawl must show: found close to the expected total, October rows still listed updated with a location and deadline, no `thin_vacancy`, no duplicate links, and ICRC unchanged. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
+First live crawl after PR #13, 19 October 2026 at 06:23 UTC (Verified): status `warn`, `Found 120 jobs; listing partial: 6 pages, expected 199, stopped: HTTP 202 on …?page=7&page-items=20`. 99 inserted, 20 updated, no rejections at all, no duplicate links (only the known `596188`). One 12 October row and 19 rows from 18 October were updated; every updated and inserted row has a location and a deadline. `extraction_logs` recorded `listing_pages` 6, `listing_expected` 199, `listing_complete` false, and the stop reason. About 79 jobs on pages 7 onward were not read. The 202 body was not saved. ReliefWeb's saved 202 was an AWS WAF challenge, so a bot challenge after six requests one second apart is likely but not verified.
+
+Pacing change, a bounded experiment: listing pages are requested 5 seconds apart. A 202, 429, or 503 is retried once after 30 seconds, and at most one retry is allowed in a whole crawl. If the retry fails, the walk stops and the crawl is partial. Later pages use one request each through `fetch_url` with the same headers as `fetch_html`; the 403 user-agent switch in `fetch_html` is not applied to them. A non-200 later page logs its status, only the allowlisted response headers (`content-type`, `content-length`, `server`, `retry-after`, `cache-control`, `x-amzn-waf-action`, `x-amzn-requestid`, `cf-ray`, `cf-mitigated`, `x-cache`, `via`), and the first 300 characters of the body with whitespace collapsed and token-like strings redacted. Cookies and authorization are never logged.
+
+After merge, one manual UNICEF crawl. If it is complete, check: found close to the expected total, October rows still listed updated, no `thin_vacancy`, no duplicate links, and ICRC unchanged. If it is still partial, stop and read the logged 202 diagnostics; a multi-crawl approach needs its own approval. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
 
 **W-05. B4 failure and lifecycle audit.** Read-only.
 Mark each B4 rule verified or defective. Production evidence already collected:
@@ -154,6 +158,8 @@ Mark each B4 rule verified or defective. Production evidence already collected:
 
 **W-06. Expiry policy decision.** Decision, after W-04.
 Closed jobs with no deadline never leave search. The contract (§6) forbids expiring a job because a crawl did not return it until a written trust policy and a consecutive-missing threshold are approved as their own decision, separate from any implementation pull request. Draft that policy for approval: what counts as a complete, trustworthy crawl, and how many such crawls a job may be missing before it expires. This solves stale rows for every source.
+
+Agreed rule (18 October 2026): absence from a listing counts as evidence only after a crawl whose `extraction_logs.extracted_fields.listing_complete` is true. The crawl status (`ok`, `warn`, `failed`) and the failure counter must not be used for that decision: `warn` resets the failure counter but marks a partial listing. Sources without a paged-listing report need their own completeness rule before they can expire anything. Today no code expires, hides, or changes a job's status after a crawl (Repository).
 
 **W-07. Oxfam GB as a live source.** C5.
 Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Add it, crawl once, and check it the way ICRC was checked.

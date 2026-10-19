@@ -47,7 +47,58 @@ def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
 
 
 _UNICEF_PAGE_CAP = 30
-_UNICEF_PAGE_DELAY = 1.0
+_UNICEF_PAGE_DELAY = 5.0
+_UNICEF_RETRY_DELAY = 30.0
+_UNICEF_RETRY_STATUSES = frozenset({202, 429, 503})
+_sleep = asyncio.sleep
+
+# Only these response headers are logged. Cookies and authorization never are.
+_LOGGED_RESPONSE_HEADERS = (
+    'content-type',
+    'content-length',
+    'server',
+    'retry-after',
+    'cache-control',
+    'x-amzn-waf-action',
+    'x-amzn-requestid',
+    'cf-ray',
+    'cf-mitigated',
+    'x-cache',
+    'via',
+)
+_TOKEN_LIKE = re.compile(r'[A-Za-z0-9+/=_-]{24,}')
+
+
+def _html_request_headers(user_agent: str, retry_count: int = 0) -> Dict[str, str]:
+    headers = {
+        "User-Agent": user_agent,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Cache-Control": "max-age=0",
+    }
+    if retry_count:
+        headers["User-Agent"] = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+    return headers
+
+
+def _logged_headers(headers: Dict[str, str]) -> Dict[str, str]:
+    lowered = {str(name).lower(): str(value) for name, value in (headers or {}).items()}
+    return {name: lowered[name][:200] for name in _LOGGED_RESPONSE_HEADERS if name in lowered}
+
+
+def _response_excerpt(text: str, limit: int = 300) -> str:
+    """Whitespace collapsed and token-like strings redacted, then cut to the limit."""
+    collapsed = ' '.join((text or '').split())
+    return _TOKEN_LIKE.sub('[redacted]', collapsed)[:limit]
 
 
 def _page_number(query: str) -> Optional[int]:
@@ -220,23 +271,7 @@ class SimpleCrawler:
     async def fetch_html(self, url: str, retry_count: int = 0, use_browser: bool = False) -> Tuple[int, str]:
         """Fetch HTML. Browser rendering is not used; the HTTP result is returned."""
         del use_browser
-        headers = {
-            "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Cache-Control": "max-age=0",
-        }
-        if retry_count:
-            headers["User-Agent"] = (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
+        headers = _html_request_headers(self.user_agent, retry_count)
         try:
             result = await fetch_url(url, headers=headers, timeout=float(self.timeout.connect or 30.0))
             if result.status_code == 403 and retry_count < 2:
@@ -250,6 +285,27 @@ class SimpleCrawler:
         except Exception as exc:
             logger.error("Error fetching %s: %s", url, exc)
             return 0, ""
+
+    async def _fetch_listing_page(self, url: str) -> Tuple[int, str]:
+        """One request for a later listing page. A non-200 logs allowlisted headers and an excerpt."""
+        try:
+            result = await fetch_url(
+                url,
+                headers=_html_request_headers(self.user_agent),
+                timeout=float(self.timeout.connect or 30.0),
+            )
+        except Exception as exc:
+            logger.warning("Listing page %s failed: %s", url, exc)
+            return 0, ""
+        if result.status_code != 200:
+            logger.warning(
+                "Listing page %s returned HTTP %s; headers=%s; body=%r",
+                url,
+                result.status_code,
+                _logged_headers(result.headers),
+                _response_excerpt(result.text),
+            )
+        return result.status_code, result.text
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:
         """
@@ -1843,6 +1899,7 @@ class SimpleCrawler:
         expected = len(jobs) + remaining if remaining is not None else None
         page_html, page_url, pages = first_html, careers_url, 1
         stop = _LISTING_COMPLETE_STOP
+        retry_used = False
         while True:
             next_url = _next_unicef_page(page_html, page_url, careers_url)
             if next_url is None:
@@ -1850,10 +1907,22 @@ class SimpleCrawler:
             if pages >= _UNICEF_PAGE_CAP:
                 stop = f'page cap {_UNICEF_PAGE_CAP}'
                 break
-            await asyncio.sleep(_UNICEF_PAGE_DELAY)
-            status, page_html = await self.fetch_html(next_url)
+            await _sleep(_UNICEF_PAGE_DELAY)
+            status, page_html = await self._fetch_listing_page(next_url)
+            retried_here = False
+            if status in _UNICEF_RETRY_STATUSES and not retry_used:
+                # At most one retry in the whole crawl.
+                retry_used = retried_here = True
+                logger.info(
+                    "UNICEF listing: HTTP %s on %s, retrying once in %ss",
+                    status, next_url, _UNICEF_RETRY_DELAY,
+                )
+                await _sleep(_UNICEF_RETRY_DELAY)
+                status, page_html = await self._fetch_listing_page(next_url)
             if status != 200 or not page_html:
                 stop = f'HTTP {status} on {next_url}'
+                if retried_here:
+                    stop += ' after one retry'
                 break
             page_url = next_url
             pages += 1

@@ -9,7 +9,13 @@ from contracts.admission import admit_batch
 from contracts.identity import both_keys
 from crawler.plugins.base import PluginResult
 from crawler.plugins.unicef import UNICEFPlugin
-from crawler_v2.simple_crawler import SimpleCrawler, _listing_outcome
+from crawler_v2.simple_crawler import (
+    SimpleCrawler,
+    _html_request_headers,
+    _listing_outcome,
+    _logged_headers,
+    _response_excerpt,
+)
 
 _UNICEF_LISTING = "https://jobs.unicef.org/en-us/listing/"
 _ICRC_LISTING = "https://careers.icrc.org/go/Global-Opportunities/8821501/"
@@ -136,12 +142,17 @@ class _FakeAI:
         return self.outcome
 
 
+async def _no_sleep(_seconds):
+    return None
+
+
 def _no_network(crawler, monkeypatch):
     async def refuse(url, *_args, **_kwargs):
         raise AssertionError(f"unexpected fetch of {url}")
 
     monkeypatch.setattr(crawler, "fetch_html", refuse)
-    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_DELAY", 0)
+    monkeypatch.setattr(crawler, "_fetch_listing_page", refuse)
+    monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
 
 
 def _crawler(outcome, monkeypatch, general=None):
@@ -304,8 +315,8 @@ def _saved_unicef_jobs(monkeypatch):
         asked.append(url)
         return 0, ""
 
-    monkeypatch.setattr(crawler, "fetch_html", unavailable)
-    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_DELAY", 0)
+    monkeypatch.setattr(crawler, "_fetch_listing_page", unavailable)
+    monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
     jobs = asyncio.run(crawler._listing_jobs_without_ai(html, _UNICEF_LISTING))
     assert asked == ["https://jobs.unicef.org/en-us/listing/?page=2&page-items=20"]
     return jobs
@@ -377,18 +388,30 @@ def _listing_page(job_ids, more_href=None, remaining=None):
 
 
 def _paged_crawler(monkeypatch, pages):
-    """Serve fetch_html from a page map. Unknown URLs fail the test."""
+    """Serve later listing pages from a map. A list answers successive requests in order.
+
+    Unknown URLs fail the test. Sleeps are recorded on crawler.slept instead of waiting.
+    """
     crawler = SimpleCrawler("postgresql://example")
     asked = []
+    crawler.slept = []
 
     async def fetch(url, *_args, **_kwargs):
         asked.append(url)
         if url not in pages:
             raise AssertionError(f"unexpected fetch of {url}")
-        return pages[url]
+        answer = pages[url]
+        return answer.pop(0) if isinstance(answer, list) else answer
 
-    monkeypatch.setattr(crawler, "fetch_html", fetch)
-    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_DELAY", 0)
+    async def record_sleep(seconds):
+        crawler.slept.append(seconds)
+
+    async def refuse(url, *_args, **_kwargs):
+        raise AssertionError(f"listing pages must not use fetch_html: {url}")
+
+    monkeypatch.setattr(crawler, "_fetch_listing_page", fetch)
+    monkeypatch.setattr(crawler, "fetch_html", refuse)
+    monkeypatch.setattr("crawler_v2.simple_crawler._sleep", record_sleep)
     return crawler, asked
 
 
@@ -571,6 +594,164 @@ def test_crawl_source_reports_the_listing_outcome():
     source = inspect.getsource(SimpleCrawler.crawl_source)
     assert "_listing_outcome(len(jobs), self._listing_report)" in source
     assert "extracted_fields['listing_complete']" in source
+
+
+_P2 = "/en-us/listing/?page=2&page-items=20"
+_P3 = "/en-us/listing/?page=3&page-items=20"
+
+
+def test_pages_are_five_seconds_apart(monkeypatch):
+    first = _listing_page(["1"], _P2, 2)
+    pages = {
+        _PAGE.format(2): (200, _listing_page(["2"], _P3, 1)),
+        _PAGE.format(3): (200, _listing_page(["3"])),
+    }
+    crawler, _asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    assert crawler.slept == [5.0, 5.0]
+
+
+@pytest.mark.parametrize("status", [202, 429, 503])
+def test_a_retryable_status_is_retried_once_after_thirty_seconds(status, monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    pages = {_PAGE.format(2): [(status, "challenge"), (200, _listing_page(["2"]))]}
+    crawler, asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_PAGE.format(2), _PAGE.format(2)]
+    assert crawler.slept == [5.0, 30.0]
+    assert crawler._listing_report["complete"] is True
+
+
+def test_a_failed_retry_stops_the_walk_as_partial(monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    pages = {_PAGE.format(2): [(202, "challenge"), (202, "challenge")]}
+    crawler, asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1"]
+    assert asked == [_PAGE.format(2), _PAGE.format(2)]
+    assert crawler.slept == [5.0, 30.0]
+    report = crawler._listing_report
+    assert report["complete"] is False
+    assert report["stop"] == f"HTTP 202 on {_PAGE.format(2)} after one retry"
+    assert _listing_outcome(1, report)[0] == "warn"
+
+
+def test_only_one_retry_is_allowed_in_a_crawl(monkeypatch):
+    first = _listing_page(["1"], _P2, 2)
+    pages = {
+        _PAGE.format(2): [(202, "challenge"), (200, _listing_page(["2"], _P3, 1))],
+        _PAGE.format(3): (503, "busy"),
+    }
+    crawler, asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_PAGE.format(2), _PAGE.format(2), _PAGE.format(3)]
+    assert crawler.slept == [5.0, 30.0, 5.0]
+    assert crawler._listing_report["stop"] == f"HTTP 503 on {_PAGE.format(3)}"
+
+
+@pytest.mark.parametrize("status", [0, 403, 404, 500])
+def test_other_failures_are_not_retried(status, monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    crawler, asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (status, "")})
+    assert _read_listing(crawler, first) == ["1"]
+    assert asked == [_PAGE.format(2)]
+    assert crawler.slept == [5.0]
+    assert crawler._listing_report["stop"] == f"HTTP {status} on {_PAGE.format(2)}"
+
+
+def test_only_allowlisted_response_headers_are_logged():
+    headers = {
+        "Set-Cookie": "session=secret",
+        "Authorization": "Bearer secret",
+        "Cookie": "a=b",
+        "X-Internal": "nope",
+        "Server": "awselb/2.0",
+        "X-Amzn-Waf-Action": "challenge",
+        "Retry-After": "30",
+        "Content-Type": "text/html",
+    }
+    assert _logged_headers(headers) == {
+        "content-type": "text/html",
+        "server": "awselb/2.0",
+        "retry-after": "30",
+        "x-amzn-waf-action": "challenge",
+    }
+
+
+def test_the_body_excerpt_is_collapsed_redacted_and_short():
+    token = "AbCdEf0123456789AbCdEf0123456789+/="
+    body = f"<html>\n  <script>  window.gokuProps = {{key: '{token}'}}  </script>\n" + "x " * 400
+    excerpt = _response_excerpt(body)
+    assert token not in excerpt
+    assert "[redacted]" in excerpt
+    assert "\n" not in excerpt and "  " not in excerpt
+    assert len(excerpt) == 300
+
+
+def test_a_listing_page_failure_logs_safe_diagnostics(monkeypatch, caplog):
+    from contracts.outbound import FetchResult
+
+    sent = []
+    token = "Zx9" * 12
+
+    async def fake_fetch_url(url, *, headers=None, timeout=None, **_kwargs):
+        sent.append(headers)
+        return FetchResult(
+            status_code=202,
+            headers={
+                "Set-Cookie": "aws-waf-token=secret-cookie",
+                "x-amzn-waf-action": "challenge",
+                "Server": "awselb/2.0",
+            },
+            body=f"<html> challenge {token} </html>".encode(),
+            url=url,
+        )
+
+    monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", fake_fetch_url)
+    crawler = SimpleCrawler("postgresql://example")
+    with caplog.at_level("WARNING", logger="crawler_v2.simple_crawler"):
+        status, text = asyncio.run(crawler._fetch_listing_page(_PAGE.format(7)))
+    assert status == 202
+    assert "challenge" in text
+    assert sent == [_html_request_headers(crawler.user_agent)]
+    logged = caplog.text
+    assert "HTTP 202" in logged
+    assert "x-amzn-waf-action" in logged and "awselb/2.0" in logged
+    assert "secret-cookie" not in logged and "set-cookie" not in logged.lower()
+    assert token not in logged and "[redacted]" in logged
+
+
+def test_a_listing_page_exception_is_a_failed_page(monkeypatch):
+    async def broken(url, **_kwargs):
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", broken)
+    crawler = SimpleCrawler("postgresql://example")
+    assert asyncio.run(crawler._fetch_listing_page(_PAGE.format(2))) == (0, "")
+
+
+def test_fetch_html_still_sends_the_same_headers_and_switches_agent_on_403(monkeypatch):
+    from contracts.outbound import FetchResult
+
+    sent = []
+
+    async def fake_fetch_url(url, *, headers=None, timeout=None, **_kwargs):
+        sent.append(dict(headers))
+        status = 403 if len(sent) == 1 else 200
+        return FetchResult(status_code=status, headers={}, body=b"<html></html>", url=url)
+
+    async def no_wait(_seconds):
+        return None
+
+    monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", fake_fetch_url)
+    monkeypatch.setattr("crawler_v2.simple_crawler.asyncio.sleep", no_wait)
+    crawler = SimpleCrawler("postgresql://example")
+    assert asyncio.run(crawler.fetch_html("https://jobs.example/")) == (200, "<html></html>")
+    assert sent[0] == _html_request_headers(crawler.user_agent, 0)
+    assert sent[0]["User-Agent"] == crawler.user_agent
+    assert sent[1]["User-Agent"].startswith("Mozilla/5.0 (Windows NT 10.0")
+    assert {k: v for k, v in sent[1].items() if k != "User-Agent"} == {
+        k: v for k, v in sent[0].items() if k != "User-Agent"
+    }
 
 
 _SAVED_PAGE2 = _ROOT / "unicef-pagination" / "page2.body"
