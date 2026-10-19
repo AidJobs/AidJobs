@@ -432,6 +432,50 @@ def test_generic_branch_does_not_reparse_a_listing_deadline():
     assert job["deadline"] == "11/06/2026"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("2026-11-13", "2026-11-13"),
+        ("2026-10-29", "2026-10-29"),
+        ("2026-10-29T23:59:00Z", "2026-10-29"),
+        ("2026-10-29 23:59", "2026-10-29"),
+        ("Closing date: 2026-10-31", "2026-10-31"),
+        ("06/11/2026", "2026-11-06"),
+        ("13 November 2026", "2026-11-13"),
+    ],
+)
+def test_parse_deadline_keeps_iso_dates_and_reads_others_as_before(raw, expected):
+    from crawler_v2.simple_crawler import SimpleCrawler
+
+    assert SimpleCrawler("postgresql://example")._parse_deadline(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["2026-13-45", "2026-02-30"])
+def test_parse_deadline_rejects_an_impossible_iso_date(raw):
+    from crawler_v2.simple_crawler import SimpleCrawler
+
+    assert SimpleCrawler("postgresql://example")._parse_deadline(raw) is None
+
+
+@pytest.mark.parametrize(
+    ("valid_through", "expected"),
+    [("2026-10-29", "2026-10-29"), ("2026-11-13T23:59:00Z", "2026-11-13")],
+)
+def test_structured_data_iso_deadline_keeps_its_date_on_the_job_page_path(
+    valid_through, expected
+):
+    html = f"""
+    <script type="application/ld+json">
+    {{"@type": "JobPosting", "title": "Finance Officer", "validThrough": "{valid_through}",
+      "jobLocation": {{"address": {{"addressLocality": "Renk", "addressCountry": "South Sudan"}}}}}}
+    </script>
+    """
+    job = _enrich_generic(html)
+    assert job["deadline"] == expected
+    assert job["location_raw"] == "Renk, South Sudan"
+    assert job["title"] == "Listing title"
+
+
 def test_reader_exception_leaves_the_generic_candidate_unchanged(monkeypatch):
     from crawler_v2.simple_crawler import SimpleCrawler
 
