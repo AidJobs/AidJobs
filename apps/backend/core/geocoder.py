@@ -14,6 +14,18 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+# Nominatim's usage policy expects clients to stop when refused.
+_NOMINATIM_REFUSED = frozenset({403, 429})
+_NOMINATIM_PAUSE_SECONDS = 3600.0
+_FAILED_LOOKUP_SECONDS = 3600.0
+
+
+def _retry_after_seconds(value: Optional[str]) -> float:
+    try:
+        return max(0.0, float(value)) if value else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
 
 class Geocoder:
     """
@@ -37,6 +49,22 @@ class Geocoder:
         # Cache for geocoding results (in-memory, simple dict)
         self._cache: Dict[str, Dict] = {}
         self._cache_max_size = 1000
+
+        # A refusal pauses Nominatim; a failed lookup is not repeated for a while.
+        self._nominatim_paused_until = 0.0
+        self._failed_until: Dict[str, float] = {}
+
+    def _nominatim_paused(self) -> bool:
+        return time.time() < self._nominatim_paused_until
+
+    def _recently_failed(self, location: str) -> bool:
+        until = self._failed_until.get(location.lower().strip())
+        return until is not None and time.time() < until
+
+    def _remember_failure(self, location: str):
+        if len(self._failed_until) >= self._cache_max_size:
+            del self._failed_until[next(iter(self._failed_until))]
+        self._failed_until[location.lower().strip()] = time.time() + _FAILED_LOOKUP_SECONDS
     
     def _get_cached(self, location: str) -> Optional[Dict]:
         """Get cached geocoding result"""
@@ -83,7 +111,20 @@ class Geocoder:
                 )
                 
                 self._last_nominatim_request = time.time()
-                
+
+                if response.status_code in _NOMINATIM_REFUSED:
+                    pause = max(
+                        _NOMINATIM_PAUSE_SECONDS,
+                        _retry_after_seconds(response.headers.get('retry-after')),
+                    )
+                    self._nominatim_paused_until = time.time() + pause
+                    logger.warning(
+                        "Nominatim refused geocoding (HTTP %s); pausing Nominatim lookups for %.0fs",
+                        response.status_code,
+                        pause,
+                    )
+                    return None
+
                 if response.status_code != 200:
                     return None
                 
@@ -215,18 +256,27 @@ class Geocoder:
         cached = self._get_cached(location)
         if cached:
             return cached
-        
+
+        if self._recently_failed(location):
+            return None
+
         # Try geocoding
         result = None
-        
+        attempted = False
+
         if use_google and self.google_api_key:
             # Try Google first if requested and available
+            attempted = True
             result = await self._geocode_google(location)
-        
-        if not result:
+
+        if not result and not self._nominatim_paused():
             # Fall back to Nominatim
+            attempted = True
             result = await self._geocode_nominatim(location)
-        
+
+        if not result and attempted:
+            self._remember_failure(location)
+
         if result:
             # Cache the result
             self._set_cached(location, result)

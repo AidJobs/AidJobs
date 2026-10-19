@@ -134,7 +134,7 @@ The menu rows hidden on 8 October used the soft action and have stayed hidden.
 
 ### Crawler plan, in order
 
-**W-04. Read every page of the UNICEF listing.** In progress. Pagination merged as PR #13 (`d7da048`); the pacing change is on branch `unicef-listing-pacing`, not merged.
+**W-04. Read every page of the UNICEF listing.** In progress. Pagination merged as PR #13 (`d7da048`) and the pacing change as PR #14 (`9d6fd99`). Next: change the UNICEF source URL to `page-items=50` (see the end of this item).
 The UNICEF listing shows 20 jobs per page, and the crawler read only the first page. Evidence, 18 October 2026:
 - The saved December 2025 page has a "More Jobs 160" link to `/en-us/listing/?page=2&page-items=20`. The number is the jobs remaining after that page.
 - One approved request for page 2 (18:33 UTC) returned HTTP 200 with the same job cards: 20 distinct jobs, all with a location and a deadline, all admitted. Its link reads "More Jobs 177" and points to `page=3`, so the live listing held about 217 jobs in about 11 pages. Page 2 also links to a job-alert signup, `/en-us/Listing/?page=2&page-items=20&subscribe=true`, which must not be followed.
@@ -148,13 +148,19 @@ First live crawl after PR #13, 19 October 2026 at 06:23 UTC (Verified): status `
 
 Pacing change, a bounded experiment: listing pages are requested 5 seconds apart. A 202, 429, or 503 is retried once after 30 seconds, and at most one retry is allowed in a whole crawl. If the retry fails, the walk stops and the crawl is partial. Later pages use one request each through `fetch_url` with the same headers as `fetch_html`; the 403 user-agent switch in `fetch_html` is not applied to them. A non-200 later page logs its status, only the allowlisted response headers (`content-type`, `content-length`, `server`, `retry-after`, `cache-control`, `x-amzn-waf-action`, `x-amzn-requestid`, `cf-ray`, `cf-mitigated`, `x-cache`, `via`), and the first 300 characters of the body with whitespace collapsed and token-like strings redacted. Cookies and authorization are never logged.
 
-After merge, one manual UNICEF crawl. If it is complete, check: found close to the expected total, October rows still listed updated, no `thin_vacancy`, no duplicate links, and ICRC unchanged. If it is still partial, stop and read the logged 202 diagnostics; a multi-crawl approach needs its own approval. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
+Results after PR #14, 19 October 2026 (Verified):
+- 08:51 UTC: page 1 timed out after 30 seconds (`Error fetching https://jobs.unicef.org/en-us/listing/: timeout`). No job changed.
+- 09:58 UTC: `Found 120 jobs; listing partial: 6 pages, expected 209, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`. Both page-7 responses were `server: CloudFront`, `x-amzn-waf-action: challenge`, with an AWS WAF JavaScript challenge naming `clinchtalent.com` and `career-pages.com`. The UNICEF listing is hosted by Clinch; PageUp handles applications. Pacing did not help: the challenge starts at the seventh request from one address with 1-second and with 5-second gaps. The challenge must not be solved or bypassed.
+- Two approved test requests from a local address with no prior requests that day, 10:21 UTC: page 7 requested first returned HTTP 200 with 20 admitted jobs and "More Jobs 69", so page 7 itself is not blocked. Page 1 with `page-items=50` returned HTTP 200 with 50 jobs, all with a location and a deadline, all admitted, and "More Jobs 159"; its link keeps `page-items=50`. Both agree with 209 jobs.
+
+Next step, no code: change the UNICEF source URL in the admin to `https://jobs.unicef.org/en-us/listing/?page-items=50`. The whole listing is then 5 requests, below the seventh request where the challenge starts. Editing a source does not queue a crawl (`PATCH /api/admin/sources/{id}`); creating one does. Then one manual crawl, after a quiet period. If it is complete, check: found close to the expected total, October rows still listed updated, no `thin_vacancy`, no duplicate links, and ICRC unchanged. If it is still partial, stop; a multi-crawl approach needs its own approval. The contract treats a crawl that missed pages as partial (§5), so this lands before any expiry rule.
 
 **W-05. B4 failure and lifecycle audit.** Read-only.
 Mark each B4 rule verified or defective. Production evidence already collected:
 - The failed UNICEF crawl (`HTTP 0`, 18 October) changed no jobs (Verified). Per the code it added one to `consecutive_failures`; the stored value was not read (Repository).
 - "NC" in the admin is `consecutive_nochange`: crawls in a row that inserted and updated nothing. Three or more makes the scheduler crawl less often. The broken UNICEF crawls raised it to 3; the 09:30 crawl reset it.
 - Rows hidden on 8 October have stayed hidden.
+- The Render log of 19 October ends with `Shutting down … Scheduler stopping` without a deploy of ours. If the service sleeps when idle, scheduled crawls do not run while it sleeps. The cause was not checked (Not verified).
 
 **W-06. Expiry policy decision.** Decision, after W-04.
 Closed jobs with no deadline never leave search. The contract (§6) forbids expiring a job because a crawl did not return it until a written trust policy and a consecutive-missing threshold are approved as their own decision, separate from any implementation pull request. Draft that policy for approval: what counts as a complete, trustworthy crawl, and how many such crawls a job may be missing before it expires. This solves stale rows for every source.
@@ -189,18 +195,24 @@ Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave a
 
 **W-16. Issue #4, parked.** Test-suite cleanup, including the JSON-LD circular import that stops `tests/test_pipeline_extractor.py` and `tests/test_pipeline_integration.py` from being collected.
 
+**W-21. Geocoding refused by Nominatim.** Fix on branch `geocoder-backoff`, not merged.
+The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
+
+**W-22. Production runs with `AIDJOBS_ENV=dev`.** Record; not scheduled.
+The Render startup log reads `AIDJOBS_ENV=dev (dev-only admin routes enabled)` (Verified, 19 October 2026). The two named login bypasses were removed in PR #2, so admin login is still required. Which development-only routes are enabled, and whether Render should use a production value, need their own review.
+
 ### Search
 
 **W-17. Clearing a search shows no jobs.** Record only; not scheduled.
 After a search, clearing the search box shows no jobs until the filters are also cleared. A likely cause, not verified: the clear button in `apps/frontend/components/TrinitySearchBar.tsx` calls `onSearch(parsedFilters, '')` with the filters from before the reset, because the state update has not applied yet. `HomeClient.tsx` then rebuilds the query from those old filters.
 
 **W-18. Track A and the search-architecture decision.** After the crawler plan.
-Track A explains why Meilisearch fails. The decision afterwards is whether to repair Meilisearch or to use PostgreSQL full-text search with the existing `search_tsv` index. Either option must keep PostgreSQL authoritative and pass the two Gate 7 tests in the contract (§13).
+Track A explains why Meilisearch fails. Evidence, 19 October 2026: at startup and on reconnection the backend logs `Failed to create index: Expecting value: line 1 column 1 (char 0)`, so the configured Meilisearch address answers with an empty or non-JSON body. That points to configuration or hosting rather than code (Verified log line; cause not verified). The decision afterwards is whether to repair Meilisearch or to use PostgreSQL full-text search with the existing `search_tsv` index. Either option must keep PostgreSQL authoritative and pass the two Gate 7 tests in the contract (§13).
 
 ### Scaling to hundreds of sites
 
 **W-19. Platform readers.** Proposal, not approved. Stays a proposal until each platform is verified against the real source systems.
-Many organisations publish jobs through the same few recruitment systems. One reader per system can cover many sites, where one reader per site cannot scale. Evidence so far: the UNICEF listing links to "Powered by PageUp" (observed). ICRC's `/go/…` and `/job/…/{id}` paths and SAP session cookies point to SAP SuccessFactors (likely, not verified). The plan for this would:
+Many organisations publish jobs through the same few recruitment systems. One reader per system can cover many sites, where one reader per site cannot scale. Evidence so far: the UNICEF listing is hosted by Clinch (`clinchtalent.com`, `career-pages.com`, from its AWS WAF challenge page) and links to "Powered by PageUp" for applications (observed). Offline, a saved December 2025 UNDP listing links to Oracle Cloud (`estm.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/…/job/{id}`); the general reader admits 94 rows whose location is the table heading "Job Title", so UNDP must not be added until it has a working reader. A saved UNESCO listing uses SuccessFactors-style `/go/…` paths like ICRC; its 25 job links are rejected as `thin_vacancy` because the listing has 52 candidates, above the 50-job detail limit (W-09). ICRC's `/go/…` and `/job/…/{id}` paths and SAP session cookies point to SAP SuccessFactors (likely, not verified). The plan for this would:
 
 1. finish the six-site gate first;
 2. survey the sources to be added and group them by recruitment system;
