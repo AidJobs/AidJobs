@@ -5,7 +5,7 @@
 - `docs/architecture/aidjobs-migration-contract.md` — the architecture contract.
 - `docs/architecture/crawler-completion-plan.md` — the crawler gates (B1–B5, C1–C5) and their records.
 
-**Last verified:** 19 October 2026. `main` is `bcdadd3` (merge of PR #15). The user confirmed the Render deploy of `9d6fd99` (PR #14); the deploy of `bcdadd3` was not yet confirmed when this was written.
+**Last verified:** 20 October 2026. `main` is `7b13a9e` (merge of PR #17), with CI green. The Render deploy of `7b13a9e` was not yet confirmed when this was written.
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -36,7 +36,7 @@ These describe how the work is run. The architecture rules are in the contract.
 
 | Item | State | Evidence |
 | --- | --- | --- |
-| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `bcdadd3` (PR #15) not yet confirmed | Verified by the user and the Render log, 19 October 2026 |
+| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `7b13a9e` (PR #17) not yet confirmed | Verified by the user and the Render log, 19 October 2026 |
 | Frontend | Vercel; Netlify builds pull-request previews | Verified from pull-request checks |
 | Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07) | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
@@ -51,7 +51,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | --- | --- | --- | --- |
 | UNICEF | `https://jobs.unicef.org/en-us/listing/` | 19 October 2026, 09:58 UTC | `warn`: 120 of 209 jobs, 6 pages, stopped by an AWS WAF challenge on page 7 after one retry. Earlier the same day 120 were saved (99 inserted, 20 updated), every row with a location and a deadline, no rejections, no duplicate links. Verified |
 | ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 17 October 2026, 18:40 UTC | 34 found, 14 saved, 20 correctly rejected, no `thin_vacancy`. One deadline corrected to `2026-11-06` by the normal update. Verified |
-| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 19 October 2026, 10:08 UTC | `ok`: 5 found, 5 inserted, no rejections, no duplicate links; all five link to `/jobs/vacancy/…/description/`. Four locations from the job pages; one (Nepal) has none. All five deadlines stored wrong (W-25) and titles carry glued place and date (W-24). Verified |
+| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 19 October 2026, 19:24 UTC | `ok`: 5 found, 0 inserted, 5 updated, no duplicate links; all five link to `/jobs/vacancy/…/description/`. Four locations from the job pages; one (Nepal) has none. Deadlines correct after the W-25 fix. Titles carry glued place and date (W-24). Verified |
 
 Two UNICEF crawls failed on page 1 with `HTTP 0`, meaning no response: 18 October at 09:21 UTC (cause not read) and 19 October at 08:51 UTC, where the Render log reads `Error fetching https://jobs.unicef.org/en-us/listing/: timeout` (Verified). Each next crawl succeeded. No job changed.
 
@@ -103,6 +103,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | UNICEF "More Jobs" paging and completeness reporting | PR #13, `d7da048` | 18 Oct 2026 | Merged, deployed; live crawl read 6 pages, 120 jobs, reported partial |
 | UNICEF page pacing, one retry, safe refusal diagnostics | PR #14, `9d6fd99` | 19 Oct 2026 | Merged, deployed; identified an AWS WAF challenge at the seventh request |
 | Nominatim pause after refusal; failed lookups not repeated | PR #15, `bcdadd3` | 19 Oct 2026 | Merged, CI green; deploy not yet confirmed |
+| Ledger: how the crawler is built today, dormant settings recorded | PR #16, `8fe99a8` | 19 Oct 2026 | Merged |
+| ISO deadlines kept as written (W-25) | PR #17, `7b13a9e` | 19 Oct 2026 | Merged, CI green; verified live: the next Oxfam crawl corrected all five deadlines |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -121,7 +123,7 @@ PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as
 | C3, admission amendment | Done and deployed | None. Its UNICEF regression was fixed by PR #11 |
 | C4, reader | Done and deployed (PR #8, #9) | None |
 | C4, confirmation fetch | Re-scoped, not built | Only listings above 50 candidates, plus `detail_unconfirmed` logging (W-09) |
-| C5, six sites | ICRC met | Oxfam, DevNetJobsIndia, Global Partnership for Education, International Rescue Committee, Médecins Sans Frontières (W-07, W-08). UNICEF is live but partial (W-04) |
+| C5, six sites | ICRC met; Oxfam met apart from glued titles (W-24) | DevNetJobsIndia, Global Partnership for Education, International Rescue Committee, Médecins Sans Frontières (W-08). UNICEF is live but partial (W-04) |
 
 ## Completion criteria
 
@@ -137,13 +139,13 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 | Failed or partial crawls cannot expire or delete jobs | Repository. Live: the failed UNICEF crawl on 18 October changed no jobs |
 | Adapter persistence failures counted; RSS/API save failures not swallowed | Repository (`28b9efc`). The HTML all-rows-fail case is parked (Issue #5) |
 | A search-projection failure does not undo a PostgreSQL commit | Repository (Gate 7 test) |
-| Relevant tests pass, and the fetch policy is checked on the deployed backend | Tests pass (CI on `bcdadd3`). The deployed check is not done |
+| Relevant tests pass, and the fetch policy is checked on the deployed backend | Tests pass (CI on `7b13a9e`). The deployed check is not done |
 
 ## Open work
 
 Each item needs its own approval. Agreed order on 18 October 2026: W-01, then the documentation pull request (W-03), then W-04, W-05, W-06, and W-07. W-02 is an inspection only: no job is hidden or retired until the W-06 rule is agreed and validated.
 
-Status on 19 October 2026: W-01 and W-03 are done, and W-21 is merged. Oxfam is live (W-07) and exposed the ISO deadline bug (W-25), whose fix comes first. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06.
+Status on 20 October 2026: W-01 and W-03 are done, and W-21 and W-25 are merged. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06. The user-experience review (W-26) follows the crawler plan.
 
 ### Now
 
@@ -203,7 +205,7 @@ Agreed rule (18 October 2026): absence from a listing counts as evidence only af
 **W-07. Oxfam GB as a live source.** C5.
 Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Approved on 19 October 2026: add it as an HTML source and check one crawl the way ICRC was checked. Creating a source sets its next run to now (`POST /api/admin/sources`), so the scheduler crawls it within about five minutes; that automatic crawl is the single test, and Crawl is not pressed. Check: crawl status and counts, saved titles, locations, and deadlines, rejection reasons, links to real vacancies, and no duplicates.
 
-Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no rejections, no duplicates, every link an individual vacancy. Locations came from the job pages' structured data, for example `Renk County, Uppernile State, South Sudan`; the Nepal role has no location on its page and was admitted on its deadline. Two defects: every deadline was stored wrong (W-25), and titles carry the card's place and date run together (W-24). Not complete until the next crawl after the W-25 fix shows correct deadlines.
+Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no rejections, no duplicates, every link an individual vacancy. Locations came from the job pages' structured data, for example `Renk County, Uppernile State, South Sudan`; the Nepal role has no location on its page and was admitted on its deadline. Two defects: every deadline was stored wrong (W-25), and titles carry the card's place and date run together (W-24). The 19:24 UTC crawl after the W-25 fix corrected all five deadlines by update (Verified). Oxfam meets the C5 check apart from the glued titles, which stay open as W-24.
 
 **W-08. The rest of C5.**
 - DevNetJobsIndia: about 150 candidates, above the 50-job detail limit. Needs W-09 or listing-level fields.
@@ -233,7 +235,7 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 **W-21. Geocoding refused by Nominatim.** Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Check the next crawl's log: after one `Nominatim refused geocoding (HTTP 429)` warning, no further Nominatim requests for an hour.
 The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
 
-**W-25. ISO deadlines misread as day-first.** Fix on branch `iso-deadline-fix`, not merged.
+**W-25. ISO deadlines misread as day-first.** Done. Fix merged as PR #17 (`7b13a9e`), 19 October 2026. One manual Oxfam crawl, authorised by the user, at 19:24 UTC on 19 October (Verified): `ok`, 5 found, 0 inserted, 5 updated, 0 skipped, no duplicate links. All five deadlines now match the dates shown on the listing: `2026-11-13`, `2026-10-29`, `2026-10-28`, `2026-10-31`, `2026-10-28`. The Nepal job, previously stored as 2013 and so treated as closed, now has a future deadline and should show in search again (not checked in the site).
 PR #9 sends every deadline the detail-page reader fills through `_parse_deadline`, which calls `dateparser` with `DATE_ORDER: DMY`. For an ISO date that reads the parts in the wrong order: `2026-10-29` became `2029-10-26` and `2026-11-13` became `2013-11-26` (Verified on the five Oxfam rows and reproduced locally). The Oxfam job with a 2013 deadline is hidden from search as closed; the other four would stay visible after closing. ICRC (`06/11/2026`) and UNICEF (its own parser) were not affected; the save step already keeps ISO dates. The PR #9 review missed this because its tests used only `06/11/2026`. The fix returns a valid `YYYY-MM-DD` date, or the date part of an ISO datetime as written, before `dateparser` runs, and rejects an impossible one such as `2026-02-30`. No manual database edit: the next normal Oxfam crawl after the deploy should correct the five deadlines through the update path, and that must be verified with a query.
 
 **W-24. Oxfam titles carry the listing card's place and date.** Record; not scheduled.
@@ -252,6 +254,23 @@ After a search, clearing the search box shows no jobs until the filters are also
 
 **W-18. Track A and the search-architecture decision.** After the crawler plan.
 Track A explains why Meilisearch fails. Evidence, 19 October 2026: at startup and on reconnection the backend logs `Failed to create index: Expecting value: line 1 column 1 (char 0)`, so the configured Meilisearch address answers with an empty or non-JSON body. That points to configuration or hosting rather than code (Verified log line; cause not verified). The decision afterwards is whether to repair Meilisearch or to use PostgreSQL full-text search with the existing `search_tsv` index. Either option must keep PostgreSQL authoritative and pass the two Gate 7 tests in the contract (§13).
+
+### User experience
+
+**W-26. User-experience review.** Record only; scheduled after the crawler plan. Added 20 October 2026.
+No planning document covers the user experience. The contract (§3) puts new public search features out of scope for the migration, and Gate 2 asks only that the frontend test command really runs. So the public site and the admin have never been reviewed against a written standard. The repository-root `DASHBOARD_FUNCTIONALITY_CHECK.md` calls the admin "complete and polished"; it is not part of the contract or this ledger and is not evidence.
+
+What exists (Repository): the public home and search page (`apps/frontend/app/page.tsx`, `HomeClient.tsx`, `TrinitySearchBar.tsx`), collections (`app/collections/[slug]`), saved jobs (`app/saved`, `SavedJobsPanel.tsx`), and the admin pages (dashboard, sources, a source's detail page, crawl, jobs, organisations, data quality, setup, login).
+
+Crawler defects that users see today, tracked in their own items:
+- Wrong or missing deadlines decide whether a job is shown: W-25, W-12, W-13.
+- Closed jobs with no deadline stay in search indefinitely: W-02, W-06.
+- Titles with place and date glued on: W-24.
+- UNICEF shows about 120 of about 209 jobs: W-04.
+- Clearing a search shows no jobs: W-17.
+- Search is a plain `ILIKE` match, not ranked full-text search: W-18.
+
+The review, when approved, is read-only first: walk each public and admin page in a browser on the deployed site, and record what a job seeker and an admin can and cannot do, with screenshots, broken states, empty and error states, mobile layout, and accessibility basics. It produces a list of findings, each with its own item. Fixes are separate steps, and new public search features need a contract decision first (§3).
 
 ### Scaling to hundreds of sites
 
@@ -287,8 +306,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether to switch off or remove the dormant extraction rollout settings in Render | W-23 |
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
-
-Approved and in progress: the ISO deadline fix (W-25), as its own pull request.
+| When to run the user-experience review | W-26 |
 
 ## Terms used in this project
 
