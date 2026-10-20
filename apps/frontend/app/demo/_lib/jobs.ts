@@ -119,6 +119,28 @@ export function sortByDeadline<T extends Job>(jobs: T[]): T[] {
   });
 }
 
+/**
+ * Recommended order: soonest deadline first, jobs not confirmed for OLD_DAYS last, and
+ * never more than two in a row from one organisation while another organisation has jobs left.
+ */
+export function recommendedOrder<T extends Job>(jobs: T[]): T[] {
+  const fresh = sortByDeadline(jobs.filter((j) => j.seenDaysAgo === null || j.seenDaysAgo <= OLD_DAYS));
+  const stale = sortByDeadline(jobs.filter((j) => j.seenDaysAgo !== null && j.seenDaysAgo > OLD_DAYS));
+  const pool = [...fresh];
+  const out: T[] = [];
+  while (pool.length) {
+    const a = out[out.length - 1];
+    const b = out[out.length - 2];
+    let i = 0;
+    if (a && b && a.org === b.org && pool[0].org === a.org) {
+      const other = pool.findIndex((j) => j.org !== a.org);
+      if (other > 0) i = other;
+    }
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return [...out, ...stale];
+}
+
 export function initials(name: string): string {
   const short = name.replace(/\(.*?\)/g, '').trim();
   const words = short.split(/\s+/).filter(Boolean);

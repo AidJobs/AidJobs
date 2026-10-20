@@ -13,15 +13,13 @@ function dayLabel(d: number): string {
   return `In ${d} days`;
 }
 
-/** Calendar-style day picker. Scrolls with swipe, mouse wheel, or the edge arrows. */
+/** Calendar-style day picker. Tap a day again to clear it. Scrolls with swipe, mouse wheel, or the edge arrows. */
 export default function DayStrip({
   groups,
-  total,
   value,
   onChange,
 }: {
   groups: DayGroup[];
-  total: number;
   value: string | null;
   onChange: (date: string | null) => void;
 }) {
@@ -62,10 +60,6 @@ export default function DayStrip({
   return (
     <div className="relative">
       <div ref={scroller} className="dj-no-scrollbar flex gap-1.5 overflow-x-auto pb-2" role="tablist" aria-label="Filter by closing day" style={{ scrollSnapType: 'x proximity' }}>
-        <button type="button" className="dj-day" data-active={!value} onClick={() => onChange(null)} role="tab" aria-selected={!value} style={{ scrollSnapAlign: 'start' }}>
-          <span className="dj-day-top">All</span>
-          <span className="dj-day-num">{total}</span>
-        </button>
         {groups.map((g) => {
           const dt = new Date(`${g.date}T00:00:00Z`);
           return (

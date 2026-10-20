@@ -45,6 +45,7 @@ import {
   isOpen,
   matchesDeadline,
   normaliseJobs,
+  recommendedOrder,
   sortByDeadline,
   OLD_DAYS,
   SOON_DAYS,
@@ -302,6 +303,14 @@ function JobRow({
               <span className="shrink-0">{job.facts.contract}</span>
             </>
           )}
+          {job.facts.sdgs.slice(0, 1).map((s) => (
+            <Tip key={s.goal} label={`SDG ${s.goal}: ${s.name}${job.facts.sdgs.length > 1 ? ` (and ${job.facts.sdgs.length - 1} more)` : ''}, read from the job title`}>
+              <span className="dj-sdg" tabIndex={0}>
+                <span className="dj-sdg-dot" style={{ background: s.colour }} aria-hidden />
+                SDG {s.goal}
+              </span>
+            </Tip>
+          ))}
         </div>
       </div>
       {job.seenDaysAgo !== null && job.seenDaysAgo > OLD_DAYS && (
@@ -403,7 +412,7 @@ function JobDetail({
   const mailto = `mailto:?subject=${encodeURIComponent(`${job.title} – ${org}`)}&body=${encodeURIComponent(
     `${job.title}\n${org}${job.place ? `, ${job.place}` : ''}\n${job.deadline ? `Deadline: ${formatDate(job.deadline)}\n` : ''}Apply: ${job.apply_url}\n`,
   )}`;
-  const hasFacts = f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
+  const hasFacts = f.sdgs.length > 0 || f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
 
   return (
     <div className="flex flex-col gap-4">
@@ -441,6 +450,14 @@ function JobDetail({
 
       {hasFacts && (
         <div className="flex flex-wrap gap-1.5">
+          {f.sdgs.map((s) => (
+            <FactChip
+              key={s.goal}
+              icon={<span className="dj-sdg-dot" style={{ background: s.colour }} aria-hidden />}
+              label={`SDG ${s.goal} · ${s.name}`}
+              hint="Sustainable Development Goal, read from the job title"
+            />
+          ))}
           {f.contract && <FactChip icon={<FileSignature size={12} />} label={f.contract} hint={CONTRACT_HINT[f.contract]} />}
           {f.grade && <FactChip icon={<ShieldCheck size={12} />} label={f.grade} hint={gradeHint(f.grade)} />}
           {f.duration && <FactChip icon={<Hourglass size={12} />} label={f.duration} hint="Contract length, read from the title" />}
@@ -532,14 +549,16 @@ function dayGroups(soon: Job[]): DayGroup[] {
 }
 
 function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => void }) {
-  const [day, setDay] = useState<string | null>(null);
   const soon = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS));
+  const [picked, setPicked] = useState<string | null>(null);
   const groups = new Map<string, JobF[]>();
   for (const j of soon) {
     const k = j.deadline as string;
     groups.set(k, [...(groups.get(k) ?? []), j]);
   }
-  const shown = [...groups.entries()].filter(([date]) => !day || date === day);
+  const firstDay = soon[0]?.deadline ?? null;
+  const day = picked && groups.has(picked) ? picked : firstDay;
+  const shown = [...groups.entries()].filter(([date]) => date === day).map(([date, list]) => [date, recommendedOrder(list)] as [string, JobF[]]);
   return (
     <div className="flex flex-col">
       <div className="flex items-baseline justify-between pb-2">
@@ -552,7 +571,7 @@ function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => v
       </div>
       {soon.length === 0 && <p className="dj-muted">No deadlines in the next {SOON_DAYS} days.</p>}
       {soon.length > 0 && (
-        <DayStrip groups={dayGroups(soon)} total={soon.length} value={day} onChange={setDay} />
+        <DayStrip groups={dayGroups(soon)} value={day} onChange={(d) => setPicked(d ?? firstDay)} />
       )}
       {shown.map(([date, list]) => {
         const d = list[0].daysLeft as number;
@@ -609,6 +628,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [language, setLanguage] = useState<Language | null>(null);
   const [day, setDay] = useState<string | null>(null);
+  const [sort, setSort] = usePersistentState<'recommended' | 'closing'>('aidjobs.demo.sort', 'recommended');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverKey | null>(null);
@@ -694,7 +714,8 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     (skip === 'day' || !day || j.deadline === day) &&
     matchesText(j, query);
 
-  const list = sortByDeadline(jobs.filter((j) => matches(j)));
+  const filtered = jobs.filter((j) => matches(j));
+  const list = sort === 'recommended' ? recommendedOrder(filtered) : sortByDeadline(filtered);
   const selected = jobs.find((j) => j.id === selectedId) ?? null;
   const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS).length;
 
@@ -737,6 +758,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const sections: MenuSection[] = [
     {
       title: 'Contract',
+      icon: <FileSignature size={12} strokeWidth={2} />,
       hint: FACTS_HINT,
       entries: contractCounts.map(([k, n]) => ({
         key: `c-${k}`,
@@ -749,6 +771,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Open to',
+      icon: <Users size={12} strokeWidth={2} />,
       hint: `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
       entries: openToCounts.map(([k, n]) => ({
         key: `o-${k}`,
@@ -761,6 +784,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Work style',
+      icon: <House size={12} strokeWidth={2} />,
       hint: FACTS_HINT,
       entries:
         remoteCount > 0
@@ -769,6 +793,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Advert language',
+      icon: <Languages size={12} strokeWidth={2} />,
       hint: 'Adverts written in a language other than English, detected from the title.',
       entries: languageCounts.map(([k, n]) => ({
         key: `l-${k}`,
@@ -781,6 +806,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Demo',
+      icon: <LayoutDashboard size={12} strokeWidth={2} />,
       entries: [
         { key: 'admin', label: 'Admin demo', icon: <LayoutDashboard size={15} strokeWidth={1.8} />, href: '/demo/admin' },
         { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
@@ -934,6 +960,18 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
                   </button>
                 </>
               )}
+              <span className="ml-auto inline-flex items-center gap-1" role="radiogroup" aria-label="Sort jobs">
+                <Tip label="Urgent deadlines first, mixing organisations so no employer fills the list">
+                  <button type="button" className="dj-sort" data-active={sort === 'recommended'} onClick={() => setSort('recommended')} role="radio" aria-checked={sort === 'recommended'}>
+                    Recommended
+                  </button>
+                </Tip>
+                <Tip label="Strictly by deadline, soonest first">
+                  <button type="button" className="dj-sort" data-active={sort === 'closing'} onClick={() => setSort('closing')} role="radio" aria-checked={sort === 'closing'}>
+                    Closing soon
+                  </button>
+                </Tip>
+              </span>
             </div>
             {inSaved && (
               <div className="mt-3 flex items-center gap-1.5" role="tablist" aria-label="Saved or applied">
@@ -951,7 +989,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
               <div className="mt-2 lg:hidden">
                 <DayStrip
                   groups={dayGroups(jobs.filter((j) => matches(j, 'day') && j.daysLeft !== null && j.daysLeft <= SOON_DAYS))}
-                  total={jobs.filter((j) => matches(j, 'day')).length}
                   value={day}
                   onChange={setDay}
                 />

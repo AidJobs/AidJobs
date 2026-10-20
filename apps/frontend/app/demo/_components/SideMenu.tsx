@@ -18,6 +18,7 @@ export type MenuEntry = {
 
 export type MenuSection = {
   title: string;
+  icon?: ReactNode;
   hint?: string;
   entries: MenuEntry[];
   footer?: ReactNode;
@@ -184,6 +185,7 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
                   aria-expanded={isOpen(s)}
                 >
                   <ChevronRight size={11} strokeWidth={2.2} style={{ transform: isOpen(s) ? 'rotate(90deg)' : 'none', transition: 'transform 120ms ease' }} />
+                  {s.icon && <span className="inline-flex" aria-hidden>{s.icon}</span>}
                   {s.title}
                   {!isOpen(s) && <span className="ml-auto" style={{ textTransform: 'none', letterSpacing: 0 }}>{s.entries.length}</span>}
                 </button>

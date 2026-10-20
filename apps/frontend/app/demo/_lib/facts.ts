@@ -7,6 +7,8 @@ export type Contract = 'Consultancy' | 'Fixed term' | 'Temporary' | 'Internship'
 export type OpenTo = 'International' | 'Nationals';
 export type Language = 'English' | 'French' | 'Spanish' | 'Portuguese';
 
+export type Sdg = { goal: number; name: string; colour: string };
+
 export type Facts = {
   contract: Contract | null;
   grade: string | null;
@@ -14,7 +16,44 @@ export type Facts = {
   openTo: OpenTo | null;
   remote: boolean;
   language: Language;
+  sdgs: Sdg[];
 };
+
+/** Official SDG names and colours; shown as a dot beside dark text, so contrast does not depend on the colour. */
+const SDG: Record<number, Sdg> = {
+  1: { goal: 1, name: 'No poverty', colour: '#E5243B' },
+  2: { goal: 2, name: 'Zero hunger', colour: '#DDA63A' },
+  3: { goal: 3, name: 'Good health and well-being', colour: '#4C9F38' },
+  4: { goal: 4, name: 'Quality education', colour: '#C5192D' },
+  5: { goal: 5, name: 'Gender equality', colour: '#FF3A21' },
+  6: { goal: 6, name: 'Clean water and sanitation', colour: '#26BDE2' },
+  10: { goal: 10, name: 'Reduced inequalities', colour: '#DD1367' },
+  13: { goal: 13, name: 'Climate action', colour: '#3F7E44' },
+  16: { goal: 16, name: 'Peace, justice and strong institutions', colour: '#00689D' },
+};
+
+/** Sectors that map to one SDG without argument. Emergencies, behaviour change, and youth do not. */
+const SDG_RULES: Array<[number, RegExp]> = [
+  [4, /\beducat|\bschool|\blearning\b|[ée]ducation|educaci[oó]n|\bteach|early childhood|\bECD\b|pre-service|curricul/i],
+  [3, /\bhealth\b|sant[ée]|\bsalud\b|immuni[sz]|vaccin|\bpolio\b|malaria|\bHIV\b|epidemi|\bnurs(e|ing)\b|first aid|pre-hospital|\bmedical\b|maternal|newborn|\bMHPSS\b/i],
+  [2, /nutrition|breastfeeding|\bBFHI\b|food security|\bIYCF\b|stunting|malnutrition/i],
+  [6, /\bWASH\b|\bwater\b|sanitation|hygiene|\beau\b/i],
+  [5, /\bgender\b|\bGBV\b|gender-based|women.s empowerment|\bPSEA\b/i],
+  [1, /social protection|social policy|cash transfer|\(cash\)|poverty|child wellbeing/i],
+  [16, /child protection|protecci[oó]n (de la )?ni[ñn]ez|protection de l.enfant|justice (pour|for) (les )?enfants|juvenile justice|violence against children|rule of law/i],
+  [13, /climate|resilien/i],
+  [10, /disabilit|inclusive education/i],
+];
+
+/** "Monitoring, Evaluation and Learning" names a function, not education. */
+function withoutMelLearning(t: string): string {
+  return t.replace(/(monitoring|evaluation|accountability|reporting)[^,#()]{0,25}\blearning\b|\blearning and reporting\b/gi, ' ');
+}
+
+function sdgsOf(t: string): Sdg[] {
+  const clean = withoutMelLearning(t);
+  return SDG_RULES.filter(([, re]) => re.test(clean)).map(([goal]) => SDG[goal]);
+}
 
 export const CONTRACT_HINT: Record<Contract, string> = {
   Consultancy: 'A consultancy contract for a set task and period',
@@ -72,6 +111,7 @@ export function factsOf(title: string): Facts {
     openTo: openToOf(title, grade),
     remote: /\bremote(ly)?\b|home[- ]based|work from home|télétravail|remoto/i.test(title),
     language: languageOf(title),
+    sdgs: sdgsOf(title),
   };
 }
 
