@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight, Info, Moon, PanelLeftClose, PanelLeftOpen, PersonStanding, Star, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import Tip from './Tip';
 import { useDemoSettings, usePersistentState, type TextSize } from './DemoRoot';
 
@@ -73,6 +74,106 @@ function Entry({ entry, collapsed, onAfterSelect }: { entry: MenuEntry; collapse
     <Tip label={entry.count !== undefined ? `${entry.label} · ${entry.count}` : entry.label} side="right">
       <span className="block w-full">{node}</span>
     </Tip>
+  );
+}
+
+/** A section as one icon on the collapsed rail; tapping it opens its options beside the rail. */
+function RailSection({ section }: { section: MenuSection }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const active = section.entries.some((e) => e.active);
+
+  useEffect(() => {
+    if (!open) return;
+    const b = button.current?.getBoundingClientRect();
+    if (b) {
+      const height = Math.min(window.innerHeight * 0.7, 56 + section.entries.length * 38);
+      setPos({ left: b.right + 10, top: Math.max(8, Math.min(b.top - 8, window.innerHeight - height - 8)) });
+    }
+    const outside = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!panel.current?.contains(t) && !button.current?.contains(t)) setOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open, section.entries.length]);
+
+  const layer = typeof document !== 'undefined' ? document.querySelector('.dj-root') : null;
+
+  return (
+    <>
+      <Tip label={open ? section.title : `${section.title}: ${section.entries.length} options`} side="right">
+        <span className="block w-full">
+          <button
+            ref={button}
+            type="button"
+            className="dj-nav"
+            data-active={active || open ? 'true' : 'false'}
+            style={{ justifyContent: 'center' }}
+            onClick={() => setOpen(!open)}
+            aria-label={section.title}
+            aria-haspopup="menu"
+            aria-expanded={open}
+          >
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">{section.icon}</span>
+          </button>
+        </span>
+      </Tip>
+      {open &&
+        layer &&
+        pos &&
+        createPortal(
+          <div ref={panel} className="dj-popover dj-scroll fixed" style={{ left: pos.left, top: pos.top, width: 260, maxHeight: '70vh' }} role="menu" aria-label={section.title}>
+            <div className="dj-section-label" style={{ padding: '6px 8px 6px' }}>
+              {section.title}
+            </div>
+            {section.hint && (
+              <div className="dj-faint px-2 pb-2" style={{ fontSize: 11 }}>
+                {section.hint}
+              </div>
+            )}
+            <div className="flex flex-col gap-0.5">
+              {section.entries.map((e) =>
+                e.href ? (
+                  <Link key={e.key} href={e.href} className="dj-nav" data-active={e.active ? 'true' : 'false'} role="menuitem" onClick={() => setOpen(false)}>
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">{e.icon}</span>
+                    <span className="min-w-0 truncate">{e.label}</span>
+                  </Link>
+                ) : (
+                  <button
+                    key={e.key}
+                    type="button"
+                    className="dj-nav"
+                    data-active={e.active ? 'true' : 'false'}
+                    role="menuitem"
+                    onClick={() => {
+                      e.onSelect?.();
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">{e.icon}</span>
+                    <span className="min-w-0 truncate">{e.label}</span>
+                    {e.count !== undefined && <span className="dj-count">{e.count}</span>}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>,
+          layer,
+        )}
+    </>
   );
 }
 
@@ -173,6 +274,15 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
             <Entry key={e.key} entry={e} collapsed={collapsed} onAfterSelect={after} />
           ))}
         </div>
+        {collapsed && props.sections && props.sections.some((s) => s.icon) && (
+          <div className="mt-2 flex flex-col gap-0.5 border-t pt-2 dj-hair">
+            {props.sections
+              .filter((s) => s.icon && s.entries.length > 0)
+              .map((s) => (
+                <RailSection key={s.title} section={s} />
+              ))}
+          </div>
+        )}
         {!collapsed &&
           props.sections?.map((s) => (
             <div key={s.title}>
@@ -185,7 +295,6 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
                   aria-expanded={isOpen(s)}
                 >
                   <ChevronRight size={11} strokeWidth={2.2} style={{ transform: isOpen(s) ? 'rotate(90deg)' : 'none', transition: 'transform 120ms ease' }} />
-                  {s.icon && <span className="inline-flex" aria-hidden>{s.icon}</span>}
                   {s.title}
                   {!isOpen(s) && <span className="ml-auto" style={{ textTransform: 'none', letterSpacing: 0 }}>{s.entries.length}</span>}
                 </button>

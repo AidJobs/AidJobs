@@ -6,7 +6,6 @@ import {
   BriefcaseBusiness,
   CalendarPlus,
   Check,
-  CircleCheck,
   ChevronDown,
   Clock,
   ExternalLink,
@@ -57,7 +56,7 @@ import {
 import { CONTRACT_HINT, factsOf, gradeHint, type Contract, type Facts, type Language, type OpenTo } from '../_lib/facts';
 
 type JobF = Job & { facts: Facts };
-type View = 'all' | 'saved' | 'applied';
+type View = 'all' | 'saved';
 type PopoverKey = 'org' | 'country' | 'deadline';
 
 const FACTS_HINT = 'Read from job titles. Today mostly UNICEF titles carry this, so some jobs are not counted.';
@@ -338,14 +337,12 @@ function JobRow({
   job,
   active,
   saved,
-  applied,
   onOpen,
   onToggleSave,
 }: {
   job: JobF;
   active: boolean;
   saved: boolean;
-  applied: boolean;
   onOpen: () => void;
   onToggleSave: () => void;
 }) {
@@ -397,14 +394,6 @@ function JobRow({
           </span>
         </Tip>
       )}
-      {applied && (
-        <Tip label="You marked this as applied">
-          <span className="dj-chip" data-tone="sage" tabIndex={0}>
-            <CircleCheck size={11} strokeWidth={2} />
-            Applied
-          </span>
-        </Tip>
-      )}
       <DaysChip job={job} />
       <Tip label={saved ? 'Saved on this device. Remove' : 'Save on this device'}>
         <button
@@ -440,13 +429,11 @@ function FactChip({ icon, label, hint }: { icon: ReactNode; label: string; hint:
 function JobDetail({
   job,
   saved,
-  applied,
   sameOrg,
   sameCountry,
   similar,
   onOpenJob,
   onToggleSave,
-  onToggleApplied,
   onClose,
   onPickOrg,
   onPickCountry,
@@ -454,13 +441,11 @@ function JobDetail({
 }: {
   job: JobF;
   saved: boolean;
-  applied: boolean;
   sameOrg: number;
   sameCountry: number;
   similar: Similar[];
   onOpenJob: (id: string) => void;
   onToggleSave: () => void;
-  onToggleApplied: () => void;
   onClose: () => void;
   onPickOrg: () => void;
   onPickCountry: () => void;
@@ -562,11 +547,6 @@ function JobDetail({
         <Tip label={saved ? 'Saved on this device. Remove' : 'Save on this device'}>
           <button type="button" className="dj-icon-btn" data-active={saved} onClick={onToggleSave} aria-label={saved ? 'Remove from saved' : 'Save job'} aria-pressed={saved}>
             <Bookmark size={15} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
-          </button>
-        </Tip>
-        <Tip label={applied ? 'Marked as applied. Undo' : 'I applied: track it under Applied'}>
-          <button type="button" className="dj-icon-btn" data-active={applied} onClick={onToggleApplied} aria-label={applied ? 'Unmark applied' : 'Mark as applied'} aria-pressed={applied}>
-            <CircleCheck size={15} strokeWidth={1.8} />
           </button>
         </Tip>
         {job.deadline && (
@@ -740,7 +720,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [saved, setSaved] = usePersistentState<string[]>('aidjobs.demo.saved', []);
-  const [applied, setApplied] = usePersistentState<string[]>('aidjobs.demo.applied', []);
   const [collapsed, setCollapsed] = usePersistentState<boolean>('aidjobs.demo.menuCollapsed', false);
   const [split, setSplit] = usePersistentState<number>('aidjobs.demo.split2', 56);
   const [dragging, setDragging] = useState(false);
@@ -803,12 +782,9 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     setToast(has ? removed : added);
   };
   const toggleSave = (id: string) => toggleIn(saved, setSaved, id, 'Saved on this device', 'Removed from saved');
-  const toggleApplied = (id: string) => toggleIn(applied, setApplied, id, 'Marked as applied', 'Unmarked');
-
   type Skip = PopoverKey | 'contract' | 'openTo' | 'remote' | 'language' | 'day';
   const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
-    (view !== 'applied' || applied.includes(j.id)) &&
     (skip === 'org' || !org || j.org === org) &&
     (skip === 'country' || !country || j.iso === country) &&
     (skip === 'deadline' || matchesDeadline(j, deadline)) &&
@@ -854,7 +830,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const openToCounts = countBy(jobs.filter((j) => matches(j, 'openTo')), (j) => j.facts.openTo);
   const remoteCount = jobs.filter((j) => matches(j, 'remote') && j.facts.remote).length;
   const languageCounts = countBy(jobs.filter((j) => matches(j, 'language')), (j) => (j.facts.language === 'English' ? null : j.facts.language));
-  const inSaved = view === 'saved' || view === 'applied';
+  const inSaved = view === 'saved';
 
   const primary: MenuEntry[] = [
     { key: 'all', label: 'All jobs', icon: <Briefcase size={15} strokeWidth={1.8} />, count: jobs.length, active: view === 'all' && !anyFilter, onSelect: clearAll },
@@ -863,7 +839,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const sections: MenuSection[] = [
     {
       title: 'Contract',
-      icon: <FileSignature size={12} strokeWidth={2} />,
+      icon: <FileSignature size={15} strokeWidth={1.8} />,
       hint: FACTS_HINT,
       entries: contractCounts.map(([k, n]) => ({
         key: `c-${k}`,
@@ -876,7 +852,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Open to',
-      icon: <Users size={12} strokeWidth={2} />,
+      icon: <Users size={15} strokeWidth={1.8} />,
       hint: `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
       entries: openToCounts.map(([k, n]) => ({
         key: `o-${k}`,
@@ -889,7 +865,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Work style',
-      icon: <House size={12} strokeWidth={2} />,
+      icon: <House size={15} strokeWidth={1.8} />,
       hint: FACTS_HINT,
       entries:
         remoteCount > 0
@@ -898,7 +874,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Advert language',
-      icon: <Languages size={12} strokeWidth={2} />,
+      icon: <Languages size={15} strokeWidth={1.8} />,
       hint: 'Adverts written in a language other than English, detected from the title.',
       entries: languageCounts.map(([k, n]) => ({
         key: `l-${k}`,
@@ -911,7 +887,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Demo',
-      icon: <LayoutDashboard size={12} strokeWidth={2} />,
       entries: [
         { key: 'admin', label: 'Admin demo', icon: <LayoutDashboard size={15} strokeWidth={1.8} />, href: '/demo/admin' },
         { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
@@ -1006,13 +981,11 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     <JobDetail
       job={selected}
       saved={saved.includes(selected.id)}
-      applied={applied.includes(selected.id)}
       sameOrg={sameOrg}
       sameCountry={sameCountry}
       similar={similarJobs(selected, jobs)}
       onOpenJob={openJob}
       onToggleSave={() => toggleSave(selected.id)}
-      onToggleApplied={() => toggleApplied(selected.id)}
       onClose={closeJob}
       onPickOrg={() => {
         setOrg(selected.org);
@@ -1028,7 +1001,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
 
   const heading = inSaved ? 'Saved jobs' : 'NGO, humanitarian and development jobs';
   const emptyHint =
-    view === 'saved' ? 'Save a job with the bookmark and it appears here.' : view === 'applied' ? 'Open a job and mark it as applied to track it here.' : 'Try fewer filters.';
+    view === 'saved' ? 'Save a job with the bookmark and it appears here.' : 'Try fewer filters.';
 
   return (
     <div className="flex h-full">
@@ -1080,16 +1053,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
                 </Tip>
               </span>
             </div>
-            {inSaved && (
-              <div className="mt-3 flex items-center gap-1.5" role="tablist" aria-label="Saved or applied">
-                <button type="button" className="dj-pill" data-active={view === 'saved'} onClick={() => setView('saved')} role="tab" aria-selected={view === 'saved'}>
-                  <Bookmark size={13} strokeWidth={1.8} /> Saved {saved.length}
-                </button>
-                <button type="button" className="dj-pill" data-active={view === 'applied'} onClick={() => setView('applied')} role="tab" aria-selected={view === 'applied'}>
-                  <CircleCheck size={13} strokeWidth={1.8} /> Applied {applied.length}
-                </button>
-              </div>
-            )}
             <div className="mt-3 hidden items-center gap-2 lg:flex">{searchBox}</div>
             <div className="mt-3">{pills}</div>
             {deadline === 'soon' && (
@@ -1109,7 +1072,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
                 job={j}
                 active={j.id === selectedId}
                 saved={saved.includes(j.id)}
-                applied={applied.includes(j.id)}
                 onOpen={() => openJob(j.id)}
                 onToggleSave={() => toggleSave(j.id)}
               />
