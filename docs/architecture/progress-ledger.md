@@ -5,7 +5,9 @@
 - `docs/architecture/aidjobs-migration-contract.md` — the architecture contract.
 - `docs/architecture/crawler-completion-plan.md` — the crawler gates (B1–B5, C1–C5) and their records.
 
-**Last verified:** 20 October 2026. `main` is `7b13a9e` (merge of PR #17), with CI green. The Render deploy of `7b13a9e` was not yet confirmed when this was written.
+The proposed public site and admin direction is in `docs/architecture/public-ux-direction.md` (W-28). It is not approved.
+
+**Last verified:** 20 October 2026. `main` is `2a2e02f` (merge of PR #18), with CI green. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -145,7 +147,9 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 
 Each item needs its own approval. Agreed order on 18 October 2026: W-01, then the documentation pull request (W-03), then W-04, W-05, W-06, and W-07. W-02 is an inspection only: no job is hidden or retired until the W-06 rule is agreed and validated.
 
-Status on 20 October 2026: W-01, W-03, W-21, and W-25 are done. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06. The user-experience review (W-26) follows the crawler plan.
+Status on 20 October 2026: W-01, W-03, W-21, and W-25 are done. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06.
+
+Priority changed on 20 October 2026, by the user: user experience first, then back to the crawler. The read-only review (W-26) is done. PR #19 fixes two live public bugs and is not merged. The direction (W-28) waits for approval. The crawler items keep their order and resume afterwards; scheduled crawls continue meanwhile. UNICEF still shows about 120 of 209 jobs (W-04); a better interface does not change coverage.
 
 ### Now
 
@@ -262,8 +266,8 @@ Track A explains why Meilisearch fails. Evidence, 19 October 2026: at startup an
 
 ### User experience
 
-**W-26. User-experience review.** Record only; scheduled after the crawler plan. Added 20 October 2026.
-No planning document covers the user experience. The contract (§3) puts new public search features out of scope for the migration, and Gate 2 asks only that the frontend test command really runs. So the public site and the admin have never been reviewed against a written standard. The repository-root `DASHBOARD_FUNCTIONALITY_CHECK.md` calls the admin "complete and polished"; it is not part of the contract or this ledger and is not evidence.
+**W-26. User-experience review.** Done 20 October 2026, read-only, on `www.aidjobs.app` at `2a2e02f`, at 1366px and 390px, public pages and, after the user logged in, admin pages. No production data changed: admin pages were read with a browser guard that blocked every non-read request.
+No planning document covered the user experience. The contract (§2) puts new public search features out of scope for the migration, and Gate 2 asks only that the frontend test command really runs. So the public site and the admin have never been reviewed against a written standard. The repository-root `DASHBOARD_FUNCTIONALITY_CHECK.md` calls the admin "complete and polished"; it is not part of the contract or this ledger and is not evidence.
 
 What exists (Repository): the public home and search page (`apps/frontend/app/page.tsx`, `HomeClient.tsx`, `TrinitySearchBar.tsx`), collections (`app/collections/[slug]`), saved jobs (`app/saved`, `SavedJobsPanel.tsx`), and the admin pages (dashboard, sources, a source's detail page, crawl, jobs, organisations, data quality, setup, login).
 
@@ -275,7 +279,33 @@ Crawler defects that users see today, tracked in their own items:
 - Clearing a search shows no jobs: W-17.
 - Search is a plain `ILIKE` match, not ranked full-text search: W-18.
 
-The review, when approved, is read-only first: walk each public and admin page in a browser on the deployed site, and record what a job seeker and an admin can and cannot do, with screenshots, broken states, empty and error states, mobile layout, and accessibility basics. It produces a list of findings, each with its own item. Fixes are separate steps, and new public search features need a contract decision first (§3).
+Public findings (Verified in the browser unless marked):
+- At 1366px the page was 1919px wide: every save button and Sort sat off-screen. Cause: the results column in `HomeClient.tsx` could not shrink. Fixed in PR #19, verified on its preview, not merged.
+- The Saved page showed an empty card: it stored the `/api/jobs/{id}` envelope as the job. Fixed in PR #19, verified on its preview. The sidebar count stays stale after removing a job until reload; not fixed.
+- On a phone the menu opens over about two-thirds of the screen and the first job is about 1,300px down.
+- Clearing a search shows no jobs (W-17). Confirmed cause: the cleared search sends the filters Trinity inferred, joined into the text, for example `Water, Sanitation & Hygiene (WASH) Program & Field Implementation Officer / Associate (2–5 yrs) WASH officer`. The address keeps `?q=`.
+- UN Jobs, Remote Jobs, Consultancies, and Fellowships return 0 jobs and show "Loading jobs..." forever, because organisation type, work modality, and career type are never filled; Surge & Emergency shows all 206 because its filter is ignored. Level reads "No data".
+- The page background computes to yellow `rgb(255, 255, 0)` and headings to brown; visible on the admin login. The UX plan records this as U3.
+- First load took about 20 seconds per request, reloads about 0.6 seconds; likely the backend waking on Render (Not verified).
+- The job panel has no description, shows country as a code, and shows "International eligible: No" for every job (likely unfilled, Not verified). "Apply Now" opens the employer's page correctly.
+- Every visitor sees "Running on backup search (temporarily)".
+- Smaller: deadlines in US format, the search clear button has no accessible name, country counts do not follow the search, one search sends four requests, the admin login greets new visitors with "Your session was not accepted".
+- The HTML sent to crawlers contains no jobs, the title is only "AidJobs", there is no structured data, and `robots.txt`, `sitemap.xml`, and the favicon return 404 (Verified with direct requests).
+
+Admin findings (Verified in the browser unless marked):
+- Delete Jobs and Delete Source are 32px icons styled like Run crawl, stacked under Edit. The code has a confirmation with an impact summary (Repository; not opened).
+- Job totals disagree without labels: 234 on the dashboard, 218 on Jobs and Data Quality, 206 public.
+- Data Quality flags all 218 jobs as listing pages: the check in `app/data_quality.py` matches `/jobs`, `/careers`, and `/list` anywhere in the link, including host names such as `jobs.unicef.org`, and takes up to 25 points off the score (Repository).
+- The dashboard reports no recent activity while Crawls lists crawls; Settings reports AI as configured with a revoked key and Meilisearch as not configured; the Search card says "Check console for details".
+- The Sources table stacks nine icon actions, about 337px per row.
+- "Cleanup expired jobs" does nothing: the backend returns `disabled` (Repository).
+- Source detail shows raw timestamps; every source has an empty organisation type, likely why UN Jobs is empty (Not verified).
+- At 390px the sidebar leaves 134px for content.
+
+Fixes are separate steps. The direction for both is W-28; new public search features need the scope change it records (§2).
+
+**W-28. Public site and admin direction.** Proposed, not approved. Added 20 October 2026.
+`docs/architecture/public-ux-direction.md`: phone-first public site with one search bar on real data, dense list with days left, a job sheet now and job pages later, saving without accounts, removal of collections, Trinity, and empty filters, the search-engine and AI-search foundation, a four-item admin, and the crawler data the design needs. It records the product reason that rule 15 requires and the scope changes to §2. Decisions taken: the user provides the logo; accent colour ink; fix two live bugs first (PR #19). It replaces most of the paused branch `ux/public-layout`, which is kept for reference and not merged.
 
 ### Scaling to hundreds of sites
 
@@ -311,8 +341,12 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether to switch off or remove the dormant extraction rollout settings in Render | W-23 |
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
-| When to run the user-experience review | W-26 |
 | How to get coordinates in production, or whether to go without | W-27 |
+| Approve the public site and admin direction, as the scope change to §2 | W-28 |
+| Merge PR #19, the two public bug fixes | W-26 |
+| Provide the logo; set a launch date | W-28 |
+| How to stop the slow first load on Render (hosting) | W-28 |
+| Which AI crawlers may read the site | W-28 |
 
 ## Terms used in this project
 
