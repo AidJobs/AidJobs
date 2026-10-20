@@ -5,7 +5,7 @@
 - `docs/architecture/aidjobs-migration-contract.md` — the architecture contract.
 - `docs/architecture/crawler-completion-plan.md` — the crawler gates (B1–B5, C1–C5) and their records.
 
-The proposed public site and admin direction is in `docs/architecture/public-ux-direction.md` (W-28). It is not approved.
+User-experience work has two documents: `docs/architecture/ux-build-plan.md`, the authoritative step-by-step plan with status, and `docs/architecture/public-ux-direction.md` (W-28), the proposed design, not yet approved.
 
 **Last verified:** 20 October 2026. `main` is `2a2e02f` (merge of PR #18), with CI green. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
@@ -13,10 +13,10 @@ Every claim below is marked **Verified** (checked against git, GitHub, CI, or a 
 
 ## How to resume
 
-1. Read this file, then the "Open work" list. Take the lowest-numbered item that is not blocked.
+1. **Current priority, set by the user on 20 October 2026: user experience.** Open `docs/architecture/ux-build-plan.md` and take the first step whose status is not Done and whose dependencies are met, following the working method at the top of that file. Crawler items (the "Open work" list below) resume in their order after Stage C of that plan, or when the user changes the priority. Without a UX priority, read the "Open work" list and take the lowest-numbered item that is not blocked.
 2. Check the current state before acting: `git status -sb`, `git log -1 origin/main`, and `gh pr list --state open`. If `main` has moved past the commit named under "Last verified", find out why before trusting this file.
 3. Follow the operating conventions below.
-4. When an item is finished, update this file in the same pull request as the work, or in the next docs pull request.
+4. When an item is finished, update this file in the same pull request as the work, or in the next docs pull request. For a UX step, also update its status line in `ux-build-plan.md`; a UX step is Done only after its live check.
 
 ### Operating conventions
 
@@ -149,7 +149,7 @@ Each item needs its own approval. Agreed order on 18 October 2026: W-01, then th
 
 Status on 20 October 2026: W-01, W-03, W-21, and W-25 are done. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06.
 
-Priority changed on 20 October 2026, by the user: user experience first, then back to the crawler. The read-only review (W-26) is done. PR #19 fixes two live public bugs and is not merged. The direction (W-28) waits for approval. The crawler items keep their order and resume afterwards; scheduled crawls continue meanwhile. UNICEF still shows about 120 of 209 jobs (W-04); a better interface does not change coverage.
+Priority changed on 20 October 2026, by the user: user experience first, then back to the crawler. The read-only review (W-26) is done. The steps are in `ux-build-plan.md`; the first is UX-01, PR #19, which fixes two live public bugs and is not merged. The direction (W-28) waits for approval at UX-08. The crawler items keep their order and resume after Stage C of the UX plan; scheduled crawls continue meanwhile. UNICEF still shows about 120 of 209 jobs (W-04); a better interface does not change coverage.
 
 ### Now
 
@@ -302,7 +302,7 @@ Admin findings (Verified in the browser unless marked):
 - Source detail shows raw timestamps; every source has an empty organisation type, likely why UN Jobs is empty (Not verified).
 - At 390px the sidebar leaves 134px for content.
 
-Fixes are separate steps. The direction for both is W-28; new public search features need the scope change it records (§2).
+Fixes are separate steps. Every finding above has a step in `ux-build-plan.md` (UX-01 to UX-07 for fixes on the current site; the rest in the redesign stages). The direction for both is W-28; new public search features need the scope change it records (§2).
 
 **W-28. Public site and admin direction.** Proposed, not approved. Added 20 October 2026.
 `docs/architecture/public-ux-direction.md`: phone-first public site with one search bar on real data, dense list with days left, a job sheet now and job pages later, saving without accounts, removal of collections, Trinity, and empty filters, the search-engine and AI-search foundation, a four-item admin, and the crawler data the design needs. It records the product reason that rule 15 requires and the scope changes to §2. Decisions taken: the user provides the logo; accent colour ink; fix two live bugs first (PR #19). It replaces most of the paused branch `ux/public-layout`, which is kept for reference and not merged.
@@ -342,11 +342,13 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 | How to get coordinates in production, or whether to go without | W-27 |
-| Approve the public site and admin direction, as the scope change to §2 | W-28 |
-| Merge PR #19, the two public bug fixes | W-26 |
-| Provide the logo; set a launch date | W-28 |
-| How to stop the slow first load on Render (hosting) | W-28 |
-| Which AI crawlers may read the site | W-28 |
+| Merge PR #19, the two public bug fixes | UX-01 |
+| Approve the public site and admin direction, and the scope changes to §2 | UX-08, W-28 |
+| Provide the logo; set a launch date | UX-08 |
+| How to stop the slow first load on Render (hosting), after an assessment | UX-08 |
+| Which AI crawlers may read the site, after an assessment | UX-08 |
+| The admin menu, which changes the contract's admin V1 navigation | UX-19 |
+| Facts read from titles, which is enrichment expansion under §2 | UX-22 |
 
 ## Terms used in this project
 

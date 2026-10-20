@@ -1,6 +1,6 @@
 # AidJobs — Public site and admin direction
 
-**Status:** Proposed, 20 October 2026. Not approved. Nothing in this document is built. Approval of this document is a product decision; each build step still needs its own approval.
+**Status:** Proposed, 20 October 2026. Not approved. Nothing in this document is built. Merging the pull request that adds this file records the proposal; it is not the approval. The user's approval is recorded at step UX-08 of `docs/architecture/ux-build-plan.md`, and each build step still needs its own approval. The order of work is in that plan, not here.
 
 **Relationship to the rules.** The contract (`aidjobs-migration-contract.md`, §2) puts user accounts, new public search features, recommendation systems, and enrichment expansion out of scope, and rule 15 forbids rewriting the public UI without a product reason. Approving this document records the product reason (below) and amends §2 only as far as the items marked **Scope change**. Everything else in the contract stands.
 
@@ -104,7 +104,7 @@ No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Ideali
 
 Review findings (ledger W-26): job totals disagree (234, 218, 206) without labels; Data Quality flags every job as a listing page because its check matches `/jobs` and `/careers` in host names (`app/data_quality.py`); the dashboard reports no recent activity while Crawls lists crawls; Settings reports AI as configured with a revoked key; Delete Jobs and Delete Source look like Run crawl; the Sources table stacks nine icon actions, about 337px per row; "Cleanup expired jobs" does nothing; the admin is unusable on a phone.
 
-Proposed menu, four items:
+Proposed menu, four items. **Scope change:** the contract fixes the admin V1 navigation as Dashboard, Organisations, Sources, Jobs, Crawls, and Data Quality, with Settings and logout allowed ("Admin V1 navigation" and Gate 9). This menu needs a contract decision before it is built.
 
 1. **Dashboard:** one health view. Each source's last crawl and whether it was complete, partial, or failed; the public job count; real alerts. Absorbs Crawls and Settings.
 2. **Sources:** one actions menu per row. A source's page holds its crawl history, the test and simulate tools, and a separate danger zone for deletes.
@@ -120,18 +120,13 @@ Organisations is hidden until the organisation model (Gate 8) is in use.
 - Facts from titles (grade, contract, duration, eligibility) stored at save time.
 - The expiry policy (W-06), so closed jobs leave search and the sitemap; Google penalises listings that stay up after closing.
 
-## Phases
+## Order of work
 
-0. **Decide.** Approve this document. Receive the logo. Set a launch date.
-1. **Launch.** Persistent shell, one bar, dense list, sheet and two panes, phone first; the bar on organisation, place, closing soon, and title words; the rich sheet; removals; the SEO foundation; the slow-start decision.
-2. **Grow.** Crawler descriptions and posting dates; job pages with JobPosting data; landing pages; the expiry policy.
-3. **Later decisions.** Sign-in for sync and alerts; AI features.
-
-Admin work runs alongside, smallest first: correct the totals and the Data Quality check, separate the delete actions, then the four-item menu.
+`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status: fixes on the current site first (Stage A), a decision gate (UX-08), the launch redesign (Stage B), the admin redesign (Stage C), and growth with the crawler (Stage D).
 
 ## The paused UX branch
 
-`ux/public-layout` (worktree `AidJobsGit-ux`) holds two unmerged commits from 12–14 October: a responsive public layout (U1) and a single home search path that removes Trinity (U2), plus `docs/architecture/ux-public-layout-plan.md` and an uncommitted colour correction (U3). This direction replaces most of it. It is kept for reference, not merged, and not deleted without a separate decision.
+`ux/public-layout` (worktree `AidJobsGit-ux`) holds two unmerged commits from 12–14 October: a responsive public layout (U1) and a single home search path that removes Trinity (U2), plus `docs/architecture/ux-public-layout-plan.md` and an uncommitted colour correction (U3). This direction replaces most of it, and `ux-build-plan.md` replaces its plan. It is kept for reference, not merged, and not deleted without a separate decision.
 
 ## Decisions taken on 20 October 2026
 
