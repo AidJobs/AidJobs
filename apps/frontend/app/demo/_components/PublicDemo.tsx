@@ -812,7 +812,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     (skip === 'day' || !day || j.deadline === day) &&
     matchesText(j, query);
   const togglePick = (f: Facet, v: string) =>
-    setPicks({ ...picks, [f]: picks[f].includes(v) ? picks[f].filter((x) => x !== v) : [...picks[f], v] });
+    setPicks((prev) => ({ ...prev, [f]: prev[f].includes(v) ? prev[f].filter((x) => x !== v) : [...prev[f], v] }));
 
   const filtered = jobs.filter((j) => matches(j));
   const list = sort === 'recommended' ? recommendedOrder(filtered) : sortByDeadline(filtered);
