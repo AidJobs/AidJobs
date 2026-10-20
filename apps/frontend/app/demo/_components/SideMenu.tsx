@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Info, Moon, PanelLeftClose, PanelLeftOpen, PersonStanding, Star, Sun, X } from 'lucide-react';
+import { ChevronRight, Info, Moon, PanelLeftClose, PanelLeftOpen, PersonStanding, Star, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from './Tip';
-import { useDemoSettings, type TextSize } from './DemoRoot';
+import { useDemoSettings, usePersistentState, type TextSize } from './DemoRoot';
 
 export type MenuEntry = {
   key: string;
@@ -21,6 +21,7 @@ export type MenuSection = {
   hint?: string;
   entries: MenuEntry[];
   footer?: ReactNode;
+  defaultOpen?: boolean;
 };
 
 type Props = {
@@ -128,7 +129,9 @@ function AccessibilityPanel({ collapsed }: { collapsed: boolean }) {
 
 function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
   const { theme, setTheme } = useDemoSettings();
+  const [openSections, setOpenSections] = usePersistentState<Record<string, boolean>>('aidjobs.demo.sections', {});
   const after = props.onCloseDrawer;
+  const isOpen = (s: MenuSection) => openSections[s.title] ?? s.defaultOpen ?? true;
   return (
     <div className="flex h-full flex-col">
       <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-3 pb-2 pt-4`}>
@@ -173,7 +176,17 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
           props.sections?.map((s) => (
             <div key={s.title}>
               <div className="dj-section-label flex items-center gap-1">
-                {s.title}
+                <button
+                  type="button"
+                  className="flex flex-1 items-center gap-1"
+                  style={{ border: 'none', background: 'transparent', padding: 0, font: 'inherit', color: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit', cursor: 'pointer' }}
+                  onClick={() => setOpenSections({ ...openSections, [s.title]: !isOpen(s) })}
+                  aria-expanded={isOpen(s)}
+                >
+                  <ChevronRight size={11} strokeWidth={2.2} style={{ transform: isOpen(s) ? 'rotate(90deg)' : 'none', transition: 'transform 120ms ease' }} />
+                  {s.title}
+                  {!isOpen(s) && <span className="ml-auto" style={{ textTransform: 'none', letterSpacing: 0 }}>{s.entries.length}</span>}
+                </button>
                 {s.hint && (
                   <Tip label={s.hint} side="right">
                     <span className="inline-flex" tabIndex={0} aria-label={s.hint}>
@@ -182,12 +195,16 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
                   </Tip>
                 )}
               </div>
-              <div className="flex flex-col gap-0.5">
-                {s.entries.map((e) => (
-                  <Entry key={e.key} entry={e} collapsed={false} onAfterSelect={after} />
-                ))}
-              </div>
-              {s.footer}
+              {isOpen(s) && (
+                <>
+                  <div className="flex flex-col gap-0.5">
+                    {s.entries.map((e) => (
+                      <Entry key={e.key} entry={e} collapsed={false} onAfterSelect={after} />
+                    ))}
+                  </div>
+                  {s.footer}
+                </>
+              )}
             </div>
           ))}
       </nav>
