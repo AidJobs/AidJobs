@@ -139,12 +139,19 @@ const COMMON_WORDS = new Set(
   ),
 );
 
-function keyWords(title: string): Set<string> {
+/** UNICEF region and office codes that appear in titles but say nothing about the work. */
+const PLACE_CODES = new Set('ecar esar wcar mena lacr eapr nyhq gpd'.split(' '));
+
+function placeWords(job: Job): string[] {
+  return `${job.place ?? ''} ${job.country ?? ''}`.toLowerCase().split(/[^a-zà-ÿ]+/).filter(Boolean);
+}
+
+function keyWords(title: string, exclude: Set<string> = new Set()): Set<string> {
   return new Set(
     title
       .toLowerCase()
       .split(/[^a-zà-ÿ&]+/)
-      .filter((w) => w.length > 3 && !COMMON_WORDS.has(w)),
+      .filter((w) => w.length > 3 && !COMMON_WORDS.has(w) && !PLACE_CODES.has(w) && !exclude.has(w)),
   );
 }
 
@@ -166,7 +173,8 @@ function similarJobs(job: JobF, all: JobF[]): Similar[] {
           reasons.push(`SDG ${s.goal}`);
         }
       }
-      const shared = [...keyWords(j.title)].filter((w) => words.has(w)).slice(0, 3);
+      const places = new Set([...placeWords(job), ...placeWords(j)]);
+      const shared = [...keyWords(j.title, places)].filter((w) => words.has(w)).slice(0, 3);
       if (shared.length) {
         score += shared.length;
         content += shared.length;
