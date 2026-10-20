@@ -41,7 +41,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07) | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
 | AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
-| Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October. PR #15 pauses Nominatim for an hour after a refusal and stops repeating failed lookups (W-21) | Verified from the Render log |
+| Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October, including the first lookup of the 19:24 UTC crawl. PR #15 pauses Nominatim for an hour after a refusal, verified live (W-21). Production lookups still get no coordinates (W-27) | Verified from the Render log |
 | `AIDJOBS_ENV` | `dev` in production; startup reads `dev-only admin routes enabled` (W-22) | Verified from the Render log |
 | Extraction rollout variables | `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org`. Dormant: no current source matches (W-23) | Verified by the user from Render's Environment page |
 
@@ -102,7 +102,7 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Progress ledger, `AGENTS.md`, UNICEF fix recorded | PR #12, `15d6e4e` | 18 Oct 2026 | Merged |
 | UNICEF "More Jobs" paging and completeness reporting | PR #13, `d7da048` | 18 Oct 2026 | Merged, deployed; live crawl read 6 pages, 120 jobs, reported partial |
 | UNICEF page pacing, one retry, safe refusal diagnostics | PR #14, `9d6fd99` | 19 Oct 2026 | Merged, deployed; identified an AWS WAF challenge at the seventh request |
-| Nominatim pause after refusal; failed lookups not repeated | PR #15, `bcdadd3` | 19 Oct 2026 | Merged, CI green; deploy not yet confirmed |
+| Nominatim pause after refusal; failed lookups not repeated | PR #15, `bcdadd3` | 19 Oct 2026 | Merged, CI green; verified live in the 19:24 UTC Oxfam crawl log |
 | Ledger: how the crawler is built today, dormant settings recorded | PR #16, `8fe99a8` | 19 Oct 2026 | Merged |
 | ISO deadlines kept as written (W-25) | PR #17, `7b13a9e` | 19 Oct 2026 | Merged, CI green; verified live: the next Oxfam crawl corrected all five deadlines |
 
@@ -145,7 +145,7 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 
 Each item needs its own approval. Agreed order on 18 October 2026: W-01, then the documentation pull request (W-03), then W-04, W-05, W-06, and W-07. W-02 is an inspection only: no job is hidden or retired until the W-06 rule is agreed and validated.
 
-Status on 20 October 2026: W-01 and W-03 are done, and W-21 and W-25 are merged. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06. The user-experience review (W-26) follows the crawler plan.
+Status on 20 October 2026: W-01, W-03, W-21, and W-25 are done. Oxfam is live (W-07) and the W-25 fix is verified on it. Next: the Clinch platform-reader plan that finishes W-04 (plan first, then approval). Then W-05 and W-06. The user-experience review (W-26) follows the crawler plan.
 
 ### Now
 
@@ -232,8 +232,13 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 
 **W-16. Issue #4, parked.** Test-suite cleanup, including the JSON-LD circular import that stops `tests/test_pipeline_extractor.py` and `tests/test_pipeline_integration.py` from being collected.
 
-**W-21. Geocoding refused by Nominatim.** Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Check the next crawl's log: after one `Nominatim refused geocoding (HTTP 429)` warning, no further Nominatim requests for an hour.
+**W-21. Geocoding refused by Nominatim.** Done. Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Verified in the Render log of the 19:24 UTC Oxfam crawl, from the lines the user pasted: the first lookup, `London, London, United Kingdom`, returned `HTTP 429 Too many requests`, then `Nominatim refused geocoding (HTTP 429); pausing Nominatim lookups for 3600s`, and no further Nominatim request in that crawl. This closes the repeated-request failure only. Geocoding itself still does not work in production (W-27).
 The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
+
+**W-27. Production geocoding is ineffective.** Record; not scheduled. Added 20 October 2026.
+Nominatim answered the first lookup of the 19:24 UTC Oxfam crawl with `HTTP 429`, after a whole day of 429s on 19 October (W-21), so production lookups currently get no coordinates (Verified from the Render log). The geocoder already sends `User-Agent: AidJobs/1.0 (contact@aidjobs.app)` (Repository). A possible cause is that Render's shared outgoing addresses are rate-limited or blocked by Nominatim; that is a hypothesis, not verified.
+User impact: job locations are still saved and shown as text from the job pages. Coordinates are missing. In the frontend they only drive the "Mapped" badge in the job panel (`JobInspector.tsx`, used on the home, saved, and collection pages) and the "geocoded" flag of the data-quality badge; no map or distance search was found in the frontend (Repository).
+Options for later evaluation, none approved: a geocoding provider used with an API key, built-in resolution of country names without a network call, or accepting missing coordinates.
 
 **W-25. ISO deadlines misread as day-first.** Done. Fix merged as PR #17 (`7b13a9e`), 19 October 2026. One manual Oxfam crawl, authorised by the user, at 19:24 UTC on 19 October (Verified): `ok`, 5 found, 0 inserted, 5 updated, 0 skipped, no duplicate links. All five deadlines now match the dates shown on the listing: `2026-11-13`, `2026-10-29`, `2026-10-28`, `2026-10-31`, `2026-10-28`. The Nepal job, previously stored as 2013 and so treated as closed, now has a future deadline and should show in search again (not checked in the site).
 PR #9 sends every deadline the detail-page reader fills through `_parse_deadline`, which calls `dateparser` with `DATE_ORDER: DMY`. For an ISO date that reads the parts in the wrong order: `2026-10-29` became `2029-10-26` and `2026-11-13` became `2013-11-26` (Verified on the five Oxfam rows and reproduced locally). The Oxfam job with a 2013 deadline is hidden from search as closed; the other four would stay visible after closing. ICRC (`06/11/2026`) and UNICEF (its own parser) were not affected; the save step already keeps ISO dates. The PR #9 review missed this because its tests used only `06/11/2026`. The fix returns a valid `YYYY-MM-DD` date, or the date part of an ISO datetime as written, before `dateparser` runs, and rejects an impossible one such as `2026-02-30`. No manual database edit: the next normal Oxfam crawl after the deploy should correct the five deadlines through the update path, and that must be verified with a query.
@@ -307,6 +312,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 | When to run the user-experience review | W-26 |
+| How to get coordinates in production, or whether to go without | W-27 |
 
 ## Terms used in this project
 
