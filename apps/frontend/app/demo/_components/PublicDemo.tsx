@@ -133,6 +133,71 @@ function Freshness({ job }: { job: Job }) {
   );
 }
 
+const COMMON_WORDS = new Set(
+  'officer consultant consultancy specialist national international position temporary fixed term months month days programme program unicef assistant associate support senior with from based remote office open only candidates nationals for and the des pour'.split(
+    ' ',
+  ),
+);
+
+function keyWords(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .split(/[^a-zà-ÿ&]+/)
+      .filter((w) => w.length > 3 && !COMMON_WORDS.has(w)),
+  );
+}
+
+type Similar = { job: JobF; why: string };
+
+/** Up to four open jobs that share the most with this one, at most two per organisation. Each says why. */
+function similarJobs(job: JobF, all: JobF[]): Similar[] {
+  const words = keyWords(job.title);
+  const scored = all
+    .filter((j) => j.id !== job.id && (j.seenDaysAgo === null || j.seenDaysAgo <= OLD_DAYS))
+    .map((j) => {
+      const reasons: string[] = [];
+      let score = 0;
+      for (const s of j.facts.sdgs) {
+        if (job.facts.sdgs.some((x) => x.goal === s.goal)) {
+          score += 3;
+          reasons.push(`SDG ${s.goal}`);
+        }
+      }
+      const shared = [...keyWords(j.title)].filter((w) => words.has(w)).slice(0, 3);
+      if (shared.length) {
+        score += shared.length;
+        reasons.push(`"${shared.join(', ')}"`);
+      }
+      if (job.facts.contract && j.facts.contract === job.facts.contract) {
+        score += 2;
+        reasons.push(j.facts.contract);
+      }
+      if (job.iso && j.iso === job.iso && j.country) {
+        score += 2;
+        reasons.push(j.country);
+      }
+      if (job.facts.openTo && j.facts.openTo === job.facts.openTo) score += 1;
+      if (job.facts.remote && j.facts.remote) {
+        score += 1;
+        reasons.push('Remote');
+      }
+      return { job: j, score, why: reasons.join(' · ') };
+    })
+    .filter((s) => s.score >= 3 && s.why)
+    .sort((a, b) => b.score - a.score || (a.job.daysLeft ?? 999) - (b.job.daysLeft ?? 999));
+  const perOrg = new Map<string, number>();
+  const out: Similar[] = [];
+  for (const s of scored) {
+    const n = perOrg.get(s.job.org) ?? 0;
+    if (n >= 2) continue;
+    perOrg.set(s.job.org, n + 1);
+    out.push({ job: s.job, why: s.why });
+    if (out.length === 4) break;
+  }
+  return out;
+}
+
 function matchesText(job: Job, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -366,6 +431,8 @@ function JobDetail({
   applied,
   sameOrg,
   sameCountry,
+  similar,
+  onOpenJob,
   onToggleSave,
   onToggleApplied,
   onClose,
@@ -378,6 +445,8 @@ function JobDetail({
   applied: boolean;
   sameOrg: number;
   sameCountry: number;
+  similar: Similar[];
+  onOpenJob: (id: string) => void;
   onToggleSave: () => void;
   onToggleApplied: () => void;
   onClose: () => void;
@@ -510,6 +579,30 @@ function JobDetail({
       <div className="dj-card dj-muted" style={{ borderStyle: 'dashed', borderRadius: 16, padding: 12 }}>
         Demo note: the role summary and full description appear here once the crawler stores descriptions (UX-23).
       </div>
+
+      {similar.length > 0 && (
+        <section className="flex flex-col gap-1" aria-label="Similar jobs">
+          <div className="dj-section-label" style={{ padding: '2px 0 4px' }}>
+            Similar jobs
+          </div>
+          {similar.map((s) => (
+            <button key={s.job.id} type="button" className="dj-option" onClick={() => onOpenJob(s.job.id)}>
+              <OrgMark name={s.job.org} size={18} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate" style={{ fontWeight: 560 }}>
+                  {s.job.title}
+                </span>
+                <span className="dj-muted block truncate">
+                  {displayOrg(s.job.org)}
+                  {s.job.country ? ` · ${s.job.country}` : ''}
+                </span>
+                <span className="dj-faint block truncate">Shared: {s.why}</span>
+              </span>
+              <DaysChip job={s.job} />
+            </button>
+          ))}
+        </section>
+      )}
 
       <div className="flex flex-col gap-1">
         {sameOrg > 0 && (
@@ -904,6 +997,8 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       applied={applied.includes(selected.id)}
       sameOrg={sameOrg}
       sameCountry={sameCountry}
+      similar={similarJobs(selected, jobs)}
+      onOpenJob={openJob}
       onToggleSave={() => toggleSave(selected.id)}
       onToggleApplied={() => toggleApplied(selected.id)}
       onClose={closeJob}
