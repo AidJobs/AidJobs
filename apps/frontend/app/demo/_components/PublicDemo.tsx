@@ -20,10 +20,12 @@ import {
   MapPin,
   Menu,
   Palette,
+  RefreshCw,
   Search,
   Share2,
   ShieldCheck,
   Timer,
+  TriangleAlert,
   Users,
   X,
 } from 'lucide-react';
@@ -43,6 +45,9 @@ import {
   matchesDeadline,
   normaliseJobs,
   sortByDeadline,
+  OLD_DAYS,
+  SOON_DAYS,
+  STALE_DAYS,
   type DeadlineFilter,
   type Job,
   type RawJob,
@@ -53,7 +58,6 @@ type JobF = Job & { facts: Facts };
 type View = 'all' | 'saved' | 'applied';
 type PopoverKey = 'org' | 'country' | 'deadline';
 
-const CLOSING_DAYS = 7;
 const FACTS_HINT = 'Read from job titles. Today mostly UNICEF titles carry this, so some jobs are not counted.';
 
 export function displayOrg(name: string): string {
@@ -71,13 +75,57 @@ export function OrgMark({ name, size = 22 }: { name: string; size?: number }) {
 export function DaysChip({ job }: { job: Job }) {
   if (job.daysLeft === null) return null;
   const d = job.daysLeft;
-  const tone = d <= 3 ? 'red' : d <= 7 ? 'amber' : undefined;
+  const tone = d <= 3 ? 'red' : d <= SOON_DAYS ? 'amber' : undefined;
   const text = d === 0 ? 'Today' : `${d}d`;
   return (
     <Tip label={`Closes ${formatLongDate(job.deadline)}${d === 0 ? ', today' : `, in ${d} day${d === 1 ? '' : 's'}`}`}>
       <span className="dj-chip" data-tone={tone} tabIndex={0}>
         <Clock size={11} strokeWidth={2} />
         {text}
+      </span>
+    </Tip>
+  );
+}
+
+function seenLabel(days: number): string {
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
+}
+
+function Freshness({ job }: { job: Job }) {
+  if (job.seenDaysAgo === null) return null;
+  const org = displayOrg(job.org);
+  const when = formatDate(job.last_seen_at ?? null);
+  if (job.seenDaysAgo > OLD_DAYS) {
+    return (
+      <div className="flex items-start gap-2" style={{ color: 'var(--amber)' }}>
+        <TriangleAlert size={14} strokeWidth={1.8} style={{ marginTop: 1, flexShrink: 0 }} />
+        <span>
+          Not found on the {org} site since {when}. It may have closed.
+        </span>
+      </div>
+    );
+  }
+  if (job.seenDaysAgo > STALE_DAYS) {
+    return (
+      <Tip label={`AidJobs has not found this job on the ${org} site since ${when}. Check the deadline before applying.`}>
+        <span className="dj-muted flex items-center gap-2" tabIndex={0}>
+          <RefreshCw size={14} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />
+          <span>
+            Last confirmed on the {org} site on {when}
+          </span>
+        </span>
+      </Tip>
+    );
+  }
+  return (
+    <Tip label={`AidJobs last found this job on the ${org} site on ${when}`}>
+      <span className="flex items-center gap-2" tabIndex={0}>
+        <RefreshCw size={14} strokeWidth={1.8} style={{ color: 'var(--sage-7)' }} />
+        <span>
+          Checked on the {org} site {seenLabel(job.seenDaysAgo)}
+        </span>
       </span>
     </Tip>
   );
@@ -255,6 +303,13 @@ function JobRow({
           )}
         </div>
       </div>
+      {job.seenDaysAgo !== null && job.seenDaysAgo > OLD_DAYS && (
+        <Tip label={`Not found on the ${displayOrg(job.org)} site since ${formatDate(job.last_seen_at ?? null)}. It may have closed.`}>
+          <span className="inline-flex" tabIndex={0} style={{ color: 'var(--amber)' }} aria-label="Not seen recently on the employer site">
+            <TriangleAlert size={14} strokeWidth={1.8} />
+          </span>
+        </Tip>
+      )}
       {applied && (
         <Tip label="You marked this as applied">
           <span className="dj-chip" data-tone="sage" tabIndex={0}>
@@ -380,6 +435,7 @@ function JobDetail({
             <span className="dj-muted">No deadline listed</span>
           )}
         </div>
+        <Freshness job={job} />
       </div>
 
       {hasFacts && (
@@ -464,7 +520,7 @@ function dayLabel(d: number): string {
 }
 
 function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => void }) {
-  const soon = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= CLOSING_DAYS));
+  const soon = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS));
   const groups = new Map<string, JobF[]>();
   for (const j of soon) {
     const k = j.deadline as string;
@@ -474,13 +530,13 @@ function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => v
     <div className="flex flex-col">
       <div className="flex items-baseline justify-between pb-2">
         <h2 className="dj-title" style={{ fontSize: 15, margin: 0 }}>
-          Closing in the next {CLOSING_DAYS} days
+          Closing in the next {SOON_DAYS} days
         </h2>
         <span className="dj-chip" data-tone="sage">
           {soon.length} roles
         </span>
       </div>
-      {soon.length === 0 && <p className="dj-muted">No deadlines in the next {CLOSING_DAYS} days.</p>}
+      {soon.length === 0 && <p className="dj-muted">No deadlines in the next {SOON_DAYS} days.</p>}
       {[...groups.entries()].map(([date, list]) => {
         const d = list[0].daysLeft as number;
         return (
@@ -621,7 +677,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
 
   const list = sortByDeadline(jobs.filter((j) => matches(j)));
   const selected = jobs.find((j) => j.id === selectedId) ?? null;
-  const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= CLOSING_DAYS).length;
+  const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS).length;
 
   const orgOptions = countBy(jobs.filter((j) => matches(j, 'org')), (j) => j.org).map(([k, n]) => ({ key: k, label: displayOrg(k), count: n, lead: <OrgMark name={k} size={18} /> }));
   const countryOptions = countBy(jobs.filter((j) => matches(j, 'country')), (j) => j.iso).map(([k, n]) => ({
@@ -841,11 +897,11 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
               <span>
                 <strong style={{ color: 'var(--text)', fontWeight: 650 }}>{list.length}</strong> {list.length === 1 ? 'open role' : 'open roles'}
               </span>
-              {view === 'all' && closingCount > 0 && deadline !== 'week' && (
+              {view === 'all' && closingCount > 0 && deadline !== 'soon' && (
                 <>
                   <span className="dj-faint">·</span>
-                  <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--amber)', cursor: 'pointer' }} onClick={() => setDeadline('week')}>
-                    {closingCount} close within {CLOSING_DAYS} days
+                  <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--amber)', cursor: 'pointer' }} onClick={() => setDeadline('soon')}>
+                    {closingCount} close within {SOON_DAYS} days
                   </button>
                 </>
               )}

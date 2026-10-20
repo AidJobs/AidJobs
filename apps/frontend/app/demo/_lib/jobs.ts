@@ -8,6 +8,7 @@ export type RawJob = {
   country_iso: string | null;
   deadline: string | null;
   apply_url: string;
+  last_seen_at?: string | null;
 };
 
 export type Job = RawJob & {
@@ -15,7 +16,12 @@ export type Job = RawJob & {
   country: string | null;
   place: string | null;
   daysLeft: number | null;
+  seenDaysAgo: number | null;
 };
+
+export const SOON_DAYS = 10;
+export const STALE_DAYS = 7;
+export const OLD_DAYS = 30;
 
 const DAY_MS = 86_400_000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -94,7 +100,9 @@ export function normaliseJobs(raw: RawJob[]): Job[] {
     } else if (country) {
       place = country;
     }
-    return { ...r, iso, country, place, daysLeft: daysUntil(r.deadline) };
+    const seen = r.last_seen_at ? Date.parse(r.last_seen_at) : NaN;
+    const seenDaysAgo = Number.isNaN(seen) ? null : Math.max(0, Math.floor((startOfToday() + DAY_MS - seen) / DAY_MS));
+    return { ...r, iso, country, place, daysLeft: daysUntil(r.deadline), seenDaysAgo };
   });
 }
 
@@ -129,10 +137,10 @@ export function countBy<T>(items: T[], key: (item: T) => string | null): Array<[
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-export type DeadlineFilter = 'week' | 'month' | 'dated';
+export type DeadlineFilter = 'soon' | 'month' | 'dated';
 
 export const DEADLINE_LABELS: Record<DeadlineFilter, string> = {
-  week: 'Closing within 7 days',
+  soon: `Closing within ${SOON_DAYS} days`,
   month: 'Closing within 30 days',
   dated: 'Has a deadline',
 };
@@ -140,7 +148,7 @@ export const DEADLINE_LABELS: Record<DeadlineFilter, string> = {
 export function matchesDeadline(job: Job, filter: DeadlineFilter | null): boolean {
   if (!filter) return true;
   if (job.daysLeft === null) return false;
-  if (filter === 'week') return job.daysLeft <= 7;
+  if (filter === 'soon') return job.daysLeft <= SOON_DAYS;
   if (filter === 'month') return job.daysLeft <= 30;
   return true;
 }
