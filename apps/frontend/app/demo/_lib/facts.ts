@@ -14,54 +14,7 @@ export type Facts = {
   openTo: OpenTo | null;
   remote: boolean;
   language: Language;
-  sectors: string[];
-  functions: string[];
 };
-
-/** What the work is about: the original plan's "impact domain", kept to terms that rarely mislead. */
-const SECTORS: Array<[string, RegExp]> = [
-  ['Child protection', /child protection|protecci[oó]n (de la )?ni[ñn]ez|protection de l.enfant|justice (pour|for) (les )?enfants|children on the move|violence against children/i],
-  ['Education', /\beducat|\bschool|\blearning\b|[ée]ducation|educaci[oó]n|\bteach|early childhood|\bECD\b|pre-service|curricul/i],
-  ['Health', /\bhealth\b|sant[ée]|\bsalud\b|immuni[sz]|vaccin|\bpolio\b|malaria|\bHIV\b|epidemi|\bnurs(e|ing)\b|first aid|pre-hospital|\bmedical\b|maternal|newborn|\bMHPSS\b/i],
-  ['Nutrition', /nutrition|breastfeeding|\bBFHI\b|food security|\bIYCF\b|stunting|malnutrition/i],
-  ['WASH', /\bWASH\b|\bwater\b|sanitation|hygiene|\beau\b/i],
-  ['Gender', /\bgender\b|\bGBV\b|gender-based|women.s empowerment|\bPSEA\b|sexual exploitation/i],
-  ['Social protection', /social protection|social policy|cash transfer|\(cash\)|poverty|public finance|child wellbeing|social inclusion/i],
-  ['Emergencies', /emergenc|humanitarian|\bcrisis\b|disaster|\bDRR\b|\bDRM\b|preparedness|\brefugee|displac|\bsurge\b/i],
-  ['Climate & environment', /climate|environment|environnement|\benergy\b|resilien/i],
-  ['Behaviour change', /\bSBC\b|behaviou?r change|\bC4D\b|community engagement|social mobili[sz]ation/i],
-  ['Adolescents & youth', /adolescen|\byouth\b|young people|\bUPSHIFT\b/i],
-  ['Disability inclusion', /disabilit|inclusive education/i],
-];
-
-/** What the person does: the original plan's "functional role", simplified. */
-const FUNCTIONS: Array<[string, RegExp]> = [
-  ['Programme & field', /programme|program\b|\bfield\b|\bproject\b|implementation/i],
-  ['Monitoring, evaluation & data', /monitoring|evaluation|\bM&E\b|\bMEAL\b|\bresearch|\bdata\b|statistic|knowledge management|information management|evidence/i],
-  ['Communication & advocacy', /communicat|advocacy|\bmedia\b|editor|\bcontent\b|writer|digital engagement/i],
-  ['Partnerships & fundraising', /partnership|fund ?raising|\bdonor|resource mobili|private sector|pledge/i],
-  ['Finance & audit', /financ|budget|\baccount|audit|treasury|\bpayment/i],
-  ['HR & administration', /human resources|\bHR\b|\badmin(istrat)|talent|workforce|recruit/i],
-  ['Supply & logistics', /supply|logistic|procurement|warehouse|\bfleet\b|\bdriver\b|distribution/i],
-  ['IT & digital', /\bICT\b|\bIT\b|digital|software|systems|technolog|\bGIS\b/i],
-  ['Leadership & management', /representative|\bchief\b|\bhead of\b|director|\bmanager\b|\bcoordinator\b|\blead\b/i],
-  ['Operations', /\boperations?\b/i],
-  ['Retail', /\bshop\b|bookshop|retail/i],
-];
-
-/** "Monitoring, Evaluation and Learning" names a function, not the education sector. */
-function withoutMelLearning(t: string): string {
-  return t.replace(/(monitoring|evaluation|accountability|reporting)[^,#()]{0,25}\blearning\b|\blearning and reporting\b/gi, ' ');
-}
-
-function sectorsOf(t: string): string[] {
-  const clean = withoutMelLearning(t);
-  return SECTORS.filter(([, re]) => re.test(clean)).map(([name]) => name);
-}
-
-function functionsOf(t: string): string[] {
-  return FUNCTIONS.filter(([, re]) => re.test(t)).map(([name]) => name);
-}
 
 export const CONTRACT_HINT: Record<Contract, string> = {
   Consultancy: 'A consultancy contract for a set task and period',
@@ -119,8 +72,6 @@ export function factsOf(title: string): Facts {
     openTo: openToOf(title, grade),
     remote: /\bremote(ly)?\b|home[- ]based|work from home|télétravail|remoto/i.test(title),
     language: languageOf(title),
-    sectors: sectorsOf(title),
-    functions: functionsOf(title),
   };
 }
 

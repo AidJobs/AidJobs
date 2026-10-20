@@ -129,7 +129,7 @@ function AccessibilityPanel({ collapsed }: { collapsed: boolean }) {
 
 function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
   const { theme, setTheme } = useDemoSettings();
-  const [openSections, setOpenSections] = usePersistentState<Record<string, boolean>>('aidjobs.demo.sections', {});
+  const [openSections, setOpenSections] = usePersistentState<Record<string, boolean>>('aidjobs.demo.sections.v2', {});
   const after = props.onCloseDrawer;
   const isOpen = (s: MenuSection) => openSections[s.title] ?? s.defaultOpen ?? true;
   return (

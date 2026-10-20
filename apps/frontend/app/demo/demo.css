@@ -511,6 +511,17 @@ body:has(.dj-root[data-theme='dark']) {
   color: var(--on-ink);
 }
 
+.dj-strip-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(calc(-50% - 4px));
+  width: 30px;
+  height: 30px;
+  z-index: 2;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .dj-swatch {
   width: 100%;
   height: 56px;
@@ -524,6 +535,50 @@ body:has(.dj-root[data-theme='dark']) {
 
 .dj-no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Phones and tablets: larger tap targets and body text. */
+@media (max-width: 1023px) {
+  .dj-root {
+    font-size: 13px;
+  }
+
+  .dj-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .dj-row .dj-icon-btn {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .dj-pill {
+    height: 36px;
+    padding: 0 14px;
+  }
+
+  .dj-nav {
+    height: 42px;
+  }
+
+  .dj-option {
+    padding: 10px 8px;
+  }
+
+  .dj-row {
+    padding: 10px 8px 10px 12px;
+  }
+
+  .dj-input {
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .dj-chip {
+    height: 24px;
+    font-size: 11.5px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

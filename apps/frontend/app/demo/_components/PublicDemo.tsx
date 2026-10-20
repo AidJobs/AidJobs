@@ -24,14 +24,13 @@ import {
   Search,
   Share2,
   ShieldCheck,
-  Target,
   Timer,
   TriangleAlert,
-  Wrench,
   Users,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import DayStrip, { type DayGroup } from './DayStrip';
 import Flag from './Flag';
 import SideMenu, { type MenuEntry, type MenuSection } from './SideMenu';
 import Tip from './Tip';
@@ -404,7 +403,7 @@ function JobDetail({
   const mailto = `mailto:?subject=${encodeURIComponent(`${job.title} – ${org}`)}&body=${encodeURIComponent(
     `${job.title}\n${org}${job.place ? `, ${job.place}` : ''}\n${job.deadline ? `Deadline: ${formatDate(job.deadline)}\n` : ''}Apply: ${job.apply_url}\n`,
   )}`;
-  const hasFacts = f.sectors.length > 0 || f.functions.length > 0 || f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
+  const hasFacts = f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
 
   return (
     <div className="flex flex-col gap-4">
@@ -442,12 +441,6 @@ function JobDetail({
 
       {hasFacts && (
         <div className="flex flex-wrap gap-1.5">
-          {f.sectors.map((s) => (
-            <FactChip key={`s-${s}`} icon={<Target size={12} />} label={s} hint="Sector, read from the job title" />
-          ))}
-          {f.functions.map((fn) => (
-            <FactChip key={`f-${fn}`} icon={<Wrench size={12} />} label={fn} hint="Function, read from the job title" />
-          ))}
           {f.contract && <FactChip icon={<FileSignature size={12} />} label={f.contract} hint={CONTRACT_HINT[f.contract]} />}
           {f.grade && <FactChip icon={<ShieldCheck size={12} />} label={f.grade} hint={gradeHint(f.grade)} />}
           {f.duration && <FactChip icon={<Hourglass size={12} />} label={f.duration} hint="Contract length, read from the title" />}
@@ -527,6 +520,17 @@ function dayLabel(d: number): string {
   return `In ${d} days`;
 }
 
+function dayGroups(soon: Job[]): DayGroup[] {
+  const m = new Map<string, DayGroup>();
+  for (const j of soon) {
+    if (!j.deadline || j.daysLeft === null) continue;
+    const g = m.get(j.deadline) ?? { date: j.deadline, count: 0, daysLeft: j.daysLeft };
+    g.count += 1;
+    m.set(j.deadline, g);
+  }
+  return [...m.values()].sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
 function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => void }) {
   const [day, setDay] = useState<string | null>(null);
   const soon = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS));
@@ -548,40 +552,7 @@ function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => v
       </div>
       {soon.length === 0 && <p className="dj-muted">No deadlines in the next {SOON_DAYS} days.</p>}
       {soon.length > 0 && (
-        <div className="dj-no-scrollbar -mx-1 mb-1 flex gap-1.5 overflow-x-auto px-1 pb-2" role="tablist" aria-label="Filter by closing day">
-          <button
-            type="button"
-            className="dj-day"
-            data-active={!day}
-            onClick={() => setDay(null)}
-            role="tab"
-            aria-selected={!day}
-          >
-            <span className="dj-day-top">All</span>
-            <span className="dj-day-num">{soon.length}</span>
-          </button>
-          {[...groups.entries()].map(([date, list]) => {
-            const d = list[0].daysLeft as number;
-            const dt = new Date(`${date}T00:00:00Z`);
-            return (
-              <Tip key={date} label={`${dayLabel(d)}: ${list.length} ${list.length === 1 ? 'role closes' : 'roles close'} on ${formatLongDate(date)}`} side="bottom">
-                <button
-                  type="button"
-                  className="dj-day"
-                  data-active={day === date}
-                  data-urgent={d <= 3}
-                  onClick={() => setDay(day === date ? null : date)}
-                  role="tab"
-                  aria-selected={day === date}
-                >
-                  <span className="dj-day-top">{d === 0 ? 'Today' : d === 1 ? 'Tmrw' : formatLongDate(date).split(' ')[0]}</span>
-                  <span className="dj-day-num">{dt.getUTCDate()}</span>
-                  <span className="dj-day-count">{list.length}</span>
-                </button>
-              </Tip>
-            );
-          })}
-        </div>
+        <DayStrip groups={dayGroups(soon)} total={soon.length} value={day} onChange={setDay} />
       )}
       {shown.map(([date, list]) => {
         const d = list[0].daysLeft as number;
@@ -637,8 +608,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [openTo, setOpenTo] = useState<OpenTo | null>(null);
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [language, setLanguage] = useState<Language | null>(null);
-  const [sector, setSector] = useState<string | null>(null);
-  const [func, setFunc] = useState<string | null>(null);
+  const [day, setDay] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverKey | null>(null);
@@ -710,7 +680,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const toggleSave = (id: string) => toggleIn(saved, setSaved, id, 'Saved on this device', 'Removed from saved');
   const toggleApplied = (id: string) => toggleIn(applied, setApplied, id, 'Marked as applied', 'Unmarked');
 
-  type Skip = PopoverKey | 'contract' | 'openTo' | 'remote' | 'language' | 'sector' | 'func';
+  type Skip = PopoverKey | 'contract' | 'openTo' | 'remote' | 'language' | 'day';
   const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
     (view !== 'applied' || applied.includes(j.id)) &&
@@ -721,8 +691,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     (skip === 'openTo' || !openTo || j.facts.openTo === openTo) &&
     (skip === 'remote' || !remoteOnly || j.facts.remote) &&
     (skip === 'language' || !language || j.facts.language === language) &&
-    (skip === 'sector' || !sector || j.facts.sectors.includes(sector)) &&
-    (skip === 'func' || !func || j.facts.functions.includes(func)) &&
+    (skip === 'day' || !day || j.deadline === day) &&
     matchesText(j, query);
 
   const list = sortByDeadline(jobs.filter((j) => matches(j)));
@@ -741,10 +710,9 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     .map((k) => ({ key: k, label: DEADLINE_LABELS[k], count: deadlinePool.filter((j) => matchesDeadline(j, k)).length }))
     .filter((o) => o.count > 0);
 
-  const anyFilter = !!(org || country || deadline || contract || openTo || remoteOnly || language || sector || func || query || view !== 'all');
+  const anyFilter = !!(org || country || deadline || contract || openTo || remoteOnly || language || day || query || view !== 'all');
   const clearAll = () => {
-    setSector(null);
-    setFunc(null);
+    setDay(null);
     setOrg(null);
     setCountry(null);
     setDeadline(null);
@@ -760,13 +728,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const openToCounts = countBy(jobs.filter((j) => matches(j, 'openTo')), (j) => j.facts.openTo);
   const remoteCount = jobs.filter((j) => matches(j, 'remote') && j.facts.remote).length;
   const languageCounts = countBy(jobs.filter((j) => matches(j, 'language')), (j) => (j.facts.language === 'English' ? null : j.facts.language));
-  const multiCount = (pool: JobF[], pickAll: (j: JobF) => string[]) => {
-    const m = new Map<string, number>();
-    for (const j of pool) for (const v of pickAll(j)) m.set(v, (m.get(v) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  };
-  const sectorCounts = multiCount(jobs.filter((j) => matches(j, 'sector')), (j) => j.facts.sectors);
-  const funcCounts = multiCount(jobs.filter((j) => matches(j, 'func')), (j) => j.facts.functions);
   const inSaved = view === 'saved' || view === 'applied';
 
   const primary: MenuEntry[] = [
@@ -775,35 +736,8 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   ];
   const sections: MenuSection[] = [
     {
-      title: 'Sector',
-      hint: `${FACTS_HINT} A job can belong to two sectors.`,
-      defaultOpen: true,
-      entries: sectorCounts.map(([k, n]) => ({
-        key: `s-${k}`,
-        label: k,
-        icon: <Target size={15} strokeWidth={1.8} />,
-        count: n,
-        active: sector === k,
-        onSelect: () => setSector(sector === k ? null : k),
-      })),
-    },
-    {
-      title: 'Function',
-      hint: `${FACTS_HINT} What the person does, whatever the sector.`,
-      defaultOpen: false,
-      entries: funcCounts.map(([k, n]) => ({
-        key: `f-${k}`,
-        label: k,
-        icon: <Wrench size={15} strokeWidth={1.8} />,
-        count: n,
-        active: func === k,
-        onSelect: () => setFunc(func === k ? null : k),
-      })),
-    },
-    {
       title: 'Contract',
       hint: FACTS_HINT,
-      defaultOpen: true,
       entries: contractCounts.map(([k, n]) => ({
         key: `c-${k}`,
         label: k === 'Consultancy' ? 'Consultancies' : k === 'Internship' ? 'Internships' : k === 'Fellowship' ? 'Fellowships' : k,
@@ -816,7 +750,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     {
       title: 'Open to',
       hint: `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
-      defaultOpen: false,
       entries: openToCounts.map(([k, n]) => ({
         key: `o-${k}`,
         label: k === 'Nationals' ? 'Nationals of the country' : 'International candidates',
@@ -829,7 +762,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     {
       title: 'Work style',
       hint: FACTS_HINT,
-      defaultOpen: false,
       entries:
         remoteCount > 0
           ? [{ key: 'remote', label: 'Remote or home-based', icon: <House size={15} strokeWidth={1.8} />, count: remoteCount, active: remoteOnly, onSelect: () => setRemoteOnly(!remoteOnly) }]
@@ -838,7 +770,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     {
       title: 'Advert language',
       hint: 'Adverts written in a language other than English, detected from the title.',
-      defaultOpen: false,
       entries: languageCounts.map(([k, n]) => ({
         key: `l-${k}`,
         label: k,
@@ -850,7 +781,6 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
     {
       title: 'Demo',
-      defaultOpen: false,
       entries: [
         { key: 'admin', label: 'Admin demo', icon: <LayoutDashboard size={15} strokeWidth={1.8} />, href: '/demo/admin' },
         { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
@@ -904,13 +834,17 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
         value={deadline ? DEADLINE_LABELS[deadline] : null}
         open={popover === 'deadline'}
         onOpen={() => setPopover(popover === 'deadline' ? null : 'deadline')}
-        onClear={() => setDeadline(null)}
+        onClear={() => {
+          setDeadline(null);
+          setDay(null);
+        }}
       >
         <OptionList
           options={deadlineOptions}
           selected={deadline}
           onPick={(k) => {
             setDeadline(k === deadline ? null : (k as DeadlineFilter));
+            setDay(null);
             setPopover(null);
           }}
         />
@@ -990,7 +924,12 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
               {view === 'all' && closingCount > 0 && deadline !== 'soon' && (
                 <>
                   <span className="dj-faint">·</span>
-                  <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--amber)', cursor: 'pointer' }} onClick={() => setDeadline('soon')}>
+                  <button
+                    type="button"
+                    className="-my-2.5 inline-flex items-center gap-1 py-2.5 lg:my-0 lg:py-0"
+                    style={{ border: 'none', background: 'transparent', paddingLeft: 0, paddingRight: 0, color: 'var(--amber)', cursor: 'pointer' }}
+                    onClick={() => setDeadline('soon')}
+                  >
                     {closingCount} close within {SOON_DAYS} days
                   </button>
                 </>
@@ -1008,6 +947,16 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
             )}
             <div className="mt-3 hidden items-center gap-2 lg:flex">{searchBox}</div>
             <div className="mt-3">{pills}</div>
+            {deadline === 'soon' && (
+              <div className="mt-2 lg:hidden">
+                <DayStrip
+                  groups={dayGroups(jobs.filter((j) => matches(j, 'day') && j.daysLeft !== null && j.daysLeft <= SOON_DAYS))}
+                  total={jobs.filter((j) => matches(j, 'day')).length}
+                  value={day}
+                  onChange={setDay}
+                />
+              </div>
+            )}
           </div>
           <div className="dj-scroll flex-1 px-2 pb-28 lg:px-4 lg:pb-4">
             {list.map((j) => (
