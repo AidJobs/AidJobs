@@ -7,7 +7,7 @@
 - Rules: `docs/architecture/aidjobs-migration-contract.md`. A step marked **Contract decision** is not approved for implementation until the user records that decision, even if its plan is otherwise ready.
 - Replaced: `docs/architecture/ux-public-layout-plan.md` on the unmerged branch `ux/public-layout` (worktree `AidJobsGit-ux`). Do not follow it. Its U1 and U2 commits are kept for reference only; its U3 colour fix is redone here as UX-02 on a fresh branch from `main`.
 
-**Recorded:** 20 October 2026, from `main` at `2a2e02f`. Priority, set by the user on 20 October 2026: this plan comes before crawler work. Crawler work resumes in ledger order after Stage C, or earlier if the user changes the priority. Stage D runs together with the crawler items it depends on.
+**Recorded:** 20 October 2026, from `main` at `2a2e02f`. Order changed the same day by the user: the design demo (UX-00) comes first, then Stage A. Priority, set by the user on 20 October 2026: this plan comes before crawler work. Crawler work resumes in ledger order after Stage C, or earlier if the user changes the priority. Stage D runs together with the crawler items it depends on.
 
 ## How every step is run
 
@@ -40,17 +40,34 @@ Status values: **Not started**, **Planning**, **Plan approved**, **In PR**, **Pr
 
 To establish before Stage B (part of UX-08): whether Netlify also publishes a production site from `main`, and which backend address each preview uses.
 
+## Stage 0 — Design demo
+
+### UX-00. Clickable design demo
+
+**Status:** Not started. The detailed demo plan needs the user's approval before anything is built.
+
+- **Why:** the user supplied three dashboard designs (Crewix, Crextio, BizLink) as the visual reference for both the public site and the admin. The demo turns `public-ux-direction.md` and that reference into something the user can try on a phone and a laptop before any real build.
+- **Scope:**
+  - Branch `demo/ux-design` from `main`, with a draft pull request titled "DO NOT MERGE", only so Netlify publishes a preview link. Never merged.
+  - Files only under `apps/frontend/app/demo/`. No backend change, no change to existing pages, no data written. Demo pages carry `noindex`, because Netlify previews are public.
+  - Data: public screens use a fixed copy of the public jobs, read once through the public search API, the same read any visitor makes; admin screens use figures already verified in the ledger, labelled as demo data.
+  - Screens: a token page (ink and sage palette, text sizes, icons, an Inter and Manrope switch); public, phone first: the collapsible side menu with Organisations and Countries, the search with Organisation, Country, and Deadline pills, the dense list with flags and days left, the job pane and phone sheet, Saved, "Closing this week"; admin: the side menu with the V1 navigation, the dashboard, Sources, and the Jobs table. Admin action buttons are inert.
+- **Not in scope:** anything on `main`; real search, saving, or admin behaviour; the logo, which the user provides later.
+- **Depends on:** this plan's update merged.
+- **Acceptance:** the user approves the look on their own phone and laptop. The approved choices (typeface, sage shade, density, menu behaviour) are recorded in `public-ux-direction.md` in a docs pull request.
+- **Verify:** type check and the existing frontend tests still pass on the demo branch; screenshots at 390px and 1366px; text contrast measured to WCAG AA.
+
 ## Stage A — Fixes on the current site
 
 Within the existing contract: these repair behaviour; they add no public search feature.
 
 ### UX-01. Laptop overflow and blank Saved page
 
-**Status:** Preview verified. PR #19, not merged. Waiting for the user's separate merge approval.
+**Status:** Preview verified. PR #19, not merged. Waiting for UX-00 and then the user's separate merge approval.
 
 - **Scope:** `min-w-0` on the results column in `HomeClient.tsx`; the Saved page unwraps the `/api/jobs/{id}` envelope through `lib/jobResponse.ts`, with tests.
 - **Not in scope:** the phone menu, the stale saved count (UX-07).
-- **Depends on:** nothing.
+- **Depends on:** UX-00, by the user's order of 20 October 2026.
 - **Acceptance:** at 1366px the page is no wider than the window, every save button and Sort are on-screen; at 390px the save button is on-screen; a saved job shows its title, organisation, and deadline on the Saved page, and Remove works.
 - **Verify:** preview measured 20 October 2026 (page 1351px at 1366px; stars at x=1282; Sort ends at x=1335; 429px wide at 390px; Saved card and Remove work). Repeat on the live site after merge.
 
@@ -130,7 +147,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started. **Nothing in UX-09 to UX-18 starts until every item here is recorded as decided.**
 
-1. **Direction approval.** The user approves `public-ux-direction.md` as written or amended. Merging the pull request that added it records the proposal; it is not the approval.
+1. **Direction approval.** The user approves `public-ux-direction.md` as written or amended, including the look approved in the demo (UX-00). Merging the pull request that added it records the proposal; it is not the approval.
 2. **Contract decision** for the public scope changes in contract §2: the organisation filter and place suggestions (new public search features), and the user-interface rewrite under rule 15 with the product reason recorded in the direction document.
 3. **Logo** file received from the user (SVG preferred).
 4. **Launch date.**
@@ -143,9 +160,9 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started.
 
-- **Scope:** Inter; three text sizes (12, 13, 15px); the ink palette for light and dark following the device; the user's logo, favicon, and app icon; icon set with hover and long-press labels as one component.
+- **Scope:** the typeface chosen in the demo; text sizes 12, 13, and 15px plus one large light size for page titles and large numbers; ink and sage for light and dark, following the device; the user's logo, favicon, and app icon; Lucide icons with hover and long-press labels as one component; SVG flags; card, pill, and hairline shapes. Shared by the public site and the admin. The demo's styles are reused, not redrawn.
 - **Not in scope:** page layouts (UX-10 onward).
-- **Depends on:** UX-08 (logo, direction).
+- **Depends on:** UX-00 (approved look), UX-08 (logo, direction).
 - **Acceptance:** tokens defined once and used by new components; favicon and app icon return 200; contrast meets WCAG AA for text.
 - **Verify:** preview; contrast measured.
 
@@ -153,7 +170,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
-- **Scope:** one persistent frame with no header or menu; phone: list with the search bar at the bottom; desktop: list and job panes with a draggable, remembered divider, each pane scrolling and the page not; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph).
+- **Scope:** one persistent frame with no header and a collapsible side menu (logo, Jobs, Closing soon, Saved with count, Organisations and Countries sections with live counts, entries only above zero, collapsing to an icon rail with hover labels); phone: list with the search bar at the bottom and the menu as a drawer opened from the bar; desktop: menu, list, and job pane, with a draggable, remembered divider between list and job, each area scrolling and the page not; a keyword page title and a strip of real counts above the list; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph).
 - **Not in scope:** the search bar's suggestions (UX-11, UX-12); job pages (UX-24).
 - **Depends on:** UX-08, UX-09.
 - **Acceptance:** the HTML returned for `/`, fetched without JavaScript, contains job titles; `robots.txt` and `sitemap.xml` return 200; on desktop the document does not scroll; switching views makes no full page load; the divider position survives a reload.
@@ -173,7 +190,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started.
 
-- **Scope:** the bar with chips, keyboard use, and smart views on an empty bar. Remove `TrinitySearchBar` and its public use of `/api/search/parse` and `/api/search/autocomplete`, the five collections (pages, `lib/collections.ts`, menu), and the Level, International eligible, and Mission Tags filters and the on-page country list.
+- **Scope:** the bar with chips, keyboard use, and smart views on an empty bar; the Organisation, Country, and Deadline pills, each a searchable list with counts. Remove `TrinitySearchBar` and its public use of `/api/search/parse` and `/api/search/autocomplete`, the five collections (pages, `lib/collections.ts`, menu), and the Level, International eligible, and Mission Tags filters and the on-page country list.
 - **Not in scope:** backend AI code removal (separate, later); filling each source's empty organisation type, which only the UN Jobs collection used.
 - **Depends on:** UX-11.
 - **Acceptance:** no suggestion leads to zero jobs; removing every chip and clearing the text shows all jobs and a clean address (W-17 closed); the removed pages return 404 or redirect to `/`.
@@ -183,7 +200,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started.
 
-- **Scope:** two lines per job (title; organisation and place); days left on the right, orange within 7 days and red within 3, full date on hover or long-press; soonest deadline first, jobs without a deadline after; bookmark per row.
+- **Scope:** two lines per job (title; organisation and place with an SVG country flag); days left on the right, orange within 7 days and red within 3, full date on hover or long-press; soonest deadline first, jobs without a deadline after; bookmark per row; the open job's row in the sage highlight; "Closing this week" in the job pane when no job is open, on wide screens.
 - **Depends on:** UX-12, and `lib/dates.ts` from UX-07.
 - **Acceptance:** on a 390px phone at least eight jobs are visible without scrolling; no horizontal overflow at 320px; urgency colours match the rule.
 - **Verify:** preview.
@@ -202,7 +219,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 **Status:** Not started.
 
-- **Scope:** the bookmark icon with a count shows only saved jobs; a saved-list link reopens the same list on another device; saved jobs closing soon move to the top on return.
+- **Scope:** the Saved menu entry with its count shows only saved jobs in the same list; a saved-list link reopens the same list on another device; saved jobs closing soon move to the top on return.
 - **Not in scope:** sign-in, sync, alerts (contract §2 excludes user accounts).
 - **Depends on:** UX-14.
 - **Acceptance:** the saved-list link reproduces the list in a fresh browser; counts stay correct after every add and remove.
@@ -239,10 +256,10 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-19. Admin navigation and Sources
 
-**Status:** Not started. **Contract decision:** the contract fixes the admin V1 navigation as Dashboard, Organisations, Sources, Jobs, Crawls, and Data Quality, with Settings and logout allowed (contract, "Admin V1 navigation", and Gate 9). The proposed four-item menu changes that and needs the user's decision first.
+**Status:** Not started. The revised proposal keeps the contract's admin V1 navigation (Dashboard, Organisations, Sources, Jobs, Crawls, Data Quality, with Settings and logout; contract "Admin V1 navigation" and Gate 9), so the menu needs no contract decision if the user agrees. The earlier four-item menu would change that navigation; it is withdrawn unless the user asks for it, and would then need a **Contract decision**.
 
-- **Scope, once decided:** Dashboard as one health view absorbing Crawls and Settings; Sources with one actions menu per row and a page per source holding its crawl history, test and simulate tools, and the danger area from UX-06; Jobs for moderation; Organisations hidden until Gate 8 is in use. Menu items become links with their own addresses (today they are buttons).
-- **Depends on:** UX-18, the contract decision.
+- **Scope:** the V1 navigation in the shared collapsible side menu; the dashboard as one health view with real counts and changes, source health sparklines and listing completeness, upcoming crawls, and the new-source checklist; Sources with one actions menu per row, an optional view by stage, and a page per source holding its crawl history, test and simulate tools, and the danger area from UX-06; Jobs as a table with filter pills, a column picker, and export. Menu items become links with their own addresses (today they are buttons).
+- **Depends on:** UX-18, the user's agreement to the revised menu.
 - **Acceptance:** each source row is one line; each source's page shows organisation, URL, type, status, schedule, last and next crawl, failure count, recent crawl runs, and health, as the contract asks.
 - **Verify:** preview with the guard.
 
@@ -251,7 +268,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 **Status:** Not started.
 
 - **Scope:** a read-only admin view per crawl: found, inserted, updated, rejected by reason, listing completeness (`listing_complete`, `listing_stop`), jobs missing a location or deadline, duplicate links. It replaces the SQL queries the user runs by hand after a crawl.
-- **Depends on:** UX-19 (or placed under the contract's Data Quality item if UX-19 is not approved).
+- **Depends on:** UX-19. It lives under the contract's Data Quality menu item.
 - **Acceptance:** for the latest Oxfam, ICRC, and UNICEF crawls the view matches the SQL results.
 - **Verify:** compare with the user's queries.
 
