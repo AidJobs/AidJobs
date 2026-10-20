@@ -53,7 +53,7 @@ const ICONS = [
 ];
 
 export default function TokensPage() {
-  const { font, theme } = useDemoSettings();
+  const { theme, textSize } = useDemoSettings();
   return (
     <div className="dj-scroll h-full">
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 lg:px-8">
@@ -66,7 +66,7 @@ export default function TokensPage() {
               Design tokens
             </h1>
             <p className="dj-muted" style={{ margin: 0 }}>
-              Ink and sage · {font === 'inter' ? 'Inter' : 'Manrope'} · {theme} mode. Switch typeface and mode at the bottom of the menu on the demo pages.
+              Ink and sage · Manrope · {theme} mode · text size {textSize.toUpperCase()}. Mode and accessibility settings are at the bottom of the menu on the demo pages.
             </p>
           </div>
         </div>

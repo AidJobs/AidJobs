@@ -102,7 +102,7 @@ export function isOpen(job: Job): boolean {
   return job.daysLeft === null || job.daysLeft >= 0;
 }
 
-export function sortByDeadline(jobs: Job[]): Job[] {
+export function sortByDeadline<T extends Job>(jobs: T[]): T[] {
   return [...jobs].sort((a, b) => {
     if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft;
     if (a.daysLeft !== null) return -1;

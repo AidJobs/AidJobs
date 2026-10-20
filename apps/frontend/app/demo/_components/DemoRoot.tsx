@@ -3,13 +3,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
-type Font = 'inter' | 'manrope';
+export type TextSize = 'm' | 'l' | 'xl';
 
 type DemoSettings = {
   theme: Theme;
-  font: Font;
+  textSize: TextSize;
+  highContrast: boolean;
+  reduceMotion: boolean;
   setTheme: (t: Theme) => void;
-  setFont: (f: Font) => void;
+  setTextSize: (s: TextSize) => void;
+  setHighContrast: (v: boolean) => void;
+  setReduceMotion: (v: boolean) => void;
 };
 
 const DemoContext = createContext<DemoSettings | null>(null);
@@ -41,9 +45,13 @@ export function usePersistentState<T>(key: string, initial: T): [T, (v: T) => vo
   return [value, update];
 }
 
+const ZOOM: Record<TextSize, number> = { m: 1, l: 1.12, xl: 1.25 };
+
 export default function DemoRoot({ fontClasses, children }: { fontClasses: string; children: ReactNode }) {
   const [theme, setTheme] = usePersistentState<Theme>('aidjobs.demo.theme', 'light');
-  const [font, setFont] = usePersistentState<Font>('aidjobs.demo.font', 'inter');
+  const [textSize, setTextSize] = usePersistentState<TextSize>('aidjobs.demo.textSize', 'm');
+  const [highContrast, setHighContrast] = usePersistentState<boolean>('aidjobs.demo.contrast', false);
+  const [reduceMotion, setReduceMotion] = usePersistentState<boolean>('aidjobs.demo.motion', false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -60,10 +68,19 @@ export default function DemoRoot({ fontClasses, children }: { fontClasses: strin
   }, []);
 
   return (
-    <DemoContext.Provider value={{ theme, font, setTheme, setFont }}>
-      <div className={`dj-root ${fontClasses}`} data-theme={theme} data-font={font}>
+    <DemoContext.Provider value={{ theme, textSize, highContrast, reduceMotion, setTheme, setTextSize, setHighContrast, setReduceMotion }}>
+      <div
+        className={`dj-root ${fontClasses}`}
+        data-theme={theme}
+        data-contrast={highContrast ? 'high' : 'normal'}
+        data-motion={reduceMotion ? 'reduce' : 'full'}
+      >
         {/* Browser-only: Node and browsers name some countries differently, which breaks hydration. */}
-        {mounted ? children : null}
+        {mounted ? (
+          <div className="dj-zoom" style={{ zoom: ZOOM[textSize] }}>
+            {children}
+          </div>
+        ) : null}
       </div>
     </DemoContext.Provider>
   );

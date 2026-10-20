@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Moon, PanelLeftClose, PanelLeftOpen, Star, Sun, Type, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Info, Moon, PanelLeftClose, PanelLeftOpen, PersonStanding, Star, Sun, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from './Tip';
-import { useDemoSettings } from './DemoRoot';
+import { useDemoSettings, type TextSize } from './DemoRoot';
 
 export type MenuEntry = {
   key: string;
@@ -18,6 +18,7 @@ export type MenuEntry = {
 
 export type MenuSection = {
   title: string;
+  hint?: string;
   entries: MenuEntry[];
   footer?: ReactNode;
 };
@@ -31,6 +32,7 @@ type Props = {
   onCloseDrawer: () => void;
   homeHref: string;
   tag?: string;
+  footnote?: string;
 };
 
 function Entry({ entry, collapsed, onAfterSelect }: { entry: MenuEntry; collapsed: boolean; onAfterSelect: () => void }) {
@@ -72,8 +74,60 @@ function Entry({ entry, collapsed, onAfterSelect }: { entry: MenuEntry; collapse
   );
 }
 
+function AccessibilityPanel({ collapsed }: { collapsed: boolean }) {
+  const { textSize, setTextSize, highContrast, setHighContrast, reduceMotion, setReduceMotion } = useDemoSettings();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+  const sizes: Array<{ key: TextSize; label: string }> = [
+    { key: 'm', label: 'A' },
+    { key: 'l', label: 'A+' },
+    { key: 'xl', label: 'A++' },
+  ];
+  return (
+    <div ref={ref} className="relative">
+      <Tip label="Accessibility: text size, contrast, motion" side={collapsed ? 'right' : 'top'}>
+        <button type="button" className="dj-icon-btn" data-active={open} onClick={() => setOpen(!open)} aria-label="Accessibility settings" aria-expanded={open}>
+          <PersonStanding size={15} strokeWidth={1.7} />
+        </button>
+      </Tip>
+      {open && (
+        <div className="dj-popover absolute bottom-[calc(100%+8px)] left-0 flex flex-col gap-3 p-3" style={{ width: 240 }} role="dialog" aria-label="Accessibility settings">
+          <div className="dj-title">Accessibility</div>
+          <div className="flex flex-col gap-1.5">
+            <span className="dj-muted">Text size</span>
+            <div className="flex gap-1.5" role="radiogroup" aria-label="Text size">
+              {sizes.map((s) => (
+                <button key={s.key} type="button" className="dj-pill" data-active={textSize === s.key} onClick={() => setTextSize(s.key)} role="radio" aria-checked={textSize === s.key}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center justify-between gap-2">
+            <span>Higher contrast</span>
+            <input type="checkbox" checked={highContrast} onChange={(e) => setHighContrast(e.target.checked)} />
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span>Reduce motion</span>
+            <input type="checkbox" checked={reduceMotion} onChange={(e) => setReduceMotion(e.target.checked)} />
+          </label>
+          <span className="dj-faint">Saved on this device.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
-  const { theme, font, setTheme, setFont } = useDemoSettings();
+  const { theme, setTheme } = useDemoSettings();
   const after = props.onCloseDrawer;
   return (
     <div className="flex h-full flex-col">
@@ -118,7 +172,16 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
         {!collapsed &&
           props.sections?.map((s) => (
             <div key={s.title}>
-              <div className="dj-section-label">{s.title}</div>
+              <div className="dj-section-label flex items-center gap-1">
+                {s.title}
+                {s.hint && (
+                  <Tip label={s.hint} side="right">
+                    <span className="inline-flex" tabIndex={0} aria-label={s.hint}>
+                      <Info size={11} strokeWidth={2} />
+                    </span>
+                  </Tip>
+                )}
+              </div>
               <div className="flex flex-col gap-0.5">
                 {s.entries.map((e) => (
                   <Entry key={e.key} entry={e} collapsed={false} onAfterSelect={after} />
@@ -135,12 +198,8 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
             {theme === 'light' ? <Moon size={15} strokeWidth={1.7} /> : <Sun size={15} strokeWidth={1.7} />}
           </button>
         </Tip>
-        <Tip label={`Typeface: ${font === 'inter' ? 'Inter' : 'Manrope'} (demo switch)`} side={collapsed ? 'right' : 'top'}>
-          <button type="button" className="dj-icon-btn" onClick={() => setFont(font === 'inter' ? 'manrope' : 'inter')} aria-label="Switch typeface">
-            <Type size={15} strokeWidth={1.7} />
-          </button>
-        </Tip>
-        {!collapsed && <span className="dj-faint ml-1 truncate">Demo · {font === 'inter' ? 'Inter' : 'Manrope'}</span>}
+        <AccessibilityPanel collapsed={collapsed} />
+        {!collapsed && props.footnote && <span className="dj-faint ml-1 truncate">{props.footnote}</span>}
       </div>
     </div>
   );

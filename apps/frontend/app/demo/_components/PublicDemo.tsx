@@ -3,11 +3,18 @@
 import {
   Bookmark,
   Briefcase,
+  BriefcaseBusiness,
   CalendarPlus,
   Check,
+  CircleCheck,
   ChevronDown,
   Clock,
   ExternalLink,
+  FileSignature,
+  GraduationCap,
+  Hourglass,
+  House,
+  Languages,
   LayoutDashboard,
   Mail,
   MapPin,
@@ -15,6 +22,9 @@ import {
   Palette,
   Search,
   Share2,
+  ShieldCheck,
+  Timer,
+  Users,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -37,9 +47,14 @@ import {
   type Job,
   type RawJob,
 } from '../_lib/jobs';
+import { CONTRACT_HINT, factsOf, gradeHint, type Contract, type Facts, type Language, type OpenTo } from '../_lib/facts';
 
-type View = 'all' | 'closing' | 'saved';
+type JobF = Job & { facts: Facts };
+type View = 'all' | 'saved' | 'applied';
 type PopoverKey = 'org' | 'country' | 'deadline';
+
+const CLOSING_DAYS = 7;
+const FACTS_HINT = 'Read from job titles. Today mostly UNICEF titles carry this, so some jobs are not counted.';
 
 export function displayOrg(name: string): string {
   return name.replace(/\s*\(.*?\)\s*/g, ' ').trim();
@@ -60,7 +75,7 @@ export function DaysChip({ job }: { job: Job }) {
   const text = d === 0 ? 'Today' : `${d}d`;
   return (
     <Tip label={`Closes ${formatLongDate(job.deadline)}${d === 0 ? ', today' : `, in ${d} day${d === 1 ? '' : 's'}`}`}>
-      <span className="dj-chip" data-tone={tone}>
+      <span className="dj-chip" data-tone={tone} tabIndex={0}>
         <Clock size={11} strokeWidth={2} />
         {text}
       </span>
@@ -192,7 +207,21 @@ export function OptionList({
   );
 }
 
-function JobRow({ job, active, saved, onOpen, onToggleSave }: { job: Job; active: boolean; saved: boolean; onOpen: () => void; onToggleSave: () => void }) {
+function JobRow({
+  job,
+  active,
+  saved,
+  applied,
+  onOpen,
+  onToggleSave,
+}: {
+  job: JobF;
+  active: boolean;
+  saved: boolean;
+  applied: boolean;
+  onOpen: () => void;
+  onToggleSave: () => void;
+}) {
   return (
     <div
       className="dj-row"
@@ -217,9 +246,23 @@ function JobRow({ job, active, saved, onOpen, onToggleSave }: { job: Job; active
           <span className="shrink-0">{displayOrg(job.org)}</span>
           <span className="dj-faint">·</span>
           <Flag iso={job.iso} title={job.country} />
-          <span className="truncate">{job.place ?? 'Location not listed'}</span>
+          <span className="min-w-0 truncate">{job.country ?? job.place ?? 'Location not listed'}</span>
+          {job.facts.contract && (
+            <>
+              <span className="dj-faint">·</span>
+              <span className="shrink-0">{job.facts.contract}</span>
+            </>
+          )}
         </div>
       </div>
+      {applied && (
+        <Tip label="You marked this as applied">
+          <span className="dj-chip" data-tone="sage" tabIndex={0}>
+            <CircleCheck size={11} strokeWidth={2} />
+            Applied
+          </span>
+        </Tip>
+      )}
       <DaysChip job={job} />
       <Tip label={saved ? 'Saved on this device. Remove' : 'Save on this device'}>
         <button
@@ -241,28 +284,44 @@ function JobRow({ job, active, saved, onOpen, onToggleSave }: { job: Job; active
   );
 }
 
+function FactChip({ icon, label, hint }: { icon: ReactNode; label: string; hint: string }) {
+  return (
+    <Tip label={hint}>
+      <span className="dj-chip" style={{ height: 26, fontSize: 12 }} tabIndex={0}>
+        {icon}
+        {label}
+      </span>
+    </Tip>
+  );
+}
+
 function JobDetail({
   job,
   saved,
+  applied,
   sameOrg,
   sameCountry,
   onToggleSave,
+  onToggleApplied,
   onClose,
   onPickOrg,
   onPickCountry,
   onToast,
 }: {
-  job: Job;
+  job: JobF;
   saved: boolean;
+  applied: boolean;
   sameOrg: number;
   sameCountry: number;
   onToggleSave: () => void;
+  onToggleApplied: () => void;
   onClose: () => void;
   onPickOrg: () => void;
   onPickCountry: () => void;
   onToast: (msg: string) => void;
 }) {
   const org = displayOrg(job.org);
+  const f = job.facts;
   const share = async () => {
     const url = window.location.href;
     try {
@@ -288,6 +347,7 @@ function JobDetail({
   const mailto = `mailto:?subject=${encodeURIComponent(`${job.title} – ${org}`)}&body=${encodeURIComponent(
     `${job.title}\n${org}${job.place ? `, ${job.place}` : ''}\n${job.deadline ? `Deadline: ${formatDate(job.deadline)}\n` : ''}Apply: ${job.apply_url}\n`,
   )}`;
+  const hasFacts = f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
 
   return (
     <div className="flex flex-col gap-4">
@@ -322,6 +382,23 @@ function JobDetail({
         </div>
       </div>
 
+      {hasFacts && (
+        <div className="flex flex-wrap gap-1.5">
+          {f.contract && <FactChip icon={<FileSignature size={12} />} label={f.contract} hint={CONTRACT_HINT[f.contract]} />}
+          {f.grade && <FactChip icon={<ShieldCheck size={12} />} label={f.grade} hint={gradeHint(f.grade)} />}
+          {f.duration && <FactChip icon={<Hourglass size={12} />} label={f.duration} hint="Contract length, read from the title" />}
+          {f.openTo && (
+            <FactChip
+              icon={<Users size={12} />}
+              label={f.openTo === 'Nationals' ? 'Nationals' : 'International'}
+              hint={f.openTo === 'Nationals' ? 'Open to nationals of the duty-station country' : 'Open to international candidates'}
+            />
+          )}
+          {f.remote && <FactChip icon={<House size={12} />} label="Remote" hint="Remote or home-based, read from the title" />}
+          {f.language !== 'English' && <FactChip icon={<Languages size={12} />} label={f.language} hint={`Advert written in ${f.language}`} />}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <a className="dj-ink-btn" href={job.apply_url} target="_blank" rel="noopener noreferrer">
           Apply on {org}
@@ -332,18 +409,23 @@ function JobDetail({
             <Bookmark size={15} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} />
           </button>
         </Tip>
-        <Tip label="Share: WhatsApp, LinkedIn, email, or copy link">
-          <button type="button" className="dj-icon-btn" onClick={share} aria-label="Share job">
-            <Share2 size={15} strokeWidth={1.8} />
+        <Tip label={applied ? 'Marked as applied. Undo' : 'I applied: track it under Applied'}>
+          <button type="button" className="dj-icon-btn" data-active={applied} onClick={onToggleApplied} aria-label={applied ? 'Unmark applied' : 'Mark as applied'} aria-pressed={applied}>
+            <CircleCheck size={15} strokeWidth={1.8} />
           </button>
         </Tip>
         {job.deadline && (
-          <Tip label="Add deadline to calendar, reminder 2 days before">
+          <Tip label="Add the deadline to my calendar, reminder 2 days before">
             <button type="button" className="dj-icon-btn" onClick={calendar} aria-label="Add deadline to calendar">
               <CalendarPlus size={15} strokeWidth={1.8} />
             </button>
           </Tip>
         )}
+        <Tip label="Share: WhatsApp, LinkedIn, email, or copy link">
+          <button type="button" className="dj-icon-btn" onClick={share} aria-label="Share job">
+            <Share2 size={15} strokeWidth={1.8} />
+          </button>
+        </Tip>
         <Tip label="Email this job to myself">
           <a className="dj-icon-btn" href={mailto} aria-label="Email this job">
             <Mail size={15} strokeWidth={1.8} />
@@ -355,7 +437,7 @@ function JobDetail({
         Demo note: the role summary and full description appear here once the crawler stores descriptions (UX-23).
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1">
         {sameOrg > 0 && (
           <button type="button" className="dj-option" onClick={onPickOrg}>
             <OrgMark name={job.org} size={18} />
@@ -375,35 +457,45 @@ function JobDetail({
   );
 }
 
-function ClosingThisWeek({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
-  const week = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= 7));
-  const groups = new Map<string, Job[]>();
-  for (const j of week) {
+function dayLabel(d: number): string {
+  if (d === 0) return 'Today';
+  if (d === 1) return 'Tomorrow';
+  return `In ${d} days`;
+}
+
+function ClosingSoon({ jobs, onOpen }: { jobs: JobF[]; onOpen: (id: string) => void }) {
+  const soon = sortByDeadline(jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= CLOSING_DAYS));
+  const groups = new Map<string, JobF[]>();
+  for (const j of soon) {
     const k = j.deadline as string;
     groups.set(k, [...(groups.get(k) ?? []), j]);
   }
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between">
+    <div className="flex flex-col">
+      <div className="flex items-baseline justify-between pb-2">
         <h2 className="dj-title" style={{ fontSize: 15, margin: 0 }}>
-          Closing this week
+          Closing in the next {CLOSING_DAYS} days
         </h2>
         <span className="dj-chip" data-tone="sage">
-          {week.length} roles
+          {soon.length} roles
         </span>
       </div>
-      {week.length === 0 && <p className="dj-muted">No deadlines in the next 7 days.</p>}
+      {soon.length === 0 && <p className="dj-muted">No deadlines in the next {CLOSING_DAYS} days.</p>}
       {[...groups.entries()].map(([date, list]) => {
         const d = list[0].daysLeft as number;
         return (
-          <div key={date} className="flex gap-3">
-            <div className="w-[64px] shrink-0 pt-1">
-              <div style={{ fontWeight: 600 }}>{formatLongDate(date).split(' ').slice(0, 3).join(' ')}</div>
-              <div className="dj-faint">{d === 0 ? 'today' : `in ${d}d`}</div>
+          <section key={date} aria-label={`${dayLabel(d)}, ${formatLongDate(date)}`}>
+            <div className="sticky top-0 z-10 flex items-center gap-2 py-2" style={{ background: 'var(--surface)' }}>
+              <span style={{ fontWeight: 650 }}>{dayLabel(d)}</span>
+              <span className="dj-faint">{formatLongDate(date)}</span>
+              <span className="ml-auto dj-chip" data-tone={d <= 3 ? 'red' : 'amber'}>
+                {list.length}
+              </span>
             </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1 border-l pl-3 dj-hair">
+            <div className="flex flex-col gap-0.5 pb-2">
               {list.map((j) => (
                 <button key={j.id} type="button" className="dj-option" onClick={() => onOpen(j.id)}>
+                  <OrgMark name={j.org} size={18} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate" style={{ fontWeight: 560 }}>
                       {j.title}
@@ -417,29 +509,41 @@ function ClosingThisWeek({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) =
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         );
       })}
     </div>
   );
 }
 
+const CONTRACT_ICONS: Record<Contract, ReactNode> = {
+  Consultancy: <BriefcaseBusiness size={15} strokeWidth={1.8} />,
+  'Fixed term': <FileSignature size={15} strokeWidth={1.8} />,
+  Temporary: <Timer size={15} strokeWidth={1.8} />,
+  Internship: <GraduationCap size={15} strokeWidth={1.8} />,
+  Fellowship: <GraduationCap size={15} strokeWidth={1.8} />,
+};
+
 export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[]; snapshotDate: string }) {
-  const jobs = useMemo(() => normaliseJobs(rawJobs).filter(isOpen), [rawJobs]);
+  const jobs = useMemo<JobF[]>(() => normaliseJobs(rawJobs).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })), [rawJobs]);
 
   const [view, setView] = useState<View>('all');
   const [org, setOrg] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const [deadline, setDeadline] = useState<DeadlineFilter | null>(null);
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [openTo, setOpenTo] = useState<OpenTo | null>(null);
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [language, setLanguage] = useState<Language | null>(null);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverKey | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [moreCountries, setMoreCountries] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [saved, setSaved] = usePersistentState<string[]>('aidjobs.demo.saved', []);
+  const [applied, setApplied] = usePersistentState<string[]>('aidjobs.demo.applied', []);
   const [collapsed, setCollapsed] = usePersistentState<boolean>('aidjobs.demo.menuCollapsed', false);
-  const [split, setSplit] = usePersistentState<number>('aidjobs.demo.split', 52);
+  const [split, setSplit] = usePersistentState<number>('aidjobs.demo.split2', 56);
   const [dragging, setDragging] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
@@ -475,7 +579,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     const move = (e: PointerEvent) => {
       const box = mainRef.current?.getBoundingClientRect();
       if (!box) return;
-      setSplit(Math.min(70, Math.max(34, ((e.clientX - box.left) / box.width) * 100)));
+      setSplit(Math.min(68, Math.max(42, ((e.clientX - box.left) / box.width) * 100)));
     };
     const up = () => setDragging(false);
     window.addEventListener('pointermove', move);
@@ -494,31 +598,32 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     setSelectedId(null);
     window.history.pushState({}, '', window.location.pathname);
   };
-  const toggleSave = (id: string) => {
-    const next = saved.includes(id) ? saved.filter((s) => s !== id) : [...saved, id];
-    setSaved(next);
-    setToast(saved.includes(id) ? 'Removed from saved' : 'Saved on this device');
+  const toggleIn = (list: string[], set: (v: string[]) => void, id: string, added: string, removed: string) => {
+    const has = list.includes(id);
+    set(has ? list.filter((s) => s !== id) : [...list, id]);
+    setToast(has ? removed : added);
   };
+  const toggleSave = (id: string) => toggleIn(saved, setSaved, id, 'Saved on this device', 'Removed from saved');
+  const toggleApplied = (id: string) => toggleIn(applied, setApplied, id, 'Marked as applied', 'Unmarked');
 
-  const matches = (j: Job, skip?: PopoverKey) =>
+  type Skip = PopoverKey | 'contract' | 'openTo' | 'remote' | 'language';
+  const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
-    (view !== 'closing' || (j.daysLeft !== null && j.daysLeft <= 7)) &&
+    (view !== 'applied' || applied.includes(j.id)) &&
     (skip === 'org' || !org || j.org === org) &&
     (skip === 'country' || !country || j.iso === country) &&
     (skip === 'deadline' || matchesDeadline(j, deadline)) &&
+    (skip === 'contract' || !contract || j.facts.contract === contract) &&
+    (skip === 'openTo' || !openTo || j.facts.openTo === openTo) &&
+    (skip === 'remote' || !remoteOnly || j.facts.remote) &&
+    (skip === 'language' || !language || j.facts.language === language) &&
     matchesText(j, query);
 
   const list = sortByDeadline(jobs.filter((j) => matches(j)));
   const selected = jobs.find((j) => j.id === selectedId) ?? null;
-  const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= 7).length;
-  const orgCounts = countBy(jobs, (j) => j.org);
-  const countryCounts = countBy(jobs, (j) => j.iso);
-  const orgOptions = countBy(jobs.filter((j) => matches(j, 'org')), (j) => j.org).map(([k, n]) => ({
-    key: k,
-    label: displayOrg(k),
-    count: n,
-    lead: <OrgMark name={k} size={18} />,
-  }));
+  const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= CLOSING_DAYS).length;
+
+  const orgOptions = countBy(jobs.filter((j) => matches(j, 'org')), (j) => j.org).map(([k, n]) => ({ key: k, label: displayOrg(k), count: n, lead: <OrgMark name={k} size={18} /> }));
   const countryOptions = countBy(jobs.filter((j) => matches(j, 'country')), (j) => j.iso).map(([k, n]) => ({
     key: k,
     label: countryName(k) ?? k,
@@ -530,50 +635,73 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     .map((k) => ({ key: k, label: DEADLINE_LABELS[k], count: deadlinePool.filter((j) => matchesDeadline(j, k)).length }))
     .filter((o) => o.count > 0);
 
-  const anyFilter = !!(org || country || deadline || query || view !== 'all');
+  const anyFilter = !!(org || country || deadline || contract || openTo || remoteOnly || language || query || view !== 'all');
   const clearAll = () => {
     setOrg(null);
     setCountry(null);
     setDeadline(null);
+    setContract(null);
+    setOpenTo(null);
+    setRemoteOnly(false);
+    setLanguage(null);
     setQuery('');
     setView('all');
   };
 
+  const contractCounts = countBy(jobs.filter((j) => matches(j, 'contract')), (j) => j.facts.contract);
+  const openToCounts = countBy(jobs.filter((j) => matches(j, 'openTo')), (j) => j.facts.openTo);
+  const remoteCount = jobs.filter((j) => matches(j, 'remote') && j.facts.remote).length;
+  const languageCounts = countBy(jobs.filter((j) => matches(j, 'language')), (j) => (j.facts.language === 'English' ? null : j.facts.language));
+
   const primary: MenuEntry[] = [
-    { key: 'all', label: 'Jobs', icon: <Briefcase size={15} strokeWidth={1.8} />, count: jobs.length, active: view === 'all' && !org && !country, onSelect: clearAll },
-    { key: 'closing', label: 'Closing soon', icon: <Clock size={15} strokeWidth={1.8} />, count: closingCount, active: view === 'closing', onSelect: () => setView(view === 'closing' ? 'all' : 'closing') },
+    { key: 'all', label: 'All jobs', icon: <Briefcase size={15} strokeWidth={1.8} />, count: jobs.length, active: view === 'all' && !anyFilter, onSelect: clearAll },
     { key: 'saved', label: 'Saved', icon: <Bookmark size={15} strokeWidth={1.8} />, count: saved.length, active: view === 'saved', onSelect: () => setView(view === 'saved' ? 'all' : 'saved') },
+    { key: 'applied', label: 'Applied', icon: <CircleCheck size={15} strokeWidth={1.8} />, count: applied.length, active: view === 'applied', onSelect: () => setView(view === 'applied' ? 'all' : 'applied') },
   ];
-  const shownCountries = moreCountries ? countryCounts : countryCounts.slice(0, 8);
   const sections: MenuSection[] = [
     {
-      title: 'Organisations',
-      entries: orgCounts.map(([k, n]) => ({
-        key: `org-${k}`,
-        label: displayOrg(k),
-        icon: <OrgMark name={k} size={16} />,
+      title: 'Contract',
+      hint: FACTS_HINT,
+      entries: contractCounts.map(([k, n]) => ({
+        key: `c-${k}`,
+        label: k === 'Consultancy' ? 'Consultancies' : k === 'Internship' ? 'Internships' : k === 'Fellowship' ? 'Fellowships' : k,
+        icon: CONTRACT_ICONS[k as Contract],
         count: n,
-        active: org === k,
-        onSelect: () => setOrg(org === k ? null : k),
+        active: contract === k,
+        onSelect: () => setContract(contract === k ? null : (k as Contract)),
       })),
     },
     {
-      title: 'Countries',
-      entries: shownCountries.map(([k, n]) => ({
-        key: `c-${k}`,
-        label: countryName(k) ?? k,
-        icon: <Flag iso={k} title={countryName(k)} />,
+      title: 'Open to',
+      hint: `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
+      entries: openToCounts.map(([k, n]) => ({
+        key: `o-${k}`,
+        label: k === 'Nationals' ? 'Nationals of the country' : 'International candidates',
+        icon: <Users size={15} strokeWidth={1.8} />,
         count: n,
-        active: country === k,
-        onSelect: () => setCountry(country === k ? null : k),
+        active: openTo === k,
+        onSelect: () => setOpenTo(openTo === k ? null : (k as OpenTo)),
       })),
-      footer:
-        countryCounts.length > 8 ? (
-          <button type="button" className="dj-nav dj-faint" onClick={() => setMoreCountries(!moreCountries)}>
-            <span className="w-4" />
-            {moreCountries ? 'Fewer countries' : `All ${countryCounts.length} countries`}
-          </button>
-        ) : undefined,
+    },
+    {
+      title: 'Work style',
+      hint: FACTS_HINT,
+      entries:
+        remoteCount > 0
+          ? [{ key: 'remote', label: 'Remote or home-based', icon: <House size={15} strokeWidth={1.8} />, count: remoteCount, active: remoteOnly, onSelect: () => setRemoteOnly(!remoteOnly) }]
+          : [],
+    },
+    {
+      title: 'Advert language',
+      hint: 'Adverts written in a language other than English, detected from the title.',
+      entries: languageCounts.map(([k, n]) => ({
+        key: `l-${k}`,
+        label: k,
+        icon: <Languages size={15} strokeWidth={1.8} />,
+        count: n,
+        active: language === k,
+        onSelect: () => setLanguage(language === k ? null : (k as Language)),
+      })),
     },
     {
       title: 'Demo',
@@ -582,10 +710,10 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
         { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
       ],
     },
-  ];
+  ].filter((s) => s.entries.length > 0);
 
   const pills = (
-    <div ref={pillsRef} className="dj-no-scrollbar flex items-center gap-2 overflow-x-auto pb-1 lg:overflow-visible">
+    <div ref={pillsRef} className="dj-no-scrollbar flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible">
       <FilterPill
         label="Organisation"
         icon={<Briefcase size={13} strokeWidth={1.8} />}
@@ -643,7 +771,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       </FilterPill>
       {anyFilter && (
         <button type="button" className="dj-pill shrink-0" style={{ border: 'none', background: 'transparent' }} onClick={clearAll}>
-          Clear
+          Clear all
         </button>
       )}
     </div>
@@ -667,9 +795,11 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     <JobDetail
       job={selected}
       saved={saved.includes(selected.id)}
+      applied={applied.includes(selected.id)}
       sameOrg={sameOrg}
       sameCountry={sameCountry}
       onToggleSave={() => toggleSave(selected.id)}
+      onToggleApplied={() => toggleApplied(selected.id)}
       onClose={closeJob}
       onPickOrg={() => {
         setOrg(selected.org);
@@ -683,7 +813,9 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     />
   ) : null;
 
-  const heading = view === 'saved' ? 'Saved jobs' : view === 'closing' ? 'Closing within 7 days' : 'NGO, humanitarian and development jobs';
+  const heading = view === 'saved' ? 'Saved jobs' : view === 'applied' ? 'Applied' : 'NGO, humanitarian and development jobs';
+  const emptyHint =
+    view === 'saved' ? 'Save a job with the bookmark and it appears here.' : view === 'applied' ? 'Open a job and mark it as applied to track it here.' : 'Try fewer filters.';
 
   return (
     <div className="flex h-full">
@@ -696,39 +828,50 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
         onCloseDrawer={() => setDrawerOpen(false)}
         homeHref="/demo"
         tag="demo"
+        footnote={`Demo data · ${snapshotDate}`}
       />
 
       <div ref={mainRef} className="flex min-w-0 flex-1" style={{ ['--split' as string]: `${split}%` }}>
-        <section className="flex h-full w-full min-w-0 shrink-0 flex-col lg:w-[var(--split)]" aria-label="Jobs">
+        <section className="flex h-full w-full min-w-0 shrink-0 flex-col lg:w-[var(--split)] lg:min-w-[400px]" aria-label="Jobs">
           <div className="shrink-0 px-4 pb-2 pt-5 lg:px-6 lg:pt-6">
-            <h1 className="dj-display" style={{ margin: 0 }}>
+            <h1 className="dj-display" style={{ margin: 0, fontSize: 22 }}>
               {heading}
             </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="dj-chip" data-tone="sage">
-                {list.length} {list.length === 1 ? 'role' : 'roles'}
+            <div className="dj-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>
+                <strong style={{ color: 'var(--text)', fontWeight: 650 }}>{list.length}</strong> {list.length === 1 ? 'open role' : 'open roles'}
               </span>
-              <span className="dj-chip">{closingCount} closing this week</span>
-              <span className="dj-chip">{orgCounts.length} organisations</span>
-              <span className="dj-chip">{countryCounts.length} countries</span>
-              <Tip label={`Fixed copy of the public jobs taken on ${snapshotDate}`}>
-                <span className="dj-chip">Demo data · {snapshotDate}</span>
-              </Tip>
+              {view === 'all' && closingCount > 0 && deadline !== 'week' && (
+                <>
+                  <span className="dj-faint">·</span>
+                  <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--amber)', cursor: 'pointer' }} onClick={() => setDeadline('week')}>
+                    {closingCount} close within {CLOSING_DAYS} days
+                  </button>
+                </>
+              )}
             </div>
-            <div className="mt-4 hidden items-center gap-2 lg:flex">{searchBox}</div>
+            <div className="mt-3 hidden items-center gap-2 lg:flex">{searchBox}</div>
             <div className="mt-3">{pills}</div>
           </div>
           <div className="dj-scroll flex-1 px-2 pb-28 lg:px-4 lg:pb-4">
             {list.map((j) => (
-              <JobRow key={j.id} job={j} active={j.id === selectedId} saved={saved.includes(j.id)} onOpen={() => openJob(j.id)} onToggleSave={() => toggleSave(j.id)} />
+              <JobRow
+                key={j.id}
+                job={j}
+                active={j.id === selectedId}
+                saved={saved.includes(j.id)}
+                applied={applied.includes(j.id)}
+                onOpen={() => openJob(j.id)}
+                onToggleSave={() => toggleSave(j.id)}
+              />
             ))}
             {list.length === 0 && (
               <div className="flex flex-col items-start gap-2 px-3 py-8">
-                <span className="dj-title">No jobs match</span>
-                <span className="dj-muted">{view === 'saved' ? 'Save a job with the bookmark and it appears here.' : 'Try fewer filters.'}</span>
+                <span className="dj-title">No jobs here yet</span>
+                <span className="dj-muted">{emptyHint}</span>
                 {anyFilter && (
                   <button type="button" className="dj-pill" onClick={clearAll}>
-                    Clear filters
+                    Show all jobs
                   </button>
                 )}
               </div>
@@ -748,9 +891,9 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
           aria-label="Resize panes"
           title="Drag to resize"
         />
-        <aside className="dj-scroll hidden h-full min-w-0 flex-1 lg:block" style={{ padding: 24 }} aria-label="Job">
+        <aside className="dj-scroll hidden h-full min-w-[340px] flex-1 lg:block" style={{ padding: 20 }} aria-label="Job">
           <div className="dj-card" style={{ padding: 20 }}>
-            {detail ?? <ClosingThisWeek jobs={jobs} onOpen={openJob} />}
+            {detail ?? <ClosingSoon jobs={jobs} onOpen={openJob} />}
           </div>
         </aside>
       </div>
