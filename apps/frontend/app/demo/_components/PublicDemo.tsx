@@ -158,17 +158,21 @@ function similarJobs(job: JobF, all: JobF[]): Similar[] {
     .map((j) => {
       const reasons: string[] = [];
       let score = 0;
+      let content = 0;
       for (const s of j.facts.sdgs) {
         if (job.facts.sdgs.some((x) => x.goal === s.goal)) {
           score += 3;
+          content += 1;
           reasons.push(`SDG ${s.goal}`);
         }
       }
       const shared = [...keyWords(j.title)].filter((w) => words.has(w)).slice(0, 3);
       if (shared.length) {
         score += shared.length;
+        content += shared.length;
         reasons.push(`"${shared.join(', ')}"`);
       }
+      if (content === 0) return { job: j, score: 0, why: '' };
       if (job.facts.contract && j.facts.contract === job.facts.contract) {
         score += 2;
         reasons.push(j.facts.contract);
