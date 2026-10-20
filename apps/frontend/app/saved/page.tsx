@@ -6,6 +6,7 @@ import JobInspector from '@/components/JobInspector';
 import CollectionsNav from '@/components/CollectionsNav';
 import Toast from '@/components/Toast';
 import { getShortlist, removeFromShortlist, isInShortlist } from '@/lib/shortlist';
+import { unwrapJob } from '@/lib/jobResponse';
 
 type Job = {
   id: string;
@@ -56,8 +57,8 @@ export default function SavedPage() {
           try {
             const response = await fetch(`/api/jobs/${id}`);
             if (response.ok) {
-              const data = await response.json();
-              jobMap.set(id, data);
+              const job = unwrapJob<Job>(await response.json());
+              if (job) jobMap.set(id, job);
             }
           } catch (error) {
             console.error(`Failed to fetch job ${id}:`, error);

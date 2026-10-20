@@ -727,7 +727,7 @@ export default function HomeClient() {
           </div>
 
           <div className="flex gap-6">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
             {searching && page === 1 ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
