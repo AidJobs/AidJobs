@@ -2,12 +2,15 @@
 
 Before any work, read `docs/architecture/progress-ledger.md`. It records what is done, what is open, the recommended order, and how this project is run.
 
-The rules are in `docs/architecture/aidjobs-migration-contract.md` and `docs/architecture/crawler-completion-plan.md`. The ledger does not override them.
+**Current priority (set by the user, 20 October 2026): user experience.** Work from `docs/architecture/ux-build-plan.md`: take the first step whose status is not Done and whose dependencies are met, in order, and follow the working method at the top of that file. Crawler work resumes in ledger order after Stage C of that plan, or when the user changes the priority.
+
+The rules are in `docs/architecture/aidjobs-migration-contract.md` and `docs/architecture/crawler-completion-plan.md`. The ledger and the UX plan do not override them. A UX step marked "Contract decision" is not approved for implementation until the user records that decision.
 
 Key conventions, detailed in the ledger:
 
 - Every step needs the user's explicit approval: investigate, plan, implement, merge.
-- Work on a branch through a pull request. Do not push `main`. Merging to `main` deploys the backend on Render.
+- Work on a branch through a pull request. Do not push `main`. Merging to `main` publishes the frontend on Vercel and deploys the backend on Render.
 - Do not crawl production, write to the jobs database, or reindex search unless the user asks for that step.
+- On admin pages, use the read-only browser guard described in the UX plan; never trigger a destructive control during verification.
 - Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`.
-- Update the ledger when an item is finished.
+- Update the ledger, and the UX plan for UX steps, when a step is finished.
