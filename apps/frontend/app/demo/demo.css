@@ -218,6 +218,10 @@ body:has(.dj-root[data-theme='dark']) {
   text-decoration: none;
 }
 
+.dj-root .dj-ink-btn {
+  color: var(--on-ink);
+}
+
 .dj-ink-btn:hover {
   background: var(--ink-hover);
 }
@@ -385,8 +389,8 @@ body:has(.dj-root[data-theme='dark']) {
 
 .dj-popover {
   z-index: 40;
-  min-width: 240px;
-  max-height: 320px;
+  min-width: 260px;
+  max-height: 340px;
   padding: 6px;
   border-radius: 16px;
   border: 1px solid var(--hair);
@@ -406,9 +410,14 @@ body:has(.dj-root[data-theme='dark']) {
   cursor: pointer;
 }
 
-.dj-option:hover,
 .dj-option[data-active='true'] {
   background: var(--sage-1);
+}
+
+@media (hover: hover) {
+  .dj-option:hover {
+    background: var(--sage-1);
+  }
 }
 
 .dj-divider {
@@ -438,6 +447,139 @@ body:has(.dj-root[data-theme='dark']) {
   border-radius: 24px 24px 0 0;
   background: var(--surface);
   border-top: 1px solid var(--hair);
+}
+
+.dj-sheet-in {
+  animation: dj-sheet-in 200ms ease-out;
+}
+
+@keyframes dj-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.dj-scrim {
+  background: var(--scrim);
+}
+
+.dj-sheet-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.dj-option-label {
+  padding: 8px 8px 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.dj-root .dj-text-btn {
+  height: 32px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--sage-8);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dj-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--sage-7);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dj-badge-corner {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+}
+
+.dj-switch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+}
+
+.dj-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dj-switch button[data-active='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(18, 21, 18, 0.12);
+}
+
+.dj-switch-count {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Folds a block away by animating its row height; the single child clips while folded. */
+.dj-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms ease, opacity 200ms ease;
+}
+
+.dj-collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dj-collapse[data-hidden='true'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.dj-h1 {
+  font-size: 22px;
 }
 
 .dj-grabber {
@@ -619,6 +761,14 @@ body:has(.dj-root[data-theme='dark']) {
   .dj-sort {
     height: 36px;
     padding: 0 10px;
+  }
+
+  .dj-h1 {
+    font-size: 20px;
+  }
+
+  .dj-sheet .dj-pill {
+    height: 38px;
   }
 }
 

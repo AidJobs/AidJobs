@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowUpDown,
   Bookmark,
   Briefcase,
   BriefcaseBusiness,
@@ -25,13 +26,17 @@ import {
   Search,
   Share2,
   ShieldCheck,
+  SlidersHorizontal,
+  Star,
   Target,
   Timer,
   TriangleAlert,
   Users,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction, type UIEvent } from 'react';
+import BottomSheet, { useIsPhone } from './BottomSheet';
 import DayStrip, { type DayGroup } from './DayStrip';
 import Flag from './Flag';
 import SideMenu, { type MenuEntry, type MenuSection } from './SideMenu';
@@ -61,6 +66,12 @@ import { CONTRACT_HINT, factsOf, gradeHint, LEVEL_HINT, LEVELS, SECTOR_SDG, typi
 type JobF = Job & { facts: Facts };
 type View = 'all' | 'saved';
 type PopoverKey = 'sector' | 'org' | 'country' | 'deadline';
+type Sort = 'recommended' | 'closing';
+const SORT_KEYS: Sort[] = ['recommended', 'closing'];
+const SORTS: Record<Sort, { label: string; hint: string }> = {
+  recommended: { label: 'Recommended', hint: 'Urgent deadlines first, mixing organisations so no employer fills the list' },
+  closing: { label: 'Soonest deadline', hint: 'Strictly by deadline, soonest first' },
+};
 
 const FACTS_HINT = 'Read from job titles. Today mostly UNICEF titles carry this, so some jobs are not counted.';
 
@@ -255,6 +266,8 @@ export function FilterPill({
   open,
   onOpen,
   onClear,
+  resultCount,
+  tall,
   children,
 }: {
   label: string;
@@ -263,8 +276,36 @@ export function FilterPill({
   open: boolean;
   onOpen: () => void;
   onClear: () => void;
+  /** Jobs that match with this filter applied; shown on the phone sheet's button. */
+  resultCount?: number;
+  tall?: boolean;
   children: ReactNode;
 }) {
+  const phone = useIsPhone();
+  const panel = !open ? null : phone ? (
+    <BottomSheet
+      title={label}
+      subtitle={value ?? undefined}
+      tall={tall}
+      onClose={onOpen}
+      action={
+        value ? (
+          <button type="button" className="dj-text-btn" onClick={onClear}>
+            Clear
+          </button>
+        ) : undefined
+      }
+      footer={
+        <button type="button" className="dj-ink-btn w-full justify-center" style={{ height: 44 }} onClick={onOpen}>
+          {resultCount === undefined ? 'Done' : resultCount === 0 ? 'No jobs match' : `Show ${resultCount} ${resultCount === 1 ? 'job' : 'jobs'}`}
+        </button>
+      }
+    >
+      {children}
+    </BottomSheet>
+  ) : (
+    <div className="dj-popover absolute left-0 top-[calc(100%+6px)] flex flex-col">{children}</div>
+  );
   return (
     <div className="relative shrink-0">
       <button type="button" className="dj-pill" data-active={value ? 'true' : 'false'} onClick={onOpen} aria-expanded={open} aria-haspopup="listbox">
@@ -293,7 +334,7 @@ export function FilterPill({
           <ChevronDown size={13} strokeWidth={1.8} />
         )}
       </button>
-      {open && children}
+      {panel}
     </div>
   );
 }
@@ -311,29 +352,47 @@ export function OptionList({
   searchable?: boolean;
   placeholder?: string;
 }) {
+  const phone = useIsPhone();
   const [q, setQ] = useState('');
-  const isPicked = (k: string) => (Array.isArray(selected) ? selected.includes(k) : k === selected);
-  const shown = options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()));
+  const picked = Array.isArray(selected) ? selected : selected ? [selected] : [];
+  // Long lists show earlier picks first, fixed at opening so rows do not jump while tapping.
+  const [pinned] = useState(() => (options.length > 8 ? picked : []));
+  const needle = q.trim().toLowerCase();
+  const top = needle ? [] : options.filter((o) => pinned.includes(o.key));
+  const rest = options.filter((o) => o.label.toLowerCase().includes(needle) && (needle !== '' || !pinned.includes(o.key)));
+  const row = (o: (typeof options)[number]) => {
+    const on = picked.includes(o.key);
+    return (
+      <button key={o.key} type="button" className="dj-option" data-active={on} onClick={() => onPick(o.key)} role="option" aria-selected={on}>
+        {o.lead}
+        <span className="min-w-0 flex-1 truncate">{o.label}</span>
+        <span className="dj-faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {o.count}
+        </span>
+        <span className="flex w-[14px] shrink-0 justify-center">{on && <Check size={14} strokeWidth={2.2} style={{ color: 'var(--sage-7)' }} />}</span>
+      </button>
+    );
+  };
   return (
-    <div className="dj-popover dj-scroll fixed inset-x-3 bottom-24 lg:absolute lg:inset-x-auto lg:bottom-auto lg:left-0 lg:top-[calc(100%+6px)]" role="listbox">
+    <>
       {searchable && (
-        <div className="relative mb-1">
-          <Search size={13} className="dj-faint absolute left-3 top-1/2 -translate-y-1/2" />
-          <input autoFocus className="dj-input" style={{ height: 32 }} placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="relative mb-1 shrink-0">
+          <Search size={13} className="dj-faint pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+          <input autoFocus={!phone} className="dj-input" style={{ height: phone ? 40 : 32 }} placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} aria-label={placeholder} />
         </div>
       )}
-      {shown.map((o) => (
-        <button key={o.key} type="button" className="dj-option" data-active={isPicked(o.key)} onClick={() => onPick(o.key)} role="option" aria-selected={isPicked(o.key)}>
-          {o.lead}
-          <span className="min-w-0 flex-1 truncate">{o.label}</span>
-          <span className="dj-faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {o.count}
-          </span>
-          {isPicked(o.key) && <Check size={13} style={{ color: 'var(--sage-7)' }} />}
-        </button>
-      ))}
-      {shown.length === 0 && <div className="dj-faint px-2 py-3">Nothing matches</div>}
-    </div>
+      <div className="dj-scroll min-h-0 flex-1 pb-1" role="listbox" aria-multiselectable={Array.isArray(selected)}>
+        {top.length > 0 && (
+          <>
+            <div className="dj-option-label">Selected</div>
+            {top.map(row)}
+            <div className="dj-option-label">All</div>
+          </>
+        )}
+        {rest.map(row)}
+        {top.length === 0 && rest.length === 0 && <div className="dj-faint px-2 py-3">Nothing matches</div>}
+      </div>
+    </>
   );
 }
 
@@ -733,13 +792,16 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const jobs = useMemo<JobF[]>(() => normaliseJobs(rawJobs).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })), [rawJobs]);
 
   const [view, setView] = useState<View>('all');
-  const [org, setOrg] = useState<string | null>(null);
-  const [country, setCountry] = useState<string | null>(null);
-  const [deadline, setDeadline] = useState<DeadlineFilter | null>(null);
+  const [orgs, setOrgs] = useState<string[]>([]);
+  const [countries, setCountries] = useState<string[]>([]);
+  const [deadlines, setDeadlines] = useState<DeadlineFilter[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
   const [picks, setPicks] = useState<Record<Facet, string[]>>(NO_PICKS);
   const [day, setDay] = useState<string | null>(null);
   const [sectors, setSectors] = useState<string[]>([]);
-  const [sort, setSort] = usePersistentState<'recommended' | 'closing'>('aidjobs.demo.sort', 'recommended');
+  const [sort, setSort] = usePersistentState<Sort>('aidjobs.demo.sort', 'recommended');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverKey | null>(null);
@@ -751,6 +813,19 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [dragging, setDragging] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
+  const lastScroll = useRef(0);
+  const phone = useIsPhone();
+
+  /** Phone: fold the brand bar and heading away while reading down the list, bring them back on the way up. */
+  const onListScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const top = el.scrollTop;
+    const atBottom = top + el.clientHeight >= el.scrollHeight - 4;
+    if (top < 40) setCompact(false);
+    else if (top > lastScroll.current + 6) setCompact(true);
+    else if (top < lastScroll.current - 6 && !atBottom) setCompact(false);
+    lastScroll.current = top;
+  };
 
   const syncFromUrl = useCallback(() => {
     const id = new URLSearchParams(window.location.search).get('job');
@@ -812,9 +887,9 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
     (skip === 'sector' || sectors.length === 0 || (j.facts.sectors.length ? j.facts.sectors.some((s) => sectors.includes(s)) : sectors.includes(NONE))) &&
-    (skip === 'org' || !org || j.org === org) &&
-    (skip === 'country' || !country || (country === NONE ? j.iso === null : j.iso === country)) &&
-    (skip === 'deadline' || matchesDeadline(j, deadline)) &&
+    (skip === 'org' || orgs.length === 0 || orgs.includes(j.org)) &&
+    (skip === 'country' || countries.length === 0 || countries.includes(j.iso ?? NONE)) &&
+    (skip === 'deadline' || deadlines.length === 0 || deadlines.some((d) => matchesDeadline(j, d))) &&
     FACETS.every((f) => skip === f || picks[f].length === 0 || picks[f].includes(facetValue(j, f))) &&
     (skip === 'day' || !day || j.deadline === day) &&
     matchesText(j, query);
@@ -824,9 +899,12 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const filtered = jobs.filter((j) => matches(j));
   const list = sort === 'recommended' ? recommendedOrder(filtered) : sortByDeadline(filtered);
   const selected = jobs.find((j) => j.id === selectedId) ?? null;
-  const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS).length;
+  const closingCount = jobs.filter(
+    (j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS && (deadlines.length === 1 && deadlines[0] === 'soon' ? matches(j, 'day') : matches(j, 'deadline')),
+  ).length;
 
   const orgOptions = countBy(jobs.filter((j) => matches(j, 'org')), (j) => j.org).map(([k, n]) => ({ key: k, label: displayOrg(k), count: n, lead: <OrgMark name={k} size={18} /> }));
+  for (const k of orgs) if (!orgOptions.some((o) => o.key === k)) orgOptions.push({ key: k, label: displayOrg(k), count: 0, lead: <OrgMark name={k} size={18} /> });
   const countryPool = jobs.filter((j) => matches(j, 'country'));
   const noCountry = countryPool.filter((j) => j.iso === null).length;
   const countryOptions = [
@@ -836,20 +914,30 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       count: n,
       lead: <Flag iso={k} title={countryName(k)} />,
     })),
-    ...(noCountry > 0 ? [{ key: NONE, label: 'Location not listed', count: noCountry, lead: <CircleDashed size={14} strokeWidth={1.8} className="dj-faint" /> }] : []),
+    ...(noCountry > 0 || countries.includes(NONE)
+      ? [{ key: NONE, label: 'Location not listed', count: noCountry, lead: <CircleDashed size={14} strokeWidth={1.8} className="dj-faint" /> }]
+      : []),
   ];
+  for (const k of countries) {
+    if (k !== NONE && !countryOptions.some((o) => o.key === k)) countryOptions.push({ key: k, label: countryName(k) ?? k, count: 0, lead: <Flag iso={k} title={countryName(k)} /> });
+  }
   const deadlinePool = jobs.filter((j) => matches(j, 'deadline'));
   const deadlineOptions = (Object.keys(DEADLINE_LABELS) as DeadlineFilter[])
     .map((k) => ({ key: k, label: DEADLINE_LABELS[k], count: deadlinePool.filter((j) => matchesDeadline(j, k)).length }))
-    .filter((o) => o.count > 0);
+    .filter((o) => o.count > 0 || deadlines.includes(o.key));
 
-  const anyPick = FACETS.some((f) => picks[f].length > 0);
-  const anyFilter = !!(sectors.length || org || country || deadline || anyPick || day || query || view !== 'all');
+  const pickCount = FACETS.reduce((n, f) => n + picks[f].length, 0);
+  const anyFilter = !!(sectors.length || orgs.length || countries.length || deadlines.length || pickCount || day || query || view !== 'all');
+  const closingView = deadlines.length === 1 && deadlines[0] === 'soon';
+  const setClosingView = (on: boolean) => {
+    setDeadlines(on ? ['soon'] : []);
+    setDay(null);
+  };
   const clearAll = () => {
     setDay(null);
-    setOrg(null);
-    setCountry(null);
-    setDeadline(null);
+    setOrgs([]);
+    setCountries([]);
+    setDeadlines([]);
     setPicks(NO_PICKS);
     setSectors([]);
     setQuery('');
@@ -886,7 +974,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     { key: 'all', label: 'All jobs', icon: <Briefcase size={15} strokeWidth={1.8} />, count: jobs.length, active: view === 'all' && !anyFilter, onSelect: clearAll },
     { key: 'saved', label: 'Saved', icon: <Bookmark size={15} strokeWidth={1.8} />, count: saved.length, active: inSaved, onSelect: () => setView(inSaved ? 'all' : 'saved') },
   ];
-  const sections: MenuSection[] = [
+  const facetSections: MenuSection[] = [
     facetSection(
       'contract',
       'Contract',
@@ -928,14 +1016,15 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       (v) => v,
       () => <Languages size={15} strokeWidth={1.8} />,
     ),
-    {
-      title: 'Demo',
-      entries: [
-        { key: 'admin', label: 'Admin demo', icon: <LayoutDashboard size={15} strokeWidth={1.8} />, href: '/demo/admin' },
-        { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
-      ],
-    },
   ].filter((s) => s.entries.length > 0);
+  const demoSection: MenuSection = {
+    title: 'Demo',
+    entries: [
+      { key: 'admin', label: 'Admin demo', icon: <LayoutDashboard size={15} strokeWidth={1.8} />, href: '/demo/admin' },
+      { key: 'tokens', label: 'Design tokens', icon: <Palette size={15} strokeWidth={1.8} />, href: '/demo/tokens' },
+    ],
+  };
+  const sections = [...facetSections, demoSection];
 
   const sectorPool = jobs.filter((j) => matches(j, 'sector'));
   const sectorCounts = new Map<string, number>();
@@ -959,83 +1048,82 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
           ),
       };
     });
-  const sectorValue =
-    sectors.length === 0 ? null : sectors.length === 1 ? (sectors[0] === NONE ? 'Sector not stated' : sectors[0]) : `${sectors.length} sectors`;
+  const summarise = (keys: string[], nameOf: (k: string) => string, plural: string) =>
+    keys.length === 0 ? null : keys.length === 1 ? nameOf(keys[0]) : `${keys.length} ${plural}`;
+  const toggler =
+    <T extends string>(set: Dispatch<SetStateAction<T[]>>) =>
+    (k: string) =>
+      set((prev) => (prev.includes(k as T) ? prev.filter((x) => x !== k) : [...prev, k as T]));
+  const pillProps = (key: PopoverKey) => ({
+    open: popover === key,
+    onOpen: () => setPopover(popover === key ? null : key),
+    resultCount: filtered.length,
+  });
 
   const pills = (
     <div ref={pillsRef} className="dj-no-scrollbar flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible">
+      <span className="shrink-0 lg:hidden">
+        <button
+          type="button"
+          className="dj-pill"
+          data-active={pickCount > 0}
+          onClick={() => {
+            setPopover(null);
+            setFiltersOpen(true);
+          }}
+          aria-label={pickCount ? `Filters, ${pickCount} selected` : 'Filters'}
+        >
+          <SlidersHorizontal size={13} strokeWidth={1.8} />
+          Filters
+          {pickCount > 0 && <span className="dj-badge">{pickCount}</span>}
+        </button>
+      </span>
       <FilterPill
         label="Sector"
         icon={<Target size={13} strokeWidth={1.8} />}
-        value={sectorValue}
-        open={popover === 'sector'}
-        onOpen={() => setPopover(popover === 'sector' ? null : 'sector')}
+        value={summarise(sectors, (s) => (s === NONE ? 'Sector not stated' : s), 'sectors')}
         onClear={() => setSectors([])}
+        tall
+        {...pillProps('sector')}
       >
-        <OptionList
-          options={sectorOptions}
-          selected={sectors}
-          searchable
-          placeholder="Find a sector · choose several"
-          onPick={(k) => setSectors((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]))}
-        />
+        <OptionList options={sectorOptions} selected={sectors} searchable placeholder="Find a sector" onPick={toggler(setSectors)} />
       </FilterPill>
       <FilterPill
         label="Organisation"
         icon={<Briefcase size={13} strokeWidth={1.8} />}
-        value={org ? displayOrg(org) : null}
-        open={popover === 'org'}
-        onOpen={() => setPopover(popover === 'org' ? null : 'org')}
-        onClear={() => setOrg(null)}
+        value={summarise(orgs, displayOrg, 'organisations')}
+        onClear={() => setOrgs([])}
+        tall
+        {...pillProps('org')}
       >
-        <OptionList
-          options={orgOptions}
-          selected={org}
-          searchable
-          placeholder="Find an organisation"
-          onPick={(k) => {
-            setOrg(k === org ? null : k);
-            setPopover(null);
-          }}
-        />
+        <OptionList options={orgOptions} selected={orgs} searchable placeholder="Find an organisation" onPick={toggler(setOrgs)} />
       </FilterPill>
       <FilterPill
         label="Country"
         icon={<MapPin size={13} strokeWidth={1.8} />}
-        value={country === NONE ? 'Location not listed' : country ? countryName(country) : null}
-        open={popover === 'country'}
-        onOpen={() => setPopover(popover === 'country' ? null : 'country')}
-        onClear={() => setCountry(null)}
+        value={summarise(countries, (k) => (k === NONE ? 'Location not listed' : countryName(k) ?? k), 'countries')}
+        onClear={() => setCountries([])}
+        tall
+        {...pillProps('country')}
       >
-        <OptionList
-          options={countryOptions}
-          selected={country}
-          searchable
-          placeholder="Find a country"
-          onPick={(k) => {
-            setCountry(k === country ? null : k);
-            setPopover(null);
-          }}
-        />
+        <OptionList options={countryOptions} selected={countries} searchable placeholder="Find a country" onPick={toggler(setCountries)} />
       </FilterPill>
       <FilterPill
         label="Deadline"
         icon={<Clock size={13} strokeWidth={1.8} />}
-        value={deadline ? DEADLINE_LABELS[deadline] : null}
-        open={popover === 'deadline'}
-        onOpen={() => setPopover(popover === 'deadline' ? null : 'deadline')}
+        value={summarise(deadlines, (k) => DEADLINE_LABELS[k as DeadlineFilter], 'deadline ranges')}
         onClear={() => {
-          setDeadline(null);
+          setDeadlines([]);
           setDay(null);
         }}
+        {...pillProps('deadline')}
       >
         <OptionList
           options={deadlineOptions}
-          selected={deadline}
+          selected={deadlines}
           onPick={(k) => {
-            setDeadline(k === deadline ? null : (k as DeadlineFilter));
+            toggler(setDeadlines)(k);
             setDay(null);
-            setPopover(null);
           }}
         />
       </FilterPill>
@@ -1072,18 +1160,18 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       onToggleSave={() => toggleSave(selected.id)}
       onClose={closeJob}
       onPickOrg={() => {
-        setOrg(selected.org);
+        setOrgs([selected.org]);
         closeJob();
       }}
       onPickCountry={() => {
-        setCountry(selected.iso);
+        setCountries(selected.iso ? [selected.iso] : []);
         closeJob();
       }}
       onToast={setToast}
     />
   ) : null;
 
-  const heading = inSaved ? 'Saved jobs' : 'NGO, humanitarian and development jobs';
+  const heading = inSaved ? 'Saved jobs' : phone ? 'Humanitarian & development jobs' : 'NGO, humanitarian and development jobs';
   const emptyHint =
     view === 'saved' ? 'Save a job with the bookmark and it appears here.' : 'Try fewer filters.';
 
@@ -1092,6 +1180,22 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       <SideMenu
         primary={primary}
         sections={sections}
+        drawerSections={[
+          {
+            title: 'Refine',
+            entries: [
+              {
+                key: 'filters',
+                label: 'Filters',
+                icon: <SlidersHorizontal size={15} strokeWidth={1.8} />,
+                count: pickCount || undefined,
+                active: pickCount > 0,
+                onSelect: () => setFiltersOpen(true),
+              },
+            ],
+          },
+          demoSection,
+        ]}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed(!collapsed)}
         drawerOpen={drawerOpen}
@@ -1103,43 +1207,94 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
 
       <div ref={mainRef} className="flex min-w-0 flex-1" style={{ ['--split' as string]: `${split}%` }}>
         <section className="flex h-full w-full min-w-0 shrink-0 flex-col lg:w-[var(--split)] lg:min-w-[400px]" aria-label="Jobs">
-          <div className="shrink-0 px-4 pb-2 pt-5 lg:px-6 lg:pt-6">
-            <h1 className="dj-display" style={{ margin: 0, fontSize: 22 }}>
-              {heading}
-            </h1>
-            <div className="dj-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>
+          <div className="lg:hidden">
+            <div className="dj-collapse" data-hidden={compact}>
+              <div>
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <Link href="/demo" className="flex items-center gap-2" aria-label="AidJobs home" style={{ color: 'var(--text)', textDecoration: 'none' }}>
+                    <Star size={18} strokeWidth={2} style={{ color: 'var(--sage-7)' }} />
+                    <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>aidjobs</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="dj-icon-btn relative"
+                    data-active={inSaved}
+                    onClick={() => setView(inSaved ? 'all' : 'saved')}
+                    aria-label={`Saved jobs, ${saved.length}`}
+                    aria-pressed={inSaved}
+                  >
+                    <Bookmark size={16} strokeWidth={1.8} />
+                    {saved.length > 0 && <span className="dj-badge dj-badge-corner">{saved.length}</span>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 px-4 pb-2 pt-1 lg:px-6 lg:pt-6">
+            <div className="dj-collapse" data-hidden={compact && phone}>
+              <div>
+                <h1 className="dj-display dj-h1" style={{ margin: 0 }}>
+                  {heading}
+                </h1>
+              </div>
+            </div>
+            <div className="dj-muted mt-1 flex items-center gap-x-2">
+              <span className="shrink-0">
                 <strong style={{ color: 'var(--text)', fontWeight: 650 }}>{list.length}</strong> {list.length === 1 ? 'open role' : 'open roles'}
               </span>
-              {view === 'all' && closingCount > 0 && deadline !== 'soon' && (
-                <>
+              {view === 'all' && closingCount > 0 && !closingView && (
+                <span className="hidden items-center gap-2 lg:inline-flex">
                   <span className="dj-faint">·</span>
                   <button
                     type="button"
-                    className="-my-2.5 inline-flex items-center gap-1 py-2.5 lg:my-0 lg:py-0"
-                    style={{ border: 'none', background: 'transparent', paddingLeft: 0, paddingRight: 0, color: 'var(--amber)', cursor: 'pointer' }}
-                    onClick={() => setDeadline('soon')}
+                    style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--amber)', cursor: 'pointer' }}
+                    onClick={() => setClosingView(true)}
                   >
                     {closingCount} close within {SOON_DAYS} days
                   </button>
-                </>
+                </span>
               )}
-              <span className="ml-auto inline-flex items-center gap-1" role="radiogroup" aria-label="Sort jobs">
-                <Tip label="Urgent deadlines first, mixing organisations so no employer fills the list">
-                  <button type="button" className="dj-sort" data-active={sort === 'recommended'} onClick={() => setSort('recommended')} role="radio" aria-checked={sort === 'recommended'}>
-                    Recommended
-                  </button>
-                </Tip>
-                <Tip label="Strictly by deadline, soonest first">
-                  <button type="button" className="dj-sort" data-active={sort === 'closing'} onClick={() => setSort('closing')} role="radio" aria-checked={sort === 'closing'}>
-                    Closing soon
-                  </button>
-                </Tip>
+              <span className="ml-auto lg:hidden">
+                <button
+                  type="button"
+                  className="dj-sort inline-flex items-center gap-1.5"
+                  style={{ color: 'var(--text-2)' }}
+                  onClick={() => {
+                    setPopover(null);
+                    setSortOpen(true);
+                  }}
+                  aria-haspopup="dialog"
+                  aria-label={`Sort: ${SORTS[sort].label}`}
+                >
+                  <ArrowUpDown size={13} strokeWidth={2} />
+                  {SORTS[sort].label}
+                </button>
+              </span>
+              <span className="ml-auto hidden items-center gap-1 lg:inline-flex" role="radiogroup" aria-label="Sort jobs">
+                {SORT_KEYS.map((k) => (
+                  <Tip key={k} label={SORTS[k].hint}>
+                    <button type="button" className="dj-sort" data-active={sort === k} onClick={() => setSort(k)} role="radio" aria-checked={sort === k}>
+                      {SORTS[k].label}
+                    </button>
+                  </Tip>
+                ))}
               </span>
             </div>
-            <div className="mt-3 hidden items-center gap-2 lg:flex">{searchBox}</div>
-            <div className="mt-3">{pills}</div>
-            {deadline === 'soon' && (
+            {view === 'all' && (
+              <div className="mt-3 lg:hidden">
+                <div className="dj-switch" role="radiogroup" aria-label="Which jobs to show">
+                  <button type="button" role="radio" aria-checked={!closingView} data-active={!closingView} onClick={() => setClosingView(false)}>
+                    All jobs
+                  </button>
+                  <button type="button" role="radio" aria-checked={closingView} data-active={closingView} onClick={() => setClosingView(true)}>
+                    <Clock size={13} strokeWidth={2} />
+                    Closing in {SOON_DAYS} days
+                    <span className="dj-switch-count">{closingCount}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            {closingView && (
               <div className="mt-2 lg:hidden">
                 <DayStrip
                   groups={dayGroups(jobs.filter((j) => matches(j, 'day') && j.daysLeft !== null && j.daysLeft <= SOON_DAYS))}
@@ -1148,8 +1303,10 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
                 />
               </div>
             )}
+            <div className="mt-3 hidden items-center gap-2 lg:flex">{searchBox}</div>
+            <div className="mt-3">{pills}</div>
           </div>
-          <div className="dj-scroll flex-1 px-2 pb-28 lg:px-4 lg:pb-4">
+          <div className="dj-scroll flex-1 px-2 pb-28 lg:px-4 lg:pb-4" onScroll={onListScroll}>
             {list.map((j) => (
               <JobRow
                 key={j.id}
@@ -1212,6 +1369,78 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
             {detail}
           </div>
         </div>
+      )}
+
+      {filtersOpen && (
+        <BottomSheet
+          title="Filters"
+          subtitle={pickCount ? `${pickCount} selected` : undefined}
+          tall
+          onClose={() => setFiltersOpen(false)}
+          action={
+            pickCount ? (
+              <button type="button" className="dj-text-btn" onClick={() => setPicks(NO_PICKS)}>
+                Clear
+              </button>
+            ) : undefined
+          }
+          footer={
+            <button type="button" className="dj-ink-btn w-full justify-center" style={{ height: 44 }} onClick={() => setFiltersOpen(false)}>
+              {filtered.length === 0 ? 'No jobs match' : `Show ${filtered.length} ${filtered.length === 1 ? 'job' : 'jobs'}`}
+            </button>
+          }
+        >
+          <div className="dj-scroll min-h-0 flex-1 px-1 pb-3">
+            <p className="dj-faint" style={{ margin: '0 0 4px', fontSize: 12 }}>
+              Read from job titles. &ldquo;Not stated&rdquo; means the title does not say. Choose as many as you like.
+            </p>
+            {facetSections.map((s) => (
+              <section key={s.title} className="pt-3" aria-label={s.title}>
+                <h3 className="dj-sheet-heading">
+                  {s.icon}
+                  {s.title}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {s.entries.map((e) => (
+                    <button key={e.key} type="button" className="dj-pill" data-active={e.active ? 'true' : 'false'} aria-pressed={!!e.active} onClick={e.onSelect}>
+                      {e.label}
+                      <span style={{ opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>{e.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
+
+      {sortOpen && (
+        <BottomSheet title="Sort jobs" onClose={() => setSortOpen(false)}>
+          <div className="flex flex-col gap-1 pb-[max(16px,env(safe-area-inset-bottom))]" role="radiogroup" aria-label="Sort jobs">
+            {SORT_KEYS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className="dj-option"
+                data-active={sort === k}
+                role="radio"
+                aria-checked={sort === k}
+                onClick={() => {
+                  setSort(k);
+                  setSortOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block" style={{ fontWeight: 600 }}>
+                    {SORTS[k].label}
+                  </span>
+                  <span className="dj-faint block">{SORTS[k].hint}</span>
+                </span>
+                <span className="flex w-[14px] shrink-0 justify-center">{sort === k && <Check size={14} strokeWidth={2.2} style={{ color: 'var(--sage-7)' }} />}</span>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
       )}
 
       {toast && (

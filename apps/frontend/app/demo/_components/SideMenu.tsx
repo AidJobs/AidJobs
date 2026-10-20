@@ -29,6 +29,8 @@ export type MenuSection = {
 type Props = {
   primary: MenuEntry[];
   sections?: MenuSection[];
+  /** Sections for the phone drawer when they differ from the desktop column. */
+  drawerSections?: MenuSection[];
   collapsed: boolean;
   onToggleCollapsed: () => void;
   drawerOpen: boolean;
@@ -347,7 +349,7 @@ export default function SideMenu(props: Props) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0" style={{ background: 'var(--scrim)' }} onClick={props.onCloseDrawer} aria-hidden />
           <aside className="absolute inset-y-0 left-0 w-[84%] max-w-[300px]" style={{ background: 'var(--surface)', borderRadius: '0 24px 24px 0' }} aria-label="Menu">
-            <MenuBody props={props} collapsed={false} />
+            <MenuBody props={{ ...props, sections: props.drawerSections ?? props.sections }} collapsed={false} />
           </aside>
         </div>
       )}
