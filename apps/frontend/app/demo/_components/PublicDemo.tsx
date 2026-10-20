@@ -5,6 +5,8 @@ import {
   Briefcase,
   BriefcaseBusiness,
   CalendarPlus,
+  CircleDashed,
+  Layers,
   Check,
   ChevronDown,
   Clock,
@@ -53,7 +55,7 @@ import {
   type Job,
   type RawJob,
 } from '../_lib/jobs';
-import { CONTRACT_HINT, factsOf, gradeHint, type Contract, type Facts, type Language, type OpenTo } from '../_lib/facts';
+import { CONTRACT_HINT, factsOf, gradeHint, LEVEL_HINT, LEVELS, typicalExperience, type Contract, type Facts } from '../_lib/facts';
 
 type JobF = Job & { facts: Facts };
 type View = 'all' | 'saved';
@@ -525,7 +527,14 @@ function JobDetail({
             />
           ))}
           {f.contract && <FactChip icon={<FileSignature size={12} />} label={f.contract} hint={CONTRACT_HINT[f.contract]} />}
-          {f.grade && <FactChip icon={<ShieldCheck size={12} />} label={f.grade} hint={gradeHint(f.grade)} />}
+          {f.level && <FactChip icon={<Layers size={12} />} label={f.level} hint={`Level: ${LEVEL_HINT[f.level]}`} />}
+          {f.grade && (
+            <FactChip
+              icon={<ShieldCheck size={12} />}
+              label={typicalExperience(f.grade) ? `${f.grade} · ${typicalExperience(f.grade)}` : f.grade}
+              hint={gradeHint(f.grade)}
+            />
+          )}
           {f.duration && <FactChip icon={<Hourglass size={12} />} label={f.duration} hint="Contract length, read from the title" />}
           {f.openTo && (
             <FactChip
@@ -701,6 +710,20 @@ const CONTRACT_ICONS: Record<Contract, ReactNode> = {
   Fellowship: <GraduationCap size={15} strokeWidth={1.8} />,
 };
 
+type Facet = 'contract' | 'level' | 'openTo' | 'work' | 'language';
+const FACETS: Facet[] = ['contract', 'level', 'openTo', 'work', 'language'];
+const NO_PICKS: Record<Facet, string[]> = { contract: [], level: [], openTo: [], work: [], language: [] };
+/** Value for jobs whose title says nothing on a facet, so every job is reachable through some choice. */
+const NONE = '__none';
+
+function facetValue(j: JobF, f: Facet): string {
+  if (f === 'contract') return j.facts.contract ?? NONE;
+  if (f === 'level') return j.facts.level ?? NONE;
+  if (f === 'openTo') return j.facts.openTo ?? NONE;
+  if (f === 'work') return j.facts.remote ? 'Remote' : NONE;
+  return j.facts.language;
+}
+
 export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[]; snapshotDate: string }) {
   const jobs = useMemo<JobF[]>(() => normaliseJobs(rawJobs).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })), [rawJobs]);
 
@@ -708,10 +731,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [org, setOrg] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const [deadline, setDeadline] = useState<DeadlineFilter | null>(null);
-  const [contract, setContract] = useState<Contract | null>(null);
-  const [openTo, setOpenTo] = useState<OpenTo | null>(null);
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [language, setLanguage] = useState<Language | null>(null);
+  const [picks, setPicks] = useState<Record<Facet, string[]>>(NO_PICKS);
   const [day, setDay] = useState<string | null>(null);
   const [sort, setSort] = usePersistentState<'recommended' | 'closing'>('aidjobs.demo.sort', 'recommended');
   const [query, setQuery] = useState('');
@@ -782,18 +802,17 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     setToast(has ? removed : added);
   };
   const toggleSave = (id: string) => toggleIn(saved, setSaved, id, 'Saved on this device', 'Removed from saved');
-  type Skip = PopoverKey | 'contract' | 'openTo' | 'remote' | 'language' | 'day';
+  type Skip = PopoverKey | Facet | 'day';
   const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
     (skip === 'org' || !org || j.org === org) &&
-    (skip === 'country' || !country || j.iso === country) &&
+    (skip === 'country' || !country || (country === NONE ? j.iso === null : j.iso === country)) &&
     (skip === 'deadline' || matchesDeadline(j, deadline)) &&
-    (skip === 'contract' || !contract || j.facts.contract === contract) &&
-    (skip === 'openTo' || !openTo || j.facts.openTo === openTo) &&
-    (skip === 'remote' || !remoteOnly || j.facts.remote) &&
-    (skip === 'language' || !language || j.facts.language === language) &&
+    FACETS.every((f) => skip === f || picks[f].length === 0 || picks[f].includes(facetValue(j, f))) &&
     (skip === 'day' || !day || j.deadline === day) &&
     matchesText(j, query);
+  const togglePick = (f: Facet, v: string) =>
+    setPicks({ ...picks, [f]: picks[f].includes(v) ? picks[f].filter((x) => x !== v) : [...picks[f], v] });
 
   const filtered = jobs.filter((j) => matches(j));
   const list = sort === 'recommended' ? recommendedOrder(filtered) : sortByDeadline(filtered);
@@ -801,35 +820,58 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const closingCount = jobs.filter((j) => j.daysLeft !== null && j.daysLeft <= SOON_DAYS).length;
 
   const orgOptions = countBy(jobs.filter((j) => matches(j, 'org')), (j) => j.org).map(([k, n]) => ({ key: k, label: displayOrg(k), count: n, lead: <OrgMark name={k} size={18} /> }));
-  const countryOptions = countBy(jobs.filter((j) => matches(j, 'country')), (j) => j.iso).map(([k, n]) => ({
-    key: k,
-    label: countryName(k) ?? k,
-    count: n,
-    lead: <Flag iso={k} title={countryName(k)} />,
-  }));
+  const countryPool = jobs.filter((j) => matches(j, 'country'));
+  const noCountry = countryPool.filter((j) => j.iso === null).length;
+  const countryOptions = [
+    ...countBy(countryPool, (j) => j.iso).map(([k, n]) => ({
+      key: k,
+      label: countryName(k) ?? k,
+      count: n,
+      lead: <Flag iso={k} title={countryName(k)} />,
+    })),
+    ...(noCountry > 0 ? [{ key: NONE, label: 'Location not listed', count: noCountry, lead: <CircleDashed size={14} strokeWidth={1.8} className="dj-faint" /> }] : []),
+  ];
   const deadlinePool = jobs.filter((j) => matches(j, 'deadline'));
   const deadlineOptions = (Object.keys(DEADLINE_LABELS) as DeadlineFilter[])
     .map((k) => ({ key: k, label: DEADLINE_LABELS[k], count: deadlinePool.filter((j) => matchesDeadline(j, k)).length }))
     .filter((o) => o.count > 0);
 
-  const anyFilter = !!(org || country || deadline || contract || openTo || remoteOnly || language || day || query || view !== 'all');
+  const anyPick = FACETS.some((f) => picks[f].length > 0);
+  const anyFilter = !!(org || country || deadline || anyPick || day || query || view !== 'all');
   const clearAll = () => {
     setDay(null);
     setOrg(null);
     setCountry(null);
     setDeadline(null);
-    setContract(null);
-    setOpenTo(null);
-    setRemoteOnly(false);
-    setLanguage(null);
+    setPicks(NO_PICKS);
     setQuery('');
     setView('all');
   };
 
-  const contractCounts = countBy(jobs.filter((j) => matches(j, 'contract')), (j) => j.facts.contract);
-  const openToCounts = countBy(jobs.filter((j) => matches(j, 'openTo')), (j) => j.facts.openTo);
-  const remoteCount = jobs.filter((j) => matches(j, 'remote') && j.facts.remote).length;
-  const languageCounts = countBy(jobs.filter((j) => matches(j, 'language')), (j) => (j.facts.language === 'English' ? null : j.facts.language));
+  /** One menu section per facet: values by count, "Not stated" last, every choice combinable. */
+  const facetSection = (f: Facet, title: string, icon: ReactNode, hint: string, labelOf: (v: string) => string, iconOf: (v: string) => ReactNode, order?: string[]): MenuSection => {
+    const counts = new Map<string, number>();
+    for (const j of jobs.filter((x) => matches(x, f))) {
+      const v = facetValue(j, f);
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    for (const v of picks[f]) if (!counts.has(v)) counts.set(v, 0);
+    const rank = (v: string) => (order ? order.indexOf(v) : -(counts.get(v) ?? 0));
+    const keys = [...counts.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || rank(a) - rank(b));
+    return {
+      title,
+      icon,
+      hint,
+      entries: keys.map((v) => ({
+        key: `${f}-${v}`,
+        label: v === NONE ? 'Not stated' : labelOf(v),
+        icon: v === NONE ? <CircleDashed size={15} strokeWidth={1.8} /> : iconOf(v),
+        count: counts.get(v) ?? 0,
+        active: picks[f].includes(v),
+        onSelect: () => togglePick(f, v),
+      })),
+    };
+  };
   const inSaved = view === 'saved';
 
   const primary: MenuEntry[] = [
@@ -837,54 +879,47 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     { key: 'saved', label: 'Saved', icon: <Bookmark size={15} strokeWidth={1.8} />, count: saved.length, active: inSaved, onSelect: () => setView(inSaved ? 'all' : 'saved') },
   ];
   const sections: MenuSection[] = [
-    {
-      title: 'Contract',
-      icon: <FileSignature size={15} strokeWidth={1.8} />,
-      hint: FACTS_HINT,
-      entries: contractCounts.map(([k, n]) => ({
-        key: `c-${k}`,
-        label: k === 'Consultancy' ? 'Consultancies' : k === 'Internship' ? 'Internships' : k === 'Fellowship' ? 'Fellowships' : k,
-        icon: CONTRACT_ICONS[k as Contract],
-        count: n,
-        active: contract === k,
-        onSelect: () => setContract(contract === k ? null : (k as Contract)),
-      })),
-    },
-    {
-      title: 'Open to',
-      icon: <Users size={15} strokeWidth={1.8} />,
-      hint: `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
-      entries: openToCounts.map(([k, n]) => ({
-        key: `o-${k}`,
-        label: k === 'Nationals' ? 'Nationals of the country' : 'International candidates',
-        icon: <Users size={15} strokeWidth={1.8} />,
-        count: n,
-        active: openTo === k,
-        onSelect: () => setOpenTo(openTo === k ? null : (k as OpenTo)),
-      })),
-    },
-    {
-      title: 'Work style',
-      icon: <House size={15} strokeWidth={1.8} />,
-      hint: FACTS_HINT,
-      entries:
-        remoteCount > 0
-          ? [{ key: 'remote', label: 'Remote or home-based', icon: <House size={15} strokeWidth={1.8} />, count: remoteCount, active: remoteOnly, onSelect: () => setRemoteOnly(!remoteOnly) }]
-          : [],
-    },
-    {
-      title: 'Advert language',
-      icon: <Languages size={15} strokeWidth={1.8} />,
-      hint: 'Adverts written in a language other than English, detected from the title.',
-      entries: languageCounts.map(([k, n]) => ({
-        key: `l-${k}`,
-        label: k,
-        icon: <Languages size={15} strokeWidth={1.8} />,
-        count: n,
-        active: language === k,
-        onSelect: () => setLanguage(language === k ? null : (k as Language)),
-      })),
-    },
+    facetSection(
+      'contract',
+      'Contract',
+      <FileSignature size={15} strokeWidth={1.8} />,
+      `${FACTS_HINT} Choose several to combine them.`,
+      (v) => (v === 'Consultancy' ? 'Consultancies' : v === 'Internship' ? 'Internships' : v === 'Fellowship' ? 'Fellowships' : v),
+      (v) => CONTRACT_ICONS[v as Contract],
+    ),
+    facetSection(
+      'level',
+      'Level',
+      <Layers size={15} strokeWidth={1.8} />,
+      `${FACTS_HINT} Read from UN grades (P, NO, G, D) and words such as Internship, Senior, Chief, Head of. Choose several to combine them.`,
+      (v) => v,
+      () => <Layers size={15} strokeWidth={1.8} />,
+      [...LEVELS],
+    ),
+    facetSection(
+      'openTo',
+      'Open to',
+      <Users size={15} strokeWidth={1.8} />,
+      `${FACTS_HINT} UN National Officer and General Service grades count as nationals.`,
+      (v) => (v === 'Nationals' ? 'Nationals of the country' : 'International candidates'),
+      () => <Users size={15} strokeWidth={1.8} />,
+    ),
+    facetSection(
+      'work',
+      'Work style',
+      <House size={15} strokeWidth={1.8} />,
+      `${FACTS_HINT} "Not stated" means the title does not say; it does not mean on-site.`,
+      () => 'Remote or home-based',
+      () => <House size={15} strokeWidth={1.8} />,
+    ),
+    facetSection(
+      'language',
+      'Advert language',
+      <Languages size={15} strokeWidth={1.8} />,
+      'The language the advert is written in, detected from the title.',
+      (v) => v,
+      () => <Languages size={15} strokeWidth={1.8} />,
+    ),
     {
       title: 'Demo',
       entries: [
@@ -918,7 +953,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
       <FilterPill
         label="Country"
         icon={<MapPin size={13} strokeWidth={1.8} />}
-        value={country ? countryName(country) : null}
+        value={country === NONE ? 'Location not listed' : country ? countryName(country) : null}
         open={popover === 'country'}
         onOpen={() => setPopover(popover === 'country' ? null : 'country')}
         onClear={() => setCountry(null)}

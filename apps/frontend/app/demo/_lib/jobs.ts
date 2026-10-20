@@ -159,18 +159,21 @@ export function countBy<T>(items: T[], key: (item: T) => string | null): Array<[
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-export type DeadlineFilter = 'soon' | 'month' | 'dated';
+/** Deadline buckets do not overlap, so their counts add up to the total. */
+export type DeadlineFilter = 'soon' | 'month' | 'later' | 'none';
 
 export const DEADLINE_LABELS: Record<DeadlineFilter, string> = {
   soon: `Closing within ${SOON_DAYS} days`,
-  month: 'Closing within 30 days',
-  dated: 'Has a deadline',
+  month: `Closing in ${SOON_DAYS + 1}–30 days`,
+  later: 'Closing in more than 30 days',
+  none: 'No deadline listed',
 };
 
 export function matchesDeadline(job: Job, filter: DeadlineFilter | null): boolean {
   if (!filter) return true;
+  if (filter === 'none') return job.daysLeft === null;
   if (job.daysLeft === null) return false;
   if (filter === 'soon') return job.daysLeft <= SOON_DAYS;
-  if (filter === 'month') return job.daysLeft <= 30;
-  return true;
+  if (filter === 'month') return job.daysLeft > SOON_DAYS && job.daysLeft <= 30;
+  return job.daysLeft > 30;
 }

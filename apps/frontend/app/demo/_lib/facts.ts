@@ -9,6 +9,18 @@ export type Language = 'English' | 'French' | 'Spanish' | 'Portuguese';
 
 export type Sdg = { goal: number; name: string; colour: string };
 
+export type Level = 'Entry' | 'Mid-career' | 'Senior' | 'Leadership' | 'Support staff';
+
+export const LEVELS: Level[] = ['Entry', 'Mid-career', 'Senior', 'Leadership', 'Support staff'];
+
+export const LEVEL_HINT: Record<Level, string> = {
+  Entry: 'Internships, UN P-1 and P-2, National Officer NO-1 (NO-A)',
+  'Mid-career': 'UN P-3, National Officer NO-2 and NO-3 (NO-B, NO-C)',
+  Senior: 'UN P-4 and P-5, National Officer NO-4 and NO-5, or "Senior" in the title',
+  Leadership: 'UN D-1 and D-2, or Chief, Head of, Director, Representative in the title',
+  'Support staff': 'UN General Service grades G-1 to G-7: locally recruited support roles',
+};
+
 export type Facts = {
   contract: Contract | null;
   grade: string | null;
@@ -17,6 +29,7 @@ export type Facts = {
   remote: boolean;
   language: Language;
   sdgs: Sdg[];
+  level: Level | null;
 };
 
 /** Official SDG names and colours; shown as a dot beside dark text, so contrast does not depend on the colour. */
@@ -73,9 +86,52 @@ function contractOf(t: string): Contract | null {
 }
 
 function gradeOf(t: string): string | null {
-  const m = t.match(/\b(P|NO|G|GS|D)[- ]?([1-7]|[A-D])\b/);
+  const m = t.match(/\b(P|NO|G|GS|D)[- ]?([1-7]|[A-E])\b/);
   if (!m) return null;
   return `${m[1] === 'GS' ? 'G' : m[1]}-${m[2]}`;
+}
+
+/** National Officer grades appear as NO-1..NO-5 or NO-A..NO-E; both mean the same level. */
+const NO_STEP: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
+
+function levelOf(title: string, grade: string | null, contract: Contract | null): Level | null {
+  if (contract === 'Internship' || contract === 'Fellowship') return 'Entry';
+  if (grade) {
+    const [k, v] = grade.split('-');
+    const n = Number(v);
+    if (k === 'P') return n <= 2 ? 'Entry' : n === 3 ? 'Mid-career' : 'Senior';
+    if (k === 'D') return 'Leadership';
+    if (k === 'G') return 'Support staff';
+    if (k === 'NO') {
+      const step = NO_STEP[v];
+      if (step) return step === 1 ? 'Entry' : step <= 3 ? 'Mid-career' : 'Senior';
+    }
+  }
+  if (/\b(chief|head of|director|representative)\b/i.test(title)) return 'Leadership';
+  if (/\bsenior\b/i.test(title)) return 'Senior';
+  return null;
+}
+
+/**
+ * Minimum years of relevant experience at step I, with a master's degree:
+ * UN Secretariat guidelines (P and D, General Service with secondary education)
+ * and UNICEF Careers (National Officer). Agencies vary; shown as "usually".
+ */
+const MIN_YEARS: Record<string, Record<string, number>> = {
+  P: { '1': 0, '2': 2, '3': 5, '4': 7, '5': 10 },
+  D: { '1': 15, '2': 15 },
+  NO: { '1': 1, '2': 2, '3': 5, '4': 8, '5': 10 },
+  G: { '1': 0, '2': 1, '3': 2, '4': 3, '5': 5, '6': 7, '7': 10 },
+};
+
+export function typicalExperience(grade: string): string | null {
+  const [k, v] = grade.split('-');
+  const key = k === 'NO' ? String(NO_STEP[v] ?? '') : v;
+  const years = MIN_YEARS[k]?.[key];
+  if (years === undefined) return null;
+  if (years === 0) return 'usually no minimum experience';
+  if (k === 'D' && v === '2') return 'usually more than 15 years’ experience';
+  return `usually ${years}+ years’ experience`;
 }
 
 function durationOf(t: string): string | null {
@@ -104,22 +160,26 @@ function languageOf(t: string): Language {
 
 export function factsOf(title: string): Facts {
   const grade = gradeOf(title);
+  const contract = contractOf(title);
   return {
-    contract: contractOf(title),
+    contract,
     grade,
     duration: durationOf(title),
     openTo: openToOf(title, grade),
     remote: /\bremote(ly)?\b|home[- ]based|work from home|télétravail|remoto/i.test(title),
     language: languageOf(title),
     sdgs: sdgsOf(title),
+    level: levelOf(title, grade, contract),
   };
 }
 
 export function gradeHint(grade: string): string {
   const [k, n] = grade.split('-');
-  if (k === 'P') return `UN Professional grade ${grade}: internationally recruited`;
-  if (k === 'D') return `UN Director grade ${grade}`;
-  if (k === 'NO') return `UN National Officer grade ${grade}: for nationals of the country`;
-  if (k === 'G') return `UN General Service grade ${grade}: locally recruited`;
+  const exp = typicalExperience(grade);
+  const tail = exp ? `; ${exp} (UN standard with a master’s degree; agencies vary)` : '';
+  if (k === 'P') return `UN Professional grade ${grade}: internationally recruited${tail}`;
+  if (k === 'D') return `UN Director grade ${grade}${tail}`;
+  if (k === 'NO') return `UN National Officer grade ${grade}: for nationals of the country${tail}`;
+  if (k === 'G') return `UN General Service grade ${grade}: locally recruited${tail}`;
   return `Grade ${n}`;
 }
