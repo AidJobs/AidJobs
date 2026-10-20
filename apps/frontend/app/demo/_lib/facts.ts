@@ -28,6 +28,7 @@ export type Facts = {
   openTo: OpenTo | null;
   remote: boolean;
   language: Language;
+  sectors: string[];
   sdgs: Sdg[];
   level: Level | null;
 };
@@ -45,27 +46,50 @@ const SDG: Record<number, Sdg> = {
   16: { goal: 16, name: 'Peace, justice and strong institutions', colour: '#00689D' },
 };
 
-/** Sectors that map to one SDG without argument. Emergencies, behaviour change, and youth do not. */
-const SDG_RULES: Array<[number, RegExp]> = [
-  [4, /\beducat|\bschool|\blearning\b|[ée]ducation|educaci[oó]n|\bteach|early childhood|\bECD\b|pre-service|curricul/i],
-  [3, /\bhealth\b|sant[ée]|\bsalud\b|immuni[sz]|vaccin|\bpolio\b|malaria|\bHIV\b|epidemi|\bnurs(e|ing)\b|first aid|pre-hospital|\bmedical\b|maternal|newborn|\bMHPSS\b/i],
-  [2, /nutrition|breastfeeding|\bBFHI\b|food security|\bIYCF\b|stunting|malnutrition/i],
-  [6, /\bWASH\b|\bwater\b|sanitation|hygiene|\beau\b/i],
-  [5, /\bgender\b|\bGBV\b|gender-based|women.s empowerment|\bPSEA\b/i],
-  [1, /social protection|social policy|cash transfer|\(cash\)|poverty|child wellbeing/i],
-  [16, /child protection|protecci[oó]n (de la )?ni[ñn]ez|protection de l.enfant|justice (pour|for) (les )?enfants|juvenile justice|violence against children|rule of law/i],
-  [13, /climate|resilien/i],
-  [10, /disabilit|inclusive education/i],
+/**
+ * Sectors read from titles with strict terms, each with its SDG where the link is clear.
+ * Emergencies, behaviour change, and youth have no single SDG.
+ */
+const SECTOR_RULES: Array<{ sector: string; sdg: number | null; re: RegExp }> = [
+  { sector: 'Education', sdg: 4, re: /\beducat|\bschool|\blearning\b|[ée]ducation|educaci[oó]n|\bteach|early childhood|\bECD\b|pre-service|curricul/i },
+  { sector: 'Health', sdg: 3, re: /\bhealth\b|sant[ée]|\bsalud\b|immuni[sz]|vaccin|\bpolio\b|malaria|\bHIV\b|epidemi|\bnurs(e|ing)\b|first aid|pre-hospital|\bmedical\b|maternal|newborn|\bMHPSS\b/i },
+  { sector: 'Child protection', sdg: 16, re: /child protection|protecci[oó]n (de la )?ni[ñn]ez|protection de l.enfant|justice (pour|for) (les )?enfants|juvenile justice|violence against children|children on the move/i },
+  { sector: 'Nutrition', sdg: 2, re: /nutrition|breastfeeding|\bBFHI\b|food security|\bIYCF\b|stunting|malnutrition/i },
+  { sector: 'WASH', sdg: 6, re: /\bWASH\b|\bwater\b|sanitation|hygiene|\beau\b/i },
+  { sector: 'Gender', sdg: 5, re: /\bgender\b|\bGBV\b|gender-based|women.s empowerment|\bPSEA\b/i },
+  { sector: 'Social protection', sdg: 1, re: /social protection|social policy|cash transfer|\(cash\)|poverty|child wellbeing|social inclusion/i },
+  { sector: 'Climate & environment', sdg: 13, re: /climate|environment|environnement|resilien/i },
+  { sector: 'Disability inclusion', sdg: 10, re: /disabilit|inclusive education/i },
+  { sector: 'Emergencies', sdg: null, re: /emergenc|humanitarian|\bcrisis\b|disaster|\bDRR\b|\bDRM\b|preparedness|\brefugee|displac|\bsurge\b/i },
+  { sector: 'Behaviour change', sdg: null, re: /\bSBC\b|behaviou?r change|\bC4D\b|community engagement|social mobili[sz]ation/i },
+  { sector: 'Adolescents & youth', sdg: null, re: /adolescen|\byouth\b|young people|\bUPSHIFT\b/i },
 ];
+
+export const SECTOR_SDG: Record<string, Sdg | null> = Object.fromEntries(
+  SECTOR_RULES.map((r) => [r.sector, r.sdg ? SDG[r.sdg] : null]),
+);
 
 /** "Monitoring, Evaluation and Learning" names a function, not education. */
 function withoutMelLearning(t: string): string {
   return t.replace(/(monitoring|evaluation|accountability|reporting)[^,#()]{0,25}\blearning\b|\blearning and reporting\b/gi, ' ');
 }
 
-function sdgsOf(t: string): Sdg[] {
+function sectorsOf(t: string): string[] {
   const clean = withoutMelLearning(t);
-  return SDG_RULES.filter(([, re]) => re.test(clean)).map(([goal]) => SDG[goal]);
+  return SECTOR_RULES.filter((r) => r.re.test(clean)).map((r) => r.sector);
+}
+
+function sdgsOf(sectors: string[]): Sdg[] {
+  const seen = new Set<number>();
+  const out: Sdg[] = [];
+  for (const s of sectors) {
+    const sdg = SECTOR_SDG[s];
+    if (sdg && !seen.has(sdg.goal)) {
+      seen.add(sdg.goal);
+      out.push(sdg);
+    }
+  }
+  return out;
 }
 
 export const CONTRACT_HINT: Record<Contract, string> = {
@@ -161,6 +185,7 @@ function languageOf(t: string): Language {
 export function factsOf(title: string): Facts {
   const grade = gradeOf(title);
   const contract = contractOf(title);
+  const sectors = sectorsOf(title);
   return {
     contract,
     grade,
@@ -168,7 +193,8 @@ export function factsOf(title: string): Facts {
     openTo: openToOf(title, grade),
     remote: /\bremote(ly)?\b|home[- ]based|work from home|télétravail|remoto/i.test(title),
     language: languageOf(title),
-    sdgs: sdgsOf(title),
+    sectors,
+    sdgs: sdgsOf(sectors),
     level: levelOf(title, grade, contract),
   };
 }

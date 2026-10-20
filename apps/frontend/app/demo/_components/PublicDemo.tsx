@@ -25,6 +25,7 @@ import {
   Search,
   Share2,
   ShieldCheck,
+  Target,
   Timer,
   TriangleAlert,
   Users,
@@ -55,11 +56,11 @@ import {
   type Job,
   type RawJob,
 } from '../_lib/jobs';
-import { CONTRACT_HINT, factsOf, gradeHint, LEVEL_HINT, LEVELS, typicalExperience, type Contract, type Facts } from '../_lib/facts';
+import { CONTRACT_HINT, factsOf, gradeHint, LEVEL_HINT, LEVELS, SECTOR_SDG, typicalExperience, type Contract, type Facts } from '../_lib/facts';
 
 type JobF = Job & { facts: Facts };
 type View = 'all' | 'saved';
-type PopoverKey = 'org' | 'country' | 'deadline';
+type PopoverKey = 'sector' | 'org' | 'country' | 'deadline';
 
 const FACTS_HINT = 'Read from job titles. Today mostly UNICEF titles carry this, so some jobs are not counted.';
 
@@ -305,12 +306,13 @@ export function OptionList({
   placeholder,
 }: {
   options: Array<{ key: string; label: string; count: number; lead?: ReactNode }>;
-  selected: string | null;
+  selected: string | string[] | null;
   onPick: (key: string) => void;
   searchable?: boolean;
   placeholder?: string;
 }) {
   const [q, setQ] = useState('');
+  const isPicked = (k: string) => (Array.isArray(selected) ? selected.includes(k) : k === selected);
   const shown = options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div className="dj-popover dj-scroll fixed inset-x-3 bottom-24 lg:absolute lg:inset-x-auto lg:bottom-auto lg:left-0 lg:top-[calc(100%+6px)]" role="listbox">
@@ -321,13 +323,13 @@ export function OptionList({
         </div>
       )}
       {shown.map((o) => (
-        <button key={o.key} type="button" className="dj-option" data-active={o.key === selected} onClick={() => onPick(o.key)} role="option" aria-selected={o.key === selected}>
+        <button key={o.key} type="button" className="dj-option" data-active={isPicked(o.key)} onClick={() => onPick(o.key)} role="option" aria-selected={isPicked(o.key)}>
           {o.lead}
           <span className="min-w-0 flex-1 truncate">{o.label}</span>
           <span className="dj-faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {o.count}
           </span>
-          {o.key === selected && <Check size={13} style={{ color: 'var(--sage-7)' }} />}
+          {isPicked(o.key) && <Check size={13} style={{ color: 'var(--sage-7)' }} />}
         </button>
       ))}
       {shown.length === 0 && <div className="dj-faint px-2 py-3">Nothing matches</div>}
@@ -480,7 +482,7 @@ function JobDetail({
   const mailto = `mailto:?subject=${encodeURIComponent(`${job.title} – ${org}`)}&body=${encodeURIComponent(
     `${job.title}\n${org}${job.place ? `, ${job.place}` : ''}\n${job.deadline ? `Deadline: ${formatDate(job.deadline)}\n` : ''}Apply: ${job.apply_url}\n`,
   )}`;
-  const hasFacts = f.sdgs.length > 0 || f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
+  const hasFacts = f.sectors.length > 0 || f.contract || f.grade || f.duration || f.openTo || f.remote || f.language !== 'English';
 
   return (
     <div className="flex flex-col gap-4">
@@ -518,14 +520,17 @@ function JobDetail({
 
       {hasFacts && (
         <div className="flex flex-wrap gap-1.5">
-          {f.sdgs.map((s) => (
-            <FactChip
-              key={s.goal}
-              icon={<span className="dj-sdg-dot" style={{ background: s.colour }} aria-hidden />}
-              label={`SDG ${s.goal} · ${s.name}`}
-              hint="Sustainable Development Goal, read from the job title"
-            />
-          ))}
+          {f.sectors.map((s) => {
+            const sdg = SECTOR_SDG[s];
+            return (
+              <FactChip
+                key={s}
+                icon={sdg ? <span className="dj-sdg-dot" style={{ background: sdg.colour }} aria-hidden /> : <Target size={12} />}
+                label={sdg ? `${s} · SDG ${sdg.goal}` : s}
+                hint={sdg ? `Sector: ${s}. SDG ${sdg.goal}: ${sdg.name}. Read from the job title.` : `Sector: ${s}, read from the job title. No single SDG applies.`}
+              />
+            );
+          })}
           {f.contract && <FactChip icon={<FileSignature size={12} />} label={f.contract} hint={CONTRACT_HINT[f.contract]} />}
           {f.level && <FactChip icon={<Layers size={12} />} label={f.level} hint={`Level: ${LEVEL_HINT[f.level]}`} />}
           {f.grade && (
@@ -733,6 +738,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const [deadline, setDeadline] = useState<DeadlineFilter | null>(null);
   const [picks, setPicks] = useState<Record<Facet, string[]>>(NO_PICKS);
   const [day, setDay] = useState<string | null>(null);
+  const [sectors, setSectors] = useState<string[]>([]);
   const [sort, setSort] = usePersistentState<'recommended' | 'closing'>('aidjobs.demo.sort', 'recommended');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -805,6 +811,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   type Skip = PopoverKey | Facet | 'day';
   const matches = (j: JobF, skip?: Skip) =>
     (view !== 'saved' || saved.includes(j.id)) &&
+    (skip === 'sector' || sectors.length === 0 || (j.facts.sectors.length ? j.facts.sectors.some((s) => sectors.includes(s)) : sectors.includes(NONE))) &&
     (skip === 'org' || !org || j.org === org) &&
     (skip === 'country' || !country || (country === NONE ? j.iso === null : j.iso === country)) &&
     (skip === 'deadline' || matchesDeadline(j, deadline)) &&
@@ -837,13 +844,14 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     .filter((o) => o.count > 0);
 
   const anyPick = FACETS.some((f) => picks[f].length > 0);
-  const anyFilter = !!(org || country || deadline || anyPick || day || query || view !== 'all');
+  const anyFilter = !!(sectors.length || org || country || deadline || anyPick || day || query || view !== 'all');
   const clearAll = () => {
     setDay(null);
     setOrg(null);
     setCountry(null);
     setDeadline(null);
     setPicks(NO_PICKS);
+    setSectors([]);
     setQuery('');
     setView('all');
   };
@@ -929,8 +937,49 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     },
   ].filter((s) => s.entries.length > 0);
 
+  const sectorPool = jobs.filter((j) => matches(j, 'sector'));
+  const sectorCounts = new Map<string, number>();
+  for (const j of sectorPool) {
+    for (const s of j.facts.sectors.length ? j.facts.sectors : [NONE]) sectorCounts.set(s, (sectorCounts.get(s) ?? 0) + 1);
+  }
+  for (const s of sectors) if (!sectorCounts.has(s)) sectorCounts.set(s, 0);
+  const sectorOptions = [...sectorCounts.entries()]
+    .sort((a, b) => Number(a[0] === NONE) - Number(b[0] === NONE) || b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([s, n]) => {
+      const sdg = s === NONE ? null : SECTOR_SDG[s];
+      return {
+        key: s,
+        label: s === NONE ? 'Not stated' : sdg ? `${s} · SDG ${sdg.goal}` : s,
+        count: n,
+        lead:
+          s === NONE ? (
+            <CircleDashed size={14} strokeWidth={1.8} className="dj-faint" />
+          ) : (
+            <span className="dj-sdg-dot" style={{ background: sdg ? sdg.colour : 'var(--hair)', width: 10, height: 10 }} aria-hidden />
+          ),
+      };
+    });
+  const sectorValue =
+    sectors.length === 0 ? null : sectors.length === 1 ? (sectors[0] === NONE ? 'Sector not stated' : sectors[0]) : `${sectors.length} sectors`;
+
   const pills = (
     <div ref={pillsRef} className="dj-no-scrollbar flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible">
+      <FilterPill
+        label="Sector"
+        icon={<Target size={13} strokeWidth={1.8} />}
+        value={sectorValue}
+        open={popover === 'sector'}
+        onOpen={() => setPopover(popover === 'sector' ? null : 'sector')}
+        onClear={() => setSectors([])}
+      >
+        <OptionList
+          options={sectorOptions}
+          selected={sectors}
+          searchable
+          placeholder="Find a sector · choose several"
+          onPick={(k) => setSectors((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]))}
+        />
+      </FilterPill>
       <FilterPill
         label="Organisation"
         icon={<Briefcase size={13} strokeWidth={1.8} />}
