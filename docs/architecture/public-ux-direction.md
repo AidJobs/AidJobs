@@ -24,14 +24,18 @@ Evidence comes from the read-only UX review of 20 October 2026 (ledger W-26): th
 
 ### Layout
 
-- No header and no menu. A small logo and the saved count at the top.
-- Phone: one column of jobs; the search bar at the bottom, in thumb reach; a job opens as a bottom sheet over the list.
-- Desktop: two panes, list and job, with a draggable divider whose position is remembered. Each pane scrolls on its own; the page itself does not scroll.
+- No header. All navigation is in one collapsible side menu (decision of 20 October 2026), with the logo at its top.
+- The side menu holds: Jobs; Closing soon; Saved, with its count; an Organisations section listing each organisation with its initials (logos later) and live count; a Countries section with a flag and live count. An entry appears only when its count is above zero. Entries are real links, which later become the landing pages under "Search engines and AI search".
+- Desktop: three areas, the side menu, the job list, and the job pane, with a draggable divider between list and job whose position is remembered. The menu collapses to an icon rail with hover labels. Each area scrolls on its own; the page itself does not scroll.
+- Phone: one column of jobs; the search bar at the bottom, in thumb reach; the side menu is a drawer, closed by default, opened from a button in the search bar; a job opens as a bottom sheet over the list.
+- Above the list: a page title carrying the sector keywords, such as "NGO, humanitarian and development jobs", and a small strip of real counts (open jobs, new this week, closing this week).
+- On wide screens, when no job is open, the job pane shows a "Closing this week" timeline: date, job, organisation.
 
 ### One search bar
 
 It replaces the filter panels, the five collections, and the "Trinity" search.
 
+- Beside the search field, three filter pills: Organisation, Country, Deadline. Each opens a searchable list with counts; a pick shows as a chip. On phones the pills scroll sideways under the bar.
 - Typing suggests values that exist in the database, each with a live count: organisations ("UNICEF · 187"), countries and places ("Kenya · 6"), and title words. A pick becomes a chip inside the bar; a tap or backspace removes it.
 - The empty bar offers smart views: Closing within 7 days, each organisation, the largest countries, with counts.
 - No AI call. "Trinity" is the current home-page search: it asks an AI model (OpenRouter) for suggestions and turns a sentence into filter categories such as "Water, Sanitation & Hygiene (WASH)". Those categories do not exist in the job data, and their text leaks into the search after clearing, which is W-17. With the key revoked, a keyword fallback does the same.
@@ -39,8 +43,8 @@ It replaces the filter panels, the five collections, and the "Trinity" search.
 
 ### Job list
 
-- Two lines per job: title; organisation and place. The right edge shows days left, orange inside 7 days and red inside 3, with the full date on hover or long-press. Soonest deadline first; jobs without a deadline after.
-- A bookmark per row saves the job.
+- Two lines per job: title; organisation and place with its country flag. The right edge shows days left, orange inside 7 days and red inside 3, with the full date on hover or long-press. Soonest deadline first; jobs without a deadline after.
+- A bookmark per row saves the job. The open job's row carries the sage highlight.
 
 ### Job sheet (launch) and job page (later)
 
@@ -62,7 +66,7 @@ Saves are stored in the browser (`localStorage`). They survive closing the tab a
 - Add to calendar and email to myself give a permanent record outside AidJobs.
 - A saved-list link reopens the same list on another device, with no sign-in.
 - Saved jobs closing soon move to the top on return.
-- Saved becomes a bookmark icon with a count that shows only saved jobs, not a separate page.
+- Saved is a side-menu entry with a count that shows only saved jobs in the same list, not a separate page.
 
 Sync across devices and email job alerts need sign-in. **Scope change, not proposed now:** user accounts stay out of scope until a separate decision.
 
@@ -75,9 +79,15 @@ Sync across devices and email job alerts need sign-in. **Scope change, not propo
 
 ### Look and feel
 
-- Logo: provided by the user (decision of 20 October 2026). A favicon and app icon are made from it.
-- One typeface (Inter), three sizes: 12px for most text, 13px for list titles, 15px for the job title in the sheet. Weight carries hierarchy.
-- Colour: neutral surfaces, ink text, grey secondary text. Accent: **ink** (near-black buttons; the orange star only in the logo), decision of 20 October 2026. Orange and red only for deadlines. Light and dark follow the device.
+Visual references: three admin dashboard designs the user supplied on 20 October 2026 (Crewix, Crextio, BizLink). They are adapted, not copied. What they share and AidJobs takes: mostly neutral surfaces with one soft tint; ink for active and primary; rounded white cards on a faintly tinted page; pill-shaped controls; thin outline icons in small round buttons; big light headings and numbers with small grey labels; status as small chips; places with flags; a sectioned side menu (BizLink). Not taken: top navigation pills (a header), low-contrast grey text, glass and blur effects, photographs, decorative charts on the public site.
+
+- Logo: provided by the user (decision of 20 October 2026). A favicon and app icon are made from it. The exact sage shade is checked against the logo when it arrives.
+- Colour: neutral surfaces, ink text, grey secondary text. Accent: **ink** for active and primary (near-black buttons, the selected menu entry), and one signature tint, **sage green**, for the page wash, highlights, and charts (decisions of 20 October 2026). Orange and red only for deadlines. Light and dark follow the device. Text contrast meets WCAG AA throughout.
+- Type: one typeface. Inter and Manrope are compared in the demo (UX-00). Sizes: 12px for most text, 13px for list titles, 15px for the job title in the sheet, and one large light size only for page titles and large numbers. Weight carries hierarchy.
+- Icons: Lucide (already in the frontend), thin outline, 16px, in 32px round buttons, each with a hover and long-press label.
+- Shape: about 20px corners on cards, fully rounded pills, 1px hairlines, flat surfaces without shadows or blur, a faint sage wash on the page.
+- Flags as small SVG images, not emoji: Windows shows emoji flags as letters.
+- Performance: many users are on low-end phones and slow networks; the look uses plain colour fills, no blur effects, no photographs.
 
 ## Search engines and AI search
 
@@ -104,14 +114,18 @@ No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Ideali
 
 Review findings (ledger W-26): job totals disagree (234, 218, 206) without labels; Data Quality flags every job as a listing page because its check matches `/jobs` and `/careers` in host names (`app/data_quality.py`); the dashboard reports no recent activity while Crawls lists crawls; Settings reports AI as configured with a revoked key; Delete Jobs and Delete Source look like Run crawl; the Sources table stacks nine icon actions, about 337px per row; "Cleanup expired jobs" does nothing; the admin is unusable on a phone.
 
-Proposed menu, four items. **Scope change:** the contract fixes the admin V1 navigation as Dashboard, Organisations, Sources, Jobs, Crawls, and Data Quality, with Settings and logout allowed ("Admin V1 navigation" and Gate 9). This menu needs a contract decision before it is built.
+Menu, revised proposal of 20 October 2026: keep the contract's admin V1 navigation, Dashboard, Organisations, Sources, Jobs, Crawls, and Data Quality, with Settings and logout ("Admin V1 navigation" and Gate 9), in the same collapsible side menu and visual language as the public site. If the user agrees, no contract decision is needed for the menu. The earlier four-item menu, which merged Crawls and Settings into the Dashboard and hid Organisations, would change that navigation and is withdrawn unless the user asks for it.
 
-1. **Dashboard:** one health view. Each source's last crawl and whether it was complete, partial, or failed; the public job count; real alerts. Absorbs Crawls and Settings.
-2. **Sources:** one actions menu per row. A source's page holds its crawl history, the test and simulate tools, and a separate danger zone for deletes.
-3. **Jobs:** moderation, hide and restore.
-4. **Crawl review:** replaces Data Quality. Per crawl: found, inserted, updated, rejected with reasons, listing completeness, jobs missing a location or deadline, duplicate links. It replaces the SQL queries run by hand after each crawl.
+What improves is inside the pages:
 
-Organisations is hidden until the organisation model (Gate 8) is in use.
+1. **Dashboard:** one health view. Real counts with their change; each source's health with a sparkline of its last crawls and its listing completeness (UNICEF on 20 October: 120 of 209); upcoming scheduled crawls; the checklist for adding a new source (one approved fetch, extraction, admission, report); real alerts.
+2. **Sources:** one actions menu per row; optionally a view by stage (proposed, checked offline, live, needs attention). A source's page holds its crawl history, the test and simulate tools, and a separate danger zone for deletes.
+3. **Jobs:** moderation, hide and restore, as a table with filter pills, a column picker, and export.
+4. **Crawls:** each crawl's outcome.
+5. **Data Quality, as crawl review:** per crawl, found, inserted, updated, rejected with reasons, listing completeness, jobs missing a location or deadline, duplicate links. It replaces the SQL queries run by hand after each crawl.
+6. **Organisations and Settings:** kept, plain, until the organisation model (Gate 8) is in use.
+
+Every number and chart comes from the database; nothing is decorative.
 
 ## Data the design needs from the crawler
 
@@ -122,7 +136,7 @@ Organisations is hidden until the organisation model (Gate 8) is in use.
 
 ## Order of work
 
-`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status: fixes on the current site first (Stage A), a decision gate (UX-08), the launch redesign (Stage B), the admin redesign (Stage C), and growth with the crawler (Stage D).
+`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status: the design demo first (UX-00), fixes on the current site (Stage A), a decision gate (UX-08), the launch redesign (Stage B), the admin redesign (Stage C), and growth with the crawler (Stage D).
 
 ## The paused UX branch
 
@@ -133,4 +147,7 @@ Organisations is hidden until the organisation model (Gate 8) is in use.
 - Write this direction up for approval.
 - The user provides the logo.
 - Accent colour: ink.
-- Fix the two live bugs on the current design first: PR #19.
+- Fix the two live bugs on the current design: PR #19.
+- Signature tint: sage green.
+- No header; all navigation in a collapsible side menu, for the public site and the admin.
+- A clickable design demo comes first (UX-00), on a separate branch that is never merged, before the fixes in Stage A.
