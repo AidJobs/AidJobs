@@ -24,6 +24,31 @@ The user approved the look of the design demo (UX-00) on their phone on 21 Octob
 4. **Public site first, admin after.** The admin is separate code used only by the user. The old admin keeps the old shared styles until Stage C; they are in use, not stale. New design tokens are built once (UX-09) so the admin reuses them.
 5. **Domain.** `aidjobs.app` has expired and `www.aidjobs.app` does not resolve (observed by the user, 20 October 2026). Nothing in Stage B needs the domain. Until it returns: the "Live" check in step 6 of the method uses the Vercel production address; the site tells search engines not to index it; the site address is one setting, so connecting the domain later changes one value. Search-engine registration, the sitemap address, and canonical links wait for the domain (UX-18).
 6. **Clean code.** Every step removes what it replaces. The switch removes the old public site entirely and runs a dead-code check. Stage C ends by removing the old shared styles.
+7. **The demo is the specification** (decided by the user, 21 October 2026: "The website should be exactly as we finalised in the demo"). The public site's look and behaviour are those of the tag `ux-demo-approved-2026-10-21`. Nothing is added, removed, or restyled unless the user approves that difference. Where any step, acceptance criterion, or the direction's earlier text disagrees with the demo, the demo wins.
+
+**Fidelity check, for every Stage B pull request:**
+
+- Run the tagged demo and the pull request's preview side by side on the same jobs: the demo's job copy loaded into the new site's data path, or the same live jobs loaded into the demo.
+- Screenshot the same screens at 360px, 390px, 412px, and 1366px: home; each filter sheet and dropdown, scrolled; the Filters sheet; sort; the 10-day view; a job sheet and the job pane; Saved; the menu, collapsed rail, and phone drawer; the settings panel; light and dark.
+- Record every visible difference in the pull request, each marked "intended" (one of the expected differences below) or "for approval". A difference not approved by the user is fixed before merge.
+
+**Expected differences from the demo,** the only ones allowed without a further decision: live jobs instead of the 20 October copy; the user's logo when it arrives; no "Demo" menu section, "demo" tag, "Demo data" footnote, or "Demo note" about descriptions in the job sheet; no demo admin screens; the server renders the first screen; launch pages (UX-27) in the demo's style.
+
+**Removed from the plan, because they are not in the demo.** Each could return later only as a new step with the user's approval:
+
+- Search chips inside the bar, typed suggestions with counts, and smart views on an empty bar (previously UX-11, UX-12). The demo's search is a plain text box that filters as you type.
+- A strip of counts with "new this week" and "closing this week" (previously UX-10). The demo shows the number of open roles and the 10-day switch. "New on AidJobs" stays parked until the backend records a first-seen date.
+- A saved-list link, meaning a web address that reopens the same saved jobs on another device, and moving saved jobs closing soon to the top (previously UX-15). The demo's Saved list itself stays exactly as it is: the bookmark, the Saved entry with its count, saves kept on the device.
+
+Sharing is not removed. The demo's job sheet has one Share button, labelled "Share: WhatsApp, LinkedIn, email, or copy link", which opens the phone's share menu (where WhatsApp, LinkedIn, and email appear) or copies the link where there is no share menu, plus a separate "Email this job to myself" button. Both are carried over as they are.
+- "At least eight jobs visible on a 390px phone" (previously UX-13). The demo shows about seven with the brand bar and switch; the acceptance is the fidelity check instead.
+
+**Porting work the demo does not show,** needed to make the same design render on the server:
+
+- Country names: the demo renders only in the browser because Node and browsers name some countries differently. The real site uses one fixed country-name table, identical on server and browser.
+- Dates: "Today" and days left depend on the visitor's clock and time zone, so they are worked out in the browser after the page loads, never baked into the cached page.
+- Title-fact rules: the demo's rules were tuned on 206 titles, mostly UNICEF, with no tests. They move with unit tests built from real titles (each sector, level, contract, open-to, remote, language, and grade case, plus "not stated"), and are re-checked against the live titles whenever a new organisation is added.
+- Saved keys: the demo stores saves under `aidjobs.demo.*`; the real site uses its own keys.
 
 **Order of steps (authoritative):**
 
@@ -34,7 +59,7 @@ The user approved the look of the design demo (UX-00) on their phone on 21 Octob
 | 3 | UX-08 launch decisions and assessments, in parallel with the admin fixes UX-04, UX-05, UX-06, UX-07 (admin parts) | Decisions; code |
 | 4 | UX-09 to UX-17, at the hidden address, with UX-26 tests growing alongside from UX-12 | Code |
 | 5 | UX-27 launch pages and UX-28 error monitoring | Code |
-| 6 | W-06 expiry rule, if the user moves it ahead of the other crawler items at UX-08 | Crawler |
+| 6 | W-02 inspection, then W-06 expiry rule, moved ahead of the other crawler items by the user at UX-08 | Crawler |
 | 7 | UX-29 the switch | Code |
 | 8 | UX-18 launch check, with the domain connected | Launch |
 | 9 | Stage C, UX-19 to UX-21, then UX-30 removal of the old shared styles | Code |
@@ -42,7 +67,7 @@ The user approved the look of the design demo (UX-00) on their phone on 21 Octob
 
 UX-31, the repository tidy-up, can run at any point with the user's approval of its list.
 
-**Open questions, decided at UX-08 and not before.** These are proposals, not decisions:
+**Questions decided at UX-08** (21 October 2026; outcomes in `ux-08-launch-decisions.md`: filtering in the browser for launch, title facts read when the page is built, W-06 ahead, domain still being chosen). As first written:
 
 - Filtering on the server or in the browser. Server filtering with counts per pill scales but needs new search features (UX-11). With 200 to 2,000 open jobs, loading all open jobs once and filtering in the browser, as the demo does, with the first page rendered on the server, may be enough for launch. Decide from measurements: payload size, time to first jobs on a phone, job counts expected within a year.
 - Where title facts are read (sector, SDG, level, contract, open to, work style, language, UN grade, typical experience). Stored on each job at save time needs crawler changes and a one-off write to every existing job, which needs its own approval. Read from the title each time the backend returns a job needs no storage and no write. Either way it is enrichment under contract §2 and needs a recorded contract decision.
@@ -84,7 +109,7 @@ To establish before Stage B (part of UX-08): whether Netlify also publishes a pr
 
 ### UX-00. Clickable design demo
 
-**Status:** Done when the docs pull request of 21 October 2026 merges. Built in twelve rounds on `demo/ux-design` (draft PR #22), approved by the user on their phone on 21 October 2026, kept at the tag `ux-demo-approved-2026-10-21`. Type check, lint, and build pass at the tag; the frontend test suite was run at the first demo build, not after the last round; colours were checked against WCAG AA when chosen. The demo grew beyond the scope below (title facts, Sector with SDGs, bottom sheets); what was approved is recorded in `public-ux-direction.md`.
+**Status:** Done (PR #23, merged as `fbcfffe`). Built in twelve rounds on `demo/ux-design` (draft PR #22), approved by the user on their phone on 21 October 2026, kept at the tag `ux-demo-approved-2026-10-21`. Type check, lint, and build pass at the tag; the frontend test suite was run at the first demo build, not after the last round; colours were checked against WCAG AA when first chosen, not the ones added in later rounds; checked only in Chromium and on the user's Android phone. Those gaps are closed at UX-16 and UX-18. The demo grew beyond the scope below (title facts, Sector with SDGs, bottom sheets); what was approved is recorded in `public-ux-direction.md`.
 
 - **Why:** the user supplied three dashboard designs (Crewix, Crextio, BizLink) as the visual reference for both the public site and the admin. The demo turns `public-ux-direction.md` and that reference into something the user can try on a phone and a laptop before any real build.
 - **Scope:**
@@ -183,10 +208,10 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-08. Launch decisions (gate)
 
-**Status:** Not started. **Nothing in UX-09 to UX-18 starts until every item here is recorded as decided.**
+**Status:** Done, 21 October 2026. Every item is decided in `docs/architecture/ux-08-launch-decisions.md`, except the domain (item 9), which the user is still choosing and which only UX-18 needs. Consequences applied in this plan: UX-09 no longer waits for the logo, which UX-18 needs instead; UX-11 is narrowed to reading every open job; UX-17 carries the cached page and the always-on backend; W-06 is in the order table before UX-29; robots rules follow item 6 (all AI crawlers allowed except `Bytespider`).
 
 1. **Direction approval.** The user approves `public-ux-direction.md` as written or amended, including the look approved in the demo (UX-00). Merging the pull request that added it records the proposal; it is not the approval.
-2. **Contract decision** for the public scope changes in contract §2: the organisation filter and place suggestions (new public search features); the Sector filter with SDGs, multi-choice filters, and the title-fact filters approved in the demo (new public search features, and enrichment where facts are read from titles); the Recommended order; and the user-interface rewrite under rule 15 with the product reason recorded in the direction document. This brings forward the UX-22 contract decision, because the approved design uses title facts at launch.
+2. **Contract decision** for the public scope changes in contract §2: the organisation filter (a new public search feature); the Sector filter with SDGs, multi-choice filters, and the title-fact filters approved in the demo (new public search features, and enrichment where facts are read from titles); the Recommended order; and the user-interface rewrite under rule 15 with the product reason recorded in the direction document. This brings forward the UX-22 contract decision, because the approved design uses title facts at launch.
 3. **Logo** file received from the user (SVG preferred).
 4. **Launch date.**
 5. **Slow first load.** Assess first, read-only: measure the cold start on Render, find the plan and sleep behaviour, list the options (always-on instance, keep-alive, caching or server rendering that does not wait on a sleeping backend) with cost. Then the user decides.
@@ -197,6 +222,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 10. **Filtering approach,** on the server or in the browser, decided from measurements (see "Open questions" in the revision).
 11. **Where title facts are read,** stored at save time or read when the backend returns a job (see "Open questions").
 12. **W-06 ahead of the other crawler items,** or not (see "Open questions").
+13. **A saved job that closes:** leaves Saved, as in the demo, or stays marked "Closed".
 
 ### UX-09. Design foundation
 
@@ -205,8 +231,8 @@ Within the existing contract: these repair behaviour; they add no public search 
 Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at `/`. Each step takes its look and behaviour from "Approved in the design demo" in `public-ux-direction.md` and carries the demo's components over from the tag; where a step's text below predates the demo, the approved demo decisions apply and the step's plan reconciles them.
 
 - **Scope:** the typeface chosen in the demo (Manrope); text sizes 12, 13, and 15px plus one large light size for page titles and large numbers; ink and sage for light and dark, following the device; the user's logo, favicon, and app icon; Lucide icons with hover and long-press labels as one component; SVG flags; card, pill, and hairline shapes. Shared by the public site and the admin. The demo's styles are reused, not redrawn.
-- **Not in scope:** page layouts (UX-10 onward).
-- **Depends on:** UX-00 (approved look), UX-08 (logo, direction).
+- **Not in scope:** page layouts (UX-10 onward); the final logo, favicon, and app icon, which arrive with the domain and are fitted at UX-18.
+- **Depends on:** UX-00 (approved look), UX-08 (direction). Not on the logo (UX-08 item 3).
 - **Acceptance:** tokens defined once and used by new components; favicon and app icon return 200; contrast meets WCAG AA for text.
 - **Verify:** preview; contrast measured.
 
@@ -214,30 +240,30 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
-- **Scope:** one persistent frame with no header and a collapsible side menu (logo, Jobs, Saved with count, and on desktop the title-fact sections with live counts, as approved in the demo; collapsing to an icon rail whose section icons open pop-outs); phone: a brand bar with Saved, the list with the search bar at the bottom, the menu as a navigation drawer opened from the bar, filters in bottom sheets; desktop: menu, list, and job pane, with a draggable, remembered divider between list and job, each area scrolling and the page not; a keyword page title and a strip of real counts above the list; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph).
-- **Not in scope:** the search bar's suggestions (UX-11, UX-12); job pages (UX-24).
+- **Scope:** one persistent frame with no header and a collapsible side menu (logo, Jobs, Saved with count, and on desktop the title-fact sections with live counts, as approved in the demo; collapsing to an icon rail whose section icons open pop-outs); phone: a brand bar with Saved, the list with the search bar at the bottom, the menu as a navigation drawer opened from the bar, filters in bottom sheets; desktop: menu, list, and job pane, with a draggable, remembered divider between list and job, each area scrolling and the page not; the keyword page title and the count of open roles above the list, as in the demo; the fixed country-name table and browser-side dates from the revision's porting work; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph).
+- **Not in scope:** the filter pills and search (UX-12); job pages (UX-24).
 - **Depends on:** UX-08, UX-09.
 - **Acceptance:** the HTML returned for the new site's address (the hidden address until UX-29, then `/`), fetched without JavaScript, contains job titles; `robots.txt` and `sitemap.xml` return 200; on desktop the document does not scroll; switching views makes no full page load; the divider position survives a reload.
 - **Verify:** raw HTML fetch of the preview; browser checks at both widths.
 
 ### UX-11. Search API for the bar
 
-**Status:** Not started. **Contract decision** (new public search features; recorded at UX-08).
+**Status:** Not started. **Contract decision** (new public search features; recorded at UX-08). Narrowed on 21 October 2026: the suggestions endpoint is removed, because the demo has no suggestions (revision, "Removed from the plan"). What remains is what the server-rendered page needs to read every open job, decided with UX-08 item 10; if filtering stays in the browser, this step may need no backend change at all.
 
-- **Scope:** backend: an organisation filter on the search query, and several values per filter where the UX-08 filtering decision puts filtering on the server; a suggestions endpoint returning organisations, countries and places, title words, and "closing within 10 days", each with a count over the current filters, never returning a zero count. Tests in the CI lists. If UX-08 decides on filtering in the browser, this step narrows to what the server-rendered first page and the suggestions need.
+- **Scope:** if UX-08 puts filtering in the browser: confirm the existing `/api/search/query` returns every open job with the fields the list needs, and add only what is missing, with tests in the CI lists. If UX-08 puts filtering on the server: an organisation filter and several values per filter on the search query, and counts per choice over the current filters, with tests.
 - **Not in scope:** AI; Meilisearch.
 - **Depends on:** UX-10.
-- **Acceptance:** counts equal the number of jobs the same filters return; no suggestion with zero; response time measured.
+- **Acceptance:** the server-rendered page receives every open job; where the server filters, counts equal the number of jobs the same filters return; response time measured.
 - **Verify:** unit tests; preview requests.
 
 ### UX-12. One search bar, and removals
 
 **Status:** Not started.
 
-- **Scope:** the bar with chips, keyboard use, and smart views on an empty bar; the Sector, Organisation, Country, and Deadline pills, each a multi-choice list with counts (searchable where long); on phones each opens as a bottom sheet, and a Filters pill opens the title-fact filters, as approved in the demo. The removals (`TrinitySearchBar` and its public use of `/api/search/parse` and `/api/search/autocomplete`, the five collections, the old field-based Level, International eligible, and Mission Tags filters, the on-page country list) happen at the switch (UX-29), because the old site keeps running until then.
+- **Scope:** the plain search box as in the demo (filters as you type; the enter key closes the phone keyboard); the Sector, Organisation, Country, and Deadline pills, each a multi-choice list with counts (searchable where long); on phones each opens as a bottom sheet, and a Filters pill opens the title-fact filters, as approved in the demo. The removals (`TrinitySearchBar` and its public use of `/api/search/parse` and `/api/search/autocomplete`, the five collections, the old field-based Level, International eligible, and Mission Tags filters, the on-page country list) happen at the switch (UX-29), because the old site keeps running until then.
 - **Not in scope:** backend AI code removal (separate, later); filling each source's empty organisation type, which only the UN Jobs collection used.
 - **Depends on:** UX-11.
-- **Acceptance:** no suggestion leads to zero jobs; removing every chip and clearing the text shows all jobs and a clean address (W-17 closed once the switch removes Trinity).
+- **Acceptance:** the fidelity check passes; every choice shows a count above zero or is a picked value; clearing the search and every filter shows all jobs and a clean address (W-17 closed once the switch removes Trinity); the title-fact rules have unit tests from real titles in CI.
 - **Verify:** preview at both widths.
 
 ### UX-13. Dense job list
@@ -246,7 +272,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 - **Scope:** two lines per job (title; organisation and place with an SVG country flag, and the SDG where clear); days left on the right, orange within 10 days and red within 3, full date on hover or long-press; the Recommended order by default and "Soonest deadline" as the alternative, as approved in the demo; bookmark per row; the open job's row in the sage highlight; "Closing in the next 10 days" with the day strip in the job pane when no job is open, on wide screens, and the "All jobs | Closing in 10 days" switch on phones.
 - **Depends on:** UX-12, and `lib/dates.ts` from UX-07.
-- **Acceptance:** on a 390px phone at least eight jobs are visible without scrolling; no horizontal overflow at 320px; urgency colours match the rule.
+- **Acceptance:** the fidelity check passes; no horizontal overflow at 320px; urgency colours match the rule.
 - **Verify:** preview.
 
 ### UX-14. Job sheet and job pane
@@ -254,26 +280,26 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 **Status:** Not started.
 
 - **Scope:** title, organisation, place with country names (not codes), deadline with days left; the freshness line; fact chips only for facts that exist in the data, including sector with SDG and typical experience on UN grades; similar jobs; "Apply on {organisation}"; save, share (system share sheet or copy link), add the deadline to a calendar (`.ics` with a reminder), email to myself; more from the same organisation and country; the address changes to the job's link and opening that link opens the job. No "International eligible: No" or other values that are unfilled for every job.
-- **Not in scope:** the permanent job page and structured data (UX-24); facts read from titles (UX-22).
+- **Not in scope:** the permanent job page and structured data (UX-24); storing title facts in the database (UX-22). The facts themselves are in scope, read as decided at UX-08 item 11.
 - **Depends on:** UX-13.
-- **Acceptance:** a shared job link opens that job for a new visitor; the calendar file imports into Google Calendar and Outlook; the sheet closes with a swipe and Back.
+- **Acceptance:** the fidelity check passes; a shared job link opens that job for a new visitor; the calendar file imports into Google Calendar and Outlook; the sheet closes with a swipe and Back.
 - **Verify:** preview on a phone-sized screen and a laptop.
 
 ### UX-15. Saving without accounts
 
 **Status:** Not started.
 
-- **Scope:** the Saved menu entry with its count shows only saved jobs in the same list; a saved-list link reopens the same list on another device; saved jobs closing soon move to the top on return.
-- **Not in scope:** sign-in, sync, alerts (contract §2 excludes user accounts).
+- **Scope:** as in the demo: the bookmark on each row and in the job, saves kept on the device, the Saved entry in the menu and the phone brand bar with its count, showing only saved jobs in the same list, and the "Saved on this device" note. What happens to a saved job after it closes follows UX-08 item 13.
+- **Not in scope:** sign-in, sync, alerts (contract §2 excludes user accounts); the saved-list link and reordering, removed on 21 October 2026 because they are not in the demo.
 - **Depends on:** UX-14.
-- **Acceptance:** the saved-list link reproduces the list in a fresh browser; counts stay correct after every add and remove.
-- **Verify:** preview in two browsers.
+- **Acceptance:** the fidelity check passes; counts stay correct after every add and remove, and after a reload.
+- **Verify:** preview.
 
 ### UX-16. Accessibility and polish
 
 **Status:** Not started.
 
-- **Scope:** every icon has a label shown on hover and long-press and read by screen readers; full keyboard use; visible focus; text contrast WCAG AA; every empty, loading, and error state has plain wording; reduced motion respected.
+- **Scope:** every icon has a label shown on hover and long-press and read by screen readers; full keyboard use; visible focus; text contrast WCAG AA, measured for every text colour the demo uses in light, dark, and high contrast, including the colours added in later rounds (the amber count in the 10-day switch, the green Clear link, the switch, the badges, the freshness note); every empty, loading, and error state has plain wording; reduced motion respected; the demo's settings panel (text size, high contrast, reduce motion, light or dark) carried over.
 - **Depends on:** UX-15.
 - **Acceptance:** an automated accessibility audit has no serious issues; a keyboard-only pass completes search, open, save, share, and apply.
 - **Verify:** preview.
@@ -282,7 +308,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started.
 
-- **Scope:** carry out the slow-first-load decision from UX-08; one search sends one request, not four; images and fonts sized for phones.
+- **Scope:** carry out the slow-first-load decision from UX-08 (item 5: the cached page, and the backend on an always-on instance, changed by the user in Render); images, fonts, and the flag icons sized for phones; the page weight of all open jobs measured against the UX-08 item 10 threshold.
 - **Depends on:** UX-16; the UX-08 hosting decision.
 - **Acceptance:** first load on a cold backend within the target set at UX-08; a phone audit's Largest Contentful Paint under 2.5 seconds.
 - **Verify:** preview and live measurements.
@@ -291,8 +317,8 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started.
 
-- **Scope:** connect the domain and set the site address; allow indexing; repeat the W-26 review method on the preview at 390px and 1366px, public pages; a speed, accessibility, and search-engine audit; the user verifies the domain in Google Search Console and Bing Webmaster Tools and submits the sitemap.
-- **Depends on:** UX-29; the domain (UX-08).
+- **Scope:** connect the domain and set the site address; allow indexing; repeat the W-26 review method on the preview at 390px and 1366px, public pages; the fidelity check on the whole site; checks on real devices: iPhone Safari, Android Chrome, Samsung Internet, and desktop Safari, Firefox, Chrome, and Edge, covering the bottom sheets, the keyboard with the search field and sheet search, the brand bar folding, the day strip swipe, share, and calendar (the demo was checked only in Chrome, and iPhone Safari handles the keyboard and screen height differently); the full frontend test suite and type check; a speed, accessibility, and search-engine audit; the user verifies the domain in Google Search Console and Bing Webmaster Tools and submits the sitemap.
+- **Depends on:** UX-29; the domain (UX-08 item 9); the user's logo (UX-08 item 3), fitted here with the favicon and app icon.
 - **Acceptance:** no open finding above Low; the user approves the launch.
 - **Verify:** recorded results.
 
@@ -300,7 +326,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started. Added 21 October 2026.
 
-- **Scope:** automated browser tests, kept in the repository and run on every pull request, for the key flows at 390px and 1366px: filter sheets (open, choose several, "Show N jobs", close by button, scrim, and swipe), the fixed search inside long lists, the search key closing the phone keyboard, the "Closing in 10 days" switch and day strip, the Filters sheet, sort, open a job, save, share link. The demo was checked with throwaway scripts outside the repository; this replaces them.
+- **Scope:** automated browser tests, kept in the repository and run on every pull request, for the key flows at 390px and 1366px: filter sheets (open, choose several, "Show N jobs", close by button, scrim, and swipe), the fixed search inside long lists, the search key closing the phone keyboard, the "Closing in 10 days" switch and day strip, the Filters sheet, sort, open a job, save, share link. They run in Chromium and in WebKit, the engine of Safari, which catches many iPhone differences before the real-device check at UX-18. The demo was checked with throwaway scripts outside the repository; this replaces them.
 - **Depends on:** UX-12; grows with each later Stage B step.
 - **Acceptance:** the tests run in CI and fail when a flow breaks.
 - **Verify:** CI on the pull request; one deliberate break shown to fail.

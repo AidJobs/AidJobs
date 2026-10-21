@@ -83,6 +83,8 @@ Users do not submit career sources. Admins control organisations and the career 
 
 Out of scope for this migration: payments, CV processing, rewards, user accounts, recommendation systems, new public search features, enrichment expansion, and taxonomy-management features.
 
+Amended by the user on 21 October 2026 (`ux-08-launch-decisions.md`, item 2): the public site approved in the design demo may add the Sector, Organisation, Country, and Deadline filters with several choices each, the title-fact filters, and the 10-day view (new public search features); facts read from job titles by fixed rules without AI (enrichment); and the Recommended order and "Similar jobs", which are the same for every visitor and use no personal data. Everything else above stays out of scope.
+
 ---
 
 ## 3. Target flow
@@ -451,7 +453,7 @@ A monitoring metric alone does not pass Gate 7.
 
 Rebuild reads eligible Postgres rows, replaces the derived index, and removes documents that are no longer eligible. Rebuild is `POST`, admin-only, and not a step of ordinary crawling. Do not empty the live index in front of traffic if a swap or equivalent non-empty handoff is available. Mutating `GET /admin/search/reindex` is removed in Gate 1.
 
-The public search UI, including `HomeClient`, stays unless a later product change says otherwise.
+The public search UI, including `HomeClient`, stays unless a later product change says otherwise. That product change was approved on 21 October 2026 (`ux-08-launch-decisions.md`, item 2A): the new public site replaces `HomeClient` at the switch (`ux-build-plan.md`, UX-29). Until then `HomeClient` stays.
 
 ---
 
