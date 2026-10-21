@@ -226,7 +226,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-09. Design foundation
 
-**Status:** Not started.
+**Status:** Plan approved, 21 October 2026: the demo's design settings (colours, text sizes, shapes) defined once; Manrope; the tooltip, flag, bottom-sheet, and settings-panel components carried over from the tag without redrawing; the flag-icon package; an empty shell at the hidden `/v2` address, marked `noindex`; contrast measured for every text colour in light, dark, and high contrast; no change to the current site, the admin, or the backend.
 
 Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at `/`. Each step takes its look and behaviour from "Approved in the design demo" in `public-ux-direction.md` and carries the demo's components over from the tag; where a step's text below predates the demo, the approved demo decisions apply and the step's plan reconciles them.
 
@@ -240,7 +240,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
-- **Scope:** one persistent frame with no header and a collapsible side menu (logo, Jobs, Saved with count, and on desktop the title-fact sections with live counts, as approved in the demo; collapsing to an icon rail whose section icons open pop-outs); phone: a brand bar with Saved, the list with the search bar at the bottom, the menu as a navigation drawer opened from the bar, filters in bottom sheets; desktop: menu, list, and job pane, with a draggable, remembered divider between list and job, each area scrolling and the page not; the keyword page title and the count of open roles above the list, as in the demo; the fixed country-name table and browser-side dates from the revision's porting work; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph).
+- **Scope:** one persistent frame with no header and a collapsible side menu (logo, Jobs, Saved with count, and on desktop the title-fact sections with live counts, as approved in the demo; collapsing to an icon rail whose section icons open pop-outs); phone: a brand bar with Saved, the list with the search bar at the bottom, the menu as a navigation drawer opened from the bar, filters in bottom sheets; desktop: menu, list, and job pane, with a draggable, remembered divider between list and job, each area scrolling and the page not; the keyword page title and the count of open roles above the list, as in the demo; the fixed country-name table and browser-side dates from the revision's porting work; the address reflects the search and the open job, Back works, and moving between views does not reload the page. The first page of jobs is rendered on the server. A real title and description per view; `robots.txt`; `sitemap.xml`; canonical links; link previews (Open Graph); a "do not index" header on every page built on Netlify, which covers the locked Netlify production copy and all previews (UX-08 item 8).
 - **Not in scope:** the filter pills and search (UX-12); job pages (UX-24).
 - **Depends on:** UX-08, UX-09.
 - **Acceptance:** the HTML returned for the new site's address (the hidden address until UX-29, then `/`), fetched without JavaScript, contains job titles; `robots.txt` and `sitemap.xml` return 200; on desktop the document does not scroll; switching views makes no full page load; the divider position survives a reload.
@@ -308,7 +308,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started.
 
-- **Scope:** carry out the slow-first-load decision from UX-08 (item 5: the cached page, and the backend on an always-on instance, changed by the user in Render); images, fonts, and the flag icons sized for phones; the page weight of all open jobs measured against the UX-08 item 10 threshold.
+- **Scope:** carry out the slow-first-load decision from UX-08 (item 5: the cached page; the paid always-on instance is deferred for budget and the keep-alive skipped until after launch, so the cached page must never wait for the backend); images, fonts, and the flag icons sized for phones; the page weight of all open jobs measured against the UX-08 item 10 threshold.
 - **Depends on:** UX-16; the UX-08 hosting decision.
 - **Acceptance:** first load on a cold backend within the target set at UX-08; a phone audit's Largest Contentful Paint under 2.5 seconds.
 - **Verify:** preview and live measurements.
