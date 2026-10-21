@@ -38,8 +38,9 @@ These describe how the work is run. The architecture rules are in the contract.
 
 | Item | State | Evidence |
 | --- | --- | --- |
-| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `7b13a9e` (PR #17) not yet confirmed | Verified by the user and the Render log, 19 October 2026 |
-| Frontend | Vercel; Netlify builds pull-request previews | Verified from pull-request checks |
+| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `7b13a9e` (PR #17) not yet confirmed. Runs on Render's free plan, which sleeps after 15 minutes without traffic: a cold first request took 42.9 seconds on 21 October 2026, and scheduled crawls run only while it is awake. Staying on the free plan, without a keep-alive monitor, until after launch (user, 21 October 2026) | Verified by the user and the Render log, 19 October 2026; sleep measured 21 October 2026 |
+| Frontend | Vercel, public at `aid-jobs-frontend.vercel.app` while the domain is down; Netlify builds pull-request previews. Netlify's production site is locked by the user (auto publishing stopped, 21 October 2026): it stays reachable at `moonlit-llama-d9f5a7.netlify.app` with the old site and no longer updates | Verified from pull-request checks and direct requests; lock reported by the user |
+| Repository | Private since 21 October 2026 (user). GitHub's free plan has no branch protection on private repositories, so "never push `main`" is enforced by process only. GitHub Actions has 2,000 free minutes a month; one push to a pull request uses about 6 | Verified with the GitHub API |
 | Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07) | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
 | AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
@@ -356,8 +357,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Choose the domain (probably an `.org`); needed by UX-18 only | UX-08 item 9, W-29 |
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
-| **User action:** change the Render backend to an always-on instance (from $7 a month), preferably soon, because scheduled crawls stop while it sleeps | UX-08 item 5 |
-| **User action:** switch off the Netlify production site, keeping pull-request previews | UX-08 item 8 |
+| After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
 | Which branches and worktrees to delete | UX-31 |
 | Agree the revised admin menu, which keeps the contract's admin V1 navigation | UX-19 |
 | Whether to store title facts in the database later, with server filtering or landing pages | UX-22 |

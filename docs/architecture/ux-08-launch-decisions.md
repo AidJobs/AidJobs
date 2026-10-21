@@ -16,10 +16,10 @@ Every recommendation below was approved by the user on 21 October 2026, except w
 | 2 | Contract | Approve the five amendments in item 2 |
 | 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
 | 4 | Launch date | Set when the domain is settled and Stage B is half done |
-| 5 | Slow first load | Cached server-rendered page (in the design anyway), plus an always-on backend from $7 a month: a cold first request took 42.9 seconds |
+| 5 | Slow first load | **Decided:** cached server-rendered page. Paid instance deferred (budget); keep-alive skipped until after launch |
 | 6 | AI crawlers | **Decided:** allow search, user-triggered, and training crawlers; block only `Bytespider` |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
-| 8 | Deployment | **Partly decided:** no ads or payments at launch, free Vercel plan fits. Open: the Netlify production copy |
+| 8 | Deployment | **Decided:** no ads or payments at launch, free Vercel plan fits; Netlify production locked, "do not index" on Netlify at UX-10 |
 | 9 | Domain | **Open:** the user is choosing, probably an `.org`; needed only by the launch check |
 | 10 | Filtering | In the browser for launch, with a threshold to move to the server |
 | 11 | Title facts | Read when the page is built, with the demo's code; store later if needed |
@@ -81,7 +81,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 | C. Cached server-rendered page with every open job (item 7) | Free, part of Stage B | Visitors get the job list from the cache without waiting for the backend; the cache refreshes in the background, and the last good page is kept if the backend is slow or asleep |
 
 - **Recommendation:** C, which the Stage B design needs anyway, so visitors never wait on the backend for the list. Add A: the 42.9-second first request points to the free plan (the user confirms in the dashboard), and sleeping also stops scheduled crawls, a crawler reliability problem a cache does not solve. A costs from $7 a month.
-- **Decision:** 21 October 2026, the user approved the recommendation: C, the cached page, in Stage B; and A, an always-on backend instance from $7 a month. The user changes the instance type in the Render dashboard (the agent has no access), before the launch check and preferably soon, because scheduled crawls stop while the free instance sleeps.
+- **Decision:** 21 October 2026, the user approved C, the cached page, in Stage B. A, the paid instance, is deferred: no budget for now. B, a free keep-alive monitor, is skipped until after launch. Consequence accepted: until then scheduled crawls run only while the backend is awake, so job data may refresh less often than scheduled; visitors to the new site are not affected, because the cached page does not wait for the backend. Revisit A or B after launch. The free keep-alive (UptimeRobot, HTTP monitor on `/api/healthz` of the Render address every 5 minutes) uses 720 to 744 of the workspace's 750 free hours a month, so it suits only a workspace with one free web service; running out suspends every free service until the next month.
 
 ## 6. AI crawlers
 
@@ -130,7 +130,7 @@ Established 21 October 2026:
 | Vercel plan | Which Vercel plan the project is on is not visible to the agent. Vercel's free Hobby plan is for "non-commercial personal use only"; advertising, payments from visitors, being paid to build or host the site, or affiliate links as the main purpose count as commercial; asking for donations does not. Pro costs $20 a month and includes one free first-year domain on `.app` and a few other endings | Vendor docs (vercel.com fair-use guidelines, terms, pricing, Pro plan page), read 21 October 2026 |
 
 - **Recommendation:** live checks use `aid-jobs-frontend.vercel.app` until the domain returns. Confirm that AidJobs stays non-commercial while on Vercel's free plan; if ads, sponsored listings, or payment for the work are planned, move to Pro before launch. Decide the Netlify production copy: keep Netlify for pull-request previews (they are public and useful) but switch off its production site, or mark it `noindex`, so search engines never find two copies of AidJobs. The user checks Netlify's production branch setting under Site configuration, Build and deploy.
-- **Decision:** partly decided, 21 October 2026, the user: no ads and no payments at launch, so the free plan fits the launch. After launch, changes come one step at a time; any step that adds ads, payments, or paid work moves Vercel to Pro first. Netlify, approved as recommended: Netlify keeps building pull-request previews; the user switches off its production site in Netlify, or, if that would also stop previews, the new site's `noindex` setting covers it until the domain is connected to Vercel only.
+- **Decision:** partly decided, 21 October 2026, the user: no ads and no payments at launch, so the free plan fits the launch. After launch, changes come one step at a time; any step that adds ads, payments, or paid work moves Vercel to Pro first. Netlify: Netlify cannot remove a production site without deleting the whole site and its previews, so on 21 October 2026 the user locked production instead (Deploys, "Lock to stop auto publishing"). Previews keep building; the production copy stays reachable with the old site and no longer updates. UX-10 adds a "do not index" header to every page built on Netlify, covering the frozen copy and all previews; Vercel is unaffected.
 
 ## 9. Domain
 
