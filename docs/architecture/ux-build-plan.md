@@ -32,14 +32,15 @@ The user approved the look of the design demo (UX-00) on their phone on 21 Octob
 - Screenshot the same screens at 360px, 390px, 412px, and 1366px: home; each filter sheet and dropdown, scrolled; the Filters sheet; sort; the 10-day view; a job sheet and the job pane; Saved; the menu, collapsed rail, and phone drawer; the settings panel; light and dark.
 - Record every visible difference in the pull request, each marked "intended" (one of the expected differences below) or "for approval". A difference not approved by the user is fixed before merge.
 
-**Expected differences from the demo,** the only ones allowed without a further decision: live jobs instead of the 20 October copy; the user's logo when it arrives; no "Demo" menu section, "demo" tag, or "Demo data" footnote; no demo admin screens; the server renders the first screen; launch pages (UX-27) in the demo's style.
+**Expected differences from the demo,** the only ones allowed without a further decision: live jobs instead of the 20 October copy; the user's logo when it arrives; no "Demo" menu section, "demo" tag, "Demo data" footnote, or "Demo note" about descriptions in the job sheet; no demo admin screens; the server renders the first screen; launch pages (UX-27) in the demo's style.
 
 **Removed from the plan, because they are not in the demo.** Each could return later only as a new step with the user's approval:
 
 - Search chips inside the bar, typed suggestions with counts, and smart views on an empty bar (previously UX-11, UX-12). The demo's search is a plain text box that filters as you type.
 - A strip of counts with "new this week" and "closing this week" (previously UX-10). The demo shows the number of open roles and the 10-day switch. "New on AidJobs" stays parked until the backend records a first-seen date.
-- A saved-list link to reopen saves on another device, and moving saved jobs closing soon to the top (previously UX-15). The demo keeps saves on the device.
-- Named share buttons for WhatsApp, LinkedIn, and email (direction). The demo uses the phone's share sheet, or copies the link.
+- A saved-list link, meaning a web address that reopens the same saved jobs on another device, and moving saved jobs closing soon to the top (previously UX-15). The demo's Saved list itself stays exactly as it is: the bookmark, the Saved entry with its count, saves kept on the device.
+
+Sharing is not removed. The demo's job sheet has one Share button, labelled "Share: WhatsApp, LinkedIn, email, or copy link", which opens the phone's share menu (where WhatsApp, LinkedIn, and email appear) or copies the link where there is no share menu, plus a separate "Email this job to myself" button. Both are carried over as they are.
 - "At least eight jobs visible on a 390px phone" (previously UX-13). The demo shows about seven with the brand bar and switch; the acceptance is the fidelity check instead.
 
 **Porting work the demo does not show,** needed to make the same design render on the server:

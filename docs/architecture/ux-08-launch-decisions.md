@@ -12,13 +12,13 @@ How this was assessed: public pages and the public search API were read over HTT
 | --- | --- | --- |
 | 1 | Direction | Approve `public-ux-direction.md` with the demo section |
 | 2 | Contract | Approve the five amendments in item 2 |
-| 3 | Logo | Start building with the placeholder; logo needed by the launch check |
+| 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
 | 4 | Launch date | Set when the domain is settled and Stage B is half done |
 | 5 | Slow first load | Cached server-rendered page (in the design anyway), plus an always-on backend from $7 a month: a cold first request took 42.9 seconds |
-| 6 | AI crawlers | Allow search and user-triggered crawlers; your choice on training crawlers |
+| 6 | AI crawlers | **Partly decided:** training crawlers blocked at launch. Open: allow search and user-triggered crawlers |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
-| 8 | Deployment | Live checks on `aid-jobs-frontend.vercel.app`; decide the Netlify production copy; confirm the site stays non-commercial on Vercel's free plan |
-| 9 | Domain | Renew `aidjobs.app` now if you want that name |
+| 8 | Deployment | **Partly decided:** no ads or payments at launch, free Vercel plan fits. Open: the Netlify production copy |
+| 9 | Domain | **Open:** the user is choosing, probably an `.org`; needed only by the launch check |
 | 10 | Filtering | In the browser for launch, with a threshold to move to the server |
 | 11 | Title facts | Read when the page is built, with the demo's code; store later if needed |
 | 12 | W-06 | Move ahead, before launch |
@@ -51,7 +51,7 @@ The contract (`aidjobs-migration-contract.md`) says, in §2: "Out of scope for t
 UX-09 (design foundation) lists the logo as a dependency. The logo matters for the favicon, the app icon, the brand bar, and checking the sage shade against it; none of that blocks the rest of UX-09 or later steps.
 
 - **Recommendation:** start UX-09 with the placeholder star; the logo becomes a dependency of UX-18 (launch check) instead. The user sends an SVG when ready.
-- **Decision:**
+- **Decision:** 21 October 2026, the user: the logo is provided at the end, together with the domain choice (item 9). UX-09 starts with the placeholder; the logo is a dependency of UX-18.
 
 ## 4. Launch date
 
@@ -94,7 +94,7 @@ AI companies use three kinds of crawler, each named separately in `robots.txt` (
 The job adverts are public pages of the employers; AidJobs adds the aggregation. None of these crawlers sees any job today: the home page HTML contains no job titles (Verified, item 8), which Stage B fixes.
 
 - **Recommendation:** allow every search and user-triggered crawler. Training crawlers are your choice: allowing them maximises visibility, including Gemini; blocking them costs little traffic except through `Google-Extended`. Block `Bytespider`, which publishes no English crawler documentation and is reported to ignore `robots.txt`. Applied in `robots.txt` at UX-10, with `llms.txt` at UX-25.
-- **Decision:**
+- **Decision:** partly decided, 21 October 2026, the user: training crawlers are not allowed at launch; they may be allowed in a later step after launch. At launch `robots.txt` blocks `GPTBot`, `ClaudeBot`, `Meta-ExternalAgent`, `Amazonbot`, `CCBot`, `MistralAI-Training`, `Bytespider`, and the control tokens `Google-Extended` and `Applebot-Extended`. Consequence to accept: blocking `Google-Extended` can keep AidJobs out of answers in Gemini apps; Google Search and its AI Overviews are unaffected, because they use `Googlebot`. **Still open:** confirm that search and user-triggered crawlers are allowed at launch, as recommended.
 
 ## 7. Server rendering approach
 
@@ -128,14 +128,14 @@ Established 21 October 2026:
 | Vercel plan | Which Vercel plan the project is on is not visible to the agent. Vercel's free Hobby plan is for "non-commercial personal use only"; advertising, payments from visitors, being paid to build or host the site, or affiliate links as the main purpose count as commercial; asking for donations does not. Pro costs $20 a month and includes one free first-year domain on `.app` and a few other endings | Vendor docs (vercel.com fair-use guidelines, terms, pricing, Pro plan page), read 21 October 2026 |
 
 - **Recommendation:** live checks use `aid-jobs-frontend.vercel.app` until the domain returns. Confirm that AidJobs stays non-commercial while on Vercel's free plan; if ads, sponsored listings, or payment for the work are planned, move to Pro before launch. Decide the Netlify production copy: keep Netlify for pull-request previews (they are public and useful) but switch off its production site, or mark it `noindex`, so search engines never find two copies of AidJobs. The user checks Netlify's production branch setting under Site configuration, Build and deploy.
-- **Decision:**
+- **Decision:** partly decided, 21 October 2026, the user: no ads and no payments at launch, so the free plan fits the launch. After launch, changes come one step at a time; any step that adds ads, payments, or paid work moves Vercel to Pro first. **Still open:** the Netlify production copy (switch off, or mark `noindex`).
 
 ## 9. Domain
 
 `aidjobs.app` has expired (W-29). Registrars usually allow a grace period, then a more expensive redemption period, after which the name is released for anyone to register. The exact dates depend on the registrar and are visible in its dashboard.
 
 - **Recommendation:** if you want `aidjobs.app`, renew it now, even though launch is weeks away; connect it at UX-18. If you move Vercel to Pro anyway (item 8), its free first-year `.app` domain could cover a new registration, but not necessarily a renewal of a name held at another registrar; check before relying on it.
-- **Decision:**
+- **Decision:** open, 21 October 2026. The user is unsure about renewing `aidjobs.app` and is looking at an `.org` domain, which suits a non-profit job site better. Nothing before UX-18 depends on the choice: the site address is one setting, and search engines are kept out until the domain is connected. If the name itself changes, not only the ending, the brand text in the menu and the phone brand bar changes with it. Vercel Pro's free domain does not cover `.org`.
 
 ## 10. Filtering approach
 

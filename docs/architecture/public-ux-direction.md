@@ -146,7 +146,7 @@ The demo (UX-00) was built in twelve rounds on the branch `demo/ux-design` and a
 
 **What this replaces in the text above:** "Closing this week" and the 7-day window become 10 days; the menu's Organisations and Countries sections become pills; "soonest deadline first" becomes the Recommended default; Inter or Manrope becomes Manrope; the removed Level filter is the old field-based one, replaced by Level read from titles.
 
-**Not in the demo, so not built** (user decision of 21 October 2026: the site is exactly the demo): search chips, typed suggestions, and smart views in the search bar; the counts strip with "new this week"; the saved-list link and reordering saved jobs; named WhatsApp, LinkedIn, and email share buttons (the phone's share sheet covers them). Any of these returns only as a new step the user approves. The rule and the fidelity check that enforces it are in `ux-build-plan.md`, revision item 7.
+**Not in the demo, so not built** (user decision of 21 October 2026: the site is exactly the demo): search chips, typed suggestions, and smart views in the search bar (the demo has a plain search box); the counts strip with "new this week"; the saved-list link (a web address that reopens saved jobs on another device) and reordering saved jobs. The Saved list itself and sharing stay exactly as in the demo: one Share button that opens the phone's share menu (WhatsApp, LinkedIn, email) or copies the link, and "Email this job to myself". Any of these returns only as a new step the user approves. The rule and the fidelity check that enforces it are in `ux-build-plan.md`, revision item 7.
 
 ## Search engines and AI search
 
