@@ -1,6 +1,6 @@
 # AidJobs — Public site and admin direction
 
-**Status:** Proposed, 20 October 2026. Not approved. Nothing in this document is built. Merging the pull request that adds this file records the proposal; it is not the approval. The user's approval is recorded at step UX-08 of `docs/architecture/ux-build-plan.md`, and each build step still needs its own approval. The order of work is in that plan, not here.
+**Status:** Proposed, 20 October 2026. The look and behaviour of the design demo were approved by the user on 21 October 2026 and are recorded under "Approved in the design demo"; where that section and the earlier text disagree, that section applies. The direction as a whole, and the scope changes to §2, are still approved at step UX-08 of `docs/architecture/ux-build-plan.md`, and each build step still needs its own approval. Nothing here is built on `main`. The order of work is in that plan, not here.
 
 **Relationship to the rules.** The contract (`aidjobs-migration-contract.md`, §2) puts user accounts, new public search features, recommendation systems, and enrichment expansion out of scope, and rule 15 forbids rewriting the public UI without a product reason. Approving this document records the product reason (below) and amends §2 only as far as the items marked **Scope change**. Everything else in the contract stands.
 
@@ -89,6 +89,63 @@ Visual references: three admin dashboard designs the user supplied on 20 October
 - Flags as small SVG images, not emoji: Windows shows emoji flags as letters.
 - Performance: many users are on low-end phones and slow networks; the look uses plain colour fills, no blur effects, no photographs.
 
+## Approved in the design demo (21 October 2026)
+
+The demo (UX-00) was built in twelve rounds on the branch `demo/ux-design` and approved by the user on their phone. The code is kept at the git tag `ux-demo-approved-2026-10-21`. Figures below come from the demo's copy of 206 public jobs taken on 20 October 2026.
+
+**Look**
+
+- Typeface: Manrope only; Inter is dropped. Body text 12px on desktop and 13px on phones, with 40px tap targets on phones.
+- Ink and sage, light and dark, as proposed. A settings panel in the menu: text size (A, A+, A++), high contrast, reduce motion, and a light or dark switch.
+- The logo is a placeholder until the user's file arrives.
+
+**Layout**
+
+- No header. A collapsible side menu on every page; collapsed, it becomes an icon rail whose section icons open pop-outs; expanded, section headings are plain text and every section is open by default.
+- Desktop: menu, job list, and job pane with a draggable, remembered divider. With no job open, the pane shows "Closing in the next 10 days" with a day strip that starts at Today and opens on the first day with deadlines.
+- Phone, top to bottom: a brand bar (logo, name, Saved with its count) that folds away with the heading while scrolling down and returns when scrolling up; the heading on one line; the count of open roles with the sort control on the same line; an "All jobs | Closing in 10 days (count)" switch, with the day strip in the 10-day view; the filter pills; the list; a bottom bar with the menu button and the search field.
+- Heading: "NGO, humanitarian and development jobs" on desktop; "NGO, humanitarian & development jobs" on phones, sized to stay on one line down to 360px screens.
+- The phone menu is navigation only: Jobs, Saved, a Filters entry, the demo links, and settings.
+
+**Filters**
+
+- Pills above the list: Sector, Organisation, Country, Deadline. Every pill takes several choices, shows counts that follow the other filters, and offers a "not stated" choice where data is missing ("Sector not stated", "Location not listed"), so every job is reachable.
+- Sector, read from the title, each with its SDG where the link is clear: Education (SDG 4), Health (3), Child protection (16), Nutrition (2), WASH (6), Gender (5), Social protection (1), Climate and environment (13), Disability inclusion (10); Emergencies, Behaviour change, and Adolescents and youth without an SDG. About 89 of 206 jobs (43%) have a sector today; the rest are "Not stated". SDG and sector replace a separate SDG or function filter, because most jobs cannot yet be classified by function.
+- Title-fact filters, each with "Not stated": Contract (Consultancy, Fixed term, Temporary, Internship, Fellowship), Level (Entry, Mid-career, Senior, Leadership, Support staff), Open to (nationals of the country, international candidates), Work style (remote or home-based), Advert language. On desktop they are side-menu sections; on phones they are chips in one Filters sheet opened by a Filters pill that shows how many are on. These read titles, which is enrichment under §2 (**Scope change**, decided at UX-08).
+- Deadline groups that do not overlap: within 10 days, 11 to 30 days, more than 30 days, no deadline listed.
+- Phones: each pill opens a bottom sheet with a title, the current choice, and Clear; a search box fixed at the top while only the list scrolls; ticks on chosen rows; earlier choices under "Selected" at the top of long lists when reopened; and a "Show N jobs" button that updates as choices change. The sheet closes with that button, a tap on the dimmed area, a swipe down, or Escape. The search box does not open the keyboard by itself.
+- Desktop: a dropdown under the pill that stays open while choosing and closes on a click outside.
+- The search field's enter key closes the phone keyboard and keeps the results.
+
+**Order and urgency**
+
+- Recommended, the default: soonest deadline first, never more than two jobs in a row from one organisation while another has jobs left, and jobs not seen on the employer's site for more than 30 days last. The alternative is "Soonest deadline". The choice is remembered. This is a ranking choice; whether it counts as a recommendation system under §2 is decided at UX-08.
+- The closing window is 10 days. Days-left chips are orange within 10 days and red within 3.
+
+**Job list**
+
+- Two lines of title; then organisation, flag and country, contract type, and the SDG where clear; days left on the right; a bookmark.
+
+**Job sheet and pane**
+
+- Title, organisation, place, deadline with days left.
+- A freshness line: if the job has not been seen on the employer's site for more than 7 days, a quiet note; for more than 30 days, an orange warning that it may have closed.
+- Fact chips with explanations: contract, UN grade with its typical minimum experience (UN Secretariat P-1 none, P-2 2 years, P-3 5, P-4 7, P-5 10, D-1 15, D-2 more than 15; National Officer NO-1 1, NO-2 2, NO-3 5, NO-4 8, NO-5 10; General Service G-1 none, G-2 1, G-3 2, G-4 3, G-5 5, G-6 7, G-7 10), duration, open to, remote, advert language, and sector with its SDG.
+- "Apply on {organisation}"; save; add the deadline to a calendar (`.ics`, reminder two days before); share (the phone's share sheet, or copy link); email the job to myself.
+- Similar jobs: up to four, at most two per organisation, each saying why it is similar. More from the same organisation and country.
+
+**Saving**
+
+- Saved is kept: stored on the device, with its count in the menu and the brand bar.
+- "I applied" is dropped for launch: stored only in the browser, it is lost with the site data and adds little without accounts.
+
+**Planned, not built**
+
+- "New on AidJobs" needs a first-seen date per job from the backend.
+- The expiry rule (W-06) so jobs that have closed leave the list; 16 jobs have not been seen since 6 December 2025 (W-02).
+
+**What this replaces in the text above:** "Closing this week" and the 7-day window become 10 days; the menu's Organisations and Countries sections become pills; "soonest deadline first" becomes the Recommended default; Inter or Manrope becomes Manrope; the removed Level filter is the old field-based one, replaced by Level read from titles.
+
 ## Search engines and AI search
 
 No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Idealist are established. A new site wins first on specific searches and in Google's job panel, then on broad terms as authority grows.
@@ -136,7 +193,7 @@ Every number and chart comes from the database; nothing is decorative.
 
 ## Order of work
 
-`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status: the design demo first (UX-00), fixes on the current site (Stage A), a decision gate (UX-08), the launch redesign (Stage B), the admin redesign (Stage C), and growth with the crawler (Stage D).
+`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status. Its revision of 21 October 2026 sets the order: the docs record of the demo, admin fixes alongside the decision gate (UX-08), the new public site built beside the current one (Stage B), the switch (UX-29) and launch check (UX-18), the admin redesign (Stage C), and growth with the crawler (Stage D).
 
 ## The paused UX branch
 
@@ -147,7 +204,15 @@ Every number and chart comes from the database; nothing is decorative.
 - Write this direction up for approval.
 - The user provides the logo.
 - Accent colour: ink.
-- Fix the two live bugs on the current design: PR #19.
+- Fix the two live bugs on the current design: PR #19. Superseded on 21 October 2026: PR #19 is closed without merging, because the switch to the new site deletes that code.
 - Signature tint: sage green.
 - No header; all navigation in a collapsible side menu, for the public site and the admin.
 - A clickable design demo comes first (UX-00), on a separate branch that is never merged, before the fixes in Stage A.
+
+## Decisions taken on 21 October 2026
+
+- The design demo's look and behaviour are approved, as recorded under "Approved in the design demo".
+- The demo is not merged; Stage B carries its components into the real site, built beside the current site and switched in one step.
+- The public site is replaced first; the admin redesign follows.
+- Public fixes to the current site (UX-01, UX-02, UX-03, the public parts of UX-07) are dropped; the admin fixes stay.
+- The domain has expired; nothing before the launch check needs it.
