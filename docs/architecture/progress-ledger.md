@@ -7,7 +7,7 @@
 
 User-experience work has two documents: `docs/architecture/ux-build-plan.md`, the authoritative step-by-step plan with status (revised 21 October 2026), and `docs/architecture/public-ux-direction.md` (W-28), the design: proposed, with the design demo's look approved on 21 October 2026. The approved demo is kept at the git tag `ux-demo-approved-2026-10-21`.
 
-**Last verified:** 21 October 2026. `main` is `3d688ec` (merge of PR #21). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 21 October 2026. `main` is `fbcfffe` (merge of PR #23). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -151,7 +151,9 @@ Status on 20 October 2026: W-01, W-03, W-21, and W-25 are done. Oxfam is live (W
 
 Priority changed on 20 October 2026, by the user: user experience first, then back to the crawler. The read-only review (W-26) is done. The steps are in `ux-build-plan.md`. By the user's order, the first is UX-00, a clickable design demo on a branch that is never merged; then UX-01, PR #19, which fixes two live public bugs and is not merged. The direction (W-28) waits for approval at UX-08. The crawler items keep their order and resume after Stage C of the UX plan; scheduled crawls continue meanwhile. UNICEF still shows about 120 of 209 jobs (W-04); a better interface does not change coverage.
 
-Status on 21 October 2026: the design demo (UX-00) is approved by the user and kept at the tag `ux-demo-approved-2026-10-21`; its decisions are in `public-ux-direction.md`. The UX plan is revised: the demo is not merged; the new public site is built beside the current one and switched in one step (UX-29); public fixes to the current site are dropped, so PR #19 is closed without merging; admin fixes UX-04 to UX-07 run alongside the launch decisions (UX-08); the admin redesign follows the public launch. The domain `aidjobs.app` has expired (W-29). Whether W-06 moves ahead of the other crawler items is a UX-08 decision.
+Status on 21 October 2026: the design demo (UX-00) is approved by the user and kept at the tag `ux-demo-approved-2026-10-21`; its decisions are in `public-ux-direction.md`. The UX plan is revised: the demo is not merged; the new public site is built beside the current one and switched in one step (UX-29); public fixes to the current site are dropped, so PR #19 is closed without merging; admin fixes UX-04 to UX-07 run alongside the launch decisions (UX-08); the admin redesign follows the public launch. The domain `aidjobs.app` has expired (W-29). Whether W-06 moves ahead of the other crawler items is a UX-08 decision. PR #23 recorded this and was merged as `fbcfffe`; PR #19 was closed without merging.
+
+UX-08 assessed on 21 October 2026, read-only (`ux-08-launch-decisions.md`). Key findings: a cold first request took 42.9 seconds after 20 minutes idle, consistent with Render's free plan, under which the backend and its scheduler sleep; Vercel production, Netlify production, and Netlify previews all use the same Render backend; `aid-jobs-frontend.vercel.app` is the public production address; all 195 open jobs are 24 KB compressed for the list; the old enrichment columns are empty for every open job.
 
 ### Now
 
@@ -347,7 +349,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 | How to get coordinates in production, or whether to go without | W-27 |
-| Close PR #19 without merging | UX-01 (dropped) |
+| The twelve UX-08 launch decisions, assessed with recommendations in `ux-08-launch-decisions.md` (21 October 2026) | UX-08 |
 | Approve the public site and admin direction, and the scope changes to §2, including Sector with SDGs, multi-choice and title-fact filters, and the Recommended order | UX-08, W-28 |
 | Renew `aidjobs.app` or choose another domain | UX-08, W-29 |
 | Filter on the server or in the browser, after measurements | UX-08 |

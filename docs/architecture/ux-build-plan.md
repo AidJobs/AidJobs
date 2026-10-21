@@ -183,7 +183,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-08. Launch decisions (gate)
 
-**Status:** Not started. **Nothing in UX-09 to UX-18 starts until every item here is recorded as decided.**
+**Status:** Assessed 21 October 2026; awaiting the user's decisions. The findings, options, and recommendations for every item are in `docs/architecture/ux-08-launch-decisions.md`, where each decision is recorded. **Nothing in UX-09 to UX-18 starts until every item here is recorded as decided.**
 
 1. **Direction approval.** The user approves `public-ux-direction.md` as written or amended, including the look approved in the demo (UX-00). Merging the pull request that added it records the proposal; it is not the approval.
 2. **Contract decision** for the public scope changes in contract §2: the organisation filter and place suggestions (new public search features); the Sector filter with SDGs, multi-choice filters, and the title-fact filters approved in the demo (new public search features, and enrichment where facts are read from titles); the Recommended order; and the user-interface rewrite under rule 15 with the product reason recorded in the direction document. This brings forward the UX-22 contract decision, because the approved design uses title facts at launch.
