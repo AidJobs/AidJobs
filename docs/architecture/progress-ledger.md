@@ -7,7 +7,7 @@
 
 User-experience work has three documents: `docs/architecture/ux-build-plan.md`, the authoritative step-by-step plan with status (revised 21 October 2026); `docs/architecture/public-ux-direction.md` (W-28), the design, approved on 21 October 2026; and `docs/architecture/ux-08-launch-decisions.md`, the launch decisions. The approved demo is kept at the git tag `ux-demo-approved-2026-10-21`.
 
-**Last verified:** 21 October 2026. `main` is `fbcfffe` (merge of PR #23). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 21 October 2026. `main` is `8083591` (merge of PR #26, UX-09). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -27,6 +27,7 @@ These describe how the work is run. The architecture rules are in the contract.
 - **Merging to `main` deploys the backend.** Render redeploys automatically when `main` changes. Merge only with explicit approval.
 - After a merge: confirm `origin/main`, CI on `main`, and the Render deploy. Then fast-forward local `main`.
 - Do not crawl production, write to the jobs database, or reindex search unless the user asks for that step.
+- Commits must be authored by the GitHub account `AidJobs` (`git config user.name AidJobs`, `git config user.email 241161196+AidJobs@users.noreply.github.com`, set in this repository only). The repository is private and Vercel's free plan builds only commits by the project owner; commits by any other author show "Deployment was blocked" (seen on PRs #25 and #26 before the change, 21 October 2026).
 - Commit only the files the step names. Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`. Both carry unrelated Pyright-ignore comments and stay modified and unstaged.
 - The local shell is PowerShell on Windows. Use `@" "@` here-strings for commit messages, not bash heredocs. `gh --jq` filters with spaces break in PowerShell; pipe JSON to `ConvertFrom-Json` instead.
 - Local tests run from `apps/backend` with `.venv\Scripts\python.exe` (Python 3.14). CI uses Python 3.11.9. Run the exact CI Ruff and pytest lists from `.github/workflows/ci.yml`. `dateparser` and `lxml` must be installed locally, or local results differ from CI.
@@ -158,7 +159,9 @@ UX-08 assessed on 21 October 2026, read-only (`ux-08-launch-decisions.md`). Key 
 
 Decided by the user on 21 October 2026: the public site is exactly the approved demo. The UX plan's revision item 7 records the rule, a fidelity check against the tagged demo for every Stage B pull request, the plan items removed because the demo does not have them (search suggestions and chips, the counts strip, the saved-list link, the eight-rows criterion; the Saved list and sharing stay as in the demo), and the porting work the demo does not show (one country-name table, browser-side dates, tests for the title-fact rules). Real-device checks, including iPhone Safari, are added to the launch check (UX-18).
 
-UX-08 decided on 21 October 2026: the user approved the direction (W-28), the contract amendments (§2 and §13, noted in the contract), the cached server-rendered page with every open job, filtering in the browser for launch, title facts read when the page is built, all AI crawlers allowed except `Bytespider`, no ads or payments at launch, W-02 then W-06 ahead of the other crawler items and before the switch, and saved jobs that close leaving Saved as in the demo. The domain is still being chosen (probably an `.org`); the logo comes with it. Next: the UX-09 plan.
+UX-08 decided on 21 October 2026: the user approved the direction (W-28), the contract amendments (§2 and §13, noted in the contract), the cached server-rendered page with every open job, filtering in the browser for launch, title facts read when the page is built, all AI crawlers allowed except `Bytespider`, no ads or payments at launch, W-02 then W-06 ahead of the other crawler items and before the switch, and saved jobs that close leaving Saved as in the demo. The domain is still being chosen (probably an `.org`); the logo comes with it.
+
+UX-09 done on 21 October 2026 (PR #26, `8083591`): the design foundation from the demo tag at `components/site/` and the hidden shell at `/v2`, live and checked. Next: the UX-10 plan.
 
 ### Now
 
