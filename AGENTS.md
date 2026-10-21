@@ -2,7 +2,7 @@
 
 Before any work, read `docs/architecture/progress-ledger.md`. It records what is done, what is open, the recommended order, and how this project is run.
 
-**Current priority (set by the user, 20 October 2026): user experience.** Work from `docs/architecture/ux-build-plan.md`: take the first step whose status is not Done and whose dependencies are met, in order, and follow the working method at the top of that file. Crawler work resumes in ledger order after Stage C of that plan, or when the user changes the priority.
+**Current priority (set by the user, 20 October 2026): user experience.** Work from `docs/architecture/ux-build-plan.md`: follow the order table in its "Revision of 21 October 2026", take the first step that is not Done and whose dependencies are met, and follow the working method at the top of that file. The approved design demo is the git tag `ux-demo-approved-2026-10-21`; it is a reference and is never merged. Crawler work resumes in ledger order after Stage C of that plan, or when the user changes the priority.
 
 The rules are in `docs/architecture/aidjobs-migration-contract.md` and `docs/architecture/crawler-completion-plan.md`. The ledger and the UX plan do not override them. A UX step marked "Contract decision" is not approved for implementation until the user records that decision.
 
