@@ -763,8 +763,9 @@ body:has(.dj-root[data-theme='dark']) {
     padding: 0 10px;
   }
 
+  /* Keeps the phone heading on one line down to 360px-wide screens. */
   .dj-h1 {
-    font-size: 20px;
+    font-size: min(20px, calc((100vw - 34px) / 17.4));
   }
 
   .dj-sheet .dj-pill {

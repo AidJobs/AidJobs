@@ -1138,7 +1138,17 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
   const searchBox = (
     <div className="relative min-w-0 flex-1">
       <Search size={14} strokeWidth={1.8} className="dj-faint pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-      <input className="dj-input" placeholder="Search roles, organisations, places" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search jobs" />
+      <input
+        className="dj-input"
+        enterKeyHint="search"
+        placeholder="Search roles, organisations, places"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        aria-label="Search jobs"
+      />
       {query && (
         <button type="button" className="absolute right-2 top-1/2 inline-flex -translate-y-1/2 dj-faint" style={{ border: 'none', background: 'transparent' }} onClick={() => setQuery('')} aria-label="Clear search">
           <X size={14} />
@@ -1171,7 +1181,7 @@ export default function PublicDemo({ rawJobs, snapshotDate }: { rawJobs: RawJob[
     />
   ) : null;
 
-  const heading = inSaved ? 'Saved jobs' : phone ? 'Humanitarian & development jobs' : 'NGO, humanitarian and development jobs';
+  const heading = inSaved ? 'Saved jobs' : phone ? 'NGO, humanitarian & development jobs' : 'NGO, humanitarian and development jobs';
   const emptyHint =
     view === 'saved' ? 'Save a job with the bookmark and it appears here.' : 'Try fewer filters.';
 
