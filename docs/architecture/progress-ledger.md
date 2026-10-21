@@ -155,6 +155,8 @@ Status on 21 October 2026: the design demo (UX-00) is approved by the user and k
 
 UX-08 assessed on 21 October 2026, read-only (`ux-08-launch-decisions.md`). Key findings: a cold first request took 42.9 seconds after 20 minutes idle, consistent with Render's free plan, under which the backend and its scheduler sleep; Vercel production, Netlify production, and Netlify previews all use the same Render backend; `aid-jobs-frontend.vercel.app` is the public production address; all 195 open jobs are 24 KB compressed for the list; the old enrichment columns are empty for every open job.
 
+Decided by the user on 21 October 2026: the public site is exactly the approved demo. The UX plan's revision item 7 records the rule, a fidelity check against the tagged demo for every Stage B pull request, the plan items removed because the demo does not have them (search suggestions and chips, the counts strip, the saved-list link, named share buttons, the eight-rows criterion), and the porting work the demo does not show (one country-name table, browser-side dates, tests for the title-fact rules). Real-device checks, including iPhone Safari, are added to the launch check (UX-18).
+
 ### Now
 
 **W-01. Revoke the leaked OpenRouter key.** Done 18 October 2026. The user deleted every OpenRouter key and closed the GitHub alert; GitHub shows it resolved as revoked, with no open secret-scanning alerts (Verified). Whether the activity log showed unrecognised use was not reported. Render may still hold the old, now invalid, key; AI calls fail into the same fallback as before. A new key is a W-14 decision.
@@ -349,7 +351,7 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 | How to get coordinates in production, or whether to go without | W-27 |
-| The twelve UX-08 launch decisions, assessed with recommendations in `ux-08-launch-decisions.md` (21 October 2026) | UX-08 |
+| The thirteen UX-08 launch decisions, assessed with recommendations in `ux-08-launch-decisions.md` (21 October 2026) | UX-08 |
 | Approve the public site and admin direction, and the scope changes to §2, including Sector with SDGs, multi-choice and title-fact filters, and the Recommended order | UX-08, W-28 |
 | Renew `aidjobs.app` or choose another domain | UX-08, W-29 |
 | Filter on the server or in the browser, after measurements | UX-08 |

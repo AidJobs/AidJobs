@@ -1,6 +1,8 @@
 # AidJobs — UX-08 launch decisions
 
-**Status:** Assessed 21 October 2026, read-only, from `main` at `fbcfffe`. **Awaiting the user's decisions.** Nothing here is decided until the user records it in the "Decision" line of each item. Once all twelve are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
+**Status:** Assessed 21 October 2026, read-only, from `main` at `fbcfffe`. **Awaiting the user's decisions.** Nothing here is decided until the user records it in the "Decision" line of each item. Once all thirteen are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
+
+Already decided by the user on 21 October 2026, and assumed throughout: the public site is exactly the approved demo (`ux-build-plan.md`, revision item 7). Every recommendation below keeps the demo's look and behaviour; none adds a feature the demo does not have.
 
 How this was assessed: public pages and the public search API were read over HTTPS, the same requests any visitor makes; GitHub deployment records; the repository; vendor documentation. No crawl, database write, reindex, or admin action. Evidence labels as in the ledger: **Verified**, **Repository**, **Vendor docs**, **Not verified**.
 
@@ -15,11 +17,12 @@ How this was assessed: public pages and the public search API were read over HTT
 | 5 | Slow first load | Cached server-rendered page (in the design anyway), plus an always-on backend from $7 a month: a cold first request took 42.9 seconds |
 | 6 | AI crawlers | Allow search and user-triggered crawlers; your choice on training crawlers |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
-| 8 | Deployment | Live checks on `aid-jobs-frontend.vercel.app`; decide the Netlify production copy |
+| 8 | Deployment | Live checks on `aid-jobs-frontend.vercel.app`; decide the Netlify production copy; confirm the site stays non-commercial on Vercel's free plan |
 | 9 | Domain | Renew `aidjobs.app` now if you want that name |
 | 10 | Filtering | In the browser for launch, with a threshold to move to the server |
 | 11 | Title facts | Read when the page is built, with the demo's code; store later if needed |
 | 12 | W-06 | Move ahead, before launch |
+| 13 | A saved job that closes | Keep the demo's behaviour for launch: it leaves Saved with the list |
 
 ## 1. Direction approval
 
@@ -35,7 +38,7 @@ The contract (`aidjobs-migration-contract.md`) says, in §2: "Out of scope for t
 | Amendment | What it allows | Contract text it amends |
 | --- | --- | --- |
 | A. Replace the public UI | The new public site replaces `HomeClient` and the current public pages at the switch (UX-29). The product reason is the "Product reason" section of the direction | §13, rule 15 |
-| B. New public search features | Sector, Organisation, Country, and Deadline filters with several choices each; the title-fact filters; the 10-day view and day strip; search suggestions later (UX-11) | §2 "new public search features" |
+| B. New public search features | As in the demo: Sector, Organisation, Country, and Deadline filters with several choices each; the title-fact filters; the 10-day view and day strip; the plain search box. No search suggestions or chips: they are not in the demo | §2 "new public search features" |
 | C. Facts read from titles | Sector with SDG, level, contract, open to, work style, advert language, UN grade with typical experience, read from the job title by fixed rules, without AI, for display and filtering | §2 "enrichment expansion" |
 | D. Ordering and similar jobs | The Recommended order (deadline, organisation mix, freshness) and "Similar jobs" (shared title words or SDG). Both are the same for every visitor and use no personal data. Recorded as permitted ordering, not a "recommendation system" in the personalised sense §2 excludes | §2 "recommendation systems" |
 | E. Unchanged | User accounts, payments, CV processing, rewards, AI features, and taxonomy management stay out of scope. Saved jobs stay on the device | None |
@@ -62,7 +65,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 **Findings:**
 
 - With the backend awake, a request through the production site took 0.4 to 1.5 seconds (Verified, 21 October 2026, three sites, three requests each).
-- Cold: after 20 minutes with no requests from the agent, the first request took 42.9 seconds and the next ones 0.35 to 0.86 seconds (Verified, 21 October 2026, 12:16 UTC). That matches a free instance waking up. On 20 October the first three requests of the review took about 20 seconds each (W-26).
+- Cold: after 20 minutes with no requests from the agent, the first request took 42.9 seconds and the next ones 0.35 to 0.86 seconds (Verified, 21 October 2026, 12:16 UTC). That matches a free instance waking up. It is a single measurement; another visitor during those 20 minutes would have kept the service awake, so a cold start can only be longer, not shorter, than shown on a quiet day. On 20 October the first three requests of the review took about 20 seconds each (W-26).
 - Render's documentation: a Free web service "spins down" after 15 minutes without inbound traffic and takes "about one minute" to spin up; paid compute plans do not spin down; the smallest paid instance is $7 a month (Vendor docs, render.com/docs/free and render.com/pricing, read 21 October 2026).
 - The Render log of 19 October ends with `Shutting down … Scheduler stopping` without a deploy (ledger, W-05 notes). The scheduler runs inside the backend, so while the service sleeps, scheduled crawls do not run (Repository; sleep as the cause Not verified).
 - The plan the backend runs on is not visible to the agent. The user can read it on the service's page in the Render dashboard (Instance type).
@@ -100,12 +103,13 @@ The job adverts are public pages of the employers; AidJobs adds the aggregation.
 **Proposed (Next.js 14, App Router, no new services):**
 
 1. The new site's page is a server component that reads every open job from the backend's existing `/api/search/query` (pages of 100) when the page is built, and caches the result for 10 minutes (incremental static regeneration). The HTML carries the first screen of jobs as real text and every open job as data for the browser.
-2. After 10 minutes, the next visitor still gets the cached page at once while a fresh one is built in the background. If the backend fails or is asleep during that rebuild, the last good page stays in the cache.
+2. After 10 minutes, the next visitor still gets the cached page at once while a fresh one is built in the background. If the backend fails or is asleep during that rebuild, the last good page stays in the cache. This is how Next.js documents incremental regeneration (Vendor docs); it is **Not verified** on our Vercel and Netlify setup, and UX-10 must prove it by rebuilding with the backend unreachable before the approach is relied on.
 3. Filtering, counts, sorting, and the job sheet run in the browser on that data (item 10), so they make no backend request.
 4. Days left are worked out in the browser from the deadline date, so a cached page never shows a stale "Today"; jobs whose deadline passed since the cache are hidden.
 5. A real page title and description, `robots.txt`, `sitemap.xml`, canonical links, and link previews come from Next's built-in metadata files. While the domain is down the site address is one setting, and the site tells search engines not to index it.
 6. A shared job link (`?job=…`) opens the job from the same data. Its own link preview needs a job page (UX-24); until then a shared link previews as the site.
-7. The same build works on Vercel and on Netlify previews.
+7. The same build works on Vercel and on Netlify previews (Not verified until UX-10).
+8. The page looks exactly like the demo. Two pieces of porting work make that possible on the server: one fixed country-name table (the demo renders only in the browser because Node and browsers name some countries differently), and dates worked out in the browser (point 4).
 
 - **Recommendation:** approve this approach for UX-10.
 - **Decision:**
@@ -121,15 +125,16 @@ Established 21 October 2026:
 | Does Netlify publish production? | `https://moonlit-llama-d9f5a7.netlify.app` serves a public copy of the site (200). GitHub shows no Netlify build for merges to `main`, so which commit it serves is not visible to the agent | Verified (address); commit Not verified |
 | Which backend do previews use? | Vercel production, Netlify production, and the Netlify preview of PR #22 all answer through the same Render backend (Render's `rndr-id` and `x-render-origin-server: uvicorn` headers) | Verified for reads. An admin action on any of them changes production (inferred, not tested) |
 | Search engine files | `robots.txt`, `sitemap.xml`, and `favicon.ico` return 404 on production | Verified |
+| Vercel plan | Which Vercel plan the project is on is not visible to the agent. Vercel's free Hobby plan is for "non-commercial personal use only"; advertising, payments from visitors, being paid to build or host the site, or affiliate links as the main purpose count as commercial; asking for donations does not. Pro costs $20 a month and includes one free first-year domain on `.app` and a few other endings | Vendor docs (vercel.com fair-use guidelines, terms, pricing, Pro plan page), read 21 October 2026 |
 
-- **Recommendation:** live checks use `aid-jobs-frontend.vercel.app` until the domain returns. Decide the Netlify production copy: keep Netlify for pull-request previews (they are public and useful) but switch off its production site, or mark it `noindex`, so search engines never find two copies of AidJobs. The user checks Netlify's production branch setting under Site configuration, Build and deploy.
+- **Recommendation:** live checks use `aid-jobs-frontend.vercel.app` until the domain returns. Confirm that AidJobs stays non-commercial while on Vercel's free plan; if ads, sponsored listings, or payment for the work are planned, move to Pro before launch. Decide the Netlify production copy: keep Netlify for pull-request previews (they are public and useful) but switch off its production site, or mark it `noindex`, so search engines never find two copies of AidJobs. The user checks Netlify's production branch setting under Site configuration, Build and deploy.
 - **Decision:**
 
 ## 9. Domain
 
 `aidjobs.app` has expired (W-29). Registrars usually allow a grace period, then a more expensive redemption period, after which the name is released for anyone to register. The exact dates depend on the registrar and are visible in its dashboard.
 
-- **Recommendation:** if you want `aidjobs.app`, renew it now, even though launch is weeks away; connect it at UX-18.
+- **Recommendation:** if you want `aidjobs.app`, renew it now, even though launch is weeks away; connect it at UX-18. If you move Vercel to Pro anyway (item 8), its free first-year `.app` domain could cover a new registration, but not necessarily a renewal of a name held at another registrar; check before relying on it.
 - **Decision:**
 
 ## 10. Filtering approach
@@ -166,6 +171,18 @@ Sixteen active UNICEF rows from 6 December 2025 have no deadline and stay listed
 - **Recommendation:** move W-06 ahead of the other crawler items, so it is decided and validated before UX-29. W-02, the read-only inspection of those rows, comes first.
 - **Decision:**
 
+## 13. A saved job that closes
+
+In the demo, Saved shows only saved jobs that are still in the list. When a saved job's deadline passes, or W-06 later expires it, it leaves Saved silently, and the count drops (Repository, the demo at the tag). This was not discussed during the demo rounds.
+
+| Option | Effect |
+| --- | --- |
+| A. As in the demo | Saved holds only open jobs; nothing to build. A job someone meant to apply for can vanish without notice |
+| B. Show it as closed | Saved keeps it greyed, marked "Closed", with a remove button; needs the job's title kept on the device. A difference from the demo, so it needs this approval |
+
+- **Recommendation:** A for launch, because the site is exactly the demo; revisit after launch if people ask.
+- **Decision:**
+
 ## After the decisions
 
-When every item has a decision: UX-08 is marked Done in `ux-build-plan.md`; the plan records the consequences (UX-09's logo dependency moved to UX-18 if item 3 is accepted; UX-11 narrowed if item 10 is accepted; UX-17 carries the caching from items 5 and 7; W-06 placed in the order table if item 12 is accepted); the ledger's "Decisions waiting" table is updated; and Stage B starts with UX-09's plan.
+When every item has a decision: UX-08 is marked Done in `ux-build-plan.md`; the plan records the consequences (UX-09's logo dependency moved to UX-18 if item 3 is accepted; UX-11 narrowed further, possibly to nothing, if item 10 is accepted; UX-17 carries the caching from items 5 and 7; W-06 placed in the order table if item 12 is accepted); the ledger's "Decisions waiting" table is updated; and Stage B starts with UX-09's plan.

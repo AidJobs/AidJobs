@@ -146,6 +146,8 @@ The demo (UX-00) was built in twelve rounds on the branch `demo/ux-design` and a
 
 **What this replaces in the text above:** "Closing this week" and the 7-day window become 10 days; the menu's Organisations and Countries sections become pills; "soonest deadline first" becomes the Recommended default; Inter or Manrope becomes Manrope; the removed Level filter is the old field-based one, replaced by Level read from titles.
 
+**Not in the demo, so not built** (user decision of 21 October 2026: the site is exactly the demo): search chips, typed suggestions, and smart views in the search bar; the counts strip with "new this week"; the saved-list link and reordering saved jobs; named WhatsApp, LinkedIn, and email share buttons (the phone's share sheet covers them). Any of these returns only as a new step the user approves. The rule and the fidelity check that enforces it are in `ux-build-plan.md`, revision item 7.
+
 ## Search engines and AI search
 
 No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Idealist are established. A new site wins first on specific searches and in Google's job panel, then on broad terms as authority grows.
@@ -216,3 +218,4 @@ Every number and chart comes from the database; nothing is decorative.
 - The public site is replaced first; the admin redesign follows.
 - Public fixes to the current site (UX-01, UX-02, UX-03, the public parts of UX-07) are dropped; the admin fixes stay.
 - The domain has expired; nothing before the launch check needs it.
+- The public site is exactly the demo. Differences need the user's approval; features described above but absent from the demo are not built.
