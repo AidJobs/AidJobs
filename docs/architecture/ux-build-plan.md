@@ -59,7 +59,7 @@ Sharing is not removed. The demo's job sheet has one Share button, labelled "Sha
 | 3 | UX-08 launch decisions and assessments, in parallel with the admin fixes UX-04, UX-05, UX-06, UX-07 (admin parts) | Decisions; code |
 | 4 | UX-09 to UX-17, at the hidden address, with UX-26 tests growing alongside from UX-12 | Code |
 | 5 | UX-27 launch pages and UX-28 error monitoring | Code |
-| 6 | W-06 expiry rule, if the user moves it ahead of the other crawler items at UX-08 | Crawler |
+| 6 | W-02 inspection, then W-06 expiry rule, moved ahead of the other crawler items by the user at UX-08 | Crawler |
 | 7 | UX-29 the switch | Code |
 | 8 | UX-18 launch check, with the domain connected | Launch |
 | 9 | Stage C, UX-19 to UX-21, then UX-30 removal of the old shared styles | Code |
@@ -67,7 +67,7 @@ Sharing is not removed. The demo's job sheet has one Share button, labelled "Sha
 
 UX-31, the repository tidy-up, can run at any point with the user's approval of its list.
 
-**Open questions, decided at UX-08 and not before.** These are proposals, not decisions:
+**Questions decided at UX-08** (21 October 2026; outcomes in `ux-08-launch-decisions.md`: filtering in the browser for launch, title facts read when the page is built, W-06 ahead, domain still being chosen). As first written:
 
 - Filtering on the server or in the browser. Server filtering with counts per pill scales but needs new search features (UX-11). With 200 to 2,000 open jobs, loading all open jobs once and filtering in the browser, as the demo does, with the first page rendered on the server, may be enough for launch. Decide from measurements: payload size, time to first jobs on a phone, job counts expected within a year.
 - Where title facts are read (sector, SDG, level, contract, open to, work style, language, UN grade, typical experience). Stored on each job at save time needs crawler changes and a one-off write to every existing job, which needs its own approval. Read from the title each time the backend returns a job needs no storage and no write. Either way it is enrichment under contract §2 and needs a recorded contract decision.
@@ -208,7 +208,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-08. Launch decisions (gate)
 
-**Status:** Assessed 21 October 2026; awaiting the user's decisions. The findings, options, and recommendations for every item are in `docs/architecture/ux-08-launch-decisions.md`, where each decision is recorded. **Nothing in UX-09 to UX-18 starts until every item here is recorded as decided.**
+**Status:** Done, 21 October 2026. Every item is decided in `docs/architecture/ux-08-launch-decisions.md`, except the domain (item 9), which the user is still choosing and which only UX-18 needs. Consequences applied in this plan: UX-09 no longer waits for the logo, which UX-18 needs instead; UX-11 is narrowed to reading every open job; UX-17 carries the cached page and the always-on backend; W-06 is in the order table before UX-29; robots rules follow item 6 (all AI crawlers allowed except `Bytespider`).
 
 1. **Direction approval.** The user approves `public-ux-direction.md` as written or amended, including the look approved in the demo (UX-00). Merging the pull request that added it records the proposal; it is not the approval.
 2. **Contract decision** for the public scope changes in contract §2: the organisation filter (a new public search feature); the Sector filter with SDGs, multi-choice filters, and the title-fact filters approved in the demo (new public search features, and enrichment where facts are read from titles); the Recommended order; and the user-interface rewrite under rule 15 with the product reason recorded in the direction document. This brings forward the UX-22 contract decision, because the approved design uses title facts at launch.
@@ -231,8 +231,8 @@ Within the existing contract: these repair behaviour; they add no public search 
 Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at `/`. Each step takes its look and behaviour from "Approved in the design demo" in `public-ux-direction.md` and carries the demo's components over from the tag; where a step's text below predates the demo, the approved demo decisions apply and the step's plan reconciles them.
 
 - **Scope:** the typeface chosen in the demo (Manrope); text sizes 12, 13, and 15px plus one large light size for page titles and large numbers; ink and sage for light and dark, following the device; the user's logo, favicon, and app icon; Lucide icons with hover and long-press labels as one component; SVG flags; card, pill, and hairline shapes. Shared by the public site and the admin. The demo's styles are reused, not redrawn.
-- **Not in scope:** page layouts (UX-10 onward).
-- **Depends on:** UX-00 (approved look), UX-08 (logo, direction).
+- **Not in scope:** page layouts (UX-10 onward); the final logo, favicon, and app icon, which arrive with the domain and are fitted at UX-18.
+- **Depends on:** UX-00 (approved look), UX-08 (direction). Not on the logo (UX-08 item 3).
 - **Acceptance:** tokens defined once and used by new components; favicon and app icon return 200; contrast meets WCAG AA for text.
 - **Verify:** preview; contrast measured.
 
@@ -308,7 +308,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 **Status:** Not started.
 
-- **Scope:** carry out the slow-first-load decision from UX-08; one search sends one request, not four; images and fonts sized for phones.
+- **Scope:** carry out the slow-first-load decision from UX-08 (item 5: the cached page, and the backend on an always-on instance, changed by the user in Render); images, fonts, and the flag icons sized for phones; the page weight of all open jobs measured against the UX-08 item 10 threshold.
 - **Depends on:** UX-16; the UX-08 hosting decision.
 - **Acceptance:** first load on a cold backend within the target set at UX-08; a phone audit's Largest Contentful Paint under 2.5 seconds.
 - **Verify:** preview and live measurements.
@@ -318,7 +318,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 **Status:** Not started.
 
 - **Scope:** connect the domain and set the site address; allow indexing; repeat the W-26 review method on the preview at 390px and 1366px, public pages; the fidelity check on the whole site; checks on real devices: iPhone Safari, Android Chrome, Samsung Internet, and desktop Safari, Firefox, Chrome, and Edge, covering the bottom sheets, the keyboard with the search field and sheet search, the brand bar folding, the day strip swipe, share, and calendar (the demo was checked only in Chrome, and iPhone Safari handles the keyboard and screen height differently); the full frontend test suite and type check; a speed, accessibility, and search-engine audit; the user verifies the domain in Google Search Console and Bing Webmaster Tools and submits the sitemap.
-- **Depends on:** UX-29; the domain (UX-08).
+- **Depends on:** UX-29; the domain (UX-08 item 9); the user's logo (UX-08 item 3), fitted here with the favicon and app icon.
 - **Acceptance:** no open finding above Low; the user approves the launch.
 - **Verify:** recorded results.
 

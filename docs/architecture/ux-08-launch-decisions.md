@@ -1,12 +1,14 @@
 # AidJobs — UX-08 launch decisions
 
-**Status:** Assessed 21 October 2026, read-only, from `main` at `fbcfffe`. **Awaiting the user's decisions.** Nothing here is decided until the user records it in the "Decision" line of each item. Once all thirteen are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
+**Status:** Decided 21 October 2026. Assessed read-only from `main` at `fbcfffe`; the user's decisions are recorded in each item. Item 9 (domain) stays open by the user's choice and is needed only by UX-18. Nothing here is decided until the user records it in the "Decision" line of each item. Once all thirteen are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
 
 Already decided by the user on 21 October 2026, and assumed throughout: the public site is exactly the approved demo (`ux-build-plan.md`, revision item 7). Every recommendation below keeps the demo's look and behaviour; none adds a feature the demo does not have.
 
 How this was assessed: public pages and the public search API were read over HTTPS, the same requests any visitor makes; GitHub deployment records; the repository; vendor documentation. No crawl, database write, reindex, or admin action. Evidence labels as in the ledger: **Verified**, **Repository**, **Vendor docs**, **Not verified**.
 
 ## Summary of recommendations
+
+Every recommendation below was approved by the user on 21 October 2026, except where the row says otherwise.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
@@ -15,7 +17,7 @@ How this was assessed: public pages and the public search API were read over HTT
 | 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
 | 4 | Launch date | Set when the domain is settled and Stage B is half done |
 | 5 | Slow first load | Cached server-rendered page (in the design anyway), plus an always-on backend from $7 a month: a cold first request took 42.9 seconds |
-| 6 | AI crawlers | **Partly decided:** training crawlers blocked at launch. Open: allow search and user-triggered crawlers |
+| 6 | AI crawlers | **Decided:** allow search, user-triggered, and training crawlers; block only `Bytespider` |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
 | 8 | Deployment | **Partly decided:** no ads or payments at launch, free Vercel plan fits. Open: the Netlify production copy |
 | 9 | Domain | **Open:** the user is choosing, probably an `.org`; needed only by the launch check |
@@ -29,7 +31,7 @@ How this was assessed: public pages and the public search API were read over HTT
 The direction is `public-ux-direction.md`, including "Approved in the design demo (21 October 2026)". The demo look was approved on 21 October; this item approves the direction as a whole, the basis for every Stage B step.
 
 - **Recommendation:** approve as written.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: the direction is approved as written, with the demo section.
 
 ## 2. Contract decisions
 
@@ -44,7 +46,7 @@ The contract (`aidjobs-migration-contract.md`) says, in §2: "Out of scope for t
 | E. Unchanged | User accounts, payments, CV processing, rewards, AI features, and taxonomy management stay out of scope. Saved jobs stay on the device | None |
 
 - **Recommendation:** approve A to E.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: amendments A to E are approved and amend the contract as stated.
 
 ## 3. Logo
 
@@ -58,7 +60,7 @@ UX-09 (design foundation) lists the logo as a dependency. The logo matters for t
 The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if item 12 moves it ahead.
 
 - **Recommendation:** set the date when the domain is settled and Stage B is about half done, when the remaining work can be counted in pull requests.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: the date is set when the domain is settled and Stage B is about half done.
 
 ## 5. Slow first load
 
@@ -79,7 +81,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 | C. Cached server-rendered page with every open job (item 7) | Free, part of Stage B | Visitors get the job list from the cache without waiting for the backend; the cache refreshes in the background, and the last good page is kept if the backend is slow or asleep |
 
 - **Recommendation:** C, which the Stage B design needs anyway, so visitors never wait on the backend for the list. Add A: the 42.9-second first request points to the free plan (the user confirms in the dashboard), and sleeping also stops scheduled crawls, a crawler reliability problem a cache does not solve. A costs from $7 a month.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: C, the cached page, in Stage B; and A, an always-on backend instance from $7 a month. The user changes the instance type in the Render dashboard (the agent has no access), before the launch check and preferably soon, because scheduled crawls stop while the free instance sleeps.
 
 ## 6. AI crawlers
 
@@ -94,7 +96,7 @@ AI companies use three kinds of crawler, each named separately in `robots.txt` (
 The job adverts are public pages of the employers; AidJobs adds the aggregation. None of these crawlers sees any job today: the home page HTML contains no job titles (Verified, item 8), which Stage B fixes.
 
 - **Recommendation:** allow every search and user-triggered crawler. Training crawlers are your choice: allowing them maximises visibility, including Gemini; blocking them costs little traffic except through `Google-Extended`. Block `Bytespider`, which publishes no English crawler documentation and is reported to ignore `robots.txt`. Applied in `robots.txt` at UX-10, with `llms.txt` at UX-25.
-- **Decision:** partly decided, 21 October 2026, the user: training crawlers are not allowed at launch; they may be allowed in a later step after launch. At launch `robots.txt` blocks `GPTBot`, `ClaudeBot`, `Meta-ExternalAgent`, `Amazonbot`, `CCBot`, `MistralAI-Training`, `Bytespider`, and the control tokens `Google-Extended` and `Applebot-Extended`. Consequence to accept: blocking `Google-Extended` can keep AidJobs out of answers in Gemini apps; Google Search and its AI Overviews are unaffected, because they use `Googlebot`. **Still open:** confirm that search and user-triggered crawlers are allowed at launch, as recommended.
+- **Decision:** 21 October 2026, the user: allow AI crawlers at launch, training crawlers included (an earlier answer to block them was a misunderstanding and is withdrawn). `robots.txt` allows every search, user-triggered, and training crawler listed above, including `Google-Extended` and `Applebot-Extended`, and blocks only `Bytespider`, as recommended.
 
 ## 7. Server rendering approach
 
@@ -112,7 +114,7 @@ The job adverts are public pages of the employers; AidJobs adds the aggregation.
 8. The page looks exactly like the demo. Two pieces of porting work make that possible on the server: one fixed country-name table (the demo renders only in the browser because Node and browsers name some countries differently), and dates worked out in the browser (point 4).
 
 - **Recommendation:** approve this approach for UX-10.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation, including the proof at UX-10 that the last good page survives an unreachable backend.
 
 ## 8. Deployment unknowns
 
@@ -128,7 +130,7 @@ Established 21 October 2026:
 | Vercel plan | Which Vercel plan the project is on is not visible to the agent. Vercel's free Hobby plan is for "non-commercial personal use only"; advertising, payments from visitors, being paid to build or host the site, or affiliate links as the main purpose count as commercial; asking for donations does not. Pro costs $20 a month and includes one free first-year domain on `.app` and a few other endings | Vendor docs (vercel.com fair-use guidelines, terms, pricing, Pro plan page), read 21 October 2026 |
 
 - **Recommendation:** live checks use `aid-jobs-frontend.vercel.app` until the domain returns. Confirm that AidJobs stays non-commercial while on Vercel's free plan; if ads, sponsored listings, or payment for the work are planned, move to Pro before launch. Decide the Netlify production copy: keep Netlify for pull-request previews (they are public and useful) but switch off its production site, or mark it `noindex`, so search engines never find two copies of AidJobs. The user checks Netlify's production branch setting under Site configuration, Build and deploy.
-- **Decision:** partly decided, 21 October 2026, the user: no ads and no payments at launch, so the free plan fits the launch. After launch, changes come one step at a time; any step that adds ads, payments, or paid work moves Vercel to Pro first. **Still open:** the Netlify production copy (switch off, or mark `noindex`).
+- **Decision:** partly decided, 21 October 2026, the user: no ads and no payments at launch, so the free plan fits the launch. After launch, changes come one step at a time; any step that adds ads, payments, or paid work moves Vercel to Pro first. Netlify, approved as recommended: Netlify keeps building pull-request previews; the user switches off its production site in Netlify, or, if that would also stop previews, the new site's `noindex` setting covers it until the domain is connected to Vercel only.
 
 ## 9. Domain
 
@@ -149,7 +151,7 @@ Established 21 October 2026:
 | On the server: the backend filters and returns counts per pill (UX-11 in full) | New backend query features with several values per filter, counts per choice, and tests | Every tap waits on the backend, including a sleeping one |
 
 - **Recommendation:** in the browser for launch. Move to the server when open jobs pass about 1,500 or the job data passes about 200 KB compressed, measured at each launch check. UX-11 narrows to what the server-rendered page needs. The public list then reads PostgreSQL through the existing database path; the Meilisearch decision (W-18) is not needed for launch.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: filtering in the browser for launch; move to the server at about 1,500 open jobs or 200 KB compressed, measured at each launch check.
 
 ## 11. Where title facts are read
 
@@ -162,14 +164,14 @@ Established 21 October 2026:
 | C. Stored on each job at save time | Crawler change, a new column or columns, and a one-off write to every existing job, which needs its own approval | Queryable everywhere; most work; needed for server filtering, landing pages, and structured data later |
 
 - **Recommendation:** A for launch. Move to C together with server filtering (item 10) or landing pages (UX-25), whichever comes first.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: A, read when the page is built, with the demo's code and its new tests; move to C with server filtering or landing pages.
 
 ## 12. W-06 before launch
 
 Sixteen active UNICEF rows from 6 December 2025 have no deadline and stay listed indefinitely (W-02). The demo shows them with an orange "may have closed" warning and places them last, which limits the harm but still lists them. W-06 is the written expiry rule the contract requires before any job leaves search because a crawl did not find it (§6); its agreed basis is a complete listing crawl (`listing_complete`).
 
 - **Recommendation:** move W-06 ahead of the other crawler items, so it is decided and validated before UX-29. W-02, the read-only inspection of those rows, comes first.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: W-06 moves ahead of the other crawler items and is decided and validated before the switch (UX-29); W-02 comes first.
 
 ## 13. A saved job that closes
 
@@ -181,7 +183,7 @@ In the demo, Saved shows only saved jobs that are still in the list. When a save
 | B. Show it as closed | Saved keeps it greyed, marked "Closed", with a remove button; needs the job's title kept on the device. A difference from the demo, so it needs this approval |
 
 - **Recommendation:** A for launch, because the site is exactly the demo; revisit after launch if people ask.
-- **Decision:**
+- **Decision:** 21 October 2026, the user approved the recommendation: A, as in the demo; revisit after launch.
 
 ## After the decisions
 

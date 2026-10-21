@@ -1,6 +1,6 @@
 # AidJobs — Public site and admin direction
 
-**Status:** Proposed, 20 October 2026. The look and behaviour of the design demo were approved by the user on 21 October 2026 and are recorded under "Approved in the design demo"; where that section and the earlier text disagree, that section applies. The direction as a whole, and the scope changes to §2, are still approved at step UX-08 of `docs/architecture/ux-build-plan.md`, and each build step still needs its own approval. Nothing here is built on `main`. The order of work is in that plan, not here.
+**Status:** Proposed, 20 October 2026. The look and behaviour of the design demo were approved by the user on 21 October 2026 and are recorded under "Approved in the design demo"; where that section and the earlier text disagree, that section applies. The direction as a whole and the scope changes to §2 were approved by the user on 21 October 2026 at step UX-08 (`ux-08-launch-decisions.md`, items 1 and 2); each build step still needs its own approval. Nothing here is built on `main`. The order of work is in that plan, not here.
 
 **Relationship to the rules.** The contract (`aidjobs-migration-contract.md`, §2) puts user accounts, new public search features, recommendation systems, and enrichment expansion out of scope, and rule 15 forbids rewriting the public UI without a product reason. Approving this document records the product reason (below) and amends §2 only as far as the items marked **Scope change**. Everything else in the contract stands.
 
