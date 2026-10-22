@@ -7,7 +7,7 @@
 
 User-experience work has three documents: `docs/architecture/ux-build-plan.md`, the authoritative step-by-step plan with status (revised 21 October 2026); `docs/architecture/public-ux-direction.md` (W-28), the design, approved on 21 October 2026; and `docs/architecture/ux-08-launch-decisions.md`, the launch decisions. The approved demo is kept at the git tag `ux-demo-approved-2026-10-21`.
 
-**Last verified:** 21 October 2026. `main` is `8083591` (merge of PR #26, UX-09). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 22 October 2026. `main` is `8083591` (merge of PR #26, UX-09). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -161,7 +161,9 @@ Decided by the user on 21 October 2026: the public site is exactly the approved 
 
 UX-08 decided on 21 October 2026: the user approved the direction (W-28), the contract amendments (§2 and §13, noted in the contract), the cached server-rendered page with every open job, filtering in the browser for launch, title facts read when the page is built, all AI crawlers allowed except `Bytespider`, no ads or payments at launch, W-02 then W-06 ahead of the other crawler items and before the switch, and saved jobs that close leaving Saved as in the demo. The domain is still being chosen (probably an `.org`); the logo comes with it.
 
-UX-09 done on 21 October 2026 (PR #26, `8083591`): the design foundation from the demo tag at `components/site/` and the hidden shell at `/v2`, live and checked. Next: the UX-10 plan.
+UX-09 done on 21 October 2026 (PR #26, `8083591`): the design foundation from the demo tag at `components/site/` and the hidden shell at `/v2`, live and checked.
+
+Reviewed on 22 October 2026, read-only, before the UX-10 plan: findings are recorded under UX-10 in the UX plan ("Review of 22 October 2026"). The most important: a database failure returns an empty job list marked `ok`, which must never be cached; the backend took 53 seconds asleep, which must not break a deploy; paging needs a duplicate and total check; saved settings must apply before the first paint; `/` on Vercel has no "do not index"; the locked Netlify production copy still serves the old site, indexable (Verified). Decided by the user on 23 October 2026: the address carries only the open job, as in the demo. Recommended, awaiting the user: publish the UX-10 production deploy on Netlify once by hand, keeping the lock. Next: the UX-10 plan, for approval before any code.
 
 ### Now
 
