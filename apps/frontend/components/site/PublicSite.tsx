@@ -44,11 +44,11 @@ import { countryName } from '@/lib/site/countries';
 import {
   countBy,
   DEADLINE_LABELS,
-  dayStart,
   formatDate,
   formatLongDate,
   initials,
   isOpen,
+  localDay,
   matchesDeadline,
   normaliseJobs,
   recommendedOrder,
@@ -56,6 +56,8 @@ import {
   OLD_DAYS,
   SOON_DAYS,
   STALE_DAYS,
+  utcDay,
+  type DayOf,
   type DeadlineFilter,
   type Job,
   type RawJob,
@@ -532,11 +534,15 @@ function JobDetail({
   };
   const calendar = () => {
     const blob = new Blob([icsFor(job)], { type: 'text/calendar;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = href;
     a.download = `deadline-${job.id.slice(0, 8)}.ics`;
+    // Firefox needs the link in the page, and Safari cancels the download if the file is released at once.
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 60_000);
     onToast('Calendar file downloaded');
   };
   const mailto = `mailto:?subject=${encodeURIComponent(`${job.title} – ${org}`)}&body=${encodeURIComponent(
@@ -785,15 +791,52 @@ function facetValue(j: JobF, f: Facet): string {
   return j.facts.language;
 }
 
+/** Phone job sheet. Pulling it down from the top of its content closes it, as with the filter sheets. */
+function JobSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const [drag, setDrag] = useState(0);
+  const start = useRef<{ y: number; atTop: boolean } | null>(null);
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden">
+      <div className="flex-1" style={{ background: 'var(--scrim)' }} onClick={onClose} aria-hidden />
+      <div
+        className="aj-sheet aj-scroll max-h-[86vh] px-5 pb-8"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ transform: drag ? `translateY(${drag}px)` : undefined, transition: drag ? 'none' : 'transform 160ms ease' }}
+        onTouchStart={(e) => {
+          start.current = { y: e.touches[0].clientY, atTop: e.currentTarget.scrollTop <= 0 };
+        }}
+        onTouchMove={(e) => {
+          if (!start.current?.atTop) return;
+          setDrag(Math.max(0, e.touches[0].clientY - start.current.y));
+        }}
+        onTouchEnd={() => {
+          if (drag > 100) onClose();
+          setDrag(0);
+          start.current = null;
+        }}
+        onTouchCancel={() => {
+          setDrag(0);
+          start.current = null;
+        }}
+      >
+        <div className="aj-grabber" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 type Load = 'ready' | 'loading' | 'failed';
 
 function LoadState({ state, onRetry }: { state: Exclude<Load, 'ready'>; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-start gap-2 px-3 py-8" role="status">
-      <span className="aj-title">{state === 'loading' ? 'Loading jobs' : 'Jobs could not be loaded'}</span>
+      <span className="aj-title">{state === 'loading' ? 'Loading jobs…' : 'Jobs could not be loaded'}</span>
       {state === 'failed' && (
         <>
-          <span className="aj-muted">The job service did not answer. It may be starting up.</span>
+          <span className="aj-muted">Please try again in a minute.</span>
           <button type="button" className="aj-pill" onClick={onRetry}>
             Try again
           </button>
@@ -805,18 +848,40 @@ function LoadState({ state, onRetry }: { state: Exclude<Load, 'ready'>; onRetry:
 
 /**
  * `initialJobs` is null when the page was built while the backend was unreachable; the browser then loads the jobs.
- * Days left start from `builtAt`, the time the cached page was made, so the first render matches the server's HTML.
+ * `serverToday` is the day the cached page was made, read in UTC: the first render uses it so it matches the
+ * server's HTML, then days left, "Today", and closed jobs follow the visitor's own clock and time zone.
  */
-export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJob[] | null; builtAt: number }) {
+export default function PublicSite({ initialJobs, serverToday }: { initialJobs: RawJob[] | null; serverToday: number }) {
   const [rawJobs, setRawJobs] = useState<RawJob[]>(initialJobs ?? []);
   const [load, setLoad] = useState<Load>(initialJobs ? 'ready' : 'loading');
-  const [today, setToday] = useState(() => dayStart(builtAt));
+  const [clock, setClock] = useState<{ today: number; dayOf: DayOf }>(() => ({ today: serverToday, dayOf: utcDay }));
   const [ready, setReady] = useState(false);
-  const jobs = useMemo<JobF[]>(() => normaliseJobs(rawJobs, today).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })), [rawJobs, today]);
+  const jobs = useMemo<JobF[]>(
+    () => normaliseJobs(rawJobs, clock.today, clock.dayOf).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })),
+    [rawJobs, clock],
+  );
 
   useEffect(() => {
-    setToday(dayStart(Date.now()));
     setReady(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => {
+      const now = Date.now();
+      const today = localDay(now);
+      setClock((c) => (c.today === today && c.dayOf === localDay ? c : { today, dayOf: localDay }));
+      clearTimeout(timer);
+      const d = new Date(now);
+      timer = setTimeout(sync, new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - now + 1000);
+    };
+    // Phones pause timers in the background, so the day is also re-read whenever the page is shown again.
+    const onShow = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    sync();
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onShow);
+    };
   }, []);
 
   const fetchJobs = useCallback(() => {
@@ -874,10 +939,36 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
     setSelectedId(id);
   }, []);
 
+  /**
+   * Phones: an open drawer or sheet gets its own history entry, so the Back button or gesture closes it
+   * instead of leaving the site. Closing it any other way removes that entry again.
+   */
+  const overlayOpen = drawerOpen || filtersOpen || sortOpen || (phone && popover !== null);
+  const overlayEntry = useRef(false);
   useEffect(() => {
+    if (overlayOpen && !overlayEntry.current) {
+      overlayEntry.current = true;
+      window.history.pushState({ ajOverlay: true }, '');
+    } else if (!overlayOpen && overlayEntry.current) {
+      overlayEntry.current = false;
+      if (window.history.state?.ajOverlay) window.history.back();
+    }
+  }, [overlayOpen]);
+
+  useEffect(() => {
+    const onPop = () => {
+      syncFromUrl();
+      if (overlayEntry.current && !window.history.state?.ajOverlay) {
+        overlayEntry.current = false;
+        setDrawerOpen(false);
+        setFiltersOpen(false);
+        setSortOpen(false);
+        setPopover(null);
+      }
+    };
     syncFromUrl();
-    window.addEventListener('popstate', syncFromUrl);
-    return () => window.removeEventListener('popstate', syncFromUrl);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, [syncFromUrl]);
 
   useEffect(() => {
@@ -911,13 +1002,21 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
     };
   }, [dragging, setSplit]);
 
+  /**
+   * Opening a job from the list adds one history entry; moving to another job from inside one replaces it,
+   * so Back or Close always returns to the list. A job reached from a shared link has no entry of ours to
+   * go back to, so closing it only clears the address.
+   */
   const openJob = (id: string) => {
+    const url = `${window.location.pathname}?job=${encodeURIComponent(id)}`;
+    if (selectedId) window.history.replaceState({ ...window.history.state }, '', url);
+    else window.history.pushState({ ajJob: true }, '', url);
     setSelectedId(id);
-    window.history.pushState({}, '', `${window.location.pathname}?job=${id}`);
   };
   const closeJob = () => {
     setSelectedId(null);
-    window.history.pushState({}, '', window.location.pathname);
+    if (window.history.state?.ajJob) window.history.back();
+    else window.history.replaceState({ ...window.history.state }, '', window.location.pathname);
   };
   const toggleIn = (list: string[], set: (v: string[]) => void, id: string, added: string, removed: string) => {
     const has = list.includes(id);
@@ -942,6 +1041,19 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
   const list = sort === 'recommended' ? recommendedOrder(filtered) : sortByDeadline(filtered);
   const selected = jobs.find((j) => j.id === selectedId) ?? null;
   const selectedTitle = selected?.title ?? null;
+  /** Saves of jobs that have since closed stay stored but are not counted, as they no longer show in Saved. */
+  const savedCount = useMemo(() => {
+    const open = new Set(jobs.map((j) => j.id));
+    return saved.filter((id) => open.has(id)).length;
+  }, [jobs, saved]);
+
+  // A shared link to a job that has closed, or is no longer listed, says so and clears the address.
+  useEffect(() => {
+    if (load !== 'ready' || !selectedId || selected) return;
+    setSelectedId(null);
+    window.history.replaceState({ ...window.history.state }, '', window.location.pathname);
+    setToast('That job is no longer open');
+  }, [load, selectedId, selected]);
 
   useEffect(() => {
     if (!selectedTitle) return;
@@ -1024,7 +1136,7 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
 
   const primary: MenuEntry[] = [
     { key: 'all', label: 'All jobs', icon: <Briefcase size={15} strokeWidth={1.8} />, count: jobs.length, active: view === 'all' && !anyFilter, onSelect: clearAll },
-    { key: 'saved', label: 'Saved', icon: <Bookmark size={15} strokeWidth={1.8} />, count: saved.length, active: inSaved, onSelect: () => setView(inSaved ? 'all' : 'saved') },
+    { key: 'saved', label: 'Saved', icon: <Bookmark size={15} strokeWidth={1.8} />, count: savedCount, active: inSaved, onSelect: () => setView(inSaved ? 'all' : 'saved') },
   ];
   const facetSections: MenuSection[] = [
     facetSection(
@@ -1278,11 +1390,11 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
                     className="aj-icon-btn relative"
                     data-active={inSaved}
                     onClick={() => setView(inSaved ? 'all' : 'saved')}
-                    aria-label={`Saved jobs, ${saved.length}`}
+                    aria-label={`Saved jobs, ${savedCount}`}
                     aria-pressed={inSaved}
                   >
                     <Bookmark size={16} strokeWidth={1.8} />
-                    {saved.length > 0 && <span className="aj-badge aj-badge-corner">{saved.length}</span>}
+                    {savedCount > 0 && <span className="aj-badge aj-badge-corner">{savedCount}</span>}
                   </button>
                 </div>
               </div>
@@ -1423,13 +1535,9 @@ export default function PublicSite({ initialJobs, builtAt }: { initialJobs: RawJ
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden">
-          <div className="flex-1" style={{ background: 'var(--scrim)' }} onClick={closeJob} aria-hidden />
-          <div className="aj-sheet aj-scroll max-h-[86vh] px-5 pb-8" role="dialog" aria-modal="true" aria-label={selected.title}>
-            <div className="aj-grabber" />
-            {detail}
-          </div>
-        </div>
+        <JobSheet title={selected.title} onClose={closeJob}>
+          {detail}
+        </JobSheet>
       )}
 
       {filtersOpen && (

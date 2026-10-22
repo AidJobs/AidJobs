@@ -1,5 +1,5 @@
 import PublicSite from '@/components/site/PublicSite';
-import type { RawJob } from '@/lib/site/jobs';
+import { utcDay, type RawJob } from '@/lib/site/jobs';
 import { backendOrigin, loadOpenJobs } from '@/lib/site/loadJobs';
 
 /** Rebuilt in the background at most every 10 minutes; a failed rebuild keeps the last good page. */
@@ -18,5 +18,5 @@ export default async function SitePage() {
     if (!building) throw error;
     console.warn(`Building /v2 without jobs: ${error instanceof Error ? error.message : String(error)}`);
   }
-  return <PublicSite initialJobs={jobs} builtAt={Date.now()} />;
+  return <PublicSite initialJobs={jobs} serverToday={utcDay(Date.now())} />;
 }

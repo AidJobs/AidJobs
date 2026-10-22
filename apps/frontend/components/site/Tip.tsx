@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type Side = 'top' | 'right' | 'bottom';
@@ -46,9 +46,20 @@ export default function Tip({ label, side = 'top', children }: { label: string; 
   const touchStart = () => {
     timer.current = setTimeout(show, 450);
   };
-  const touchEnd = () => {
+  const cancelPress = () => {
     if (timer.current) clearTimeout(timer.current);
+  };
+  const touchEnd = () => {
+    cancelPress();
     if (open) setTimeout(hide, 1200);
+  };
+  // A tap also sends mouse and focus events; only a real mouse or keyboard focus shows the label, so a tap never leaves one open.
+  const focusShow = (e: FocusEvent<HTMLSpanElement>) => {
+    try {
+      if ((e.target as Element).matches(':focus-visible')) show();
+    } catch {
+      show();
+    }
   };
 
   const layer = typeof document !== 'undefined' ? document.querySelector('.aj-root') : null;
@@ -57,11 +68,12 @@ export default function Tip({ label, side = 'top', children }: { label: string; 
     <span
       ref={anchor}
       className="aj-tip"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && show()}
+      onPointerLeave={(e) => e.pointerType === 'mouse' && hide()}
+      onFocus={focusShow}
       onBlur={hide}
       onTouchStart={touchStart}
+      onTouchMove={cancelPress}
       onTouchEnd={touchEnd}
       onTouchCancel={touchEnd}
     >

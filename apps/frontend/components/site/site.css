@@ -25,6 +25,9 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* Sideways on a notched iPhone, keeps the list clear of the notch; zero everywhere else. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   color: var(--text);
   background: radial-gradient(120% 80% at 0% 0%, var(--wash) 0%, var(--page) 55%);
   font-size: 12px;

@@ -28,18 +28,30 @@ const DAY_MS = 86_400_000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/** The country of a location: the last part that names one, so "Afghanistan, various sites" is Afghanistan. */
 export function isoFromLocation(location: string | null): string | null {
   if (!location) return null;
-  const last = location.split(',').pop()?.trim();
-  if (!last) return null;
-  return isoFromName(last);
+  const parts = location.split(',');
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const iso = isoFromName(parts[i]);
+    if (iso) return iso;
+  }
+  return null;
 }
 
-/** Start of the UTC day containing `ms`. */
-export function dayStart(ms: number): number {
+/**
+ * A calendar day as the UTC midnight of that date, so deadlines ("2026-10-23") and days compare directly.
+ * `utcDay` reads the date in UTC, as the server does; `localDay` reads it on the visitor's clock.
+ */
+export type DayOf = (ms: number) => number;
+export const utcDay: DayOf = (ms) => {
   const d = new Date(ms);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
+};
+export const localDay: DayOf = (ms) => {
+  const d = new Date(ms);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+};
 
 export function daysUntil(deadline: string | null, today: number): number | null {
   if (!deadline) return null;
@@ -48,11 +60,17 @@ export function daysUntil(deadline: string | null, today: number): number | null
   return Math.round((t - today) / DAY_MS);
 }
 
+/** A date ("2026-10-23") as written; a moment ("2026-10-22T18:55:56+00:00") on the visitor's clock. */
 export function formatDate(iso: string | null): string {
   if (!iso) return '';
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  if (iso.length === 10) {
+    const d = new Date(`${iso}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+  const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function formatLongDate(iso: string | null): string {
@@ -62,8 +80,8 @@ export function formatLongDate(iso: string | null): string {
   return `${WEEKDAYS[d.getUTCDay()]} ${formatDate(iso)}`;
 }
 
-/** `today` is the start of the UTC day to count from (see `dayStart`). */
-export function normaliseJobs(raw: RawJob[], today: number): Job[] {
+/** `today` and `dayOf` must read the same clock: `utcDay` on the server, `localDay` in the browser. */
+export function normaliseJobs(raw: RawJob[], today: number, dayOf: DayOf): Job[] {
   return raw.map((r) => {
     const fromIso = r.country_iso && hasFlag(r.country_iso.toUpperCase()) ? r.country_iso.toUpperCase() : null;
     const iso = fromIso ?? isoFromLocation(r.location);
@@ -77,7 +95,7 @@ export function normaliseJobs(raw: RawJob[], today: number): Job[] {
       place = country;
     }
     const seen = r.last_seen_at ? Date.parse(r.last_seen_at) : NaN;
-    const seenDaysAgo = Number.isNaN(seen) ? null : Math.max(0, Math.floor((today + DAY_MS - seen) / DAY_MS));
+    const seenDaysAgo = Number.isNaN(seen) ? null : Math.max(0, Math.round((today - dayOf(seen)) / DAY_MS));
     return { ...r, iso, country, place, daysLeft: daysUntil(r.deadline, today), seenDaysAgo };
   });
 }

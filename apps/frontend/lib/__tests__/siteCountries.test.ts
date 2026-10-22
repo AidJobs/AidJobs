@@ -2,11 +2,11 @@
  * @jest-environment node
  */
 import { countries as flagCountries, hasFlag } from 'country-flag-icons';
-import { COUNTRY_NAMES, countryName, isoFromName } from '../site/countries';
+import { COUNTRY_NAMES, countryName, isoFromName, nameKey } from '../site/countries';
 import { isoFromLocation } from '../site/jobs';
 import liveLocations from './fixtures/liveLocations.json';
 
-/** The approved demo named countries with the runtime's Intl names; the fixed table must give the same answers. */
+/** The approved demo named countries with the runtime's Intl names and a few extra spellings. */
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const DEMO_ALIASES: Record<string, string> = {
   uk: 'GB',
@@ -35,8 +35,22 @@ function siteIso(location: string | null, iso: string | null): string | null {
 
 const rows = liveLocations as Array<{ location: string | null; country_iso: string | null }>;
 
+/** Live locations the demo left without a country, and where they are now placed (approved 23 October 2026). */
+const NOW_PLACED: Record<string, string> = {
+  'Afghanistan, various sites': 'AF',
+  'Democratic Republic of the Congo, various sites': 'CD',
+  'Ethiopia, various sites': 'ET',
+  'Lao People’s Democratic Republic': 'LA',
+  Myanmar: 'MM',
+  'Nigeria, various sites': 'NG',
+  'Syrian Arab Republic': 'SY',
+  'Ukraine, various sites': 'UA',
+  'United Republic of Tanzania': 'TZ',
+  'Yangon, Bahan Township, Myanmar': 'MM',
+};
+
 describe('fixed country table', () => {
-  it('names every two-letter flag the same way the demo did', () => {
+  it('keeps the CLDR name for every two-letter flag', () => {
     for (const code of flagCountries) {
       if (code.length !== 2 || code === 'XA') continue;
       const name = regionNames.of(code);
@@ -45,22 +59,41 @@ describe('fixed country table', () => {
     }
   });
 
-  it('looks names up both ways, ignoring case and spaces', () => {
+  it('shows plainer names for a few countries and writes "and" for "&"', () => {
+    expect(countryName('MM')).toBe('Myanmar');
+    expect(countryName('CD')).toBe('DR Congo');
+    expect(countryName('PS')).toBe('State of Palestine');
+    expect(countryName('BA')).toBe('Bosnia and Herzegovina');
     expect(countryName('ke')).toBe('Kenya');
-    expect(countryName('SS')).toBe('South Sudan');
     expect(countryName(null)).toBeNull();
     expect(countryName('ZZ')).toBeNull();
-    expect(isoFromName(' kenya ')).toBe('KE');
+  });
+
+  it('matches names regardless of accents, apostrophes, "&", case, and a leading "The"', () => {
+    expect(nameKey('  Côte d’Ivoire ')).toBe("cote d'ivoire");
+    expect(isoFromName("Cote d'Ivoire")).toBe('CI');
+    expect(isoFromName('Türkiye')).toBe('TR');
+    expect(isoFromName('Turkiye')).toBe('TR');
+    expect(isoFromName('Bosnia and Herzegovina')).toBe('BA');
+    expect(isoFromName('The Gambia')).toBe('GM');
     expect(isoFromName('Myanmar (Burma)')).toBe('MM');
     expect(isoFromName('State of Palestine')).toBe('PS');
     expect(isoFromName('UK')).toBe('GB');
     expect(isoFromName('Atlantis')).toBeNull();
   });
 
-  it('places every live job location exactly as the demo did', () => {
+  it('places every live location the demo placed in the same country', () => {
     expect(rows.length).toBeGreaterThan(50);
     for (const r of rows) {
-      expect([r.location, siteIso(r.location, r.country_iso)]).toEqual([r.location, demoIso(r.location, r.country_iso)]);
+      const demo = demoIso(r.location, r.country_iso);
+      if (demo) expect([r.location, siteIso(r.location, r.country_iso)]).toEqual([r.location, demo]);
+    }
+  });
+
+  it('places the live locations the demo missed, and only real countries', () => {
+    for (const r of rows) {
+      if (demoIso(r.location, r.country_iso) || !r.location) continue;
+      expect([r.location, siteIso(r.location, r.country_iso)]).toEqual([r.location, NOW_PLACED[r.location] ?? null]);
     }
   });
 });

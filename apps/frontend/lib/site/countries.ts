@@ -259,26 +259,103 @@ export const COUNTRY_NAMES: Record<string, string> = {
   ZW: 'Zimbabwe',
 };
 
-/** Spellings seen in job locations that differ from the names above. */
-const ALIASES: Record<string, string> = {
-  uk: 'GB',
-  usa: 'US',
-  'south sudan': 'SS',
-  "cote d'ivoire": 'CI',
-  'state of palestine': 'PS',
-  'state of palestine (sop)': 'PS',
+/** Plainer names where the CLDR name reads oddly in a job list; "&" is written "and" everywhere. */
+const DISPLAY: Record<string, string> = {
+  CD: 'DR Congo',
+  CG: 'Congo',
+  HK: 'Hong Kong',
+  MM: 'Myanmar',
+  MO: 'Macao',
+  PS: 'State of Palestine',
 };
 
+/**
+ * Other spellings employers use, mostly the official UN names. Matched after `nameKey`, so accents,
+ * apostrophe styles, "&" or "and", case, and a leading "The" do not matter.
+ */
+const ALIASES: Record<string, string> = {
+  uk: 'GB',
+  'great britain': 'GB',
+  'united kingdom of great britain and northern ireland': 'GB',
+  england: 'GB',
+  scotland: 'GB',
+  wales: 'GB',
+  'northern ireland': 'GB',
+  usa: 'US',
+  us: 'US',
+  'united states of america': 'US',
+  uae: 'AE',
+  'ivory coast': 'CI',
+  palestine: 'PS',
+  'state of palestine (sop)': 'PS',
+  'occupied palestinian territory': 'PS',
+  'palestinian territory': 'PS',
+  gaza: 'PS',
+  'west bank': 'PS',
+  burma: 'MM',
+  'syrian arab republic': 'SY',
+  'united republic of tanzania': 'TZ',
+  "lao people's democratic republic": 'LA',
+  'lao pdr': 'LA',
+  'democratic republic of the congo': 'CD',
+  'democratic republic of congo': 'CD',
+  drc: 'CD',
+  'republic of the congo': 'CG',
+  'republic of congo': 'CG',
+  'congo-brazzaville': 'CG',
+  'iran (islamic republic of)': 'IR',
+  'islamic republic of iran': 'IR',
+  'venezuela (bolivarian republic of)': 'VE',
+  'bolivia (plurinational state of)': 'BO',
+  'republic of moldova': 'MD',
+  'republic of korea': 'KR',
+  "democratic people's republic of korea": 'KP',
+  'viet nam': 'VN',
+  turkey: 'TR',
+  'czech republic': 'CZ',
+  'russian federation': 'RU',
+  'cabo verde': 'CV',
+  swaziland: 'SZ',
+  macedonia: 'MK',
+  'east timor': 'TL',
+  'micronesia (federated states of)': 'FM',
+  'saint lucia': 'LC',
+  'saint kitts and nevis': 'KN',
+  'saint vincent and the grenadines': 'VC',
+  'hong kong sar': 'HK',
+  macau: 'MO',
+  'brunei darussalam': 'BN',
+  'kyrgyz republic': 'KG',
+  'slovak republic': 'SK',
+};
+
+/** Lower case, without accents, straight apostrophes, "and" for "&", no leading "The" or trailing full stop. */
+export function nameKey(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2018\u2019\u0060\u00b4]/g, "'")
+    .replace(/&/g, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/^the /, '')
+    .replace(/\.+$/, '');
+}
+
 const ISO_BY_NAME = new Map<string, string>([
-  ...Object.entries(COUNTRY_NAMES).map(([code, name]): [string, string] => [name.toLowerCase(), code]),
-  ...Object.entries(ALIASES),
+  ...Object.entries(COUNTRY_NAMES).map(([code, name]): [string, string] => [nameKey(name), code]),
+  ...Object.entries(DISPLAY).map(([code, name]): [string, string] => [nameKey(name), code]),
+  ...Object.entries(ALIASES).map(([name, code]): [string, string] => [nameKey(name), code]),
 ]);
 
 export function countryName(iso: string | null): string | null {
   if (!iso) return null;
-  return COUNTRY_NAMES[iso.toUpperCase()] ?? null;
+  const code = iso.toUpperCase();
+  const name = DISPLAY[code] ?? COUNTRY_NAMES[code];
+  return name ? name.replace(/ & /g, ' and ') : null;
 }
 
 export function isoFromName(name: string): string | null {
-  return ISO_BY_NAME.get(name.trim().toLowerCase()) ?? null;
+  return ISO_BY_NAME.get(nameKey(name)) ?? null;
 }

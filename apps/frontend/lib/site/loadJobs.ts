@@ -56,8 +56,16 @@ export type LoadOptions = {
  * Every open job, in pages. Throws unless the result is complete: the search answers `ok` with no jobs when its
  * database is unreachable, and its order is not unique, so a short or repeated page would otherwise pass as real.
  */
+/** `AbortSignal.timeout` is missing before Safari 16 (iOS 15), where the browser loads the jobs itself. */
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(new Error('timed out')), ms);
+  return controller.signal;
+}
+
 export async function loadOpenJobs({ origin, timeoutMs, fetchImpl = fetch }: LoadOptions): Promise<RawJob[]> {
-  const signal = AbortSignal.timeout(timeoutMs);
+  const signal = timeoutSignal(timeoutMs);
   const byId = new Map<string, RawJob>();
   const seen = new Set<string>();
   let total: number | null = null;
