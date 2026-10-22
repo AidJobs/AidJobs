@@ -1,0 +1,458 @@
+[
+  {
+    "location": "",
+    "country_iso": null
+  },
+  {
+    "location": "Afghanistan",
+    "country_iso": "AF"
+  },
+  {
+    "location": "Afghanistan",
+    "country_iso": null
+  },
+  {
+    "location": "Afghanistan, various sites",
+    "country_iso": null
+  },
+  {
+    "location": "Algeria",
+    "country_iso": "DZ"
+  },
+  {
+    "location": "Angola",
+    "country_iso": "AO"
+  },
+  {
+    "location": "Angola",
+    "country_iso": null
+  },
+  {
+    "location": "Belgium",
+    "country_iso": "BE"
+  },
+  {
+    "location": "Belgium",
+    "country_iso": null
+  },
+  {
+    "location": "Belize",
+    "country_iso": null
+  },
+  {
+    "location": "Belize, Guyana, Suriname, Barbados, Jamaica",
+    "country_iso": null
+  },
+  {
+    "location": "Bolivia",
+    "country_iso": null
+  },
+  {
+    "location": "Bosnia & Herzegovina",
+    "country_iso": "BA"
+  },
+  {
+    "location": "Bosnia & Herzegovina",
+    "country_iso": null
+  },
+  {
+    "location": "Brazil",
+    "country_iso": null
+  },
+  {
+    "location": "Central African Republic",
+    "country_iso": "CF"
+  },
+  {
+    "location": "Chad",
+    "country_iso": "TD"
+  },
+  {
+    "location": "China",
+    "country_iso": null
+  },
+  {
+    "location": "Colombia",
+    "country_iso": "CO"
+  },
+  {
+    "location": "Cote d'Ivoire",
+    "country_iso": "CI"
+  },
+  {
+    "location": "Cuba",
+    "country_iso": null
+  },
+  {
+    "location": "Democratic Republic of Congo",
+    "country_iso": "ZM"
+  },
+  {
+    "location": "Democratic Republic of the Congo, various sites",
+    "country_iso": null
+  },
+  {
+    "location": "Denmark",
+    "country_iso": "DK"
+  },
+  {
+    "location": "Denmark",
+    "country_iso": null
+  },
+  {
+    "location": "Egypt",
+    "country_iso": "EG"
+  },
+  {
+    "location": "Ethiopia",
+    "country_iso": "ET"
+  },
+  {
+    "location": "Ethiopia",
+    "country_iso": null
+  },
+  {
+    "location": "Ethiopia, various sites",
+    "country_iso": null
+  },
+  {
+    "location": "Fiji/Pacific Island Countries",
+    "country_iso": null
+  },
+  {
+    "location": "Germany",
+    "country_iso": "DE"
+  },
+  {
+    "location": "Ghana",
+    "country_iso": null
+  },
+  {
+    "location": "Global Deployment",
+    "country_iso": null
+  },
+  {
+    "location": "Global Field Deployment.",
+    "country_iso": null
+  },
+  {
+    "location": "Guinea",
+    "country_iso": "GN"
+  },
+  {
+    "location": "Guyana, Jamaica, Barbados, Trinidad and Tobago, Belize",
+    "country_iso": null
+  },
+  {
+    "location": "Haiti",
+    "country_iso": "HT"
+  },
+  {
+    "location": "Honduras",
+    "country_iso": null
+  },
+  {
+    "location": "Hungary",
+    "country_iso": null
+  },
+  {
+    "location": "India",
+    "country_iso": "IN"
+  },
+  {
+    "location": "India",
+    "country_iso": null
+  },
+  {
+    "location": "Indonesia",
+    "country_iso": null
+  },
+  {
+    "location": "Iran",
+    "country_iso": null
+  },
+  {
+    "location": "Iraq",
+    "country_iso": "IQ"
+  },
+  {
+    "location": "Italy",
+    "country_iso": "IT"
+  },
+  {
+    "location": "Jamaica",
+    "country_iso": null
+  },
+  {
+    "location": "Jordan",
+    "country_iso": "JO"
+  },
+  {
+    "location": "Jordan",
+    "country_iso": null
+  },
+  {
+    "location": "Kenya",
+    "country_iso": "KE"
+  },
+  {
+    "location": "Lao People’s Democratic Republic",
+    "country_iso": null
+  },
+  {
+    "location": "Lebanon",
+    "country_iso": "LB"
+  },
+  {
+    "location": "Lesotho",
+    "country_iso": "LS"
+  },
+  {
+    "location": "Lesotho",
+    "country_iso": null
+  },
+  {
+    "location": "Libya",
+    "country_iso": null
+  },
+  {
+    "location": "Liverpool, Liverpool, United Kingdom",
+    "country_iso": null
+  },
+  {
+    "location": "London, London, United Kingdom",
+    "country_iso": null
+  },
+  {
+    "location": "Madagascar",
+    "country_iso": "MG"
+  },
+  {
+    "location": "Maldives",
+    "country_iso": "MV"
+  },
+  {
+    "location": "Mali",
+    "country_iso": "ML"
+  },
+  {
+    "location": "Marshall Islands",
+    "country_iso": null
+  },
+  {
+    "location": "Mexico",
+    "country_iso": "MX"
+  },
+  {
+    "location": "Morocco",
+    "country_iso": "MA"
+  },
+  {
+    "location": "Mozambique",
+    "country_iso": "MZ"
+  },
+  {
+    "location": "Mozambique",
+    "country_iso": null
+  },
+  {
+    "location": "Myanmar",
+    "country_iso": "MM"
+  },
+  {
+    "location": "Myanmar",
+    "country_iso": null
+  },
+  {
+    "location": "Near & Middle East Region, various contexts",
+    "country_iso": null
+  },
+  {
+    "location": "Nepal",
+    "country_iso": "NP"
+  },
+  {
+    "location": "Nepal",
+    "country_iso": null
+  },
+  {
+    "location": "Nicaragua",
+    "country_iso": "NI"
+  },
+  {
+    "location": "Niger",
+    "country_iso": "NE"
+  },
+  {
+    "location": "Nigeria",
+    "country_iso": "NG"
+  },
+  {
+    "location": "Nigeria, various sites",
+    "country_iso": null
+  },
+  {
+    "location": null,
+    "country_iso": null
+  },
+  {
+    "location": "Oman",
+    "country_iso": "OM"
+  },
+  {
+    "location": "Pakistan",
+    "country_iso": null
+  },
+  {
+    "location": "Panama",
+    "country_iso": "PA"
+  },
+  {
+    "location": "Philippines",
+    "country_iso": null
+  },
+  {
+    "location": "Philippines",
+    "country_iso": "PH"
+  },
+  {
+    "location": "Renk County, Uppernile State, South Sudan",
+    "country_iso": null
+  },
+  {
+    "location": "Republic of Moldova",
+    "country_iso": "MD"
+  },
+  {
+    "location": "Romania",
+    "country_iso": "RO"
+  },
+  {
+    "location": "Samoa",
+    "country_iso": "WS"
+  },
+  {
+    "location": "Senegal",
+    "country_iso": "SN"
+  },
+  {
+    "location": "Serbia",
+    "country_iso": null
+  },
+  {
+    "location": "Somalia / Nairobi, Kenya",
+    "country_iso": "KE"
+  },
+  {
+    "location": "Sri Lanka",
+    "country_iso": "LK"
+  },
+  {
+    "location": "Sri Lanka",
+    "country_iso": null
+  },
+  {
+    "location": "State of Palestine (SoP)",
+    "country_iso": null
+  },
+  {
+    "location": "Switzerland",
+    "country_iso": "CH"
+  },
+  {
+    "location": "Syrian Arab Republic",
+    "country_iso": null
+  },
+  {
+    "location": "Tajikistan",
+    "country_iso": null
+  },
+  {
+    "location": "Tajikistan",
+    "country_iso": "TJ"
+  },
+  {
+    "location": "Thailand",
+    "country_iso": null
+  },
+  {
+    "location": "Thailand",
+    "country_iso": "TH"
+  },
+  {
+    "location": "To be deployed globally",
+    "country_iso": null
+  },
+  {
+    "location": "Tunisia",
+    "country_iso": "TN"
+  },
+  {
+    "location": "Türkiye",
+    "country_iso": null
+  },
+  {
+    "location": "Turkmenistan",
+    "country_iso": "TM"
+  },
+  {
+    "location": "Ukraine",
+    "country_iso": null
+  },
+  {
+    "location": "Ukraine",
+    "country_iso": "UA"
+  },
+  {
+    "location": "Ukraine, various sites",
+    "country_iso": null
+  },
+  {
+    "location": "United Republic of Tanzania",
+    "country_iso": null
+  },
+  {
+    "location": "United States",
+    "country_iso": "US"
+  },
+  {
+    "location": "Uzbekistan",
+    "country_iso": "UZ"
+  },
+  {
+    "location": "Venezuela",
+    "country_iso": null
+  },
+  {
+    "location": "Venezuela",
+    "country_iso": "VE"
+  },
+  {
+    "location": "West Africa, various contexts",
+    "country_iso": null
+  },
+  {
+    "location": "within the Caribbean Multi-Country Office (excluding Kingston, Jamaica)",
+    "country_iso": null
+  },
+  {
+    "location": "Yangon, Bahan Township, Myanmar",
+    "country_iso": null
+  },
+  {
+    "location": "Yemen",
+    "country_iso": null
+  },
+  {
+    "location": "Yemen",
+    "country_iso": "YE"
+  },
+  {
+    "location": "Zambia",
+    "country_iso": "ZM"
+  },
+  {
+    "location": "Zimbabwe",
+    "country_iso": "ZW"
+  }
+]

@@ -1,20 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 const PHONE_QUERY = '(max-width: 1023px)';
 
-/** True below the desktop breakpoint, where pickers open as bottom sheets instead of dropdowns. */
+function subscribePhone(onChange: () => void): () => void {
+  const mq = window.matchMedia(PHONE_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+/**
+ * True below the desktop breakpoint, where pickers open as bottom sheets instead of dropdowns.
+ * False while hydrating, as on the server; components mounted later, such as an opened sheet, get the real value at once.
+ */
 export function useIsPhone(): boolean {
-  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(PHONE_QUERY).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(PHONE_QUERY);
-    const sync = () => setPhone(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
-  return phone;
+  return useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia(PHONE_QUERY).matches,
+    () => false,
+  );
 }
 
 /**

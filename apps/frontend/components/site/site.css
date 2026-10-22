@@ -75,6 +75,28 @@ body:has(.aj-root[data-theme='dark']) {
   height: 100%;
 }
 
+.aj-root[data-text='l'] .aj-zoom {
+  zoom: 1.12;
+}
+
+.aj-root[data-text='xl'] .aj-zoom {
+  zoom: 1.25;
+}
+
+/* Divider position; the settings script and then the page override it with the stored value. */
+.aj-root {
+  --split: 56%;
+}
+
+/* Before the page is interactive, a collapsed menu keeps its rail width and hides the expanded content. */
+.aj-root[data-menu='collapsed']:not([data-ready]) .aj-menu {
+  width: 64px !important;
+}
+
+.aj-root[data-menu='collapsed']:not([data-ready]) .aj-menu > * {
+  visibility: hidden;
+}
+
 .aj-root[data-contrast='high'] {
   --text-2: var(--text);
   --text-3: #3b4139;

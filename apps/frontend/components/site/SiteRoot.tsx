@@ -46,14 +46,34 @@ export function usePersistentState<T>(key: string, initial: T): [T, (v: T) => vo
   return [value, update];
 }
 
-const ZOOM: Record<TextSize, number> = { m: 1, l: 1.12, xl: 1.25 };
 const THEME_KEY = 'aidjobs.theme';
+
+/**
+ * Runs while the HTML is parsed, before the first paint: applies the stored settings to the root so a visitor never
+ * sees the defaults first. React then loads the same values from storage after hydration. Keys match the
+ * `usePersistentState` calls here and in PublicSite.
+ */
+const SETTINGS_SCRIPT = `(function(){try{
+var r=document.currentScript.parentElement;
+var g=function(k){var v=localStorage.getItem(k);return v===null?null:JSON.parse(v)};
+var t=g('${THEME_KEY}');
+if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+r.setAttribute('data-theme',t);
+if(g('aidjobs.contrast')===true)r.setAttribute('data-contrast','high');
+if(g('aidjobs.motion')===true)r.setAttribute('data-motion','reduce');
+var s=g('aidjobs.textSize');if(s==='l'||s==='xl')r.setAttribute('data-text',s);
+if(g('aidjobs.menuCollapsed')===true)r.setAttribute('data-menu','collapsed');
+var p=g('aidjobs.split');if(typeof p==='number'&&p>=42&&p<=68)r.style.setProperty('--split',p+'%');
+}catch(e){}})();`;
 
 export default function SiteRoot({ fontClasses, children }: { fontClasses: string; children: ReactNode }) {
   const [theme, setTheme] = usePersistentState<Theme>(THEME_KEY, 'light');
   const [textSize, setTextSize] = usePersistentState<TextSize>('aidjobs.textSize', 'm');
   const [highContrast, setHighContrast] = usePersistentState<boolean>('aidjobs.contrast', false);
   const [reduceMotion, setReduceMotion] = usePersistentState<boolean>('aidjobs.motion', false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => setReady(true), []);
 
   useEffect(() => {
     try {
@@ -73,10 +93,12 @@ export default function SiteRoot({ fontClasses, children }: { fontClasses: strin
         data-theme={theme}
         data-contrast={highContrast ? 'high' : 'normal'}
         data-motion={reduceMotion ? 'reduce' : 'full'}
+        data-text={textSize}
+        data-ready={ready ? '' : undefined}
+        suppressHydrationWarning
       >
-        <div className="aj-zoom" style={{ zoom: ZOOM[textSize] }}>
-          {children}
-        </div>
+        <script dangerouslySetInnerHTML={{ __html: SETTINGS_SCRIPT }} />
+        <div className="aj-zoom">{children}</div>
       </div>
     </SiteContext.Provider>
   );
