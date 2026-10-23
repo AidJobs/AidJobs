@@ -1074,10 +1074,10 @@ class SearchService:
         return base
     
     async def get_job_by_id(self, job_id: str) -> dict[str, Any]:
-        """Get a single job by ID, preferring database over Meilisearch."""
-        aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
-        is_dev = aidjobs_env == "dev"
-        
+        """Get a single job by ID, preferring database over Meilisearch.
+
+        A public endpoint: it never returns `raw_metadata` or internal `_` keys, in any mode (W-22).
+        """
         # Prefer database even if Meilisearch is enabled
         if self.db_enabled and psycopg2:
             conn_params = db_config.get_connection_params()
@@ -1085,38 +1085,19 @@ class SearchService:
                 try:
                     conn = psycopg2.connect(**conn_params, connect_timeout=1)
                     cursor = conn.cursor(cursor_factory=RealDictCursor)
-                    
-                    # Select all normalized fields
-                    if is_dev:
-                        # In dev mode, include raw_metadata
-                        cursor.execute(
-                            """
-                            SELECT 
-                                id, org_name, title, location_raw, country_iso, 
-                                level_norm, career_type, work_modality, org_type,
-                                international_eligible, deadline, apply_url, 
-                                last_seen_at, mission_tags, benefits, policy_flags,
-                                description_snippet, raw_metadata
-                            FROM jobs 
-                            WHERE id = %s
-                            """,
-                            (job_id,)
-                        )
-                    else:
-                        # In production, exclude raw_metadata and internal keys
-                        cursor.execute(
-                            """
-                            SELECT 
-                                id, org_name, title, location_raw, country_iso, 
-                                level_norm, career_type, work_modality, org_type,
-                                international_eligible, deadline, apply_url, 
-                                last_seen_at, mission_tags, benefits, policy_flags,
-                                description_snippet
-                            FROM jobs 
-                            WHERE id = %s
-                            """,
-                            (job_id,)
-                        )
+                    cursor.execute(
+                        """
+                        SELECT 
+                            id, org_name, title, location_raw, country_iso, 
+                            level_norm, career_type, work_modality, org_type,
+                            international_eligible, deadline, apply_url, 
+                            last_seen_at, mission_tags, benefits, policy_flags,
+                            description_snippet
+                        FROM jobs 
+                        WHERE id = %s
+                        """,
+                        (job_id,)
+                    )
                     
                     row = cursor.fetchone()
                     
@@ -1150,9 +1131,8 @@ class SearchService:
                 index = self.meili_client.index(self.meili_index_name)
                 doc = index.get_document(job_id)
                 if doc:
-                    # Filter out internal keys in production
-                    if not is_dev and isinstance(doc, dict):
-                        doc = {k: v for k, v in doc.items() if not k.startswith('_')}
+                    if isinstance(doc, dict):
+                        doc = {k: v for k, v in doc.items() if not k.startswith('_') and k != 'raw_metadata'}
                     
                     return {
                         "status": "ok",

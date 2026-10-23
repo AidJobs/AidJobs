@@ -46,10 +46,10 @@ async def lifespan(app: FastAPI):
     
     aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
     if aidjobs_env == "dev":
-        logger.info("[aidjobs] env: AIDJOBS_ENV=dev (dev-only admin routes enabled)")
+        logger.info("[aidjobs] env: AIDJOBS_ENV=dev (development: tracebacks logged, search debug and analytics on)")
         analytics_tracker.enable()
     else:
-        logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env} (admin routes disabled)")
+        logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env}")
     
     # Start crawler orchestrator
     try:
@@ -84,7 +84,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Error masking middleware
 @app.middleware("http")
 async def error_masking_middleware(request: Request, call_next):
-    """Mask detailed errors in production; show full errors in dev."""
+    """Callers get a generic message in every mode; details go only to the log (W-22)."""
     try:
         response = await call_next(request)
         return response
@@ -92,31 +92,16 @@ async def error_masking_middleware(request: Request, call_next):
         # Let HTTPException propagate untouched (proper status codes like 404, 400, 401, etc.)
         raise
     except Exception as e:
-        is_dev = os.getenv("AIDJOBS_ENV", "").lower() == "dev"
-        
-        # Log the full error
         logger.error(f"Unhandled error: {str(e)}")
-        if is_dev:
+        if os.getenv("AIDJOBS_ENV", "").lower() == "dev":
             logger.error(traceback.format_exc())
-        
-        # Return masked or detailed error based on environment
-        if is_dev:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "error": str(e),
-                    "traceback": traceback.format_exc()
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "error": "An internal error occurred. Please try again later."
-                }
-            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "error": "An internal error occurred. Please try again later.",
+            },
+        )
 
 
 def _cors_origins() -> list[str]:
