@@ -16,7 +16,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 Or use this pre-generated secret (copy the line below):
 ```
-COOKIE_SECRET=a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 ### Step 2: Update Render Environment Variables
@@ -50,7 +50,7 @@ COOKIE_SECRET=a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
    - Click "Add Environment Variable"
    - Name: `COOKIE_SECRET`
    - Value: (paste the generated secret from Step 1)
-   - Example: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
+   - Example: `<generate a new value; never commit it>`
 
 6. **Save Changes**
    - Click "Save Changes" or similar button
@@ -104,8 +104,8 @@ COOKIE_SECRET=a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
 
 ### Required in Render (Backend):
 ```bash
-ADMIN_PASSWORD=your-password-here
-COOKIE_SECRET=your-random-secret-here
+ADMIN_PASSWORD=<generate a new value; never commit it>
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 ### Required in Vercel (Frontend):

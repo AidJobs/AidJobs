@@ -9,7 +9,7 @@ services:
       - "7700:7700"
     environment:
       # Set a master key for production (generate with: openssl rand -hex 32)
-      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-change-me-in-production}
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY}
       # Optional: Development mode (no master key required)
       # MEILI_ENV: development
     volumes:

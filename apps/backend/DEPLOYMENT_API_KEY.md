@@ -19,7 +19,7 @@ The OpenRouter API key is **only needed in Render** (where your backend runs), *
 4. Click **Add Environment Variable**
 5. Add:
    - **Key**: `OPENROUTER_API_KEY`
-   - **Value**: `sk-or-v1-your-actual-api-key-here`
+   - **Value**: `<generate a new value; never commit it>`
 6. Click **Save Changes**
 7. **Redeploy** your service (or it will auto-redeploy)
 

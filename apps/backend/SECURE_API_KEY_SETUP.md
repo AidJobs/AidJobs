@@ -15,7 +15,7 @@
 
 2. **Add your API key**:
    ```bash
-   OPENROUTER_API_KEY=sk-or-v1-your-actual-api-key-here
+   OPENROUTER_API_KEY=<generate a new value; never commit it>
    ```
 
 3. **Verify it's gitignored**:
@@ -29,7 +29,7 @@
 2. Settings → Environment Variables
 3. Add:
    - **Name**: `OPENROUTER_API_KEY`
-   - **Value**: `sk-or-v1-your-actual-api-key-here`
+   - **Value**: `<generate a new value; never commit it>`
    - **Environment**: Production, Preview, Development (select all)
 4. Redeploy
 
@@ -38,7 +38,7 @@
 2. Find "Environment Variables" or "Secrets"
 3. Add:
    - **Key**: `OPENROUTER_API_KEY`
-   - **Value**: `sk-or-v1-your-actual-api-key-here`
+   - **Value**: `<generate a new value; never commit it>`
 4. Restart your application
 
 ### ✅ Option 3: System Environment Variables (Local)
@@ -46,16 +46,16 @@
 **Windows (PowerShell):**
 ```powershell
 # Set for current session
-$env:OPENROUTER_API_KEY="sk-or-v1-your-actual-api-key-here"
+$env:OPENROUTER_API_KEY="<generate a new value; never commit it>"
 
 # Set permanently (User-level)
-[System.Environment]::SetEnvironmentVariable('OPENROUTER_API_KEY', 'sk-or-v1-your-actual-api-key-here', 'User')
+[System.Environment]::SetEnvironmentVariable('OPENROUTER_API_KEY', '<generate a new value; never commit it>', 'User')
 ```
 
 **Linux/Mac:**
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-export OPENROUTER_API_KEY="sk-or-v1-your-actual-api-key-here"
+export OPENROUTER_API_KEY="<generate a new value; never commit it>"
 
 # Reload
 source ~/.bashrc  # or source ~/.zshrc

@@ -43,7 +43,7 @@ Admin login fails with "Invalid password" even though password matches `admin_pa
 2. Add to Render environment variables:
    - **Name**: `COOKIE_SECRET`
    - **Value**: (the random string you generated, e.g., `a1b2c3d4e5f6...`)
-   - **Example**: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
+   - **Example**: `<generate a new value; never commit it>`
 
 ### Step 4: Restart Backend Service
 
@@ -62,10 +62,10 @@ Admin login fails with "Invalid password" even though password matches `admin_pa
 ### Backend (Render)
 ```bash
 # Required for admin authentication
-ADMIN_PASSWORD=your-password-here
+ADMIN_PASSWORD=<generate a new value; never commit it>
 
 # Required for session cookies (choose one)
-COOKIE_SECRET=your-random-secret-here
+COOKIE_SECRET=<generate a new value; never commit it>
 # OR
 SESSION_SECRET=your-random-secret-here
 ```

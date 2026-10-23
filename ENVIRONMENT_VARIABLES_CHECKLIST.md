@@ -48,7 +48,7 @@
 - **Required**: Yes
 - **Description**: Secret for signing session cookies
 - **Format**: Random hex string (32+ characters)
-- **Example**: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
+- **Example**: `<generate a new value; never commit it>`
 - **Generation**: `python -c "import secrets; print(secrets.token_hex(32))"`
 
 #### `SUPABASE_DB_URL` or `DATABASE_URL`

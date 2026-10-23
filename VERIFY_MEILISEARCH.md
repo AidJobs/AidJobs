@@ -44,14 +44,14 @@ Go to Render dashboard → Your backend service → Environment tab
 **Required variables**:
 ```
 MEILI_HOST=https://aidjobs-meili-dev.onrender.com
-MEILI_MASTER_KEY=4ff5624f0a04f098bc30963d9d6c3326
+MEILI_MASTER_KEY=<generate a new value; never commit it>
 MEILI_JOBS_INDEX=jobs_index
 ```
 
 **OR** (newer format, both work):
 ```
 MEILISEARCH_URL=https://aidjobs-meili-dev.onrender.com
-MEILISEARCH_KEY=4ff5624f0a04f098bc30963d9d6c3326
+MEILISEARCH_KEY=<generate a new value; never commit it>
 MEILI_JOBS_INDEX=jobs_index
 ```
 

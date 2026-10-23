@@ -22,7 +22,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 **Option C: Use this pre-generated secret**
 ```
-4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+<generate a new value; never commit it>
 ```
 
 ### Step 2: Go to Render Dashboard
@@ -68,7 +68,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 1. **Click "Add Environment Variable"**
 2. **Name**: `COOKIE_SECRET` (exactly as shown)
 3. **Value**: Paste the generated secret from Step 1
-   - Example: `4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3`
+   - Example: `<generate a new value; never commit it>`
 4. **Click "Save"**
 
 ### Step 6: Verify Variables
@@ -163,17 +163,17 @@ After fixing, verify:
 
 ```bash
 # Admin Authentication
-ADMIN_PASSWORD=your-password-here
+ADMIN_PASSWORD=<generate a new value; never commit it>
 
 # Session Management
-COOKIE_SECRET=4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 ### Generated COOKIE_SECRET
 
 You can use this pre-generated secret:
 ```
-4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+<generate a new value; never commit it>
 ```
 
 Or generate a new one:

@@ -11,7 +11,7 @@ Can't login to admin because:
 
 **Pre-generated COOKIE_SECRET (you can use this):**
 ```
-4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+<generate a new value; never commit it>
 ```
 
 **Or generate a new one:**
@@ -33,7 +33,7 @@ python scripts/generate_cookie_secret.py
 
 5. **Add COOKIE_SECRET**:
    - Name: `COOKIE_SECRET`
-   - Value: `4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3`
+   - Value: `<generate a new value; never commit it>`
 
 6. **Save** - Render will auto-restart
 
@@ -85,13 +85,13 @@ After fixing, you should be able to:
 
 ### Render Environment Variables:
 ```bash
-ADMIN_PASSWORD=your-password-here
-COOKIE_SECRET=4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+ADMIN_PASSWORD=<generate a new value; never commit it>
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 ### Generated COOKIE_SECRET:
 ```
-4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+<generate a new value; never commit it>
 ```
 
 ## 🚀 Next Steps
