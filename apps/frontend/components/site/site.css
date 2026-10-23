@@ -25,6 +25,9 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* Sideways on a notched iPhone, keeps the list clear of the notch; zero everywhere else. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   color: var(--text);
   background: radial-gradient(120% 80% at 0% 0%, var(--wash) 0%, var(--page) 55%);
   font-size: 12px;
@@ -73,6 +76,28 @@ body:has(.aj-root[data-theme='dark']) {
 
 .aj-zoom {
   height: 100%;
+}
+
+.aj-root[data-text='l'] .aj-zoom {
+  zoom: 1.12;
+}
+
+.aj-root[data-text='xl'] .aj-zoom {
+  zoom: 1.25;
+}
+
+/* Divider position; the settings script and then the page override it with the stored value. */
+.aj-root {
+  --split: 56%;
+}
+
+/* Before the page is interactive, a collapsed menu keeps its rail width and hides the expanded content. */
+.aj-root[data-menu='collapsed']:not([data-ready]) .aj-menu {
+  width: 64px !important;
+}
+
+.aj-root[data-menu='collapsed']:not([data-ready]) .aj-menu > * {
+  visibility: hidden;
 }
 
 .aj-root[data-contrast='high'] {

@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    // Same setting as SITE_INDEXABLE in lib/site/siteUrl.ts. Netlify never sets it, so its copies stay unindexed.
+    if (process.env.NEXT_PUBLIC_SITE_INDEXABLE === 'true') return [];
+    return [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }];
+  },
   async rewrites() {
     const api = process.env.NEXT_PUBLIC_API_URL;
 

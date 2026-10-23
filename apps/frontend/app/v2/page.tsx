@@ -1,22 +1,22 @@
-import { Star } from 'lucide-react';
-import { AccessibilityPanel, ThemeToggle } from '@/components/site/SettingsPanel';
+import PublicSite from '@/components/site/PublicSite';
+import { utcDay, type RawJob } from '@/lib/site/jobs';
+import { backendOrigin, loadOpenJobs } from '@/lib/site/loadJobs';
 
-export default function SitePage() {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-4 pt-3 lg:px-6 lg:pt-6">
-        <Star size={18} strokeWidth={2} style={{ color: 'var(--sage-7)' }} />
-        <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>aidjobs</span>
-      </div>
-      <div className="px-4 pt-1 lg:px-6">
-        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-          NGO, humanitarian and development jobs
-        </h1>
-      </div>
-      <div className="mt-auto flex items-center gap-1 border-t px-3 py-3 aj-hair">
-        <ThemeToggle />
-        <AccessibilityPanel />
-      </div>
-    </div>
-  );
+/** Rebuilt in the background at most every 10 minutes; a failed rebuild keeps the last good page. */
+export const revalidate = 600;
+/** The free backend can take about a minute to wake. */
+export const maxDuration = 60;
+
+export default async function SitePage() {
+  const building = process.env.NEXT_PHASE === 'phase-production-build';
+  let jobs: RawJob[] | null = null;
+  try {
+    jobs = await loadOpenJobs({ origin: backendOrigin(), timeoutMs: building ? 40_000 : 50_000 });
+  } catch (error) {
+    // Throwing during a background rebuild keeps the cached page. During a deploy there is no page to keep,
+    // so the deploy ships the frame and the browser loads the jobs.
+    if (!building) throw error;
+    console.warn(`Building /v2 without jobs: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return <PublicSite initialJobs={jobs} serverToday={utcDay(Date.now())} />;
 }

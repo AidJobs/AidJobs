@@ -1,10 +1,12 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Analytics } from '@vercel/analytics/react';
+import { SITE_INDEXABLE } from '@/lib/site/siteUrl';
 
 export const metadata: Metadata = {
   title: 'AidJobs',
   description: 'AI-powered job search for NGOs/INGOs',
+  robots: SITE_INDEXABLE ? undefined : { index: false, follow: false },
 };
 
 export default function RootLayout({
@@ -16,7 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
-        <Analytics />
+        {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>
   );

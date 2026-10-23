@@ -1,6 +1,9 @@
 /** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: 'jsdom',
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
   testMatch: [
     '<rootDir>/lib/__tests__/**/*.test.ts',
     '<rootDir>/app/__tests__/**/*.test.tsx',
@@ -15,6 +18,7 @@ module.exports = {
           jsx: 'react-jsx',
           module: 'commonjs',
           moduleResolution: 'node',
+          resolveJsonModule: true,
           strict: true,
           target: 'ES2020',
         },
