@@ -7,7 +7,7 @@
 
 User-experience work has three documents: `docs/architecture/ux-build-plan.md`, the authoritative step-by-step plan with status (revised 21 October 2026); `docs/architecture/public-ux-direction.md` (W-28), the design, approved on 21 October 2026; and `docs/architecture/ux-08-launch-decisions.md`, the launch decisions. The approved demo is kept at the git tag `ux-demo-approved-2026-10-21`.
 
-**Last verified:** 23 October 2026. `main` is `d13d983` (merge of PR #28, UX-10). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 24 October 2026, in a full status review (this pull request). `main` is `ef632a0` (merge of PR #32). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -29,6 +29,7 @@ These describe how the work is run. The architecture rules are in the contract.
 - After a merge: confirm `origin/main`, CI on `main`, and the Render deploy. Then fast-forward local `main`.
 - Do not crawl production, write to the jobs database, or reindex search unless the user asks for that step.
 - Commits must be authored by the GitHub account `AidJobs` (`git config user.name AidJobs`, `git config user.email 241161196+AidJobs@users.noreply.github.com`, set in this repository only). The repository is private and Vercel's free plan builds only commits by the project owner; commits by any other author show "Deployment was blocked" (seen on PRs #25 and #26 before the change, 21 October 2026).
+- Never write a secret into a tracked file: passwords, keys, connection strings, and tokens live only in Render, Vercel, Supabase, or the user's machine. Documentation uses placeholders. CI's gitleaks job fails a pull request that adds one; a value that reaches git must be rotated, because removing it from a file does not remove it from history (W-30). The agent never prints a secret's value: checks report lengths, matches, or fingerprints only.
 - Commit only the files the step names. Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`. Both carry unrelated Pyright-ignore comments and stay modified and unstaged.
 - The local shell is PowerShell on Windows. Use `@" "@` here-strings for commit messages, not bash heredocs. `gh --jq` filters with spaces break in PowerShell; pipe JSON to `ConvertFrom-Json` instead.
 - Local tests run from `apps/backend` with `.venv\Scripts\python.exe` (Python 3.14). CI uses Python 3.11.9. Run the exact CI Ruff and pytest lists from `.github/workflows/ci.yml`. `dateparser` and `lxml` must be installed locally, or local results differ from CI.
@@ -40,29 +41,32 @@ These describe how the work is run. The architecture rules are in the contract.
 
 | Item | State | Evidence |
 | --- | --- | --- |
-| Backend | Render, auto-deploys from `main`. Last confirmed deploy `9d6fd99` (PR #14); `7b13a9e` (PR #17) not yet confirmed. Runs on Render's free plan, which sleeps after 15 minutes without traffic: a cold first request took 42.9 seconds on 21 October 2026, and scheduled crawls run only while it is awake. Staying on the free plan, without a keep-alive monitor, until after launch (user, 21 October 2026) | Verified by the user and the Render log, 19 October 2026; sleep measured 21 October 2026 |
-| Frontend | Vercel, public at `aid-jobs-frontend.vercel.app` while the domain is down; Netlify builds pull-request previews. Netlify's production site is locked by the user (auto publishing stopped, 21 October 2026): it stays reachable at `moonlit-llama-d9f5a7.netlify.app` with the old site and no longer updates | Verified from pull-request checks and direct requests; lock reported by the user |
-| Repository | Private since 21 October 2026 (user). GitHub's free plan has no branch protection on private repositories, so "never push `main`" is enforced by process only. GitHub Actions has 2,000 free minutes a month; one push to a pull request uses about 6 | Verified with the GitHub API |
-| Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07) | Verified from production queries |
-| Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description). Meilisearch does not work. The search log shows `source=database total=203` | Verified by the user and the Render log |
+| Backend | Render, auto-deploys from `main` ("On Commit", restored by the user on 23 October 2026 after a manual deploy had switched it off). The user confirmed the deploy after the 23 October environment changes (new secrets, Meilisearch settings removed). Runs on Render's free plan, which sleeps after 15 minutes without traffic: a cold first request took 42.9 seconds on 21 October 2026, and scheduled crawls run only while it is awake. Staying on the free plan, without a keep-alive monitor, until after launch (user, 21 October 2026). Healthy on 24 October 2026 (`/api/healthz` 200) | Verified by the user (deploys) and by direct requests |
+| Frontend | Vercel, public at `aid-jobs-frontend.vercel.app` while the domain is down; the new site at `/v2` (UX-10), the old site at `/`, "do not index" on every address. Pull-request previews are Vercel previews behind the Vercel login, opened by the agent with the bypass key (UX plan, method step 4). Netlify is no longer used: the user deleted the site on 23 October 2026 | Verified from direct requests and GitHub deployments |
+| Database | Supabase PostgreSQL, project `yijlbzlzfahubwukulkv`, reached by the backend as `postgres` through the pooler. Password rotated on 23 October 2026 after it was found in the repository (W-30). The Data API is closed: Row-Level Security on all 38 public tables, no privileges for `anon` or `authenticated`, Auth sign-ups off | Verified, 24 October 2026 |
+| Repository | Private since 21 October 2026 (user). GitHub's free plan has no branch protection on private repositories, so "never push `main`" is enforced by process only. GitHub Actions has 2,000 free minutes a month; one push to a pull request uses about 6. CI runs backend tests, frontend tests, and a gitleaks secret scan of each push's and pull request's new commits (PR #31). No secret remains in tracked files (W-30) | Verified with the GitHub API and gitleaks |
+| Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07). Open jobs on 24 October 2026: UNICEF 254, ICRC 14, Oxfam 7 | Verified from production queries |
+| Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description), 275 jobs on 24 October 2026. Meilisearch is gone: its server was deleted and its settings removed from Render and Vercel on 23 October 2026 (W-30), so the backend no longer tries it. The new site filters in the browser and needs no search server | Verified by direct requests |
 | AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
 | Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October, including the first lookup of the 19:24 UTC crawl. PR #15 pauses Nominatim for an hour after a refusal, verified live (W-21). Production lookups still get no coordinates (W-27) | Verified from the Render log |
-| `AIDJOBS_ENV` | `dev` in production; startup reads `dev-only admin routes enabled` (W-22) | Verified from the Render log |
+| `AIDJOBS_ENV` | `dev` in production; startup reads `dev-only admin routes enabled` (W-22). In the code this sends error tracebacks to callers and leaves the admin session cookie without the Secure flag; the top open security follow-up (W-22) | Verified from the Render log and the repository |
 | Extraction rollout variables | `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org`. Dormant: no current source matches (W-23) | Verified by the user from Render's Environment page |
 
 ### Live sources
 
 | Source | Listing URL | Latest crawl | Result |
 | --- | --- | --- | --- |
-| UNICEF | `https://jobs.unicef.org/en-us/listing/` | 19 October 2026, 09:58 UTC | `warn`: 120 of 209 jobs, 6 pages, stopped by an AWS WAF challenge on page 7 after one retry. Earlier the same day 120 were saved (99 inserted, 20 updated), every row with a location and a deadline, no rejections, no duplicate links. Verified |
-| ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 17 October 2026, 18:40 UTC | 34 found, 14 saved, 20 correctly rejected, no `thin_vacancy`. One deadline corrected to `2026-11-06` by the normal update. Verified |
-| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 19 October 2026, 19:24 UTC | `ok`: 5 found, 0 inserted, 5 updated, no duplicate links; all five link to `/jobs/vacancy/…/description/`. Four locations from the job pages; one (Nepal) has none. Deadlines correct after the W-25 fix. Titles carry glued place and date (W-24). Verified |
+| UNICEF | `https://jobs.unicef.org/en-us/listing/` | 22 October 2026, 18:54 UTC | `warn`: `Found 120 jobs; listing partial: 6 pages, expected 244, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`; 102 inserted, 1 updated. The same AWS WAF challenge on page 7 as on 19 October (W-04). Verified |
+| ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 21 October 2026, 11:42 UTC | `ok`: 34 found, 0 inserted, 0 updated (unchanged since 17 October, when 14 were saved and 20 correctly rejected). Verified |
+| Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 23 October 2026, 05:05 UTC | `ok`: 5 found, 2 inserted, 1 updated. Titles still carry glued place and date (W-24). Verified |
+
+Crawls run every 3 days per source, and only while the backend is awake. As read on 24 October 2026, the next runs are ICRC 24 October 16:48 UTC, UNICEF 25 October 18:17 UTC, and Oxfam 25 October 21:20 UTC (Verified from `sources.next_run_at`).
 
 Two UNICEF crawls failed on page 1 with `HTTP 0`, meaning no response: 18 October at 09:21 UTC (cause not read) and 19 October at 08:51 UTC, where the Render log reads `Error fetching https://jobs.unicef.org/en-us/listing/: timeout` (Verified). Each next crawl succeeded. No job changed.
 
 ### Search
 
-- `SearchService.search_query` in `apps/backend/app/search.py` queries Meilisearch when it is configured, and always queries PostgreSQL. When Meilisearch returns nothing usable, the PostgreSQL result is served. That is why users find jobs. Repository, with the user's confirmation that search works.
+- `SearchService.search_query` in `apps/backend/app/search.py` queries Meilisearch when it is configured, and always queries PostgreSQL. Since 23 October 2026 Meilisearch is not configured (W-30), so only PostgreSQL answers (`source: "db"`). Repository, and Verified by direct requests.
 - The PostgreSQL query is a plain `ILIKE` match. The schema already has a full-text column and index (`search_tsv`, GIN, with a trigger) and the `pg_trgm` extension in `infra/supabase.sql`. Search does not use them. Repository.
 - The contract (§3 and §13) already requires SQL search to keep working when Meilisearch is down. No document records a decision to replace Meilisearch. The plan defers the search-architecture decision until after the crawler plan.
 
@@ -110,6 +114,18 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Nominatim pause after refusal; failed lookups not repeated | PR #15, `bcdadd3` | 19 Oct 2026 | Merged, CI green; verified live in the 19:24 UTC Oxfam crawl log |
 | Ledger: how the crawler is built today, dormant settings recorded | PR #16, `8fe99a8` | 19 Oct 2026 | Merged |
 | ISO deadlines kept as written (W-25) | PR #17, `7b13a9e` | 19 Oct 2026 | Merged, CI green; verified live: the next Oxfam crawl corrected all five deadlines |
+| UX gap recorded (W-26) and the verified Oxfam deadline fix | PR #18, `2a2e02f` | 20 Oct 2026 | Merged |
+| UX review findings and the proposed public site and admin direction (W-28) | PR #20, `867731b` | 20 Oct 2026 | Merged |
+| Design demo first (UX-00) and the visual direction | PR #21, `3d688ec` | 20 Oct 2026 | Merged |
+| UX decisions, demo approved (UX-00), PR #19 closed | PR #23, `fbcfffe` | 21 Oct 2026 | Merged |
+| UX-08 launch decisions | PR #24, `a80005c` | 21 Oct 2026 | Merged |
+| Hosting decisions; UX-09 plan approved | PR #25, `c0be479` | 21 Oct 2026 | Merged |
+| UX-09 design foundation at `/v2` | PR #26, `8083591` | 21 Oct 2026 | Merged, live-checked |
+| UX-09 done; pre-UX-10 review and decisions | PR #27, `b7c9132` | 23 Oct 2026 | Merged |
+| UX-10 the demo's public page on live jobs at `/v2` | PR #28, `d13d983` | 23 Oct 2026 | Merged, live-checked |
+| UX-10 done; previews on Vercel; Netlify retired | PR #29, `4f7af82`; PR #30, `048a44a` | 23 Oct 2026 | Merged |
+| Leaked credentials removed from tracked files; gitleaks in CI (W-30) | PR #31, `0f90855` | 24 Oct 2026 | Merged, CI green |
+| Data API closure recorded (W-30) | PR #32, `ef632a0` | 24 Oct 2026 | Merged |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -184,6 +200,7 @@ Background: an OpenRouter API key was committed to this repository on 21 Novembe
 
 **W-02. Inspect the stale UNICEF rows from 6 December 2025.** Read-only. Do not hide them yet.
 Sixteen active UNICEF rows created on 6 December 2025 have no deadline, so search shows them indefinitely. Age alone is not proof they are closed. Inspect the records first. Nothing is hidden or retired until the W-06 rule is agreed and validated.
+State on 24 October 2026 (Verified, read-only count): the 16 rows are still visible on the site, none has a deadline, and no crawl has seen any of them since 6 December 2025; 11 other rows from that day are hidden. The UX plan's order puts W-02 and then W-06 before the switch (UX-29).
 
 What the admin controls do (Repository, from the code):
 - **Soft Delete** on the Jobs page (`POST /api/admin/jobs/delete-bulk`, soft option) sets `deleted_at`, `deleted_by`, and `deletion_reason`. It is reversible.
@@ -215,6 +232,8 @@ Results after PR #14, 19 October 2026 (Verified):
 - 08:51 UTC: page 1 timed out after 30 seconds (`Error fetching https://jobs.unicef.org/en-us/listing/: timeout`). No job changed.
 - 09:58 UTC: `Found 120 jobs; listing partial: 6 pages, expected 209, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`. Both page-7 responses were `server: CloudFront`, `x-amzn-waf-action: challenge`, with an AWS WAF JavaScript challenge naming `clinchtalent.com` and `career-pages.com`. The UNICEF listing is hosted by Clinch; PageUp handles applications. Pacing did not help: the challenge starts at the seventh request from one address with 1-second and with 5-second gaps. The challenge must not be solved or bypassed.
 - Two approved test requests from a local address with no prior requests that day, 10:21 UTC: page 7 requested first returned HTTP 200 with 20 admitted jobs and "More Jobs 69", so page 7 itself is not blocked. Page 1 with `page-items=50` returned HTTP 200 with 50 jobs, all with a location and a deadline, all admitted, and "More Jobs 159"; its link keeps `page-items=50`. Both agree with 209 jobs.
+
+Latest scheduled crawl, 22 October 2026 at 18:54 UTC (Verified): unchanged behaviour, `Found 120 jobs; listing partial: 6 pages, expected 244, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`. The listing has grown to about 244 jobs, so each crawl still misses about half. Rows saved by earlier crawls stay listed until their deadline, which is why the site shows 254 open UNICEF jobs.
 
 Withdrawn 19 October 2026: changing the UNICEF source URL to `?page-items=50` in the admin. Per-site URL edits do not scale (see "How the crawler is built today"). Do not make that edit.
 
@@ -281,6 +300,7 @@ Render sets `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100
 
 **W-22. Production runs with `AIDJOBS_ENV=dev`.** Record; not scheduled.
 The Render startup log reads `AIDJOBS_ENV=dev (dev-only admin routes enabled)` (Verified, 19 October 2026). The two named login bypasses were removed in PR #2, so admin login is still required. Which development-only routes are enabled, and whether Render should use a production value, need their own review.
+Raised to the top open security follow-up on 24 October 2026, after W-30. What `dev` does in the code today (Repository): an unhandled error returns its message and full traceback to the caller (`main.py` error middleware; also two `job_management.py` responses); the admin session cookie is set without the Secure flag (`security/admin_auth.py`); search responses carry a debug block; the public single-job endpoint (`get_job_by_id` in `app/search.py`) also returns each job's `raw_metadata` and its internal `_` fields; the analytics tracker is on; rate limits are lower (60 instead of 120 searches a minute). No route is enabled only by `dev` any more, despite the log message. Switching Render to a production value needs a plan first: which behaviour changes, a check that the admin login still works with a Secure cookie, and the test files that set `AIDJOBS_ENV=dev` (`test_gate1_safety.py`, `test_gate9_admin.py`).
 
 ### Search
 
@@ -289,6 +309,7 @@ After a search, clearing the search box shows no jobs until the filters are also
 
 **W-18. Track A and the search-architecture decision.** After the crawler plan.
 Track A explains why Meilisearch fails. Evidence, 19 October 2026: at startup and on reconnection the backend logs `Failed to create index: Expecting value: line 1 column 1 (char 0)`, so the configured Meilisearch address answers with an empty or non-JSON body. That points to configuration or hosting rather than code (Verified log line; cause not verified). The decision afterwards is whether to repair Meilisearch or to use PostgreSQL full-text search with the existing `search_tsv` index. Either option must keep PostgreSQL authoritative and pass the two Gate 7 tests in the contract (§13).
+Update, 23 October 2026: the Meilisearch server (`aidjobs-meili-dev.onrender.com`, on Render's free plan in another Render account) was deleted, and its settings were removed from Render and Vercel, because its master key had been committed (W-30). The likely cause of the fault was the free plan itself: the service slept and lost its index on every restart, having no persistent disk (Not verified). Repairing Meilisearch would now mean new hosting with persistent storage, which is not free on Render. The new public site filters every open job in the browser, so this decision matters only for much larger job counts or ranked search in the admin.
 
 ### User experience
 
@@ -368,7 +389,9 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | The expiry trust policy and missing-crawl threshold | W-06 |
 | Add ICRC's other lists | W-20 |
 | Whether to switch off or remove the dormant extraction rollout settings in Render | W-23 |
-| Whether Render should run with a production `AIDJOBS_ENV` | W-22 |
+| Approve a plan to run Render with a production `AIDJOBS_ENV` (the top open security follow-up) | W-22 |
+| Whether to remove `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, and `SUPABASE_URL` from Render: the saved-page storage that reads the service key defaults to the local disk, so the key looks unused (Repository); confirm with a search of the code before removing | W-30 |
+| Whether the admin fixes UX-04 to UX-07 run now, beside Stage B as the order table planned, or move into Stage C | UX plan, order step 3 |
 | Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
 | How to get coordinates in production, or whether to go without | W-27 |
 | Choose the domain (probably an `.org`); needed by UX-18 only | UX-08 item 9, W-29 |
