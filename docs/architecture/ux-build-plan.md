@@ -79,9 +79,9 @@ UX-31, the repository tidy-up, can run at any point with the user's approval of 
 1. **Plan.** Read the step, re-check the code and the live site, and write a short plan: files, exact change, tests, risks. Stop for the user's approval.
 2. **Build.** A separate branch and pull request per step, from the latest `main`. Only the files the step names. Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`.
 3. **Test.** Frontend: `npm run test --workspace=@aidjobs/frontend` and `npx tsc --noEmit -p apps/frontend`. Backend changes: the CI Ruff and pytest lists in `.github/workflows/ci.yml`, with new tests added to them. CI must pass.
-4. **Preview.** Check every acceptance criterion on the pull request's Netlify preview, at 390px and 1366px, and record the measurements in the pull request.
+4. **Preview.** Check every acceptance criterion on the pull request's Vercel preview, at 390px and 1366px, and record the measurements in the pull request. The preview's address is the `environment_url` of the commit's GitHub deployment. Previews stay behind the Vercel login; the agent sends the `x-vercel-protection-bypass` header with the key in the user's Windows environment variable `VERCEL_AUTOMATION_BYPASS_SECRET`, never written to the repository, a log, or the chat. Vercel attaches the key to a preview when it is built, so a preview built before the key existed rejects it. Vercel's preview toolbar keeps the network busy, so browser checks wait for the page and the job rows, not for an idle network. The user sees previews by signing in to Vercel.
 5. **Merge.** Only with the user's explicit merge approval for that pull request.
-6. **Live.** After the deploy, check the acceptance criteria again on `www.aidjobs.app`.
+6. **Live.** After the deploy, check the acceptance criteria again on `aid-jobs-frontend.vercel.app` until the domain is connected (UX-18).
 7. **Record.** Update this step's status line and the ledger. A step is **Done** only after the live check; merged code alone is not done.
 
 Admin pages, on a preview or live:
@@ -96,11 +96,11 @@ Status values: **Not started**, **Planning**, **Plan approved**, **In PR**, **Pr
 
 | What | Behaviour | Evidence |
 | --- | --- | --- |
-| Merge to `main`, frontend | Vercel builds a Production deployment for `www.aidjobs.app` within about a minute | Verified from GitHub deployments for every merge from `15d6e4e` to `2a2e02f`; `2a2e02f` succeeded |
-| Merge to `main`, backend | Render redeploys automatically | Verified by the user for each merge; the agent cannot see Render, so each deploy is confirmed by the user |
-| Pull request, Vercel preview | Built for every commit, but protected by a Vercel login | Verified 20 October 2026: the agent is sent to the Vercel login page |
-| Pull request, Netlify preview | `https://deploy-preview-<number>--moonlit-llama-d9f5a7.netlify.app`, public | Verified on PR #19 |
-| Previews and data | The Netlify preview reads the production backend: it showed the same 206 jobs. An admin action on a preview changes production | Verified for reads on PR #19; writes inferred from that, not tested |
+| Merge to `main`, frontend | Vercel builds a Production deployment for `aid-jobs-frontend.vercel.app` within a few minutes; GitHub's webhooks sometimes start it several minutes late | Verified from GitHub deployments, most recently the UX-10 merge `d13d983` on 23 October 2026 |
+| Merge to `main`, backend | Render redeploys automatically, unless a manual deploy of a specific commit has switched Auto-Deploy off (see the ledger) | Verified by the user for each merge; the agent cannot see Render, so each deploy is confirmed by the user |
+| Pull request, Vercel preview | Built for every commit, behind the Vercel login; opened by the agent with the bypass key (method step 4) | Verified 23 October 2026: 302 to the Vercel login without the key; with it, all 275 jobs in the HTML, and the full phone (90 of 90) and desktop (33 of 33) checks passed |
+| Pull request, Netlify preview | No longer used (user decision, 23 October 2026); the Netlify site is to be deleted, which also removes its old production copy | Netlify's free credits ran out on 23 October 2026 |
+| Previews and data | Previews read the production backend. An admin action on a preview changes production | Verified for reads; writes inferred, not tested |
 | `aidjobs.app` | Redirected to `www.aidjobs.app` until the domain expired; `www.aidjobs.app` does not resolve as of 20 October 2026. Live checks use the Vercel production address until the domain returns | Verified earlier; expiry reported by the user |
 
 To establish before Stage B (part of UX-08): whether Netlify also publishes a production site from `main`, which backend address each preview uses, and the Vercel production address used for live checks while the domain is down.
@@ -238,7 +238,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 ### UX-10. Server-rendered shell and search-engine foundation
 
-**Status:** In PR (#28), 23 October 2026. Verified locally with a production build:
+**Status:** Done, 23 October 2026. PR #28, merged as `d13d983`. Live on `aid-jobs-frontend.vercel.app/v2`: "do not index" on `/`, `/v2`, the admin, `robots.txt`, and `sitemap.xml`; the backend was asleep during Vercel's build, so the first cached page was the "Loading jobs…" frame, and browsers loaded the jobs themselves (275 jobs in 3.0 s on a laptop and 6.6 s on a phone, no page errors); once the 10 minutes had passed, the next request got the old page while Vercel rebuilt it, and the following request had all 275 jobs in the HTML (Verified, 11:14 to 11:15 IST). Keeping the last good page when a refresh fails is still Not verified on Vercel (open item 4). The Netlify step (open item 17) is blocked: see that item. Before the merge, verified locally with a production build:
 
 - Raw HTML of `/v2` holds every open job (287 rows, the backend's total) and the count; 98 KB compressed (804 KB uncompressed, of which about 300 KB is inline flag images and 148 KB the job data for the browser; UX-17).
 - No hydration or page errors at 390px and 1366px, light and dark, and with saved settings (the only failed request locally is Vercel Analytics' script, which exists only on Vercel). Saved dark theme, larger text, collapsed menu, and divider position are in place before any JavaScript runs, and the list does not move when it loads.
@@ -283,7 +283,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 | 14 | Vercel Analytics runs on the new site | Visitors should be told | UX-27, the Privacy page |
 | 15 | Safari logs that it ignores the `interactive-widget` viewport setting, which Android needs for the keyboard | A console note only | None needed |
 | 16 | The organisation name "ICRC (or International Committee of the Red Cross)" comes from the source record; the site shows "ICRC" | Data quality | Admin source clean-up (UX-19) |
-| 17 | The locked Netlify production copy still serves the old site without "do not index" | Search engines could find a second copy | The user's one-time "Publish deploy" after the UX-10 merge, then the agent's header check |
+| 17 | The locked Netlify production copy still serves the old site without "do not index". **Blocked, 23 October 2026:** the Netlify team has used its free credits for this billing cycle, so production builds are paused and the build of `main@d13d983` shows "Skipped"; deploy previews still build | Search engines could find a second copy; low risk while it sits on a Netlify address with no domain and the Vercel site says "do not index" | **Decided by the user, 23 October 2026:** stop using Netlify. Pull-request previews move to Vercel, kept behind the Vercel login, with a "Protection Bypass for Automation" key for the agent's checks, stored only on the user's machine and never in the repository. Once a Vercel preview is confirmed working that way, the user deletes the Netlify site, which removes the old copy; then the method's Netlify steps are rewritten for Vercel previews. **Vercel previews confirmed working, 23 October 2026, and the method rewritten (step 4). Remaining: the user deletes the Netlify site, and the agent checks the old address is gone** |
 
 Plan approved, 23 October 2026, as option A: UX-10 carries the demo's whole public page from the tag (list, menu, filter pills and sheets, sort, the 10-day switch, the job sheet and pane, Saved) close to unchanged, connected to live jobs. UX-12 to UX-15 then check and test those parts against their acceptance criteria, and UX-12 adds the title-fact tests from real titles. UX-11 narrows to a unique tie-breaker in the search order. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
