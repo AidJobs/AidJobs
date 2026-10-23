@@ -263,6 +263,28 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
   - Netlify previews loaded Vercel Analytics, which exists only on Vercel, and logged an error on every page.
 - Phone checks after the fixes, Android (Chromium, Pixel 7) and iPhone (WebKit, iPhone 13), 90 of 90: no errors and no sideways scrolling at 320px, 360px, 390px, and 412px at normal and the largest text size; a tap leaves no label; the Sector sheet's search does not raise the keyboard; Back closes the Sector sheet, the drawer, Filters opened from the drawer, and the job sheet, staying on the site; the swipe closes the job sheet; the search key closes the keyboard; a closed job's link says so; "Today" is the visitor's date in four time zones. Desktop checks 33 of 33, including labels on hover and keyboard focus. The fidelity subset against the tag after the fixes (360px, 390px, 1366px, light and dark) changed only where intended: Myanmar's flag and name on the Oxfam Yangon job. Real devices remain for UX-18; WebKit in Playwright is not iPhone Safari, and the on-screen keyboard cannot be emulated.
 
+**Open after UX-10** (recorded 23 October 2026 at the user's request, to resolve later). Each item names the step that resolves it; none is approved for work until that step's plan is.
+
+| # | Item | Why it matters | Resolved at |
+| --- | --- | --- | --- |
+| 1 | The backend drops a job once its deadline has passed in UTC (`deadline >= CURRENT_DATE`), so in the Americas a job closing "today" leaves the list that evening, before the visitor's day ends | Visitors in the Americas lose same-day jobs early | A backend change with its own approval: keep jobs until a day after the deadline and let the browser hide them on the visitor's clock (with UX-11) |
+| 2 | Paging orders by `last_seen_at`, which is not unique; the page refuses an incomplete result, so a crawl during a refresh only delays the refresh | Delayed refreshes, never wrong data | UX-11: unique tie-breaker (`id`) with a test |
+| 3 | Next.js reuses the previous backend answer while it asks again, so a refreshed page can show data up to about 20 minutes old | Freshness | UX-17, if it matters in practice |
+| 4 | Vercel's own handling of the cached page (refresh, keeping the last good page) is proven locally only | The cache is the answer to the sleeping backend | Live check after the UX-10 merge, then whenever the backend is down |
+| 5 | Page weight: 98 KB compressed for 287 jobs; about 300 KB of the uncompressed HTML is inline flag images, and the flag component bundles every flag | Speed on slow phones | UX-17 |
+| 6 | Where the visitor's date differs from UTC (India before 05:30, the Americas in the evening), the list updates once just after load; a visitor who chose "Soonest deadline" sees one re-sort after load | A brief visible change | Accepted; revisit at UX-17 only if it is noticeable on real phones |
+| 7 | Real devices not yet checked: iPhone Safari with the keyboard and the fixed search bar, the notch padding when sideways, Samsung Internet, desktop Safari and Firefox | Emulation is not the real browser | UX-18 |
+| 8 | The browser checks used for UX-10 (fidelity against the tag, phone flows, cache survival) are throwaway scripts outside the repository | They do not protect future changes | UX-26: turn them into repository tests run on every pull request |
+| 9 | Accessibility from the demo: the job sheet and job pane do not move or trap keyboard focus; each job row is a button with the bookmark button inside it; Escape does not close the job pane on desktop | Keyboard and screen-reader use | UX-16 |
+| 10 | At the largest text size the phone heading wraps to two or three lines | Fits the screen, no sideways scrolling; looks heavier | UX-16, with the text-size settings |
+| 11 | Locations still without a country: regions, global roles, empty locations, French spellings such as "Guinee" when the job has no country code, and a location naming only a US state ("Atlanta, Georgia" would read as the country Georgia) | Missing or, rarely, wrong flag | The crawler's location cleaning (W-24 family); add spellings as new organisations arrive |
+| 12 | Saved jobs that close are no longer shown or counted, but their ids stay in the browser's storage | Harmless growth | UX-15 |
+| 13 | The job loader stops at 50 pages (5,000 jobs) and would then refuse every refresh | Not reachable soon (287 jobs) | UX-17, with the page-weight threshold |
+| 14 | Vercel Analytics runs on the new site | Visitors should be told | UX-27, the Privacy page |
+| 15 | Safari logs that it ignores the `interactive-widget` viewport setting, which Android needs for the keyboard | A console note only | None needed |
+| 16 | The organisation name "ICRC (or International Committee of the Red Cross)" comes from the source record; the site shows "ICRC" | Data quality | Admin source clean-up (UX-19) |
+| 17 | The locked Netlify production copy still serves the old site without "do not index" | Search engines could find a second copy | The user's one-time "Publish deploy" after the UX-10 merge, then the agent's header check |
+
 Plan approved, 23 October 2026, as option A: UX-10 carries the demo's whole public page from the tag (list, menu, filter pills and sheets, sort, the 10-day switch, the job sheet and pane, Saved) close to unchanged, connected to live jobs. UX-12 to UX-15 then check and test those parts against their acceptance criteria, and UX-12 adds the title-fact tests from real titles. UX-11 narrows to a unique tie-breaker in the search order. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
 Approved plan, 23 October 2026:
