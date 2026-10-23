@@ -865,7 +865,6 @@ async def diagnose_search_vs_db(
         return {
             "status": "error",
             "error": str(e),
-            "traceback": traceback.format_exc() if os.getenv("AIDJOBS_ENV", "").lower() == "dev" else None
         }
     finally:
         if cursor:
@@ -1100,7 +1099,6 @@ async def diagnose_job_id(
         return {
             "status": "error",
             "error": str(e),
-            "traceback": traceback.format_exc() if os.getenv("AIDJOBS_ENV", "").lower() == "dev" else None
         }
     finally:
         if cursor:
