@@ -238,7 +238,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 
 ### UX-10. Server-rendered shell and search-engine foundation
 
-**Status:** In PR (#28), 23 October 2026. Verified locally with a production build:
+**Status:** Done, 23 October 2026. PR #28, merged as `d13d983`. Live on `aid-jobs-frontend.vercel.app/v2`: "do not index" on `/`, `/v2`, the admin, `robots.txt`, and `sitemap.xml`; the backend was asleep during Vercel's build, so the first cached page was the "Loading jobs…" frame, and browsers loaded the jobs themselves (275 jobs in 3.0 s on a laptop and 6.6 s on a phone, no page errors); once the 10 minutes had passed, the next request got the old page while Vercel rebuilt it, and the following request had all 275 jobs in the HTML (Verified, 11:14 to 11:15 IST). Keeping the last good page when a refresh fails is still Not verified on Vercel (open item 4). The Netlify step (open item 17) is blocked: see that item. Before the merge, verified locally with a production build:
 
 - Raw HTML of `/v2` holds every open job (287 rows, the backend's total) and the count; 98 KB compressed (804 KB uncompressed, of which about 300 KB is inline flag images and 148 KB the job data for the browser; UX-17).
 - No hydration or page errors at 390px and 1366px, light and dark, and with saved settings (the only failed request locally is Vercel Analytics' script, which exists only on Vercel). Saved dark theme, larger text, collapsed menu, and divider position are in place before any JavaScript runs, and the list does not move when it loads.
@@ -283,7 +283,7 @@ Stage B, UX-09 to UX-17, builds at the hidden address from the revision, not at 
 | 14 | Vercel Analytics runs on the new site | Visitors should be told | UX-27, the Privacy page |
 | 15 | Safari logs that it ignores the `interactive-widget` viewport setting, which Android needs for the keyboard | A console note only | None needed |
 | 16 | The organisation name "ICRC (or International Committee of the Red Cross)" comes from the source record; the site shows "ICRC" | Data quality | Admin source clean-up (UX-19) |
-| 17 | The locked Netlify production copy still serves the old site without "do not index" | Search engines could find a second copy | The user's one-time "Publish deploy" after the UX-10 merge, then the agent's header check |
+| 17 | The locked Netlify production copy still serves the old site without "do not index". **Blocked, 23 October 2026:** the Netlify team has used its free credits for this billing cycle, so production builds are paused and the build of `main@d13d983` shows "Skipped"; deploy previews still build | Search engines could find a second copy; low risk while it sits on a Netlify address with no domain and the Vercel site says "do not index" | When the credits reset: the user runs Trigger deploy, Deploy site, then Publish deploy (the lock stays), and the agent checks the header on `moonlit-llama-d9f5a7.netlify.app` |
 
 Plan approved, 23 October 2026, as option A: UX-10 carries the demo's whole public page from the tag (list, menu, filter pills and sheets, sort, the 10-day switch, the job sheet and pane, Saved) close to unchanged, connected to live jobs. UX-12 to UX-15 then check and test those parts against their acceptance criteria, and UX-12 adds the title-fact tests from real titles. UX-11 narrows to a unique tie-breaker in the search order. **Contract decision** (rule 15 rewrite; recorded at UX-08).
 
