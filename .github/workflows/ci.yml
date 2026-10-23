@@ -65,3 +65,20 @@ jobs:
 
       - name: Frontend tests
         run: npm run test --workspace=@aidjobs/frontend
+
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Scans only the commits a push or pull request adds. Values in older history were
+      # rotated on 23 October 2026 and would fail every run if scanned again.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false

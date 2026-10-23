@@ -25,7 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_city ON jobs(city) WHERE city IS NOT NULL;
 
 ```powershell
 cd apps/backend
-python scripts/apply_country_city_migration.py "postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+python scripts/apply_country_city_migration.py "postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 ---
@@ -35,7 +35,7 @@ python scripts/apply_country_city_migration.py "postgresql://postgres.yijlbzlzfa
 Create `apps/backend/.env.local` (this file is gitignored):
 
 ```
-SUPABASE_DB_URL=postgresql://postgres.yijlbzlzfahubwukulkv:ghXps3My5KPZCNn2@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+SUPABASE_DB_URL=postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
 ```
 
 Then the script will automatically use it.

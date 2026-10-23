@@ -23,7 +23,7 @@ The new AI-powered extraction system uses LLM (Large Language Model) to extract 
 Add to your `.env` file or environment:
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_API_KEY=<generate a new value; never commit it>
 ```
 
 Or set in your deployment platform (Vercel, etc.)

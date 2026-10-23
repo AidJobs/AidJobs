@@ -34,7 +34,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 **2. COOKIE_SECRET**
 - **Name**: `COOKIE_SECRET`
 - **Value**: (paste the generated secret from Step 1)
-- **Example**: `a8d71fe5f781b18752fa6050f87271601cc6432197c096d4bbdbe24abec8acc7`
+- **Example**: `<generate a new value; never commit it>`
 
 ### Step 3: Restart Service
 
@@ -53,7 +53,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Here's a pre-generated COOKIE_SECRET you can use:
 
 ```
-COOKIE_SECRET=a8d71fe5f781b18752fa6050f87271601cc6432197c096d4bbdbe24abec8acc7
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 **Note**: This is a random secret. You can generate a new one if you prefer.

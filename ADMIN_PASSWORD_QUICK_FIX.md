@@ -16,7 +16,7 @@ python scripts/generate_cookie_secret.py
 
 **Or use this pre-generated secret:**
 ```
-4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+<generate a new value; never commit it>
 ```
 
 ### 2. Update Render Environment Variables
@@ -30,7 +30,7 @@ python scripts/generate_cookie_secret.py
    - Value: Your password (exact same, no extra spaces)
 5. **Add COOKIE_SECRET**:
    - Name: `COOKIE_SECRET`
-   - Value: `4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3`
+   - Value: `<generate a new value; never commit it>`
 6. **Save** - Render will auto-restart
 7. **Wait** for deployment (1-2 minutes)
 
@@ -66,8 +66,8 @@ After fixing, you should be able to:
 
 ### Render (Backend):
 ```bash
-ADMIN_PASSWORD=your-password-here
-COOKIE_SECRET=4ead798b950082fc46a4c83bb5328f56c01b740921c30f2869de5fc68ba607f3
+ADMIN_PASSWORD=<generate a new value; never commit it>
+COOKIE_SECRET=<generate a new value; never commit it>
 ```
 
 ### Vercel (Frontend):

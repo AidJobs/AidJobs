@@ -26,7 +26,7 @@ Go to Render Dashboard → Your Backend Service → Environment → Add Environm
 1. **COOKIE_SECRET** (REQUIRED)
    - Name: `COOKIE_SECRET`
    - Value: Paste the generated secret from Step 1
-   - Example: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
+   - Example: `<generate a new value; never commit it>`
 
 2. **AIDJOBS_ENV** (OPTIONAL - for dev mode)
    - Name: `AIDJOBS_ENV`
