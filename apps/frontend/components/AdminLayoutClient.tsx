@@ -3,6 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Database, FileText, Settings, Network, LogOut, Menu, ChevronLeft, Shield, Briefcase } from 'lucide-react';
+import {
+  classifySession,
+  loginPathFor,
+  nextSessionStep,
+  SESSION_TIMEOUT_MESSAGE,
+  SLOW_AFTER_MS,
+  STARTING_UP_MESSAGE,
+} from '@/lib/admin/sessionCheck';
 
 type MenuItem = {
   id: string;
@@ -206,12 +214,15 @@ export default function AdminLayoutClient({
   const router = useRouter();
   const isLoginPage = pathname === '/admin/login';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [session, setSession] = useState<'pending' | 'ok' | 'no'>('pending');
+  const [session, setSession] = useState<'pending' | 'ok' | 'no' | 'gave-up'>('pending');
+  const [slow, setSlow] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const loginPath = useRef(loginPathFor('signed-out'));
   const wasLoginPage = useRef(isLoginPage);
   // A failed check leaves session as "no". The layout does not remount on the
   // way back from login, so that stale "no" would bounce a successful sign-in
   // before the new check finishes. Clear it during render, before the redirect.
-  if (wasLoginPage.current && !isLoginPage && session === 'no') {
+  if (wasLoginPage.current && !isLoginPage && (session === 'no' || session === 'gave-up')) {
     setSession('pending');
   }
   wasLoginPage.current = isLoginPage;
@@ -221,26 +232,51 @@ export default function AdminLayoutClient({
       return;
     }
     let cancelled = false;
-    fetch('/api/admin/session', { credentials: 'include', cache: 'no-store' })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({ authenticated: false }));
-        if (!cancelled) {
-          setSession(response.ok && body.authenticated ? 'ok' : 'no');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSession('no');
-        }
-      });
+    const started = Date.now();
+    setSlow(false);
+    const slowTimer = setTimeout(() => {
+      if (!cancelled) setSlow(true);
+    }, SLOW_AFTER_MS);
+
+    const check = async (attempt: number): Promise<void> => {
+      let status: number | null = null;
+      let body: unknown = null;
+      try {
+        const response = await fetch('/api/admin/session', { credentials: 'include', cache: 'no-store' });
+        status = response.status;
+        body = await response.json().catch(() => null);
+      } catch {
+        status = null;
+      }
+      if (cancelled) return;
+      const step = nextSessionStep(classifySession(status, body), attempt, Date.now() - started);
+      if (step.action === 'retry') {
+        setSlow(true);
+        await new Promise((resolve) => setTimeout(resolve, step.delayMs));
+        if (!cancelled) await check(attempt + 1);
+        return;
+      }
+      clearTimeout(slowTimer);
+      if (step.action === 'give-up') {
+        setSession('gave-up');
+      } else if (step.outcome === 'ok') {
+        setSession('ok');
+      } else {
+        loginPath.current = loginPathFor(step.outcome);
+        setSession('no');
+      }
+    };
+    check(1);
+
     return () => {
       cancelled = true;
+      clearTimeout(slowTimer);
     };
-  }, [isLoginPage]);
+  }, [isLoginPage, retryKey]);
 
   useEffect(() => {
     if (!isLoginPage && session === 'no') {
-      router.replace('/admin/login?reason=session');
+      router.replace(loginPath.current);
     }
   }, [isLoginPage, session, router]);
 
@@ -248,10 +284,27 @@ export default function AdminLayoutClient({
     return <>{children}</>;
   }
 
+  if (session === 'gave-up') {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-4 px-6 text-center text-sm text-[#1D1D1F]">
+        <p className="max-w-md">{SESSION_TIMEOUT_MESSAGE}</p>
+        <button
+          onClick={() => {
+            setSession('pending');
+            setRetryKey((k) => k + 1);
+          }}
+          className="px-4 py-2 rounded-lg bg-[#0071E3] text-white hover:bg-[#0077ED] transition-colors"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (session !== 'ok') {
     return (
-      <div className="h-screen flex items-center justify-center text-sm text-[#86868B]">
-        Checking session
+      <div className="h-screen flex items-center justify-center px-6 text-center text-sm text-[#86868B]" role="status" aria-live="polite">
+        {slow ? STARTING_UP_MESSAGE : 'Checking session'}
       </div>
     );
   }
