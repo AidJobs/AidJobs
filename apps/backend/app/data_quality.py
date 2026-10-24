@@ -15,6 +15,42 @@ from psycopg2.extras import RealDictCursor  # type: ignore
 
 logger = logging.getLogger(__name__)
 
+# Path words that name a list of jobs rather than one job (UX-04).
+LISTING_WORDS = frozenset({
+    "jobs", "job", "careers", "career", "vacancies", "vacancy", "opportunities", "listing",
+    "listings", "list", "search", "all", "index", "home", "internships", "results", "positions",
+})
+# Path words that introduce a single vacancy when an identifier follows them.
+JOB_MARKERS = frozenset({
+    "job", "jobs", "vacancy", "vacancies", "position", "positions", "posting", "requisition",
+})
+_PAGE_EXTENSION = re.compile(r"\.(html?|aspx?|php|jsp)$")
+_IDENTIFIER = re.compile(r"\d{3,}|[0-9a-f]{8,}")
+
+
+def is_listing_url(url: Optional[str]) -> bool:
+    """True when an apply link points at a list of jobs, judged from its path alone.
+
+    A link is a job when a job marker is followed, later in the path, by a segment that carries an
+    identifier (three or more digits, or a long hex id); a job link is never a listing, whatever
+    word it ends in. Otherwise it is a listing when it has no path or ends in a listing word.
+    Host names and query strings are ignored. A value that does not parse as an absolute web
+    address returns False: it is not classified here.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urlparse(url.strip())
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    segments = [_PAGE_EXTENSION.sub("", s) for s in parsed.path.lower().split("/") if s]
+    for i, segment in enumerate(segments):
+        if segment in JOB_MARKERS and any(_IDENTIFIER.search(s) for s in segments[i + 1:]):
+            return False
+    return not segments or segments[-1] in LISTING_WORDS
+
 
 class DataQualityValidator:
     """Validates job data quality before and after upsert"""
@@ -54,8 +90,7 @@ class DataQualityValidator:
             except Exception as e:
                 errors.append(f"URL parsing error: {str(e)}")
             
-            # Check if URL is a listing page
-            if any(kw in apply_url.lower() for kw in ['/jobs', '/careers', '/vacancies', '/opportunities', '/list', '/search', '/all', '/index']):
+            if is_listing_url(apply_url):
                 errors.append(f"URL appears to be listing page: {apply_url[:80]}")
             
             # Check if URL is base URL
@@ -194,17 +229,6 @@ class DataQualityValidator:
                         COUNT(*) as total_jobs,
                         COUNT(DISTINCT apply_url) as unique_urls,
                         COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls,
-                        COUNT(CASE 
-                            WHEN apply_url LIKE '%/jobs%' 
-                            OR apply_url LIKE '%/careers%'
-                            OR apply_url LIKE '%/vacancies%'
-                            OR apply_url LIKE '%/opportunities%'
-                            OR apply_url LIKE '%/list%'
-                            OR apply_url LIKE '%/search%'
-                            OR apply_url LIKE '%/all%'
-                            OR apply_url LIKE '%/index%'
-                            THEN 1 
-                        END) as listing_page_urls,
                         COUNT(CASE WHEN title IS NULL OR title = '' THEN 1 END) as missing_titles,
                         COUNT(CASE WHEN LENGTH(title) < 5 THEN 1 END) as short_titles
                     FROM jobs
@@ -212,6 +236,16 @@ class DataQualityValidator:
                     AND deleted_at IS NULL
                 """, (source_id,))
                 stats = cur.fetchone()
+                if stats:
+                    cur.execute("""
+                        SELECT apply_url FROM jobs
+                        WHERE source_id::text = %s
+                        AND deleted_at IS NULL
+                    """, (source_id,))
+                    stats = dict(stats)
+                    stats['listing_page_urls'] = sum(
+                        1 for row in cur.fetchall() if is_listing_url(row.get('apply_url'))
+                    )
                 
                 # Ensure stats is not None and has required keys
                 if not stats:
@@ -335,21 +369,22 @@ class DataQualityValidator:
                         COUNT(DISTINCT source_id) as total_sources,
                         COUNT(*) as total_jobs,
                         COUNT(DISTINCT apply_url) as unique_urls,
-                        COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls,
-                        COUNT(CASE 
-                            WHEN apply_url LIKE '%/jobs%' 
-                            OR apply_url LIKE '%/careers%'
-                            OR apply_url LIKE '%/vacancies%'
-                            OR apply_url LIKE '%/opportunities%'
-                            OR apply_url LIKE '%/list%'
-                            OR apply_url LIKE '%/search%'
-                            THEN 1 
-                        END) as listing_page_urls
+                        COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls
                     FROM jobs
                     WHERE status = 'active'
                     AND deleted_at IS NULL
                 """)
                 global_stats = cur.fetchone()
+                if global_stats:
+                    cur.execute("""
+                        SELECT apply_url FROM jobs
+                        WHERE status = 'active'
+                        AND deleted_at IS NULL
+                    """)
+                    global_stats = dict(global_stats)
+                    global_stats['listing_page_urls'] = sum(
+                        1 for row in cur.fetchall() if is_listing_url(row.get('apply_url'))
+                    )
                 
                 # Handle None result
                 if not global_stats:
@@ -369,21 +404,19 @@ class DataQualityValidator:
                     global_stats.setdefault('null_urls', 0)
                     global_stats.setdefault('listing_page_urls', 0)
                 
-                # Sources with issues
+                # Sources with issues: jobs without a link, or whose link is a listing page
                 cur.execute("""
-                    SELECT source_id, COUNT(*) as issue_count
-                    FROM (
-                        SELECT source_id FROM jobs WHERE apply_url IS NULL AND deleted_at IS NULL
-                        UNION ALL
-                        SELECT source_id FROM jobs 
-                        WHERE deleted_at IS NULL
-                        AND (apply_url LIKE '%/jobs%' OR apply_url LIKE '%/careers%')
-                    ) issues
-                    GROUP BY source_id
-                    ORDER BY issue_count DESC
-                    LIMIT 10
+                    SELECT source_id, apply_url FROM jobs
+                    WHERE deleted_at IS NULL
                 """)
-                sources_with_issues = cur.fetchall()
+                issue_counts: Dict = {}
+                for row in cur.fetchall():
+                    if row.get('apply_url') is None or is_listing_url(row.get('apply_url')):
+                        issue_counts[row['source_id']] = issue_counts.get(row['source_id'], 0) + 1
+                ranked = sorted(issue_counts.items(), key=lambda item: -item[1])[:10]
+                sources_with_issues = [
+                    {'source_id': source, 'issue_count': count} for source, count in ranked
+                ]
                 
                 # Calculate global quality score
                 total = global_stats['total_jobs']
