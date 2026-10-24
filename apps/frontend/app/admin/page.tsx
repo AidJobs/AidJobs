@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
 import { COUNT_LABELS, healthScore as computeHealthScore, recentActivity, searchSummary, type RecentActivity } from '@/lib/admin/status';
+import { meiliControlsVisible } from '@/lib/admin/danger';
 
 type DbStatus = {
   ok: boolean;
@@ -274,6 +275,7 @@ export default function AdminPage() {
 
   const healthScore = computeHealthScore(dbStatus, crawlerStatus);
   const search = searchSummary(searchStatus, searchLoadError);
+  const showMeiliControls = meiliControlsVisible(searchStatus, searchLoadError);
   // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
   const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
 
@@ -521,6 +523,8 @@ export default function AdminPage() {
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Search</h2>
                 </div>
                 <div className="flex items-center gap-2">
+                  {showMeiliControls && (
+                  <>
                   <button
                     onClick={() => handleSyncMeilisearch(false)}
                     disabled={syncingMeilisearch}
@@ -543,6 +547,8 @@ export default function AdminPage() {
                       Execute Sync
                     </span>
                   </button>
+                  </>
+                  )}
                   {searchStatus?.enabled ? (
                     <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
@@ -647,6 +653,7 @@ export default function AdminPage() {
                   <div className={`text-caption ${search.tone === 'neutral' ? 'text-[#86868B]' : 'text-[#FF3B30]'}`}>
                     {search.text}
                   </div>
+                  {showMeiliControls && (
                   <button
                     onClick={handleInitialize}
                     disabled={initializing}
@@ -661,6 +668,7 @@ export default function AdminPage() {
                       {initializing ? 'Initializing...' : 'Initialize Index'}
                     </span>
                   </button>
+                  )}
                 </div>
               )}
             </div>

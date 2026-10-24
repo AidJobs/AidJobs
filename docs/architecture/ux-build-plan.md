@@ -234,7 +234,22 @@ What was built (frontend only; no backend, count, crawler, or data change):
 
 ### UX-06. Admin delete safety and dead controls
 
-**Status:** Not started.
+**Status:** Plan approved by the user on 24 October 2026, with the Jobs-page option "remove the per-row bin; Soft Delete keeps its window and Restore; Hard Delete requires typing the number of jobs", and safeguards: typed confirmations are exact and case-sensitive, with no trimming; destructive buttons stay disabled until they match, and the action itself checks again; if an impact count does not load, an error shows and the action stays disabled (applied to both source deletes); no change to backend deletion, restore, job status, or expiry; the broken Delete Jobs window removed, not repaired; Meilisearch controls hidden only when the backend confirms it is not configured; "Cleanup expired jobs" removed without adding expiry logic. Built the same day on branch `ux-06/admin-delete-safety`; waiting for review, not merged.
+
+Found before the plan (24 October 2026, code and the live backend's route list, read-only):
+- Sources rows carried "Delete Jobs", "Delete Source", and "Permanently delete" beside Run, Pause, and Edit. "Delete Jobs" called `/api/admin/crawl/deletion-impact/{id}` (404 live) and `/api/admin/crawl/delete-jobs-by-source` (not a backend route), so it could never load its impact or delete; its "Proceed with Deletion" also re-ran the dry run. "Delete Source" (status `deleted`, its jobs soft-deleted; undone by Resume and Restore) and "Permanently delete" (only after a delete; removes the source and, by cascade, its crawl logs; jobs keep `source_id` NULL) used one browser `confirm`.
+- Jobs rows carried a red bin beside View details; Soft Delete is undone by Restore; Hard Delete asked only for a reason.
+- Dashboard "Check Sync", "Execute Sync", and "Initialize Index" showed while Meilisearch is not configured. Crawls "Cleanup expired jobs" calls a backend action that returns `disabled` and deletes nothing.
+- Four other frontend proxies point at routes the backend does not have (`config-check`, `crawl-v2/run`, `data-quality/logs`, `data-quality/stats`); no page calls them. Left for UX-31 with the two Delete Jobs proxies.
+
+What was built (frontend only):
+- `apps/frontend/lib/admin/danger.ts` with `lib/__tests__/adminDanger.test.ts` (12 tests): exact confirmation, the Hard Delete count, which danger actions a source offers, impact counts and their failure, the "at least" wording for a capped count, enabling only when counts loaded and the text matches, and when Meilisearch controls show.
+- Sources table: the three delete actions removed from the row; the whole Delete Jobs window, its dry-run result window, and their state removed. Tooltips: "Run crawl now"; the details button reads "Source details and delete options".
+- Source page (`/admin/sources/{id}`): a red-bordered "Danger area" below the crawl runs. "Delete source…" (when not deleted) opens a window stating it stops crawling and hides N jobs (from `GET /api/admin/jobs/search?source_id=…`, the same not-deleted set the backend hides) and how to undo it. "Permanently delete…" (only when deleted) states it removes the source and M crawl runs (from `GET /api/admin/crawl/logs`, up to 100, shown as "at least 100" when capped), that it cannot be undone, and that its hidden jobs stay without a source. Each requires the exact organisation name; the button is disabled until it matches and every count loaded; a failed count shows an error and keeps it disabled; the confirm handler re-checks before sending the existing `DELETE` request.
+- Jobs page: the per-row bin removed (deleted rows keep Restore); deleting requires a selection; Hard Delete shows "cannot be undone" and requires typing the exact number of selected jobs, checked on the button and in the action. The request still lists exactly the selected job IDs.
+- Dashboard: Check Sync, Execute Sync, and Initialize Index hidden only when the backend reports Meilisearch not configured.
+- Crawls: "Cleanup expired jobs" and its handler removed.
+- Local checks: TypeScript passes; lint shows only the two warnings already on `main` (Jobs page hooks); the frontend Jest suite, 108 passed.
 
 - **Scope:**
   - Delete Jobs and Delete Source leave the row's action column. They move to a separate, visually distinct danger area on the source, with a confirmation that shows the impact summary the code already has and requires typing the organisation name.

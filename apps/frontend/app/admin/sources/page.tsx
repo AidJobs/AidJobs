@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Upload, Play, Pause, Edit, Trash2, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, AlertTriangle, FileDown, Shield, History, Database, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle } from 'lucide-react';
 
 type Source = {
   id: string;
@@ -79,19 +79,6 @@ export default function AdminSourcesPage() {
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Health scores for sources
   const [healthScores, setHealthScores] = useState<Record<string, { score: number; priority: number }>>({});
-  // Job deletion state
-  const [showDeleteJobsModal, setShowDeleteJobsModal] = useState(false);
-  const [sourceToDeleteJobs, setSourceToDeleteJobs] = useState<Source | null>(null);
-  const [deletingJobs, setDeletingJobs] = useState(false);
-  const [deletionType, setDeletionType] = useState<'soft' | 'hard'>('soft');
-  const [deleteJobsTriggerCrawl, setDeleteJobsTriggerCrawl] = useState(true);
-  const [deleteJobsDryRun, setDeleteJobsDryRun] = useState(true);
-  const [deleteJobsExportData, setDeleteJobsExportData] = useState(false);
-  const [deletionReason, setDeletionReason] = useState('');
-  const [deletionImpact, setDeletionImpact] = useState<any>(null);
-  const [loadingImpact, setLoadingImpact] = useState(false);
-  const [deletionResult, setDeletionResult] = useState<any>(null);
-  const [showDeletionResult, setShowDeletionResult] = useState(false);
   const [formData, setFormData] = useState<SourceFormData>({
     org_name: '',
     careers_url: '',
@@ -246,30 +233,6 @@ export default function AdminSourcesPage() {
   useEffect(() => {
     fetchSources();
   }, [page, statusFilter, searchQuery, fetchSources]);
-
-  // Fetch deletion impact
-  const fetchDeletionImpact = useCallback(async (sourceId: string) => {
-    setLoadingImpact(true);
-    try {
-      const res = await fetch(`/api/admin/crawl/deletion-impact/${sourceId}`, {
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch deletion impact');
-      }
-
-      const data = await res.json();
-      if (data.status === 'ok' && data.impact) {
-        setDeletionImpact(data.impact);
-      }
-    } catch (error) {
-      console.error('Failed to fetch deletion impact:', error);
-      toast.error('Failed to load deletion impact');
-    } finally {
-      setLoadingImpact(false);
-    }
-  }, []);
 
   // Fetch health scores for sources
   useEffect(() => {
@@ -700,123 +663,6 @@ export default function AdminSourcesPage() {
       console.error('Failed to update source:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to update source';
       toast.error(errorMsg);
-    }
-  };
-
-  const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
-
-  const handleDeleteJobs = useCallback((source: Source) => {
-    setSourceToDeleteJobs(source);
-    setShowDeleteJobsModal(true);
-    setDeletionImpact(null);
-    setDeletionResult(null);
-    setShowDeletionResult(false);
-    // Fetch deletion impact
-    fetchDeletionImpact(source.id);
-  }, [fetchDeletionImpact]);
-
-  const confirmDeleteJobs = useCallback(async () => {
-    if (!sourceToDeleteJobs) return;
-
-    if (deletionType === 'hard' && !deletionReason.trim()) {
-      toast.error('Deletion reason is required for hard delete');
-      return;
-    }
-
-    setDeletingJobs(true);
-    try {
-      const res = await fetch('/api/admin/crawl/delete-jobs-by-source', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          source_id: sourceToDeleteJobs.id,
-          deletion_type: deletionType,
-          trigger_crawl: deleteJobsTriggerCrawl,
-          dry_run: deleteJobsDryRun,
-          deletion_reason: deletionReason || undefined,
-          export_data: deleteJobsExportData,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || data.detail || 'Failed to delete jobs');
-      }
-
-      if (data.status === 'ok') {
-        setDeletionResult(data);
-        if (deleteJobsDryRun) {
-          setShowDeletionResult(true);
-        } else {
-          toast.success(`Successfully ${deletionType === 'soft' ? 'soft-deleted' : 'hard-deleted'} ${data.data?.deleted_count || 0} jobs`);
-          setShowDeleteJobsModal(false);
-          setSourceToDeleteJobs(null);
-          setDeletionResult(null);
-          setDeletionReason('');
-          setDeleteJobsDryRun(true);
-          setDeleteJobsTriggerCrawl(true);
-          setDeleteJobsExportData(false);
-          // Refresh sources list
-          fetchSources();
-        }
-      } else {
-        throw new Error(data.error || 'Failed to delete jobs');
-      }
-    } catch (error) {
-      console.error('Failed to delete jobs:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete jobs');
-    } finally {
-      setDeletingJobs(false);
-    }
-  }, [sourceToDeleteJobs, deletionType, deletionReason, deleteJobsTriggerCrawl, deleteJobsDryRun, deleteJobsExportData, fetchSources]);
-
-  const handleDeleteSource = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this source? This action cannot be undone.')) return;
-
-    setDeletingSourceId(id);
-    try {
-      toast.info('Deleting source...');
-      
-      const res = await fetch(`/api/admin/sources/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (res.status === 401) {
-        router.push('/admin/login');
-        return;
-      }
-
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => 'Unknown error');
-        console.error('Delete source error:', res.status, errorText);
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { error: errorText, detail: errorText };
-        }
-        const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to delete source`;
-        throw new Error(errorMsg);
-      }
-
-      const json = await res.json();
-      if (json.status === 'ok') {
-        toast.success('Source deleted successfully');
-        fetchSources();
-      } else {
-        throw new Error(json.error || 'Failed to delete source');
-      }
-    } catch (error) {
-      console.error('Failed to delete source:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Failed to delete source';
-      toast.error(errorMsg);
-    } finally {
-      setDeletingSourceId(null);
     }
   };
 
@@ -1258,7 +1104,7 @@ export default function AdminSourcesPage() {
                             onClick={() => handleRunNow(source.id)}
                             disabled={runningSourceId === source.id}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#0071E3] bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group border border-[#0071E3] border-opacity-30"
-                            title="Run crawl (enterprise-grade)"
+                            title="Run crawl now"
                           >
                             {runningSourceId === source.id ? (
                               <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
@@ -1266,7 +1112,7 @@ export default function AdminSourcesPage() {
                               <Play className="w-4 h-4 text-[#0071E3]" />
                             )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                              Run crawl
+                              Run crawl now
                             </span>
                           </button>
                           <button
@@ -1296,95 +1142,6 @@ export default function AdminSourcesPage() {
                               Edit
                             </span>
                           </button>
-                          {source.status === 'deleted' ? (
-                            <button
-                              onClick={async () => {
-                                if (!confirm('Are you sure you want to permanently delete this source? This action cannot be undone and will delete all associated crawl logs.')) return;
-                                
-                                setDeletingSourceId(source.id);
-                                try {
-                                  toast.info('Permanently deleting source...');
-                                  
-                                  const res = await fetch(`/api/admin/sources/${source.id}/permanent`, {
-                                    method: 'DELETE',
-                                    credentials: 'include',
-                                  });
-
-                                  if (res.status === 401) {
-                                    router.push('/admin/login');
-                                    return;
-                                  }
-
-                                  if (!res.ok) {
-                                    const errorText = await res.text().catch(() => 'Unknown error');
-                                    console.error('Permanent delete error:', res.status, errorText);
-                                    let errorData;
-                                    try {
-                                      errorData = JSON.parse(errorText);
-                                    } catch {
-                                      errorData = { error: errorText, detail: errorText };
-                                    }
-                                    const errorMsg = errorData.error || errorData.detail || `HTTP ${res.status}: Failed to permanently delete source`;
-                                    throw new Error(errorMsg);
-                                  }
-
-                                  const json = await res.json();
-                                  if (json.status === 'ok') {
-                                    toast.success('Source permanently deleted');
-                                    fetchSources();
-                                  } else {
-                                    throw new Error(json.error || 'Failed to permanently delete source');
-                                  }
-                                } catch (error: any) {
-                                  console.error('Failed to permanently delete source:', error);
-                                  const errorMsg = error instanceof Error ? error.message : 'Failed to permanently delete source';
-                                  toast.error(errorMsg);
-                                } finally {
-                                  setDeletingSourceId(null);
-                                }
-                              }}
-                              disabled={deletingSourceId === source.id}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#FF3B30] hover:bg-[#FF2D20] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                              title="Permanently delete"
-                            >
-                              {deletingSourceId === source.id ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4 text-white" />
-                              )}
-                              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                                Permanently delete
-                              </span>
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => handleDeleteJobs(source)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                                title="Delete all jobs from this source"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                                  Delete Jobs
-                                </span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteSource(source.id)}
-                                disabled={deletingSourceId === source.id}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                                title="Delete source"
-                              >
-                                {deletingSourceId === source.id ? (
-                                  <div className="w-4 h-4 border-2 border-[#FF3B30] border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4 text-[#FF3B30]" />
-                                )}
-                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                                  Delete Source
-                                </span>
-                              </button>
-                            </>
-                          )}
                           <button
                             onClick={() => handleTestSource(source.id)}
                             disabled={testLoading}
@@ -1433,11 +1190,11 @@ export default function AdminSourcesPage() {
                           <button
                             onClick={() => router.push(`/admin/sources/${source.id}`)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
-                            title="View crawl details"
+                            title="Source details and delete options"
                           >
                             <Info className="w-4 h-4 text-[#0071E3]" />
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                              View crawl details
+                              Source details and delete options
                             </span>
                           </button>
                         </div>
@@ -2421,320 +2178,6 @@ export default function AdminSourcesPage() {
             </div>
           </div>
         </>
-      )}
-
-      {/* Enterprise Job Deletion Modal */}
-      {showDeleteJobsModal && sourceToDeleteJobs && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full border border-[#D2D2D7] max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-[#D2D2D7] flex items-center justify-between sticky top-0 bg-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <Shield className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#1D1D1F]">Delete All Jobs</h3>
-                  <p className="text-sm text-[#86868B]">Enterprise-grade deletion with audit trail</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDeleteJobsModal(false);
-                  setSourceToDeleteJobs(null);
-                  setDeletionResult(null);
-                  setShowDeletionResult(false);
-                }}
-                className="p-1 hover:bg-[#F5F5F7] rounded transition-colors"
-              >
-                <X className="w-5 h-5 text-[#86868B]" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-4 space-y-4">
-              {/* Source Info */}
-              <div className="p-4 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
-                <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-4 h-4 text-[#86868B]" />
-                  <span className="text-sm font-semibold text-[#1D1D1F]">Source</span>
-                </div>
-                <p className="text-sm text-[#1D1D1F] font-medium">{sourceToDeleteJobs.org_name}</p>
-                <p className="text-xs text-[#86868B] mt-1 break-all">{sourceToDeleteJobs.careers_url}</p>
-              </div>
-
-              {/* Impact Analysis */}
-              {loadingImpact ? (
-                <div className="p-4 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
-                  <div className="flex items-center gap-2 text-[#86868B]">
-                    <div className="w-4 h-4 border-2 border-[#86868B] border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">Analyzing deletion impact...</span>
-                  </div>
-                </div>
-              ) : deletionImpact ? (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-start gap-3 mb-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-amber-900 mb-2">Deletion Impact Analysis</p>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-amber-700">Total Jobs:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.total_jobs || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-700">Active Jobs:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.active_jobs || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-700">User Shortlists:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.shortlists_count || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-700">Enrichment Reviews:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.enrichment_reviews_count || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-700">Enrichment History:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.enrichment_history_count || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-amber-700">Ground Truth Data:</span>
-                          <span className="font-semibold text-amber-900 ml-2">{deletionImpact.ground_truth_count || 0}</span>
-                        </div>
-                      </div>
-                      {(deletionImpact.shortlists_count > 0 || deletionImpact.enrichment_history_count > 0) && (
-                        <p className="text-xs text-amber-700 mt-2">
-                          ⚠️ Related data will also be deleted (cascade delete)
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Deletion Type Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-[#1D1D1F] flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Deletion Type
-                </label>
-                <div className="flex gap-3">
-                  <label className="flex-1 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
-                    <input
-                      type="radio"
-                      name="deletionType"
-                      value="soft"
-                      checked={deletionType === 'soft'}
-                      onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
-                      className="mr-2"
-                    />
-                    <div>
-                      <div className="font-medium text-[#1D1D1F]">Soft Delete</div>
-                      <div className="text-xs text-[#86868B] mt-1">
-                        Mark as deleted (recoverable within retention period)
-                      </div>
-                    </div>
-                  </label>
-                  <label className="flex-1 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-[#F5F5F7]">
-                    <input
-                      type="radio"
-                      name="deletionType"
-                      value="hard"
-                      checked={deletionType === 'hard'}
-                      onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
-                      className="mr-2"
-                    />
-                    <div>
-                      <div className="font-medium text-[#1D1D1F]">Hard Delete</div>
-                      <div className="text-xs text-[#86868B] mt-1">
-                        Permanently remove (cannot be recovered)
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Deletion Reason (Required for hard delete) */}
-              {deletionType === 'hard' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-[#1D1D1F]">
-                    Deletion Reason <span className="text-red-600">*</span>
-                  </label>
-                  <textarea
-                    value={deletionReason}
-                    onChange={(e) => setDeletionReason(e.target.value)}
-                    placeholder="Explain why you're performing a hard delete (required for audit trail)"
-                    className="w-full px-3 py-2 border border-[#D2D2D7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows={3}
-                  />
-                  <p className="text-xs text-[#86868B]">
-                    This reason will be logged in the audit trail for compliance
-                  </p>
-                </div>
-              )}
-
-              {/* Options */}
-              <div className="space-y-3 p-4 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={deleteJobsDryRun}
-                    onChange={(e) => setDeleteJobsDryRun(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-[#D2D2D7] rounded focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-[#1D1D1F]">Dry Run Mode</span>
-                    <p className="text-xs text-[#86868B]">
-                      Preview deletion without actually deleting (recommended first step)
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={deleteJobsExportData}
-                    onChange={(e) => setDeleteJobsExportData(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-[#D2D2D7] rounded focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-[#1D1D1F]">Export Data Before Deletion</span>
-                    <p className="text-xs text-[#86868B]">
-                      Download job data as JSON before deletion (backup)
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={deleteJobsTriggerCrawl}
-                    onChange={(e) => setDeleteJobsTriggerCrawl(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-[#D2D2D7] rounded focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-[#1D1D1F]">Trigger Fresh Crawl After Deletion</span>
-                    <p className="text-xs text-[#86868B]">
-                      Automatically start a new crawl to repopulate jobs with correct data
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={confirmDeleteJobs}
-                  disabled={deletingJobs || (deletionType === 'hard' && !deletionReason.trim())}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-                >
-                  {deletingJobs ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {deleteJobsDryRun ? 'Analyzing...' : 'Deleting...'}
-                    </>
-                  ) : (
-                    <>
-                      {deleteJobsDryRun ? (
-                        <>
-                          <TestTube className="w-4 h-4" />
-                          Run Dry-Run Analysis
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="w-4 h-4" />
-                          {deletionType === 'soft' ? 'Soft Delete Jobs' : 'Hard Delete Jobs'}
-                        </>
-                      )}
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteJobsModal(false);
-                    setSourceToDeleteJobs(null);
-                    setDeletionResult(null);
-                    setShowDeletionResult(false);
-                  }}
-                  disabled={deletingJobs}
-                  className="flex-1 px-4 py-2.5 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Deletion Result Modal (for dry-run results) */}
-      {showDeletionResult && deletionResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-xl w-full border border-[#D2D2D7]">
-            <div className="px-6 py-4 border-b border-[#D2D2D7] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Info className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#1D1D1F]">Dry Run Results</h3>
-                  <p className="text-sm text-[#86868B]">Preview of what would be deleted</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDeletionResult(false);
-                  setDeleteJobsDryRun(false); // Allow actual deletion now
-                }}
-                className="p-1 hover:bg-[#F5F5F7] rounded transition-colors"
-              >
-                <X className="w-5 h-5 text-[#86868B]" />
-              </button>
-            </div>
-
-            <div className="px-6 py-4 space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
-                  <strong>{deletionResult.would_delete || deletionResult.deletion?.count || 0} jobs</strong> would be {deletionType} deleted
-                </p>
-              </div>
-
-              {deletionResult.impact && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-[#1D1D1F]">Impact Summary:</p>
-                  <div className="text-sm text-[#86868B] space-y-1">
-                    <p>• {deletionResult.impact.shortlists_count || 0} user shortlists would be removed</p>
-                    <p>• {deletionResult.impact.enrichment_history_count || 0} enrichment history records would be removed</p>
-                    <p>• {deletionResult.impact.enrichment_reviews_count || 0} enrichment reviews would be removed</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setShowDeletionResult(false);
-                    setDeleteJobsDryRun(false);
-                    // Proceed with actual deletion
-                    confirmDeleteJobs();
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                >
-                  Proceed with Deletion
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeletionResult(false);
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
