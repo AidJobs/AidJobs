@@ -158,7 +158,7 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-04. False "listing page" alarm in Data Quality
 
-**Status:** Built on 24 October 2026 in the pull request on branch `ux-04/data-quality-listing`; waiting for the user's review. Not merged, not deployed.
+**Status:** Done 24 October 2026. PR #35, merged as `124cc3f` with the user's approval; CI passed on `124cc3f`; the user confirmed Render live on `124cc3f`; live check passed the same day (below).
 
 What was found and done (24 October 2026):
 - The code on `main` counted a job as a listing page when its apply link contained `/jobs` or `/careers` anywhere, host included (SQL `LIKE`, in the per-source and global reports and in the sources-with-issues list); the per-job check in `validate_job` used a word list against the whole link. The per-source report also failed on every call: its `LIKE '%/jobs%'` sat in a query with a `%s` parameter, so the database driver read the `%` signs as placeholders and raised `IndexError` (seen on all three sources, read-only). The admin per-source Data Quality view could never load.
@@ -181,7 +181,9 @@ Remaining after UX-04:
 - Pages that are neither jobs nor listings, such as the UNICEF careers articles, are not counted by this check. Admission rejects them at crawl time (`root_careers_page`, `social_profile`, `vendor_badge`).
 - A listing address that ends in a number, such as ICRC's `/go/Global-Opportunities/8821501/`, is not classified as a listing. No job links to it today.
 - `app/data_quality.py` is not in CI's Ruff list. It has three style findings (import order, one long line, one unused variable), all already on `main`; `main` had five, and the change removes two.
-- Still to do: the admin Data Quality page checked on the preview and, after merge, live, with the guard.
+- The Data Quality page lists only sources with issues, so with none it reads "No source quality data available" (moved to UX-05).
+
+Live check, 24 October 2026, after the merge (Verified). The read-only comparison was run again on the merged code, read-only confirmed: the same figures as above. The user signed in to the admin in Cursor's browser; with the read-only guard installed and tested (a dummy POST blocked through both `fetch` and `XMLHttpRequest`), and no control clicked, the live Data Quality page read: Global Quality Score 100.0; Total Jobs 322 across 3 sources; Unique URLs 322 (100.0%); Issues Detected 0; Null URLs 0; Listing Page URLs 0; Sources with Issues 0. The page's own per-source request, sent as a GET for each source, answered `200` with `status: ok` for UNICEF (301 jobs), ICRC (14), and Oxfam GB (7): 0 listing pages, 0 null links, 0 duplicates, score 100 each. On the old code each of these failed, so this also shows the new code is live. The tab was reloaded afterwards to remove the guard. The preview was not used for this check: previews call the production backend, which ran the old code until the merge.
 
 - **Scope:** `apps/backend/app/data_quality.py` counts a job as pointing to a listing page by matching `/jobs`, `/careers`, `/vacancies`, `/opportunities`, `/list`, or `/search` anywhere in `apply_url`, which matches host names such as `jobs.unicef.org`. Match the path only, and define "listing page" so verified vacancy links (UNICEF `/job/{id}/…`, ICRC `/job/…/{id}`, Oxfam `/jobs/vacancy/…/description/`) are not flagged. Both queries in the file. Tests with those three real link shapes and a real listing link.
 - **Not in scope:** the score formula otherwise; other checks.
@@ -198,9 +200,10 @@ Remaining after UX-04:
   - Dashboard "Recent activity" reads "No recent activity" while Crawls lists crawls: show the latest crawl runs, or remove the card.
   - Settings shows "AI: Configured" while every call fails with `401` because the key was revoked, and "Meilisearch: Not configured" while the dashboard reports an invalid response. Report what is true: key present or absent, and the last call's outcome where known.
   - Replace "Check console for details" with a plain message.
+  - Data Quality, "Source Quality Reports" (found 24 October 2026, after UX-04): the list is built from the global report's sources with issues, so when every source is healthy it reads "No source quality data available" and no source's report can be opened, although each report loads. The same message also shows when the reports fail to load, which hid the per-source failure fixed in UX-04. Separate three states: all sources healthy (every source listed with its score, each report still openable, worded as no issues found); some sources with issues (those marked, healthy sources still listed); a report that failed to load (an error message, never "no data"). The list of sources needs its own source of truth, not the issues list; the plan confirms which existing endpoint serves it.
 - **Not in scope:** fixing Meilisearch (W-18) or AI (W-14); the menu change (UX-19).
 - **Depends on:** UX-04.
-- **Acceptance:** every number on the dashboard, Jobs, and Data Quality has a label saying what it counts, and the same quantity shows the same value everywhere; recent activity matches the Crawls page; AI and search status match reality on 20 October terms (AI failing, search on the database).
+- **Acceptance:** every number on the dashboard, Jobs, and Data Quality has a label saying what it counts, and the same quantity shows the same value everywhere; Data Quality lists every source when none has issues and tells "no issues found", "no data", and "failed to load" apart; recent activity matches the Crawls page; AI and search status match reality on 20 October terms (AI failing, search on the database).
 - **Verify:** with the guard, compare the dashboard, Jobs, Data Quality, Crawls, and Settings on the preview and live; the user confirms totals with one read-only SQL count if needed.
 
 ### UX-06. Admin delete safety and dead controls
