@@ -158,7 +158,30 @@ Within the existing contract: these repair behaviour; they add no public search 
 
 ### UX-04. False "listing page" alarm in Data Quality
 
-**Status:** Not started.
+**Status:** Built on 24 October 2026 in the pull request on branch `ux-04/data-quality-listing`; waiting for the user's review. Not merged, not deployed.
+
+What was found and done (24 October 2026):
+- The code on `main` counted a job as a listing page when its apply link contained `/jobs` or `/careers` anywhere, host included (SQL `LIKE`, in the per-source and global reports and in the sources-with-issues list); the per-job check in `validate_job` used a word list against the whole link. The per-source report also failed on every call: its `LIKE '%/jobs%'` sat in a query with a `%s` parameter, so the database driver read the `%` signs as placeholders and raised `IndexError` (seen on all three sources, read-only). The admin per-source Data Quality view could never load.
+- The fix is one rule, `is_listing_url` in `apps/backend/app/data_quality.py`, used by all four places. It reads the path only, ignoring host, query string, letter case, trailing slashes, and page extensions (`.html`, `.aspx`, `.php`, `.jsp`). A link is a job when a job word (`job`, `jobs`, `vacancy`, `vacancies`, `position`, `positions`, `posting`, `requisition`) is followed later in the path by a segment with an identifier (three or more digits, or a hex id of eight or more characters); a job link is never a listing, whatever word it ends in. Otherwise it is a listing when it has no path or its last segment is a listing word (`jobs`, `careers`, `vacancies`, `listing`, `search`, `home`, `internships`, and similar). A value that is not an absolute `http` or `https` address is not classified. The SQL counts are replaced by the same rule applied in Python to the fetched links. The score formula, the crawler, ingestion, and the admin interface are unchanged; nothing in the crawler or ingestion calls this module.
+- Tests: `apps/backend/tests/test_data_quality_listing.py`, 41 tests, added to CI's Ruff and pytest lists. They cover the real UNICEF, ICRC, and Oxfam job links; real listing pages; job links ending in a listing word (`/job/12345/search`); capitals; query strings; trailing slashes; links with no path; malformed and relative values; host names containing `jobs` or `careers`; and both reports counting through the rule. Local result: CI's Ruff list passes; CI's pytest list, 282 passed.
+- Live comparison, read-only (24 October 2026): every connection was opened read-only and checked with `SHOW transaction_read_only` = `on` before any query. Both the code on `main` and the new code ran against the live database; every link was also classified locally under both rules.
+
+| Measure, jobs not deleted (322, all active) | `main` | New |
+| --- | --- | --- |
+| Listing pages, global report | 322 | 0 |
+| Global quality score | 75.0 | 100.0 |
+| Sources with issues | 3 | 0 |
+| Per-source report, UNICEF (301 jobs) | fails (`IndexError`) | 0 listing pages, score 100.0 |
+| Per-source report, ICRC (14 jobs) | fails (`IndexError`) | 0 listing pages, score 100.0 |
+| Per-source report, Oxfam GB (7 jobs) | fails (`IndexError`) | 0 listing pages, score 100.0 |
+
+All 322 were flagged by the old rule only; none by both rules or by the new rule only. Their shapes: UNICEF `jobs.unicef.org/en-us/job/{id}/{title}` (301, for example `https://jobs.unicef.org/en-us/job/585973/emergency-officer-no1-sokoto-nigeria-134792-temp-appointment`), ICRC `careers.icrc.org/job/{title}/{id}` (14, for example `…/job/Geneva-%28GVA%29-WatHab-WaSH-Project-Manager-33632/1448577233`), Oxfam `jobs.oxfam.org.uk/jobs/vacancy/{title}/{id}/description/` (7, for example `…/jobs/vacancy/finance-officer-int11802/25026/description/`). No null links, no duplicate links. The 16 soft-deleted jobs, which the reports exclude, were also checked: the new rule flags the two real listing pages (`https://www.unicef.org/careers`, `https://www.unicef.org/careers/internships`), and flags neither the 8 UNICEF careers articles (`www.unicef.org/careers/{article}`) nor the 6 social, badge, and reporting links. The old rule flagged the listing pages and the 8 articles.
+
+Remaining after UX-04:
+- Pages that are neither jobs nor listings, such as the UNICEF careers articles, are not counted by this check. Admission rejects them at crawl time (`root_careers_page`, `social_profile`, `vendor_badge`).
+- A listing address that ends in a number, such as ICRC's `/go/Global-Opportunities/8821501/`, is not classified as a listing. No job links to it today.
+- `app/data_quality.py` is not in CI's Ruff list. It has three style findings (import order, one long line, one unused variable), all already on `main`; `main` had five, and the change removes two.
+- Still to do: the admin Data Quality page checked on the preview and, after merge, live, with the guard.
 
 - **Scope:** `apps/backend/app/data_quality.py` counts a job as pointing to a listing page by matching `/jobs`, `/careers`, `/vacancies`, `/opportunities`, `/list`, or `/search` anywhere in `apply_url`, which matches host names such as `jobs.unicef.org`. Match the path only, and define "listing page" so verified vacancy links (UNICEF `/job/{id}/…`, ICRC `/job/…/{id}`, Oxfam `/jobs/vacancy/…/description/`) are not flagged. Both queries in the file. Tests with those three real link shapes and a real listing link.
 - **Not in scope:** the score formula otherwise; other checks.
