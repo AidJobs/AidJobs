@@ -3,24 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Database, TrendingDown, TrendingUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
-
-type SourceQuality = {
-  source_id: string;
-  source_name: string | null;
-  source_url: string;
-  total_jobs: number;
-  unique_urls: number;
-  null_urls: number;
-  listing_page_urls: number;
-  missing_titles: number;
-  short_titles: number;
-  duplicate_urls: Array<{
-    url: string;
-    count: number;
-    titles: string[];
-  }>;
-  quality_score: number;
-};
+import {
+  COUNT_LABELS,
+  qualityList,
+  type ReportResult,
+  type SourceQuality,
+  type SourceRow,
+} from '@/lib/admin/status';
 
 type GlobalQuality = {
   total_jobs: number;
@@ -38,13 +27,15 @@ type GlobalQuality = {
 
 export default function DataQualityPage() {
   const [globalQuality, setGlobalQuality] = useState<GlobalQuality | null>(null);
-  const [sources, setSources] = useState<SourceQuality[]>([]);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [sourceRows, setSourceRows] = useState<SourceRow[] | null>(null);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  const [reports, setReports] = useState<Record<string, ReportResult | undefined>>({});
   const [loading, setLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [sourceDetails, setSourceDetails] = useState<SourceQuality | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const fetchGlobalQuality = useCallback(async () => {
+    setGlobalError(null);
     try {
       const response = await fetch('/api/admin/data-quality/global', {
         credentials: 'include',
@@ -52,6 +43,7 @@ export default function DataQualityPage() {
       if (!response.ok) {
         if (response.status === 401) {
           toast.error('Authentication required. Please login.');
+          setGlobalError('Authentication required');
           return;
         }
         throw new Error(`HTTP ${response.status}`);
@@ -64,91 +56,82 @@ export default function DataQualityPage() {
       }
     } catch (error) {
       console.error('Failed to fetch global quality:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch global quality');
+      setGlobalQuality(null);
+      setGlobalError(error instanceof Error ? error.message : 'Failed to fetch global quality');
     }
   }, []);
 
-  const fetchSourceQuality = useCallback(async (sourceId: string) => {
-    setLoadingDetails(true);
+  const fetchReport = useCallback(async (sourceId: string) => {
+    setReports((prev) => ({ ...prev, [sourceId]: undefined }));
+    let result: ReportResult;
     try {
       const response = await fetch(`/api/admin/data-quality/source/${sourceId}`, {
         credentials: 'include',
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      if (data.status === 'ok' && data.data) {
-        // Ensure quality_score exists
-        if (typeof data.data.quality_score !== 'number') {
-          data.data.quality_score = 0;
-        }
-        setSourceDetails(data.data);
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.status === 'ok' && data.data) {
+        const report = data.data;
+        result = {
+          ok: true,
+          report: {
+            ...report,
+            duplicate_urls: report.duplicate_urls || [],
+            quality_score: report.quality_score ?? 0,
+            total_jobs: report.total_jobs ?? 0,
+            unique_urls: report.unique_urls ?? 0,
+            null_urls: report.null_urls ?? 0,
+            listing_page_urls: report.listing_page_urls ?? 0,
+          },
+        };
       } else {
-        throw new Error(data.error || 'Failed to fetch source quality');
+        result = { ok: false, error: data?.error || data?.detail || `HTTP ${response.status}` };
       }
     } catch (error) {
-      console.error('Failed to fetch source quality:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch source quality');
-      setSourceDetails(null);
-    } finally {
-      setLoadingDetails(false);
+      result = { ok: false, error: error instanceof Error ? error.message : 'No answer' };
     }
+    setReports((prev) => ({ ...prev, [sourceId]: result }));
   }, []);
 
-  const fetchAllSources = useCallback(async () => {
-    // For now, we'll fetch top issue sources from global quality
-    // In a full implementation, we'd have a list endpoint
-    if (globalQuality?.top_issue_sources) {
-      const sourcePromises = globalQuality.top_issue_sources.slice(0, 10).map(source =>
-        fetch(`/api/admin/data-quality/source/${source.source_id}`, {
-          credentials: 'include',
-        }).then(res => res.json())
-      );
+  const loadSources = useCallback(async () => {
+    setSourcesError(null);
+    setReports({});
+    const size = 100;
+    const rows: SourceRow[] = [];
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const response = await fetch(`/api/admin/sources?page=${page}&size=${size}`, { credentials: 'include' });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || data?.status !== 'ok' || !Array.isArray(data.data?.items)) {
+          throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+        rows.push(...data.data.items);
+        if (data.data.items.length < size || rows.length >= (data.data.total ?? 0)) break;
+      }
+    } catch (error) {
+      setSourceRows(null);
+      setSourcesError(error instanceof Error ? error.message : 'No answer');
+      return;
+    }
+    setSourceRows(rows);
+    await Promise.all(rows.filter((s) => s.status !== 'deleted').map((s) => fetchReport(s.id)));
+  }, [fetchReport]);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const sourcesDone = loadSources();
+    await fetchGlobalQuality();
+    setLoading(false);
+    await sourcesDone;
+  }, [fetchGlobalQuality, loadSources]);
+
       
-      const results = await Promise.allSettled(sourcePromises);
-      const qualityData = results
-        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-        .map(r => r.value)
-        .filter(r => r && r.status === 'ok' && r.data)
-        .map(r => {
-          // Ensure all required fields have defaults
-          const data = r.data;
-          return {
-            ...data,
-            duplicate_urls: data.duplicate_urls || [],
-            quality_score: data.quality_score ?? 0,
-            total_jobs: data.total_jobs ?? 0,
-            unique_urls: data.unique_urls ?? 0,
-            null_urls: data.null_urls ?? 0,
-            listing_page_urls: data.listing_page_urls ?? 0,
-          };
-        });
-      setSources(qualityData);
-    }
-  }, [globalQuality]);
-
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchGlobalQuality();
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchGlobalQuality]);
+    loadAll();
+  }, [loadAll]);
 
-  useEffect(() => {
-    if (globalQuality) {
-      fetchAllSources();
-    }
-  }, [globalQuality, fetchAllSources]);
-
-  useEffect(() => {
-    if (selectedSource) {
-      fetchSourceQuality(selectedSource);
-    }
-  }, [selectedSource, fetchSourceQuality]);
+  const list = qualityList(sourceRows, sourcesError, reports);
+  const selectedResult = selectedSource ? reports[selectedSource] : undefined;
+  const sourceDetails: SourceQuality | null = selectedResult && selectedResult.ok ? selectedResult.report : null;
 
   const getQualityColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -314,8 +297,7 @@ export default function DataQualityPage() {
             </div>
             <button
               onClick={() => {
-                setLoading(true);
-                fetchGlobalQuality().finally(() => setLoading(false));
+                loadAll();
               }}
               className="px-4 py-2 bg-[#007AFF] text-white rounded-lg hover:bg-[#0051D5] transition-colors flex items-center gap-2"
             >
@@ -324,6 +306,18 @@ export default function DataQualityPage() {
             </button>
           </div>
         </div>
+
+        {globalError && (
+          <div className="mb-8 p-4 rounded-xl border border-red-200 bg-red-50 flex items-center justify-between gap-4">
+            <p className="text-sm text-red-700">Could not load the overall report: {globalError}</p>
+            <button
+              onClick={() => fetchGlobalQuality()}
+              className="px-3 py-1.5 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-100 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Global Quality Overview */}
         {globalQuality && (
@@ -340,11 +334,11 @@ export default function DataQualityPage() {
             />
 
             <QualityMetricCard
-              label="Total Jobs"
+              label={COUNT_LABELS.activeJobs}
               value={globalQuality.total_jobs.toLocaleString()}
               subtitle={`Across ${globalQuality.total_sources} sources`}
               icon={<CheckCircle className="w-5 h-5 text-green-600" />}
-              tooltip="Total number of jobs in the system across all sources."
+              tooltip={`${COUNT_LABELS.activeJobsHelp}. The public site shows only those whose deadline has not passed.`}
               score={null}
               getQualityBg={getQualityBg}
               getQualityColor={getQualityColor}
@@ -398,7 +392,7 @@ export default function DataQualityPage() {
               title="Sources with Issues"
               value={globalQuality.sources_with_issues.toString()}
               description="Sources requiring attention"
-              tooltip="Number of sources that have at least one data quality issue. Click on sources in the list below to see detailed quality reports."
+              tooltip="Sources with at least one job missing its apply link or linking to a listing page. Every source is listed below; click one to see its report."
             />
           </div>
         )}
@@ -408,37 +402,93 @@ export default function DataQualityPage() {
           <div className="px-6 py-4 border-b border-[#D2D2D7]">
             <h2 className="text-xl font-semibold text-[#1D1D1F]">Source Quality Reports</h2>
             <p className="text-sm text-[#86868B] mt-1">Click on a source to view detailed quality metrics</p>
+            {list.state !== 'failed' && list.state !== 'no-sources' && (
+              <p
+                className={`text-sm mt-2 font-medium ${
+                  list.state === 'all-healthy'
+                    ? 'text-green-700'
+                    : list.state === 'loading'
+                    ? 'text-[#86868B]'
+                    : list.state === 'some-issues'
+                    ? 'text-yellow-700'
+                    : 'text-red-700'
+                }`}
+              >
+                {list.summary}
+              </p>
+            )}
           </div>
           
-          {sources.length === 0 ? (
+          {list.state === 'failed' ? (
+            <div className="p-12 text-center">
+              <XCircle className="w-12 h-12 mx-auto mb-4 text-red-600" />
+              <p className="text-red-700 mb-4">{list.summary}</p>
+              <button
+                onClick={() => loadSources()}
+                className="px-3 py-1.5 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-100 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : list.state === 'no-sources' ? (
             <div className="p-12 text-center">
               <Database className="w-12 h-12 mx-auto mb-4 text-[#86868B]" />
-              <p className="text-[#86868B]">No source quality data available</p>
+              <p className="text-[#86868B]">{list.summary}</p>
             </div>
           ) : (
             <div className="divide-y divide-[#D2D2D7]">
-              {sources.map((source) => (
+              {list.rows.map(({ source: row, result, issues }) => {
+                const source = result && result.ok ? result.report : null;
+                if (!source) {
+                  return (
+                    <div key={row.id} className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-[#1D1D1F] mb-1">{row.org_name || 'Unnamed Source'}</h3>
+                          <p className="text-sm text-[#86868B] truncate">{row.careers_url}</p>
+                        </div>
+                        {result && !result.ok ? (
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className="text-sm text-red-700">Report could not be loaded: {result.error}</span>
+                            <button
+                              onClick={() => fetchReport(row.id)}
+                              className="px-3 py-1.5 text-sm rounded-lg border border-red-300 text-red-700 hover:bg-red-100 transition-colors"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-[#86868B] flex-shrink-0">Loading report…</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
                 <div
-                  key={source.source_id}
-                  onClick={() => setSelectedSource(source.source_id)}
+                  key={row.id}
+                  onClick={() => setSelectedSource(row.id)}
                   className={`p-6 hover:bg-[#F5F5F7] cursor-pointer transition-colors ${
-                    selectedSource === source.source_id ? 'bg-[#F5F5F7]' : ''
+                    selectedSource === row.id ? 'bg-[#F5F5F7]' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-semibold text-[#1D1D1F]">
-                          {source.source_name || 'Unnamed Source'}
+                          {source.source_name || row.org_name || 'Unnamed Source'}
                         </h3>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getQualityBg(source.quality_score || 0)} ${getQualityColor(source.quality_score || 0)}`}>
                           Score: {(source.quality_score ?? 0).toFixed(1)}
                         </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${issues ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                          {issues ? 'Has issues' : 'No issues found'}
+                        </span>
                       </div>
-                      <p className="text-sm text-[#86868B] mb-3">{source.source_url}</p>
+                      <p className="text-sm text-[#86868B] mb-3">{source.source_url || row.careers_url}</p>
                       <div className="flex items-center gap-6 text-sm">
-                        <span className="text-[#86868B]">
-                          <span className="font-medium text-[#1D1D1F]">{source.total_jobs}</span> jobs
+                        <span className="text-[#86868B]" title={COUNT_LABELS.notDeleted}>
+                          <span className="font-medium text-[#1D1D1F]">{source.total_jobs}</span> jobs (not deleted, any status)
                         </span>
                         <span className="text-[#86868B]">
                           <span className="font-medium text-[#1D1D1F]">{source.unique_urls}</span> unique URLs
@@ -462,7 +512,8 @@ export default function DataQualityPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -478,7 +529,6 @@ export default function DataQualityPage() {
                 <button
                   onClick={() => {
                     setSelectedSource(null);
-                    setSourceDetails(null);
                   }}
                   className="p-2 hover:bg-[#F5F5F7] rounded-lg transition-colors"
                 >
@@ -489,7 +539,7 @@ export default function DataQualityPage() {
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-lg border border-[#D2D2D7]">
-                    <div className="text-sm text-[#86868B] mb-1">Total Jobs</div>
+                    <div className="text-sm text-[#86868B] mb-1">{COUNT_LABELS.notDeleted}</div>
                     <div className="text-2xl font-bold text-[#1D1D1F]">{sourceDetails.total_jobs}</div>
                   </div>
                   <div className="p-4 rounded-lg border border-[#D2D2D7]">

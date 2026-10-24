@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { jobsCountScope } from '@/lib/admin/status';
 import {
   Search, Filter, Trash2, RefreshCw, Download, RotateCcw, AlertTriangle,
   CheckCircle, XCircle, Calendar, Building2, Globe, FileText, Info,
@@ -557,7 +558,7 @@ export default function JobManagementPage() {
           <div className="flex items-center justify-between mb-3 text-xs text-[#86868B]">
             <div>
               {total > 0
-                ? `Showing ${(page - 1) * size + 1}–${Math.min(page * size, total)} of ${total} jobs` +
+                ? `Showing ${(page - 1) * size + 1}–${Math.min(page * size, total)} of ${total} jobs (${jobsCountScope(filters.status, filters.include_deleted)})` +
                   (filters.org_name
                     ? ` for "${filters.org_name}"`
                     : filters.query
@@ -907,7 +908,7 @@ export default function JobManagementPage() {
           {total > 0 && (
           <div className="px-6 py-4 border-t border-[#D2D2D7] flex items-center justify-between">
             <div className="text-sm text-[#86868B]">
-              Showing {(page - 1) * size + 1} to {Math.min(page * size, total)} of {total} jobs
+              Showing {(page - 1) * size + 1} to {Math.min(page * size, total)} of {total} jobs ({jobsCountScope(filters.status, filters.include_deleted)})
             </div>
               <div className="flex items-center gap-2">
                 <button

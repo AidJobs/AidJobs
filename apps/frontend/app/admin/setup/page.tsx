@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info, MinusCircle } from 'lucide-react';
+import { aiKeyStatus, databaseStatus, meiliSetupStatus, type SearchStatus, type Tone } from '@/lib/admin/status';
 
 type ProviderStatus = 'ok' | 'warn' | 'fail';
 
@@ -14,6 +15,7 @@ type SetupStatus = {
 
 export default function AdminSetupPage() {
   const [status, setStatus] = useState<SetupStatus | null>(null);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -24,7 +26,11 @@ export default function AdminSetupPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/setup/status', { credentials: 'include' });
+      const [res, searchBody] = await Promise.all([
+        fetch('/api/admin/setup/status', { credentials: 'include' }),
+        fetch('/api/search/status').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+      setSearchStatus(searchBody);
       
       console.log('[Setup] Response:', res.status, res.ok);
       
@@ -49,26 +55,18 @@ export default function AdminSetupPage() {
     }
   };
 
-  const getStatusIcon = (status: ProviderStatus | boolean) => {
-    if (status === 'ok' || status === true) {
-      return <CheckCircle className="w-5 h-5 text-green-600" />;
-    } else if (status === 'warn') {
-      return <AlertCircle className="w-5 h-5 text-orange-600" />;
-    } else {
-      return <XCircle className="w-5 h-5 text-red-600" />;
-    }
+  const getStatusIcon = (tone: Tone) => {
+    if (tone === 'ok') return <CheckCircle className="w-5 h-5 text-green-600" />;
+    if (tone === 'warn') return <AlertCircle className="w-5 h-5 text-orange-600" />;
+    if (tone === 'neutral') return <MinusCircle className="w-5 h-5 text-gray-500" />;
+    return <XCircle className="w-5 h-5 text-red-600" />;
   };
 
-  const getStatusText = (status: ProviderStatus | boolean) => {
-    if (status === 'ok' || status === true) return 'Configured';
-    if (status === 'warn') return 'Partial';
-    return 'Not configured';
-  };
-
-  const getStatusColor = (status: ProviderStatus | boolean) => {
-    if (status === 'ok' || status === true) return 'border-green-200 bg-green-50';
-    if (status === 'warn') return 'border-orange-200 bg-orange-50';
-    return 'border-gray-200 bg-gray-50';
+  const getStatusColor = (tone: Tone) => {
+    if (tone === 'ok') return 'border-green-200 bg-green-50';
+    if (tone === 'warn') return 'border-orange-200 bg-orange-50';
+    if (tone === 'neutral') return 'border-gray-200 bg-gray-50';
+    return 'border-red-200 bg-red-50';
   };
 
   if (loading) {
@@ -119,35 +117,21 @@ export default function AdminSetupPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className={`border rounded-lg p-6 ${getStatusColor(status.supabase)}`}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Supabase</h2>
-            {getStatusIcon(status.supabase)}
+        {[
+          { name: 'Database (Supabase)', ...databaseStatus(status.supabase) },
+          { name: 'Meilisearch', ...meiliSetupStatus(status.meili, searchStatus) },
+          { name: 'AI', ...aiKeyStatus(status.ai) },
+        ].map((card) => (
+          <div key={card.name} className={`border rounded-lg p-6 ${getStatusColor(card.tone)}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{card.name}</h2>
+              {getStatusIcon(card.tone)}
+            </div>
+            <div>
+              <span className="font-medium">Status:</span> {card.text}
+            </div>
           </div>
-          <div>
-            <span className="font-medium">Status:</span> {getStatusText(status.supabase)}
-          </div>
-        </div>
-
-        <div className={`border rounded-lg p-6 ${getStatusColor(status.meili)}`}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Meilisearch</h2>
-            {getStatusIcon(status.meili)}
-          </div>
-          <div>
-            <span className="font-medium">Status:</span> {getStatusText(status.meili)}
-          </div>
-        </div>
-
-        <div className={`border rounded-lg p-6 ${getStatusColor(status.ai)}`}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">AI</h2>
-            {getStatusIcon(status.ai)}
-          </div>
-          <div>
-            <span className="font-medium">Status:</span> {getStatusText(status.ai)}
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
