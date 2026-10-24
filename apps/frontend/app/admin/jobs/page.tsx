@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { jobsCountScope } from '@/lib/admin/status';
+import { hardDeleteConfirmationMatches } from '@/lib/admin/danger';
 import {
   Search, Filter, Trash2, RefreshCw, Download, RotateCcw, AlertTriangle,
   CheckCircle, XCircle, Calendar, Building2, Globe, FileText, Info,
@@ -78,6 +79,10 @@ export default function JobManagementPage() {
   const [impactAnalysis, setImpactAnalysis] = useState<ImpactAnalysis | null>(null);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [deletionType, setDeletionType] = useState<'soft' | 'hard'>('soft');
+  const [hardConfirmText, setHardConfirmText] = useState('');
+  useEffect(() => {
+    setHardConfirmText('');
+  }, [showDeleteModal, deletionType]);
   const [deletionReason, setDeletionReason] = useState('');
   const [exportData, setExportData] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -240,9 +245,14 @@ export default function JobManagementPage() {
       return;
     }
 
-    // Validate that we have something to delete
-    if (selectedJobs.size === 0 && !filters.org_name && !filters.source_id) {
-      toast.error('Please select at least one job to delete, or use filters (org_name or source_id)');
+    // Deleting needs a selection; the window opens only from "Delete selected".
+    if (selectedJobs.size === 0) {
+      toast.error('Select the jobs to delete first.');
+      return;
+    }
+
+    if (deletionType === 'hard' && !hardDeleteConfirmationMatches(hardConfirmText, selectedJobs.size)) {
+      toast.error(`Type ${selectedJobs.size} to confirm the Hard Delete.`);
       return;
     }
     
@@ -866,26 +876,13 @@ export default function JobManagementPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
-                          {job.deleted_at ? (
+                          {job.deleted_at && (
                             <button
                               onClick={() => handleRestore([job.id])}
                               className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors group"
                               aria-label="Restore job"
                             >
                               <RotateCcw className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setSelectedJobs(new Set([job.id]));
-                                setShowDeleteModal(true);
-                                setImpactAnalysis(null);
-                                setHasAnalyzed(false);
-                              }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
-                              aria-label="Delete job"
-                            >
-                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                           <button
@@ -1050,6 +1047,21 @@ export default function JobManagementPage() {
                     className="w-full px-2.5 py-2 border border-[#D2D2D7] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
                     rows={2}
                   />
+                  <div className="p-2.5 rounded-lg border border-red-300 bg-red-50">
+                    <p className="text-xs font-semibold text-red-800">
+                      Hard Delete cannot be undone. {selectedJobs.size} job{selectedJobs.size === 1 ? '' : 's'} will be removed permanently.
+                    </p>
+                    <label className="block text-xs text-red-900 mt-1.5">
+                      Type <span className="font-mono font-semibold">{selectedJobs.size}</span> to confirm:
+                      <input
+                        value={hardConfirmText}
+                        onChange={(e) => setHardConfirmText(e.target.value)}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        className="mt-1 w-full px-2.5 py-1.5 border border-red-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-400"
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -1073,7 +1085,13 @@ export default function JobManagementPage() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleDelete}
-                  disabled={deleting || loadingImpact || (hasAnalyzed && deletionType === 'hard' && !deletionReason.trim())}
+                  disabled={
+                    deleting ||
+                    loadingImpact ||
+                    (hasAnalyzed &&
+                      deletionType === 'hard' &&
+                      (!deletionReason.trim() || !hardDeleteConfirmationMatches(hardConfirmText, selectedJobs.size)))
+                  }
                   className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                 >
                   {deleting ? (
