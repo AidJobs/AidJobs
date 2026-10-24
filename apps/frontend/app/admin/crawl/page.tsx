@@ -392,7 +392,7 @@ export default function AdminCrawlPage() {
                       <div className="flex items-center gap-4 mt-2">
                         {log.actual_job_count !== undefined && (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-caption-sm text-[#86868B]">Total Jobs:</span>
+                            <span className="text-caption-sm text-[#86868B]">Jobs (not deleted):</span>
                             <span className="text-body-sm font-semibold text-[#30D158]">{log.actual_job_count}</span>
                           </div>
                         )}

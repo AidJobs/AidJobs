@@ -193,7 +193,32 @@ Live check, 24 October 2026, after the merge (Verified). The read-only compariso
 
 ### UX-05. Admin numbers and status that mislead
 
-**Status:** Not started.
+**Status:** Plan approved by the user on 24 October 2026, with Decision 5 ("Key set, not tested" / "No key") and four clarifications: labels describe the existing count definitions without changing any count or job status; Recent Activity reuses the Crawls page's crawl log, with no crawler or logging change; database search confirmed as the real search path before the health score changes; UX-06, W-06, W-14, UX-19 and the crawler stay out. Built the same day on branch `ux-05/admin-labels-and-states`; waiting for review, not merged.
+
+What each number counts (from the code; live values read-only on 24 October 2026, read-only confirmed):
+
+| Where | Label before | Counts | Live |
+| --- | --- | --- | --- |
+| Dashboard | Total Jobs | every job row, deleted included | 338 |
+| Dashboard | Active (Frontend) | active, not deleted, deadline not passed; the same filter as the public site | 263 |
+| Jobs page | "of N jobs" (default filter) | not deleted, any status | 322 |
+| Data Quality | Total Jobs | active, not deleted, any deadline | 322 |
+| Data Quality, per source | jobs | not deleted, any status | 301, 14, 7 |
+| Crawls, per run | Total Jobs | not deleted, any status, for that source | — |
+| Dashboard | Active Sources / Sources | every source row | 3 |
+
+338 − 322 = 16 deleted jobs; 322 − 263 = 59 active jobs whose deadline has passed (their retirement is W-06). Database search confirmed as the search path: `/api/search/query` answers `source: "db"` with 263 jobs, and `/api/search/status` answers `Meilisearch not configured` (Verified, 24 October 2026).
+
+What was built (frontend only; no backend, count, crawler, or data change):
+- `apps/frontend/lib/admin/status.ts`: the labels and the status rules in one place, with `lib/__tests__/adminStatus.test.ts` (20 tests).
+- Labels: dashboard "All job records (including deleted)", "Open on the public site", "Sources", "Open jobs by source"; Jobs page totals name their filter ("not deleted, any status", "active, not deleted", "deleted only", "including deleted, any status"); Data Quality "Active jobs (including past deadline)" for the global total and "jobs (not deleted, any status)" per source; Crawls "Jobs (not deleted)". The dashboard's "Indexed Documents 0" shows only when Meilisearch is connected.
+- Data Quality source list: every source from `GET /api/admin/sources` (deleted sources left out), each report loaded on its own. States: all healthy ("No issues found in N sources", each source listed with its score and openable); some with issues (marked "Has issues", listed first, healthy sources still listed); a report that failed (that row says so, with Retry; the others still shown); the list itself failing (an error with Retry); no sources ("No sources yet", the only "no data" wording); the global report failing (a banner with Retry). "Has issues" uses the global card's test: a job without a link or linking to a listing page.
+- Dashboard Recent Activity: the latest 5 runs from `/api/admin/crawl/logs`, the Crawls page's own source; "No crawl runs yet" or "Could not load recent crawls" otherwise.
+- Search status: "Search runs on the database (Meilisearch not used)" in grey when the backend reports Meilisearch not configured; a configured Meilisearch that fails, or a status that cannot be read, still shows red. The health score counts the database and the crawler, as before, and no longer Meilisearch.
+- Settings: Database (Supabase) "Connected" / "Connection settings missing" / "Cannot connect"; Meilisearch "Not used: search runs on the database" only when the backend says it is not configured, otherwise "Connected", "Settings present, not connected", or "Not responding"; AI "Key set, not tested" or "No key".
+- "Check console for details" and "Check server logs" / "Please check backend logs" removed from the dashboard's messages.
+- Local checks: TypeScript passes; lint shows only two warnings already on `main` (Jobs page hooks); the frontend Jest suite, 96 passed.
+- PR #37: CI green (backend, frontend, secrets, Vercel preview). Preview check, 24 October 2026 (Verified): the user signed in to Vercel and to the preview's admin in Cursor's browser; the read-only guard was installed and tested (a dummy POST blocked through `fetch` and `XMLHttpRequest`), pages were opened with client-side navigation so the guard stayed loaded, and no control was clicked except one Data Quality source row (opens its loaded report; no request). The preview reads the production backend. Dashboard: System Health 100%; "Open on the public site" 263; "All job records (including deleted)" 338; Sources 3; open jobs by source UNICEF 242, ICRC 14, Oxfam GB 7; Recent Activity the five newest runs, identical to the first five on the Crawls page (Oxfam 23 Oct found 5, new 2, updated 1; UNICEF 23 Oct `warn` found 120, new 102, updated 1; ICRC 21 Oct found 34; Oxfam 20 Oct and 19 Oct); Search "Search runs on the database (Meilisearch not used)" with a grey dot. Crawls: "Jobs (not deleted)" 7, 301, 14. Jobs: "Showing 1–50 of 322 jobs (not deleted, any status)". Data Quality: score 100.0; "Active jobs (including past deadline)" 322; "No issues found in 3 sources."; Oxfam GB, ICRC, and UNICEF each listed with score 100.0, "No issues found", and "jobs (not deleted, any status)" 7, 14, 301; UNICEF's report opened (301 jobs, 0 null, 0 listing). Settings: Database (Supabase) "Connected"; Meilisearch "Not used: search runs on the database"; AI "Key set, not tested". The tab was reloaded afterwards to remove the guard.
 
 - **Scope:**
   - Job totals: the dashboard shows 234, Jobs and Data Quality 218, the public site 206. First establish from the code what each counts (all rows, active, not hidden, deadline not passed), then label each number with that meaning.

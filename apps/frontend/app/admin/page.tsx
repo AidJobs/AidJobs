@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
+import { COUNT_LABELS, healthScore as computeHealthScore, recentActivity, searchSummary, type RecentActivity } from '@/lib/admin/status';
 
 type DbStatus = {
   ok: boolean;
@@ -47,6 +48,8 @@ type Toast = {
 export default function AdminPage() {
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus | null>(null);
+  const [searchLoadError, setSearchLoadError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<RecentActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [reindexing, setReindexing] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -70,7 +73,7 @@ export default function AdminPage() {
     // If the backend returned HTML (e.g. a 404 page with CSS like "--bg: 255 255 255"),
     // don't show the entire document in the UI – just a concise message.
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.includes('--bg')) {
-      return `Request failed with status ${status}. Check server logs for details.`;
+      return `Request failed with status ${status}.`;
     }
     // Limit very long messages
     if (trimmed.length > 300) {
@@ -82,14 +85,18 @@ export default function AdminPage() {
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbRes, searchRes, crawlRes] = await Promise.all([
+      const [dbRes, searchRes, crawlRes, logsBody] = await Promise.all([
         fetch('/api/db/status'),
         fetch('/api/search/status').catch((err) => {
           console.error('Search status fetch failed:', err);
           return { ok: false, status: 0, text: async () => err.message } as Response;
         }),
         fetch('/api/admin/crawl/status').catch(() => null), // May fail if not authenticated
+        fetch('/api/admin/crawl/logs?limit=5', { credentials: 'include', cache: 'no-store' })
+          .then((res) => res.json())
+          .catch(() => null),
       ]);
+      setActivity(recentActivity(logsBody));
 
       if (!dbRes.ok) {
         const rawText = await dbRes.text().catch(() => '');
@@ -123,6 +130,7 @@ export default function AdminPage() {
           const safeMessage = sanitizeErrorText(statusCode, rawText ?? 'No response from server');
           console.error('Search status error:', statusCode, rawText || '(no body)');
           setSearchStatus({ enabled: false, error: `HTTP ${statusCode}: ${safeMessage}` });
+          setSearchLoadError(`HTTP ${statusCode}`);
         } else {
           // Read response as text first to check if it's empty
           let text = '';
@@ -131,25 +139,29 @@ export default function AdminPage() {
           } catch (readError) {
             console.error('Failed to read search status response:', readError);
             setSearchStatus({ enabled: false, error: 'Failed to read response from search status endpoint' });
+            setSearchLoadError('unreadable response');
             return;
           }
           
           if (!text || text.trim() === '') {
             console.error('Search status returned empty response. Status:', searchRes.status);
             setSearchStatus({ enabled: false, error: 'Empty response from search status endpoint' });
+            setSearchLoadError('empty response');
           } else {
             try {
               const searchData = JSON.parse(text);
               setSearchStatus(searchData);
+              setSearchLoadError(null);
             } catch (parseError) {
               console.error('Failed to parse search status JSON. Status:', searchRes.status);
               console.error('Response content:', text.substring(0, 200));
               console.error('Parse error:', parseError);
               // Provide user-friendly error message
               const errorMsg = parseError instanceof Error && parseError.message.includes('Expecting value') 
-                ? 'Empty or invalid response from search status endpoint. Please check backend logs.'
+                ? 'Empty or invalid response from search status endpoint.'
                 : `Invalid JSON response: ${parseError instanceof Error ? parseError.message : 'Parse error'}`;
               setSearchStatus({ enabled: false, error: errorMsg });
+              setSearchLoadError('invalid response');
             }
           }
         }
@@ -161,6 +173,7 @@ export default function AdminPage() {
               : error.message)
           : 'Failed to fetch search status';
         setSearchStatus({ enabled: false, error: errorMsg });
+        setSearchLoadError(errorMsg);
       }
 
       if (crawlRes && crawlRes.ok) {
@@ -179,6 +192,8 @@ export default function AdminPage() {
       addToast('Failed to fetch status', 'error');
       setDbStatus({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' });
       setSearchStatus({ enabled: false, error: error instanceof Error ? error.message : 'Unknown error' });
+      setSearchLoadError(error instanceof Error ? error.message : 'Unknown error');
+      setActivity({ state: 'error' });
     } finally {
       setLoading(false);
     }
@@ -257,30 +272,8 @@ export default function AdminPage() {
     );
   }
 
-  // Calculate system health score (0-100)
-  const calculateHealthScore = () => {
-    let score = 0;
-    let total = 0;
-    
-    if (dbStatus) {
-      total += 1;
-      if (dbStatus.ok) score += 1;
-    }
-    
-    if (searchStatus) {
-      total += 1;
-      if (searchStatus.enabled) score += 1;
-    }
-    
-    if (crawlerStatus) {
-      total += 1;
-      if (crawlerStatus.running) score += 1;
-    }
-    
-    return total > 0 ? Math.round((score / total) * 100) : 0;
-  };
-
-  const healthScore = calculateHealthScore();
+  const healthScore = computeHealthScore(dbStatus, crawlerStatus);
+  const search = searchSummary(searchStatus, searchLoadError);
   // Soft, elegant colors: mint green (80-100%), soft amber (50-79%), soft coral (0-49%)
   const healthColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#FCD34D' : '#F87171';
 
@@ -372,23 +365,31 @@ export default function AdminPage() {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-caption text-[#86868B]">Total Jobs</span>
+                  <span className="text-caption text-[#86868B]" title={COUNT_LABELS.openOnSiteHelp}>{COUNT_LABELS.openOnSite}</span>
+                  <span className="text-body font-semibold text-[#1D1D1F]">
+                    {dbStatus?.row_counts?.active_jobs ?? 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-caption text-[#86868B]">{COUNT_LABELS.allRecords}</span>
                   <span className="text-body font-semibold text-[#1D1D1F]">
                     {dbStatus?.row_counts?.jobs || 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-caption text-[#86868B]">Active Sources</span>
+                  <span className="text-caption text-[#86868B]">{COUNT_LABELS.sources}</span>
                   <span className="text-body font-semibold text-[#1D1D1F]">
                     {dbStatus?.row_counts?.sources || 0}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-caption text-[#86868B]">Indexed Documents</span>
-                  <span className="text-body font-semibold text-[#1D1D1F]">
-                    {searchStatus?.index?.stats.numberOfDocuments || 0}
-                  </span>
-                </div>
+                {searchStatus?.index && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-caption text-[#86868B]">Meilisearch documents</span>
+                    <span className="text-body font-semibold text-[#1D1D1F]">
+                      {searchStatus.index.stats?.numberOfDocuments || 0}
+                    </span>
+                  </div>
+                )}
                 {searchStatus?.index?.lastReindexedAt && (
                   <div className="pt-2 border-t border-[#D2D2D7]">
                     <div className="flex items-center gap-2">
@@ -409,27 +410,33 @@ export default function AdminPage() {
                 <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Recent Activity</h2>
               </div>
               <div className="space-y-2">
-                {searchStatus?.index?.lastReindexedAt ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-[#86868B] rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="text-caption text-[#1D1D1F]">Search index reindexed</div>
-                      <div className="text-caption text-[#86868B]">
-                        {new Date(searchStatus.index.lastReindexedAt).toLocaleString()}
+                <div className="text-caption-sm text-[#86868B]">Latest crawl runs</div>
+                {!activity || activity.state === 'error' ? (
+                  <div className="text-caption text-[#FF3B30]">Could not load recent crawls.</div>
+                ) : activity.state === 'empty' ? (
+                  <div className="text-caption text-[#86868B]">No crawl runs yet.</div>
+                ) : (
+                  activity.runs.map((run) => (
+                    <div key={run.id} className="flex items-start gap-3">
+                      <div
+                        className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
+                          run.status === 'ok' || run.status === 'success'
+                            ? 'bg-[#30D158]'
+                            : run.status === 'fail' || run.status === 'error'
+                            ? 'bg-[#FF3B30]'
+                            : 'bg-[#FF9500]'
+                        }`}
+                      ></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-caption text-[#1D1D1F] truncate">
+                          {run.org_name || 'Unnamed'} · {run.status}
+                        </div>
+                        <div className="text-caption text-[#86868B]">
+                          {new Date(run.ran_at).toLocaleString()} · found {run.found}, new {run.inserted}, updated {run.updated}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-caption text-[#86868B]">No recent activity</div>
-                )}
-                {dbStatus?.ok && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-[#30D158] rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="text-caption text-[#1D1D1F]">Database connected</div>
-                      <div className="text-caption text-[#86868B]">System operational</div>
-                    </div>
-                  </div>
+                  ))
                 )}
               </div>
           </div>
@@ -462,28 +469,28 @@ export default function AdminPage() {
               {dbStatus?.ok ? (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-caption text-[#86868B]">Total Jobs</span>
+                    <span className="text-caption text-[#86868B]">{COUNT_LABELS.allRecords}</span>
                     <span className="text-2xl font-semibold text-[#1D1D1F]">
                       {dbStatus.row_counts?.jobs || 0}
                     </span>
                   </div>
                   {dbStatus.row_counts?.active_jobs !== undefined && (
                     <div className="flex justify-between items-center">
-                      <span className="text-caption text-[#86868B]">Active (Frontend)</span>
+                      <span className="text-caption text-[#86868B]" title={COUNT_LABELS.openOnSiteHelp}>{COUNT_LABELS.openOnSite}</span>
                       <span className="text-body-lg font-semibold text-[#0071E3]">
                         {dbStatus.row_counts.active_jobs}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between items-center">
-                    <span className="text-caption text-[#86868B]">Sources</span>
+                    <span className="text-caption text-[#86868B]">{COUNT_LABELS.sources}</span>
                     <span className="text-2xl font-semibold text-[#1D1D1F]">
                       {dbStatus.row_counts?.sources || 0}
                     </span>
                   </div>
                   {dbStatus.source_breakdown && dbStatus.source_breakdown.length > 0 && (
                     <div className="pt-2 border-t border-[#D2D2D7] mt-2">
-                      <div className="text-caption text-[#86868B] mb-1.5">Jobs by Source</div>
+                      <div className="text-caption text-[#86868B] mb-1.5" title={COUNT_LABELS.openOnSiteHelp}>{COUNT_LABELS.openBySource}</div>
                       <div className="space-y-1 max-h-32 overflow-y-auto">
                         {dbStatus.source_breakdown.map((source) => (
                           <div key={source.source_id} className="flex justify-between items-center">
@@ -540,6 +547,12 @@ export default function AdminPage() {
                     <div className="w-2 h-2 bg-[#30D158] rounded-full relative group" title="Enabled">
                       <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
                         Enabled
+                      </span>
+                    </div>
+                  ) : search.tone === 'neutral' ? (
+                    <div className="w-2 h-2 bg-[#86868B] rounded-full relative group" title="Database search">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                        Database search
                       </span>
                     </div>
                   ) : (
@@ -631,12 +644,8 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="text-caption text-[#FF3B30]">
-                    {searchStatus?.error 
-                      ? (searchStatus.error.includes('Expecting value') 
-                          ? 'Empty or invalid response from search endpoint. Check console for details.'
-                          : searchStatus.error)
-                      : 'Search not enabled'}
+                  <div className={`text-caption ${search.tone === 'neutral' ? 'text-[#86868B]' : 'text-[#FF3B30]'}`}>
+                    {search.text}
                   </div>
                   <button
                     onClick={handleInitialize}
