@@ -532,7 +532,7 @@ Approved plan, 23 October 2026:
 
 ### UX-31. Repository tidy-up
 
-**Status:** Not started. Added 21 October 2026. Needs the user's approval of the list.
+**Status:** Not started. Added 21 October 2026. Needs the user's approval of the list. List prepared on 25 October 2026, read-only, in `docs/architecture/ux-31-tidy-up-list.md`: 53 branches already in `main`, 4 to decide (one kept: the demo), 73 root guides, other root leftovers, the six dead proxies of open item 23, the out-of-date environment templates, and the Render variable of open item 18. Waiting for the user's approval; nothing deleted.
 
 - **Scope:** list every remote branch and local worktree with what it holds and whether `main` already contains it (about 30 branches from 2025, `ux/public-layout` and its worktree `AidJobsGit-ux`). Tag anything worth keeping, then delete what the user approves. The demo branch is kept until Stage B is done; its tag is permanent.
 - **Acceptance:** only active branches remain; every deleted branch is either merged or tagged.
