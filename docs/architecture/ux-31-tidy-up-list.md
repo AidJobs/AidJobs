@@ -9,6 +9,7 @@ Never touched by this tidy-up: `apps/backend/scripts/diagnose_enrichment_bias.py
 - **Approved** by the user on 25 October 2026 with these decisions: `AidJobsGit-ux` — save the uncommitted change as a patch outside both repositories, verify it (contents and `git apply --check`), inspect ignored files other than `node_modules` and stop for the user if any exist, then remove the folder and branch; the 73 guides deleted, not archived; the template and README edits in the same pull request as the deletions; stages separated by approvals; records updated only after each stage is verified. PR #45 (this list) merged as `0cfebe6`.
 - **Stage 1 done (B, C, D): 26 October 2026.** PR #46, merged as `d50f2ee` with the user's approval after a pre-merge scope check (106 files: 104 deletions, 2 edits, the six proxies the only frontend files, the protected files absent). CI passed; Vercel production deployed `d50f2ee`; the user confirmed Render live on `d50f2ee`. Verified live: none of the 73 guides or the 31 other removed items remains in `main` (the root keeps `AGENTS.md`, `README.md`, and the new `.env.sample`); `GET /api/admin/config-check` and `GET /api/admin/data-quality/stats` on the live site answer 404; `/v2` and the admin login answer 200; with the user signed in and the read-only guard (which also recorded failed requests), the dashboard, Organisations, Sources, Jobs, Crawls, Data Quality, and Settings all loaded and no request failed. External callers of the removed proxies cannot be ruled out (no access to Vercel request logs); the backend routes behind them did not exist.
 - **Still to do, each with its own approval:** the `AidJobsGit-ux` patch and removal (A2); the branches (A1, A2); the user's Render change (F).
+- **26 October 2026, verified:** the `AidJobsGit-ux` change was saved as a patch outside the repository (SHA-256 checked; `git apply --check` onto `af72047` passes) and the folder removed with the user's approval; the branch `ux/public-layout` was kept. The four annotated archive tags were created, pushed one by one, and verified on GitHub (git and the GitHub API). The full commit ID of every branch proposed for deletion is recorded in section G. **No branch has been deleted.**
 
 ## A. Branches
 
@@ -195,6 +196,94 @@ Six route files under `apps/frontend/app/api/admin/` forward to backend routes t
 ## F. Done by the user, not in the repository
 
 - Render: delete the environment variable `BACKEND_CORS_ORIGINS` (open item 18). The agent cannot change Render settings. Afterwards the backend is checked as healthy.
+
+## G. Branch record before deletion (26 October 2026)
+
+Recorded before any branch is deleted, so every branch can be recreated exactly. Each full commit ID was read from GitHub (`git ls-remote`) on 26 October 2026 and checked: the 55 merged branches are ancestors of `main` (`git merge-base --is-ancestor`), and each archived branch's tip equals its tag. **This record does not approve any deletion**; branch deletion needs the user's separate approval.
+
+Since the list in A was written on 25 October: three branches were created and merged during this tidy-up (`docs/ux-31-list`, `ux-31/remove-obsolete-files`, `docs/ux-31-stage1-done`), and `codex/secure-admin-routes` moved from A1 to the archived group, so 55 branches are in `main` (A1 said 53) and 4 are archived. `main` and `demo/ux-design` (PR #22, open; its tip `acb1fcf` is the commit of the tag `ux-demo-approved-2026-10-21`) are kept and are not listed here.
+
+### G1. Archived branches (4), preserved by annotated tags
+
+Tags created, pushed individually, and verified on GitHub (git and the GitHub API) on 26 October 2026. `codex/secure-admin-routes` was squash-merged by PR #2 into `main` as `8d3bd7e`: `main` has its final content (the 3 files it changed are identical), but not its five original commits (`2b4ab5f`, `5437845`, `b2f5f7c`, `cee6145`, `2808f91`); the tag keeps them.
+
+| Branch | Full commit ID (GitHub tip, 26 Oct 2026) | Classification | Archive tag | Pull request |
+| --- | --- | --- | --- | --- |
+| `codex/fix-scheduler-like-query` | `14cad29e4f49ee1b725f05b26a258d009e03de2a` | archived | `archive/codex-fix-scheduler-like-query` | #1 closed |
+| `codex/secure-admin-routes` | `2808f9160189b7ff29e132a2f91ce8e556d33417` | archived | `archive/codex-secure-admin-routes` | #2 merged |
+| `ux/public-layout` | `af72047db20afaa5843b5a45511db0a202f21428` | archived | `archive/ux-public-layout` | — |
+| `fix/public-stopgap` | `2b387ca60f971d8f2bc24aa28d6031d030ed47fd` | archived | `archive/fix-public-stopgap` | #19 closed |
+
+
+### G2. Branches whose commits are in `main` (55)
+
+41 were merged through a pull request; the 14 from December 2025 had none and were merged into `main` directly.
+
+| Branch | Full commit ID (GitHub tip, 26 Oct 2026) | Classification | Archive tag | Pull request |
+| --- | --- | --- | --- | --- |
+| `fix/robust-extractor-20250105-173044` | `bbdac2bc72aeb1f248228caf471177637cad98d3` | in `main` | — | — |
+| `fix/crawl-logging-duration-20250105-232000` | `ea99bb5115c6ae0d661caa19e113e413b1583a74` | in `main` | — | — |
+| `fix/global-extraction-improvements-shadow-test-20250106-130000` | `a07b024f382d240684682d8bc42c9c185a9ae51b` | in `main` | — | — |
+| `fix/insertion-diagnosis-20250105-210000` | `c72fa4062a2bfbaebcb23ba9a5c7e0c6845cca7f` | in `main` | — | — |
+| `fix/integrate-storage-proper-20250105-190000` | `bba82d989a877788402651eb96439fd436e52d4d` | in `main` | — | — |
+| `fix/logging-diagnose-inserts-20250105-220000` | `b6904f317b93c9add3a0523680e9f8f947f00436` | in `main` | — | — |
+| `fix/mailto-filter-failed-inserts-replay-20250106-150000` | `5a20f8b2a89db27eda20a3049a9e4a3efb7539ac` | in `main` | — | — |
+| `fix/re-crawl-full-pagination-20250105-234000` | `7cc1c28e7d505107e9ee10c57abcd2c42c980851` | in `main` | — | — |
+| `fix/re-crawl-full-pagination-run-20250106-120000` | `1d01f91f1b0138613e6cffcfe3c7a5fcc2e69473` | in `main` | — | — |
+| `fix/remove-debug-add-monitoring-20250105-233000` | `8fbfe9308d9c7209f916f0ab5efebdfd9107b68d` | in `main` | — | — |
+| `fix/robust-followup-20250105-180000` | `844dbcb22552ebdcbc5ce034f1467e1a859d9ae4` | in `main` | — | — |
+| `fix/shadow-rollout-domains-20250105-200000` | `7d3b9dff52ee35f8921cc67b51e02761cb0591b1` | in `main` | — | — |
+| `fix/sql-debug-insert-20250105-230000` | `fc57c02c68083ba9ea5c4e31f4352c6403045785` | in `main` | — | — |
+| `fix/sql-insert-field-value-sync-20250105-231000` | `da47aad681d0dd85129e7bab4e6ad2f69b4a0f7a` | in `main` | — | — |
+| `cleanup/fix-mailto-sql-20251206` | `853bb111aa3eadca23e671dfe95c5bb26809b726` | in `main` | — | #3 merged |
+| `fix/admin-session-cookie` | `71888a7c9b21fc472781567afcaf9d65b3555104` | in `main` | — | #6 merged |
+| `crawler-hardening-ci` | `37761f752f8bab4d3c9762aeb1110e441c1ea06a` | in `main` | — | #7 merged |
+| `crawler-detail-reader-ci` | `487b92b0380faddf2592266f3d129a5a9c2ee728` | in `main` | — | #8 merged |
+| `crawler-reader-deadline` | `ac27d6e4431dcd7e4b0c97c5cd15d831f730cba1` | in `main` | — | #9 merged |
+| `docs-crawler-plan-c4-status` | `997466cd22edcb1577914eaa9b1b442f66613788` | in `main` | — | #10 merged |
+| `docs-progress-ledger` | `d0bb7d5054fc4cca30c3f0cc6fc9a4554c4a800d` | in `main` | — | #12 merged |
+| `unicef-reader-fallback` | `cbc6bf33e9ec9cf0a6efedea0c38beef64097b1b` | in `main` | — | #11 merged |
+| `docs-ledger-crawler-shape` | `52db6422fba318ad1545cae7988d0b4f5d01eb5c` | in `main` | — | #16 merged |
+| `geocoder-backoff` | `a84253e6e7649e28b5e9c7cbd8f2df6dde931d41` | in `main` | — | #15 merged |
+| `iso-deadline-fix` | `9ed92ec56697b8cdabc86e75b15395689d671b99` | in `main` | — | #17 merged |
+| `unicef-listing-pacing` | `3be4d394e7e19ddb85413c5def74d37aa55da0d6` | in `main` | — | #14 merged |
+| `unicef-listing-pages` | `21b8fa4517fe368848bd7a498ec8b47d02fe2cd6` | in `main` | — | #13 merged |
+| `docs/public-ux-direction` | `edda7666cfb003ae59cdc9c735940d65efe98fc3` | in `main` | — | #20 merged |
+| `docs/ux-demo-first` | `e18564f5466a18e755428e472662a1daf8acebf2` | in `main` | — | #21 merged |
+| `docs-ux-track` | `d5b475227515e690c1866aaec504de1d4b5b37fc` | in `main` | — | #18 merged |
+| `docs/hosting-decisions` | `a8c2cd9768be51833093574edf221712943aedb4` | in `main` | — | #25 merged |
+| `docs/ux-08-assessment` | `3fa0fd7a08f7e5c1b122fa05abb840d48c931e47` | in `main` | — | #24 merged |
+| `docs/ux-demo-decisions` | `fba896421f0d127857797864a9a728658b62c582` | in `main` | — | #23 merged |
+| `ux-09/design-foundation` | `3b6048b680325faf4c801f5f30a7bc9efb2fa6eb` | in `main` | — | #26 merged |
+| `docs/netlify-removed` | `c17a71b673c80aa6f46ab4c6e6d0d09b6b69e40f` | in `main` | — | #30 merged |
+| `docs/ux-09-done` | `f39d82cb0515878cc8f4a37d559b5edb93ce162c` | in `main` | — | #27 merged |
+| `docs/ux-10-done` | `d038f4e43c05cab15658d6d65012609e812f7de7` | in `main` | — | #29 merged |
+| `ux-10/live-site` | `05e4fdf268094be58504c75b90a3a8cf4fbffe07` | in `main` | — | #28 merged |
+| `docs/status-review-2026-10-24` | `2c31b09bd35460e3ad22a79054ec417e365729e8` | in `main` | — | #33 merged |
+| `docs/ux-04-done` | `4dc8715989f4fd352c20beb01a441ae5f6e6f604` | in `main` | — | #36 merged |
+| `docs/ux-05-done` | `e22cc96c3f332dd6cf1cc703066466daa7674a88` | in `main` | — | #38 merged |
+| `docs/w30-data-api-closed` | `12d73464c3428877b94c148cef30bae296c7b35c` | in `main` | — | #32 merged |
+| `security/remove-leaked-secrets` | `eb395b9882337fad63cb1425fd133eadd4ce7021` | in `main` | — | #31 merged |
+| `security/w22-production-mode` | `c6471c7ef8d7041294ecf14e1f69b1ee970760e0` | in `main` | — | #34 merged |
+| `ux-04/data-quality-listing` | `66af62aad10b33e365660f6f43289224789e7bc5` | in `main` | — | #35 merged |
+| `ux-05/admin-labels-and-states` | `051bddabdaad3b41fca5c7700971825d68f4f068` | in `main` | — | #37 merged |
+| `docs/session-fix-done` | `5d979558852700e03efc41bcbbf01ed2c6452876` | in `main` | — | #42 merged |
+| `docs/ux-06-done` | `02ddd3878dfabfe7d13046b6d2a432945a7d0c78` | in `main` | — | #40 merged |
+| `docs/ux-07-done` | `60edf4ba7b320548e93dc2bc1cb15a46c8e59f7e` | in `main` | — | #44 merged |
+| `docs/ux-31-list` | `0317d5b05ae0f9d7f24422b1de4b158d89a5108f` | in `main` | — | #45 merged |
+| `fix/admin-session-startup` | `96c1c31e61c34f28f52e3d1139177484b3113bc2` | in `main` | — | #41 merged |
+| `ux-06/admin-delete-safety` | `e3f987540f4ac3a99be1a95bfb836b49006d753a` | in `main` | — | #39 merged |
+| `ux-07/admin-dates` | `84fbbde005e6003f1cde86f1b8140adfb053d746` | in `main` | — | #43 merged |
+| `docs/ux-31-stage1-done` | `8979f3d1a944037732545e5eeae30265353ac869` | in `main` | — | #47 merged |
+| `ux-31/remove-obsolete-files` | `1d8aa928eb9e685cd6b1ce496998d6423ff5b108` | in `main` | — | #46 merged |
+
+
+### G3. Recovery
+
+- A branch in G2: `git push origin <full commit ID>:refs/heads/<branch>` recreates it exactly. For a branch with a merged pull request, the pull request page on GitHub also offers "Restore branch".
+- A branch in G1: `git push origin <archive tag>^{commit}:refs/heads/<branch>`, for example `git push origin archive/ux-public-layout^{commit}:refs/heads/ux/public-layout`. The uncommitted `tailwind.config.js` change of `ux/public-layout` is also kept outside the repository as `aidjobs-patches/ux-public-layout-af72047-tailwind-config-uncommitted.patch` (SHA-256 `8BCED966FD765B3174F1D9E863D40B4E0DEAD65D8464F7BCF2AEF8E716B732E8`).
+- A local copy: `git branch <branch> origin/<branch>` while the branch is on GitHub, or from the commit ID or tag above.
+- Vercel previews: deleting a branch does not delete its deployments; a recreated branch gets a new preview on its next push. How long Vercel keeps old deployments, and what happens to a deleted branch's preview alias, were not verified.
 
 ## How it would be carried out, after approval
 
