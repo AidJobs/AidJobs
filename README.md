@@ -1,59 +1,29 @@
 # AidJobs
 
-AI-powered job search platform for NGOs/INGOs.
+A job site for NGO, humanitarian, and development work. A crawler reads organisations' career pages; the public site lists the open jobs.
 
-## Project Structure
+**Start here:** `AGENTS.md`, then `docs/architecture/progress-ledger.md` (what is done, what is open, how the project is run). The rules are in `docs/architecture/aidjobs-migration-contract.md` and `docs/architecture/crawler-completion-plan.md`.
+
+## Layout
 
 ```
-/
-├── apps/
-│   ├── frontend/        # Next.js (TypeScript, App Router) + Tailwind + shadcn/ui
-│   └── backend/         # FastAPI (Python 3.11)
-├── packages/
-│   ├── ui/              # Shared components/tokens
-│   └── lib/             # Shared types/helpers
-├── infra/
-│   ├── supabase.sql     # Database schema
-│   └── seed.sql         # Seed data
-├── tests/
-│   ├── unit/            # Unit tests
-│   └── integration/     # Integration tests
-├── scripts/             # Utility scripts
-└── env.example          # Environment variables template
+apps/frontend/   Next.js 14 (App Router, TypeScript, Tailwind): the public site and the admin
+apps/backend/    FastAPI (Python 3.11): the API, the crawler, and the scheduler
+infra/           database schema (supabase.sql), seed data, and migrations
+docs/            architecture records and plans
+scripts/         pre-deploy checks
 ```
 
-## Tech Stack
+## Services
 
-- **Frontend**: Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: FastAPI (Python 3.11)
-- **Database**: Supabase (PostgreSQL)
-- **Search**: Meilisearch
-- **AI**: OpenRouter
-- **Deployment**: Vercel (Frontend), Render (Backend)
+- Frontend: Vercel. Backend: Render. Database: Supabase PostgreSQL.
+- Search runs on the database; Meilisearch is not used.
+- AI extraction (OpenRouter) is optional; crawls run without it.
 
-## Getting Started
+## Local development
 
-1. Copy `env.example` to `.env` and fill in your environment variables
-2. Install dependencies: `npm install`
-3. Start development servers: `npm run dev`
+1. Copy `.env.sample` to `apps/backend/.env` and `apps/frontend/.env.local` and fill in the values. It lists names only.
+2. `npm install`, then `pip install -r apps/backend/requirements.txt`.
+3. `npm run dev` starts the frontend on port 5000 and the backend on port 8000.
 
-## Scripts
-
-- `npm run dev` - Start frontend (port 3000) and backend (port 8000)
-- `npm run lint` - Lint frontend and backend code
-- `npm run test` - Run unit tests
-
-## Environment Setup
-
-See `env.example` for all required environment variables. The application gracefully handles missing environment variables without crashing.
-
-## Features
-
-The platform supports:
-- Job search with Meilisearch
-- AI-powered job processing via OpenRouter
-- Payment processing (PayPal/Razorpay)
-- CV upload and processing
-- Find & Earn opportunities
-
-Enable/disable features via `AIDJOBS_ENABLE_*` environment variables.
+Other scripts: `npm run lint`, `npm run test`, `npm run build`, `npm run pre-deploy`.
