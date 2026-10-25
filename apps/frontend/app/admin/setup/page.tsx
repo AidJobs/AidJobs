@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, XCircle, Info, MinusCircle } from 'lucide-react';
 import { aiKeyStatus, databaseStatus, meiliSetupStatus, type SearchStatus, type Tone } from '@/lib/admin/status';
+import { adminDateTime } from '@/lib/dates';
 
 type ProviderStatus = 'ok' | 'warn' | 'fail';
 
@@ -113,7 +114,7 @@ export default function AdminSetupPage() {
       </div>
 
       <div className="text-sm text-gray-600 mb-6">
-        Last updated: {new Date(status.timestamp).toLocaleString()}
+        Last updated: {adminDateTime(status.timestamp)}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

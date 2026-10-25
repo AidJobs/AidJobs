@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { adminDateTime, relativeTime } from '@/lib/dates';
 import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap } from 'lucide-react';
 
 type CrawlStatus = {
@@ -177,20 +178,7 @@ export default function AdminCrawlPage() {
     init();
   }, [fetchCrawlStatus, fetchLogs]);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
+  const formatDate = (dateStr: string) => relativeTime(dateStr, Date.now()) ?? adminDateTime(dateStr);
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return '-';
@@ -333,7 +321,7 @@ export default function AdminCrawlPage() {
                         <span className="text-body-sm font-semibold text-[#1D1D1F] truncate">
                           {log.org_name || 'Unnamed'}
                         </span>
-                        <span className="text-caption text-[#86868B] flex-shrink-0">
+                        <span className="text-caption text-[#86868B] flex-shrink-0" title={adminDateTime(log.ran_at)}>
                           {formatDate(log.ran_at)}
                         </span>
                       </div>

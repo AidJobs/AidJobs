@@ -265,6 +265,16 @@ What was built (frontend only):
 
 **Status:** Not started. Narrowed on 21 October 2026 to the admin: the public items (saved count, search clear button, public dates) belong to code the switch (UX-29) deletes.
 
+Plan approved by the user on 25 October 2026 with both recommended decisions: the public site's existing formatter moves to `lib/dates.ts` and `lib/site/jobs.ts` re-exports it, its output unchanged; admin moments are shown on the reader's clock with the offset, for example "23 Oct 2026, 10:35 GMT+5:30". Built the same day on branch `ux-07/admin-dates`; waiting for review, not merged.
+
+Found (code, 25 October 2026): the source page showed raw timestamps (`2026-10-19T19:24:44.794571+00:00`); Sources, the dashboard, and Settings used the browser default (`10/23/2026, 10:35:43 AM`); Crawls fell back to it after 7 days; Jobs used a US format and read a deadline such as `2026-11-06` as UTC midnight, so west of UTC it would show the day before. The second scope item ("Your session was not accepted" for a first-time visitor) was already fixed by PR #41 (`973e0e6`): a visitor without a session sees "Sign in to continue." (live-checked 25 October 2026).
+
+What was built (frontend only):
+- `apps/frontend/lib/dates.ts`: `formatDate` (moved unchanged from `lib/site/jobs.ts`: a calendar date as written, a moment on the reader's clock, empty when missing), `formatDateTime` ("23 Oct 2026, 10:35 GMT+5:30"; the zone label is computed from the offset, so it reads "GMT+5:30", "GMT-4", or "GMT", never a locale abbreviation), `adminDate` and `adminDateTime` (the same, with "—" for missing or unreadable values), and `relativeTime` (the Crawls page's existing "Just now", "5m ago", "3h ago", "2d ago" for 7 days). `lib/site/jobs.ts` imports and re-exports `formatDate`; the public site's output is unchanged and its tests pass.
+- Admin pages: the source page (last crawl, next crawl, each run), Sources (rows and details), the dashboard (Recent Activity, last reindex), Settings (Last updated), Crawls (recent runs keep "1d ago" and gain the exact time on hover; older runs show the full format), Jobs (deadline and created as "28 Oct 2026", deleted at as a full moment, "—" for missing where it said "N/A").
+- `apps/frontend/lib/__tests__/dates.test.ts` (10 tests): deadlines as written, including west of UTC; moments in India, UTC, and New York; zone labels; the reader's clock by default; "—" and never "Invalid Date" for missing or malformed values; the public output for the same values; the relative-time boundaries; the public re-export.
+- Local checks: TypeScript passes; lint shows only the two warnings already on `main`; the frontend Jest suite, 133 passed.
+
 - **Scope:**
   - Dates: one shared formatter, `lib/dates.ts`, giving unambiguous dates such as "28 Oct 2026", used by the admin, replacing raw timestamps such as `2026-10-19T19:24:44.794571+00:00`. The new public site reuses it.
   - The admin login does not say "Your session was not accepted" to a first-time visitor.
