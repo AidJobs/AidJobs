@@ -4,6 +4,12 @@ Prepared 25 October 2026 from `main` at `b27449a`, read-only (git, GitHub, and a
 
 Never touched by this tidy-up: `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py` (modified, unstaged, protected), the tag `ux-demo-approved-2026-10-21`, and anything under `apps/` that runs.
 
+## Progress
+
+- **Approved** by the user on 25 October 2026 with these decisions: `AidJobsGit-ux` — save the uncommitted change as a patch outside both repositories, verify it (contents and `git apply --check`), inspect ignored files other than `node_modules` and stop for the user if any exist, then remove the folder and branch; the 73 guides deleted, not archived; the template and README edits in the same pull request as the deletions; stages separated by approvals; records updated only after each stage is verified. PR #45 (this list) merged as `0cfebe6`.
+- **Stage 1 done (B, C, D): 26 October 2026.** PR #46, merged as `d50f2ee` with the user's approval after a pre-merge scope check (106 files: 104 deletions, 2 edits, the six proxies the only frontend files, the protected files absent). CI passed; Vercel production deployed `d50f2ee`; the user confirmed Render live on `d50f2ee`. Verified live: none of the 73 guides or the 31 other removed items remains in `main` (the root keeps `AGENTS.md`, `README.md`, and the new `.env.sample`); `GET /api/admin/config-check` and `GET /api/admin/data-quality/stats` on the live site answer 404; `/v2` and the admin login answer 200; with the user signed in and the read-only guard (which also recorded failed requests), the dashboard, Organisations, Sources, Jobs, Crawls, Data Quality, and Settings all loaded and no request failed. External callers of the removed proxies cannot be ruled out (no access to Vercel request logs); the backend routes behind them did not exist.
+- **Still to do, each with its own approval:** the `AidJobsGit-ux` patch and removal (A2); the branches (A1, A2); the user's Render change (F).
+
 ## A. Branches
 
 GitHub has 58 branches besides `main`, and the local copy has the same names (no local-only branch). There is one tag, `ux-demo-approved-2026-10-21`.
