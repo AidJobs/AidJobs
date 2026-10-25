@@ -281,9 +281,14 @@ Tags created, pushed individually, and verified on GitHub (git and the GitHub AP
 ### G3. Recovery
 
 - A branch in G2: `git push origin <full commit ID>:refs/heads/<branch>` recreates it exactly. For a branch with a merged pull request, the pull request page on GitHub also offers "Restore branch".
-- A branch in G1: `git push origin <archive tag>^{commit}:refs/heads/<branch>`, for example `git push origin archive/ux-public-layout^{commit}:refs/heads/ux/public-layout`. The uncommitted `tailwind.config.js` change of `ux/public-layout` is also kept outside the repository as `aidjobs-patches/ux-public-layout-af72047-tailwind-config-uncommitted.patch` (SHA-256 `8BCED966FD765B3174F1D9E863D40B4E0DEAD65D8464F7BCF2AEF8E716B732E8`).
+- A branch in G1: recreate it from its full commit ID in G1; the archive tag is the evidence that the ID is right. Use the ID, not the form `<tag>^{commit}`: typed unquoted into PowerShell, `^{commit}` is misread and points at the commit before (tested 26 October 2026).
+  - `git push origin 14cad29e4f49ee1b725f05b26a258d009e03de2a:refs/heads/codex/fix-scheduler-like-query`
+  - `git push origin 2808f9160189b7ff29e132a2f91ce8e556d33417:refs/heads/codex/secure-admin-routes`
+  - `git push origin 2b387ca60f971d8f2bc24aa28d6031d030ed47fd:refs/heads/fix/public-stopgap`
+  - `git push origin af72047db20afaa5843b5a45511db0a202f21428:refs/heads/ux/public-layout`
+- The uncommitted `tailwind.config.js` change of `ux/public-layout` is also kept outside the repository, in `C:\Users\DELL\Documents\AidJobs App\aidjobs-patches\`, as `ux-public-layout-af72047-tailwind-config-uncommitted.patch` (SHA-256 `8BCED966FD765B3174F1D9E863D40B4E0DEAD65D8464F7BCF2AEF8E716B732E8`).
 - A local copy: `git branch <branch> origin/<branch>` while the branch is on GitHub, or from the commit ID or tag above.
-- Vercel previews: deleting a branch does not delete its deployments; a recreated branch gets a new preview on its next push. How long Vercel keeps old deployments, and what happens to a deleted branch's preview alias, were not verified.
+- Vercel previews: expected but not verified — deleting a branch should leave its existing deployments in place, and a recreated branch should get a new preview on its next push. How long Vercel keeps old deployments, and what happens to a deleted branch's preview alias, were not verified either.
 
 ## How it would be carried out, after approval
 
