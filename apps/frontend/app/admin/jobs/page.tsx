@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { jobsCountScope } from '@/lib/admin/status';
 import { hardDeleteConfirmationMatches } from '@/lib/admin/danger';
+import { adminDate, adminDateTime } from '@/lib/dates';
 import {
   Search, Filter, Trash2, RefreshCw, Download, RotateCcw, AlertTriangle,
   CheckCircle, XCircle, Calendar, Building2, Globe, FileText, Info,
@@ -508,14 +509,7 @@ export default function JobManagementPage() {
     return 'text-green-600 bg-green-50 border-green-200';
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | null) => adminDate(dateStr);
 
   return (
     <div className="h-full overflow-y-auto bg-white">
@@ -1194,7 +1188,7 @@ export default function JobManagementPage() {
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                         <div className="text-xs text-red-600 mb-1">Deleted Information</div>
                         <div className="text-sm text-red-900">
-                          <div>Deleted at: {formatDate(job.deleted_at)}</div>
+                          <div>Deleted at: {adminDateTime(job.deleted_at)}</div>
                           {job.deleted_by && <div>Deleted by: {job.deleted_by}</div>}
                           {job.deletion_reason && <div>Reason: {job.deletion_reason}</div>}
                         </div>

@@ -1,5 +1,6 @@
 import { hasFlag } from 'country-flag-icons';
 import { countryName, isoFromName } from './countries';
+import { formatDate } from '../dates';
 
 export type RawJob = {
   id: string;
@@ -25,7 +26,6 @@ export const STALE_DAYS = 7;
 export const OLD_DAYS = 30;
 
 const DAY_MS = 86_400_000;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** The country of a location: the last part that names one, so "Afghanistan, various sites" is Afghanistan. */
@@ -60,18 +60,7 @@ export function daysUntil(deadline: string | null, today: number): number | null
   return Math.round((t - today) / DAY_MS);
 }
 
-/** A date ("2026-10-23") as written; a moment ("2026-10-22T18:55:56+00:00") on the visitor's clock. */
-export function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  if (iso.length === 10) {
-    const d = new Date(`${iso}T00:00:00Z`);
-    if (Number.isNaN(d.getTime())) return '';
-    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-  }
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
+export { formatDate };
 
 export function formatLongDate(iso: string | null): string {
   if (!iso) return '';

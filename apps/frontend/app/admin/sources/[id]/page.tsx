@@ -12,6 +12,7 @@ import {
   sourceDangerActions,
   type ImpactCount,
 } from '@/lib/admin/danger';
+import { adminDateTime } from '@/lib/dates';
 
 const CRAWL_RUN_LIMIT = 100;
 
@@ -171,8 +172,8 @@ export default function SourceDetailPage() {
     ['Organisation type', source.org_type || '—'],
     ['Status', source.status],
     ['Schedule', source.crawl_frequency_days ? `Every ${source.crawl_frequency_days} days` : '—'],
-    ['Last crawl', source.last_crawled_at || '—'],
-    ['Next crawl', source.next_run_at || '—'],
+    ['Last crawl', adminDateTime(source.last_crawled_at)],
+    ['Next crawl', adminDateTime(source.next_run_at)],
     ['Failures', String(source.consecutive_failures ?? 0)],
     ['Health', source.last_crawl_status || '—'],
   ];
@@ -206,7 +207,7 @@ export default function SourceDetailPage() {
         {logs.map((log) => (
           <li key={log.id} className="py-3 text-sm">
             <span className="font-medium">{log.status}</span>
-            {log.ran_at ? <span className="ml-2 text-[#86868B]">{log.ran_at}</span> : null}
+            {log.ran_at ? <span className="ml-2 text-[#86868B]">{adminDateTime(log.ran_at)}</span> : null}
             {log.message ? <span className="mt-1 block text-[#1D1D1F]">{log.message}</span> : null}
           </li>
         ))}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { adminDateTime } from '@/lib/dates';
 import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle } from 'lucide-react';
 
 type Source = {
@@ -919,10 +920,7 @@ export default function AdminSourcesPage() {
     setShowAdvanced(false);
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString();
-  };
+  const formatDate = (dateStr: string | null) => adminDateTime(dateStr);
 
   const totalPages = Math.ceil(total / pageSize);
 

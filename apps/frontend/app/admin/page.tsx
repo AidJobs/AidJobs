@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
 import { COUNT_LABELS, healthScore as computeHealthScore, recentActivity, searchSummary, type RecentActivity } from '@/lib/admin/status';
 import { meiliControlsVisible } from '@/lib/admin/danger';
+import { adminDateTime } from '@/lib/dates';
 
 type DbStatus = {
   ok: boolean;
@@ -397,7 +398,7 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2">
                       <Clock className="w-3.5 h-3.5 text-[#86868B]" />
                       <span className="text-caption text-[#86868B]">
-                        Last reindex: {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                        Last reindex: {adminDateTime(searchStatus.index.lastReindexedAt)}
                       </span>
                     </div>
                   </div>
@@ -434,7 +435,7 @@ export default function AdminPage() {
                           {run.org_name || 'Unnamed'} · {run.status}
                         </div>
                         <div className="text-caption text-[#86868B]">
-                          {new Date(run.ran_at).toLocaleString()} · found {run.found}, new {run.inserted}, updated {run.updated}
+                          {adminDateTime(run.ran_at)} · found {run.found}, new {run.inserted}, updated {run.updated}
                         </div>
                       </div>
                     </div>
@@ -597,7 +598,7 @@ export default function AdminPage() {
                         <div className="flex justify-between items-center text-caption">
                           <span className="text-[#86868B]">Last reindexed</span>
                           <span className="text-[#1D1D1F]">
-                            {new Date(searchStatus.index.lastReindexedAt).toLocaleDateString()}
+                            {adminDateTime(searchStatus.index.lastReindexedAt)}
                           </span>
                         </div>
                       )}
