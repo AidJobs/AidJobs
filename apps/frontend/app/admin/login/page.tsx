@@ -3,60 +3,97 @@
 import { Suspense, useEffect, useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import {
+  classifyLogin,
+  classifySession,
+  loginReasonMessage,
+  SLOW_AFTER_MS,
+  STARTING_UP_MESSAGE,
+} from '@/lib/admin/sessionCheck';
 
 function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get('reason') === 'session') {
-      setError('Your session was not accepted. Sign in again.');
+    const reason = searchParams.get('reason');
+    const message = loginReasonMessage(reason);
+    if (reason === 'signed-out') {
+      setNotice(message);
+    } else if (message) {
+      setError(message);
     }
   }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
+    setSlow(false);
+    const slowTimer = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
 
     try {
-      const response = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ password }),
-      });
+      let status: number | null = null;
+      let body: unknown = null;
+      try {
+        const response = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ password }),
+        });
+        status = response.status;
+        body = await response.json().catch(() => null);
+      } catch (err) {
+        console.error('Login error:', err);
+      }
 
-      if (response.ok) {
+      const login = classifyLogin(status, body);
+      if (login.kind === 'wrong-password') {
+        setError('Invalid password');
+        return;
+      }
+      if (login.kind !== 'ok') {
+        setError(login.message);
+        return;
+      }
+
+      let sessionStatus: number | null = null;
+      let sessionBody: unknown = null;
+      try {
         const session = await fetch('/api/admin/session', {
           credentials: 'include',
           cache: 'no-store',
         });
-        const sessionBody = await session.json().catch(() => ({ authenticated: false, reason: 'invalid' }));
-        if (session.ok && sessionBody.authenticated) {
-          router.push('/admin');
-          return;
-        }
-        if (sessionBody.reason === 'missing') {
-          setError('Login succeeded, but the browser did not keep the session. Allow cookies for this site and try again.');
-        } else {
-          setError('Login succeeded, but the session could not be verified. Try again in a moment.');
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.error || 'Invalid password';
-        setError(errorMessage);
+        sessionStatus = session.status;
+        sessionBody = await session.json().catch(() => null);
+      } catch {
+        sessionStatus = null;
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      setError('Login failed. Please try again.');
+      const outcome = classifySession(sessionStatus, sessionBody);
+      if (outcome === 'ok') {
+        router.push('/admin');
+        return;
+      }
+      if (outcome === 'signed-out') {
+        setError('Login succeeded, but the browser did not keep the session. Allow cookies for this site and try again.');
+      } else if (outcome === 'unavailable') {
+        setError('Login succeeded, but the admin service did not answer the session check. Try again in a moment.');
+      } else {
+        setError('Login succeeded, but the session was not accepted. Try again.');
+      }
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setLoading(false);
     }
   };
@@ -165,6 +202,15 @@ function AdminLoginForm() {
                   )}
                 </button>
               </div>
+
+              {loading && slow && (
+                <p className="text-sm text-[#86868B] font-light" role="status" aria-live="polite">
+                  {STARTING_UP_MESSAGE}
+                </p>
+              )}
+              {notice && !error && (
+                <p className="text-sm text-[#86868B] font-light">{notice}</p>
+              )}
 
               {/* Error Message */}
               {error && (

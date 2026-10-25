@@ -6,8 +6,15 @@ import {
   sessionCookieOptions,
   sessionRequestSecure,
 } from '@/lib/adminSession';
+import { BACKEND_WAIT_MS } from '@/lib/admin/sessionCheck';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+const UNAVAILABLE = {
+  detail: 'The admin service did not answer. It may be starting up; wait a moment and try again.',
+  reason: 'unavailable',
+};
 
 function loginJson(body: unknown, status = 200) {
   const response = NextResponse.json(body, { status });
@@ -27,12 +34,16 @@ export async function POST(req: NextRequest) {
       cache: 'no-store',
       redirect: 'manual',
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(BACKEND_WAIT_MS),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => null);
     if (!res.ok) {
+      if (data === null && res.status >= 500) {
+        return loginJson(UNAVAILABLE, 503);
+      }
       return loginJson(
-        { detail: data.detail || data.error || 'Invalid credentials' },
+        { detail: data?.detail || data?.error || 'Invalid credentials' },
         res.status
       );
     }
@@ -51,9 +62,6 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error('Login proxy error:', error);
-    return loginJson(
-      { detail: 'Login failed. The admin service could not be reached.' },
-      500
-    );
+    return loginJson(UNAVAILABLE, 503);
   }
 }
