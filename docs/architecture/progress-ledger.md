@@ -15,7 +15,7 @@ Every claim below is marked **Verified** (checked against git, GitHub, CI, or a 
 
 ## How to resume
 
-1. **Current priority, set by the user on 26 October 2026: security hardening.** Open `docs/architecture/security-hardening-plan.md` and take the first stage in its order table that is not done; each stage needs its own approval at every step. UX-11 resumes as its last stage. **After that, the priority set on 20 October 2026: user experience.** Open `docs/architecture/ux-build-plan.md`, read its "Revision of 21 October 2026", and take the first step in its order table that is not Done and whose dependencies are met, following the working method at the top of that file. Crawler items (the "Open work" list below) resume in their order after Stage C of that plan, or when the user changes the priority. Without a UX priority, read the "Open work" list and take the lowest-numbered item that is not blocked.
+1. **Current priority, set by the user on 26 October 2026: security hardening.** Open `docs/architecture/security-hardening-plan.md` and take the first stage in its order table that is not done; each stage needs its own approval at every step. Its stage 8 is the employer survey (W-31, set by the user on 26 October 2026), and UX-11 resumes as its last stage. **After that, the priority set on 20 October 2026: user experience.** Open `docs/architecture/ux-build-plan.md`, read its "Revision of 21 October 2026", and take the first step in its order table that is not Done and whose dependencies are met, following the working method at the top of that file. Crawler items (the "Open work" list below) resume in their order after Stage C of that plan, or when the user changes the priority. Without a UX priority, read the "Open work" list and take the lowest-numbered item that is not blocked.
 2. Check the current state before acting: `git status -sb`, `git log -1 origin/main`, and `gh pr list --state open`. If `main` has moved past the commit named under "Last verified", find out why before trusting this file.
 3. Follow the operating conventions below.
 4. When an item is finished, update this file in the same pull request as the work, or in the next docs pull request. For a UX step, also update its status line in `ux-build-plan.md`; a UX step is Done only after its live check.
@@ -146,6 +146,7 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | UX-31 stage 1 recorded as done | PR #47, `be17091` | 26 Oct 2026 | Merged, CI green |
 | UX-31 branch record: full commit IDs before deletion, recovery commands | PR #48, `6b58703` | 26 Oct 2026 | Merged, CI green |
 | UX-31 done: branches deleted, Render variable removed, checks recorded | PR #49, `efb8cd4` | 26 Oct 2026 | Merged, CI green, deployed |
+| Security hardening plan and the 26 October incidents recorded | PR #52, `6711707` | 26 Oct 2026 | Merged, CI green |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -402,6 +403,29 @@ The plan's "After this plan" section lists the later work: extracting stages fro
 **W-20. ICRC's other lists.** User decision.
 The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates and Students lists. Each would be its own source.
 
+**W-31. Employer discovery and coverage survey.** Added 26 October 2026. Placed by the user the same day after the security hardening stages and before UX-11 (security plan, stage 8). Read-only: no source is added, nothing is crawled, and no database is touched. Each step needs the user's approval.
+The goal set by the user is to capture the jobs of every relevant employer, systematically and without gaps. This is W-19's step 2 (survey and group by recruitment system), widened from the six-site gate to the whole sector. The unit of record is one careers site: an affiliate or national office with its own careers site is its own record, and organisations that share one site (for example, probably, the UN Secretariat offices on `careers.un.org`) are one record.
+- **Master lists, ready (from the user, 26 October 2026):**
+  - UNjobs "UN and Intergovernmental Organizations" (`unjobs.org/organizations`): 108 entries, 107 distinct (UNICEF listed twice), about 2,052 jobs shown.
+  - UNjobs "Non-UN and other International Organizations" (`unjobs.org/non-un-organizations`, the full list pasted by the user because the site serves a Cloudflare challenge to scripts): 539 entries, about 535 distinct, about 7,326 jobs shown. Duplicates: Conciliation Resources, Prosper Global, Norwegian Refugee Council, and Antora Energy each appear twice. The Global Fund and BIPM are also on the UN page. Nine entries are UN offices and join the UN Secretariat group.
+  - About 640 distinct organisations in total. UNjobs' counts are a benchmark only; each employer's own site is the real count.
+  - Non-aid entries (for example Zipline, Control Risks, Mozilla, Euroclear, US think tanks) stay in the survey, marked, for the user's decision.
+  - Possibly missing major NGOs, from the agent's knowledge, not checked, proposed for the user's review only: World Vision, ActionAid, Concern Worldwide, Christian Aid, Tearfund, CAFOD, Caritas, SOS Children's Villages, Habitat for Humanity, HelpAge International, Medair, ALIMA, Terre des Hommes, ZOA, Cordaid, Finn Church Aid, Johanniter, Gavi, ICRISAT.
+- **Discovery sources, in order:**
+  1. IATI publisher register: 2,130 publishers (Verified, 26 October 2026), open API with no key (`https://iatiregistry.org/api/3/action/organization_list` and `organization_show`). Records give the name, IATI organisation ID, country, and organisation type; some have no website. Names are ambiguous: `irc` is IRC WASH (Netherlands), while the International Rescue Committee is `irc_inc` and `irc_uk`. Contact emails in the records are never stored.
+  2. ReliefWeb API v2 (`https://api.reliefweb.int/v2`): every request needs an `appname` approved by ReliefWeb; the user is requesting one through the form at `apidoc.reliefweb.int`. Its terms let anyone use the API; content may belong to the original source. Use: the organisations that post jobs there and how many each posts. Whether its organisation records carry a website is not verified. The appname is kept like a setting (local `.env`, later Render), not in a tracked file. The repository preset (`apps/backend/app/presets.py`) calls the old `/v1/jobs` path and was never used.
+- **Later coverage checks, recorded so they are not lost; not started:**
+  - Member lists of humanitarian and development networks: ICVA, InterAction, Bond, VOICE, CHS Alliance.
+  - DevNetJobs.org (not DevNetJobsIndia, which is a C5 site), as a gap check of employer names only, run against the merged list: paid membership, some adverts for members only, no public API known, terms to be checked first; its pages show job seekers' profiles, which are never collected.
+  - ReliefWeb as a jobs feed, separate from its use for discovery: a decision for the user. The same job would arrive from ReliefWeb and from the employer's site with different links, and the identity rules do not merge them.
+- **Considered and not used:** GlobalGiving Atlas (every registered UK charity, about 316,000, mostly local, with no careers page or jobs); the WANGO NGO directory (local and outdated entries, names and towns only, paged web pages); Idealist (no open API known, mostly US nonprofits and volunteering).
+- **Duplicate removal:** match on the website domain first, then the IATI organisation ID, then the cleaned name and acronym. Uncertain matches go on a review list for the user and are not merged automatically. Each record keeps every name and ID it is known by on UNjobs, ReliefWeb, and IATI.
+- **Ranking:** organisations with hiring evidence (jobs on UNjobs or ReliefWeb) first, by job count; IATI-only organisations last.
+- **Per record:** the official careers page; the recruitment system and the evidence for it (for example links to `myworkdayjobs.com` or `oraclecloud.com/…/CandidateExperience`); how the listing can be read (plain page, page that needs JavaScript, feed, or public API); paging and size against the benchmark; bot protection seen; whether job pages show location, deadline, and contract type; which other organisations share the site. One or two spaced requests per organisation; a bot challenge is recorded, never solved or bypassed. At this size, finding careers pages needs a small read-only research script run from the user's machine, which needs its own approval.
+- **Output:** `docs/architecture/source-survey.md` (summary, groups by recruitment system ranked by jobs covered) and a CSV master list beside it, through a pull request. Expected after matching: probably 2,500 to 3,500 distinct organisations, of which perhaps 600 to 1,000 hire regularly (an estimate).
+- **Known crawler limits that would lose jobs at this scale,** each its own item: crawl locks never expire (security plan, stage 2); job pages are not opened above 50 candidates (W-09); closed jobs without a deadline never leave search (W-06); scheduled crawls run only while the free Render backend is awake (UX-08 item 5); no per-site time budget; found against expected is reported only for UNICEF (W-04).
+- **Background:** the MSF and UNDP sources the user added and removed on 26 October 2026 are recorded in the security plan's incident record.
+
 ### Known and deliberately left alone
 
 - UNICEF job `596188` has two rows, because UNICEF renamed it and the link changed. Fixing it would mean an identity redesign, which the contract rules out.
@@ -425,6 +449,9 @@ The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates an
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
 | Review Supabase's database logs for the exposure window of 26 October 2026 | Security plan, stage 0 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
+| Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
+| Whether to use ReliefWeb as a jobs feed as well as for discovery | W-31 |
+| Which non-aid organisations, and which proposed missing NGOs, the survey keeps | W-31 |
 | Agree the revised admin menu, which keeps the contract's admin V1 navigation | UX-19 |
 | Whether to store title facts in the database later, with server filtering or landing pages | UX-22 |
 

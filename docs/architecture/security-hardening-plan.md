@@ -2,7 +2,7 @@
 
 **Status:** approved in principle by the user on 26 October 2026, including the order below. This is approval of the direction only. Each stage needs its own defined scope, reviewable changes, tests, and the user's explicit approval at every step (plan, implement, merge). Nothing here approves a database change, a credential change, a production setting change, or a crawl.
 
-**Priority:** set by the user on 26 October 2026. This plan runs before UX-11; UX-11 resumes as stage 8, with a plan for the user's approval.
+**Priority:** set by the user on 26 October 2026. This plan runs before UX-11. The employer survey (ledger W-31) follows the security stages as stage 8, placed there by the user the same day; UX-11 resumes as stage 9, with a plan for the user's approval.
 
 Every claim is marked as in the ledger: **Verified** (checked against git, GitHub, CI, the code, or a read-only production request), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -39,7 +39,8 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
 | 7 | Two design decisions: readiness check, public database status | Each its own decision |
-| 8 | Resume UX-11 | Plan first, for the user's approval |
+| 8 | Employer survey (ledger W-31) | After stages 0 to 7; read-only; each step for the user's approval |
+| 9 | Resume UX-11 | Plan first, for the user's approval |
 
 The documentation is updated after each stage is merged and verified live. It records what was done; it is not a substitute for the control itself.
 
@@ -93,6 +94,10 @@ A plan, after stages 3 and 4 are reviewed. It inventories the tables the backend
 
 - **Readiness:** keep Render's health check on liveness. First establish which path Render uses and what Render does when the check fails; do not point Render at a check that depends on the database without that analysis. A separate readiness check, if needed, may belong with UX-28 error monitoring.
 - **Public database status:** `/api/db/status` lists every source's internal ID and job count. Inventory its callers first (the admin dashboard calls it), then propose the minimum public response and where the detail moves.
+
+### Stage 8. Employer survey
+
+Not a security stage. Placed here by the user on 26 October 2026 so that it follows the security work and comes before UX-11. The scope, sources, and rules are in the ledger, W-31. It is read-only: no source is added, nothing is crawled, and no database is touched. The ReliefWeb `appname` it needs is kept like a setting, never in a tracked file, and contact details from the organisation lists are not stored.
 
 ## Safeguards for every stage
 
