@@ -64,6 +64,13 @@ def _iso_calendar_date(text: str) -> Tuple[bool, Optional[str]]:
     return True, day.strftime('%Y-%m-%d')
 
 
+# Without a language list, dateparser tries every locale it knows on every call: about a
+# second per text, run on the event loop. The six UN official languages, plus Portuguese,
+# German, and Italian; a month name in any other language no longer parses.
+DEADLINE_LANGUAGES = ('en', 'fr', 'es', 'ar', 'ru', 'zh', 'pt', 'de', 'it')
+_HAS_DIGIT = re.compile(r'\d')
+
+
 _UNICEF_PAGE_CAP = 30
 _UNICEF_PAGE_DELAY = 5.0
 _UNICEF_RETRY_DELAY = 30.0
@@ -1201,6 +1208,11 @@ class SimpleCrawler:
         if is_iso:
             return iso_date
 
+        # A deadline names a day, so it contains a digit. Labels and column headings
+        # ("Agency", "Location") and relative words ("today", "December") are not deadlines.
+        if not _HAS_DIGIT.search(text):
+            return None
+
         # Remove time components if present (e.g., "2025-12-31T23:59:59Z" -> "2025-12-31")
         if 'T' in text:
             text = text.split('T')[0]
@@ -1213,6 +1225,7 @@ class SimpleCrawler:
             # Parse with dateparser (handles many locales and formats)
             parsed_date = dateparser.parse(
                 text,
+                languages=list(DEADLINE_LANGUAGES) if DEADLINE_LANGUAGES else None,
                 settings={
                     'PREFER_DAY_OF_MONTH': 'first',
                     'RELATIVE_BASE': datetime.now(),
