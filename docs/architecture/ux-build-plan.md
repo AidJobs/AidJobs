@@ -65,7 +65,7 @@ Sharing is not removed. The demo's job sheet has one Share button, labelled "Sha
 | 9 | Stage C, UX-19 to UX-21, then UX-30 removal of the old shared styles | Code |
 | 10 | Stage D with the crawler | Code |
 
-UX-31, the repository tidy-up, can run at any point with the user's approval of its list. Done on 26 October 2026. Next in the user's approved order: UX-11, plan first.
+UX-31, the repository tidy-up, can run at any point with the user's approval of its list. Done on 26 October 2026. Next in the user's approved order: UX-11, plan first. Paused the same day by the user: the security hardening plan (`security-hardening-plan.md`) runs first, and UX-11 resumes as its last stage.
 
 **Questions decided at UX-08** (21 October 2026; outcomes in `ux-08-launch-decisions.md`: filtering in the browser for launch, title facts read when the page is built, W-06 ahead, domain still being chosen). As first written:
 
