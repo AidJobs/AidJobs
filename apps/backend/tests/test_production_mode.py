@@ -15,6 +15,7 @@ if "app.db" not in sys.modules:
 
 import app.job_management as job_management
 import app.search as search
+import main as main_module
 from main import app
 
 SECRET_DETAIL = "detail-that-must-not-leak"
@@ -116,3 +117,155 @@ def test_single_job_from_meilisearch_drops_raw_and_internal_fields(monkeypatch, 
     result = asyncio.run(service.get_job_by_id("job-2"))
 
     assert result["data"] == {"id": "job-2", "title": "Officer"}
+
+
+DRIVER_ERROR = (
+    'connection to server at "pooler.db.example.internal" (203.0.113.7), port 5432 failed: '
+    "FATAL:  (ECIRCUITBREAKER) too many authentication failures"
+)
+LEAK_MARKERS = ["pooler.db.example.internal", "203.0.113.7", "5432", "FATAL", "ECIRCUITBREAKER"]
+
+
+def _db_service():
+    service = search.SearchService.__new__(search.SearchService)
+    service.db_enabled = True
+    service.meili_enabled = False
+    service.meili_client = None
+    return service
+
+
+def _failing_connect(message):
+    def connect(**kwargs):
+        raise search.psycopg2.OperationalError(message)
+
+    return connect
+
+
+@pytest.mark.parametrize("env", ["dev", "production"])
+def test_public_db_status_hides_driver_errors(monkeypatch, env):
+    monkeypatch.setenv("AIDJOBS_ENV", env)
+    monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
+    monkeypatch.setattr(search.psycopg2, "connect", _failing_connect(DRIVER_ERROR))
+    monkeypatch.setattr(main_module, "search_service", _db_service())
+
+    response = TestClient(app).get("/api/db/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "error": "Database unavailable"}
+    for marker in LEAK_MARKERS:
+        assert marker not in response.text
+
+
+def test_db_status_log_masks_connection_strings(monkeypatch, caplog):
+    fake_password = "fake" + "-test-value"
+    address = "postgresql" + "://user:" + fake_password + "@db.example.internal:5432/postgres"
+    monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
+    monkeypatch.setattr(
+        search.psycopg2,
+        "connect",
+        _failing_connect(f'invalid dsn: "{address}" password={fake_password}'),
+    )
+
+    with caplog.at_level("ERROR", logger=search.logger.name):
+        result = asyncio.run(_db_service().get_db_status())
+
+    assert result == {"ok": False, "error": "Database unavailable"}
+    assert "Database status check failed: OperationalError" in caplog.text
+    assert fake_password not in caplog.text
+    assert "<redacted-url>" in caplog.text
+
+
+class _StatusCursor:
+    def __init__(self):
+        self.counts = iter([{"count": 7}, {"count": 4}, {"count": 2}])
+
+    def execute(self, sql, params=None):
+        pass
+
+    def fetchone(self):
+        return next(self.counts)
+
+    def fetchall(self):
+        return [{"source_id": "s-1", "org_name": "Org", "job_count": 4}]
+
+    def close(self):
+        pass
+
+
+class _StatusConn:
+    def cursor(self, cursor_factory=None):
+        return _StatusCursor()
+
+    def close(self):
+        pass
+
+
+def test_db_status_success_is_unchanged(monkeypatch):
+    monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
+    monkeypatch.setattr(search.psycopg2, "connect", lambda **kwargs: _StatusConn())
+
+    result = asyncio.run(_db_service().get_db_status())
+
+    assert result == {
+        "ok": True,
+        "row_counts": {"jobs": 7, "active_jobs": 4, "sources": 2},
+        "source_breakdown": [{"source_id": "s-1", "org_name": "Org", "job_count": 4}],
+    }
+
+
+def _meili_service(**attrs):
+    service = search.SearchService.__new__(search.SearchService)
+    service.meili_index_name = "jobs_index"
+    service.last_reindexed_at = None
+    for name, value in attrs.items():
+        setattr(service, name, value)
+    return service
+
+
+def test_search_status_keeps_not_configured_and_hides_meilisearch_errors(monkeypatch):
+    not_configured = _meili_service(meili_enabled=False, meili_client=None, meili_error=None)
+    assert asyncio.run(not_configured.get_search_status()) == {
+        "enabled": False,
+        "error": "Meilisearch not configured",
+    }
+
+    failed_init = _meili_service(
+        meili_enabled=False,
+        meili_client=None,
+        meili_error=f"Connection refused: http://10.0.0.5:7700 {SECRET_DETAIL}",
+    )
+    monkeypatch.setattr(main_module, "search_service", failed_init)
+    response = TestClient(app).get("/api/search/status")
+    assert response.json() == {"enabled": False, "error": "Meilisearch unavailable"}
+    assert SECRET_DETAIL not in response.text
+    assert "10.0.0.5" not in response.text
+
+    class _BrokenIndex:
+        def get_stats(self):
+            raise RuntimeError(SECRET_DETAIL)
+
+    class _BrokenClient:
+        def index(self, name):
+            return _BrokenIndex()
+
+    unreachable = _meili_service(meili_enabled=True, meili_client=_BrokenClient(), meili_error=None)
+    unreachable._init_meilisearch = lambda: None
+    result = asyncio.run(unreachable.get_search_status())
+    assert result == {"enabled": False, "error": "Meilisearch unavailable"}
+
+
+def test_search_parse_and_autocomplete_hide_exception_text(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError(SECRET_DETAIL)
+
+    monkeypatch.setattr(main_module, "parse_query", boom)
+    monkeypatch.setattr(main_module, "get_suggestions", boom)
+    client = TestClient(app)
+
+    parsed = client.post("/api/search/parse", json={"query": "officer"})
+    assert parsed.json() == {"status": "error", "data": None, "error": "Failed to parse query"}
+    assert SECRET_DETAIL not in parsed.text
+
+    suggested = client.get("/api/search/autocomplete", params={"q": "offi"})
+    assert suggested.json() == {"status": "error", "data": [], "error": "Failed to get suggestions"}
+    assert SECRET_DETAIL not in suggested.text
