@@ -385,7 +385,7 @@ The crawler calls no AI service. The AI listing extraction and the AI normaliser
 - On the ICRC crawl of 27 October 2026, the AI attempt made about 30 calls, each rejected, in about 18 seconds. Each call sent part of the job page to a third party.
 - On every saved page, the crawl saves identical records with the revoked key and without AI.
 
-The old plugin registry and its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins are removed. The registry could not be built, so none of them ever ran in the current crawler (`SimpleCrawler`, which has called the registry since 4 December 2025). An earlier crawler ran them for a few days before `unesco.py` stopped compiling on 3 December 2025. The UNICEF reader stays and is the only organisation-specific reader.
+The old plugin registry and its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins are removed. The registry could not be built, so none of them ever ran in the current crawler (`SimpleCrawler`, which has called the registry since 4 December 2025). Between 30 November and 3 December 2025, an earlier crawler could call the registry, which then held only the UNDP, UNESCO, and generic plugins; whether it did in a live crawl is not verified. The UNICEF reader stays and is the only organisation-specific reader.
 
 This covers the crawler only. The public search helpers (query parsing and suggestions) still read `OPENROUTER_API_KEY` until the switch to the new site (UX-29), and fall back to rule-based results without it.
 
