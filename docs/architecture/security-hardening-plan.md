@@ -110,14 +110,221 @@ Tests: interrupted crawls, restarts, expired locks, recovery, and concurrent wor
 - Live on Render, 27 October 2026: during an ICRC crawl the user ran from the admin at 16:25 IST (by then with PR #56 too), the health checks kept their 5-second rhythm, longest gap 6 seconds over 63 checks, against 70 seconds of silence on 26 October; no failed instance (ledger W-32). One crawl of one source, not a proof for UNDP-sized listings.
 - Follow-ups, tracked in the ledger rather than as GitHub issues (decided by the user, 27 October 2026): `core/ai_normalizer.py`'s `normalize_deadline` still calls `dateparser` with every locale, synchronously, inside an async function (lines 163–174; W-13, closed by PR #58, which removes the AI normaliser from the crawl path); two-digit years read as the 2100s (W-12) and the cut at any capital "T" (W-32) are fixed in [PR #56](https://github.com/AidJobs/AidJobs/pull/56), merged as `c86984e` and live-checked, together with ICRC's missing deadlines.
 
-**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation not yet approved.** This replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered.
+**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation not yet approved.** The design replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered. The full specification follows, written on 27 October 2026 against the code on `main` after PR #58 (`51c6299`), for an independent review before the user decides on implementation.
 
-- **Timing:** each crawl's owner ends its own run at `CRAWL_TIME_LIMIT`, 15 minutes (2.3 times the longest observed crawl, 6.6 minutes); `LOCK_TTL` is 25 minutes; both configurable. After a hard kill, recovery takes at most about 30 minutes. `asyncio.wait_for` cannot stop code that blocks the event loop; that case is handled by Render replacing the process and recovery afterwards.
-- **Ownership:** the run's `crawl_logs.id` is the token. A run token is mandatory in all three `save_jobs`: without a valid owned run, nothing is written. `POST /api/admin/crawl/fix-undp-urls` is removed.
-- **Transactions,** each locking rows in one order (run, then lock, then source, then jobs): acquire (insert the lock, then the run; Gate 5's statement order kept); takeover, only after a conflict and only for a lock older than `LOCK_TTL`; every save first confirms its run is still running (`FOR SHARE`), so a takeover waits for a save in progress and every later save is refused; finish updates only its own running run, otherwise changes nothing; recovery at scheduler start and on every scheduler run.
-- **Outcomes:** success stays `ok` or `warn`; the owner's time limit, and an expired lock with the cause unknown, are `fail`, each counted once toward the existing five-failure pause; a confirmed graceful shutdown is the new status `interrupted`, not counted, shown as neutral text; an old worker finishing late writes nothing.
-- **Gate 5 changes,** approved, with the crawler plan's record to be updated: a held lock with no running run starts again once older than `LOCK_TTL`; when finishing fails, only the owner releases the lock, through an ownership-checked retry.
-- **Tests, required before PR B is complete:** a PostgreSQL 17 service in CI, and tests on real concurrent transactions: concurrent acquisition, a save racing a takeover, a stale worker after takeover, exactly-once failure counting, recovery leaving live runs alone, graceful shutdown, hard kill, no deadlock, jobs unchanged on every failure path, and a writer without a token refused.
+#### PR B specification
+
+Revised the same day after an independent read-only review of the first version against the code. Each change it caused is marked "(review)".
+
+**A. What the design rests on.**
+
+- **Verified (Render documentation, read 27 October 2026).**
+  - A deploy is zero-downtime: the new instance takes traffic, Render sends `SIGTERM` to the old instance about 60 seconds later, and `SIGKILL` if it has not exited within the shutdown delay (default 30 seconds). So two schedulers can run at once for at least 60 seconds on every deploy.
+  - The free plan spins an instance down after 15 minutes without inbound traffic, and "might restart a Free web service at any time" (review).
+  - Not verified: which signal a spin-down sends, and Render's start command and shutdown settings for this service. The start command is not in the repository.
+- **Verified (Supabase documentation, read 27 October 2026).** The shared pooler in session mode, which production uses (port 5432), supports everything a direct connection does. Row locks taken inside a transaction behave as in plain PostgreSQL. Not verified: the session pool's size limit.
+- **Verified (production, read-only).**
+  - PostgreSQL 17.6. No check constraint on `crawl_logs.status` or `sources.last_crawl_status`. `crawl_logs.id` is a `uuid` generated by the database.
+  - Crawl durations up to 27 October 2026, before PR #58 removed about 17 seconds of failed AI calls per crawl: UNICEF's longest was 393.6 seconds (19 October); ICRC about 141 seconds; Oxfam at most 104 seconds.
+- **Verified (Render log).** Saving 118 and 119 UNICEF jobs took about one second each, on 25 and 26 October; ICRC's 13 jobs took under a second on 27 October. The log has one-second resolution.
+- **Repository: the event loop.**
+  - Every orchestrator database step and every `save_jobs` call runs synchronously inside the web server's event loop.
+  - `CrawlerOrchestrator._get_db_conn` retries with `time.sleep`: 2 addresses × 3 attempts, a 10-second connect timeout each, plus 2- and 4-second sleeps, about 72 seconds at worst.
+  - Other writes during a crawl are also synchronous, and some have no connect timeout (review):
+    - `log_admission_rejections` opens one connection per rejected job;
+    - the `raw_pages` insert;
+    - the extraction logger.
+- **Repository: one crawler instance shared by every crawl (review).** One `SimpleCrawler` serves every HTML crawl. `crawl_source` keeps `self._listing_report` and `self._current_source_id` on that shared instance, and reads the report after the save.
+- **Repository: shutdown today.** Uvicorn handles `SIGTERM` in this order (review; read in the installed uvicorn 0.54, same structure in production's pinned 0.32.0):
+  1. stops accepting connections;
+  2. waits for open requests to finish, with no limit unless a graceful-shutdown timeout is set;
+  3. runs the lifespan shutdown, where `stop_scheduler` only sets `running = False`;
+  4. cancels the loop's remaining tasks.
+
+  A cancelled crawl's `finally` releases its lock but leaves its run `running`; the interruption tests of 26 October reproduced this. An admin `POST /api/admin/crawl/run_due` in progress holds step 2 open until all its crawls end.
+- **Repository: source updates and counters.**
+  - `finish_run` writes failure and no-change counters calculated from the source row read when the crawl was selected, minutes earlier. It also writes the source's `status` from that row.
+  - The admin "Run" route does not read `status`, so `finish_run` falls back to `active`. A manual crawl of a paused source un-pauses it, and a crawl of a source soft-deleted during the crawl un-deletes it (review).
+  - `compute_next_run` opens a second connection, through `SourceHealthScorer`, with no timeout (review).
+- **Repository: `POST /api/admin/crawl/fix-undp-urls`.** It refers to names that do not exist (`cursor`, `normalized_jobs`, `size`; Ruff F821 on `main`), so it fails before it reaches `save_jobs`. It also bypasses the locks.
+- **Repository: who writes what.**
+  - `crawl_locks` and `crawl_logs`: only the orchestrator (`begin_run`, `finish_run`, `release_lock`), plus permanent source deletion (`app/sources.py`). Permanent deletion removes the source's runs, then its lock, then the source, in one transaction.
+  - Jobs: crawls write only through `persist_candidate`, inside the three crawlers' `save_jobs`. Admin pages also write jobs: the source soft delete, `delete-jobs-by-org`, and the job-management routes (review).
+  - Inserting a job takes a key-share lock on its source row, through the foreign key. Updating a job does not, because its `source_id` never changes (review).
+- **Repository: the lock and its run are not linked.** `crawl_locks` has no run id. The acquire step writes `locked_at = NOW()` and `ran_at = NOW()` in one transaction. `NOW()` is the transaction's start time, so the two timestamps are equal, and that equality identifies the run that owns a lock (review). Both columns are `TIMESTAMPTZ` in `infra/supabase.sql`; production's types are to be confirmed by the schema query (F).
+- **Repository and not verified: issue #5.**
+  - In the HTML crawler, a database error on one job is caught and the loop continues. It is not verified that this aborts the transaction so that the final commit silently rolls the whole batch back while the crawl reports `ok`. The first PostgreSQL test will show it.
+  - The RSS and API crawlers have no per-job catch: their whole save rolls back and reports `failed` (review).
+- **Versions (Repository).** CI uses Python 3.11.9, and `requirements.txt` pins `uvicorn[standard]==0.32.0`. The versions Render runs are not verified. The local environment runs Python 3.14 and uvicorn 0.54; uvicorn's shutdown order above was read in 0.54 and in 0.32.0's published source.
+- **Repository: admission-rejection logging** runs before `save_jobs`, on its own connections, outside the save transaction.
+
+**B. Settings.** Read from the environment, with defaults. No Render change is needed.
+- `CRAWL_TIME_LIMIT_MINUTES`: 15.
+- `CRAWL_LOCK_TTL_MINUTES`: 25. It must be longer than the time limit plus 6 minutes (finishing plus one 5-minute recovery interval); the code refuses a value that is not. This holds only because both clocks start when the lock is taken (C1).
+
+**C. Design.**
+
+1. **One clock (review).** A run's lock age and its time limit both start when the lock is taken.
+   - **Scheduled crawls** (the scheduler and `run_due`) take one of the 3 concurrency slots first, and only then the lock. A crawl queued behind others therefore holds no lock while it waits.
+     - The orchestrator keeps the set of source ids queued in this process and does not queue a source twice (review).
+     - When its slot comes, the acquire re-reads the source in the same transaction. It goes ahead only if the source is still `active` and still due; otherwise it rolls back and skips, with nothing written (review). A manual run, a pause, or a deletion during the wait is therefore respected.
+   - **The admin "Run" route** keeps the contract: it takes the lock at once and returns the run's id. A manual run does not require the source to be due, and may run a paused source; it never changes that status (C4).
+     - Its time limit runs from that moment.
+     - If its slot frees with less than 5 minutes of its limit left, or not at all, the run ends `interrupted` ("no free crawl slot") without crawling. It writes nothing to the source: no counter, no last status, no next-run time. So it does not feed the second-interruption rule in C5 (review).
+   - **`POST /api/admin/crawl/run_due`** queues the due crawls as tracked tasks and returns at once. Its response keeps `data.queued`, the number of sources queued, which the admin Crawls page reads (review). It no longer holds a request open while the crawls run, and so no longer delays shutdown.
+2. **Ownership token.** The token is the run's `crawl_logs.id`.
+   - It is passed explicitly, from `execute_run` to `crawl_source(source, run_token)` and on to all three crawlers' `save_jobs(..., run_token)`. It is never stored on the shared crawler instance.
+   - The token is mandatory: `save_jobs` without a token, or with one that does not identify a running run of the same source, writes nothing and raises `OwnershipLost`.
+   - Each crawler's broad `except` in `crawl_source` turns that error into `failed`. That is harmless, because the finish of a run it no longer owns writes nothing (review).
+3. **Database steps.** Each locks rows in one order: the run rows (R), then the lock row (L), then the source row (S), then job rows (J). The source row is locked with `FOR NO KEY UPDATE`, which does not block the key-share locks that job inserts take through the foreign key (review).
+   - **Timeouts (review).** Every step sets `SET LOCAL statement_timeout = '30s'` and `idle_in_transaction_session_timeout = '60s'`, so a stuck database cannot hold these locks indefinitely. The lock timeout depends on the step:
+     - takeover and recovery use `lock_timeout = '5s'`, and hitting it means "skip, try again later", with nothing written or counted;
+     - the finish uses `lock_timeout = '30s'`, and runs only after the run's own save has ended (C7, C8). A lock wait also counts toward the 30-second statement limit, so either error leads to the finish's single retry;
+     - the acquire and the save set no lock timeout of their own, and are bounded by the 30-second statement limit.
+   - **Connect timeout (review).** Every crawl connection, for the save, the run steps and the crawl-time logs, uses a 10-second connect timeout.
+   - **Acquire.**
+     - `INSERT INTO crawl_locks … ON CONFLICT DO NOTHING RETURNING`, then `INSERT INTO crawl_logs (… 'running' …) RETURNING id`, then commit. This keeps Gate 5's statement order.
+     - Both inserts use `NOW()` in the same transaction; never `clock_timestamp()` or a time from Python. A takeover and the acquire that follows it are separate transactions (review).
+     - The new run row cannot be contended, because no other transaction knows it exists, so taking L before R here cannot deadlock.
+     - On a conflict with a live lock (younger than the lifetime), roll back and return the live run's id, found as the running row whose `ran_at` equals the lock's `locked_at`. This keeps the contract's "a duplicate request returns the open run".
+   - **Take over**, only after a conflict with an expired lock.
+     - Lock every running row of the source, ordered by id.
+     - Lock the lock row only if it is still older than the lifetime; otherwise roll back and return the live run's id as above.
+     - Mark the owning run `fail` ("lock expired, cause unknown") and any other running row `interrupted`. Delete the lock, count one failure on the source for the owning run only (C4), and commit. Then acquire again.
+     - Rows marked `interrupted` here, or by recovery, write no source field and no counter (review).
+     - A lock with no owning run, as left before PR B, is taken over the same way, with only the lock to remove.
+   - **Save.**
+     - The first statement is `SELECT 1 FROM crawl_logs WHERE id = %(token)s AND source_id = %(source)s AND status = 'running' FOR SHARE`. If no row comes back, roll back and refuse.
+     - Then the job writes, each under its own savepoint (C6), and commit.
+     - A takeover's `FOR UPDATE` waits until a save in progress commits; every save after the takeover is refused.
+   - **Finish.**
+     - `UPDATE crawl_logs SET … WHERE id = %(token)s AND status = 'running' RETURNING id`. If no row comes back, roll back and change nothing: no counter, no lock, no source field.
+     - Otherwise delete the lock, update the source (C4), and commit. This replaces today's separate lock release in `finally`; a crawl cannot release a newer run's lock.
+     - If the finish itself fails, it is retried once. If that fails too, the lock stays until the lifetime passes and recovery counts the run once (review).
+   - **Recover.** At scheduler start, then on its own 5-minute timer, separate from the scheduler rounds so a long round does not delay it (review). Each source is handled in its own transaction:
+     - an expired lock is handled like a takeover, without starting a crawl;
+     - a running row that does not own a lock and is older than 2 minutes is marked `interrupted`. That covers rows left by an earlier version, and a row orphaned while a newer run holds the lock (review).
+     - A lock younger than the lifetime is never touched, including the old instance's live crawl during a deploy overlap.
+4. **Source updates.**
+   - The health score that `compute_next_run` needs is calculated before the locked transaction (review).
+   - Inside the transaction, the source row is read fresh under its row lock. The new counters, the next run time and the pause are calculated from that fresh row.
+   - Status changes only from `active` to `paused`, at the five-failure threshold. Any other status, such as `paused` or `deleted`, is left exactly as it is (review). This fixes the manual-run un-pause and the un-delete.
+5. **Outcomes.**
+
+   | Outcome | Run status | Source last status | Failure count | Next run |
+   | --- | --- | --- | --- | --- |
+   | Success | `ok` or `warn`, as today | the same | reset to 0 | as today |
+   | Time limit reached | `fail`, "Timed out after N minutes" | `fail` | +1 | as today, with back-off |
+   | Lock expired, owner died | `fail`, "lock expired, cause unknown" | `fail` | +1 | as today, with back-off |
+   | Shutdown, cancelled cleanly | `interrupted` | `interrupted` | unchanged the first time; +1 if the source's last status was already `interrupted` (review) | unchanged the first time, so it runs again at the next check; with back-off when counted |
+   | Manual run, no free slot in time (C1) | `interrupted`, "no free crawl slot" | nothing written | unchanged | unchanged |
+   | Old crawl finishing late | nothing written | nothing written | unchanged | unchanged |
+   | Every job failed to save (C6) | `fail` | `fail` | +1 | as today, with back-off |
+   | Some jobs failed to save (C6) | `warn`, "N of M jobs failed to save" | `warn` | reset to 0, as for `warn` today | as today |
+
+   Counting a second interruption in a row bounds the 26 October pattern, where a crawl that stalls the server causes a restart and runs again at once. With the existing back-off and the five-failure pause, it cannot repeat indefinitely.
+
+   `fail` and `failed` keep counting as today. The admin shows `interrupted` as neutral text, because its pages colour only `ok`/`success` and `fail`/`error` (Repository; to be checked on a preview).
+6. **Issue #5.**
+   - In all three `save_jobs`, each job's writes run under `SAVEPOINT` / `RELEASE SAVEPOINT`. A database error, including a deadlock with an admin job write (review), rolls back to the savepoint, skips that job, removes its entry from the search-projection list, counts it as failed, and the batch continues.
+   - `crawl_source` turns the failed count into the statuses in C5.
+   - For RSS and API this changes an all-or-nothing save into a per-job save. Neither has a live source.
+7. **Time limit.** `execute_run` wraps the crawl in `asyncio.timeout` (Python 3.11), not `wait_for`, which can swallow a cancellation (review). The deadline is the lock time plus the limit (C1). On timeout the run finishes as `fail` through the ownership-checked finish.
+   - A save already running in a worker thread (C9) cannot be cancelled. It completes under its own ownership check. The orchestrator keeps that save's thread future and waits for it before running the finish, so the finish never queues behind its own save on the run row (review).
+   - Code that blocks the event loop cannot be timed out. Render replaces such a process, and recovery handles it after the lifetime.
+8. **Shutdown.**
+   - The orchestrator keeps a reference to its scheduler task and to every running crawl's task: from the scheduler, `run_due`, and the admin "Run" route.
+   - `stop_scheduler` stops new crawls, cancels the tracked tasks, and waits until a deadline 20 seconds after it starts. Each cancelled crawl first waits for a save it has in progress (C7), then records `interrupted` (C5) through a shielded, ownership-checked finish. Whatever is not finished by the deadline, including a finish still waiting on its 30-second lock timeout, is left to recovery.
+   - With `run_due` no longer holding requests open (C1), uvicorn's wait for open requests is short. But the 20 seconds start only after it, and nothing guarantees they fit inside Render's 30. A graceful-shutdown timeout in Render's start command would bound it; that is a setting change for the user's approval, not part of PR B (review).
+9. **Off the event loop.** Every orchestrator database step, and `save_jobs`, run in a worker thread (`asyncio.to_thread`), so a slow database or a larger save cannot block the health check.
+   - The admission-rejection log, the `raw_pages` insert and the extraction logger run in the same worker thread, and their connections get a 10-second connect timeout (review).
+   - **No per-crawl state on the shared crawler instance (review).** `_listing_jobs` returns the jobs and the listing report together, and the UNICEF reader returns its report rather than setting an attribute. `crawl_source` keeps both in local variables from then on. `_current_source_id`, used only for logging, becomes a local value too.
+   - Each thread opens and closes its own connections. A crawl uses one at a time, plus one for the health score before finishing. Up to 3 crawls run at once per instance, and a deploy overlap doubles that briefly.
+   - Scheduling the search projection moves back onto the event loop after the thread returns. In a thread it would only log "no running event loop"; it does nothing since Meilisearch was removed (W-30), but the path must stay correct.
+10. **Removed:** `POST /api/admin/crawl/fix-undp-urls`, the only other caller of `save_jobs`. Decided by the user on 27 October 2026. The crawler plan said to leave it "unless a separate fix is approved"; this is that approval.
+11. **Unchanged:**
+    - extraction, admission, identity, `persist_candidate`, and deadline parsing;
+    - the scheduler interval and the concurrency limit of 3.
+
+**D. Contract and plan decisions this needs.** All were decided by the user on 27 October 2026 and are recorded with this specification:
+- **A new status text, `interrupted`.** Contract §5 says to use the existing status text "unless a versioned migration is separately approved". No migration is needed, because neither status column has a check constraint (Verified).
+- **`/fix-undp-urls` removed** (crawler plan, Gate 4 record).
+- **Issue #5 reopened inside PR B** (crawler plan, "Parked decision").
+- **The two Gate 5 behaviour changes:**
+  - a held lock with no running run starts again once older than the lifetime;
+  - when finishing fails, only the owner releases the lock.
+- **"A duplicate request returns the open run" is kept unchanged.**
+
+**E. Files.**
+- `orchestrator.py`: C1, C3, C4, C7, C8 and C9; task tracking; recovery.
+- `crawler_v2/simple_crawler.py`, `rss_crawler.py`, `api_crawler.py`: token, save check, savepoints, failed-save statuses, thread work, local listing report.
+- `app/search_projection.py`: commit and scheduling split so a thread can commit.
+- `app/crawler_admin.py`: `/fix-undp-urls` removed; `/run` reads `status`; `/run_due` returns at once.
+- `contracts/admission.py`: the rejection log's connect timeout.
+- `.github/workflows/ci.yml`: a `postgres:17` service; the new test file in the Ruff list only; and its own pytest step, separate from the existing command (F). That step sets `TEST_DATABASE_URL`, leaves `SUPABASE_DB_URL` and `DATABASE_URL` unset, and fails if any of its tests is skipped.
+- Tests and documents as listed in F.
+- No frontend change, unless the preview shows `interrupted` wrongly.
+
+**F. Tests.**
+- **The test database must never be production (review).**
+  - The tests accept only a `TEST_DATABASE_URL` whose host is `localhost` or `127.0.0.1` and whose database name ends in `_test`. They refuse anything else before connecting.
+  - They run in their own pytest process, in CI and locally, with `SUPABASE_DB_URL` and `DATABASE_URL` unset. The rest of the suite imports `main`, which loads `.env`, and `app/db_config.py` caches database settings at import, so sharing one process is not safe (review).
+  - Inside that process, `psycopg2.connect` is wrapped to refuse any address that is not the test database, whatever code calls it.
+  - Locally they skip without `TEST_DATABASE_URL`. In CI (`CI=true`), a missing variable is a failure, and the CI step fails if any test in the file is skipped.
+- **The schema (review).**
+  - A committed test schema, `apps/backend/tests/sql/crawl_schema.sql`, is written from one read-only production query, with the user's approval. It covers the columns, constraints, foreign keys, triggers and indexes of `sources`, `crawl_logs`, `crawl_locks` and `jobs`.
+  - `infra/supabase.sql` cannot be used as it stands: it lacks columns the writer uses (`is_remote`, the geocoding and quality fields, `organisation_id`), and its policies refer to Supabase roles.
+  - A test checks that every column `persist_candidate` writes exists in the schema.
+- **New `tests/test_crawl_ownership.py`, against real PostgreSQL 17.** Concurrent steps run on separate connections and threads, with barriers that force each interleaving. Cases:
+  - two acquisitions at once: one token, and the other returns the live run's id;
+  - four or more due sources with 3 slots: no queued live run is taken over (review);
+  - a manual run while the same source is queued, `run_due` together with a scheduler round, and a source paused while queued: no duplicate crawl, and no crawl of the paused source (review);
+  - two HTML crawls at once, interleaved during the listing, geocoding and save awaits, keep their own listing reports (review);
+  - the owning run's `ran_at` equals its lock's `locked_at` (review);
+  - a timed-out run with a save in progress: the finish waits for the save, then records `fail` once (review);
+  - a save racing a takeover: the save completes, and the stale worker's next save is refused;
+  - a stale worker's save, finish and release all change nothing; the new owner's lock, run and source are untouched;
+  - exactly one failure counted for each of: a timeout then recovery; a lock expiry then a late finish; two recoveries at once;
+  - recovery leaves a live lock alone, including two orchestrators overlapping as in a deploy;
+  - an orphaned running row beside a live run is marked `interrupted`, and the live run keeps its lock (review);
+  - a slow but live crawl keeps its ownership up to the limit;
+  - a shutdown cancellation records `interrupted`, unchanged the first time and counted the second time in a row;
+  - a manual run with no free slot, or under 5 minutes left when it frees, ends `interrupted` and writes nothing to the source;
+  - a hard kill is recovered after a shortened lifetime and counted once;
+  - forced interleavings of takeover against finish, save against takeover, and save against an admin soft delete do not deadlock, or are handled per job (review);
+  - job rows, `deleted_at` and expiry fields stay byte-identical on every failure path;
+  - a save without a token, or with a foreign one, writes nothing;
+  - issue #5: first today's behaviour, shown on `main`'s code; then the savepoint behaviour;
+  - a manual run of a paused source stays paused, and a source soft-deleted mid-crawl stays deleted (review);
+  - `run_due` returns at once, with `data.queued`;
+  - the lifetime setting is refused when not longer than the limit plus 6 minutes.
+- **Existing tests.**
+  - `test_gate5_crawl_run.py`: the two approved behaviour changes (D), and the manual route's duplicate request still returning the open run.
+  - `test_reliability_persist.py`, `test_link_admission.py` (its check of the order of admission and save) and `test_gate6_lifecycle.py`: updated for the token and the thread.
+  - Everything else must pass unchanged.
+- **Evidence before the pull request is opened:**
+  - the new tests fail on `main`'s code where they test new behaviour;
+  - the whole-crawl comparison on the saved pages shows identical saved job records;
+  - the full CI list passes on Python 3.11, as in production;
+  - an independent code review.
+
+**G. Acceptance, rollout, and rollback.**
+- **Before merge:** all of F green in CI against PostgreSQL 17, the crawler plan's Gate 5 record and the contract amendments in D recorded, and the review's findings resolved.
+- **After merge, read-only only:**
+  - CI on `main` and the Render deploy;
+  - no health-check failure during the deploy overlap or the next scheduled crawls;
+  - no orphaned lock, and no run left `running`;
+  - the next crawl of each source ends with a normal status.
+- **No crawl is triggered** unless the user chooses to run one.
+- **Rollback:** reverting PR B is safe. There is no schema or data change, and runs marked `interrupted` stay as text.
+
+**H. Open risks.**
+- **A crawl blocked inside code that does not pause** still holds its lock until Render replaces the process and the lifetime passes. Recovery runs on its own 5-minute timer, so the delay is at most about 30 minutes: the 25-minute lifetime plus one interval (review).
+- **Two deploys in a row** interrupting the same source, for example a code merge followed by its documentation merge, count a false failure and 12 hours of back-off (review). Accepted; the next normal crawl resets the count.
+- **A manual run** can wait behind up to 3 running crawls, and behind queued ones once there are many sources. When too little time is left it ends `interrupted` and writes nothing to the source (C1).
+- **The shutdown window** depends on uvicorn's wait for open requests (C8).
+- **Not verified:** the free plan's spin-down signal and the session pool's size.
+- **Issue #5's mechanism** is to be shown by the first test before the code changes. If it is wrong, C6 is re-planned.
 
 ### Stage 3. Backend error handling and logging
 

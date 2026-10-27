@@ -41,7 +41,7 @@ These stay closed.
 - Reliability fix, commit `28b9efc`, confirmed on Render: `finish_run` counts both `fail` and `failed`. RSS and API `save_jobs` roll back and re-raise. `ok` and `warn` still clear the failure counter. `crawl_logs.found` on the success path remains the pre-admission extraction count. A healthy crawl that writes nothing stays successful.
 - Gate 7 already shows that a projection failure does not undo a PostgreSQL commit (`test_projection_failure_does_not_raise_or_write_jobs`). That test was not new work in `28b9efc`.
 
-Parked decision, not an open implementation: HTML can still return `ok` when every per-row save failed, because `finish_run` does not read `counts.failed`. Issue #5 stays open for that case only. Do not reopen it inside the next gate.
+Parked decision, not an open implementation: HTML can still return `ok` when every per-row save failed, because `finish_run` does not read `counts.failed`. Issue #5 stays open for that case only. Do not reopen it inside the next gate. Reopened by the user's decision of 27 October 2026, inside PR B (security plan, stage 2, specification C6): each job's save gets its own savepoint, and a crawl whose every job failed to save is recorded `fail`.
 
 ## Track A — Meilisearch investigation
 
@@ -434,7 +434,7 @@ Under algorithm B, with the same title, a trailing slash, a listed tracking para
 
 The hash uses the full apply URL. C3’s collapsed family key is not an identity input. Distinct slugs and distinct `job_id` values stay distinct rows. C3 must not hash that family key and must not pass `job_id` as the reference.
 
-A repeat of the same key follows the existing upsert. No match creates a row. A field change updates the row and leaves `canonical_hash` and `deleted_at` unchanged. No field change is unchanged and still advances `last_seen_at`. A suppressed row is `seen_again` and stays suppressed. Two different rows hit by the two keys write nothing. `/fix-undp-urls` still reaches `save_jobs` without `admit_batch`. The missing stamp makes `persist_candidate` reject that candidate before SQL. Leave that route unless a separate fix is approved.
+A repeat of the same key follows the existing upsert. No match creates a row. A field change updates the row and leaves `canonical_hash` and `deleted_at` unchanged. No field change is unchanged and still advances `last_seen_at`. A suppressed row is `seen_again` and stays suppressed. Two different rows hit by the two keys write nothing. `/fix-undp-urls` still reaches `save_jobs` without `admit_batch`. The missing stamp makes `persist_candidate` reject that candidate before SQL. Leave that route unless a separate fix is approved. Removal decided by the user on 27 October 2026, inside PR B (security plan, stage 2, specification C10). Checked the same day: the route no longer reaches `save_jobs` at all, because it fails earlier on names that do not exist.
 
 Exit: these repository facts. No identity redesign. Production deduplication remains unverified.
 
