@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from app.config import Capabilities
 from app.search import search_service
 from app.sources import router as sources_router
-from app.shortlist import router as shortlist_router
 from app.analytics import analytics_tracker
 from app.admin_auth_routes import router as admin_auth_router
 from app.presets import router as presets_router
@@ -72,7 +71,16 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="AidJobs API", version="0.1.0", lifespan=lifespan)
+# The interactive API docs and schema list every route, admin ones included.
+_api_docs = os.getenv("AIDJOBS_ENV", "production").lower() == "dev"
+app = FastAPI(
+    title="AidJobs API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _api_docs else None,
+    redoc_url="/redoc" if _api_docs else None,
+    openapi_url="/openapi.json" if _api_docs else None,
+)
 
 # Add rate limiter state
 app.state.limiter = limiter
@@ -129,7 +137,7 @@ app.add_middleware(
 app.include_router(admin_auth_router)
 app.include_router(sources_router)
 app.include_router(presets_router)
-app.include_router(shortlist_router)
+# app/shortlist.py stays unmounted: it takes user_id from the request, not from a session.
 
 # Add new crawler admin routes
 try:

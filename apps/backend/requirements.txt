@@ -17,6 +17,8 @@ python-dateutil==2.9.0
 jsonpath-ng==1.6.1
 playwright==1.48.0
 dateparser==1.2.0
+# Already installed through uvicorn[standard]; the crawler's link scoring reads YAML domain config.
+PyYAML==6.0.3
 scikit-learn==1.5.0
 pdfminer.six==20231228
 prometheus-client==0.20.0
