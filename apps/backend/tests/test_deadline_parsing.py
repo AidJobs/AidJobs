@@ -102,13 +102,46 @@ def test_the_language_list_reads_what_every_locale_reads(crawler, previous_behav
     assert crawler._parse_deadline(raw) == restricted
 
 
-@pytest.mark.parametrize("raw", UNDATED)
-def test_text_without_a_digit_is_not_a_deadline_and_skips_dateparser(crawler, monkeypatch, raw):
-    def must_not_run(*args, **kwargs):
-        raise AssertionError(f"dateparser called for {raw!r}")
+@pytest.fixture
+def dateparser_calls(monkeypatch):
+    """Every call to dateparser.parse, recorded.
 
-    monkeypatch.setattr(dateparser, "parse", must_not_run)
+    A stub that raises would prove nothing: _parse_deadline catches the error and returns None.
+    """
+    calls = []
+    real_parse = dateparser.parse
+
+    def recording(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real_parse(*args, **kwargs)
+
+    monkeypatch.setattr(dateparser, "parse", recording)
+    return calls
+
+
+@pytest.mark.parametrize("raw", UNDATED)
+def test_text_without_a_digit_is_not_a_deadline_and_skips_dateparser(
+    crawler, dateparser_calls, raw
+):
     assert crawler._parse_deadline(raw) is None
+    assert dateparser_calls == []
+
+
+def test_dateparser_receives_the_configured_languages(crawler, dateparser_calls):
+    assert crawler._parse_deadline("13 November 2026") == "2026-11-13"
+    assert len(dateparser_calls) == 1
+    _, kwargs = dateparser_calls[0]
+    assert kwargs["languages"] == list(sc.DEADLINE_LANGUAGES)
+
+
+def test_a_month_name_outside_the_list_is_not_read(crawler, previous_behaviour):
+    """One example of the accepted trade-off (Polish); other unlisted languages are not tested here.
+
+    Every locale read it as a date; the configured list does not.
+    """
+    assert crawler._parse_deadline("15 grudnia 2026") is None
+    previous_behaviour()
+    assert crawler._parse_deadline("15 grudnia 2026") == "2026-12-15"
 
 
 def test_headings_are_rejected_quickly(crawler):
