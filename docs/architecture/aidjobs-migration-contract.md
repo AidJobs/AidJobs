@@ -182,6 +182,8 @@ An expired count is recorded only after a missing-job expiry policy has been sep
 
 Statuses must be distinguishable as running, succeeded, failed, and partial. Use the existing status text unless a versioned migration is separately approved. HTTP 200 is not a trustworthy catalogue.
 
+Amendment, decided by the user on 27 October 2026, taking effect with PR B (security plan, stage 2): one new status text, `interrupted`, for a run ended by a clean shutdown, or a manual run that found no free slot before its time limit. No migration is needed, because neither status column has a check constraint (Verified). The first interruption is not counted as a failure; a second in a row is.
+
 A partial crawl, including a crawl that did not process every page, must not be treated as a complete catalogue.
 
 ### Job
