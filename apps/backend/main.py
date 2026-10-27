@@ -365,7 +365,7 @@ async def parse_search_query(
         return {
             "status": "error",
             "data": None,
-            "error": str(e),
+            "error": "Failed to parse query",
         }
 
 
@@ -395,7 +395,7 @@ async def autocomplete_suggestions(
         return {
             "status": "error",
             "data": [],
-            "error": str(e),
+            "error": "Failed to get suggestions",
         }
 
 

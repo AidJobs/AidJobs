@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import logging
 import time
@@ -32,6 +33,17 @@ else:
         meilisearch = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+DB_UNAVAILABLE = "Database unavailable"
+MEILI_UNAVAILABLE = "Meilisearch unavailable"
+_CONNECTION_URL = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
+_PASSWORD_PARAM = re.compile(r"(password\s*=\s*)\S+", re.IGNORECASE)
+
+
+def _redacted(error: Exception) -> str:
+    """Exception text for the server log. Driver messages can quote the connection string."""
+    text = _PASSWORD_PARAM.sub(r"\1<redacted>", str(error))
+    return f"{type(error).__name__}: {_CONNECTION_URL.sub('<redacted-url>', text)}"
 
 
 class SearchService:
@@ -1228,10 +1240,10 @@ class SearchService:
                 "source_breakdown": source_breakdown
             }
         except Exception as e:
-            logger.error(f"Database status check failed: {e}")
+            logger.error("Database status check failed: %s", _redacted(e))
             return {
                 "ok": False,
-                "error": str(e)
+                "error": DB_UNAVAILABLE
             }
         finally:
             if cursor:
@@ -1246,7 +1258,7 @@ class SearchService:
                 logger.debug(f"[search_status] Meilisearch not enabled. Error: {self.meili_error}")
                 return {
                     "enabled": False,
-                    "error": self.meili_error if self.meili_error else "Meilisearch not configured"
+                    "error": MEILI_UNAVAILABLE if self.meili_error else "Meilisearch not configured"
                 }
             
             if not self.meili_client:
@@ -1300,14 +1312,14 @@ class SearchService:
                     logger.error(f"[search_status] Retry also failed: {retry_error}")
                     return {
                         "enabled": False,
-                        "error": f"Failed to connect to Meilisearch: {str(index_error)}"
+                        "error": MEILI_UNAVAILABLE
                     }
                     
         except Exception as e:
             logger.error(f"[search_status] Unexpected error in get_search_status: {e}", exc_info=True)
             return {
                 "enabled": False,
-                "error": f"Unexpected error: {str(e)}"
+                "error": MEILI_UNAVAILABLE
             }
     
     async def get_search_settings(self) -> dict[str, Any]:
