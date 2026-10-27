@@ -10,6 +10,20 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
+    # Only the crawl-ownership tests use this database. Production runs PostgreSQL 17.6.
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: aidjobs_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +59,9 @@ jobs:
           tests/test_data_quality_listing.py
           tests/test_public_surface.py
           tests/test_deadline_parsing.py
+          tests/test_crawl_ownership.py
           app/search_projection.py
+          crawler_v2/run_handle.py
           contracts
           security/admin_auth.py
           app/data_quality_logs.py
@@ -53,6 +69,20 @@ jobs:
 
       - name: Executed backend tests
         run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_reliability_persist.py tests/test_outbound_fetch.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py tests/test_link_admission.py tests/test_detail_reader.py tests/test_site_reader_fallback.py tests/test_geocoder_backoff.py tests/test_production_mode.py tests/test_data_quality_listing.py tests/test_public_surface.py tests/test_deadline_parsing.py -q
+
+      # Its own process, with no production database variable, against the service above.
+      # A skipped test fails the step.
+      - name: Crawl ownership tests (PostgreSQL)
+        shell: bash
+        env:
+          TEST_DATABASE_URL: postgresql://postgres@localhost:5432/aidjobs_test
+        run: |
+          unset SUPABASE_DB_URL DATABASE_URL
+          python -m pytest tests/test_crawl_ownership.py -q -rs -p no:cacheprovider | tee ownership-tests.log
+          if grep -qE "[0-9]+ skipped" ownership-tests.log; then
+            echo "Crawl ownership tests must not be skipped"
+            exit 1
+          fi
 
   frontend:
     runs-on: ubuntu-latest
