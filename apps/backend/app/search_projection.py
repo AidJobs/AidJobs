@@ -75,7 +75,11 @@ def schedule_after_commit(recorded, loop=None) -> None:
             logger.exception("search projection failed")
 
     if loop is not None:
-        loop.call_soon_threadsafe(lambda: loop.create_task(_run()))
+        # The jobs are already committed; a closed loop must not turn that into a failed save.
+        try:
+            loop.call_soon_threadsafe(lambda: loop.create_task(_run()))
+        except RuntimeError:
+            logger.warning("search projection skipped; the event loop is closed")
         return
     try:
         loop = asyncio.get_running_loop()

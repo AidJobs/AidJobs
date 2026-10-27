@@ -40,7 +40,7 @@ SHUTDOWN_DEADLINE_SECONDS = 20
 # Finishing plus one recovery interval: the lock must outlive the limit by more than this.
 _LIFETIME_MARGIN = timedelta(minutes=6)
 
-EXPIRED_MESSAGE = "Interrupted: lock expired, cause unknown"
+EXPIRED_MESSAGE = "Lock expired, cause unknown"
 ORPHAN_MESSAGE = "Interrupted: run had no lock"
 SHUTDOWN_MESSAGE = "Interrupted: the server shut down"
 NO_SLOT_MESSAGE = "Interrupted: no free crawl slot"
@@ -574,7 +574,10 @@ class CrawlerOrchestrator:
                             " WHERE id = %s",
                             (ORPHAN_MESSAGE, orphan),
                         )
-                    cur.execute("DELETE FROM crawl_locks WHERE source_id = %s", (source_id,))
+                    cur.execute(
+                        "DELETE FROM crawl_locks WHERE source_id = %s AND locked_at = %s",
+                        (source_id, locked_at),
+                    )
                     if owner:
                         self._update_source(
                             cur, source_id, outcome="fail", run_status="fail",
@@ -723,7 +726,15 @@ class CrawlerOrchestrator:
                             run_id, source_id,
                         )
                         return False
-                    cur.execute("DELETE FROM crawl_locks WHERE source_id = %s", (source_id,))
+                    # Only this run's own lock: the one taken in the same transaction as its row.
+                    cur.execute(
+                        """
+                        DELETE FROM crawl_locks
+                        WHERE source_id = %s
+                          AND locked_at = (SELECT ran_at FROM crawl_logs WHERE id = %s)
+                        """,
+                        (source_id, run_id),
+                    )
                     if mode != "no_slot":
                         if mode == "interrupted":
                             outcome = "interrupted"
@@ -764,6 +775,10 @@ class CrawlerOrchestrator:
 
     async def _close_run(self, source: Dict, run: RunHandle, result: Dict, mode: str):
         await run.wait_for_saves()
+        counts = result.setdefault("counts", {})
+        for name, value in run.saved.items():
+            if not counts.get(name):
+                counts[name] = value
         try:
             await self.finish_run(source, run.token, result, mode=mode)
         except Exception:
@@ -782,6 +797,7 @@ class CrawlerOrchestrator:
             deadline = loop.time() + self.time_limit.total_seconds()
         run = RunHandle(run_id, source["id"])
         mode = "normal"
+        started = loop.time()
         result = _failed_result("Crawl ended without a result")
         try:
             async with asyncio.timeout_at(deadline):
@@ -800,6 +816,8 @@ class CrawlerOrchestrator:
             )
             result = _failed_result(str(exc)[:500])
         finally:
+            if not result.get("duration_ms"):
+                result["duration_ms"] = int((loop.time() - started) * 1000)
             closing = asyncio.ensure_future(self._close_run(source, run, result, mode))
             self._closing.add(closing)
             closing.add_done_callback(self._closing.discard)
@@ -811,6 +829,36 @@ class CrawlerOrchestrator:
         task.add_done_callback(self._tasks.discard)
         return task
 
+    def _keep_closing(self, coro) -> asyncio.Future:
+        closing = asyncio.ensure_future(coro)
+        self._closing.add(closing)
+        closing.add_done_callback(self._closing.discard)
+        return closing
+
+    async def _begin_owned(self, source: Dict, *, scheduled: bool):
+        """begin_run that survives cancellation: the acquire's thread commits regardless, so a
+        cancelled caller (shutdown) closes a run it started, writing nothing to the source.
+        """
+        acquiring = asyncio.ensure_future(self.begin_run(source, scheduled=scheduled))
+        try:
+            return await asyncio.shield(acquiring)
+        except asyncio.CancelledError:
+            self._keep_closing(self._close_unstarted(source, acquiring))
+            raise
+
+    async def _close_unstarted(self, source: Dict, acquiring: asyncio.Future):
+        try:
+            run_id, started = await acquiring
+            if started:
+                await self.finish_run(
+                    source, run_id, _interrupted_result(SHUTDOWN_MESSAGE), mode="no_slot"
+                )
+        except Exception:
+            logger.error(
+                "[orchestrator] Run for %s begun during shutdown left to recovery",
+                source.get("org_name"), exc_info=True,
+            )
+
     async def start_manual_run(self, source: Dict):
         """Take the lock now and return its run id; the crawl waits for a slot in the background.
 
@@ -818,7 +866,7 @@ class CrawlerOrchestrator:
         interrupted and writes nothing to the source.
         """
         loop = asyncio.get_running_loop()
-        run_id, started = await self.begin_run(source)
+        run_id, started = await self._begin_owned(source, scheduled=False)
         if started:
             deadline = loop.time() + self.time_limit.total_seconds()
             self._track(self._manual_run(source, run_id, deadline))
@@ -835,11 +883,9 @@ class CrawlerOrchestrator:
         except (TimeoutError, asyncio.CancelledError) as exc:
             cancelled = isinstance(exc, asyncio.CancelledError)
             message = SHUTDOWN_MESSAGE if cancelled else NO_SLOT_MESSAGE
-            closing = asyncio.ensure_future(
+            closing = self._keep_closing(
                 self.finish_run(source, run_id, _interrupted_result(message), mode="no_slot")
             )
-            self._closing.add(closing)
-            closing.add_done_callback(self._closing.discard)
             await asyncio.shield(closing)
             if cancelled:
                 raise
@@ -853,7 +899,7 @@ class CrawlerOrchestrator:
         """Scheduler path: wait for a slot, then take the lock (if still active and due)."""
         loop = asyncio.get_running_loop()
         async with self.semaphore:
-            run_id, started = await self.begin_run(source, scheduled=True)
+            run_id, started = await self._begin_owned(source, scheduled=True)
             if not started:
                 if run_id is None:
                     return {
@@ -934,14 +980,27 @@ class CrawlerOrchestrator:
         finally:
             conn.close()
 
+        # One source's error (a timeout, a dropped connection) must not stop the others.
         taken = 0
         for source_id in expired:
-            if self._take_over(str(source_id), self.health_score(str(source_id))):
-                taken += 1
+            try:
+                if self._take_over(str(source_id), self.health_score(str(source_id))):
+                    taken += 1
+            except Exception:
+                logger.error(
+                    "[orchestrator] Recovery of source %s failed; retried next round",
+                    source_id, exc_info=True,
+                )
         marked = 0
         for run_id, source_id in orphans:
-            if self._mark_orphan(str(run_id), str(source_id)):
-                marked += 1
+            try:
+                if self._mark_orphan(str(run_id), str(source_id)):
+                    marked += 1
+            except Exception:
+                logger.error(
+                    "[orchestrator] Marking run %s failed; retried next round",
+                    run_id, exc_info=True,
+                )
         if taken or marked:
             logger.warning(
                 "[orchestrator] Recovery: %d expired lock(s) taken over, %d orphaned run(s)",
@@ -1032,7 +1091,7 @@ class CrawlerOrchestrator:
         logger.info("[orchestrator] Scheduler stopped")
 
     async def start(self):
-        """Start the scheduler and the recovery timer. Recovery runs first."""
+        """Start the recovery timer and the scheduler, side by side; both are safe concurrently."""
         if os.getenv("AIDJOBS_DISABLE_SCHEDULER", "").lower() == "true":
             logger.info("[orchestrator] Scheduler disabled by AIDJOBS_DISABLE_SCHEDULER")
             return

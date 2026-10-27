@@ -560,9 +560,11 @@ def test_scheduler_uses_the_shared_runner_and_caps_stay():
     locked = inspect.getsource(CrawlerOrchestrator.run_source_with_lock)
     assert "run_source_with_lock" in due
     assert "run_due_sources_once" in loop
-    assert "begin_run" in locked
+    owned = inspect.getsource(CrawlerOrchestrator._begin_owned)
+    assert "_begin_owned" in locked
+    assert "self.begin_run" in owned
     assert "execute_run" in locked
-    assert locked.index("self.semaphore") < locked.index("begin_run")
+    assert locked.index("self.semaphore") < locked.index("_begin_owned")
     assert GLOBAL_MAX_CONCURRENCY == 3
     assert MAX_SOURCES_PER_RUN == 20
     assert orchestrator_module.SCHEDULER_INTERVAL_SECONDS == 300

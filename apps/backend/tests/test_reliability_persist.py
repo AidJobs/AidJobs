@@ -3,9 +3,10 @@ import inspect
 
 import pytest
 
-from contracts.run_ownership import OwnershipLost
+from contracts.run_ownership import OwnershipLost, save_failure_outcome
 from crawler_v2.api_crawler import SimpleAPICrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
+from crawler_v2.run_handle import RunHandle
 
 
 class RaisingConn:
@@ -68,6 +69,41 @@ def test_save_jobs_without_a_run_token_writes_nothing(cls):
     job = {"title": "Officer", "apply_url": "https://example.org/jobs/1", "admitted": True}
     with pytest.raises(OwnershipLost):
         crawler.save_jobs([job], "src-1", "Example")
+
+
+def test_a_raw_page_connection_failure_does_not_fail_the_crawl():
+    from crawler_v2.simple_crawler import SimpleCrawler
+
+    class Storage:
+        def store(self, url, html, source_id):
+            return "pages/1.html"
+
+    crawler = SimpleCrawler("postgresql://example")
+    crawler.html_storage = Storage()
+
+    def unreachable():
+        raise RuntimeError("connection refused")
+
+    crawler._get_db_conn = unreachable
+    assert crawler._record_raw_page("https://example.org/jobs", 200, "<html></html>", "s") is None
+
+
+def test_every_job_failed_counts_only_the_jobs_that_reached_their_write():
+    counts = {"inserted": 0, "failed": 8, "validated": 10, "attempted": 8}
+    assert save_failure_outcome("ok", "Found 10 jobs", counts)[0] == "fail"
+    counts = {"inserted": 1, "failed": 7, "validated": 10, "attempted": 8}
+    status, message = save_failure_outcome("ok", "Found 10 jobs", counts)
+    assert status == "warn" and "7 of 8 jobs failed to save" in message
+    assert save_failure_outcome("ok", "Found 3 jobs", {"failed": 0, "validated": 3}) == (
+        "ok",
+        "Found 3 jobs",
+    )
+
+
+def test_a_run_handle_needs_its_token():
+    for token in (None, ""):
+        with pytest.raises(ValueError):
+            RunHandle(token, "src-1")
 
 
 def test_success_status_and_found_stay_pre_admission():

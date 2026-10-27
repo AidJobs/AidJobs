@@ -5,10 +5,14 @@ Runs in its own pytest process, never with the rest of the suite:
     TEST_DATABASE_URL=postgresql://postgres@localhost:5432/aidjobs_test \
         python -m pytest tests/test_crawl_ownership.py -q
 
-Only a local database whose name ends in _test is accepted, SUPABASE_DB_URL and
-DATABASE_URL must be unset, every psycopg2 connection is checked against the test
-database, and the network is closed except for loopback. Concurrent steps run on their
-own connections and threads; events and barriers force each interleaving.
+Without TEST_DATABASE_URL the file skips before changing anything (in CI that is an
+error). With it: only a local database whose name ends in _test is accepted, with no URL
+options; SUPABASE_DB_URL, DATABASE_URL, PGHOST, PGHOSTADDR and PGSERVICE must be unset;
+every psycopg2 connection is checked against the test database (host, port, name, and no
+hostaddr, service or second host); and Python sockets may connect only to loopback.
+libpq's own sockets are not intercepted, which is why the connection check exists.
+Concurrent steps run on their own connections and threads; events and barriers force
+each interleaving.
 """
 import asyncio
 import os
@@ -21,13 +25,11 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
-import dotenv
-import psycopg2
-import psycopg2.extensions
 import pytest
 
 _ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1"})
-_PRODUCTION_VARIABLES = ("SUPABASE_DB_URL", "DATABASE_URL")
+_PRODUCTION_VARIABLES = ("SUPABASE_DB_URL", "DATABASE_URL", "PGHOST", "PGHOSTADDR", "PGSERVICE")
+_REFUSED_PARAMETERS = ("hostaddr", "service")
 
 
 def check_test_url(url):
@@ -36,29 +38,42 @@ def check_test_url(url):
     database = parsed.path.lstrip("/")
     if (
         parsed.scheme not in ("postgresql", "postgres")
+        or parsed.query
+        or parsed.fragment
+        or "," in parsed.netloc
         or parsed.hostname not in _ALLOWED_HOSTS
         or not database.endswith("_test")
     ):
-        raise RuntimeError("TEST_DATABASE_URL must be a local database whose name ends in _test")
+        raise RuntimeError(
+            "TEST_DATABASE_URL must be a local database whose name ends in _test, with no options"
+        )
     return parsed.hostname, parsed.port or 5432, database
 
 
+TEST_URL = os.getenv("TEST_DATABASE_URL", "")
+if not TEST_URL:
+    if os.getenv("CI") == "true":
+        raise RuntimeError("TEST_DATABASE_URL is required in CI")
+    pytest.skip("TEST_DATABASE_URL is not set", allow_module_level=True)
 for _name in _PRODUCTION_VARIABLES:
     if os.getenv(_name):
         raise RuntimeError(f"{_name} must be unset when the ownership tests run")
-TEST_URL = os.getenv("TEST_DATABASE_URL", "")
-if not TEST_URL and os.getenv("CI") == "true":
-    raise RuntimeError("TEST_DATABASE_URL is required in CI")
-_TARGET = check_test_url(TEST_URL) if TEST_URL else None
+_TARGET = check_test_url(TEST_URL)
+
+import dotenv  # noqa: E402
+import psycopg2  # noqa: E402
+import psycopg2.extensions  # noqa: E402
 
 _real_connect = psycopg2.connect
 
 
 def _guarded_connect(dsn=None, connection_factory=None, cursor_factory=None, **kwargs):
     params = psycopg2.extensions.parse_dsn(dsn) if dsn else {}
-    params.update({k: v for k, v in kwargs.items() if k in ("host", "port", "dbname")})
+    params.update(kwargs)
     if (
-        _TARGET is None
+        any(name in params for name in _REFUSED_PARAMETERS)
+        or "," in str(params.get("host", ""))
+        or "," in str(params.get("port", ""))
         or params.get("host") not in _ALLOWED_HOSTS
         or int(params.get("port") or 5432) != _TARGET[1]
         or params.get("dbname") != _TARGET[2]
@@ -112,9 +127,6 @@ from orchestrator import (  # noqa: E402
     CrawlerOrchestrator,
     crawl_time_settings,
 )
-
-if not TEST_URL:
-    pytestmark = pytest.mark.skip(reason="TEST_DATABASE_URL is not set")
 
 SCHEMA = Path(__file__).parent / "sql" / "crawl_schema.sql"
 STEP_SECONDS = 20
@@ -327,18 +339,27 @@ def _pause_saves_after(monkeypatch, module, count, reached, release):
 
 def test_the_guard_refuses_anything_but_the_local_test_database(db):
     for url in (
-        "postgresql://user:secret@db.example.supabase.co:5432/postgres",
+        "postgresql://postgres@db.example.supabase.co:5432/postgres",
         "postgresql://postgres@localhost:5432/postgres",
         "postgresql://postgres@10.0.0.5:5432/aidjobs_test",
+        "postgresql://postgres@localhost:5432/aidjobs_test?hostaddr=10.0.0.5",
+        "postgresql://postgres@localhost,db.example.org:5432/aidjobs_test",
         "mysql://localhost/aidjobs_test",
         "",
     ):
         with pytest.raises(RuntimeError):
             check_test_url(url)
-    with pytest.raises(RuntimeError, match="refused"):
-        psycopg2.connect("postgresql://postgres@db.example.org:5432/aidjobs_test")
-    with pytest.raises(RuntimeError, match="refused"):
-        psycopg2.connect(host="localhost", port=_TARGET[1], dbname="postgres")
+    local = {"host": "localhost", "port": _TARGET[1], "dbname": _TARGET[2]}
+    for refused in (
+        "postgresql://postgres@db.example.org:5432/aidjobs_test",
+        f"postgresql://postgres@localhost:{_TARGET[1]}/{_TARGET[2]}?hostaddr=10.0.0.5",
+        f"postgresql://postgres@localhost:{_TARGET[1]}/{_TARGET[2]}?service=production",
+    ):
+        with pytest.raises(RuntimeError, match="refused"):
+            psycopg2.connect(refused)
+    for overrides in ({"dbname": "postgres"}, {"hostaddr": "10.0.0.5"}, {"host": "localhost,x"}):
+        with pytest.raises(RuntimeError, match="refused"):
+            psycopg2.connect(**{**local, **overrides})
     with pytest.raises(RuntimeError, match="network"):
         socket.create_connection(("93.184.216.34", 443), timeout=1)
     for name in _PRODUCTION_VARIABLES:
@@ -631,28 +652,154 @@ def test_a_timed_out_run_waits_for_its_save_then_records_fail_once(db, monkeypat
 
     _start(release_later)
     crawler = _crawler()
+    save_done = threading.Event()
+    finish_saw_save_done = []
+
+    def save_then_mark(*args, **kwargs):
+        try:
+            return crawler.save_jobs(*args, **kwargs)
+        finally:
+            save_done.set()
 
     async def scenario():
         orch = _orch()
         orch.time_limit = timedelta(seconds=0.5)
+        real_finish = orch._finish
+
+        def finish(*args, **kwargs):
+            finish_saw_save_done.append(save_done.is_set())
+            return real_finish(*args, **kwargs)
+
+        orch._finish = finish
 
         async def crawl(src, run):
-            return await run.save(crawler.save_jobs, [_job(1), _job(2)], src["id"], "Example")
+            return await run.save(save_then_mark, [_job(1), _job(2)], src["id"], "Example")
 
         orch.crawl_source = crawl
         run_id, _ = await orch.begin_run(source)
-        started = time.monotonic()
         await orch.execute_run(source, run_id)
-        return run_id, time.monotonic() - started
+        return run_id
 
-    run_id, elapsed = asyncio.run(scenario())
+    run_id = asyncio.run(scenario())
     assert reached.is_set()
-    assert elapsed >= 1.2, "the finish must wait for the save in progress"
+    assert finish_saw_save_done == [True], "the finish must start only after the save ended"
     (only,) = _runs(source["id"])
     assert only[0] == run_id and only[1] == "fail" and only[2].startswith("Timed out")
+    recorded = _sql("SELECT inserted, duration_ms FROM crawl_logs WHERE id = %s", (run_id,))[0]
+    assert recorded[0] == 2, "a timed-out run records what it saved"
+    assert recorded[1] >= 500
     assert _job_count() == 2
     assert _source_fields(source["id"])["failures"] == 1
     assert _lock(source["id"]) is None
+
+
+def test_a_timeout_whose_finish_fails_twice_is_counted_once_by_recovery(db):
+    source = _add_source()
+
+    async def scenario():
+        orch = _orch()
+        orch.time_limit = timedelta(seconds=0.2)
+        attempts = []
+
+        def broken(*args, **kwargs):
+            attempts.append(1)
+            raise RuntimeError("database unreachable")
+
+        async def crawl(src, run):
+            await asyncio.sleep(10)
+
+        orch._finish = broken
+        orch.crawl_source = crawl
+        run_id, _ = await orch.begin_run(source)
+        await orch.execute_run(source, run_id)
+        return orch, run_id, len(attempts)
+
+    orch, run_id, attempts = asyncio.run(scenario())
+    assert attempts == 2
+    assert _runs(source["id"]) == [(run_id, "running", "queued")]
+    assert _lock(source["id"]) is not None
+    _age(source["id"], orch.lock_lifetime.total_seconds() + 60)
+    assert _orch()._recover_once()["expired_locks"] == 1
+    assert _orch()._recover_once()["expired_locks"] == 0
+    assert _runs(source["id"]) == [(run_id, "fail", EXPIRED_MESSAGE)]
+    assert _source_fields(source["id"])["failures"] == 1
+
+
+def test_a_shutdown_during_the_lock_acquire_closes_the_run_and_writes_nothing(db):
+    source = _add_source()
+    before = _source_row(source["id"])
+    committed, release = threading.Event(), threading.Event()
+
+    async def scenario():
+        orch = _orch()
+        real_acquire = orch._acquire
+
+        def slow_acquire(*args, **kwargs):
+            result = real_acquire(*args, **kwargs)
+            committed.set()
+            release.wait(STEP_SECONDS)
+            return result
+
+        async def crawl(src, run):
+            raise AssertionError("no crawl may start")
+
+        orch._acquire = slow_acquire
+        orch.crawl_source = crawl
+        orch._track(orch.run_source_with_lock(source))
+        await asyncio.to_thread(committed.wait, STEP_SECONDS)
+        assert _lock(source["id"]) is not None
+        threading.Timer(0.3, release.set).start()
+        await orch.stop()
+
+    asyncio.run(scenario())
+    (only,) = _runs(source["id"])
+    assert only[1:] == ("interrupted", SHUTDOWN_MESSAGE)
+    assert _lock(source["id"]) is None
+    assert _source_row(source["id"]) == before
+
+
+def test_a_shutdown_while_a_scheduled_run_waits_for_a_slot_writes_nothing(db):
+    source = _add_source()
+    before = _source_row(source["id"])
+
+    async def scenario():
+        orch = _orch()
+        orch.semaphore = asyncio.Semaphore(0)
+        orch._track(orch.run_source_with_lock(source))
+        await asyncio.sleep(0.2)
+        await orch.stop()
+
+    asyncio.run(scenario())
+    assert _runs(source["id"]) == []
+    assert _lock(source["id"]) is None
+    assert _source_row(source["id"]) == before
+
+
+def test_the_run_due_route_returns_at_once_with_data_queued(db, monkeypatch):
+    from app import crawler_admin
+
+    sources = [_add_source(f"Route {n}") for n in range(2)]
+
+    async def scenario():
+        orch = _orch()
+        gate = asyncio.Event()
+
+        async def crawl(src, run):
+            await gate.wait()
+            return _ok()
+
+        orch.crawl_source = crawl
+        monkeypatch.setattr(crawler_admin, "get_db_url", lambda: TEST_URL)
+        monkeypatch.setattr(crawler_admin, "get_orchestrator", lambda url: orch)
+        response = await asyncio.wait_for(crawler_admin.run_due(admin=None), 5)
+        gate.set()
+        await asyncio.wait_for(asyncio.gather(*list(orch._tasks)), STEP_SECONDS)
+        return response
+
+    response = asyncio.run(scenario())
+    assert response == {"status": "ok", "data": {"queued": 2}}
+    for source in sources:
+        assert [r[1] for r in _runs(source["id"])] == ["ok"]
 
 
 def _shutdown_during_a_crawl(source):

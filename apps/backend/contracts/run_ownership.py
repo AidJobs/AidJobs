@@ -39,7 +39,8 @@ def confirm_running(cursor, run_token, source_id) -> None:
 def save_failure_outcome(status: str, message: str, counts: dict) -> tuple:
     """Issue #5: a crawl whose every job failed to save is a failure; some failures, a warning."""
     failed = counts.get("failed", 0) or 0
-    attempted = counts.get("validated", 0) or 0
+    # Jobs that reached their write; jobs skipped before it do not dilute "every job failed".
+    attempted = counts.get("attempted", counts.get("validated", 0)) or 0
     if not failed:
         return status, message
     if attempted and failed >= attempted:

@@ -12,6 +12,7 @@ import logging
 import asyncio
 import contextvars
 import re
+import threading
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse, urljoin
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 # The crawl's source id for log lines. One crawler instance serves concurrent crawls, so this
 # is task-local rather than an attribute.
 _SOURCE_FOR_LOGS: contextvars.ContextVar = contextvars.ContextVar("crawl_source_id", default=None)
+_DATEPARSER_LOCK = threading.Lock()
 
 
 def _is_unicef_listing(url: str) -> bool:
@@ -1205,17 +1207,19 @@ class SimpleCrawler:
             import dateparser
             from datetime import datetime
             
-            # Parse with dateparser (handles many locales and formats)
-            parsed_date = dateparser.parse(
-                text,
-                languages=list(DEADLINE_LANGUAGES) if DEADLINE_LANGUAGES else None,
-                settings={
-                    'PREFER_DAY_OF_MONTH': 'first',
-                    'RELATIVE_BASE': datetime.now(),
-                    'DATE_ORDER': 'DMY',  # Day-Month-Year (common in international formats)
-                    'PREFER_DATES_FROM': 'future'  # Prefer future dates for deadlines
-                }
-            )
+            # Parse with dateparser (handles many locales and formats). Saves run in worker
+            # threads, and dateparser's thread safety is not established.
+            with _DATEPARSER_LOCK:
+                parsed_date = dateparser.parse(
+                    text,
+                    languages=list(DEADLINE_LANGUAGES) if DEADLINE_LANGUAGES else None,
+                    settings={
+                        'PREFER_DAY_OF_MONTH': 'first',
+                        'RELATIVE_BASE': datetime.now(),
+                        'DATE_ORDER': 'DMY',  # Day-Month-Year (common in international formats)
+                        'PREFER_DATES_FROM': 'future'  # Prefer future dates for deadlines
+                    }
+                )
             
             if parsed_date:
                 # PREFER_DATES_FROM future puts a two-digit year in the next century:
@@ -1415,6 +1419,7 @@ class SimpleCrawler:
         updated = 0
         skipped = validation_skipped
         failed = 0
+        attempted = 0  # jobs that reached their write, or failed on the way to it
         failed_inserts = []  # Track failed inserts for logging
         
         logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
@@ -1556,6 +1561,7 @@ class SimpleCrawler:
                             candidate["admitted"] = True
                         cur.execute("SAVEPOINT job_save")
                         in_savepoint = True
+                        attempted += 1
                         outcome = persist_candidate(
                             cur,
                             candidate,
@@ -1589,6 +1595,8 @@ class SimpleCrawler:
                         if in_savepoint:
                             cur.execute("ROLLBACK TO SAVEPOINT job_save")
                             del recorded[recorded_mark:]
+                        else:
+                            attempted += 1
                         error_msg = f"Unexpected error processing job: {str(e)}"
                         logger.error(f"Error processing job: {error_msg}")
                         failed += 1
@@ -1648,7 +1656,8 @@ class SimpleCrawler:
             'updated': updated, 
             'skipped': skipped, 
             'failed': failed,
-            'validated': len(jobs) if 'jobs' in locals() else 0
+            'validated': len(jobs) if 'jobs' in locals() else 0,
+            'attempted': attempted,
         }
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
@@ -1972,7 +1981,11 @@ class SimpleCrawler:
             return None
         if not storage_path:
             return None
-        conn = self._get_db_conn()
+        try:
+            conn = self._get_db_conn()
+        except Exception as e:
+            logger.warning(f"Error saving raw_page record: {e}")
+            return None
         try:
             with conn.cursor() as cur:
                 cur.execute("""
