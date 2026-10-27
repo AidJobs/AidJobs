@@ -9,7 +9,16 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 27 October 2026, after PR #56 and one ICRC crawl. `main` is `c86984e` (merge of PR #56); CI passed on it; Vercel production on `c86984e` (GitHub deployments); Render live on `c86984e` via Auto-Deploy at 16:17 IST (Render events, read by the agent). Afterwards, read-only: the health check answers; the database status is ok; the search status still reads "Meilisearch not configured"; the API docs answer 404; `/v2` answers. The ICRC crawl the user ran at 16:25 IST is recorded under W-32. No crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 27 October 2026, after PR #58 and the user's removal of `OPENROUTER_API_KEY` from Render.
+- **`main`:** `51c6299` (merge of PR #58). CI passed on it.
+- **Render:** the user redeployed `66a1319` by hand at 21:50 IST after removing the key; Auto-Deploy then put `51c6299` live at 21:54 IST (Render events, read by the agent).
+- **The new instance's start-up log:** no AI extractor or AI normaliser starts. The public search helpers log "OpenRouter API key not configured … using fallback". No error lines.
+- **Read-only afterwards:**
+  - the health check answers;
+  - the database status is ok (405 jobs, 293 active, 3 sources);
+  - search parsing and suggestions answer from their rule-based path;
+  - the API docs answer 404, and `/v2` answers;
+  - no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -153,6 +162,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Security stages 0 and 1 recorded; stage 2 PR A done and PR B design decided | PR #54, `014814d` | 27 Oct 2026 | Merged, CI green |
 | Generic errors from the public database status, search status, query parsing, and suggestions; connection strings masked in the status log | PR #50, `614f12e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
 | ICRC deadlines from microdata (C4 amendment), the capital-T cut, two-digit years | PR #56, `c86984e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked with one ICRC crawl |
+| PR #56 live and the ICRC crawl recorded | PR #57, `66a1319` | 27 Oct 2026 | Merged, CI green |
+| Crawl path without AI or the old plugin registry; contract §10 amended | PR #58, `51c6299` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -336,6 +347,7 @@ Decided by the user on 27 October 2026: no AI in the crawl, with the contract am
 - **Where ICRC's 2.4 minutes went:** most of it is opening its 33 job pages (about 96 seconds) and geocoding (about 23 seconds).
 - **Proof of no change:** offline, the whole crawl saves identical records with and without AI on 12 saved sites (171 records).
 - **After merge:** the crawler no longer uses `OPENROUTER_API_KEY`, but the old public search bar's query parsing and suggestions still do. They send the visitor's search text to OpenRouter, are refused, and fall back to rule-based results. Deleting the key from Render (the user's action) stops that traffic and keeps the same results. The admin Settings card then shows "No key" if `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are not set either (`main.py` checks all three).
+**Done, 27 October 2026.** The user removed `OPENROUTER_API_KEY` from Render and redeployed. PR #58 was merged as `51c6299` and went live at 21:54 IST. The new instance's log shows no AI extractor or normaliser, and the public search helpers using their rule-based fallback (Verified). The next scheduled crawls of each source are the first on this path.
 
 **W-15. Issue #5, parked.** HTML can report `ok` when every row failed to save. "Failed persistence can still advance next_run_at."
 
@@ -467,8 +479,6 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 
 | Decision | Item |
 | --- | --- |
-| Merge PR #58 (no AI and no old plugin registry in the crawl; contract §10 amended) | W-11, W-14 |
-| After PR #58: delete `OPENROUTER_API_KEY` from Render (user action); it stops the old search bar sending search text to OpenRouter, with the same rule-based results | W-14 |
 | Whether to hide the December 2025 UNICEF rows, after inspection and the W-06 rule | W-02 |
 | Approve the Clinch platform-reader plan, then its implementation | W-04, W-19 |
 | The expiry trust policy and missing-crawl threshold | W-06 |
@@ -480,7 +490,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Approve PR B's implementation (crawl-lock recovery, design decided 27 October 2026) | Security plan, stage 2 |
+| Approve PR B's implementation (crawl-lock recovery), after its specification and the specification's independent review | Security plan, stage 2, "PR B specification" |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
