@@ -70,6 +70,9 @@ def _iso_calendar_date(text: str) -> Tuple[bool, Optional[str]]:
 # and Italian; a month name in any other language no longer parses.
 DEADLINE_LANGUAGES = ('en', 'fr', 'es', 'ar', 'ru', 'zh', 'pt', 'de', 'it')
 _HAS_DIGIT = re.compile(r'\d')
+# A time follows a date as "...2026T23:59"; the T in "UTC", "Tue", or "Thu" is not one.
+_ISO_TIME = re.compile(r'(?<=\d)T(?=\d)')
+_FOUR_DIGITS = re.compile(r'\d{4}')
 
 
 _UNICEF_PAGE_CAP = 30
@@ -1215,9 +1218,8 @@ class SimpleCrawler:
         if not _HAS_DIGIT.search(text):
             return None
 
-        # Remove time components if present (e.g., "2025-12-31T23:59:59Z" -> "2025-12-31")
-        if 'T' in text:
-            text = text.split('T')[0]
+        # Remove a time joined to the date (e.g., "31/12/2025T23:59:59Z" -> "31/12/2025")
+        text = _ISO_TIME.split(text, maxsplit=1)[0]
         
         # Try dateparser first (handles many formats automatically)
         try:
@@ -1237,6 +1239,10 @@ class SimpleCrawler:
             )
             
             if parsed_date:
+                # PREFER_DATES_FROM future puts a two-digit year in the next century:
+                # "Dec-6-25" would be 2125-12-06. A page writing "25" means 2025.
+                if parsed_date.year >= 2100 and not _FOUR_DIGITS.search(text):
+                    parsed_date = parsed_date.replace(year=parsed_date.year - 100)
                 return parsed_date.strftime('%Y-%m-%d')
         except ImportError:
             logger.warning("dateparser not available, falling back to regex parsing")

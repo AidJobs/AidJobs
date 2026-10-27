@@ -144,6 +144,43 @@ def test_a_month_name_outside_the_list_is_not_read(crawler, previous_behaviour):
     assert crawler._parse_deadline("15 grudnia 2026") == "2026-12-15"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # ICRC's microdata validThrough; before, the cut at the T of "UTC" left no date.
+        ("Fri Nov 06 23:00:00 UTC 2026", "2026-11-06"),
+        ("Wed Jul 07 22:00:00 UTC 2027", "2027-07-07"),
+        ("Fri Dec 31 23:00:00 UTC 2027", "2027-12-31"),
+        # Before, a leading "Tue"/"Thu" left an empty string.
+        ("Tue Nov 10 23:00:00 UTC 2026", "2026-11-10"),
+        ("Thu Dec 31 23:00:00 UTC 2026", "2026-12-31"),
+        ("Tuesday, 10 November 2026", "2026-11-10"),
+        # A time joined to a date is still removed.
+        ("31/12/2026T23:59:00Z", "2026-12-31"),
+    ],
+)
+def test_a_capital_t_cuts_only_an_iso_time(crawler, raw, expected):
+    assert crawler._parse_deadline(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Dec-6-25", "2025-12-06"),
+        ("06-Dec-25", "2025-12-06"),
+        ("6/12/25", "2025-12-06"),
+        ("06.12.25", "2025-12-06"),
+        ("6 December 25", "2025-12-06"),
+        ("31 Jan 27", "2027-01-31"),
+        # A four-digit year is kept as written, however far ahead.
+        ("31 December 2125", "2125-12-31"),
+        ("06-Dec-2025", "2025-12-06"),
+    ],
+)
+def test_a_two_digit_year_is_this_century(crawler, raw, expected):
+    assert crawler._parse_deadline(raw) == expected
+
+
 def test_headings_are_rejected_quickly(crawler):
     started = time.perf_counter()
     for _ in range(100):

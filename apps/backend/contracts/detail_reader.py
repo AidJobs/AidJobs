@@ -1,6 +1,7 @@
 """Read evidence from one saved detail page. No fetch, log, or admission.
 
 apply_detail_reading fills blank listing fields from exactly one reader result.
+The visible read also takes the validThrough of a page's one microdata JobPosting.
 """
 import json
 
@@ -132,9 +133,31 @@ def _visible_result(soup: BeautifulSoup) -> dict | None:
         if value is None:
             continue
         row[_LABELS[label]].append(value)
+    row["deadlines"].extend(_microdata_deadlines(soup))
     if not _has_evidence(row):
         return None
     return row
+
+
+def _microdata_deadlines(soup: BeautifulSoup) -> list[str]:
+    """validThrough content of the page's only microdata JobPosting, after the visible labels."""
+    postings = [tag for tag in soup.find_all(attrs={"itemtype": True}) if _microdata_posting(tag)]
+    if len(postings) != 1:
+        return []
+    posting = postings[0]
+    found = []
+    for tag in posting.find_all(attrs={"itemprop": "validThrough"}):
+        if tag.find_parent(attrs={"itemtype": True}) is not posting:
+            continue
+        text = _plain(tag.get("content"))
+        if text:
+            found.append(text)
+    return found
+
+
+def _microdata_posting(tag: Tag) -> bool:
+    kinds = str(tag.get("itemtype") or "").split()
+    return any(kind.rstrip("/").rsplit("/", 1)[-1] == "JobPosting" for kind in kinds)
 
 
 def _label_text(text: str) -> tuple[str, str | None] | None:
