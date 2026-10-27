@@ -52,6 +52,8 @@ def test_empty_save_jobs_returns_before_sql(cls):
         "inserted": 0,
         "updated": 0,
         "skipped": 0,
+        "failed": 0,
+        "validated": 0,
     }
 
 

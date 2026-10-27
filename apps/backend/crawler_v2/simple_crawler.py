@@ -20,7 +20,7 @@ from contracts.admission import admit_batch, log_admission_rejections
 from contracts.detail_reader import apply_detail_reading, read_detail_page
 from contracts.outbound import FetchError, fetch_url
 from contracts.persist import persist_candidate
-from contracts.run_ownership import OwnershipLost, confirm_running
+from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.search_projection import commit_and_schedule
 import httpx
 from bs4 import BeautifulSoup
@@ -1335,11 +1335,12 @@ class SimpleCrawler:
         loop=None,
     ) -> Dict:
         """
-        Save jobs as the run that owns the source.
+        Save jobs as the run that owns the source, one savepoint per job.
 
         Without a token, or with one that is not a running run of this source, nothing is
-        written and OwnershipLost is raised. loop, when given, is the event loop that
-        schedules the search projection (this method runs in a worker thread).
+        written and OwnershipLost is raised. A database error on one job rolls back that job
+        only and counts it as failed. loop, when given, is the event loop that schedules the
+        search projection (this method runs in a worker thread).
 
         Returns:
             Dict with counts: {inserted, updated, skipped, failed, validated}
@@ -1425,6 +1426,8 @@ class SimpleCrawler:
                 confirm_running(cur, run_token, source_id)
                 recorded = []
                 for job in jobs:
+                    in_savepoint = False
+                    recorded_mark = len(recorded)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1551,6 +1554,8 @@ class SimpleCrawler:
                             candidate["quality_scored_at"] = observed_at
                         if job.get("admitted") is True:
                             candidate["admitted"] = True
+                        cur.execute("SAVEPOINT job_save")
+                        in_savepoint = True
                         outcome = persist_candidate(
                             cur,
                             candidate,
@@ -1561,6 +1566,8 @@ class SimpleCrawler:
                             org_name=org_name,
                             recorded=recorded,
                         )
+                        cur.execute("RELEASE SAVEPOINT job_save")
+                        in_savepoint = False
                         if outcome == "created":
                             inserted += 1
                         elif outcome == "updated":
@@ -1578,6 +1585,10 @@ class SimpleCrawler:
                             })
 
                     except Exception as e:
+                        # This job only: roll back to its savepoint and drop what it recorded.
+                        if in_savepoint:
+                            cur.execute("ROLLBACK TO SAVEPOINT job_save")
+                            del recorded[recorded_mark:]
                         error_msg = f"Unexpected error processing job: {str(e)}"
                         logger.error(f"Error processing job: {error_msg}")
                         failed += 1
@@ -2226,7 +2237,9 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
-                crawl_status, crawl_message = _listing_outcome(len(jobs), listing_report)
+                crawl_status, crawl_message = save_failure_outcome(
+                    *_listing_outcome(len(jobs), listing_report), counts
+                )
                 return {
                     'status': crawl_status,
                     'message': crawl_message,

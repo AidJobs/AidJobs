@@ -16,7 +16,7 @@ from contracts.admission import admit_batch, extraction_logger_for, log_admissio
 from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
-from contracts.run_ownership import OwnershipLost, confirm_running
+from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.search_projection import commit_and_schedule
 
 logger = logging.getLogger(__name__)
@@ -177,14 +177,14 @@ class SimpleRSSCrawler:
         run_token: Optional[str] = None,
         loop=None,
     ) -> Dict:
-        """Save jobs as the run that owns the source.
+        """Save jobs as the run that owns the source, one savepoint per job.
 
         Without a valid running run token nothing is written and OwnershipLost is raised.
         """
         if not run_token:
             raise OwnershipLost("save_jobs needs a run token")
         if not jobs:
-            return {'inserted': 0, 'updated': 0, 'skipped': 0}
+            return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
         # Ensure apply_url exists - use fallback if missing
         for job in jobs:
@@ -204,6 +204,8 @@ class SimpleRSSCrawler:
         inserted = 0
         updated = 0
         skipped = 0
+        failed = 0
+        validated = 0
         
         try:
             with conn.cursor() as cur:
@@ -229,16 +231,28 @@ class SimpleRSSCrawler:
                     if job.get("admitted") is True:
                         candidate["admitted"] = True
                     observed_at = datetime.now(timezone.utc)
-                    outcome = persist_candidate(
-                        cur,
-                        candidate,
-                        observed_at=observed_at,
-                        heuristics=heuristics_enabled(),
-                        reference=job.get("reference"),
-                        source_id=source_id,
-                        org_name=org_name,
-                        recorded=recorded,
-                    )
+                    validated += 1
+                    recorded_mark = len(recorded)
+                    cur.execute("SAVEPOINT job_save")
+                    try:
+                        outcome = persist_candidate(
+                            cur,
+                            candidate,
+                            observed_at=observed_at,
+                            heuristics=heuristics_enabled(),
+                            reference=job.get("reference"),
+                            source_id=source_id,
+                            org_name=org_name,
+                            recorded=recorded,
+                        )
+                        cur.execute("RELEASE SAVEPOINT job_save")
+                    except Exception as exc:
+                        # This job only: roll back to its savepoint and drop what it recorded.
+                        cur.execute("ROLLBACK TO SAVEPOINT job_save")
+                        del recorded[recorded_mark:]
+                        failed += 1
+                        logger.error("RSS job failed to save: %s", exc)
+                        continue
                     if outcome == "created":
                         inserted += 1
                     elif outcome == "updated":
@@ -257,7 +271,13 @@ class SimpleRSSCrawler:
         finally:
             conn.close()
         
-        return {'inserted': inserted, 'updated': updated, 'skipped': skipped}
+        return {
+            'inserted': inserted,
+            'updated': updated,
+            'skipped': skipped,
+            'failed': failed,
+            'validated': validated,
+        }
     
     async def crawl_source(self, source: Dict, run=None) -> Dict:
         """Crawl RSS source"""
@@ -291,10 +311,15 @@ class SimpleRSSCrawler:
             counts = await run.save(
                 self.save_jobs, admitted, source_id, org_name, base_url=careers_url
             )
+            status, message = save_failure_outcome(
+                'ok' if jobs else 'warn',
+                f'Found {len(jobs)} jobs' if jobs else 'No jobs found',
+                counts,
+            )
             
             return {
-                'status': 'ok' if jobs else 'warn',
-                'message': f'Found {len(jobs)} jobs' if jobs else 'No jobs found',
+                'status': status,
+                'message': message,
                 'counts': {
                     'found': len(jobs),
                     'inserted': counts['inserted'],

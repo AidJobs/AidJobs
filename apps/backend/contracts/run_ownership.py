@@ -35,3 +35,13 @@ def confirm_running(cursor, run_token, source_id) -> None:
     if cursor.fetchone() is None:
         raise OwnershipLost(f"run {run_token} is not running for source {source_id}")
 
+
+def save_failure_outcome(status: str, message: str, counts: dict) -> tuple:
+    """Issue #5: a crawl whose every job failed to save is a failure; some failures, a warning."""
+    failed = counts.get("failed", 0) or 0
+    attempted = counts.get("validated", 0) or 0
+    if not failed:
+        return status, message
+    if attempted and failed >= attempted:
+        return "fail", f"{message}; every job failed to save ({failed})"
+    return "warn", f"{message}; {failed} of {attempted} jobs failed to save"
