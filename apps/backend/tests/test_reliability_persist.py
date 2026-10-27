@@ -3,6 +3,7 @@ import inspect
 
 import pytest
 
+from contracts.run_ownership import OwnershipLost
 from crawler_v2.api_crawler import SimpleAPICrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
 
@@ -34,7 +35,7 @@ def test_save_jobs_rolls_back_and_reraises(cls):
     crawler = _crawler(cls, conn)
     job = {"title": "Officer", "apply_url": "https://example.org/jobs/1", "admitted": True}
     with pytest.raises(RuntimeError, match="persist failed"):
-        crawler.save_jobs([job], "src-1", "Example")
+        crawler.save_jobs([job], "src-1", "Example", run_token="run-1")
     assert conn.rolled_back is True
     assert conn.closed is True
 
@@ -47,11 +48,24 @@ def test_empty_save_jobs_returns_before_sql(cls):
         raise AssertionError("empty save must not open a connection")
 
     crawler._get_db_conn = connect
-    assert crawler.save_jobs([], "src-1", "Example") == {
+    assert crawler.save_jobs([], "src-1", "Example", run_token="run-1") == {
         "inserted": 0,
         "updated": 0,
         "skipped": 0,
     }
+
+
+@pytest.mark.parametrize("cls", [SimpleRSSCrawler, SimpleAPICrawler])
+def test_save_jobs_without_a_run_token_writes_nothing(cls):
+    crawler = cls("postgresql://example")
+
+    def connect():
+        raise AssertionError("a save without a token must not open a connection")
+
+    crawler._get_db_conn = connect
+    job = {"title": "Officer", "apply_url": "https://example.org/jobs/1", "admitted": True}
+    with pytest.raises(OwnershipLost):
+        crawler.save_jobs([job], "src-1", "Example")
 
 
 def test_success_status_and_found_stay_pre_admission():

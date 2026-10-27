@@ -54,13 +54,16 @@ def stale_document_ids(index_ids, eligible_ids) -> list:
     return [str(job_id) for job_id in index_ids if str(job_id) not in allowed]
 
 
-def commit_and_schedule(conn, recorded) -> None:
-    """Commit the job writes, then schedule projection of those committed ids."""
+def commit_and_schedule(conn, recorded, loop=None) -> None:
+    """Commit the job writes, then schedule projection of those committed ids.
+
+    loop is the event loop to schedule on when the caller runs in a worker thread.
+    """
     conn.commit()
-    schedule_after_commit(recorded)
+    schedule_after_commit(recorded, loop=loop)
 
 
-def schedule_after_commit(recorded) -> None:
+def schedule_after_commit(recorded, loop=None) -> None:
     project_ids, remove_ids = projection_actions(recorded)
     if not project_ids and not remove_ids:
         return
@@ -71,6 +74,9 @@ def schedule_after_commit(recorded) -> None:
         except Exception:
             logger.exception("search projection failed")
 
+    if loop is not None:
+        loop.call_soon_threadsafe(lambda: loop.create_task(_run()))
+        return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:

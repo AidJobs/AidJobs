@@ -3,6 +3,7 @@ Simple API crawler - extracts jobs from JSON APIs.
 """
 
 import json
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -14,6 +15,7 @@ from contracts.admission import admit_batch, extraction_logger_for, log_admissio
 from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
+from contracts.run_ownership import OwnershipLost, confirm_running
 from app.search_projection import commit_and_schedule
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,7 @@ class SimpleAPICrawler:
     
     def _get_db_conn(self):
         """Get database connection"""
-        return psycopg2.connect(self.db_url)
+        return psycopg2.connect(self.db_url, connect_timeout=10)
     
     async def fetch_api(self, url: str, headers: Optional[Dict] = None) -> Optional[Dict]:
         """Fetch JSON from API"""
@@ -178,8 +180,22 @@ class SimpleAPICrawler:
         logger.info(f"Extracted {len(jobs)} jobs from JSON API")
         return jobs
     
-    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:
-        """Save jobs to database (same logic as HTML crawler)"""
+    def save_jobs(
+        self,
+        jobs: List[Dict],
+        source_id: str,
+        org_name: str,
+        base_url: Optional[str] = None,
+        *,
+        run_token: Optional[str] = None,
+        loop=None,
+    ) -> Dict:
+        """Save jobs as the run that owns the source.
+
+        Without a valid running run token nothing is written and OwnershipLost is raised.
+        """
+        if not run_token:
+            raise OwnershipLost("save_jobs needs a run token")
         if not jobs:
             return {'inserted': 0, 'updated': 0, 'skipped': 0}
         
@@ -204,6 +220,7 @@ class SimpleAPICrawler:
         
         try:
             with conn.cursor() as cur:
+                confirm_running(cur, run_token, source_id)
                 recorded = []
                 for job in jobs:
                     title = job.get('title', '').strip()
@@ -244,7 +261,7 @@ class SimpleAPICrawler:
                     else:
                         skipped += 1
                 
-                commit_and_schedule(conn, recorded)
+                commit_and_schedule(conn, recorded, loop=loop)
         
         except Exception as e:
             logger.error(f"Error saving jobs: {e}")
@@ -255,7 +272,7 @@ class SimpleAPICrawler:
         
         return {'inserted': inserted, 'updated': updated, 'skipped': skipped}
     
-    async def crawl_source(self, source: Dict) -> Dict:
+    async def crawl_source(self, source: Dict, run=None) -> Dict:
         """Crawl API source"""
         source_id = str(source['id'])
         org_name = source.get('org_name', 'Unknown')
@@ -279,8 +296,14 @@ class SimpleAPICrawler:
             
             # Save to database. Admission sees the finished list and does not fetch.
             admitted, rejected = admit_batch(jobs, "api")
-            log_admission_rejections(extraction_logger_for(self.db_url), rejected, source_id)
-            counts = self.save_jobs(admitted, source_id, org_name, base_url=careers_url)
+            await asyncio.to_thread(
+                log_admission_rejections, extraction_logger_for(self.db_url), rejected, source_id
+            )
+            if run is None:
+                raise OwnershipLost("crawl_source needs the run that owns the source")
+            counts = await run.save(
+                self.save_jobs, admitted, source_id, org_name, base_url=careers_url
+            )
             
             return {
                 'status': 'ok' if jobs else 'warn',

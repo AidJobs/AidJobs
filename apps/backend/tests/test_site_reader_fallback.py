@@ -180,7 +180,7 @@ def _unicef_reader_returns(monkeypatch, outcome):
 
 def test_unicef_uses_its_reader(monkeypatch):
     crawler, sentinel = _crawler(monkeypatch)
-    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
+    jobs, _report = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert [job["apply_url"] for job in jobs] == [
         _link("588602"),
         _link("588591"),
@@ -195,8 +195,9 @@ def test_other_sources_go_straight_to_the_general_reader(monkeypatch):
     lookalike = "https://example.org/jobs?next=https://jobs.unicef.org/en-us/listing/"
     for url in (_ICRC_LISTING, lookalike):
         crawler, sentinel = _crawler(monkeypatch)
-        jobs = asyncio.run(crawler._listing_jobs(_LISTING, url))
+        jobs, report = asyncio.run(crawler._listing_jobs(_LISTING, url))
         assert jobs == sentinel
+        assert report is None
         assert crawler.general_calls == 1
 
 
@@ -227,7 +228,7 @@ def test_the_old_plugin_registry_is_gone():
 def test_unicef_reader_failure_falls_back_to_the_general_reader(plugin_outcome, monkeypatch):
     _unicef_reader_returns(monkeypatch, plugin_outcome)
     crawler, sentinel = _crawler(monkeypatch)
-    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
+    jobs, _report = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert jobs == sentinel
     assert crawler.general_calls == 1
 
@@ -240,7 +241,7 @@ def test_repeated_links_keep_the_first_row(monkeypatch):
     ]
     _unicef_reader_returns(monkeypatch, PluginResult(jobs=rows))
     crawler, _sentinel = _crawler(monkeypatch)
-    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
+    jobs, _report = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert [(job["title"], job["apply_url"]) for job in jobs] == [
         ("First wording", _link("1")),
         ("Other job", _link("2")),
@@ -315,7 +316,7 @@ def _saved_unicef_jobs(monkeypatch):
 
     monkeypatch.setattr(crawler, "_fetch_listing_page", unavailable)
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
-    jobs = asyncio.run(crawler._listing_jobs(html, _UNICEF_LISTING))
+    jobs, _report = asyncio.run(crawler._listing_jobs(html, _UNICEF_LISTING))
     assert asked == ["https://jobs.unicef.org/en-us/listing/?page=2&page-items=20"]
     return jobs
 
@@ -359,7 +360,8 @@ def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
     crawler = SimpleCrawler("postgresql://example")
     _no_network(crawler, monkeypatch)
     before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
-    after = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
+    after, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
+    assert report is None
     assert after == before
     first = admit_batch([dict(job) for job in before], "html")
     second = admit_batch([dict(job) for job in after], "html")
@@ -413,7 +415,8 @@ def _paged_crawler(monkeypatch, pages):
 
 
 def _read_listing(crawler, first_html):
-    jobs = asyncio.run(crawler._listing_jobs(first_html, _UNICEF_LISTING))
+    """Job ids read from the listing; the walk's report is kept on the test's crawler."""
+    jobs, crawler.report = asyncio.run(crawler._listing_jobs(first_html, _UNICEF_LISTING))
     return [re.search(r"/job/(\d+)/", job["apply_url"]).group(1) for job in jobs]
 
 
@@ -485,8 +488,9 @@ def test_the_signup_link_alone_is_not_pagination(monkeypatch):
 def test_icrc_never_paginates(monkeypatch):
     crawler, _sentinel = _crawler(monkeypatch)
     html = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 5)
-    jobs = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
+    jobs, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
     assert jobs == _sentinel
+    assert report is None
 
 
 def test_a_walk_that_runs_out_of_links_is_complete(monkeypatch):
@@ -498,13 +502,13 @@ def test_a_walk_that_runs_out_of_links_is_complete(monkeypatch):
     }
     crawler, _asked = _paged_crawler(monkeypatch, pages)
     _read_listing(crawler, first)
-    assert crawler._listing_report == {
+    assert crawler.report == {
         "pages": 3,
         "expected": 5,
         "complete": True,
         "stop": "no More Jobs link",
     }
-    assert _listing_outcome(5, crawler._listing_report) == (
+    assert _listing_outcome(5, crawler.report) == (
         "ok",
         "Found 5 jobs; listing complete: 3 pages, expected 5",
     )
@@ -516,7 +520,7 @@ def test_a_failed_page_makes_the_crawl_partial(monkeypatch):
     pages = {_PAGE.format(2): (200, second), _PAGE.format(3): (0, "")}
     crawler, _asked = _paged_crawler(monkeypatch, pages)
     assert _read_listing(crawler, first) == ["1", "2", "3"]
-    report = crawler._listing_report
+    report = crawler.report
     assert report["complete"] is False
     assert report["pages"] == 2
     assert report["stop"] == f"HTTP 0 on {_PAGE.format(3)}"
@@ -534,20 +538,20 @@ def test_the_page_cap_and_a_repeated_page_are_partial(monkeypatch):
     endless = _listing_page(["2"], "/en-us/listing/?page=3&page-items=20", 8)
     crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, endless)})
     _read_listing(crawler, first)
-    assert crawler._listing_report["complete"] is False
-    assert crawler._listing_report["stop"] == "page cap 2"
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "page cap 2"
 
     repeat = _listing_page(["1"], "/en-us/listing/?page=3&page-items=20", 8)
     crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, repeat)})
     _read_listing(crawler, first)
-    assert crawler._listing_report["complete"] is False
-    assert crawler._listing_report["stop"] == "page 2 added no new jobs"
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "page 2 added no new jobs"
 
 
 def test_sources_without_a_paged_listing_keep_the_plain_message(monkeypatch):
     crawler, _sentinel = _crawler(monkeypatch)
-    asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING))
-    assert crawler._listing_report is None
+    _jobs, report = asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING))
+    assert report is None
     assert _listing_outcome(14, None) == ("ok", "Found 14 jobs")
     assert _listing_outcome(0, None) == ("warn", "No jobs found")
 
@@ -564,7 +568,8 @@ def test_crawl_source_reports_the_listing_outcome():
     import inspect
 
     source = inspect.getsource(SimpleCrawler.crawl_source)
-    assert "_listing_outcome(len(jobs), self._listing_report)" in source
+    assert "_listing_outcome(len(jobs), listing_report)" in source
+    assert "self._listing_report" not in inspect.getsource(SimpleCrawler)
     assert "extracted_fields['listing_complete']" in source
 
 
@@ -591,7 +596,7 @@ def test_a_retryable_status_is_retried_once_after_thirty_seconds(status, monkeyp
     assert _read_listing(crawler, first) == ["1", "2"]
     assert asked == [_PAGE.format(2), _PAGE.format(2)]
     assert crawler.slept == [5.0, 30.0]
-    assert crawler._listing_report["complete"] is True
+    assert crawler.report["complete"] is True
 
 
 def test_a_failed_retry_stops_the_walk_as_partial(monkeypatch):
@@ -601,7 +606,7 @@ def test_a_failed_retry_stops_the_walk_as_partial(monkeypatch):
     assert _read_listing(crawler, first) == ["1"]
     assert asked == [_PAGE.format(2), _PAGE.format(2)]
     assert crawler.slept == [5.0, 30.0]
-    report = crawler._listing_report
+    report = crawler.report
     assert report["complete"] is False
     assert report["stop"] == f"HTTP 202 on {_PAGE.format(2)} after one retry"
     assert _listing_outcome(1, report)[0] == "warn"
@@ -617,7 +622,7 @@ def test_only_one_retry_is_allowed_in_a_crawl(monkeypatch):
     assert _read_listing(crawler, first) == ["1", "2"]
     assert asked == [_PAGE.format(2), _PAGE.format(2), _PAGE.format(3)]
     assert crawler.slept == [5.0, 30.0, 5.0]
-    assert crawler._listing_report["stop"] == f"HTTP 503 on {_PAGE.format(3)}"
+    assert crawler.report["stop"] == f"HTTP 503 on {_PAGE.format(3)}"
 
 
 @pytest.mark.parametrize("status", [0, 403, 404, 500])
@@ -627,7 +632,7 @@ def test_other_failures_are_not_retried(status, monkeypatch):
     assert _read_listing(crawler, first) == ["1"]
     assert asked == [_PAGE.format(2)]
     assert crawler.slept == [5.0]
-    assert crawler._listing_report["stop"] == f"HTTP {status} on {_PAGE.format(2)}"
+    assert crawler.report["stop"] == f"HTTP {status} on {_PAGE.format(2)}"
 
 
 def test_only_allowlisted_response_headers_are_logged():

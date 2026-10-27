@@ -9,8 +9,10 @@ import time
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta, timezone
 import psycopg2
+import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
+from crawler_v2.run_handle import RunHandle
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
 from crawler_v2.api_crawler import SimpleAPICrawler
@@ -29,6 +31,42 @@ DEFAULT_FREQ_DAYS = {
 GLOBAL_MAX_CONCURRENCY = 3
 SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes
 MAX_SOURCES_PER_RUN = 20
+
+RECOVERY_INTERVAL_SECONDS = 300
+ORPHAN_RUN_AGE = timedelta(minutes=2)
+# A manual run that gets a slot with less than this left of its limit does not start.
+MANUAL_MIN_REMAINING = timedelta(minutes=5)
+SHUTDOWN_DEADLINE_SECONDS = 20
+# Finishing plus one recovery interval: the lock must outlive the limit by more than this.
+_LIFETIME_MARGIN = timedelta(minutes=6)
+
+EXPIRED_MESSAGE = "Interrupted: lock expired, cause unknown"
+ORPHAN_MESSAGE = "Interrupted: run had no lock"
+SHUTDOWN_MESSAGE = "Interrupted: the server shut down"
+NO_SLOT_MESSAGE = "Interrupted: no free crawl slot"
+
+# Set at the start of every run step, so a stuck database cannot hold run, lock, or source rows
+# indefinitely.
+_STEP_TIMEOUTS_SQL = (
+    "SET LOCAL statement_timeout = '30s'; "
+    "SET LOCAL idle_in_transaction_session_timeout = '60s'"
+)
+
+
+def _minutes_setting(name: str, default: int) -> timedelta:
+    raw = os.getenv(name, "").strip()
+    return timedelta(minutes=float(raw) if raw else default)
+
+
+def crawl_time_settings() -> tuple:
+    """(time limit, lock lifetime) from the environment; refuses a lifetime that is too short."""
+    limit = _minutes_setting("CRAWL_TIME_LIMIT_MINUTES", 15)
+    lifetime = _minutes_setting("CRAWL_LOCK_TTL_MINUTES", 25)
+    if limit <= timedelta(0) or lifetime <= limit + _LIFETIME_MARGIN:
+        raise ValueError(
+            "CRAWL_LOCK_TTL_MINUTES must be longer than CRAWL_TIME_LIMIT_MINUTES plus 6 minutes"
+        )
+    return limit, lifetime
 
 
 def _row_id(row):
@@ -57,6 +95,12 @@ class CrawlerOrchestrator:
         self.api_crawler = SimpleAPICrawler(db_url)
         self.running = False
         self.semaphore = asyncio.Semaphore(GLOBAL_MAX_CONCURRENCY)
+        self.time_limit, self.lock_lifetime = crawl_time_settings()
+        self._queued: set = set()
+        self._tasks: set = set()
+        self._closing: set = set()
+        self._scheduler_task: Optional[asyncio.Task] = None
+        self._recovery_task: Optional[asyncio.Task] = None
     
     def _get_db_conn(self, retries=3, timeout=10):
         """Get database connection with retry logic and IPv4 preference"""
@@ -171,6 +215,15 @@ class CrawlerOrchestrator:
         else:
             raise Exception("Database connection failed: Unknown error")
     
+    def health_score(self, source_id: str) -> Optional[Dict]:
+        """The source's health score, read on its own connection; None when it cannot be read."""
+        try:
+            from app.source_health import SourceHealthScorer
+            return SourceHealthScorer(self.db_url).calculate_health_score(str(source_id))
+        except Exception as e:
+            logger.debug(f"[orchestrator] Could not calculate health score: {e}")
+            return None
+
     def compute_next_run(
         self,
         base_freq_days: int,
@@ -179,7 +232,8 @@ class CrawlerOrchestrator:
         updated: int,
         consecutive_failures: int,
         consecutive_nochange: int,
-        source_id: Optional[str] = None
+        source_id: Optional[str] = None,
+        health: Optional[Dict] = None,
     ) -> datetime:
         """
         Compute next run time with enhanced adaptive scheduling.
@@ -232,11 +286,10 @@ class CrawlerOrchestrator:
             logger.debug(f"[orchestrator] {consecutive_failures} failures -> backoff={backoff_days} days")
         
         # Consider source health score if available
-        if source_id:
+        if health is None and source_id:
+            health = self.health_score(source_id)
+        if health:
             try:
-                from app.source_health import SourceHealthScorer
-                scorer = SourceHealthScorer(self.db_url)
-                health = scorer.calculate_health_score(source_id)
                 
                 # Adjust frequency based on health
                 if health['score'] >= 80:
@@ -265,6 +318,10 @@ class CrawlerOrchestrator:
         return next_run
     
     async def get_due_sources(self, limit: int = MAX_SOURCES_PER_RUN) -> List[Dict]:
+        """Due sources, prioritised; read off the event loop."""
+        return await asyncio.to_thread(self._due_sources, limit)
+
+    def _due_sources(self, limit: int) -> List[Dict]:
         """
         Get sources that are due for crawling, prioritized by health score.
         
@@ -353,83 +410,80 @@ class CrawlerOrchestrator:
         # Low-priority sources can wait until off-peak
         return high_priority + medium_priority + low_priority
 
-    async def release_lock(self, source_id: str):
-        """Release lock for a source"""
-        conn = self._get_db_conn()
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    DELETE FROM crawl_locks WHERE source_id = %s
-                """, (source_id,))
-                conn.commit()
-        finally:
-            conn.close()
-    
-    async def crawl_source(self, source: Dict) -> Dict:
+    # ------------------------------------------------------------------
+    # Crawl runs. Rows are always locked in one order: run rows (crawl_logs), then the lock
+    # row (crawl_locks), then the source row, then job rows. Acquire is the one exception:
+    # its new run row cannot be contended, because no other transaction knows it exists.
+    # Ownership of a run is checked on its crawl_logs row, never assumed from the lock.
+    # ------------------------------------------------------------------
+
+    async def crawl_source(self, source: Dict, run: Optional[RunHandle] = None) -> Dict:
         """
-        Crawl a single source.
-        
+        Crawl a single source as the given run.
+
         Returns:
-            {'status': 'ok'|'warn'|'fail', 'message': str, 'counts': dict, 'duration_ms': int}
+            {'status': 'ok'|'warn'|'fail'|'failed', 'message': str, 'counts': dict,
+             'duration_ms': int}
         """
         start_time = time.time()
-        source_id = source['id']
         url = source['careers_url']
         source_type = source['source_type']
-        
+
         logger.info(f"[orchestrator] Starting crawl: {source['org_name']} ({url})")
-        
+
         try:
-            # Use enterprise-grade SimpleCrawler which handles everything
-            # All crawlers (HTML, RSS, API) have crawl_source method that does:
-            # - Fetch
-            # - Extract
-            # - Normalize
-            # - Geocode
-            # - Quality score
-            # - Save to database
             if source_type == 'rss':
-                result = await self.rss_crawler.crawl_source(source)
+                result = await self.rss_crawler.crawl_source(source, run)
             elif source_type in ['api', 'json']:
-                result = await self.api_crawler.crawl_source(source)
+                result = await self.api_crawler.crawl_source(source, run)
             else:  # html (default)
-                result = await self.html_crawler.crawl_source(source)
-            
-            # All crawl_source methods return the same format:
-            # {'status': 'ok'|'warn'|'failed', 'message': str, 'counts': dict}
-            # Add duration_ms to result
-            duration_ms = int((time.time() - start_time) * 1000)
-            result['duration_ms'] = duration_ms
+                result = await self.html_crawler.crawl_source(source, run)
+            result['duration_ms'] = int((time.time() - start_time) * 1000)
             return result
-        
         except Exception as e:
             logger.error(f"[orchestrator] Error crawling {url}: {e}")
-            duration_ms = int((time.time() - start_time) * 1000)
             return {
                 'status': 'fail',
                 'message': str(e)[:500],
                 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
-                'duration_ms': duration_ms
+                'duration_ms': int((time.time() - start_time) * 1000),
             }
-    
-    async def begin_run(self, source: Dict):
-        """Lock the source and insert the running row in one transaction.
 
-        The lock insert is the decision. A duplicate key returns the open
-        running id and does not start another crawl.
-        """
-        source_id = source["id"]
+    def _lifetime_sql(self) -> str:
+        return f"{int(self.lock_lifetime.total_seconds())} seconds"
+
+    def _acquire(self, source_id: str, scheduled: bool):
+        """Take the lock and open a running row. (run_id, True), or (None, False, reason)."""
         conn = self._get_db_conn()
         try:
             try:
                 with conn.cursor() as cur:
+                    cur.execute(_STEP_TIMEOUTS_SQL)
                     cur.execute(
                         """
                         INSERT INTO crawl_locks (source_id, locked_at)
                         VALUES (%s, NOW())
+                        ON CONFLICT (source_id) DO NOTHING
+                        RETURNING source_id
                         """,
                         (source_id,),
                     )
+                    if cur.fetchone() is None:
+                        conn.rollback()
+                        return None, False, "locked"
+                    if scheduled:
+                        cur.execute(
+                            """
+                            SELECT status = 'active'
+                                   AND (next_run_at IS NULL OR next_run_at <= NOW())
+                            FROM sources WHERE id = %s
+                            """,
+                            (source_id,),
+                        )
+                        row = cur.fetchone()
+                        if not row or not row[0]:
+                            conn.rollback()
+                            return None, False, "not due"
                     cur.execute(
                         """
                         INSERT INTO crawl_logs (
@@ -442,184 +496,383 @@ class CrawlerOrchestrator:
                     )
                     run_id = _row_id(cur.fetchone())
                 conn.commit()
-                return run_id, True
-            except psycopg2.IntegrityError:
-                conn.rollback()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT id FROM crawl_logs
-                        WHERE source_id = %s AND status = 'running'
-                        ORDER BY ran_at DESC
-                        LIMIT 1
-                        """,
-                        (source_id,),
-                    )
-                    return _row_id(cur.fetchone()), False
+                return run_id, True, None
             except Exception:
                 conn.rollback()
                 raise
         finally:
             conn.close()
 
-    async def finish_run(self, source: Dict, run_id, result: Dict):
-        """Update source health and the same crawl_logs row. Do not insert another."""
+    def _read_lock(self, source_id: str):
+        """(lock time, expired, owning running run id), locking nothing; None if unlocked."""
         conn = self._get_db_conn()
         try:
             with conn.cursor() as cur:
-                counts = result.get("counts", {})
-                duration_ms = result.get("duration_ms", 0)
-                inserted = counts.get("inserted", 0)
-                updated = counts.get("updated", 0)
-                if not duration_ms:
-                    logger.warning(
-                        "[orchestrator] Missing duration_ms for %s, using 0",
-                        source.get("org_name"),
+                cur.execute(_STEP_TIMEOUTS_SQL)
+                cur.execute(
+                    """
+                    SELECT l.locked_at, l.locked_at < NOW() - %s::interval,
+                           (SELECT r.id FROM crawl_logs r
+                            WHERE r.source_id = l.source_id AND r.status = 'running'
+                              AND r.ran_at = l.locked_at
+                            LIMIT 1)
+                    FROM crawl_locks l WHERE l.source_id = %s
+                    """,
+                    (self._lifetime_sql(), source_id),
+                )
+                row = cur.fetchone()
+            conn.rollback()
+            if row is None:
+                return None
+            return row[0], bool(row[1]), row[2]
+        finally:
+            conn.close()
+
+    def _take_over(self, source_id: str, health: Optional[Dict]) -> bool:
+        """End an expired lock: owner run fail (counted once), orphans interrupted, lock deleted.
+
+        False when the lock is no longer expired, is gone, or its rows are busy (skip, try later).
+        """
+        conn = self._get_db_conn()
+        try:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(_STEP_TIMEOUTS_SQL)
+                    cur.execute("SET LOCAL lock_timeout = '5s'")
+                    cur.execute(
+                        """
+                        SELECT id, ran_at FROM crawl_logs
+                        WHERE source_id = %s AND status = 'running'
+                        ORDER BY id FOR UPDATE
+                        """,
+                        (source_id,),
                     )
-                if result.get("status") in {"fail", "failed"}:
-                    consecutive_failures = (source.get("consecutive_failures") or 0) + 1
-                    consecutive_nochange = 0
-                else:
-                    consecutive_failures = 0
-                    if inserted == 0 and updated == 0:
-                        consecutive_nochange = (source.get("consecutive_nochange") or 0) + 1
-                    else:
-                        consecutive_nochange = 0
-                next_run_at = self.compute_next_run(
-                    source["crawl_frequency_days"],
-                    source.get("org_type"),
-                    inserted,
-                    updated,
-                    consecutive_failures,
-                    consecutive_nochange,
-                    source_id=str(source["id"]),
-                )
-                new_status = source.get("status", "active")
-                message = result.get("message") or "Crawl completed"
-                if consecutive_failures >= 5:
-                    new_status = "paused"
-                    message += " (auto-paused after 5 failures)"
-                terminal_status = result.get("status", "unknown")
-                cur.execute(
-                    """
-                    UPDATE sources SET
-                        last_crawled_at = NOW(),
-                        last_crawl_status = %s,
-                        last_crawl_message = %s,
-                        consecutive_failures = %s,
-                        consecutive_nochange = %s,
-                        next_run_at = %s,
-                        status = %s,
-                        updated_at = NOW()
-                    WHERE id = %s
-                    """,
-                    (
-                        terminal_status,
-                        message,
-                        consecutive_failures,
-                        consecutive_nochange,
-                        next_run_at,
-                        new_status,
-                        source["id"],
-                    ),
-                )
-                cur.execute(
-                    """
-                    UPDATE crawl_logs SET
-                        duration_ms = %s,
-                        found = %s,
-                        inserted = %s,
-                        updated = %s,
-                        skipped = %s,
-                        status = %s,
-                        message = %s
-                    WHERE id = %s
-                    """,
-                    (
-                        duration_ms,
-                        counts.get("found", 0),
-                        inserted,
-                        updated,
-                        counts.get("skipped", 0),
-                        terminal_status,
-                        message,
-                        run_id,
-                    ),
-                )
+                    running = cur.fetchall()
+                    cur.execute(
+                        """
+                        SELECT locked_at FROM crawl_locks
+                        WHERE source_id = %s AND locked_at < NOW() - %s::interval
+                        FOR UPDATE
+                        """,
+                        (source_id, self._lifetime_sql()),
+                    )
+                    lock = cur.fetchone()
+                    if lock is None:
+                        conn.rollback()
+                        return False
+                    locked_at = lock[0]
+                    owner = [row[0] for row in running if row[1] == locked_at]
+                    orphans = [row[0] for row in running if row[1] != locked_at]
+                    if owner:
+                        cur.execute(
+                            "UPDATE crawl_logs SET status = 'fail', message = %s WHERE id = %s",
+                            (EXPIRED_MESSAGE, owner[0]),
+                        )
+                    for orphan in orphans:
+                        cur.execute(
+                            "UPDATE crawl_logs SET status = 'interrupted', message = %s"
+                            " WHERE id = %s",
+                            (ORPHAN_MESSAGE, orphan),
+                        )
+                    cur.execute("DELETE FROM crawl_locks WHERE source_id = %s", (source_id,))
+                    if owner:
+                        self._update_source(
+                            cur, source_id, outcome="fail", run_status="fail",
+                            message=EXPIRED_MESSAGE, counts={}, health=health,
+                        )
                 conn.commit()
+                logger.warning(
+                    "[orchestrator] Took over an expired lock for source %s (%d running rows)",
+                    source_id, len(running),
+                )
+                return True
+            except psycopg2.errors.LockNotAvailable:
+                conn.rollback()
+                return False
+            except Exception:
+                conn.rollback()
+                raise
+        finally:
+            conn.close()
+
+    def _begin(self, source_id: str, scheduled: bool):
+        """Acquire, resolving a conflict: the live run's id, or a takeover of an expired lock."""
+        for _attempt in range(3):
+            run_id, started, reason = self._acquire(source_id, scheduled)
+            if started or reason == "not due":
+                return run_id, started
+            lock = self._read_lock(source_id)
+            if lock is None:
+                continue
+            _locked_at, expired, live_run = lock
+            if not expired:
+                return live_run, False
+            # Taken over: acquire again. Not taken over: the lock is live again or busy; re-read.
+            self._take_over(source_id, self.health_score(source_id))
+        return None, False
+
+    async def begin_run(self, source: Dict, *, scheduled: bool = False):
+        """Lock the source and insert the running row. A live lock returns its open run's id."""
+        return await asyncio.to_thread(self._begin, source["id"], scheduled)
+
+    def _update_source(self, cur, source_id, *, outcome, run_status, message, counts, health):
+        """Update the source from its fresh row, under that row's lock. Inside the caller's tx.
+
+        outcome: 'success', 'fail', or 'interrupted'. An interruption is counted only when the
+        source's previous run was interrupted too.
+        """
+        cur.execute(
+            """
+            SELECT status, crawl_frequency_days, org_type, consecutive_failures,
+                   consecutive_nochange, last_crawl_status
+            FROM sources WHERE id = %s FOR NO KEY UPDATE
+            """,
+            (source_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return
+        status, freq_days, org_type, failures, nochange, last_status = row
+        failures = failures or 0
+        nochange = nochange or 0
+        inserted = counts.get("inserted", 0) or 0
+        updated = counts.get("updated", 0) or 0
+
+        if outcome == "interrupted" and last_status != "interrupted":
+            cur.execute(
+                """
+                UPDATE sources SET last_crawl_status = %s, last_crawl_message = %s,
+                       updated_at = NOW()
+                WHERE id = %s
+                """,
+                (run_status, message, source_id),
+            )
+            return
+
+        if outcome == "success":
+            failures = 0
+            nochange = nochange + 1 if inserted == 0 and updated == 0 else 0
+        else:
+            failures += 1
+            nochange = 0
+        next_run_at = self.compute_next_run(
+            freq_days, org_type, inserted, updated, failures, nochange, health=health,
+        )
+        new_status = status
+        if failures >= 5 and status == "active":
+            new_status = "paused"
+            message = f"{message} (auto-paused after 5 failures)"
+        cur.execute(
+            """
+            UPDATE sources SET
+                last_crawled_at = NOW(),
+                last_crawl_status = %s,
+                last_crawl_message = %s,
+                consecutive_failures = %s,
+                consecutive_nochange = %s,
+                next_run_at = %s,
+                status = %s,
+                updated_at = NOW()
+            WHERE id = %s
+            """,
+            (run_status, message, failures, nochange, next_run_at, new_status, source_id),
+        )
+
+    def _finish(self, source_id, run_id, result: Dict, *, mode: str, health) -> bool:
+        """Close the run if it is still ours. False, with nothing written, when it is not.
+
+        mode: 'normal', 'interrupted' (shutdown), or 'no_slot' (a manual run that never started).
+        """
+        counts = result.get("counts", {}) or {}
+        terminal_status = result.get("status", "unknown")
+        message = result.get("message") or "Crawl completed"
+        conn = self._get_db_conn()
+        try:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(_STEP_TIMEOUTS_SQL)
+                    cur.execute("SET LOCAL lock_timeout = '30s'")
+                    cur.execute(
+                        """
+                        UPDATE crawl_logs SET
+                            duration_ms = %s,
+                            found = %s,
+                            inserted = %s,
+                            updated = %s,
+                            skipped = %s,
+                            status = %s,
+                            message = %s
+                        WHERE id = %s AND status = 'running'
+                        RETURNING id
+                        """,
+                        (
+                            result.get("duration_ms", 0) or 0,
+                            counts.get("found", 0),
+                            counts.get("inserted", 0),
+                            counts.get("updated", 0),
+                            counts.get("skipped", 0),
+                            terminal_status,
+                            message,
+                            run_id,
+                        ),
+                    )
+                    if cur.fetchone() is None:
+                        conn.rollback()
+                        logger.warning(
+                            "[orchestrator] Run %s no longer owns source %s; nothing written",
+                            run_id, source_id,
+                        )
+                        return False
+                    cur.execute("DELETE FROM crawl_locks WHERE source_id = %s", (source_id,))
+                    if mode != "no_slot":
+                        if mode == "interrupted":
+                            outcome = "interrupted"
+                        elif terminal_status in {"fail", "failed"}:
+                            outcome = "fail"
+                        else:
+                            outcome = "success"
+                        self._update_source(
+                            cur, source_id, outcome=outcome, run_status=terminal_status,
+                            message=message, counts=counts, health=health,
+                        )
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                raise
+        finally:
+            conn.close()
+
+    async def finish_run(self, source: Dict, run_id, result: Dict, *, mode: str = "normal"):
+        """Ownership-checked finish, off the event loop. Retried once; then left to recovery."""
+        source_id = source["id"]
+        health = None
+        if mode == "normal":
+            health = await asyncio.to_thread(self.health_score, source_id)
+        for attempt in (1, 2):
+            try:
+                return await asyncio.to_thread(
+                    self._finish, source_id, run_id, result, mode=mode, health=health
+                )
+            except Exception:
+                logger.error(
+                    "[orchestrator] Error finishing crawl for %s (attempt %d)",
+                    source.get("org_name"), attempt, exc_info=True,
+                )
+                if attempt == 2:
+                    raise
+
+    async def _close_run(self, source: Dict, run: RunHandle, result: Dict, mode: str):
+        await run.wait_for_saves()
+        try:
+            await self.finish_run(source, run.token, result, mode=mode)
         except Exception:
             logger.error(
-                "[orchestrator] Error finishing crawl for %s",
-                source.get("org_name"),
+                "[orchestrator] Run %s for %s left to recovery", run.token, source.get("org_name")
+            )
+
+    async def execute_run(self, source: Dict, run_id, *, deadline: Optional[float] = None):
+        """Crawl as the owner of run_id, within its time limit, then finish it.
+
+        deadline is a loop.time() value measured from when the lock was taken. A cancellation
+        (shutdown) records the run as interrupted through a shielded finish.
+        """
+        loop = asyncio.get_running_loop()
+        if deadline is None:
+            deadline = loop.time() + self.time_limit.total_seconds()
+        run = RunHandle(run_id, source["id"])
+        mode = "normal"
+        result = _failed_result("Crawl ended without a result")
+        try:
+            async with asyncio.timeout_at(deadline):
+                result = await self.crawl_source(source, run)
+        except TimeoutError:
+            minutes = int(self.time_limit.total_seconds() // 60)
+            result = _failed_result(f"Timed out after {minutes} minutes")
+        except asyncio.CancelledError:
+            mode = "interrupted"
+            result = _interrupted_result(SHUTDOWN_MESSAGE)
+            raise
+        except Exception as exc:
+            logger.error(
+                "[orchestrator] Crawl failed for %s: %s", source.get("org_name"), exc,
                 exc_info=True,
             )
-            if conn:
-                conn.rollback()
-            raise
+            result = _failed_result(str(exc)[:500])
         finally:
-            if conn:
-                conn.close()
+            closing = asyncio.ensure_future(self._close_run(source, run, result, mode))
+            self._closing.add(closing)
+            closing.add_done_callback(self._closing.discard)
+            await asyncio.shield(closing)
 
-    async def execute_run(self, source: Dict, run_id) -> None:
-        """Own a run that begin_run already locked. Release that lock in finally."""
-        async with self.semaphore:
-            try:
-                try:
-                    result = await self.crawl_source(source)
-                except Exception as exc:
-                    logger.error(
-                        "[orchestrator] Crawl failed for %s: %s",
-                        source.get("org_name"),
-                        exc,
-                        exc_info=True,
-                    )
-                    result = {
-                        "status": "fail",
-                        "message": str(exc)[:500],
-                        "counts": {
-                            "found": 0,
-                            "inserted": 0,
-                            "updated": 0,
-                            "skipped": 0,
-                        },
-                        "duration_ms": 0,
-                    }
-                await self.finish_run(source, run_id, result)
-            finally:
-                await self.release_lock(source["id"])
+    def _track(self, coro) -> asyncio.Task:
+        task = asyncio.ensure_future(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
 
     async def start_manual_run(self, source: Dict):
-        """Commit the open run, schedule it, and return before the crawl finishes."""
+        """Take the lock now and return its run id; the crawl waits for a slot in the background.
+
+        A duplicate request returns the open run. If no slot frees in time, the run ends
+        interrupted and writes nothing to the source.
+        """
+        loop = asyncio.get_running_loop()
         run_id, started = await self.begin_run(source)
         if started:
-            asyncio.create_task(self.execute_run(source, run_id))
+            deadline = loop.time() + self.time_limit.total_seconds()
+            self._track(self._manual_run(source, run_id, deadline))
         return run_id, started
 
+    async def _manual_run(self, source: Dict, run_id, deadline: float):
+        loop = asyncio.get_running_loop()
+        wait = deadline - loop.time() - MANUAL_MIN_REMAINING.total_seconds()
+        try:
+            if wait <= 0:
+                raise TimeoutError
+            async with asyncio.timeout(wait):
+                await self.semaphore.acquire()
+        except (TimeoutError, asyncio.CancelledError) as exc:
+            cancelled = isinstance(exc, asyncio.CancelledError)
+            message = SHUTDOWN_MESSAGE if cancelled else NO_SLOT_MESSAGE
+            closing = asyncio.ensure_future(
+                self.finish_run(source, run_id, _interrupted_result(message), mode="no_slot")
+            )
+            self._closing.add(closing)
+            closing.add_done_callback(self._closing.discard)
+            await asyncio.shield(closing)
+            if cancelled:
+                raise
+            return
+        try:
+            await self.execute_run(source, run_id, deadline=deadline)
+        finally:
+            self.semaphore.release()
+
     async def run_source_with_lock(self, source: Dict):
-        """Scheduler path. Await the same begin/execute/finish sequence."""
-        run_id, started = await self.begin_run(source)
-        if not started:
-            if run_id is None:
-                logger.debug(
-                    "[orchestrator] Source %s already locked, skipping",
-                    source.get("org_name"),
-                )
+        """Scheduler path: wait for a slot, then take the lock (if still active and due)."""
+        loop = asyncio.get_running_loop()
+        async with self.semaphore:
+            run_id, started = await self.begin_run(source, scheduled=True)
+            if not started:
+                if run_id is None:
+                    return {
+                        "status": "warn",
+                        "message": "Source already locked or no longer due",
+                        "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
+                        "crawl_run_id": None,
+                        "started": False,
+                    }
                 return {
-                    "status": "warn",
-                    "message": "Source already locked",
-                    "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
-                    "crawl_run_id": None,
+                    "status": "ok",
+                    "message": "Open crawl run",
+                    "crawl_run_id": run_id,
                     "started": False,
                 }
-            return {
-                "status": "ok",
-                "message": "Open crawl run",
-                "crawl_run_id": run_id,
-                "started": False,
-            }
-        await self.execute_run(source, run_id)
-        return {"status": "ok", "crawl_run_id": run_id, "started": True}
-    
+            deadline = loop.time() + self.time_limit.total_seconds()
+            await self.execute_run(source, run_id, deadline=deadline)
+            return {"status": "ok", "crawl_run_id": run_id, "started": True}
+
     async def cleanup_expired_jobs(self) -> Dict:
         """
         Deadline hard deletion is disabled.
@@ -631,77 +884,204 @@ class CrawlerOrchestrator:
             'disabled': True,
             'message': 'Hard deletion of jobs past their deadline is disabled',
         }
-    
-    async def run_due_sources_once(self) -> Dict:
-        """Run all due sources once (for manual trigger)"""
+
+    async def run_due_sources_once(self, wait: bool = True) -> Dict:
+        """Queue every due source not already queued in this process.
+
+        The scheduler waits for its round; the admin route returns at once.
+        """
         sources = await self.get_due_sources()
-        
-        if not sources:
+        fresh = [s for s in sources if s["id"] not in self._queued]
+        if not fresh:
             logger.info("[orchestrator] No due sources found")
             return {'queued': 0}
-        
-        logger.info(f"[orchestrator] Running {len(sources)} due sources")
-        
-        # Run all sources in parallel (bounded by semaphore)
-        tasks = [self.run_source_with_lock(source) for source in sources]
-        await asyncio.gather(*tasks, return_exceptions=True)
-        
-        return {'queued': len(sources)}
-    
+
+        logger.info(f"[orchestrator] Running {len(fresh)} due sources")
+        tasks = []
+        for source in fresh:
+            source_id = source["id"]
+            self._queued.add(source_id)
+            task = self._track(self.run_source_with_lock(source))
+            task.add_done_callback(lambda _t, sid=source_id: self._queued.discard(sid))
+            tasks.append(task)
+        if wait:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        return {'queued': len(fresh)}
+
+    def _recover_once(self) -> Dict:
+        """Expired locks taken over (counted once); runs without their lock marked interrupted."""
+        conn = self._get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(_STEP_TIMEOUTS_SQL)
+                cur.execute(
+                    "SELECT source_id FROM crawl_locks WHERE locked_at < NOW() - %s::interval",
+                    (self._lifetime_sql(),),
+                )
+                expired = [row[0] for row in cur.fetchall()]
+                cur.execute(
+                    """
+                    SELECT r.id, r.source_id FROM crawl_logs r
+                    WHERE r.status = 'running' AND r.ran_at < NOW() - %s::interval
+                      AND NOT EXISTS (
+                          SELECT 1 FROM crawl_locks l
+                          WHERE l.source_id = r.source_id AND l.locked_at = r.ran_at)
+                    """,
+                    (f"{int(ORPHAN_RUN_AGE.total_seconds())} seconds",),
+                )
+                orphans = cur.fetchall()
+            conn.rollback()
+        finally:
+            conn.close()
+
+        taken = 0
+        for source_id in expired:
+            if self._take_over(str(source_id), self.health_score(str(source_id))):
+                taken += 1
+        marked = 0
+        for run_id, source_id in orphans:
+            if self._mark_orphan(str(run_id), str(source_id)):
+                marked += 1
+        if taken or marked:
+            logger.warning(
+                "[orchestrator] Recovery: %d expired lock(s) taken over, %d orphaned run(s)",
+                taken, marked,
+            )
+        return {"expired_locks": taken, "orphaned_runs": marked}
+
+    def _mark_orphan(self, run_id: str, source_id: str) -> bool:
+        conn = self._get_db_conn()
+        try:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(_STEP_TIMEOUTS_SQL)
+                    cur.execute("SET LOCAL lock_timeout = '5s'")
+                    cur.execute(
+                        "SELECT ran_at FROM crawl_logs WHERE id = %s AND status = 'running'"
+                        " FOR UPDATE",
+                        (run_id,),
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        conn.rollback()
+                        return False
+                    cur.execute(
+                        "SELECT 1 FROM crawl_locks WHERE source_id = %s AND locked_at = %s",
+                        (source_id, row[0]),
+                    )
+                    if cur.fetchone() is not None:
+                        conn.rollback()
+                        return False
+                    cur.execute(
+                        "UPDATE crawl_logs SET status = 'interrupted', message = %s WHERE id = %s",
+                        (ORPHAN_MESSAGE, run_id),
+                    )
+                conn.commit()
+                return True
+            except psycopg2.errors.LockNotAvailable:
+                conn.rollback()
+                return False
+            except Exception:
+                conn.rollback()
+                raise
+        finally:
+            conn.close()
+
+    async def recover_once(self) -> Dict:
+        return await asyncio.to_thread(self._recover_once)
+
+    async def recovery_loop(self):
+        while self.running:
+            try:
+                await self.recover_once()
+            except Exception as e:
+                logger.error(f"[orchestrator] Recovery error: {e}", exc_info=True)
+            await asyncio.sleep(RECOVERY_INTERVAL_SECONDS)
+
     async def scheduler_loop(self):
         """Background scheduler loop with resilient error handling"""
         logger.info("[orchestrator] Scheduler started")
-        
+
         consecutive_errors = 0
         max_consecutive_errors = 5
-        
+
         while self.running:
             try:
                 await self.run_due_sources_once()
-                consecutive_errors = 0  # Reset error counter on success
+                consecutive_errors = 0
             except psycopg2.OperationalError as e:
                 consecutive_errors += 1
-                error_msg = str(e)
-                if "Network is unreachable" in error_msg or "connection" in error_msg.lower():
-                    logger.error(f"[orchestrator] Database connection error (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
-                    if consecutive_errors >= max_consecutive_errors:
-                        logger.error(f"[orchestrator] Too many consecutive database errors. Scheduler will continue but may not function properly.")
-                        logger.error(f"[orchestrator] Check SUPABASE_DB_URL environment variable and network connectivity.")
-                        # Reset counter to prevent log spam, but continue trying
-                        consecutive_errors = 0
-                        # Wait longer before retrying after many errors
-                        await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)
-                        continue
-                else:
-                    logger.error(f"[orchestrator] Database operational error: {e}")
+                logger.error(
+                    f"[orchestrator] Database error (attempt {consecutive_errors}"
+                    f"/{max_consecutive_errors}): {e}"
+                )
+                if consecutive_errors >= max_consecutive_errors:
+                    consecutive_errors = 0
+                    await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)
+                    continue
             except Exception as e:
                 consecutive_errors += 1
                 logger.error(f"[orchestrator] Scheduler error: {e}", exc_info=True)
                 if consecutive_errors >= max_consecutive_errors:
-                    logger.error(f"[orchestrator] Too many consecutive errors. Scheduler will continue but may not function properly.")
                     consecutive_errors = 0
                     await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)
                     continue
-            
-            # Wait for next interval
+
             await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS)
-        
+
         logger.info("[orchestrator] Scheduler stopped")
-    
+
     async def start(self):
-        """Start the scheduler"""
+        """Start the scheduler and the recovery timer. Recovery runs first."""
         if os.getenv("AIDJOBS_DISABLE_SCHEDULER", "").lower() == "true":
             logger.info("[orchestrator] Scheduler disabled by AIDJOBS_DISABLE_SCHEDULER")
             return
-        
+
         self.running = True
-        asyncio.create_task(self.scheduler_loop())
+        self._recovery_task = asyncio.ensure_future(self.recovery_loop())
+        self._scheduler_task = asyncio.ensure_future(self.scheduler_loop())
         logger.info("[orchestrator] Scheduler task created")
-    
+
     async def stop(self):
-        """Stop the scheduler"""
+        """Stop new crawls; cancel running ones, which record interrupted; wait up to a deadline."""
         self.running = False
         logger.info("[orchestrator] Scheduler stopping...")
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + SHUTDOWN_DEADLINE_SECONDS
+        for task in (self._scheduler_task, self._recovery_task):
+            if task is not None:
+                task.cancel()
+        for task in list(self._tasks):
+            task.cancel()
+        pending = set(self._tasks) | set(self._closing)
+        while pending:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                logger.warning(
+                    "[orchestrator] %d crawl(s) not closed by the shutdown deadline;"
+                    " left to recovery", len(pending),
+                )
+                break
+            _done, pending = await asyncio.wait(pending, timeout=remaining)
+            pending |= set(self._closing)
+
+
+def _failed_result(message: str) -> Dict:
+    return {
+        "status": "fail",
+        "message": message,
+        "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
+        "duration_ms": 0,
+    }
+
+
+def _interrupted_result(message: str) -> Dict:
+    return {
+        "status": "interrupted",
+        "message": message,
+        "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0},
+        "duration_ms": 0,
+    }
 
 
 # Global instance
