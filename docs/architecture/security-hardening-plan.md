@@ -160,7 +160,7 @@ Revised the same day after an independent read-only review of the first version 
 
 **B. Settings.** Read from the environment, with defaults. No Render change is needed.
 - `CRAWL_TIME_LIMIT_MINUTES`: 15.
-- `CRAWL_LOCK_TTL_MINUTES`: 25. It must be longer than the time limit plus 6 minutes (finishing plus one scheduler interval); the code refuses a value that is not. This holds only because both clocks start when the lock is taken (C1).
+- `CRAWL_LOCK_TTL_MINUTES`: 25. It must be longer than the time limit plus 6 minutes (finishing plus one 5-minute recovery interval); the code refuses a value that is not. This holds only because both clocks start when the lock is taken (C1).
 
 **C. Design.**
 
@@ -179,7 +179,8 @@ Revised the same day after an independent read-only review of the first version 
 3. **Database steps.** Each locks rows in one order: the run rows (R), then the lock row (L), then the source row (S), then job rows (J). The source row is locked with `FOR NO KEY UPDATE`, which does not block the key-share locks that job inserts take through the foreign key (review).
    - **Timeouts (review).** Every step sets `SET LOCAL statement_timeout = '30s'` and `idle_in_transaction_session_timeout = '60s'`, so a stuck database cannot hold these locks indefinitely. The lock timeout depends on the step:
      - takeover and recovery use `lock_timeout = '5s'`, and hitting it means "skip, try again later", with nothing written or counted;
-     - the finish uses `lock_timeout = '30s'`, and runs only after the run's own save has ended (C7, C8).
+     - the finish uses `lock_timeout = '30s'`, and runs only after the run's own save has ended (C7, C8). A lock wait also counts toward the 30-second statement limit, so either error leads to the finish's single retry;
+     - the acquire and the save set no lock timeout of their own, and are bounded by the 30-second statement limit.
    - **Connect timeout (review).** Every crawl connection, for the save, the run steps and the crawl-time logs, uses a 10-second connect timeout.
    - **Acquire.**
      - `INSERT INTO crawl_locks … ON CONFLICT DO NOTHING RETURNING`, then `INSERT INTO crawl_logs (… 'running' …) RETURNING id`, then commit. This keeps Gate 5's statement order.
@@ -233,7 +234,7 @@ Revised the same day after an independent read-only review of the first version 
    - Code that blocks the event loop cannot be timed out. Render replaces such a process, and recovery handles it after the lifetime.
 8. **Shutdown.**
    - The orchestrator keeps a reference to its scheduler task and to every running crawl's task: from the scheduler, `run_due`, and the admin "Run" route.
-   - `stop_scheduler` stops new crawls, cancels the tracked tasks, and waits until a deadline 20 seconds after it starts. Each cancelled crawl first waits for a save it has in progress (C7), then records `interrupted` (C5) through a shielded, ownership-checked finish. Whatever is not finished by the deadline is left to recovery.
+   - `stop_scheduler` stops new crawls, cancels the tracked tasks, and waits until a deadline 20 seconds after it starts. Each cancelled crawl first waits for a save it has in progress (C7), then records `interrupted` (C5) through a shielded, ownership-checked finish. Whatever is not finished by the deadline, including a finish still waiting on its 30-second lock timeout, is left to recovery.
    - With `run_due` no longer holding requests open (C1), uvicorn's wait for open requests is short. But the 20 seconds start only after it, and nothing guarantees they fit inside Render's 30. A graceful-shutdown timeout in Render's start command would bound it; that is a setting change for the user's approval, not part of PR B (review).
 9. **Off the event loop.** Every orchestrator database step, and `save_jobs`, run in a worker thread (`asyncio.to_thread`), so a slow database or a larger save cannot block the health check.
    - The admission-rejection log, the `raw_pages` insert and the extraction logger run in the same worker thread, and their connections get a 10-second connect timeout (review).
@@ -260,7 +261,7 @@ Revised the same day after an independent read-only review of the first version 
 - `app/search_projection.py`: commit and scheduling split so a thread can commit.
 - `app/crawler_admin.py`: `/fix-undp-urls` removed; `/run` reads `status`; `/run_due` returns at once.
 - `contracts/admission.py`: the rejection log's connect timeout.
-- `.github/workflows/ci.yml`: a `postgres:17` service, `TEST_DATABASE_URL`, the new test file in the Ruff and pytest lists, and a step that fails if any of its tests is skipped.
+- `.github/workflows/ci.yml`: a `postgres:17` service; the new test file in the Ruff list only; and its own pytest step, separate from the existing command (F). That step sets `TEST_DATABASE_URL`, leaves `SUPABASE_DB_URL` and `DATABASE_URL` unset, and fails if any of its tests is skipped.
 - Tests and documents as listed in F.
 - No frontend change, unless the preview shows `interrupted` wrongly.
 
