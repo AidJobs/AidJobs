@@ -1831,7 +1831,7 @@ class SimpleCrawler:
                     listing_deadline = job.get('deadline')
                     job = apply_detail_reading(job, read_detail_page(html))
                     read_deadline = job.get('deadline')
-                    # Day-first here, before the month-first AI normaliser sees the raw value.
+                    # Day-first, the order the save step uses for every deadline.
                     if read_deadline and read_deadline != listing_deadline:
                         parsed_deadline = self._parse_deadline(read_deadline)
                         if parsed_deadline:
@@ -1869,7 +1869,6 @@ class SimpleCrawler:
         The walk is recorded in self._listing_report; only a walk that ran out of links is complete.
         """
         self._listing_report = None
-        # Imported directly: building the plugin registry fails while unesco.py does not compile.
         from crawler.plugins.unicef import UNICEFPlugin
         reader = UNICEFPlugin()
         jobs = _first_row_per_link(reader.extract(first_html, careers_url).jobs or [])

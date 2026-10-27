@@ -383,9 +383,11 @@ The crawler calls no AI service. The AI listing extraction and the AI normaliser
 
 - Every OpenRouter key was revoked on 18 October 2026, and every job saved since came from the rule-based readers.
 - On the ICRC crawl of 27 October 2026, the AI attempt made about 30 calls, each rejected, in about 18 seconds. Each call sent part of the job page to a third party.
-- On every saved page, the crawl saves identical records with or without it.
+- On every saved page, the crawl saves identical records with the revoked key and without AI.
 
-The old plugin registry and its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins are removed. The registry could not be built, so none of them ever ran in the live crawl. The UNICEF reader stays and is the only organisation-specific reader.
+The old plugin registry and its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins are removed. The registry could not be built, so none of them ever ran in the current crawler (`SimpleCrawler`, which has called the registry since 4 December 2025). An earlier crawler ran them for a few days before `unesco.py` stopped compiling on 3 December 2025. The UNICEF reader stays and is the only organisation-specific reader.
+
+This covers the crawler only. The public search helpers (query parsing and suggestions) still read `OPENROUTER_API_KEY` until the switch to the new site (UX-29), and fall back to rule-based results without it.
 
 Bringing back AI, or another site-specific reader, is its own decision, with offline proof first. The removal rests on that evidence, not on a preference for rules-only design.
 
@@ -694,7 +696,7 @@ One admission function, three existing adapter call sites, one writer. HTML call
 14. Never add a second orchestrator.
 15. Never rewrite the public UI without a product reason.
 16. Never remove extraction rules before characterization tests exist.
-17. Never silently change AI order while splitting the crawler.
+17. Never silently change AI order while splitting the crawler. (Since the §10 amendment of 27 October 2026 the crawler calls no AI service; bringing AI back is its own decision.)
 18. Never invent an employer application URL.
 19. Never connect to, or navigate to, an address the SSRF policy has not evaluated. Fail closed when enforcement is impossible.
 20. Never claim production verification from repository files alone.

@@ -26,7 +26,7 @@ If the repository contradicts this plan, stop and propose the smallest amendment
 
 1. One production crawler path and one writer. HTML, RSS, and API use the same admission and persistence contract.
 2. PostgreSQL is authoritative. Meilisearch is derived.
-3. Preserve existing extraction order, identity rules, and the UNICEF reader. Amended on 27 October 2026 by the user's decision (contract §10, ledger W-11 and W-14): the crawler calls no AI service, and the old plugin registry with its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins is removed. None of them ever ran in the live crawl. Bringing back AI or another site-specific reader is its own decision, with offline proof first.
+3. Preserve existing extraction order, identity rules, and the UNICEF reader. Amended on 27 October 2026 by the user's decision (contract §10, ledger W-11 and W-14): the crawler calls no AI service, and the old plugin registry with its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins is removed. None of them ever ran in the current crawler (`SimpleCrawler`, since 4 December 2025). Bringing back AI or another site-specific reader is its own decision, with offline proof first.
 4. An incomplete or untrusted crawl must not expire or delete jobs.
 5. Reject junk before persistence. A job-like URL is not enough.
 6. Every server-side fetch follows one outbound-request policy, or it does not run.
@@ -250,7 +250,7 @@ The gzip and brotli responses are a measurement gap. They do not support a cover
 
 Recorded 12 October 2026. C1 decoding is committed locally as `cd6d63c`. C2 labels, the B3 repository identity reading, and the narrowed C3 contract are recorded below. No C3 code is permitted until that implementation is separately approved. No fetch, database write, push, or deploy is part of this record.
 
-C1–C5 sit after this evaluation and before any B3 code change. Track A stays independent. ReliefWeb HTML stays a challenge. Production crawls stay forbidden while B1 is undeployed. `canonical_hash`, plugins, AI order, Issue #4, and Issue #5 stay untouched. `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py` stay out of every commit.
+C1–C5 sit after this evaluation and before any B3 code change. Track A stays independent. ReliefWeb HTML stays a challenge. Production crawls stay forbidden while B1 is undeployed. `canonical_hash`, plugins, AI order, Issue #4, and Issue #5 stay untouched. (Plugins and AI order amended on 27 October 2026, principle 3.) `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py` stay out of every commit.
 
 | Order | Gate | Allowed work |
 | --- | --- | --- |
