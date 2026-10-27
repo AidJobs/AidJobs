@@ -373,12 +373,21 @@ Extract produces candidate jobs and does not write SQL. Preserve proven behaviou
 
 - JSON-LD and other structured data
 - DOM and link heuristics
-- organisation-specific plugins that already help, including UNDP, UNESCO, UNICEF, Amnesty, and Save the Children
+- the UNICEF reader, the only organisation-specific reader in use
 - RSS and API extraction
 - browser-rendered extraction
-- the current AI order
 
-Do not change whether AI is primary or fallback while splitting the crawler. Characterise the current order first. The crawler must still run when OpenRouter is unavailable. Do not enable AI for a source merely because `OPENROUTER_API_KEY` is present if that source’s current path does not use it. Do not remove AI because a cleaner architecture would prefer rules only.
+**Amendment, decided by the user on 27 October 2026 (ledger W-11, W-14).** This replaces the earlier rules that kept organisation-specific plugins "that already help, including UNDP, UNESCO, UNICEF, Amnesty, and Save the Children" and "the current AI order", and said not to change whether AI is primary or fallback, nor to remove AI because a cleaner architecture would prefer rules only.
+
+The crawler calls no AI service. The AI listing extraction and the AI normaliser are removed from the crawl path. Evidence:
+
+- Every OpenRouter key was revoked on 18 October 2026, and every job saved since came from the rule-based readers.
+- On the ICRC crawl of 27 October 2026, the AI attempt made about 30 calls, each rejected, in about 18 seconds. Each call sent part of the job page to a third party.
+- On every saved page, the crawl saves identical records with or without it.
+
+The old plugin registry and its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins are removed. The registry could not be built, so none of them ever ran in the live crawl. The UNICEF reader stays and is the only organisation-specific reader.
+
+Bringing back AI, or another site-specific reader, is its own decision, with offline proof first. The removal rests on that evidence, not on a preference for rules-only design.
 
 There is one normalisation contract for new crawler writes. It may clean title, whitespace, location representation, employment type, remote, experience level, URLs, and dates. It must not invent facts.
 

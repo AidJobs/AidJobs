@@ -26,7 +26,7 @@ If the repository contradicts this plan, stop and propose the smallest amendment
 
 1. One production crawler path and one writer. HTML, RSS, and API use the same admission and persistence contract.
 2. PostgreSQL is authoritative. Meilisearch is derived.
-3. Preserve existing extraction order, identity rules, source-specific plugins, and AI extraction behaviour.
+3. Preserve existing extraction order, identity rules, and the UNICEF reader. Amended on 27 October 2026 by the user's decision (contract §10, ledger W-11 and W-14): the crawler calls no AI service, and the old plugin registry with its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins is removed. None of them ever ran in the live crawl. Bringing back AI or another site-specific reader is its own decision, with offline proof first.
 4. An incomplete or untrusted crawl must not expire or delete jobs.
 5. Reject junk before persistence. A job-like URL is not enough.
 6. Every server-side fetch follows one outbound-request policy, or it does not run.
@@ -135,7 +135,7 @@ These two working-tree files were already modified before B1. After `faf00d1` th
 
 Read-only unless a preflight proves a specific defect.
 
-Confirm JSON-LD, metadata, DOM heuristics, regex fallback, RSS, API, and the existing source plugins still run in their current order. Do not reorder AI extraction. Keep the current UNDP, UNESCO, and UNICEF rules.
+Confirm JSON-LD, metadata, DOM heuristics, regex fallback, RSS, API, and the existing source plugins still run in their current order. Do not reorder AI extraction. Keep the current UNDP, UNESCO, and UNICEF rules. (Amended 27 October 2026, principle 3: the old plugins and AI extraction are removed; the UNICEF reader and the UNDP detail-page rules stay.)
 
 Check representative sources with fixtures. Separate genuine vacancies from landing pages, search pages, pagination, and unrelated content. Do not raise a rejection threshold unless a fixture shows junk passing and a genuine vacancy of the same shape still passes.
 
@@ -416,7 +416,7 @@ PR #11 (`4947d44`) fixes it without changing admission. When AI extraction retur
 
 Live check, 18 October 2026 at 09:30 UTC: 20 found, 20 inserted, all with a location and a deadline between 20 and 31 October, no rejections, and no duplicate links. Offline, on the saved December 2025 page, the 16 stored titles from that crawl match the reader's identities exactly. The UNICEF detail-page skip and the AI-off plugin branch are unchanged.
 
-The plugin registry cannot be built on `main`: `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161), and the registry catches only `ImportError`. The UNDP plugin also fails to import. PR #11 imports the UNICEF reader directly. The registry repair is open work, not part of C5.
+The plugin registry cannot be built on `main`: `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161), and the registry catches only `ImportError`. The UNDP plugin also fails to import. PR #11 imports the UNICEF reader directly. The registry repair is open work, not part of C5. Superseded on 27 October 2026: the registry and its plugins are removed (PR #58, principle 3).
 
 Still open for UNICEF: the crawler reads only page one of the listing (20 jobs), and rows from before the fix have no deadline, so search keeps showing them. See W-02, W-04, and W-06 in the progress ledger.
 

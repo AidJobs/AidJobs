@@ -50,7 +50,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | Repository | Private since 21 October 2026 (user). GitHub's free plan has no branch protection on private repositories, so "never push `main`" is enforced by process only. GitHub Actions has 2,000 free minutes a month; one push to a pull request uses about 6. CI runs backend tests, frontend tests, and a gitleaks secret scan of each push's and pull request's new commits (PR #31). No secret remains in tracked files (W-30). Branches: only `main` and `demo/ux-design` since 26 October 2026 (UX-31); older work is kept by commit IDs and five tags | Verified with the GitHub API and gitleaks |
 | Live sources | Three: UNICEF, ICRC, and Oxfam GB (added 19 October 2026, W-07). Open jobs on 24 October 2026: UNICEF 254, ICRC 14, Oxfam 7 | Verified from production queries |
 | Public search | Served by the PostgreSQL text search (`ILIKE` on title, organisation, and description), 275 jobs on 24 October 2026. Meilisearch is gone: its server was deleted and its settings removed from Render and Vercel on 23 October 2026 (W-30), so the backend no longer tries it. The new site filters in the browser and needs no search server | Verified by direct requests |
-| AI extraction | `OPENROUTER_API_KEY` is still set in Render, but every OpenRouter key was revoked on 18 October 2026. Every crawl tries AI, gets `401 User not found` within about a second, and continues without AI. The AI normaliser fails the same way | Verified from the Render log, 19 October 2026 |
+| AI extraction | None after PR #58: the crawler calls no AI service (W-14, contract §10 amendment). Before it, every crawl tried AI with the revoked key; on 27 October 2026 the ICRC crawl made about 30 calls, each `401 User not found`, in about 18 seconds. `OPENROUTER_API_KEY` is still set in Render and becomes unused; the user may delete it | Verified from the Render log, 19 and 27 October 2026 |
 | Geocoding | `nominatim.openstreetmap.org` answered every lookup with `HTTP 429` on 19 October, including the first lookup of the 19:24 UTC crawl. PR #15 pauses Nominatim for an hour after a refusal, verified live (W-21). Production lookups still get no coordinates (W-27) | Verified from the Render log |
 | `AIDJOBS_ENV` | `production` since 24 October 2026 (was `dev`; W-22). Callers get generic error messages; search responses carry no debug block; the job endpoint returns no raw stored data | Verified by direct requests; the setting changed by the user |
 | Extraction rollout variables | `EXTRACTION_USE_NEW_EXTRACTOR=True`, `EXTRACTION_ROLLOUT_PERCENT=100`, `EXTRACTION_SHADOW_MODE=true`, `EXTRACTION_DOMAIN_ALLOWLIST=unicef.org,undp.org,unesco.org`. Dormant: no current source matches (W-23) | Verified by the user from Render's Environment page |
@@ -82,10 +82,10 @@ There is one crawler. The scheduler and the admin Crawl button both enter `Crawl
 Inside the HTML crawler, a listing page is read by the first of these that produces jobs (`SimpleCrawler._listing_jobs` and `crawl_source`, `crawler_v2/simple_crawler.py`):
 
 1. The pipeline extractor, only when `core/rollout_config.py` selects the source. Dormant: see W-23.
-2. AI extraction. Fails on every crawl while the OpenRouter key is revoked (W-14).
-3. The UNICEF reader, then paging through "More Jobs". UNICEF only, chosen by the `unicef.org` host (PRs #11, #13, #14).
-4. With AI off only: the plugin registry (UNDP, UNESCO, Amnesty, Save the Children, generic). It cannot be built while `unesco.py` does not compile (W-11).
-5. The general rule-based reader. Every other source, including ICRC.
+2. The UNICEF reader, then paging through "More Jobs". UNICEF only, chosen by the `unicef.org` host (PRs #11, #13, #14). If it finds nothing or fails, the general reader.
+3. The general rule-based reader. Every other source, including ICRC and Oxfam.
+
+Since PR #58 (27 October 2026) there is no AI step and no plugin registry (W-11, W-14). Before it, AI extraction was tried first and failed on every crawl after 18 October, and the plugin registry ran only with AI off and could not be built.
 
 Job pages, for a listing of 1–50 candidates or any UNDP listing (`enrich_job_from_detail_page`): UNICEF is skipped, UNDP has its own rules, and every other site uses the detail-page reader (PRs #8, #9).
 
@@ -306,10 +306,11 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 ### Robustness
 
 **W-11. Repair the plugin registry.** `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161). The registry catches only `ImportError`, so building it always fails. The UNDP plugin also fails to import (`core.data_quality` has no `data_quality_validator`). Today this only affects the AI-off path. PR #11 avoids it by importing the UNICEF reader directly. Repository, confirmed on `main` and on PR #11.
+Decided 27 October 2026: removed rather than repaired, with the contract amended (§10). Offline, the first registry call in a process failed after about 0.7 seconds and later calls built an empty registry, so no plugin ever ran in the live crawl; repairing it would have let untested plugins take over live sources. PR #58 deletes the registry and the UNDP, UNESCO, Amnesty, Save the Children, and generic plugins, and keeps the UNICEF reader.
 
 **W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2). No production row had a deadline in the 2100s on 27 October 2026 (Verified). Done: PR #56, merged as `c86984e` on 27 October 2026; a two-digit year is read as this century, and a four-digit year is kept as written.
 
-**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2). Whether production reaches this call is not established; the AI key was revoked (W-14).
+**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2). Whether production reaches this call is not established; the AI key was revoked (W-14). Closed 27 October 2026: PR #58 removes the AI normaliser from the crawl path. Production did reach it: the ICRC crawl of that day logged two failed AI normaliser calls. Offline, on every saved page, it changed no stored value, and no live job carries the `is_remote` flag it could set (Verified).
 
 **W-32. ICRC deadlines.** Found 27 October 2026. Read-only query: 13 of ICRC's 14 active jobs had no deadline, all first saved on 17 October (Verified). Offline, on the saved pages:
 - ICRC's listing shows an "Application deadline" on every job tile, for 11 of the 13 (saved listing of 12 October; the WatHab WaSH Project Manager and the MEAL Coordinator were not on it). The general listing reader does not read that tile layout, which belongs to the SuccessFactors reader (W-19).
@@ -326,6 +327,11 @@ Fix in PR #56, with the user's C4 amendment (crawler plan, C4 reader, point 8) a
 - During the crawl (16:24:33 to 16:28:58 IST) Render's health checks kept their 5-second rhythm: 63 checks, longest gap 6 seconds. No failed instance in Render's events and no `ERROR` line in the logs for that hour. This is the first live evidence for PR #55 on Render (security plan, stage 2).
 
 **W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source except UNICEF down the plugin path, which needs W-11 first and changes the verified ICRC path. Once W-04 is merged, UNICEF takes its own reader with AI off.
+Decided by the user on 27 October 2026: no AI in the crawl, with the contract amended (§10). PR #58 removes AI from the code, so the outcome no longer depends on the Render setting.
+- **Measured cost:** on the ICRC crawl of 27 October, the AI listing attempt made 28 calls in about 17 seconds and the normaliser 2 more, each `401`. Each call sent part of the job page to OpenRouter.
+- **Where ICRC's 2.4 minutes went:** most of it is opening its 33 job pages (about 96 seconds) and geocoding (about 23 seconds).
+- **Proof of no change:** offline, the whole crawl saves identical records with and without AI on 12 saved sites (171 records).
+- **After merge:** the user may delete `OPENROUTER_API_KEY` from Render.
 
 **W-15. Issue #5, parked.** HTML can report `ok` when every row failed to save. "Failed persistence can still advance next_run_at."
 
@@ -457,7 +463,8 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 
 | Decision | Item |
 | --- | --- |
-| Whether to set up AI again with a new key, or remove the setting from Render | W-14 |
+| Merge PR #58 (no AI and no old plugin registry in the crawl; contract §10 amended) | W-11, W-14 |
+| After PR #58: delete the unused `OPENROUTER_API_KEY` from Render (user action) | W-14 |
 | Whether to hide the December 2025 UNICEF rows, after inspection and the W-06 rule | W-02 |
 | Approve the Clinch platform-reader plan, then its implementation | W-04, W-19 |
 | The expiry trust policy and missing-crawl threshold | W-06 |
@@ -471,7 +478,6 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
 | Approve PR B's implementation (crawl-lock recovery, design decided 27 October 2026) | Security plan, stage 2 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
-| Whether and how to fix the AI normaliser's `dateparser` call, after checking production reaches it | W-13 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
