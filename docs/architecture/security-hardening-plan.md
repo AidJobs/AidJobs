@@ -33,7 +33,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | --- | --- | --- |
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
-| 2 | Crawl-lock recovery | Next: investigation plan for the user's approval; new evidence below |
+| 2 | Crawl-lock recovery | In progress: PR A done ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)); PR B built in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), not merged (implementation record below) |
 | 3 | Backend error handling and logging | Design first, for approval |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -110,7 +110,7 @@ Tests: interrupted crawls, restarts, expired locks, recovery, and concurrent wor
 - Live on Render, 27 October 2026: during an ICRC crawl the user ran from the admin at 16:25 IST (by then with PR #56 too), the health checks kept their 5-second rhythm, longest gap 6 seconds over 63 checks, against 70 seconds of silence on 26 October; no failed instance (ledger W-32). One crawl of one source, not a proof for UNDP-sized listings.
 - Follow-ups, tracked in the ledger rather than as GitHub issues (decided by the user, 27 October 2026): `core/ai_normalizer.py`'s `normalize_deadline` still calls `dateparser` with every locale, synchronously, inside an async function (lines 163–174; W-13, closed by PR #58, which removes the AI normaliser from the crawl path); two-digit years read as the 2100s (W-12) and the cut at any capital "T" (W-32) are fixed in [PR #56](https://github.com/AidJobs/AidJobs/pull/56), merged as `c86984e` and live-checked, together with ICRC's missing deadlines.
 
-**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation not yet approved.** The design replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered. The full specification follows, written on 27 October 2026 against the code on `main` after PR #58 (`51c6299`), for an independent review before the user decides on implementation.
+**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation approved the same day and built in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), not merged (record after part H).** The design replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered. The full specification follows, written on 27 October 2026 against the code on `main` after PR #58 (`51c6299`), for an independent review before the user decides on implementation.
 
 #### PR B specification
 
@@ -324,7 +324,60 @@ Revised the same day after an independent read-only review of the first version 
 - **A manual run** can wait behind up to 3 running crawls, and behind queued ones once there are many sources. When too little time is left it ends `interrupted` and writes nothing to the source (C1).
 - **The shutdown window** depends on uvicorn's wait for open requests (C8).
 - **Not verified:** the free plan's spin-down signal and the session pool's size.
-- **Issue #5's mechanism** is to be shown by the first test before the code changes. If it is wrong, C6 is re-planned.
+- **Issue #5's mechanism** is to be shown by the first test before the code changes. If it is wrong, C6 is re-planned. Shown on 27 October 2026; it is as described (implementation record).
+
+#### PR B implementation record
+
+Implementation approved by the user on 27 October 2026, together with the three decisions in D. Built on the branch `feat/crawl-ownership` from `main` at `bb9430c`, in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), as three commits:
+- `cfe981d`: the ownership token, the owner-only finish, takeover and recovery, slots and the queued set, the time limit, shutdown, work in worker threads, and the removal of `/fix-undp-urls` (C1–C5, C7–C11);
+- `31d1b7a`: issue #5, one savepoint per job and the failed-save statuses (C6), as its own commit;
+- `abf19d0`: the PostgreSQL tests and their CI step (F);
+- `b8d85f6`: the fixes from the independent review (below).
+
+Choices made while building, each within the specification:
+- **Acquire.** It uses `INSERT … ON CONFLICT (source_id) DO NOTHING RETURNING`. On a conflict it reads the lock: a live lock returns the live run's id; an expired one is taken over and the acquire is tried again, three attempts at most.
+- **Step timeouts.** They are set with `SET LOCAL` as the first statement of every run step, and of every save inside `confirm_running`. They are not connection options, which the Supabase pooler may not pass on.
+- **`RunHandle`.** It runs a save in a worker thread and lets the finish wait for that save (C7). It lives in `crawler_v2/run_handle.py`, because Gate 3's test forbids the orchestrator importing `contracts`.
+- **`contracts/admission.py` is unchanged** (E listed it). Its rejection log connects through `core/extraction_logger.py`, which now has the 10-second connect timeout.
+- **Manual runs.** A manual run whose slot comes with less than 5 minutes of its limit left ends `interrupted` without crawling, including when the limit itself is shorter than that. A shutdown while it waits for a slot records the shutdown message, not "no free crawl slot".
+- **CI.** The service is `postgres:17.6`, production's exact version. `crawler_v2/run_handle.py` joins the new test file in the Ruff list.
+
+Evidence, 27 October 2026:
+- **Production schema** (structure only, read-only enforced and confirmed, run with the user's approval):
+  - `crawl_locks.locked_at` and `crawl_logs.ran_at` are both `timestamp with time zone`;
+  - `crawl_logs.status` has no check constraint.
+  - `tests/sql/crawl_schema.sql` is written from this query. Loaded into a local PostgreSQL 17.6, it matches production's four tables column for column and index for index (Verified).
+- **Today's behaviour, on `main`'s code against the local test database** (Verified, local). Issue #5's mechanism is as H described. With one failing job among three, `save_jobs` reported 1 inserted and 2 failed, and no row was stored: the first error aborted the transaction, every later job failed with it, and the commit rolled the batch back. The same run showed five more faults on `main`:
+  - a save with no run at all wrote a job;
+  - a day-old lock with no running run never started again;
+  - an old run's release deleted a newer run's lock;
+  - a manual run turned a paused source `active`;
+  - a late finish overwrote a failed run with `ok`.
+- **The branch** (local, Python 3.14; CI checks Python 3.11 on the pull request):
+  - after the review fixes, the 40 PostgreSQL tests pass against PostgreSQL 17.6, four runs in a row;
+  - the full CI list passes, 420 passed and 4 skipped, the same skips as before;
+  - Ruff passes, and the changed modules have no new Pyflakes finding against `main`;
+  - with only the ownership commit, the CI list also passes.
+- **Whole-crawl comparison on the saved pages** (12 sources, network blocked), `main` against the branch, before and after the review fixes (Verified, local):
+  - the jobs handed to the save are identical;
+  - the job rows stored in PostgreSQL by the real save are identical, 171 rows of 94 fields;
+  - statuses, messages and counts are identical.
+
+**Independent review**, 28 October 2026, by a separate agent instructed to change nothing. Verdict: ready with minor fixes; no blocker or major finding. It confirmed the lock order has no cycle, exactly one failure is counted per lost run, recovery never touches a live lock (including old `main` instances during a deploy overlap), no slot leaks, cancellation is handled, and the CI step works. Fixed in `b8d85f6`, each with a test:
+- A shutdown while a crawl is taking its lock left the lock and its running row for recovery, which would count a failure. The cancelled caller now closes the run it started as `interrupted`, writing nothing to the source.
+- The raw-page step's connect had moved outside its error handling, so a failed connect would have failed the HTML crawl. It logs a warning again, as on `main`.
+- The time-limit test passed even without the finish waiting for its save. It now checks that the finish starts only after the save has ended; with the wait removed in memory it fails, as does the new acquire test with its fix removed.
+- The test guard: the file now skips before installing anything when no test database is set, and refuses `hostaddr`, `service`, several hosts, URL options, and `PGHOST`, `PGHOSTADDR` and `PGSERVICE`. Its description of the network block is narrowed to Python sockets.
+- Recovery handles each source separately; the finish deletes only its own run's lock; "every job failed" counts only jobs that reached their write; a timed-out run records what it saved; the lock-expired message no longer begins "Interrupted:"; `dateparser` runs under a lock, because saves now run in up to three threads; a closed event loop cannot turn a committed save into a failed one; a run handle refuses an empty token.
+- New tests also cover a shutdown while a scheduled run waits for a slot, a timeout whose finish fails twice (recovery counts once), and the real `run_due` route's response.
+
+Accepted, not changed:
+- The raw-page row, the extraction log and the rejection log are written in their own threads and are not ownership-checked. A stale run can still add log rows after it lost ownership, never job rows.
+- A save with an empty list, or one whose every job is filtered before any write, returns without checking a foreign token; it writes nothing either way.
+- A counted second interruption computes its next run without the health score.
+- Issue #5's behaviour on `main` is shown by a one-off run, recorded above, not by a committed test.
+
+**Unrequested edits during the review.** While the reviewer ran, duplicate versions of this PR's documentation edits appeared in the ledger and the crawler plan, written by none of the user, this session's agent, a hook, or another session; the reviewer was the only other agent running. The user confirmed they had not made them. They were removed before commit, and the code was checked unchanged. Later reviews run read-only.
 
 ### Stage 3. Backend error handling and logging
 
