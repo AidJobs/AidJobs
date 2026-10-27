@@ -1,6 +1,7 @@
 """Read evidence from one saved detail page. No fetch, log, or admission.
 
 apply_detail_reading fills blank listing fields from exactly one reader result.
+The visible read also takes the validThrough of a page's one microdata JobPosting.
 """
 import json
 
@@ -132,9 +133,56 @@ def _visible_result(soup: BeautifulSoup) -> dict | None:
         if value is None:
             continue
         row[_LABELS[label]].append(value)
+    row["deadlines"].extend(_microdata_deadlines(soup, heading, title))
     if not _has_evidence(row):
         return None
     return row
+
+
+def _microdata_deadlines(soup: BeautifulSoup, heading: Tag, title: str) -> list[str]:
+    """validThrough content of the page's only microdata JobPosting, when it is the page's own job.
+
+    A posting elsewhere on the page ("similar jobs") must not lend its deadline to the heading.
+    """
+    postings = [
+        tag
+        for tag in soup.find_all(attrs={"itemscope": True})
+        if _microdata_posting(tag) and not _unrendered(tag)
+    ]
+    if len(postings) != 1:
+        return []
+    posting = postings[0]
+    inside = any(parent is posting for parent in heading.parents)
+    if not inside and _microdata_title(posting) != title:
+        return []
+    found = []
+    for tag in posting.find_all(attrs={"itemprop": "validThrough"}):
+        if _item_of(tag) is not posting:
+            continue
+        text = _plain(tag.get("content"))
+        if text and any(char.isdigit() for char in text):
+            found.append(text)
+    return found
+
+
+def _item_of(tag: Tag) -> Tag | None:
+    return tag.find_parent(attrs={"itemscope": True})
+
+
+def _unrendered(tag: Tag) -> bool:
+    return _hidden(tag) or tag.find_parent(["noscript", "template"]) is not None
+
+
+def _microdata_title(posting: Tag) -> str | None:
+    for tag in posting.find_all(attrs={"itemprop": "title"}):
+        if _item_of(tag) is posting:
+            return _plain(tag.get("content")) or _plain(tag.get_text(" ", strip=True))
+    return None
+
+
+def _microdata_posting(tag: Tag) -> bool:
+    kinds = str(tag.get("itemtype") or "").split()
+    return any(kind.rstrip("/").rsplit("/", 1)[-1] == "JobPosting" for kind in kinds)
 
 
 def _label_text(text: str) -> tuple[str, str | None] | None:

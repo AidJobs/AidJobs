@@ -9,7 +9,7 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 27 October 2026, after the date-parsing fix (security plan, stage 2, PR A). `main` is `1df6009` (merge of PR #53, documents only); CI passed on it and on `47c9d1e` (merge of PR #55); Vercel production on `1df6009` (GitHub deployments); Render live on `47c9d1e` via Auto-Deploy, with no deploy for the documents-only `1df6009` (Render events, read by the agent). Afterwards, read-only: the health check answers, the API docs and the server shortlist answer 404, no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 27 October 2026, after PR #50. `main` is `614f12e` (merge of PR #50); CI passed on it; Vercel production on `614f12e` (GitHub deployments); Render live on `614f12e` via Auto-Deploy (Render events, read by the agent). Afterwards, read-only: the health check answers; the database status is ok (404 jobs, 292 active, 3 sources); the search status still reads "Meilisearch not configured"; search parsing and suggestions answer; the API docs answer 404; `/v2` answers; no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -150,6 +150,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Security stage 1: server shortlist unmounted, API docs only in development, public-route allowlist test | PR #51, `c207066` | 26 Oct 2026 | Merged, CI green, deployed, live-checked |
 | Security stage 2, PR A: deadline parsing skips text without a digit and limits `dateparser`'s languages | PR #55, `47c9d1e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
 | Employer survey recorded (W-31), placed as security plan stage 8 | PR #53, `1df6009` | 27 Oct 2026 | Merged, CI green |
+| Security stages 0 and 1 recorded; stage 2 PR A done and PR B design decided | PR #54, `014814d` | 27 Oct 2026 | Merged, CI green |
+| Generic errors from the public database status, search status, query parsing, and suggestions; connection strings masked in the status log | PR #50, `614f12e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -302,9 +304,17 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 
 **W-11. Repair the plugin registry.** `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161). The registry catches only `ImportError`, so building it always fails. The UNDP plugin also fails to import (`core.data_quality` has no `data_quality_validator`). Today this only affects the AI-off path. PR #11 avoids it by importing the UNICEF reader directly. Repository, confirmed on `main` and on PR #11.
 
-**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2).
+**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2). No production row had a deadline in the 2100s on 27 October 2026 (Verified). Fix in PR #56, open: a two-digit year is read as this century; a four-digit year is kept as written.
 
-**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2).
+**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2). Whether production reaches this call is not established; the AI key was revoked (W-14).
+
+**W-32. ICRC deadlines.** Found 27 October 2026. Read-only query: 13 of ICRC's 14 active jobs had no deadline, all first saved on 17 October (Verified). Offline, on the saved pages:
+- ICRC's listing shows an "Application deadline" on every job tile, for 11 of the 13 (saved listing of 12 October; the WatHab WaSH Project Manager and the MEAL Coordinator were not on it). The general listing reader does not read that tile layout, which belongs to the SuccessFactors reader (W-19).
+- The job pages of the interpreter postings show no deadline label; the C4 reader read only JSON-LD and visible labels. Each saved page carries the deadline as microdata, `<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027">`, matching the listing's date for the same job in all three cases.
+- `_parse_deadline` cut any text at its first capital "T" to drop an ISO time, so that value lost its year at the T of "UTC" and gave no deadline; `Tue …` and `Thu …` became empty. Upper-case month names were cut too: `31 OCT 2026`, `15-OCT-2025`, and `31 AUGUST 2026` gave no date, and `SEPTEMBER 30, 2026` gave `2027-09-01`. This affects every caller of `_parse_deadline`, so such rows can change on their next crawl. One new false positive is known: `T2 2026` now gives a date.
+- Health Delegate showed a deadline of 25/10/2026 on the saved listing and was still active without a deadline in production on 27 October, so it is probably closed but still on the public site (W-06). Not edited.
+
+Fix in PR #56, open, with the user's C4 amendment (crawler plan, C4 reader, point 8) and the T split narrowed to a digit–T–digit boundary. An independent read-only review (27 October 2026) approved it with minor changes, made before merge: the microdata posting must be the page's own job and rendered, its content must contain a digit, and nested unnamed items are their own scope. After merge, the next scheduled ICRC crawl should fill the deadlines through the update path; checked with a read-only query, no manual edit.
 
 **W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source except UNICEF down the plugin path, which needs W-11 first and changes the verified ICRC path. Once W-04 is merged, UNICEF takes its own reader with AI off.
 
@@ -452,7 +462,8 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
 | Approve PR B's implementation (crawl-lock recovery, design decided 27 October 2026) | Security plan, stage 2 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
-| Whether to open the three proposed date-parsing follow-ups | Security plan, stage 2 |
+| Merge PR #56 (ICRC deadlines, T split, two-digit years) | W-32, W-12 |
+| Whether and how to fix the AI normaliser's `dateparser` call, after checking production reaches it | W-13 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |

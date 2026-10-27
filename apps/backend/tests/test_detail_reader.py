@@ -288,9 +288,120 @@ def test_blank_reader_values_do_not_replace_a_blank_listing_field():
     assert updated["reference"] == "keep-me"
 
 
+_ICRC_MICRODATA = """
+<div itemscope itemtype="http://schema.org/JobPosting">
+  <meta itemprop="title" content="Burmese Interpreter">
+  <meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027">
+  <span itemprop="jobLocation" itemscope itemtype="http://schema.org/Place">
+    <meta itemprop="validThrough" content="Mon Jan 01 00:00:00 UTC 2029">
+  </span>
+  <h1>Burmese Interpreter</h1>
+  <span>Location: Myanmar</span>
+</div>
+"""
+
+
+def test_microdata_deadline_is_read_when_no_label_shows_one():
+    rows = read_detail_page(_ICRC_MICRODATA)
+    assert rows == [
+        {
+            "title": "Burmese Interpreter",
+            "locations": ["Myanmar"],
+            "deadlines": ["Wed Jul 07 22:00:00 UTC 2027"],
+            "employment_types": [],
+        }
+    ]
+
+
+def test_a_visible_deadline_label_comes_before_the_microdata_one():
+    html = _ICRC_MICRODATA.replace(
+        "<h1>", "<strong>Application Deadline:</strong> <span>06/11/2026</span><h1>"
+    )
+    rows = read_detail_page(html)
+    assert rows[0]["deadlines"] == ["06/11/2026", "Wed Jul 07 22:00:00 UTC 2027"]
+    assert apply_detail_reading(_listing(), rows)["deadline"] == "06/11/2026"
+
+
+def test_microdata_deadline_alone_is_evidence():
+    html = (
+        '<div itemscope itemtype="https://schema.org/JobPosting">'
+        '<meta itemprop="validThrough" content="Fri Dec 31 23:00:00 UTC 2027">'
+        "<h1>Pashto Interpreter</h1></div>"
+    )
+    assert read_detail_page(html)[0]["deadlines"] == ["Fri Dec 31 23:00:00 UTC 2027"]
+
+
+def test_another_jobs_posting_does_not_lend_its_deadline():
+    html = (
+        "<h1>Main role</h1><span>Location: Geneva</span>"
+        '<aside><div itemscope itemtype="http://schema.org/JobPosting">'
+        '<meta itemprop="title" content="Other role">'
+        '<meta itemprop="validThrough" content="31 January 2027"></div></aside>'
+    )
+    assert read_detail_page(html)[0]["deadlines"] == []
+
+
+# Each posting below is titled like the page heading, so only the case's own rule can reject it.
+_ROLE_POSTING = (
+    '<div itemscope itemtype="http://schema.org/JobPosting"><meta itemprop="title" content="Role">'
+)
+_UNTIL = '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027">'
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        # Two microdata postings: whose deadline it is cannot be told.
+        _ROLE_POSTING + _UNTIL + "</div>" + _ROLE_POSTING + _UNTIL + "</div>",
+        # Not inside a JobPosting.
+        '<div itemscope itemtype="http://schema.org/Event">' + _UNTIL + "</div>",
+        _UNTIL,
+        # Blank or missing content; visible text is not microdata content.
+        _ROLE_POSTING + '<meta itemprop="validThrough" content="  ">'
+        '<span itemprop="validThrough">31/12/2027</span></div>',
+        # Content without a digit cannot name a day.
+        _ROLE_POSTING + '<meta itemprop="validThrough" content="N/A">'
+        '<meta itemprop="validThrough" content="{{validThrough}}"></div>',
+        # Inside an unnamed nested item, which is its own scope.
+        _ROLE_POSTING + '<div itemprop="hiringOrganization" itemscope>' + _UNTIL + "</div></div>",
+        # A type without itemscope is not an item.
+        '<div itemtype="http://schema.org/JobPosting"><meta itemprop="title" content="Role">'
+        + _UNTIL + "</div>",
+        # Not rendered.
+        "<noscript>" + _ROLE_POSTING + _UNTIL + "</div></noscript>",
+        "<template>" + _ROLE_POSTING + _UNTIL + "</div></template>",
+    ],
+)
+def test_microdata_deadline_needs_the_pages_own_posting_and_a_dated_content(html):
+    rows = read_detail_page("<h1>Role</h1><span>Location: Geneva</span>" + html)
+    assert rows[0]["deadlines"] == []
+
+
+def test_a_titled_posting_outside_the_heading_is_read():
+    """The positive twin of the cases above: the same shape, with nothing to reject it."""
+    rows = read_detail_page("<h1>Role</h1><span>Location: Geneva</span>" + _ROLE_POSTING + _UNTIL)
+    assert rows[0]["deadlines"] == ["Wed Jul 07 22:00:00 UTC 2027"]
+
+
+def test_a_qualifying_jsonld_posting_is_used_whole_without_microdata():
+    html = _OXFAM + (
+        '<div itemscope itemtype="http://schema.org/JobPosting">'
+        '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027"></div>'
+    )
+    assert read_detail_page(html)[0]["deadlines"] == ["2026-10-26"]
+
+
+def test_generic_branch_stores_a_microdata_deadline_as_a_date():
+    job = _enrich_generic(_ICRC_MICRODATA)
+    assert job["deadline"] == "2027-07-07"
+    assert job["location_raw"] == "Myanmar"
+    assert job["title"] == "Listing title"
+
+
 _SAVED_PAGES = {
     "icrc-pashto.body": {
         "location_raw": "Afghanistan, various sites",
+        "deadline": "Fri Dec 31 23:00:00 UTC 2027",
         "employment_type": "Maximum-term contract",
     },
     "icrc-first-aid.body": {
@@ -300,6 +411,7 @@ _SAVED_PAGES = {
     },
     "icrc-burmese.body": {
         "location_raw": "Myanmar",
+        "deadline": "Wed Jul 07 22:00:00 UTC 2027",
         "employment_type": "Maximum-term contract",
     },
     "oxfam-finance.body": {
@@ -329,8 +441,6 @@ def test_saved_vacancy_pages_fill_blank_fields_in_reader_order():
         updated = apply_detail_reading(_listing(), read_detail_page(html))
         for field, value in expected.items():
             assert updated[field] == value, name
-        if name in {"icrc-pashto.body", "icrc-burmese.body"}:
-            assert "deadline" not in updated
         assert updated["title"] == "Listing title"
         assert updated["apply_url"] == "https://example.org/jobs/role/1"
         assert updated["reference"] == "keep-me"

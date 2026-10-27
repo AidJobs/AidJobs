@@ -107,7 +107,7 @@ Tests: interrupted crawls, restarts, expired locks, recovery, and concurrent wor
 - Independent review by a separate read-only agent: approve with minor changes. The test gaps it found (a stub that raised inside `_parse_deadline`'s own error handler proved nothing; no test that the language list is passed; no test of an unlisted language) and two inaccurate comments were fixed in `4c2bbd7`, tests and comments only, with the code checked identical to `ad5c28d`. With the old behaviour restored in memory, 13 tests fail; with only the language list removed, 2 fail.
 - Measured locally, not on Render: on the saved UNDP pages the worst event-loop stall fell from 23–34 seconds to 1.0–2.0 seconds in a fresh process, 0.4–1.4 seconds once warm (reviewer's measurements). The one-second target is not met when a process is cold; A2 (parsing off the event loop) or parsing each deadline once needs the user's decision.
 - Merged as `47c9d1e` with the user's approval, locked to `4c2bbd7`. CI passed on `main`; Vercel production deployed it; Render: "Deploy live for 47c9d1e" at 11:55 IST via Auto-Deploy (Verified, Render events); the old instance stopped its scheduler and shut down cleanly, and the new one has answered every health check since. Read-only afterwards: health and capabilities answer 200, `/docs` and `/api/shortlist` 404; no crawl lock held and no run marked running.
-- Proposed follow-ups, not opened, waiting on the user: `core/ai_normalizer.py`'s `normalize_deadline` still calls `dateparser` with every locale, synchronously, inside an async function (lines 163–174; see also W-13); two-digit years read as the 2100s (already W-12: UNDP's own `Dec-6-25` gives `2125-12-06`, re-checked on `main` on 27 October); splitting on any capital "T" to drop an ISO time cuts ICRC's `validThrough` text (`Fri Nov 06 23:00:00 UTC 2026` loses its year at the T in "UTC" and gives no deadline), so split only on a digit–T–digit boundary.
+- Follow-ups, tracked in the ledger rather than as GitHub issues (decided by the user, 27 October 2026): `core/ai_normalizer.py`'s `normalize_deadline` still calls `dateparser` with every locale, synchronously, inside an async function (lines 163–174; W-13, open); two-digit years read as the 2100s (W-12) and the cut at any capital "T" (W-32) are fixed in [PR #56](https://github.com/AidJobs/AidJobs/pull/56), open, together with ICRC's missing deadlines.
 
 **PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation not yet approved.** This replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered.
 
@@ -126,7 +126,7 @@ Design first, for the user's approval, then implementation. The design gives:
 - The verified and classified inventory of unsafe patterns (above), false positives named.
 - A redaction filter on the logging system for connection strings, password parameters, bearer tokens, and key shapes, applied to every logger.
 - A regression test that fails if exception text is put into a response again.
-- How [PR #50](https://github.com/AidJobs/AidJobs/pull/50) fits. PR #50 (`f7645ef`, CI green, open, not merged) gives generic messages on the four public endpoints and masks the database-status log line. It is not merged or extended without the user's approval; if its pattern would need replacing straight away, the design proposes the replacement.
+- How [PR #50](https://github.com/AidJobs/AidJobs/pull/50) fits. PR #50 gives generic messages on the four public endpoints and masks the database-status log line. Merged with the user's approval on 27 October 2026 as `614f12e`, after its branch was brought up to date with `main` (`7cd16ba`, CI green); deployed and live-checked (ledger, "Last verified"). If its pattern needs replacing, the design proposes the replacement.
 
 ### Stage 4. Frontend proxy error handling
 
@@ -151,7 +151,7 @@ Not a security stage. Placed here by the user on 26 October 2026 so that it foll
 
 ## Open risks after stage 1 (26 October 2026)
 
-- Public endpoints still return raw error text in production (`/api/db/status`, `/api/search/status`, `/api/search/parse`, `/api/search/autocomplete`); PR #50 addresses them and stays open for the stage 3 design.
+- Closed on 27 October 2026 by PR #50: the public endpoints (`/api/db/status`, `/api/search/status`, `/api/search/parse`, `/api/search/autocomplete`) no longer return raw error text.
 - About 60 admin-side raw-error responses, and no log redaction (stage 3); frontend proxies pass error text through (stage 4).
 - `/api/db/status` is public and lists every source's internal ID and job count (stage 7).
 - The backend and diagnostic checks connect as `postgres` (stage 6); the rule against printing secrets is not enforced by tooling (stage 5).
