@@ -1,5 +1,7 @@
-"""UNICEF listing reader and the no-AI fallback. Excerpts only; saved pages are optional."""
+"""UNICEF listing reader and the general reader. Excerpts only; saved pages are optional."""
 import asyncio
+import importlib
+import inspect
 import re
 from pathlib import Path
 
@@ -132,16 +134,6 @@ def test_a_page_without_job_cards_produces_no_card_rows():
     assert plugin._extract_job_cards(plugin.get_soup(html), _UNICEF_LISTING) == []
 
 
-class _FakeAI:
-    def __init__(self, outcome):
-        self.outcome = outcome
-
-    async def extract_jobs_from_html(self, html, url, max_jobs=100):
-        if isinstance(self.outcome, BaseException):
-            raise self.outcome
-        return self.outcome
-
-
 async def _no_sleep(_seconds):
     return None
 
@@ -155,21 +147,25 @@ def _no_network(crawler, monkeypatch):
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
 
 
-def _crawler(outcome, monkeypatch, general=None):
+def _crawler(monkeypatch, general=None):
+    """A crawler whose general reader returns a sentinel and counts its calls."""
     crawler = SimpleCrawler("postgresql://example")
-    crawler.ai_extractor = _FakeAI(outcome)
-    crawler.use_ai = True
     sentinel = general if general is not None else [{"title": "general", "apply_url": "https://x/1"}]
-    monkeypatch.setattr(crawler, "extract_jobs_from_html", lambda html, url: list(sentinel))
+    crawler.general_calls = 0
+
+    def general_reader(html, url):
+        crawler.general_calls += 1
+        return list(sentinel)
+
+    monkeypatch.setattr(crawler, "extract_jobs_from_html", general_reader)
     _no_network(crawler, monkeypatch)
     return crawler, sentinel
 
 
-def _readers_must_not_be_called(monkeypatch):
+def _unicef_reader_must_not_be_called(monkeypatch):
     def refuse(*_args, **_kwargs):
-        raise AssertionError("a site reader was consulted")
+        raise AssertionError("the UNICEF reader was consulted")
 
-    monkeypatch.setattr("crawler.plugins.get_plugin_registry", refuse)
     monkeypatch.setattr("crawler.plugins.unicef.UNICEFPlugin.extract", refuse)
 
 
@@ -182,42 +178,43 @@ def _unicef_reader_returns(monkeypatch, outcome):
     monkeypatch.setattr("crawler.plugins.unicef.UNICEFPlugin.extract", extract)
 
 
-_AI_FAILURES = [
-    pytest.param([], id="no-jobs"),
-    pytest.param(asyncio.TimeoutError(), id="timeout"),
-    pytest.param(RuntimeError("no credits"), id="error"),
-]
-
-
-@pytest.mark.parametrize("outcome", _AI_FAILURES)
-def test_unicef_uses_its_reader_when_ai_produces_nothing(outcome, monkeypatch):
-    crawler, sentinel = _crawler(outcome, monkeypatch)
-    jobs = asyncio.run(crawler._ai_listing_jobs(_LISTING, _UNICEF_LISTING, "UNICEF"))
+def test_unicef_uses_its_reader(monkeypatch):
+    crawler, sentinel = _crawler(monkeypatch)
+    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert [job["apply_url"] for job in jobs] == [
         _link("588602"),
         _link("588591"),
         _link("588601"),
     ]
     assert jobs != sentinel
+    assert crawler.general_calls == 0
 
 
-@pytest.mark.parametrize("outcome", _AI_FAILURES)
-def test_other_sources_never_reach_the_unicef_reader(outcome, monkeypatch):
-    _readers_must_not_be_called(monkeypatch)
+def test_other_sources_go_straight_to_the_general_reader(monkeypatch):
+    _unicef_reader_must_not_be_called(monkeypatch)
     lookalike = "https://example.org/jobs?next=https://jobs.unicef.org/en-us/listing/"
     for url in (_ICRC_LISTING, lookalike):
-        crawler, sentinel = _crawler(outcome, monkeypatch)
-        jobs = asyncio.run(crawler._ai_listing_jobs(_LISTING, url, "Other"))
+        crawler, sentinel = _crawler(monkeypatch)
+        jobs = asyncio.run(crawler._listing_jobs(_LISTING, url))
         assert jobs == sentinel
+        assert crawler.general_calls == 1
 
 
-@pytest.mark.parametrize("url", [_UNICEF_LISTING, _ICRC_LISTING])
-def test_ai_jobs_are_used_without_any_reader(url, monkeypatch):
-    _readers_must_not_be_called(monkeypatch)
-    ai_jobs = [{"title": "From AI", "apply_url": "https://jobs.example/1"}]
-    crawler, _sentinel = _crawler(ai_jobs, monkeypatch)
-    jobs = asyncio.run(crawler._ai_listing_jobs(_LISTING, url, "Any"))
-    assert jobs == ai_jobs
+def test_the_crawler_calls_no_ai_service_even_with_a_key_set(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "set-but-unused")
+    assert "use_ai" not in inspect.signature(SimpleCrawler.__init__).parameters
+    crawler = SimpleCrawler("postgresql://example")
+    for name in ("use_ai", "ai_extractor", "ai_normalizer"):
+        assert not hasattr(crawler, name), name
+    source = inspect.getsource(SimpleCrawler)
+    for marker in ("ai_extractor", "ai_normalizer", "_ai_listing_jobs", "openrouter"):
+        assert marker not in source.lower(), marker
+
+
+def test_the_old_plugin_registry_is_gone():
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("crawler.plugins.registry")
+    assert "get_plugin_registry" not in inspect.getsource(SimpleCrawler)
 
 
 @pytest.mark.parametrize(
@@ -229,9 +226,10 @@ def test_ai_jobs_are_used_without_any_reader(url, monkeypatch):
 )
 def test_unicef_reader_failure_falls_back_to_the_general_reader(plugin_outcome, monkeypatch):
     _unicef_reader_returns(monkeypatch, plugin_outcome)
-    crawler, sentinel = _crawler([], monkeypatch)
-    jobs = asyncio.run(crawler._ai_listing_jobs(_LISTING, _UNICEF_LISTING, "UNICEF"))
+    crawler, sentinel = _crawler(monkeypatch)
+    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert jobs == sentinel
+    assert crawler.general_calls == 1
 
 
 def test_repeated_links_keep_the_first_row(monkeypatch):
@@ -241,8 +239,8 @@ def test_repeated_links_keep_the_first_row(monkeypatch):
         {"title": "Other job", "apply_url": _link("2"), "deadline": "2025-12-03"},
     ]
     _unicef_reader_returns(monkeypatch, PluginResult(jobs=rows))
-    crawler, _sentinel = _crawler([], monkeypatch)
-    jobs = asyncio.run(crawler._ai_listing_jobs(_LISTING, _UNICEF_LISTING, "UNICEF"))
+    crawler, _sentinel = _crawler(monkeypatch)
+    jobs = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert [(job["title"], job["apply_url"]) for job in jobs] == [
         ("First wording", _link("1")),
         ("Other job", _link("2")),
@@ -317,7 +315,7 @@ def _saved_unicef_jobs(monkeypatch):
 
     monkeypatch.setattr(crawler, "_fetch_listing_page", unavailable)
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
-    jobs = asyncio.run(crawler._listing_jobs_without_ai(html, _UNICEF_LISTING))
+    jobs = asyncio.run(crawler._listing_jobs(html, _UNICEF_LISTING))
     assert asked == ["https://jobs.unicef.org/en-us/listing/?page=2&page-items=20"]
     return jobs
 
@@ -353,16 +351,15 @@ def test_saved_unicef_titles_match_the_stored_identities(monkeypatch):
     assert mismatched == []
 
 
-def test_saved_icrc_listing_is_unchanged_by_the_fallback(monkeypatch):
+def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
     if not _SAVED_ICRC.is_file():
         pytest.skip("saved ICRC listing is gitignored")
-    _readers_must_not_be_called(monkeypatch)
+    _unicef_reader_must_not_be_called(monkeypatch)
     html = _SAVED_ICRC.read_bytes().decode("utf-8", errors="replace")
     crawler = SimpleCrawler("postgresql://example")
     _no_network(crawler, monkeypatch)
     before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
-    crawler.ai_extractor = _FakeAI(RuntimeError("no credits"))
-    after = asyncio.run(crawler._ai_listing_jobs(html, _ICRC_LISTING, "ICRC"))
+    after = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
     assert after == before
     first = admit_batch([dict(job) for job in before], "html")
     second = admit_batch([dict(job) for job in after], "html")
@@ -416,7 +413,7 @@ def _paged_crawler(monkeypatch, pages):
 
 
 def _read_listing(crawler, first_html):
-    jobs = asyncio.run(crawler._listing_jobs_without_ai(first_html, _UNICEF_LISTING))
+    jobs = asyncio.run(crawler._listing_jobs(first_html, _UNICEF_LISTING))
     return [re.search(r"/job/(\d+)/", job["apply_url"]).group(1) for job in jobs]
 
 
@@ -485,35 +482,10 @@ def test_the_signup_link_alone_is_not_pagination(monkeypatch):
     assert asked == []
 
 
-def test_ai_off_unicef_uses_the_unicef_pages_and_skips_the_registry(monkeypatch):
-    def refuse():
-        raise AssertionError("the plugin registry was consulted")
-
-    monkeypatch.setattr("crawler.plugins.get_plugin_registry", refuse)
-    first = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 1)
-    crawler, asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, _listing_page(["2"]))})
-    crawler.use_ai = False
-    jobs = asyncio.run(crawler._listing_jobs(first, _UNICEF_LISTING, "UNICEF"))
-    assert [job["apply_url"] for job in jobs] == [_link("1"), _link("2")]
-    assert asked == [_PAGE.format(2)]
-
-
-def test_ai_off_other_sources_keep_the_registry_path(monkeypatch):
-    class _Registry:
-        def extract(self, html, base_url, config=None, preferred_plugin=None):
-            return PluginResult(jobs=[{"title": "From plugin", "apply_url": "https://x/9"}])
-
-    monkeypatch.setattr("crawler.plugins.get_plugin_registry", lambda: _Registry())
-    crawler, _sentinel = _crawler([], monkeypatch)
-    crawler.use_ai = False
-    jobs = asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING, "ICRC"))
-    assert jobs == [{"title": "From plugin", "apply_url": "https://x/9"}]
-
-
 def test_icrc_never_paginates(monkeypatch):
-    crawler, _sentinel = _crawler(RuntimeError("no credits"), monkeypatch)
+    crawler, _sentinel = _crawler(monkeypatch)
     html = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 5)
-    jobs = asyncio.run(crawler._ai_listing_jobs(html, _ICRC_LISTING, "ICRC"))
+    jobs = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
     assert jobs == _sentinel
 
 
@@ -573,8 +545,8 @@ def test_the_page_cap_and_a_repeated_page_are_partial(monkeypatch):
 
 
 def test_sources_without_a_paged_listing_keep_the_plain_message(monkeypatch):
-    crawler, _sentinel = _crawler(RuntimeError("no credits"), monkeypatch)
-    asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING, "ICRC"))
+    crawler, _sentinel = _crawler(monkeypatch)
+    asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING))
     assert crawler._listing_report is None
     assert _listing_outcome(14, None) == ("ok", "Found 14 jobs")
     assert _listing_outcome(0, None) == ("warn", "No jobs found")

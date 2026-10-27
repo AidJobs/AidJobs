@@ -127,11 +127,8 @@ async def test_source_extraction(source: Dict, dry_run: bool = True) -> Dict:
     }
     
     try:
-        import os
-        use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-        
         if source_type == 'html':
-            crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            crawler = SimpleCrawler(db_url)
             status, html = await crawler.fetch_html(careers_url)
             if status == 200:
                 jobs = crawler.extract_jobs_from_html(html, careers_url)

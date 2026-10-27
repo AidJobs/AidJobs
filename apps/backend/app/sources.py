@@ -1016,8 +1016,7 @@ async def simulate_extract(
             db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
             if not db_url:
                 raise HTTPException(status_code=500, detail="Database not configured")
-            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-            html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            html_crawler = SimpleCrawler(db_url)
             # Fetch and extract jobs
             status, html = await html_crawler.fetch_html(source['careers_url'])
             if status == 200:

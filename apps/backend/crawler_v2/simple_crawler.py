@@ -191,15 +191,15 @@ class SimpleCrawler:
     """
     Simple crawler that fetches HTML, extracts jobs, and saves to database.
     No complex validation, no repair system - just extract and save.
-    
-    Now supports AI-powered extraction as primary method with rule-based fallback.
+
+    Extraction is rule-based: structured data, visible labels, the UNICEF reader, and the
+    general reader. No AI service is called.
     """
     
-    def __init__(self, db_url: str, use_ai: bool = True, shadow_mode: bool = False):
+    def __init__(self, db_url: str, shadow_mode: bool = False):
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
         self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
-        self.use_ai = use_ai
         self.shadow_mode = shadow_mode
         self._listing_report: Optional[Dict] = None
         
@@ -225,22 +225,10 @@ class SimpleCrawler:
                 logger.warning(f"Global heuristics not available: {e}")
                 self.use_global_heuristics = False
         
-        # Initialize AI extractor if available
-        self.ai_extractor = None
-        if use_ai:
-            try:
-                from core.ai_extractor import AIJobExtractor
-                self.ai_extractor = AIJobExtractor()
-                logger.info("AI extractor initialized")
-            except Exception as e:
-                logger.warning(f"AI extractor not available: {e}")
-                self.use_ai = False
-        
-        # Initialize AI-powered strategy selector
         self.strategy_selector = None
         try:
             from core.strategy_selector import StrategySelector
-            self.strategy_selector = StrategySelector(ai_extractor=self.ai_extractor)
+            self.strategy_selector = StrategySelector()
             logger.info("Strategy selector initialized")
         except Exception as e:
             logger.warning(f"Strategy selector not available: {e}")
@@ -262,18 +250,6 @@ class SimpleCrawler:
             logger.info("Extraction logger initialized")
         except Exception as e:
             logger.warning(f"Extraction logger not available: {e}")
-        
-        # Initialize AI normalizer (Phase 3)
-        self.ai_normalizer = None
-        try:
-            from core.ai_normalizer import get_ai_normalizer
-            self.ai_normalizer = get_ai_normalizer()
-            if self.ai_normalizer:
-                logger.info("AI normalizer initialized")
-            else:
-                logger.debug("AI normalizer not available (OPENROUTER_API_KEY not set)")
-        except Exception as e:
-            logger.warning(f"AI normalizer not available: {e}")
         
         # Initialize geocoder (Phase 4)
         self.geocoder = None
@@ -338,7 +314,7 @@ class SimpleCrawler:
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:
         """
-        Extract jobs from HTML using AI-powered strategy selection.
+        Extract jobs from HTML using rule-based strategy selection.
         
         Uses intelligent strategy selection that:
         1. Tries JSON-LD structured data FIRST (most reliable)
@@ -357,7 +333,6 @@ class SimpleCrawler:
             logger.info(f"JSON-LD extraction found {len(jobs)} jobs")
             return jobs
         
-        # Use AI-powered strategy selector if available
         if self.strategy_selector:
             try:
                 # Prepare strategy functions
@@ -1856,7 +1831,7 @@ class SimpleCrawler:
                     listing_deadline = job.get('deadline')
                     job = apply_detail_reading(job, read_detail_page(html))
                     read_deadline = job.get('deadline')
-                    # Day-first here, before the month-first AI normaliser sees the raw value.
+                    # Day-first, the order the save step uses for every deadline.
                     if read_deadline and read_deadline != listing_deadline:
                         parsed_deadline = self._parse_deadline(read_deadline)
                         if parsed_deadline:
@@ -1873,52 +1848,14 @@ class SimpleCrawler:
         
         return job
     
-    async def _listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
-        """Default listing extraction: AI when enabled, otherwise the UNICEF pages or the plugin registry."""
-        self._listing_report = None
-        if self.use_ai and self.ai_extractor:
-            return await self._ai_listing_jobs(html, careers_url, org_name)
-        if _is_unicef_listing(careers_url):
-            return await self._listing_jobs_without_ai(html, careers_url)
-        # Try plugin system first, then fall back to rule-based extraction
-        try:
-            from crawler.plugins import get_plugin_registry
-            registry = get_plugin_registry()
-            plugin_result = registry.extract(html, careers_url, config=None, preferred_plugin=None)
-            if plugin_result.is_success() and plugin_result.jobs:
-                logger.info(f"Plugin extraction successful: {len(plugin_result.jobs)} jobs found")
-                return plugin_result.jobs
-            logger.info("Plugin extraction returned no jobs, falling back to rule-based")
-        except Exception as e:
-            logger.warning(f"Plugin system error: {e}, falling back to rule-based")
-        return self.extract_jobs_from_html(html, careers_url)
-
-    async def _ai_listing_jobs(self, html: str, careers_url: str, org_name: str) -> List[Dict]:
-        """AI listing extraction. No jobs, a timeout, or an error falls back without AI."""
-        try:
-            logger.info(f"Attempting AI extraction for {org_name}...")
-            # Use asyncio.wait_for to add overall timeout (2 minutes max)
-            jobs = await asyncio.wait_for(
-                self.ai_extractor.extract_jobs_from_html(html, careers_url, max_jobs=100),
-                timeout=120.0  # 2 minute overall timeout
-            )
-            if jobs:
-                logger.info(f"AI extraction successful: {len(jobs)} jobs found")
-                return jobs
-            logger.info("AI extraction returned no jobs, falling back to rule-based")
-        except asyncio.TimeoutError:
-            logger.warning("AI extraction timed out (2 minutes), falling back to rule-based")
-        except Exception as e:
-            logger.warning(f"AI extraction failed: {e}, falling back to rule-based")
-        return await self._listing_jobs_without_ai(html, careers_url)
-
-    async def _listing_jobs_without_ai(self, html: str, careers_url: str) -> List[Dict]:
+    async def _listing_jobs(self, html: str, careers_url: str) -> List[Dict]:
         """UNICEF listings use the UNICEF reader first. Every other source goes to the rule-based reader."""
+        self._listing_report = None
         if _is_unicef_listing(careers_url):
             try:
                 jobs = await self._unicef_listing_jobs(html, careers_url)
                 if jobs:
-                    logger.info(f"UNICEF reader found {len(jobs)} jobs without AI extraction")
+                    logger.info(f"UNICEF reader found {len(jobs)} jobs")
                     return jobs
                 logger.info("UNICEF reader returned no jobs, falling back to rule-based")
             except Exception as e:
@@ -1932,7 +1869,6 @@ class SimpleCrawler:
         The walk is recorded in self._listing_report; only a walk that ran out of links is complete.
         """
         self._listing_report = None
-        # Imported directly: building the plugin registry fails while unesco.py does not compile.
         from crawler.plugins.unicef import UNICEFPlugin
         reader = UNICEFPlugin()
         jobs = _first_row_per_link(reader.extract(first_html, careers_url).jobs or [])
@@ -2090,7 +2026,7 @@ class SimpleCrawler:
                         from pipeline.integration import PipelineAdapter
                         pipeline_adapter = PipelineAdapter(
                             db_url=self.db_url,
-                            enable_ai=self.use_ai,
+                            enable_ai=False,
                             shadow_mode=False,
                             enable_storage=False,
                         )
@@ -2101,7 +2037,7 @@ class SimpleCrawler:
                         use_new_extractor = False  # Fall through to default
                 
                 if not use_new_extractor:
-                    jobs = await self._listing_jobs(html, careers_url, org_name)
+                    jobs = await self._listing_jobs(html, careers_url)
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
@@ -2144,58 +2080,6 @@ class SimpleCrawler:
                     if len(jobs) > 50 and not needs_enrichment:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
                     jobs = jobs
-                
-                # Normalize ambiguous fields using AI (Phase 3) - only when heuristics fail
-                if self.ai_normalizer and jobs:
-                    normalized_count = 0
-                    for job in jobs:
-                        try:
-                            # Check if normalization is needed
-                            needs_normalization = False
-                            
-                            # Check deadline: normalize if not in YYYY-MM-DD format
-                            if job.get('deadline'):
-                                deadline_str = str(job['deadline'])
-                                if not (len(deadline_str) == 10 and deadline_str.count('-') == 2):
-                                    needs_normalization = True
-                            
-                            # Check location: normalize if ambiguous (contains /, ;, or multiple parts)
-                            if job.get('location_raw') and not job.get('location_normalized'):
-                                location = job['location_raw']
-                                if '/' in location or ';' in location or location.count(',') > 1:
-                                    needs_normalization = True
-                            
-                            # Check salary: normalize if present but not structured
-                            if job.get('salary_raw') and not job.get('salary_normalized'):
-                                needs_normalization = True
-                            
-                            # Only normalize if needed (cost control)
-                            if needs_normalization:
-                                normalized_job = await self.ai_normalizer.normalize_job_fields(
-                                    job,
-                                    use_ai_for_deadline=bool(job.get('deadline') and not re.match(r'^\d{4}-\d{2}-\d{2}$', str(job.get('deadline', '')))),
-                                    use_ai_for_location=bool(job.get('location_raw') and not job.get('location_normalized')),
-                                    use_ai_for_salary=bool(job.get('salary_raw') and not job.get('salary_normalized'))
-                                )
-                                
-                                # Update job with normalized fields
-                                if normalized_job.get('deadline') and normalized_job.get('deadline') != job.get('deadline'):
-                                    job['deadline'] = normalized_job['deadline']
-                                    normalized_count += 1
-                                
-                                if normalized_job.get('location_normalized'):
-                                    job['location_normalized'] = normalized_job['location_normalized']
-                                    normalized_count += 1
-                                
-                                if normalized_job.get('salary_normalized'):
-                                    job['salary_normalized'] = normalized_job['salary_normalized']
-                                    normalized_count += 1
-                        except Exception as e:
-                            logger.debug(f"Error normalizing job {job.get('title', 'unknown')[:50]}: {e}")
-                            # Continue with original job if normalization fails
-                    
-                    if normalized_count > 0:
-                        logger.info(f"AI normalized {normalized_count} field(s) across {len(jobs)} jobs")
                 
                 # Geocode locations (Phase 4) - only for jobs with location but no coordinates
                 if self.geocoder and jobs:

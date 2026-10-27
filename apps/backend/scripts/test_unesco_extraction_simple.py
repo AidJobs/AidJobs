@@ -31,9 +31,7 @@ async def test():
     print("=" * 80)
     print(f"URL: {url}\n")
     
-    import os
-    use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-    crawler = SimpleCrawler(db_url, use_ai=use_ai)
+    crawler = SimpleCrawler(db_url)
     
     # Step 1: Fetch HTML
     print("Step 1: Fetching HTML...")
