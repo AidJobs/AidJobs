@@ -247,9 +247,7 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
             
             # Test extraction
             db_url = get_db_url()
-            import os
-            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-            crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            crawler = SimpleCrawler(db_url)
             
             # Fetch HTML
             status, html = await crawler.fetch_html(careers_url)
@@ -501,9 +499,7 @@ async def fix_undp_urls(admin=Depends(admin_required)):
             
             # Get database URL
             db_url = get_db_url()
-            import os
-            use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-            crawler = SimpleCrawler(db_url, use_ai=use_ai)
+            crawler = SimpleCrawler(db_url)
             
             # Fetch and extract jobs
             logger.info(f"[fix-undp-urls] Fetching UNDP page: {careers_url}")

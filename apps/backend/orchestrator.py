@@ -52,10 +52,7 @@ class CrawlerOrchestrator:
     
     def __init__(self, db_url: str):
         self.db_url = db_url
-        # Use enterprise-grade SimpleCrawler (has all Phase 1-4 features)
-        import os
-        use_ai = bool(os.getenv('OPENROUTER_API_KEY'))
-        self.html_crawler = SimpleCrawler(db_url, use_ai=use_ai)
+        self.html_crawler = SimpleCrawler(db_url)
         self.rss_crawler = SimpleRSSCrawler(db_url)
         self.api_crawler = SimpleAPICrawler(db_url)
         self.running = False
