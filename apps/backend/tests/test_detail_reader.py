@@ -325,33 +325,62 @@ def test_a_visible_deadline_label_comes_before_the_microdata_one():
 def test_microdata_deadline_alone_is_evidence():
     html = (
         '<div itemscope itemtype="https://schema.org/JobPosting">'
-        '<meta itemprop="validThrough" content="Fri Dec 31 23:00:00 UTC 2027"></div>'
-        "<h1>Pashto Interpreter</h1>"
+        '<meta itemprop="validThrough" content="Fri Dec 31 23:00:00 UTC 2027">'
+        "<h1>Pashto Interpreter</h1></div>"
     )
     assert read_detail_page(html)[0]["deadlines"] == ["Fri Dec 31 23:00:00 UTC 2027"]
+
+
+def test_another_jobs_posting_does_not_lend_its_deadline():
+    html = (
+        "<h1>Main role</h1><span>Location: Geneva</span>"
+        '<aside><div itemscope itemtype="http://schema.org/JobPosting">'
+        '<meta itemprop="title" content="Other role">'
+        '<meta itemprop="validThrough" content="31 January 2027"></div></aside>'
+    )
+    assert read_detail_page(html)[0]["deadlines"] == []
+
+
+# Each posting below is titled like the page heading, so only the case's own rule can reject it.
+_ROLE_POSTING = (
+    '<div itemscope itemtype="http://schema.org/JobPosting"><meta itemprop="title" content="Role">'
+)
+_UNTIL = '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027">'
 
 
 @pytest.mark.parametrize(
     "html",
     [
         # Two microdata postings: whose deadline it is cannot be told.
-        '<div itemscope itemtype="http://schema.org/JobPosting">'
-        '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027"></div>'
-        '<div itemscope itemtype="http://schema.org/JobPosting">'
-        '<meta itemprop="validThrough" content="Fri Dec 31 23:00:00 UTC 2027"></div>',
+        _ROLE_POSTING + _UNTIL + "</div>" + _ROLE_POSTING + _UNTIL + "</div>",
         # Not inside a JobPosting.
-        '<div itemscope itemtype="http://schema.org/Event">'
-        '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027"></div>',
-        '<meta itemprop="validThrough" content="Wed Jul 07 22:00:00 UTC 2027">',
+        '<div itemscope itemtype="http://schema.org/Event">' + _UNTIL + "</div>",
+        _UNTIL,
         # Blank or missing content; visible text is not microdata content.
-        '<div itemscope itemtype="http://schema.org/JobPosting">'
-        '<meta itemprop="validThrough" content="  ">'
+        _ROLE_POSTING + '<meta itemprop="validThrough" content="  ">'
         '<span itemprop="validThrough">31/12/2027</span></div>',
+        # Content without a digit cannot name a day.
+        _ROLE_POSTING + '<meta itemprop="validThrough" content="N/A">'
+        '<meta itemprop="validThrough" content="{{validThrough}}"></div>',
+        # Inside an unnamed nested item, which is its own scope.
+        _ROLE_POSTING + '<div itemprop="hiringOrganization" itemscope>' + _UNTIL + "</div></div>",
+        # A type without itemscope is not an item.
+        '<div itemtype="http://schema.org/JobPosting"><meta itemprop="title" content="Role">'
+        + _UNTIL + "</div>",
+        # Not rendered.
+        "<noscript>" + _ROLE_POSTING + _UNTIL + "</div></noscript>",
+        "<template>" + _ROLE_POSTING + _UNTIL + "</div></template>",
     ],
 )
-def test_microdata_deadline_needs_one_posting_and_content(html):
-    rows = read_detail_page(html + "<h1>Role</h1><span>Location: Geneva</span>")
+def test_microdata_deadline_needs_the_pages_own_posting_and_a_dated_content(html):
+    rows = read_detail_page("<h1>Role</h1><span>Location: Geneva</span>" + html)
     assert rows[0]["deadlines"] == []
+
+
+def test_a_titled_posting_outside_the_heading_is_read():
+    """The positive twin of the cases above: the same shape, with nothing to reject it."""
+    rows = read_detail_page("<h1>Role</h1><span>Location: Geneva</span>" + _ROLE_POSTING + _UNTIL)
+    assert rows[0]["deadlines"] == ["Wed Jul 07 22:00:00 UTC 2027"]
 
 
 def test_a_qualifying_jsonld_posting_is_used_whole_without_microdata():

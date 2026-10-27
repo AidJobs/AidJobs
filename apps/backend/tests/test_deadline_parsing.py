@@ -157,6 +157,11 @@ def test_a_month_name_outside_the_list_is_not_read(crawler, previous_behaviour):
         ("Tuesday, 10 November 2026", "2026-11-10"),
         # A time joined to a date is still removed.
         ("31/12/2026T23:59:00Z", "2026-12-31"),
+        # Upper-case month names contain a T too; before, these gave no date or a wrong one.
+        ("31 OCT 2026", "2026-10-31"),
+        ("15-OCT-2025", "2025-10-15"),
+        ("31 AUGUST 2026", "2026-08-31"),
+        ("SEPTEMBER 30, 2026", "2026-09-30"),
     ],
 )
 def test_a_capital_t_cuts_only_an_iso_time(crawler, raw, expected):
