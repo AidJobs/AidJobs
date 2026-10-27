@@ -9,7 +9,7 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 26 October 2026, after security stage 1. `main` is `c207066` (merge of PR #51); CI passed on it; Vercel production on `c207066` (GitHub deployments); Render live on `c207066` via Auto-Deploy (Render events, read by the agent). Afterwards, read-only: the API docs and the server shortlist answer 404; the health check, the database status (404 jobs, 307 open, 3 sources), search, `/v2`, and the admin login answer; no crawl lock is held (security plan, stage 1). Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 27 October 2026, after the date-parsing fix (security plan, stage 2, PR A). `main` is `1df6009` (merge of PR #53, documents only); CI passed on it and on `47c9d1e` (merge of PR #55); Vercel production on `1df6009` (GitHub deployments); Render live on `47c9d1e` via Auto-Deploy, with no deploy for the documents-only `1df6009` (Render events, read by the agent). Afterwards, read-only: the health check answers, the API docs and the server shortlist answer 404, no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -148,6 +148,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | UX-31 done: branches deleted, Render variable removed, checks recorded | PR #49, `efb8cd4` | 26 Oct 2026 | Merged, CI green, deployed |
 | Security hardening plan and the 26 October incidents recorded | PR #52, `6711707` | 26 Oct 2026 | Merged, CI green |
 | Security stage 1: server shortlist unmounted, API docs only in development, public-route allowlist test | PR #51, `c207066` | 26 Oct 2026 | Merged, CI green, deployed, live-checked |
+| Security stage 2, PR A: deadline parsing skips text without a digit and limits `dateparser`'s languages | PR #55, `47c9d1e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
+| Employer survey recorded (W-31), placed as security plan stage 8 | PR #53, `1df6009` | 27 Oct 2026 | Merged, CI green |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -300,9 +302,9 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 
 **W-11. Repair the plugin registry.** `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161). The registry catches only `ImportError`, so building it always fails. The UNDP plugin also fails to import (`core.data_quality` has no `data_quality_validator`). Today this only affects the AI-off path. PR #11 avoids it by importing the UNICEF reader directly. Repository, confirmed on `main` and on PR #11.
 
-**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8.
+**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2).
 
-**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare.
+**W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2).
 
 **W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source except UNICEF down the plugin path, which needs W-11 first and changes the verified ICRC path. Once W-04 is merged, UNICEF takes its own reader with AI off.
 
@@ -448,6 +450,10 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
+| Approve PR B's implementation (crawl-lock recovery, design decided 27 October 2026) | Security plan, stage 2 |
+| A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
+| Whether to open the three proposed date-parsing follow-ups | Security plan, stage 2 |
+| Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
 | Whether to use ReliefWeb as a jobs feed as well as for discovery | W-31 |
