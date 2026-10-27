@@ -9,7 +9,7 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 27 October 2026, after PR #50. `main` is `614f12e` (merge of PR #50); CI passed on it; Vercel production on `614f12e` (GitHub deployments); Render live on `614f12e` via Auto-Deploy (Render events, read by the agent). Afterwards, read-only: the health check answers; the database status is ok (404 jobs, 292 active, 3 sources); the search status still reads "Meilisearch not configured"; search parsing and suggestions answer; the API docs answer 404; `/v2` answers; no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+**Last verified:** 27 October 2026, after PR #56 and one ICRC crawl. `main` is `c86984e` (merge of PR #56); CI passed on it; Vercel production on `c86984e` (GitHub deployments); Render live on `c86984e` via Auto-Deploy at 16:17 IST (Render events, read by the agent). Afterwards, read-only: the health check answers; the database status is ok; the search status still reads "Meilisearch not configured"; the API docs answer 404; `/v2` answers. The ICRC crawl the user ran at 16:25 IST is recorded under W-32. No crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -60,7 +60,7 @@ These describe how the work is run. The architecture rules are in the contract.
 | Source | Listing URL | Latest crawl | Result |
 | --- | --- | --- | --- |
 | UNICEF | `https://jobs.unicef.org/en-us/listing/` | 22 October 2026, 18:54 UTC | `warn`: `Found 120 jobs; listing partial: 6 pages, expected 244, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`; 102 inserted, 1 updated. The same AWS WAF challenge on page 7 as on 19 October (W-04). Verified |
-| ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 21 October 2026, 11:42 UTC | `ok`: 34 found, 0 inserted, 0 updated (unchanged since 17 October, when 14 were saved and 20 correctly rejected). Verified |
+| ICRC | `https://careers.icrc.org/go/Global-Opportunities/8821501/` | 27 October 2026, 10:55 UTC (run by the user from the admin) | `ok`: 33 found, 1 inserted, 11 updated: the deadlines filled by PR #56 (W-32). Before that, 34 found and nothing changed on 21 and 24 October. Verified |
 | Oxfam GB | `https://jobs.oxfam.org.uk/jobs/home/` | 23 October 2026, 05:05 UTC | `ok`: 5 found, 2 inserted, 1 updated. Titles still carry glued place and date (W-24). Verified |
 
 Crawls run every 3 days per source, and only while the backend is awake. As read on 24 October 2026, the next runs are ICRC 24 October 16:48 UTC, UNICEF 25 October 18:17 UTC, and Oxfam 25 October 21:20 UTC (Verified from `sources.next_run_at`).
@@ -152,6 +152,7 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Employer survey recorded (W-31), placed as security plan stage 8 | PR #53, `1df6009` | 27 Oct 2026 | Merged, CI green |
 | Security stages 0 and 1 recorded; stage 2 PR A done and PR B design decided | PR #54, `014814d` | 27 Oct 2026 | Merged, CI green |
 | Generic errors from the public database status, search status, query parsing, and suggestions; connection strings masked in the status log | PR #50, `614f12e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
+| ICRC deadlines from microdata (C4 amendment), the capital-T cut, two-digit years | PR #56, `c86984e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked with one ICRC crawl |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -284,6 +285,8 @@ Closed jobs with no deadline never leave search. The contract (§6) forbids expi
 
 Agreed rule (18 October 2026): absence from a listing counts as evidence only after a crawl whose `extraction_logs.extracted_fields.listing_complete` is true. The crawl status (`ok`, `warn`, `failed`) and the failure counter must not be used for that decision: `warn` resets the failure counter but marks a partial listing. Sources without a paged-listing report need their own completeness rule before they can expire anything. Today no code expires, hides, or changes a job's status after a crawl (Repository).
 
+Evidence, 27 October 2026: after the ICRC crawl of that day (`ok`, 33 found, one fewer than before), Health Delegate and Pashto Interpreter were not seen; both stay active without a deadline, so the public site still shows them. Health Delegate's listed deadline was 25 October 2026 (saved listing of 12 October), so it has almost certainly closed. Not edited (W-32).
+
 **W-07. Oxfam GB as a live source.** C5.
 Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Approved on 19 October 2026: add it as an HTML source and check one crawl the way ICRC was checked. Creating a source sets its next run to now (`POST /api/admin/sources`), so the scheduler crawls it within about five minutes; that automatic crawl is the single test, and Crawl is not pressed. Check: crawl status and counts, saved titles, locations, and deadlines, rejection reasons, links to real vacancies, and no duplicates.
 
@@ -304,7 +307,7 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 
 **W-11. Repair the plugin registry.** `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161). The registry catches only `ImportError`, so building it always fails. The UNDP plugin also fails to import (`core.data_quality` has no `data_quality_validator`). Today this only affects the AI-off path. PR #11 avoids it by importing the UNICEF reader directly. Repository, confirmed on `main` and on PR #11.
 
-**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2). No production row had a deadline in the 2100s on 27 October 2026 (Verified). Fix in PR #56, open: a two-digit year is read as this century; a four-digit year is kept as written.
+**W-12. Two-digit years.** `_parse_deadline` uses `dateparser` with `PREFER_DATES_FROM: future`, so `03-Dec-25` becomes `2125-12-03`. This predates PR #8. Re-checked on 27 October 2026 after PR #55: UNDP's own format, `Dec-6-25`, gives `2125-12-06` (security plan, stage 2). No production row had a deadline in the 2100s on 27 October 2026 (Verified). Done: PR #56, merged as `c86984e` on 27 October 2026; a two-digit year is read as this century, and a four-digit year is kept as written.
 
 **W-13. The AI normaliser reads numeric dates month-first.** `normalize_deadline` calls `dateparser` without `DATE_ORDER`. The detail reader, the general listing reader, and the UNICEF reader all store `YYYY-MM-DD` before it runs, so this is now rare. It also calls `dateparser` with every locale, synchronously, inside an async function, the pattern PR #55 removed from `_parse_deadline` (security plan, stage 2). Whether production reaches this call is not established; the AI key was revoked (W-14).
 
@@ -314,7 +317,13 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 - `_parse_deadline` cut any text at its first capital "T" to drop an ISO time, so that value lost its year at the T of "UTC" and gave no deadline; `Tue …` and `Thu …` became empty. Upper-case month names were cut too: `31 OCT 2026`, `15-OCT-2025`, and `31 AUGUST 2026` gave no date, and `SEPTEMBER 30, 2026` gave `2027-09-01`. This affects every caller of `_parse_deadline`, so such rows can change on their next crawl. One new false positive is known: `T2 2026` now gives a date.
 - Health Delegate showed a deadline of 25/10/2026 on the saved listing and was still active without a deadline in production on 27 October, so it is probably closed but still on the public site (W-06). Not edited.
 
-Fix in PR #56, open, with the user's C4 amendment (crawler plan, C4 reader, point 8) and the T split narrowed to a digit–T–digit boundary. An independent read-only review (27 October 2026) approved it with minor changes, made before merge: the microdata posting must be the page's own job and rendered, its content must contain a digit, and nested unnamed items are their own scope. After merge, the next scheduled ICRC crawl should fill the deadlines through the update path; checked with a read-only query, no manual edit.
+Fix in PR #56, with the user's C4 amendment (crawler plan, C4 reader, point 8) and the T split narrowed to a digit–T–digit boundary. An independent read-only review (27 October 2026) approved it with minor changes, made before merge: the microdata posting must be the page's own job and rendered, its content must contain a digit, and nested unnamed items are their own scope; a second pass approved it for merge.
+
+**Done, 27 October 2026.** Merged with the user's approval as `c86984e`, locked to `bbc40fe`; CI passed on `main`; Vercel production deployed it; Render: "Deploy live for c86984e" at 16:17 IST via Auto-Deploy. The user then ran one ICRC crawl from the admin, at 16:25 IST. Read-only comparison of snapshots taken before and after (Verified):
+- The crawl ended `ok`: 33 found, 1 inserted, 11 updated, about 2.5 minutes; the lock was released and no run is left running.
+- Active ICRC jobs without a deadline: 13 before, 2 after. Filled: Burmese Interpreter 2027-07-07; Russian and Kurdish Interpreters 2027-07-09; the Hausa, Somali, Fula, Arabic, Amharic/Oromo/Tigrinya, and Kinyarwanda Interpreters 2027-12-31, matching the saved listing; WatHab WaSH Project Manager and the MEAL Coordinator 2026-11-08 (not on the saved listing). First Aid kept 2026-11-06. New: Protection Data Manager, 2026-11-15. 15 jobs, 15 distinct links; Oxfam and UNICEF unchanged.
+- Not seen by the crawl and still without a deadline: Health Delegate and Pashto Interpreter, both still active and shown on the public site (W-06). Not edited.
+- During the crawl (16:24:33 to 16:28:58 IST) Render's health checks kept their 5-second rhythm: 63 checks, longest gap 6 seconds. No failed instance in Render's events and no `ERROR` line in the logs for that hour. This is the first live evidence for PR #55 on Render (security plan, stage 2).
 
 **W-14. Decide the OpenRouter setup.** Every OpenRouter key was revoked on 18 October 2026 (W-01), so every crawl spends time on a failed AI call. Either create a new key with credits, stored only in Render, or remove `OPENROUTER_API_KEY` from Render. Removing it sends every HTML source except UNICEF down the plugin path, which needs W-11 first and changes the verified ICRC path. Once W-04 is merged, UNICEF takes its own reader with AI off.
 
@@ -462,7 +471,6 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
 | Approve PR B's implementation (crawl-lock recovery, design decided 27 October 2026) | Security plan, stage 2 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
-| Merge PR #56 (ICRC deadlines, T split, two-digit years) | W-32, W-12 |
 | Whether and how to fix the AI normaliser's `dateparser` call, after checking production reaches it | W-13 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
