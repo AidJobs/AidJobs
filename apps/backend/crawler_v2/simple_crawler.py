@@ -10,7 +10,9 @@ Design principles:
 
 import logging
 import asyncio
+import contextvars
 import re
+import threading
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse, urljoin
@@ -19,6 +21,7 @@ from contracts.admission import admit_batch, log_admission_rejections
 from contracts.detail_reader import apply_detail_reading, read_detail_page
 from contracts.outbound import FetchError, fetch_url
 from contracts.persist import persist_candidate
+from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.search_projection import commit_and_schedule
 import httpx
 from bs4 import BeautifulSoup
@@ -26,6 +29,11 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
+
+# The crawl's source id for log lines. One crawler instance serves concurrent crawls, so this
+# is task-local rather than an attribute.
+_SOURCE_FOR_LOGS: contextvars.ContextVar = contextvars.ContextVar("crawl_source_id", default=None)
+_DATEPARSER_LOCK = threading.Lock()
 
 
 def _is_unicef_listing(url: str) -> bool:
@@ -201,7 +209,6 @@ class SimpleCrawler:
         self.timeout = httpx.Timeout(30.0)
         self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
         self.shadow_mode = shadow_mode
-        self._listing_report: Optional[Dict] = None
         
         # Check if global heuristics are enabled
         import os
@@ -271,7 +278,7 @@ class SimpleCrawler:
     
     def _get_db_conn(self):
         """Get database connection"""
-        return psycopg2.connect(self.db_url)
+        return psycopg2.connect(self.db_url, connect_timeout=10)
     
     async def fetch_html(self, url: str, retry_count: int = 0, use_browser: bool = False) -> Tuple[int, str]:
         """Fetch HTML. Browser rendering is not used; the HTTP result is returned."""
@@ -696,8 +703,7 @@ class SimpleCrawler:
                 logger.info(f"Extracted contact info: {len(contact_info.get('emails', []))} emails, {len(contact_info.get('phones', []))} phones")
             
             # Filter and score links using heuristics
-            # Get source_id if available (from context)
-            source_id = getattr(self, '_current_source_id', None)
+            source_id = _SOURCE_FOR_LOGS.get()
             scored_links = self._filter_and_score_job_links(soup, base_url, max_links=max_links, source_id=source_id)
             logger.info(f"Found {len(scored_links)} scored job links (using global heuristics)")
             
@@ -1201,17 +1207,19 @@ class SimpleCrawler:
             import dateparser
             from datetime import datetime
             
-            # Parse with dateparser (handles many locales and formats)
-            parsed_date = dateparser.parse(
-                text,
-                languages=list(DEADLINE_LANGUAGES) if DEADLINE_LANGUAGES else None,
-                settings={
-                    'PREFER_DAY_OF_MONTH': 'first',
-                    'RELATIVE_BASE': datetime.now(),
-                    'DATE_ORDER': 'DMY',  # Day-Month-Year (common in international formats)
-                    'PREFER_DATES_FROM': 'future'  # Prefer future dates for deadlines
-                }
-            )
+            # Parse with dateparser (handles many locales and formats). Saves run in worker
+            # threads, and dateparser's thread safety is not established.
+            with _DATEPARSER_LOCK:
+                parsed_date = dateparser.parse(
+                    text,
+                    languages=list(DEADLINE_LANGUAGES) if DEADLINE_LANGUAGES else None,
+                    settings={
+                        'PREFER_DAY_OF_MONTH': 'first',
+                        'RELATIVE_BASE': datetime.now(),
+                        'DATE_ORDER': 'DMY',  # Day-Month-Year (common in international formats)
+                        'PREFER_DATES_FROM': 'future'  # Prefer future dates for deadlines
+                    }
+                )
             
             if parsed_date:
                 # PREFER_DATES_FROM future puts a two-digit year in the next century:
@@ -1320,13 +1328,29 @@ class SimpleCrawler:
             if placeholder == "NOW()" and val != "NOW()":
                 raise ValueError(f"{operation} NOW() placeholder at index {i} doesn't match value '{val}'")
     
-    def save_jobs(self, jobs: List[Dict], source_id: str, org_name: str, base_url: Optional[str] = None) -> Dict:
+    def save_jobs(
+        self,
+        jobs: List[Dict],
+        source_id: str,
+        org_name: str,
+        base_url: Optional[str] = None,
+        *,
+        run_token: Optional[str] = None,
+        loop=None,
+    ) -> Dict:
         """
-        Save jobs to database with comprehensive error logging and pre-upsert validation.
-        
+        Save jobs as the run that owns the source, one savepoint per job.
+
+        Without a token, or with one that is not a running run of this source, nothing is
+        written and OwnershipLost is raised. A database error on one job rolls back that job
+        only and counts it as failed. loop, when given, is the event loop that schedules the
+        search projection (this method runs in a worker thread).
+
         Returns:
             Dict with counts: {inserted, updated, skipped, failed, validated}
         """
+        if not run_token:
+            raise OwnershipLost("save_jobs needs a run token")
         logger.info(f"save_jobs called: {len(jobs)} jobs, source_id={source_id}, org_name={org_name}")
         
         # DEBUG: Log extracted jobs before validation
@@ -1395,6 +1419,7 @@ class SimpleCrawler:
         updated = 0
         skipped = validation_skipped
         failed = 0
+        attempted = 0  # jobs that reached their write, or failed on the way to it
         failed_inserts = []  # Track failed inserts for logging
         
         logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
@@ -1403,8 +1428,11 @@ class SimpleCrawler:
         try:
             conn = self._get_db_conn()
             with conn.cursor() as cur:
+                confirm_running(cur, run_token, source_id)
                 recorded = []
                 for job in jobs:
+                    in_savepoint = False
+                    recorded_mark = len(recorded)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1531,6 +1559,9 @@ class SimpleCrawler:
                             candidate["quality_scored_at"] = observed_at
                         if job.get("admitted") is True:
                             candidate["admitted"] = True
+                        cur.execute("SAVEPOINT job_save")
+                        in_savepoint = True
+                        attempted += 1
                         outcome = persist_candidate(
                             cur,
                             candidate,
@@ -1541,6 +1572,8 @@ class SimpleCrawler:
                             org_name=org_name,
                             recorded=recorded,
                         )
+                        cur.execute("RELEASE SAVEPOINT job_save")
+                        in_savepoint = False
                         if outcome == "created":
                             inserted += 1
                         elif outcome == "updated":
@@ -1558,7 +1591,12 @@ class SimpleCrawler:
                             })
 
                     except Exception as e:
-                        # Catch any unexpected errors during job processing
+                        # This job only: roll back to its savepoint and drop what it recorded.
+                        if in_savepoint:
+                            cur.execute("ROLLBACK TO SAVEPOINT job_save")
+                            del recorded[recorded_mark:]
+                        else:
+                            attempted += 1
                         error_msg = f"Unexpected error processing job: {str(e)}"
                         logger.error(f"Error processing job: {error_msg}")
                         failed += 1
@@ -1570,7 +1608,7 @@ class SimpleCrawler:
                             'operation': 'process'
                         })
                 
-                commit_and_schedule(conn, recorded)
+                commit_and_schedule(conn, recorded, loop=loop)
                 logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {skipped} skipped, {failed} failed")
         
         except Exception as e:
@@ -1618,7 +1656,8 @@ class SimpleCrawler:
             'updated': updated, 
             'skipped': skipped, 
             'failed': failed,
-            'validated': len(jobs) if 'jobs' in locals() else 0
+            'validated': len(jobs) if 'jobs' in locals() else 0,
+            'attempted': attempted,
         }
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
@@ -1848,32 +1887,38 @@ class SimpleCrawler:
         
         return job
     
-    async def _listing_jobs(self, html: str, careers_url: str) -> List[Dict]:
-        """UNICEF listings use the UNICEF reader first. Every other source goes to the rule-based reader."""
-        self._listing_report = None
+    async def _listing_jobs(
+        self, html: str, careers_url: str
+    ) -> Tuple[List[Dict], Optional[Dict]]:
+        """(jobs, listing report). UNICEF listings use the UNICEF reader first; every other
+        source goes to the rule-based reader, with no report.
+
+        The report is returned, never stored on the crawler: one instance serves concurrent crawls.
+        """
         if _is_unicef_listing(careers_url):
             try:
-                jobs = await self._unicef_listing_jobs(html, careers_url)
+                jobs, report = await self._unicef_listing_jobs(html, careers_url)
                 if jobs:
                     logger.info(f"UNICEF reader found {len(jobs)} jobs")
-                    return jobs
+                    return jobs, report
                 logger.info("UNICEF reader returned no jobs, falling back to rule-based")
             except Exception as e:
                 logger.warning(f"UNICEF reader failed: {e}, falling back to rule-based")
-        return self.extract_jobs_from_html(html, careers_url)
+        return self.extract_jobs_from_html(html, careers_url), None
 
-    async def _unicef_listing_jobs(self, first_html: str, careers_url: str) -> List[Dict]:
+    async def _unicef_listing_jobs(
+        self, first_html: str, careers_url: str
+    ) -> Tuple[List[Dict], Optional[Dict]]:
         """Read page one, then follow the More Jobs link page by page. All pages form one batch.
 
         A failed later page keeps the jobs already read. Pages after the first use job cards only.
-        The walk is recorded in self._listing_report; only a walk that ran out of links is complete.
+        Returns the jobs and the walk's report; only a walk that ran out of links is complete.
         """
-        self._listing_report = None
         from crawler.plugins.unicef import UNICEFPlugin
         reader = UNICEFPlugin()
         jobs = _first_row_per_link(reader.extract(first_html, careers_url).jobs or [])
         if not jobs:
-            return []
+            return [], None
         seen = {job.get('apply_url') for job in jobs}
         remaining = _more_jobs_remaining(first_html)
         expected = len(jobs) + remaining if remaining is not None else None
@@ -1919,20 +1964,54 @@ class SimpleCrawler:
             "UNICEF listing: %s pages, %s jobs, expected %s, stopped: %s",
             pages, len(jobs), expected if expected is not None else 'unknown', stop,
         )
-        self._listing_report = {
+        report = {
             'pages': pages,
             'expected': expected,
             'complete': stop == _LISTING_COMPLETE_STOP,
             'stop': stop,
         }
-        return jobs
+        return jobs, report
 
-    async def crawl_source(self, source: Dict) -> Dict:
+    def _record_raw_page(self, careers_url: str, status: int, html: str, source_id: str):
+        """Store the fetched page and its raw_pages row. Runs in a worker thread."""
+        try:
+            storage_path = self.html_storage.store(careers_url, html, source_id)
+        except Exception as e:
+            logger.warning(f"Error storing HTML: {e}")
+            return None
+        if not storage_path:
+            return None
+        try:
+            conn = self._get_db_conn()
+        except Exception as e:
+            logger.warning(f"Error saving raw_page record: {e}")
+            return None
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO raw_pages (
+                        url, status, storage_path, content_length, source_id, fetched_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    RETURNING id
+                """, (careers_url, status, storage_path, len(html), source_id))
+                raw_page_id = str(cur.fetchone()[0])
+            conn.commit()
+            return raw_page_id
+        except Exception as e:
+            logger.warning(f"Error saving raw_page record: {e}")
+            conn.rollback()
+            return None
+        finally:
+            conn.close()
+
+    async def crawl_source(self, source: Dict, run=None) -> Dict:
         """
-        Crawl a single source.
+        Crawl a single source as the given run (contracts.run_ownership.RunHandle).
         
         Args:
             source: Dict with id, org_name, careers_url, source_type
+            run: the run that owns the source; saving without one is refused
         
         Returns:
             Dict with status, message, counts
@@ -1941,10 +2020,8 @@ class SimpleCrawler:
         org_name = source.get('org_name', 'Unknown')
         careers_url = source['careers_url']
         source_type = source.get('source_type', 'html')
-        
-        # Store source_id for heuristics logging
-        self._current_source_id = source_id
-        self._listing_report = None
+        _SOURCE_FOR_LOGS.set(source_id)
+        listing_report = None
         
         logger.info(f"Crawling {org_name} ({source_type}): {careers_url}")
         
@@ -1960,37 +2037,17 @@ class SimpleCrawler:
                 
                 # Store raw HTML (Phase 2)
                 raw_page_id = None
-                storage_path = None
                 if self.html_storage and html:
-                    try:
-                        storage_path = self.html_storage.store(careers_url, html, source_id)
-                        if storage_path:
-                            # Save raw_page record to database
-                            conn = self._get_db_conn()
-                            try:
-                                with conn.cursor() as cur:
-                                    cur.execute("""
-                                        INSERT INTO raw_pages (
-                                            url, status, storage_path, content_length, source_id, fetched_at
-                                        )
-                                        VALUES (%s, %s, %s, %s, %s, NOW())
-                                        RETURNING id
-                                    """, (careers_url, status, storage_path, len(html), source_id))
-                                    raw_page_id = str(cur.fetchone()[0])
-                                    conn.commit()
-                            except Exception as e:
-                                logger.warning(f"Error saving raw_page record: {e}")
-                                conn.rollback()
-                            finally:
-                                conn.close()
-                    except Exception as e:
-                        logger.warning(f"Error storing HTML: {e}")
+                    raw_page_id = await asyncio.to_thread(
+                        self._record_raw_page, careers_url, status, html, source_id
+                    )
                 
                 # Accept any 2xx status as success (some sites use 202, 204, etc.)
                 if status < 200 or status >= 300:
                     # Log failed extraction
                     if self.extraction_logger:
-                        self.extraction_logger.log_extraction(
+                        await asyncio.to_thread(
+                            self.extraction_logger.log_extraction,
                             url=careers_url,
                             status='EMPTY',
                             source_id=source_id,
@@ -2037,7 +2094,7 @@ class SimpleCrawler:
                         use_new_extractor = False  # Fall through to default
                 
                 if not use_new_extractor:
-                    jobs = await self._listing_jobs(html, careers_url)
+                    jobs, listing_report = await self._listing_jobs(html, careers_url)
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
@@ -2139,8 +2196,14 @@ class SimpleCrawler:
                 
                 # Save to database. Admission sees the finished list and does not fetch.
                 admitted, rejected = admit_batch(jobs, "html")
-                log_admission_rejections(self.extraction_logger, rejected, source_id)
-                counts = self.save_jobs(admitted, source_id, org_name, base_url=careers_url)
+                await asyncio.to_thread(
+                    log_admission_rejections, self.extraction_logger, rejected, source_id
+                )
+                if run is None:
+                    raise OwnershipLost("crawl_source needs the run that owns the source")
+                counts = await run.save(
+                    self.save_jobs, admitted, source_id, org_name, base_url=careers_url
+                )
                 
                 # Log extraction result (Phase 2)
                 if self.extraction_logger:
@@ -2170,13 +2233,14 @@ class SimpleCrawler:
                         extracted_fields['sample_title'] = sample_job.get('title', '')[:100]
                         extracted_fields['has_location'] = bool(sample_job.get('location_raw'))
                         extracted_fields['has_deadline'] = bool(sample_job.get('deadline'))
-                    if self._listing_report:
-                        extracted_fields['listing_pages'] = self._listing_report['pages']
-                        extracted_fields['listing_expected'] = self._listing_report['expected']
-                        extracted_fields['listing_complete'] = self._listing_report['complete']
-                        extracted_fields['listing_stop'] = self._listing_report['stop']
+                    if listing_report:
+                        extracted_fields['listing_pages'] = listing_report['pages']
+                        extracted_fields['listing_expected'] = listing_report['expected']
+                        extracted_fields['listing_complete'] = listing_report['complete']
+                        extracted_fields['listing_stop'] = listing_report['stop']
                     
-                    self.extraction_logger.log_extraction(
+                    await asyncio.to_thread(
+                        self.extraction_logger.log_extraction,
                         url=careers_url,
                         status=extraction_status,
                         source_id=source_id,
@@ -2186,7 +2250,9 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
-                crawl_status, crawl_message = _listing_outcome(len(jobs), self._listing_report)
+                crawl_status, crawl_message = save_failure_outcome(
+                    *_listing_outcome(len(jobs), listing_report), counts
+                )
                 return {
                     'status': crawl_status,
                     'message': crawl_message,

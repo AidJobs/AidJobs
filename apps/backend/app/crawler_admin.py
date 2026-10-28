@@ -82,7 +82,7 @@ async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
             cur.execute("""
                 SELECT id, org_name, careers_url, source_type, org_type,
                        parser_hint, crawl_frequency_days, consecutive_failures,
-                       consecutive_nochange
+                       consecutive_nochange, status, last_crawl_status
                 FROM sources
                 WHERE id::text = %s
             """, (request.source_id,))
@@ -118,7 +118,7 @@ async def run_due(admin=Depends(admin_required)):
     db_url = get_db_url()
     orchestrator = get_orchestrator(db_url)
     
-    result = await orchestrator.run_due_sources_once()
+    result = await orchestrator.run_due_sources_once(wait=False)
     
     return {
         "status": "ok",
@@ -464,119 +464,6 @@ async def undp_diagnostics(admin=Depends(admin_required)):
     except Exception as e:
         logger.error(f"Error in undp_diagnostics: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get UNDP diagnostics: {str(e)}")
-    finally:
-        conn.close()
-
-
-@router.post("/fix-undp-urls")
-async def fix_undp_urls(admin=Depends(admin_required)):
-    """
-    Fix UNDP jobs with incorrect apply_url values by re-extracting and updating.
-    This endpoint forces re-extraction of UNDP jobs and updates apply_url for old jobs
-    that have incorrect URLs (listing pages, base URLs, or missing unique identifiers).
-    """
-    from crawler_v2.simple_crawler import SimpleCrawler
-    
-    conn = get_db_conn()
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Find UNDP source
-            cur.execute("""
-                SELECT id, org_name, careers_url, source_type, parser_hint
-                FROM sources
-                WHERE org_name ILIKE '%UNDP%' OR careers_url ILIKE '%undp%'
-                ORDER BY created_at DESC
-                LIMIT 1
-            """)
-            source = cur.fetchone()
-            
-            if not source:
-                raise HTTPException(status_code=404, detail="No UNDP source found in database")
-            
-            source_id = source['id']
-            careers_url = source['careers_url']
-            parser_hint = source.get('parser_hint')
-            
-            # Get database URL
-            db_url = get_db_url()
-            crawler = SimpleCrawler(db_url)
-            
-            # Fetch and extract jobs
-            logger.info(f"[fix-undp-urls] Fetching UNDP page: {careers_url}")
-            status, html = await crawler.fetch_html(careers_url)
-            
-            if status != 200:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to fetch UNDP page: HTTP {status}"
-                )
-            
-            logger.info(f"[fix-undp-urls] Extracting jobs from {len(html)} bytes of HTML")
-            extracted_jobs = crawler.extract_jobs_from_html(html, careers_url)
-            
-            if not extracted_jobs:
-                return {
-                    "status": "error",
-                    "message": "No jobs extracted from UNDP page",
-                    "html_size": len(html)
-                }
-            
-            # Save jobs directly (SimpleCrawler handles normalization internally)
-            org_name = source.get('org_name') or 'UNDP'
-            # Get careers_url for fallback
-            cursor.execute("SELECT careers_url FROM sources WHERE id::text = %s", (source_id,))
-            source_data = cursor.fetchone()
-            careers_url = source_data.get('careers_url') if source_data else None
-            upsert_counts = crawler.save_jobs(extracted_jobs, str(source_id), org_name, base_url=careers_url)
-            
-            logger.info(f"[fix-undp-urls] Saved {len(extracted_jobs)} jobs")
-            
-            # Get statistics on fixed jobs
-            cur.execute("""
-                SELECT 
-                    COUNT(*) as total_jobs,
-                    COUNT(DISTINCT apply_url) as unique_urls,
-                    COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls,
-                    COUNT(CASE 
-                        WHEN apply_url LIKE '%/cj_view_consultancies%' 
-                        OR apply_url LIKE '%/jobs%'
-                        OR apply_url LIKE '%/careers%'
-                        OR apply_url LIKE '%/list%'
-                        OR apply_url LIKE '%/search%'
-                        THEN 1 
-                    END) as listing_page_urls
-                FROM jobs
-                WHERE source_id = %s
-            """, (source_id,))
-            stats = cur.fetchone()
-            
-            return {
-                "status": "ok",
-                "message": f"UNDP URL fix completed",
-                "source": {
-                    "id": str(source_id),
-                    "org_name": source.get('org_name'),
-                    "careers_url": careers_url
-                },
-                "extraction": {
-                    "jobs_extracted": len(extracted_jobs),
-                    "jobs_normalized": len(normalized_jobs),
-                    "html_size_bytes": size
-                },
-                "upsert": upsert_counts,
-                "current_stats": {
-                    "total_jobs": stats['total_jobs'],
-                    "unique_urls": stats['unique_urls'],
-                    "null_urls": stats['null_urls'],
-                    "listing_page_urls": stats['listing_page_urls']
-                }
-            }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in fix_undp_urls: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fix UNDP URLs: {str(e)}")
     finally:
         conn.close()
 

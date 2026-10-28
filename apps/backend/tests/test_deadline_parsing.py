@@ -234,7 +234,7 @@ async def _extract_with_stall(crawler, html, url):
 
     beat = asyncio.create_task(heartbeat())
     await asyncio.sleep(0.05)
-    jobs = await crawler._listing_jobs(html, url)
+    jobs, _report = await crawler._listing_jobs(html, url)
     stop.set()
     await beat
     return jobs, max(gaps, default=0.0)
@@ -264,7 +264,7 @@ def test_undp_style_listing_extracts_the_same_jobs_without_calling_dateparser(
 
     previous_behaviour()
     calls.clear()
-    before = asyncio.run(crawler._listing_jobs(html, url))
+    before, _report = asyncio.run(crawler._listing_jobs(html, url))
     assert calls, "the previous behaviour sent the heading to dateparser"
     assert _summary(jobs) == _summary(before)
 
@@ -288,6 +288,6 @@ def test_saved_pages_extract_the_same_jobs(crawler, previous_behaviour, relative
     html = path.read_text(encoding="utf-8", errors="replace")
     jobs, worst_stall = asyncio.run(_extract_with_stall(crawler, html, SAVED[relative]))
     previous_behaviour()
-    before = asyncio.run(crawler._listing_jobs(html, SAVED[relative]))
+    before, _report = asyncio.run(crawler._listing_jobs(html, SAVED[relative]))
     assert _summary(jobs) == _summary(before)
     print(f"{relative}: {len(jobs)} jobs, worst event-loop stall {worst_stall:.2f}s")

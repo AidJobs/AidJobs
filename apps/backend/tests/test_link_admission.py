@@ -475,9 +475,9 @@ def test_each_adapter_admits_once_before_save_and_the_orchestrator_does_not():
     assert 'admit_batch(jobs, "html")' in html
     assert 'admit_batch(jobs, "rss")' in rss
     assert 'admit_batch(jobs, "api")' in api
-    assert html.index('admit_batch(jobs, "html")') < html.index("self.save_jobs(admitted")
-    assert rss.index('admit_batch(jobs, "rss")') < rss.index("self.save_jobs(admitted")
-    assert api.index('admit_batch(jobs, "api")') < api.index("self.save_jobs(admitted")
+    assert html.index('admit_batch(jobs, "html")') < html.index("self.save_jobs, admitted")
+    assert rss.index('admit_batch(jobs, "rss")') < rss.index("self.save_jobs, admitted")
+    assert api.index('admit_batch(jobs, "api")') < api.index("self.save_jobs, admitted")
     assert 'job[\'record_class\'] = \'job_posting\'' in html
     assert "restrict_to_repeated_detail_templates" not in html
     assert "admit_batch" not in orchestrator

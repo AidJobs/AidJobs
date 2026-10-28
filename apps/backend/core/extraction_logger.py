@@ -26,7 +26,7 @@ class ExtractionLogger:
     
     def _get_db_conn(self):
         """Get database connection"""
-        return psycopg2.connect(self.db_url)
+        return psycopg2.connect(self.db_url, connect_timeout=10)
     
     def log_extraction(
         self,

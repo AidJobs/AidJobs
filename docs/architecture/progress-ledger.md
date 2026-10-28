@@ -490,7 +490,8 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Approve PR B's implementation (crawl-lock recovery), after its specification and the specification's independent review | Security plan, stage 2, "PR B specification" |
+| Merge PR B, crawl-lock recovery ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)). Approved and built on 27 October 2026; independently reviewed and its findings fixed on 28 October 2026 | Security plan, stage 2, "PR B implementation record" |
+| Optional, a Render setting: a graceful-shutdown timeout in the start command, so that the crawl shutdown's 20 seconds fit inside Render's 30. Not part of PR B | Security plan, stage 2, C8 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
