@@ -815,7 +815,14 @@ def _shutdown_during_a_crawl(source):
         run_id, started = await orch.start_manual_run(source)
         assert started
         await asyncio.wait_for(crawling.wait(), STEP_SECONDS)
+        stopping = time.monotonic()
         await orch.stop()
+        # Recorded by stop() itself, before asyncio.run's teardown could cancel anything.
+        assert time.monotonic() - stopping < 5, "stop() must not wait out its deadline"
+        runs = await asyncio.to_thread(_runs, source["id"])
+        assert (run_id, "interrupted", SHUTDOWN_MESSAGE) in runs
+        assert await asyncio.to_thread(_lock, source["id"]) is None
+        assert not orch._tasks and not orch._closing
         return run_id
 
     return asyncio.run(scenario())
@@ -1279,3 +1286,194 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
     assert icrc_result["message"] == "Found 1 jobs"
     assert extractions[unicef["id"]]["listing_pages"] == 3
     assert "listing_pages" not in extractions[icrc["id"]]
+
+
+# ---------------------------------------------------------------------------
+# Guards named by the final review as having no test of their own.
+# ---------------------------------------------------------------------------
+
+
+def test_a_takeover_based_on_an_old_reading_leaves_a_newer_live_run_alone(db):
+    """A saw the lock expired; B took it over and started a new run; A's takeover must refuse."""
+    source = _add_source()
+    first, second = _orch(), _orch()
+    first._begin(source["id"], False)
+    _age(source["id"], first.lock_lifetime.total_seconds() + 60)
+    assert first._read_lock(source["id"])[1] is True
+    new_run, started = second._begin(source["id"], False)
+    assert started
+    before = (_source_row(source["id"]), _lock(source["id"]), _runs(source["id"]))
+
+    assert first._take_over(source["id"], None) is False
+    assert (_source_row(source["id"]), _lock(source["id"]), _runs(source["id"])) == before
+    assert (new_run, "running", "queued") in before[2]
+
+
+def test_an_expired_lock_with_no_owning_run_is_removed_without_counting(db):
+    source = _add_source()
+    _sql(
+        "INSERT INTO crawl_locks (source_id, locked_at) VALUES (%s, NOW() - interval '1 day')",
+        (source["id"],),
+    )
+    before = _source_row(source["id"])
+    assert _orch()._recover_once() == {"expired_locks": 1, "orphaned_runs": 0}
+    assert _lock(source["id"]) is None
+    assert _source_row(source["id"]) == before
+    run_id, started = _orch()._begin(source["id"], False)
+    assert started and run_id
+
+
+def test_an_orphans_finish_never_deletes_the_live_runs_lock(db):
+    source = _add_source()
+    orch = _orch()
+    live_run, _ = orch._begin(source["id"], False)
+    orphan = str(_sql(
+        """
+        INSERT INTO crawl_logs (source_id, ran_at, status, message)
+        VALUES (%s, NOW() - interval '1 minute', 'running', 'queued') RETURNING id
+        """,
+        (source["id"],),
+    )[0][0])
+    lock_before = _lock(source["id"])
+    orch._finish(source["id"], orphan, _ok(), mode="no_slot", health=None)
+    assert _lock(source["id"]) == lock_before
+    assert (live_run, "running", "queued") in _runs(source["id"])
+    assert orch._finish(source["id"], live_run, _ok(), mode="normal", health=None) is True
+    assert _lock(source["id"]) is None
+
+
+def test_a_takeover_fails_only_the_owner_and_interrupts_the_orphans(db):
+    source = _add_source()
+    orch = _orch()
+    owner, _ = orch._begin(source["id"], False)
+    orphans = [
+        str(_sql(
+            """
+            INSERT INTO crawl_logs (source_id, ran_at, status, message)
+            VALUES (%s, NOW() - interval '1 minute', 'running', 'queued') RETURNING id
+            """,
+            (source["id"],),
+        )[0][0])
+        for _ in range(3)
+    ]
+    _age(source["id"], orch.lock_lifetime.total_seconds() + 60)
+    assert _orch()._take_over(source["id"], None) is True
+    runs = {run[0]: run[1:] for run in _runs(source["id"])}
+    assert runs[owner] == ("fail", EXPIRED_MESSAGE)
+    assert all(runs[o] == ("interrupted", ORPHAN_MESSAGE) for o in orphans)
+    assert _source_fields(source["id"])["failures"] == 1
+    assert _lock(source["id"]) is None
+
+
+def test_recovery_continues_past_one_sources_error(db):
+    sources = [_add_source("First"), _add_source("Second")]
+    orch = _orch()
+    for source in sources:
+        orch._begin(source["id"], False)
+        _age(source["id"], orch.lock_lifetime.total_seconds() + 60)
+    rescuer = _orch()
+    real_take_over = rescuer._take_over
+    calls = []
+
+    def first_one_fails(source_id, health):
+        calls.append(source_id)
+        if len(calls) == 1:
+            raise RuntimeError("connection dropped")
+        return real_take_over(source_id, health)
+
+    rescuer._take_over = first_one_fails
+    assert rescuer._recover_once() == {"expired_locks": 1, "orphaned_runs": 0}
+    assert len(calls) == 2
+    assert sum(_lock(s["id"]) is None for s in sources) == 1
+    assert rescuer._recover_once() == {"expired_locks": 1, "orphaned_runs": 0}
+    assert all(_lock(s["id"]) is None for s in sources)
+
+
+def test_the_real_scheduler_and_recovery_loops_run_and_stop(db, monkeypatch):
+    import orchestrator as orchestrator_module
+
+    due = _add_source("Due")
+    stuck = _add_source("Stuck", due=False)
+    _sql(
+        "INSERT INTO crawl_locks (source_id, locked_at) VALUES (%s, NOW() - interval '1 day')",
+        (stuck["id"],),
+    )
+    monkeypatch.delenv("AIDJOBS_DISABLE_SCHEDULER", raising=False)
+    monkeypatch.setattr(orchestrator_module, "SCHEDULER_INTERVAL_SECONDS", 0.2)
+    monkeypatch.setattr(orchestrator_module, "RECOVERY_INTERVAL_SECONDS", 0.2)
+
+    async def scenario():
+        orch = _orch()
+        crawled = []
+
+        async def crawl(src, run):
+            crawled.append(src["org_name"])
+            return _ok()
+
+        orch.crawl_source = crawl
+        await orch.start()
+        assert orch.running
+        give_up = time.monotonic() + STEP_SECONDS
+        while time.monotonic() < give_up:
+            runs = await asyncio.to_thread(_runs, due["id"])
+            lock = await asyncio.to_thread(_lock, stuck["id"])
+            if runs and runs[-1][1] == "ok" and lock is None:
+                break
+            await asyncio.sleep(0.1)
+        await orch.stop()
+        assert not orch.running
+        assert orch._scheduler_task.cancelled() or orch._scheduler_task.cancelling()
+        assert orch._recovery_task.cancelled() or orch._recovery_task.cancelling()
+        assert not orch._tasks and not orch._closing
+        return crawled
+
+    crawled = asyncio.run(scenario())
+    assert crawled == ["Due"], "one scheduled crawl, through scheduler_loop"
+    assert [r[1] for r in _runs(due["id"])] == ["ok"]
+    assert _lock(stuck["id"]) is None, "recovery_loop removed the expired lock"
+    assert _lock(due["id"]) is None
+
+
+def test_the_run_route_starts_a_crawl_returns_the_open_run_and_refuses_an_unknown_source(
+    db, monkeypatch
+):
+    from fastapi import HTTPException
+
+    from app import crawler_admin
+
+    source = _add_source()
+
+    async def scenario():
+        orch = _orch()
+        gate = asyncio.Event()
+
+        async def crawl(src, run):
+            await gate.wait()
+            return _ok()
+
+        orch.crawl_source = crawl
+        monkeypatch.setattr(crawler_admin, "get_db_url", lambda: TEST_URL)
+        monkeypatch.setattr(crawler_admin, "get_orchestrator", lambda url: orch)
+        request = crawler_admin.RunSourceRequest
+        first = await crawler_admin.run_source(request(source_id=source["id"]), admin=None)
+        second = await crawler_admin.run_source(request(source_id=source["id"]), admin=None)
+        with pytest.raises(HTTPException) as unknown:
+            await crawler_admin.run_source(request(source_id=str(uuid.uuid4())), admin=None)
+        gate.set()
+        await asyncio.wait_for(asyncio.gather(*list(orch._tasks)), STEP_SECONDS)
+        return first, second, unknown.value.status_code
+
+    first, second, unknown_status = asyncio.run(scenario())
+    run_id = first["data"]["crawl_run_id"]
+    assert first == {
+        "status": "ok",
+        "message": "Crawl started for Example",
+        "data": {"crawl_run_id": run_id, "started": True},
+    }
+    assert second == {
+        "status": "ok",
+        "message": "Crawl already running for Example",
+        "data": {"crawl_run_id": run_id, "started": False},
+    }
+    assert unknown_status == 404
+    assert _runs(source["id"]) == [(run_id, "ok", "Found 0 jobs")]

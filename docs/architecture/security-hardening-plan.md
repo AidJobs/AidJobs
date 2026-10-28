@@ -328,7 +328,7 @@ Revised the same day after an independent read-only review of the first version 
 
 #### PR B implementation record
 
-Implementation approved by the user on 27 October 2026, together with the three decisions in D. Built on the branch `feat/crawl-ownership` from `main` at `bb9430c`, in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), as three commits:
+Implementation approved by the user on 27 October 2026, together with the three decisions in D. Built on the branch `feat/crawl-ownership` from `main` at `bb9430c`, in [PR #60](https://github.com/AidJobs/AidJobs/pull/60). The code commits:
 - `cfe981d`: the ownership token, the owner-only finish, takeover and recovery, slots and the queued set, the time limit, shutdown, work in worker threads, and the removal of `/fix-undp-urls` (C1–C5, C7–C11);
 - `31d1b7a`: issue #5, one savepoint per job and the failed-save statuses (C6), as its own commit;
 - `abf19d0`: the PostgreSQL tests and their CI step (F);
@@ -354,7 +354,7 @@ Evidence, 27 October 2026:
   - a manual run turned a paused source `active`;
   - a late finish overwrote a failed run with `ok`.
 - **The branch** (local, Python 3.14; CI checks Python 3.11 on the pull request):
-  - after the review fixes, the 40 PostgreSQL tests pass against PostgreSQL 17.6, four runs in a row;
+  - after both reviews, the 47 PostgreSQL tests pass against PostgreSQL 17.6, four runs in a row;
   - the full CI list passes, 420 passed and 4 skipped, the same skips as before;
   - Ruff passes, and the changed modules have no new Pyflakes finding against `main`;
   - with only the ownership commit, the CI list also passes.
@@ -378,6 +378,16 @@ Accepted, not changed:
 - Issue #5's behaviour on `main` is shown by a one-off run, recorded above, not by a committed test.
 
 **Unrequested edits during the review.** While the reviewer ran, duplicate versions of this PR's documentation edits appeared in the ledger and the crawler plan, written by none of the user, this session's agent, a hook, or another session; the reviewer was the only other agent running. The user confirmed they had not made them. They were removed before commit, and the code was checked unchanged. Later reviews run read-only.
+
+**Final independent review of the whole diff**, 28 October 2026, requested by the user before deciding on the merge. It was run by a fresh agent in a separate clone with no remote, with its own test database, and a fingerprint of this repository was taken before and after (unchanged). Verdict: approve with minor changes; no blocker, no major finding, no code defect.
+- **Stale runs:** a run that has lost ownership cannot write jobs, any `crawl_logs` row, any lock, or any source field. It can still add `raw_pages`, `extraction_logs` and rejection-log rows, and stored HTML, which only admin diagnostics read; scheduling, the health score and failure counting do not.
+- **Lock order, counting and shutdown:** confirmed, as was the CI test-count difference. CI's 9 skips are the 4 opt-in saved-page deadline tests plus 5 tests that need the git-ignored `raw-html` pages, present only on the agent's machine: 415 + 9 = 420 + 4.
+- **End-to-end comparison:** a new comparison runs the real scheduler path, orchestrator, crawler and save on the saved pages, `main` against the branch. It showed the same source rows, `crawl_logs` rows, stored jobs and no lock left, for all 12 sources. It covers successful crawls only.
+- **In-memory mutations:** of 20, 13 were caught and 7 survived (the reviewer's summary said 14 and 6; its results file shows 13 and 7). Five of the survivors were real guards with no test of their own: the takeover's expiry re-check, the finish deleting only its own lock, counting only a lock that had an owning run, identifying the owner by `ran_at = locked_at`, and recovery continuing past one source's error. Tests for each were added, and each now fails with its guard removed in memory. The shutdown test now checks the outcome before Python's teardown; a test now runs the real scheduler and recovery loops through `start()` and `stop()`, and another the `/run` route's three responses. The other two survivors stay as they are: the shield around a finish, which matters only on a second cancellation, and a defensive re-check in orphan marking that guards no race the reviewer could find.
+- **Nits not acted on:**
+  - `interrupted` runs, including manual runs that found no slot, lower the health score, as `running` rows already did on `main`.
+  - The `dateparser` lock can make the event loop wait for a parse running in a save thread: at most one parse, about 1–2 seconds only the first time in a cold process.
+- **Before the merge:** recovery acts on production's leftovers on its first round, as designed (C3). The read-only check for leftover locks and running rows is run just before the merge, so the user sees what it would touch.
 
 ### Stage 3. Backend error handling and logging
 
