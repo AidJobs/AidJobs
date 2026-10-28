@@ -62,7 +62,9 @@ def test_short_and_boolean_values_are_not_secrets():
         'invalid dsn: missing "=" after "OTHERPW99xyz" in connection info string',
         'invalid integer value "OTHERPW99" for connection option "port"',
         "Port could not be cast to integer value as 'OTHERPW99'",
-        "connect to postgresql://user:OTHER/PW99@db.example.invalid:5432/x failed",
+        "connect to postgresql://user:OTHERPW99/x@db.example.invalid:5432/x failed",
+        "clone https://OTHERPW99token@git.example.invalid/repo failed",
+        "token ghp_" + "OTHERPW99abcdefghijklmnop leaked",
         "password=OTHERPW99 host=db.example.invalid",
         "Authorization: Bearer OTHERPW99abcdefgh",
         "GET https://maps.example.invalid/geocode?address=Nairobi&key=OTHERPW99xyz",
@@ -71,6 +73,17 @@ def test_short_and_boolean_values_are_not_secrets():
 )
 def test_demonstrated_secret_shapes_are_redacted(message):
     assert "OTHERPW99" not in redact_text(message)
+
+
+def test_redaction_stays_fast_on_long_text_without_spaces():
+    """An unbounded URL scheme made 16 KB of dotted text take 9 s inside every log call."""
+    import time
+
+    text = ("ab." * 6000)[:16000]
+    start = time.perf_counter()
+    redact_text(text)
+    redact_exception(RuntimeError(text))
+    assert time.perf_counter() - start < 1.0
 
 
 def test_redact_exception_keeps_pr50_markers():
@@ -192,6 +205,49 @@ def test_install_covers_uvicorns_own_logging_configuration():
             logger.handlers[:] = handlers
             logger.propagate = propagate
         logging.lastResort.setFormatter(original_last_resort)
+
+
+def test_main_installs_redaction_before_importing_any_app_module():
+    """Some app modules log while importing; nothing may be logged before install()."""
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8"))
+    order = []
+    for index, stmt in enumerate(tree.body):
+        if isinstance(stmt, ast.ImportFrom) and stmt.module:
+            root = stmt.module.split(".")[0]
+            if stmt.module == "app" and [a.name for a in stmt.names] == ["log_safety"]:
+                order.append(("import log_safety", index))
+            elif root in {"app", "core", "security", "orchestrator", "crawler_v2", "contracts"}:
+                order.append(("app import", index))
+        elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+            text = ast.unparse(stmt.value)
+            if text == "log_safety.install()":
+                order.append(("install", index))
+            elif text.startswith("logging.basicConfig("):
+                order.append(("basicConfig", index))
+    first = {}
+    for name, index in order:
+        first.setdefault(name, index)
+    assert first["basicConfig"] < first["import log_safety"] < first["install"]
+    assert first["install"] < first["app import"]
+
+
+def test_prevention_keeps_secrets_out_of_the_message_itself(monkeypatch, caplog):
+    """Before any formatter: the logged message (record.getMessage()) never holds the secret."""
+    from app import db_config as db_config_module
+    from app.errors import log_failure
+
+    config = db_config_module.DBConfig.__new__(db_config_module.DBConfig)
+    config.supabase_db_url = "postgresql://probe:" + "OTHERPW99" + "/zz@127.0.0.1:1/postgres"
+    with caplog.at_level(logging.DEBUG):
+        assert config.get_connection_params() is None
+        log_failure(logging.getLogger("stage3-test"), "Unhandled error",
+                    RuntimeError("password=" + "OTHERPW99zz"))
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages and not any("OTHERPW99" in m for m in messages)
+    assert any("could not be parsed (ValueError)" in m for m in messages)
 
 
 def _app():

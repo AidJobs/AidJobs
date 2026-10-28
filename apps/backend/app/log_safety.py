@@ -24,8 +24,12 @@ _MIN_SECRET_LENGTH = 12
 _NOT_SECRETS = frozenset({"true", "false", "yes", "no", "none", "null", "on", "off"})
 _SECRET_NAME = re.compile(r"(KEY|SECRET|PASSWORD|PASSWD|TOKEN)", re.IGNORECASE)
 
-# PR #50's shapes, kept as they were: any URL, and a password= parameter.
-_ANY_URL = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
+# A URL scheme, bounded: an unbounded one makes every pattern below quadratic on long text
+# without spaces (16 KB took 9 s), and redaction runs inside every log call.
+_SCHEME = r"[a-z][a-z0-9+.-]{0,31}://"
+
+# PR #50's shapes, kept: any URL, and a password= parameter.
+_ANY_URL = re.compile(r"\b" + _SCHEME + r"\S+", re.IGNORECASE)
 _PASSWORD_PARAM = re.compile(r"(password\s*=\s*)\S+", re.IGNORECASE)
 
 _QUOTED = re.compile(r'"[^"]*"')
@@ -45,9 +49,9 @@ _PATTERNS = (
     (re.compile(r"(Port could not be cast to integer value as )'[^']*'"),
      r"\1'" + VALUE_MARK + "'"),
     # user:password@ (the password may contain "/"), then a bare token@.
-    (re.compile(r"\b([a-z][a-z0-9+.-]*://)[^\s/@:]*:[^\s@]*@", re.IGNORECASE),
+    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]*:[^\s@]*@", re.IGNORECASE),
      r"\1" + VALUE_MARK + "@"),
-    (re.compile(r"\b([a-z][a-z0-9+.-]*://)[^\s/@:]+@", re.IGNORECASE), r"\1" + VALUE_MARK + "@"),
+    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]+@", re.IGNORECASE), r"\1" + VALUE_MARK + "@"),
     (re.compile(r"\b(password|passwd|pwd)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)",
                 re.IGNORECASE), r"\1\2" + VALUE_MARK),
     (re.compile(r"\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE), r"\1" + VALUE_MARK),

@@ -1173,9 +1173,10 @@ class SearchService:
         try:
             conn_params = db_config.get_connection_params()
             if not conn_params:
+                # A malformed database URL: the same answer as before phase 1 (PR #50's message).
                 return {
                     "ok": False,
-                    "error": "Database connection params missing"
+                    "error": DB_UNAVAILABLE
                 }
             
             # Log connection attempt for debugging

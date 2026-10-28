@@ -1,10 +1,11 @@
 """Security stage 3: no new place may put exception text into an API response.
 
-A static tripwire over app/ and main.py. Inside every `except ... as NAME:` block it finds where
-NAME (or traceback.format_exc()) reaches a `raise HTTPException(...)`, a `return`, a
-`JSONResponse(...)`, or, inside a route function, a dict entry, an error/message variable, or an
-append/update, all of which are returned later. It is not a proof of absence; it stops the
-pattern from growing.
+A static tripwire over app/ and main.py. Inside every `except ... as NAME:` block, in any
+function, it finds where NAME (or traceback.format_exc()) reaches a `raise HTTPException(...)`, a
+`return`, a `JSONResponse(...)`, a dict entry, an error/message variable, or an append/update.
+The last three are counted in every function, not only routes, because the facets leak was a
+helper's `base["error"] = str(e)` returned by a public route. It does not follow values through
+other variables; it is not a proof of absence, and the runtime leak tests remain the proof.
 
 ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
 convert them and shrink this list to nothing. A converted function must be removed from it.
@@ -14,7 +15,6 @@ from collections import Counter
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
-ROUTE_METHODS = {"get", "post", "put", "delete", "patch"}
 
 ALLOWED = {
     # Admin routes (session required); phase 2.
@@ -75,6 +75,11 @@ ALLOWED = {
     # Reviewed, not leaks: the except branch cannot run; only our own fixed fetch messages.
     "main.py::healthz": 1,
     "app/sources.py::_policy_head": 1,
+    # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None,
+    # _search_meilisearch only logs), or a job URL's parse error in the admin quality report.
+    "app/ai_service.py::_call_openrouter": 6,
+    "app/search.py::_search_meilisearch": 2,
+    "app/data_quality.py::validate_job": 1,
 }
 
 
@@ -88,21 +93,13 @@ def _refs(node, name):
     return False
 
 
-def _is_route(func):
-    return any(
-        isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute)
-        and d.func.attr in ROUTE_METHODS
-        for d in getattr(func, "decorator_list", [])
-    )
-
-
 def _call_name(call):
     f = call.func
     return f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
 
 
 def _stored(node, name):
-    """In a route: error text kept for the response (dict entry, error variable, append)."""
+    """Error text kept for later: a dict entry, an error/message variable, an append/update."""
     assigned = isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None
     if assigned and _refs(node.value, name):
         targets = node.targets if isinstance(node, ast.Assign) else [node.target]
@@ -116,14 +113,16 @@ def _stored(node, name):
             and node.func.attr in {"append", "extend", "update"} and _refs(node, name))
 
 
-def _reaches_response(node, name, route):
+def _reaches_response(node, name):
     if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
         return _call_name(node.exc) == "HTTPException" and _refs(node.exc, name)
     if isinstance(node, ast.Return):
         return node.value is not None and _refs(node.value, name)
     if isinstance(node, ast.Call) and _call_name(node) == "JSONResponse":
         return _refs(node, name)
-    return route and _stored(node, name)
+    # In any function, not only routes: the facets leak was a helper's dict entry
+    # (base["error"] = str(e)) returned by a public route.
+    return _stored(node, name)
 
 
 def findings():
@@ -135,13 +134,12 @@ def findings():
         for func in ast.walk(tree):
             if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            route = _is_route(func)
             for handler in ast.walk(func):
                 if not isinstance(handler, ast.ExceptHandler) or not handler.name:
                     continue
                 for stmt in handler.body:
                     for node in ast.walk(stmt):
-                        if _reaches_response(node, handler.name, route):
+                        if _reaches_response(node, handler.name):
                             counts[f"{rel}::{func.name}"] += 1
     return counts
 

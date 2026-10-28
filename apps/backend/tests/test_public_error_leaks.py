@@ -72,11 +72,16 @@ def _run(db_url, body):
 
 
 def _assert_no_leak(calls, logs):
+    """The leak first, for every response and the logs; request IDs are checked separately."""
+    leaking = [c["path"] for c in calls if FRAGMENT in c["body"]]
+    assert not leaking, f"responses quoting the database password: {leaking}"
+    assert FRAGMENT not in logs, [line for line in logs.splitlines() if FRAGMENT in line][:5]
+
+
+def _assert_request_ids(calls):
     for c in calls:
-        assert FRAGMENT not in c["body"], c
         assert c["request_id"] and len(c["request_id"]) == 32, c
     assert len({c["request_id"] for c in calls}) == len(calls)
-    assert FRAGMENT not in logs, [line for line in logs.splitlines() if FRAGMENT in line][:5]
 
 
 def _statuses(calls):
@@ -95,7 +100,16 @@ def test_a_malformed_database_url_reaches_no_response_or_log():
         "/api/db/status": 200,
         "/api/capabilities": 200,
     }
+    db_status = next(c for c in calls if c["path"] == "/api/db/status")
+    assert json.loads(db_status["body"]) == {"ok": False, "error": "Database unavailable"}
     assert "could not be parsed (ValueError)" in logs
+
+
+def test_every_public_response_carries_a_new_request_id():
+    for db_url, body in ((MALFORMED_DB_URL, PUBLIC_CALLS),
+                         (WELL_FORMED_DB_URL, DRIVER_FAILURE + PUBLIC_CALLS)):
+        calls, _logs = _run(db_url, body)
+        _assert_request_ids(calls)
 
 
 def test_driver_errors_reach_no_response_or_log():
