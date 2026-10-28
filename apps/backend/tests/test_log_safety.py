@@ -75,15 +75,16 @@ def test_demonstrated_secret_shapes_are_redacted(message):
     assert "OTHERPW99" not in redact_text(message)
 
 
-def test_redaction_stays_fast_on_long_text_without_spaces():
-    """An unbounded URL scheme made 16 KB of dotted text take 9 s inside every log call."""
+@pytest.mark.parametrize("unit", ["ab.", "x://", "x://y:", "x://u:p/"])
+def test_redaction_stays_fast_on_long_text_without_spaces(unit):
+    """Unbounded URL patterns made 16 KB take seconds (64 KB: 20 s) inside every log call."""
     import time
 
-    text = ("ab." * 6000)[:16000]
+    text = (unit * (64000 // len(unit) + 1))[:64000]
     start = time.perf_counter()
     redact_text(text)
     redact_exception(RuntimeError(text))
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < 2.0
 
 
 def test_redact_exception_keeps_pr50_markers():
@@ -248,6 +249,27 @@ def test_prevention_keeps_secrets_out_of_the_message_itself(monkeypatch, caplog)
     messages = [r.getMessage() for r in caplog.records]
     assert messages and not any("OTHERPW99" in m for m in messages)
     assert any("could not be parsed (ValueError)" in m for m in messages)
+
+
+def test_the_global_error_handler_logs_without_the_secret(caplog):
+    """main.py's middleware must log through log_failure, not with the raw exception text."""
+    import sys
+    import types
+
+    sys.modules.setdefault("app.db", types.ModuleType("app.db")).get_db_conn = lambda: None
+    import main
+
+    def explode():
+        raise RuntimeError("password=" + "OTHERPW99mw")
+
+    if not any(getattr(r, "path", None) == "/__stage3_boom" for r in main.app.routes):
+        main.app.add_api_route("/__stage3_boom", explode, methods=["GET"])
+    client = TestClient(main.app, raise_server_exceptions=False)
+    with caplog.at_level(logging.ERROR):
+        response = client.get("/__stage3_boom")
+    assert response.status_code == 500 and "OTHERPW99" not in response.text
+    messages = [r.getMessage() for r in caplog.records if "Unhandled error" in r.getMessage()]
+    assert messages and not any("OTHERPW99" in m for m in messages)
 
 
 def _app():

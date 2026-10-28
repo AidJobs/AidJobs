@@ -48,10 +48,12 @@ _PATTERNS = (
      r'\1"' + VALUE_MARK + r'"\2'),
     (re.compile(r"(Port could not be cast to integer value as )'[^']*'"),
      r"\1'" + VALUE_MARK + "'"),
-    # user:password@ (the password may contain "/"), then a bare token@.
-    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]*:[^\s@]*@", re.IGNORECASE),
+    # user:password@ (the password may contain "/"), then a bare token@. Each run is bounded,
+    # as the scheme is, so text with many "x://" and no "@" stays linear.
+    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]{0,256}:[^\s@]{0,256}@", re.IGNORECASE),
      r"\1" + VALUE_MARK + "@"),
-    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]+@", re.IGNORECASE), r"\1" + VALUE_MARK + "@"),
+    (re.compile(r"\b(" + _SCHEME + r")[^\s/@:]{1,256}@", re.IGNORECASE),
+     r"\1" + VALUE_MARK + "@"),
     (re.compile(r"\b(password|passwd|pwd)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)",
                 re.IGNORECASE), r"\1\2" + VALUE_MARK),
     (re.compile(r"\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE), r"\1" + VALUE_MARK),

@@ -675,19 +675,23 @@ Decisions made while building, each within the approved design or noted against 
   
   `/api/db/status` keeps PR #50's "Database unavailable".
 - **Tracebacks are now logged in every environment** through `log_failure`, redacted on output. Before, the middleware logged them only in development.
-- **Redaction's URL patterns bound the scheme to 32 characters.** Unbounded, they were quadratic: 16 KB of dotted text took 9 seconds per log call. PR #50's original pattern had the same flaw on one log line. A timing test guards it.
+- **Redaction's URL patterns are bounded:** the scheme to 32 characters, and the user-and-password runs to 256. Unbounded, they were quadratic inside every log call:
+  - 16 KB of dotted text took 9 seconds;
+  - 64 KB of repeated `x://` took 20 seconds.
+  
+  PR #50's original pattern had the scheme flaw on one log line. A timing test covers four shapes at 64 KB; each takes under 0.4 seconds locally.
 - **Crawl tasks log under `run-<id>`,** set in `execute_run`, which always runs in its own task.
 
 Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pinned versions):
 - **On `main`'s code, with a fake malformed database URL:**
-  - the public facets response quoted the password fragment (`Port could not be cast to integer value as '<fragment>'`), and 8 log lines did too;
+  - the public facets response quoted the password fragment (`Port could not be cast to integer value as '<fragment>'`), and 8 or 9 log lines did too, depending on the environment;
   - search and the single job answered 500.
 - **The new tests on `main`'s code:**
   - both leak tests fail on the leak itself ("responses quoting the database password: `['/api/search/facets']`");
   - the request-ID test fails on the missing header;
   - the static guard flags `search.py::get_facets`.
 - **On the branch:**
-  - 451 passed in the CI list, with the same 4 skips as before;
+  - 455 passed in the CI list, with the same 4 skips as before;
   - 47 PostgreSQL tests passed;
   - Ruff is clean, and the edited files have no new Pyflakes finding;
   - the offline end-to-end crawl comparison against `main` is identical for all 12 sources.
@@ -695,16 +699,17 @@ Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
   - every response carries `X-Request-ID`, and access-log lines carry the same ID;
   - a malformed URL is logged as "could not be parsed (ValueError)";
   - the fake fragment appears nowhere.
-- **Independent review** (separate agent, isolated clone, fake values; verdict: approve with changes; 29 of 33 in-memory mutations caught). Fixed:
-  - the quadratic patterns;
-  - leak tests that failed on `main` only for the missing header;
-  - a URL-credential test that passed for the wrong reason, and untested rules;
-  - no proof of the import-time order;
-  - prevention tested only through the safety net;
-  - a static guard that missed helper functions (it now flags the old facets leak);
-  - the malformed-URL database status message.
-  
-  The four surviving rule mutations now fail their tests.
+- **Independent review** (separate agent, isolated clone, fake values; verdict: approve with changes).
+  - **First pass:** 27 of 33 mutations caught, run on copies. The 6 survivors were three redaction rules, the import order, and raw logging in the middleware and in `db_config`.
+  - **Fixed:**
+    - the quadratic patterns;
+    - leak tests that failed on `main` only for the missing header;
+    - a URL-credential test that passed for the wrong reason, and untested rules;
+    - no proof of the import-time order;
+    - prevention tested only through the safety net (now tested on the logged message itself, including through `main.py`'s middleware);
+    - a static guard that missed helper functions (it now flags the old facets leak);
+    - the malformed-URL database status message.
+  - **Re-review of the fixes:** 11 of 12 mutations caught, plus a remaining quadratic shape (`x://` repeated). Both were then fixed. All 6 first-pass survivors now fail their tests.
 - **Accepted, not changed:**
   - harmless false positives in logs only (`?key=` in job URLs, long `sk-` slugs);
   - Python's own `--- Logging error ---` dump, `warnings`, and thread excepthooks bypass the formatters;

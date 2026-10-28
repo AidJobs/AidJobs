@@ -44,6 +44,7 @@ ALLOWED = {
     "app/job_management.py::get_deletion_impact": 1,
     "app/job_management.py::restore_jobs": 1,
     "app/job_management.py::search_jobs": 1,
+    "app/data_quality.py::validate_job": 1,  # a job URL's parse error, in the quality report
     "app/presets.py::get_source_preset": 1,
     "app/presets.py::get_source_presets": 1,
     "app/search.py::get_search_settings": 1,
@@ -75,11 +76,10 @@ ALLOWED = {
     # Reviewed, not leaks: the except branch cannot run; only our own fixed fetch messages.
     "main.py::healthz": 1,
     "app/sources.py::_policy_head": 1,
-    # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None,
-    # _search_meilisearch only logs), or a job URL's parse error in the admin quality report.
+    # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;
+    # _search_meilisearch uses the text only for keyword matching).
     "app/ai_service.py::_call_openrouter": 6,
     "app/search.py::_search_meilisearch": 2,
-    "app/data_quality.py::validate_job": 1,
 }
 
 
