@@ -9,16 +9,19 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 27 October 2026, after PR #58 and the user's removal of `OPENROUTER_API_KEY` from Render.
-- **`main`:** `51c6299` (merge of PR #58). CI passed on it.
-- **Render:** the user redeployed `66a1319` by hand at 21:50 IST after removing the key; Auto-Deploy then put `51c6299` live at 21:54 IST (Render events, read by the agent).
-- **The new instance's start-up log:** no AI extractor or AI normaliser starts. The public search helpers log "OpenRouter API key not configured … using fallback". No error lines.
+**Last verified:** 28 October 2026, after PR #60 (security stage 2, PR B), the first crawl under it, and the Render start-command change.
+- **`main`:** `f4059f0` (merge of PR #60). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
+- **Render:**
+  - Auto-Deploy put `f4059f0` live at 17:23 IST.
+  - At 19:03 IST the user changed the start command to `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`. Render redeployed the same commit, and the old instance shut down cleanly.
+  - Auto-Deploy is still "On Commit".
+  - All three read by the agent from Render's settings, events and logs.
 - **Read-only afterwards:**
   - the health check answers;
-  - the database status is ok (405 jobs, 293 active, 3 sources);
-  - search parsing and suggestions answer from their rule-based path;
-  - the API docs answer 404, and `/v2` answers;
-  - no crawl lock is held and no run is marked running. Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
+  - the database status is ok (405 jobs, 282 active, 3 sources);
+  - no crawl lock is held and no run is marked running, before and after the deploy;
+  - ICRC's crawl, run by the user from the admin at 18:45 IST, ended `ok` and released its lock (security plan, stage 2, live record).
+- Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -164,6 +167,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | ICRC deadlines from microdata (C4 amendment), the capital-T cut, two-digit years | PR #56, `c86984e` | 27 Oct 2026 | Merged, CI green, deployed, live-checked with one ICRC crawl |
 | PR #56 live and the ICRC crawl recorded | PR #57, `66a1319` | 27 Oct 2026 | Merged, CI green |
 | Crawl path without AI or the old plugin registry; contract §10 amended | PR #58, `51c6299` | 27 Oct 2026 | Merged, CI green, deployed, live-checked |
+| PR B specification (security stage 2); contract §5 `interrupted` and crawler-plan decisions; PR #58 recorded live | PR #59, `bb9430c` | 27 Oct 2026 | Merged, CI green |
+| Security stage 2, PR B: crawl-run ownership, takeover and recovery, owner-only finish, slots, time limit, shutdown; issue #5 savepoints; `/fix-undp-urls` removed | PR #60, `f4059f0` | 28 Oct 2026 | Merged, CI green, deployed, live-checked with one ICRC crawl |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -175,7 +180,7 @@ PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as
 | B1, outbound fetch policy | Done and deployed | Check the policy on the deployed backend (part of B5) |
 | B2, extraction and admission audit | Recorded | None |
 | B3, identity and upsert audit | Recorded from the repository | Production keys are not verified. No identity change is planned |
-| B4, failure and lifecycle audit | Not started | Read-only audit. Production evidence is now available (see W-05). Crawl locks never expire, so a restart during a crawl leaves its source skipped (found 26 October 2026; fixed ahead of B4 as stage 2 of the security plan) |
+| B4, failure and lifecycle audit | Not started | Read-only audit. Production evidence is now available (see W-05). Crawl locks never expired, so a restart during a crawl left its source skipped (found 26 October 2026). Fixed ahead of B4 as stage 2 of the security plan: PR #60, live on 28 October 2026 |
 | B5, completion record | Not started | After B4 |
 | C1, decode responses | Done and deployed | None |
 | C2, labels | Recorded | None |
@@ -467,7 +472,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 - **Ranking:** organisations with hiring evidence (jobs on UNjobs or ReliefWeb) first, by job count; IATI-only organisations last.
 - **Per record:** the official careers page; the recruitment system and the evidence for it (for example links to `myworkdayjobs.com` or `oraclecloud.com/…/CandidateExperience`); how the listing can be read (plain page, page that needs JavaScript, feed, or public API); paging and size against the benchmark; bot protection seen; whether job pages show location, deadline, and contract type; which other organisations share the site. One or two spaced requests per organisation; a bot challenge is recorded, never solved or bypassed. At this size, finding careers pages needs a small read-only research script run from the user's machine, which needs its own approval.
 - **Output:** `docs/architecture/source-survey.md` (summary, groups by recruitment system ranked by jobs covered) and a CSV master list beside it, through a pull request. Expected after matching: probably 2,500 to 3,500 distinct organisations, of which perhaps 600 to 1,000 hire regularly (an estimate).
-- **Known crawler limits that would lose jobs at this scale,** each its own item: crawl locks never expire (security plan, stage 2); job pages are not opened above 50 candidates (W-09); closed jobs without a deadline never leave search (W-06); scheduled crawls run only while the free Render backend is awake (UX-08 item 5); no per-site time budget; found against expected is reported only for UNICEF (W-04).
+- **Known crawler limits that would lose jobs at this scale,** each its own item: job pages are not opened above 50 candidates (W-09); closed jobs without a deadline never leave search (W-06); scheduled crawls run only while the free Render backend is awake (UX-08 item 5); no per-site time budget; found against expected is reported only for UNICEF (W-04).
 - **Background:** the MSF and UNDP sources the user added and removed on 26 October 2026 are recorded in the security plan's incident record.
 
 ### Known and deliberately left alone
@@ -490,8 +495,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Merge PR B, crawl-lock recovery ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)). Approved and built on 27 October 2026; independently reviewed and its findings fixed on 28 October 2026 | Security plan, stage 2, "PR B implementation record" |
-| Optional, a Render setting: a graceful-shutdown timeout in the start command, so that the crawl shutdown's 20 seconds fit inside Render's 30. Not part of PR B | Security plan, stage 2, C8 |
+| Delete the merged branch `feat/crawl-ownership`; its commit IDs are recorded and kept in `main` by the merge commit | Security plan, stage 2, live record |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |

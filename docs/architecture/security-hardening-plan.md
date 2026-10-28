@@ -33,7 +33,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | --- | --- | --- |
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
-| 2 | Crawl-lock recovery | In progress: PR A done ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)); PR B built in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), not merged (implementation record below) |
+| 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design first, for approval |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -85,7 +85,7 @@ Plan, then implementation, as a separate crawler-reliability pull request. Requi
 
 Tests: interrupted crawls, restarts, expired locks, recovery, and concurrent workers. No existing lock is cleared by hand or automatically as part of preparing this.
 
-**Until this is merged and verified:** after every merge, the post-merge check includes a read-only query for sources holding a lock with no live crawl behind it. A finding is reported to the user, never cleared.
+**Until this is merged and verified:** after every merge, the post-merge check includes a read-only query for sources holding a lock with no live crawl behind it. A finding is reported to the user, never cleared. Merged and verified on 28 October 2026. The query stays in each post-merge check: since PR B, recovery handles such locks itself, and the query shows whether it has.
 
 **Evidence gathered on 26 October 2026, after this stage was written.** The plan for this stage starts by establishing the actual failure mechanism; none of the hypotheses below is proven.
 
@@ -110,7 +110,7 @@ Tests: interrupted crawls, restarts, expired locks, recovery, and concurrent wor
 - Live on Render, 27 October 2026: during an ICRC crawl the user ran from the admin at 16:25 IST (by then with PR #56 too), the health checks kept their 5-second rhythm, longest gap 6 seconds over 63 checks, against 70 seconds of silence on 26 October; no failed instance (ledger W-32). One crawl of one source, not a proof for UNDP-sized listings.
 - Follow-ups, tracked in the ledger rather than as GitHub issues (decided by the user, 27 October 2026): `core/ai_normalizer.py`'s `normalize_deadline` still calls `dateparser` with every locale, synchronously, inside an async function (lines 163–174; W-13, closed by PR #58, which removes the AI normaliser from the crawl path); two-digit years read as the 2100s (W-12) and the cut at any capital "T" (W-32) are fixed in [PR #56](https://github.com/AidJobs/AidJobs/pull/56), merged as `c86984e` and live-checked, together with ICRC's missing deadlines.
 
-**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation approved the same day and built in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), not merged (record after part H).** The design replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered. The full specification follows, written on 27 October 2026 against the code on `main` after PR #58 (`51c6299`), for an independent review before the user decides on implementation.
+**PR B, crawl-lock recovery: design decided by the user on 27 October 2026; implementation approved the same day and built in [PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0` on 28 October 2026 and live-checked (records after part H).** The design replaces requirement 1 above: the user chose no heartbeat. Safety comes from run ownership checked under row locks, not from the expiry time; the expiry only decides how soon a dead crawl is recovered. The full specification follows, written on 27 October 2026 against the code on `main` after PR #58 (`51c6299`), for an independent review before the user decides on implementation.
 
 #### PR B specification
 
@@ -322,7 +322,7 @@ Revised the same day after an independent read-only review of the first version 
 - **A crawl blocked inside code that does not pause** still holds its lock until Render replaces the process and the lifetime passes. Recovery runs on its own 5-minute timer, so the delay is at most about 30 minutes: the 25-minute lifetime plus one interval (review).
 - **Two deploys in a row** interrupting the same source, for example a code merge followed by its documentation merge, count a false failure and 12 hours of back-off (review). Accepted; the next normal crawl resets the count.
 - **A manual run** can wait behind up to 3 running crawls, and behind queued ones once there are many sources. When too little time is left it ends `interrupted` and writes nothing to the source (C1).
-- **The shutdown window** depends on uvicorn's wait for open requests (C8).
+- **The shutdown window** depends on uvicorn's wait for open requests (C8). Bounded since 28 October 2026, when the user added `--timeout-graceful-shutdown 5` to Render's start command (live record).
 - **Not verified:** the free plan's spin-down signal and the session pool's size.
 - **Issue #5's mechanism** is to be shown by the first test before the code changes. If it is wrong, C6 is re-planned. Shown on 27 October 2026; it is as described (implementation record).
 
@@ -389,6 +389,33 @@ Accepted, not changed:
   - The `dateparser` lock can make the event loop wait for a parse running in a save thread: at most one parse, about 1–2 seconds only the first time in a cold process.
 - **Before the merge:** recovery acts on production's leftovers on its first round, as designed (C3). The read-only check for leftover locks and running rows is run just before the merge, so the user sees what it would touch.
 
+**Live record, 28 October 2026.**
+- **Before the merge** (read-only, enforced and confirmed; 10:01 UTC and again at 11:49 UTC, just before merging): no crawl lock and no run marked `running`, so recovery's first round would change nothing. No crawl was due for about 28 hours.
+- **Merged** with the user's approval at 17:21 IST as `f4059f0`, locked to the reviewed head `7289895`.
+  - CI on `main` passed: backend 415 passed (9 skipped, as before), the 47 PostgreSQL ownership tests on Python 3.11.9 and PostgreSQL 17.6, frontend 133, and the secret scan.
+  - Render: "Deploy live for f4059f0" at 17:23 IST through Auto-Deploy (Verified, Render events). The new instance started its scheduler at 17:23:04 ("No due sources found"). The old instance logged "Application shutdown complete" at 17:23:11. No error lines and no failed health check.
+- **After the deploy** (read-only): no lock and no running run. Recovery's first round found nothing to act on; the health check and the database status answer.
+- **First crawl under the new code:** ICRC, run by the user from the admin at 18:45:54 IST (Verified, database and Render log).
+  - It ended `ok` in 127 seconds, against 141 on 27 October: 34 found, 0 inserted, 1 updated; 14 admitted jobs saved at 18:48:01.
+  - Lock released, no run left `running`, source `ok` with 0 failures, next scheduled run 31 October.
+  - No error line, and no failed health check or replaced instance in Render's events.
+  - Not read: the individual health-check lines during the crawl, because Render's log viewer showed only its newest 50 lines. Health checks from 18:50 onwards were every 5 seconds, all `200`.
+- **The free plan's sleep:** between the deploy and the crawl, the free plan put the backend to sleep. The admin visit woke a new instance, as expected on the free plan.
+- **Render start command**, a separate decision (C8):
+  - The agent read it without changing anything: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+  - uvicorn 0.32.0, the version `requirements.txt` pins, has `--timeout-graceful-shutdown` (read from its source).
+  - The user changed it at 19:03 IST to `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`.
+  - Render redeployed `f4059f0` ("Start command updated"). The new instance logged that command at 19:03:25, and the old one "Application shutdown complete" at 19:03:48. Auto-Deploy is still "On Commit"; the health check answers.
+  - Open web requests now get at most 5 seconds at shutdown, so the crawler's 20-second shutdown fits inside Render's 30.
+- **Branch `feat/crawl-ownership`:** kept until the user approves its deletion. Its commits are in `main` through the merge commit:
+  - `cfe981dc6f7a5c97f997733038363b4cf91c69f5`
+  - `31d1b7a4e70f4a8822527373d27e89a2cb809d9b`
+  - `abf19d06cbb6c76488e12355b08c8a055f06b1af`
+  - `b8d85f64372e0f695d2851c159cc718fdd27ba07`
+  - `212bfe386943deb4fc7e494f968ed1332e45d65a`
+  - `72898958230a8862fae27adf2816bd90f4a7acf9`
+- **Still to watch** (read-only, no crawl triggered): the scheduled crawls, ICRC on 31 October at 03:59 UTC, Oxfam on 31 October at 13:21 UTC, and UNICEF on 1 November at 05:36 UTC.
+
 ### Stage 3. Backend error handling and logging
 
 Design first, for the user's approval, then implementation. The design gives:
@@ -426,7 +453,7 @@ Not a security stage. Placed here by the user on 26 October 2026 so that it foll
 - About 60 admin-side raw-error responses, and no log redaction (stage 3); frontend proxies pass error text through (stage 4).
 - `/api/db/status` is public and lists every source's internal ID and job count (stage 7).
 - The backend and diagnostic checks connect as `postgres` (stage 6); the rule against printing secrets is not enforced by tooling (stage 5).
-- Crawl locks never expire (stage 2, PR B). The known stall is reduced by PR A (#55) but not removed: about 1–2 seconds when a process is cold.
+- Closed on 28 October 2026 by PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)): crawl locks now expire and are recovered, and a run writes only while it owns its source. The known stall is reduced by PR A (#55) but not removed: about 1–2 seconds when a process is cold.
 - Found in the stage 1 reviews, not yet assigned: `verify_internal_api_key` compares keys with `!=` rather than a constant-time comparison; an unauthenticated caller can make the server parse a request body on admin routes before the guard runs; `app/job_management.py`'s router is included twice; `app/shortlist.py` remains in the repository, unreferenced.
 
 ## Safeguards for every stage
