@@ -12,6 +12,7 @@ import psycopg2
 import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
+from app.log_safety import REQUEST_ID
 from crawler_v2.run_handle import RunHandle
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
@@ -796,6 +797,9 @@ class CrawlerOrchestrator:
         if deadline is None:
             deadline = loop.time() + self.time_limit.total_seconds()
         run = RunHandle(run_id, source["id"])
+        # A crawl's log lines carry its run ID, not the ID of the admin request that started it.
+        # This task runs in its own copy of the context, so the request's ID is untouched.
+        REQUEST_ID.set(f"run-{run_id}")
         mode = "normal"
         started = loop.time()
         result = _failed_result("Crawl ended without a result")

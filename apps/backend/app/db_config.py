@@ -50,7 +50,11 @@ class DBConfig:
                     masked_url = self.supabase_db_url
                 logger.info(f"[db_config] SUPABASE_DB_URL configured: {parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}")
             except Exception as e:
-                logger.info(f"[db_config] SUPABASE_DB_URL configured (unable to parse for logging: {e})")
+                # The parser's message can quote part of the password.
+                logger.warning(
+                    "[db_config] SUPABASE_DB_URL is set but could not be parsed (%s)",
+                    type(e).__name__,
+                )
         else:
             logger.warning("[db_config] SUPABASE_DB_URL not set - database connections will fail")
         
@@ -80,10 +84,13 @@ class DBConfig:
         cleaned_url = self.supabase_db_url.replace('[', '').replace(']', '')
         
         # Parse the database connection URL
+        # Never let a parse error escape or be logged with its text: urllib's and libpq's
+        # messages can quote part of the password, and callers once put them in responses.
         try:
             parsed = urlparse(cleaned_url)
+            port = parsed.port or 5432
         except Exception as e:
-            logger.error(f"Failed to parse SUPABASE_DB_URL: {e}")
+            logger.error("[db_config] SUPABASE_DB_URL could not be parsed (%s)", type(e).__name__)
             return None
         
         if not parsed.hostname:
@@ -105,7 +112,7 @@ class DBConfig:
                 # Force IPv4 resolution
                 addr_info = socket.getaddrinfo(
                     hostname, 
-                    parsed.port or 5432, 
+                    port, 
                     socket.AF_INET,  # Force IPv4
                     socket.SOCK_STREAM
                 )
@@ -113,7 +120,10 @@ class DBConfig:
                     resolved_host = addr_info[0][4][0]  # Get IPv4 address
                     logger.info(f"[db_config] Resolved {hostname} to IPv4: {resolved_host}")
             except (socket.gaierror, ValueError, OSError) as e:
-                logger.warning(f"[db_config] Could not resolve {hostname} to IPv4, using original hostname: {e}")
+                logger.warning(
+                    "[db_config] Could not resolve %s to IPv4, using original hostname (%s)",
+                    hostname, type(e).__name__,
+                )
                 # Continue with original hostname (pooler should work anyway)
         elif is_pooler:
             logger.debug(f"[db_config] Using pooler hostname (IPv4 compatible): {hostname}")
@@ -121,7 +131,7 @@ class DBConfig:
         # Extract all parameters from the parsed URL
         params = {
             "host": resolved_host,  # Use resolved IPv4 address or original hostname
-            "port": parsed.port or 5432,
+            "port": port,
             "database": parsed.path.lstrip('/') or 'postgres',
             "user": parsed.username or 'postgres',
         }
