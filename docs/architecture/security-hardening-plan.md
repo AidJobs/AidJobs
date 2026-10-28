@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design first, for approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below); phase 1 implementation proposed, not yet approved |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -407,7 +407,7 @@ Accepted, not changed:
   - The user changed it at 19:03 IST to `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`.
   - Render redeployed `f4059f0` ("Start command updated"). The new instance logged that command at 19:03:25, and the old one "Application shutdown complete" at 19:03:48. Auto-Deploy is still "On Commit"; the health check answers.
   - Open web requests now get at most 5 seconds at shutdown, so the crawler's 20-second shutdown fits inside Render's 30.
-- **Branch `feat/crawl-ownership`:** kept until the user approves its deletion. Its commits are in `main` through the merge commit:
+- **Branch `feat/crawl-ownership`:** deleted on 28 October 2026 with the user's approval, after all its commits were confirmed in `main` (Verified, `git merge-base` and the PR timeline). The same day, with the user's approval, the 12 other branches of the merged PRs #49–#59 and #61 were deleted, among them `docs/ux-31-done` and `docs/security-plan`, after each was confirmed to have no commit outside `main`. Only `main` and `demo/ux-design` remain. Every merged PR keeps its diff and a "Restore branch" button. The deletion triggered no CI run and no deploy (Verified). The approved deletion command ran twice: the first run deleted the 12 branches in one push at 20:02:49 IST, by the `AidJobs` account (PR timelines), and the second found nothing to delete and changed nothing (Verified). The deleted branch's commits are in `main` through the merge commit:
   - `cfe981dc6f7a5c97f997733038363b4cf91c69f5`
   - `31d1b7a4e70f4a8822527373d27e89a2cb809d9b`
   - `abf19d06cbb6c76488e12355b08c8a055f06b1af`
@@ -425,6 +425,242 @@ Design first, for the user's approval, then implementation. The design gives:
 - A redaction filter on the logging system for connection strings, password parameters, bearer tokens, and key shapes, applied to every logger.
 - A regression test that fails if exception text is put into a response again.
 - How [PR #50](https://github.com/AidJobs/AidJobs/pull/50) fits. PR #50 gives generic messages on the four public endpoints and masks the database-status log line. Merged with the user's approval on 27 October 2026 as `614f12e`, after its branch was brought up to date with `main` (`7cd16ba`, CI green); deployed and live-checked (ledger, "Last verified"). If its pattern needs replacing, the design proposes the replacement.
+
+#### Stage 3 design
+
+**Approved by the user on 28 October 2026.** Implementation is not approved: each phase comes to the user as its own proposal.
+
+How it was written: from a read-only investigation of `main` at `71939ce`, then reviewed by a separate read-only agent working in an isolated clone with fake values only. The review's verdict on the first draft was "request changes". Every finding was checked against the code and folded in. One of the reviewer's claims was corrected: the Google geocoding key is latent, not reachable.
+
+**0. Scope**
+
+- **Goal:** internal errors, database details, credentials and implementation details never reach an API response or a log line, while operators keep what they need to diagnose a failure.
+- **In scope:** the backend: its responses, its logging, and the error text it stores in the database and returns on admin pages.
+- **Out of scope:**
+  - Next.js proxies (stage 4);
+  - tooling against printing secrets (stage 5);
+  - database roles (stage 6);
+  - readiness check and the public database status (stage 7);
+  - removing dead modules;
+  - any rewrite.
+
+**A. Verified findings**
+
+Method: an `ast` scan of every backend module for exception text reaching a response, an assignment returned later, or a log call; a text search; and classification by hand by reachability. The reviewer re-derived it independently, which produced the corrections below.
+
+**Public routes.** There are 12, matching the stage 1 allowlist.
+- **One real leak, with a different cause from the first draft:** `GET /api/search/facets`.
+  - Where: `app/db_config.py:124` reads `parsed.port` outside any `try`. If `SUPABASE_DB_URL`'s password contains an unencoded `/`, `?` or `#`, that line raises `Port could not be cast to integer value as '<start of the password>'`.
+  - How it reaches the response: `search.py:942` calls `get_connection_params()` outside the `try`, and `get_facets` (`search.py:1082`) puts `str(e)` into the public response.
+  - Reviewer's demonstration, with fake values: the response contained the fake password's first segment.
+  - Ordinary connection failures never reach line 1082. `_get_database_facets` catches them and `print`s them (`search.py:1022`).
+  - Exposure: only while the URL is malformed, for example during a password rotation like 26 October's. It needs no credentials.
+- **The same configuration error also reaches:**
+  - `/api/search/query` and `/api/jobs/{id}`: the global middleware returns a generic 500 but logs the text (`main.py:103`);
+  - `db_config.py:116`, which logs it.
+- **`/api/healthz`'s `except` cannot run** (false positive).
+- **Checked safe:**
+  - the four PR #50 endpoints;
+  - capabilities;
+  - login, logout and session: no password is echoed or logged;
+  - 422 responses: FastAPI echoes only what the caller sent;
+  - 429 responses: slowapi's fixed message.
+- **Nit:** the login returns a fixed "COOKIE_SECRET not configured" message, which reveals configuration state.
+
+**Admin routes (session-protected, mounted in production): about 64 places.**
+- **`app/crawler_admin.py`, 21:** 20 `HTTPException(500, detail=f"...{str(e)}")`, and `errors.append(...)` in `/backfill-quality-scores`. Also, link-validation results (`core/link_validator.py:160`, `'Validation error: {error_msg}'` for any exception) are returned directly by `/validate` and `/validate-job` (`crawler_admin.py:1122`, `:1218`).
+- **`app/job_management.py`, 18:** 6 `HTTPException`s (including the two in `/delete-bulk`), 2 returned diagnose dictionaries, and 10 entries inside `GET /diagnose/{job_id}`.
+- **`app/sources.py`:**
+  - 9 `detail=str(e)` sites (145, 179, 219, 346, 452, 533, 611, 867, 963);
+  - `/test` and `/simulate_extract` return fetch and parse error text;
+  - two places catch their own 4xx and re-wrap it (903, 689).
+  - Safe: `_policy_head` (631) returns only our own fixed fetch messages.
+- **`app/search.py` via the `main.py` admin routes, 3;** `app/presets.py`, 2; `main.py` admin search init, 1.
+- **Internal-key routes:** `app/pipeline_api.py`, 2.
+
+**Not reachable in production: 10.**
+- `app/data_quality_logs.py` 3: it imports the missing `app.db`, and `main.py:179` skips the router.
+- `app/shortlist.py` 2: unmounted.
+- `enrichment*` 3: no callers.
+- `pipeline/db_insert.py` 3 and `pre_upsert_validator` 1: the extractor is never built with storage.
+
+**Stored, then returned by admin routes.**
+- **Crawl failure messages:** `str(e)[:500]` in the three crawlers and `orchestrator.py:447` and `817`, stored in `crawl_logs.message` and `sources.last_crawl_message`.
+- **Failed-insert errors:** `simple_crawler.py:1600`, stored in `failed_inserts.error` and returned by `GET /api/admin/observability/failed-inserts`.
+- **Link-validation errors:** stored in `link_validations`.
+
+**Logging**
+- About 276 log calls in about 50 application files carry exception text, about 61 with tracebacks.
+- **What can carry secret material** (reviewer's demonstration with psycopg2 2.9 and libpq, fake values):
+  - DSN-parse errors quote the password or part of it:
+    - `invalid dsn: invalid percent-encoded token: "<password>"`;
+    - `invalid dsn: missing "=" after "<password>"`;
+    - `invalid integer value "<fragment>" for connection option "port"`;
+    - and Python's `Port could not be cast to integer value as '<fragment>'`.
+  - Connection-refused errors name the host and port only.
+  - Paths that log these: `db_config.py:116`; `main.py:63` (scheduler start-up); `main.py:103` (middleware); every connection helper.
+- **Latent, not live: the Google geocoding key** goes in a URL query parameter (`core/geocoder.py:173`). httpx logs every request URL at INFO, and its errors quote the URL. The only caller passes `use_google=False` and Google is never a fallback (verified), so no request carries it today.
+- **`search.py:1022` uses `print`,** which bypasses logging.
+- **Log calls that happen at import time,** before `logging.basicConfig` (`main.py:29`), go through Python's `lastResort`, unformatted.
+- **uvicorn:** `uvicorn` and `uvicorn.access` have their own handlers and don't propagate; **`uvicorn.error` has none** and propagates to `uvicorn`. This was read in the installed uvicorn 0.54; production pins 0.32.0, to be checked in CI.
+- **Redaction that already exists:**
+  - PR #50's `_redacted()` (`search.py`), with markers `<redacted-url>` and `<redacted>`, asserted by `test_production_mode.py:175`;
+  - `simple_crawler.py:106` `_TOKEN_LIKE`;
+  - `_logged_headers` (an allow-list);
+  - `core/secrets.mask_secrets`.
+- **Checked safe:**
+  - no credential in an incoming query string (session as cookie or header, internal key as header, password in the body), so uvicorn's access log is safe;
+  - no code logs request bodies, headers or a DSN directly;
+  - `db_config.py:51` masks the password.
+
+**Frontend**
+- **Status codes:** 401 (to login, in about 40 places) and 404 (job inspector) are relied on.
+- **Proxies:** they keep `errorData.detail || errorData.error` as a string.
+- **Error-text checks:** `admin/sources/page.tsx:1954` checks a stored crawl message for `relation "robots_cache" does not exist`. Redaction does not touch that wording, so nothing breaks, but the frontend does read some error text.
+- **Existing ID:** `search_query` already returns its own `request_id` (a fresh uuid4, `search.py:433`, `:538`).
+
+**B. Error-response contract**
+
+1. **Request ID.**
+   - What it is: pure ASGI middleware, added last so it wraps everything, including CORS preflight and 429 responses.
+   - How it works:
+     - it generates a random ID per request and never trusts an inbound one;
+     - it keeps the ID in a context variable;
+     - it returns it as `X-Request-ID` on every response, with `expose_headers` so browser code can read it;
+     - `search_query`'s existing `request_id` reuses the same ID.
+   - **Background work:** a task started inside a request, such as the manual crawl from `/run`, inherits the context. Crawl tasks set their own logging context to the crawl run's ID, so a 2-minute crawl is not filed under the click's request. `asyncio.to_thread` carries the context into threads; `run_in_executor` does not (only dead code uses it).
+2. **Unexpected failures (5xx).** One exception class, `InternalError(message, cause)`, with its own registered handler. The body is `{"detail": "<fixed message> (ref <short id>)", "request_id": "<id>"}`, with the same status code as today.
+   - `detail` stays a string, so every proxy and page keeps working and shows the reference today, before stage 4.
+   - The handler logs the cause through the safe path (C).
+   - Routes with their own shapes, such as the public status, parse, autocomplete and facets, keep their keys, with a fixed string and `request_id`.
+   - The global middleware's generic 500 gains `request_id`.
+3. **Expected failures (4xx)** keep their status codes and wording: 400, 401, 403, 404, 409, 429. Our own messages are allowed; third-party exception text is not. FastAPI's 422 detail is the stated exception: it echoes only the caller's own input.
+   - `InternalError` is never used for a 4xx, and the conversions let an `HTTPException` pass through unchanged. This fixes `sources.py` 689 and 903.
+4. **Admin diagnostic tools keep useful detail, in our own words.** `/test`, `/simulate_extract` and link validation exist to say why an external URL failed, and the UI shows that message (`page.tsx:1675`). They map failures to categories and messages we write: DNS failure, connection refused, timeout, HTTP <status>, TLS error, invalid JSON at line and column. Never a raw exception string, and never a generic "failed".
+5. **Operators:** the admin sees the message and the reference. The full, redacted detail is in Render's log under the request ID.
+
+**C. Logging: prevention first, redaction as the safety net**
+
+1. **Prevention, all in Phase 1 because it carries the live risks:**
+   - `db_config.get_connection_params()` never raises with text. It catches the port and parse error, logs only the exception type and "SUPABASE_DB_URL could not be parsed", and returns `None`, which every caller already handles as "not configured".
+   - The scheduler start-up log (`main.py:63`) and the middleware (`main.py:103`) log through the safe path.
+   - `search.py:1022`'s `print` becomes a logger call.
+   - The `httpx` logger is set to WARNING, so request URLs are no longer logged at INFO.
+   - The connection helpers' messages and the crawl and stored messages follow in Phase 3.
+2. **Redaction of the final string, never the record.** A wrapper around each handler's formatter redacts the formatted output, which covers argument substitution, `logger.exception`, tracebacks and stack text.
+   - Rewriting `record.msg` or `args` is ruled out: it crashes uvicorn's `AccessFormatter` (demonstrated by the reviewer).
+   - It is installed at the very top of `main.py`, before the app imports, together with `basicConfig`, so import-time logging is covered. Python's `lastResort` handler is covered too.
+   - It wraps the handlers of the root, `uvicorn` and `uvicorn.access` loggers.
+   - The rules:
+     - **Exact values:**
+       - Which: the values of secret environment variables, read once after `load_dotenv`. That means the database URLs and the password inside them, in decoded and URL-encoded forms, plus the admin password, session secrets, the internal API key, and any `*_KEY`, `*_SECRET`, `*_TOKEN` or `*_PASSWORD` variable.
+       - Which not: values shorter than 12 characters, empty values, and boolean-like values, to avoid wiping ordinary words.
+       - Safety: the values are never logged. Their names may be.
+     - **Patterns:**
+       - user information in URLs;
+       - `password=` and `pwd=`;
+       - `Bearer` tokens;
+       - URL query parameters `key`, `api_key`, `apikey`, `token`, `access_token`, `secret`, `password`, `sig` and `signature`;
+       - the DSN-error shapes above (`invalid dsn: …`, `invalid integer value "…" for connection option`, `Port could not be cast to integer value as '…'`);
+       - common key shapes.
+   - **Markers:** PR #50's `<redacted-url>` and `<redacted>` are kept, so its test stays unchanged, and its helper moves into the shared module.
+3. **Stored messages:** redacted **before** truncation (today `str(e)[:500]` truncates first). Applies to crawl messages, `failed_inserts.error` and link-validation errors (Phase 3).
+4. **Not redacted:** host names in normal operation logs. They're infrastructure detail in Render's private log; masking them would be a separate decision.
+
+**D. Tests**
+
+1. **Static guard.** A committed test, based on the scan's method, fails if production-reachable code puts exception text into a response. The scan's taint-following also covers assignments returned later. It starts with an allowlist of the reviewed findings that the phases convert; the allowlist shrinks to zero. The unreachable modules are named explicitly, so mounting one fails the test until it is converted.
+2. **Runtime leak tests.** Each runs in a fresh process built as production builds it, with fake values only and no network.
+   - **Facets and the configuration error:** `SUPABASE_DB_URL` gets a malformed fake password, the actual cause. The test must fail on `main`'s code, and that failure is shown in the PR.
+   - **Database failures:**
+     - make `psycopg2.connect` raise with fake DSN-shaped text;
+     - expect each public endpoint's documented outcome: 200 with degraded results for search query and the single job, the fixed `error` for facets and status;
+     - and a parametrised walk over every admin route with a test session, expecting the fixed message.
+   - **Every response:**
+     - no fake password, fragment, host or URL in the body or headers;
+     - `request_id` in the body (where present) equal to `X-Request-ID`;
+     - the wrapped handler's actual output carries the ID with the secrets redacted.
+3. **Redaction unit tests:**
+   - each rule;
+   - the demonstrated psycopg2 strings, with fake values;
+   - tracebacks, `%` arguments, `logger.exception`;
+   - uvicorn's access formatter;
+   - import-time logging;
+   - the minimum-length rule;
+   - and that no secret value appears in the redactor's own output.
+4. **Fixtures that look like keys are assembled at runtime,** as PR #50 does, so the gitleaks job doesn't flag them.
+5. **The new test files are added to `ci.yml`'s explicit Ruff and pytest lists.** The existing tests stay unchanged and green: the public-surface allowlist, `test_production_mode.py`, the stage 2 PostgreSQL tests, and the full CI list. The behaviour of the pinned versions (uvicorn 0.32, FastAPI 0.115, Python 3.11) is checked in CI, not only locally.
+
+**E. How PR #50 fits**
+
+- **Kept:** its fixed public messages and its markers.
+- **Moved:** its `_redacted()` helper becomes part of the shared redactor.
+- **Added:** facets and the configuration error are covered.
+- **Not duplicated:** nothing PR #50 protects is changed.
+
+**F. Compatibility and the stage 4 boundary**
+
+- Status codes and response keys stay the same, and `detail` stays a string.
+- Admin pages will show "Failed to … (ref 3f9a…)" instead of the driver's text. The diagnostic tools show categories in our own words.
+- Stage 4 keeps the proxies' own text and Node's error messages, and forwarding of `X-Request-ID`. Stage 3's fixed messages also remove backend text from what the proxies write to Vercel's log.
+
+**G. Phases**
+
+**Phase 1: the live risks and the foundations.** One pull request.
+- Deliverables:
+  - the `db_config` fix and the facets fixed message;
+  - prevention for `main.py:63` and `:103`, `search.py:1022` and the `httpx` logger level;
+  - the redacting formatter, installed first;
+  - the request-ID middleware and `InternalError` handler;
+  - `request_id` on public errors;
+  - PR #50's helper moved;
+  - tests D2 (public part and configuration error), D3 and D4, and the static guard D1 with its starting allowlist.
+- **Proof the tests work:** before the fix, the facets test is shown failing on `main`'s code.
+
+**Phase 2: admin responses.** One pull request per group:
+- `crawler_admin.py`, including link validation;
+- `sources.py` and `presets.py`, including the diagnostic categories;
+- `job_management.py`;
+- the admin parts of `main.py` and `search.py`;
+- `pipeline_api.py`.
+
+Each converts its findings, shrinks the allowlist, and extends the admin-route walk.
+
+**Phase 3: stored messages and the remaining log paths.**
+- What changes:
+  - crawl messages, `failed_inserts.error` and link-validation errors are redacted before truncation;
+  - the connection helpers log through the safe path;
+  - the allowlist is empty.
+- Proof nothing else changed: the offline whole-crawl and end-to-end comparisons on the saved pages (never production crawls) show identical saved jobs, statuses and messages, apart from redaction.
+
+**For every phase:**
+- CI, including the stage 2 PostgreSQL tests;
+- an independent review;
+- a read-only live check after merge, which provokes no failure in production. A normal request and a 404 such as `GET /api/jobs/<random UUID>` show `X-Request-ID`, and Render's log shows the same ID.
+
+**H. Acceptance criteria**
+
+- **Phase 1:**
+  - the facets and configuration-error tests fail on `main`'s code and pass after;
+  - no response from a public route contains the fake secret material;
+  - every response has `X-Request-ID`;
+  - redaction is proven on every handler (root, `uvicorn`, `uvicorn.access`) and for import-time logging;
+  - `httpx` no longer logs request URLs;
+  - the public-surface and PR #50 tests are unchanged and green.
+- **Phase 2:** the allowlist holds no admin route; the admin-route walk passes; the 401 and 404 behaviour is unchanged; the diagnostic tools still name the cause category.
+- **Phase 3:**
+  - the allowlist is empty;
+  - stored messages are redacted before truncation, which a test proves;
+  - the offline comparisons are identical apart from redaction.
+- **In every phase:** the protected files are untouched, and no production data, setting or crawl is touched.
+
+**I. Remaining assumptions and risks**
+
+1. **uvicorn 0.32 and FastAPI 0.115 logging and handler behaviour.** Read in newer local versions. CI checks the pinned ones.
+2. **Searching Render's log by request ID.** Expected to work through the log viewer's text search; checked on the first live request after Phase 1.
+3. **Redaction cannot catch a secret in an unforeseen format.** That's why prevention comes first and known secrets are matched exactly.
+4. **Whether production sets `GOOGLE_GEOCODING_API_KEY`.** Not verified, and not needed: no code path sends it today, and Phase 1 removes the logging route.
+5. **Cost:** negligible. One context variable, and one string pass per log line.
 
 ### Stage 4. Frontend proxy error handling
 
@@ -450,7 +686,12 @@ Not a security stage. Placed here by the user on 26 October 2026 so that it foll
 ## Open risks after stage 1 (26 October 2026)
 
 - Closed on 27 October 2026 by PR #50: the public endpoints (`/api/db/status`, `/api/search/status`, `/api/search/parse`, `/api/search/autocomplete`) no longer return raw error text.
-- About 60 admin-side raw-error responses, and no log redaction (stage 3); frontend proxies pass error text through (stage 4).
+- Stage 3, verified on 28 October 2026 (design above):
+  - one public leak: `/api/search/facets` returns database-URL parsing errors that can quote part of the password;
+  - database connection-string errors can quote the password into Render's log;
+  - about 64 admin-side places return raw error text;
+  - no log redaction.
+- Frontend proxies pass error text through (stage 4).
 - `/api/db/status` is public and lists every source's internal ID and job count (stage 7).
 - The backend and diagnostic checks connect as `postgres` (stage 6); the rule against printing secrets is not enforced by tooling (stage 5).
 - Closed on 28 October 2026 by PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)): crawl locks now expire and are recovered, and a run writes only while it owns its source. The known stall is reduced by PR A (#55) but not removed: about 1–2 seconds when a process is cold.
@@ -461,7 +702,7 @@ Not a security stage. Placed here by the user on 26 October 2026 so that it foll
 - Do not modify, stage, reset, clean, or discard `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`.
 - No crawl, no database write outside an approved step, no tag change, no branch deletion, no manual deploy, no production setting change without the user's explicit approval.
 - Never print a secret or a connection string. Checks report set or not set, lengths, or matches only.
-- Keep `docs/ux-31-done` until the user approves its deletion; it is checked for unique work after the next docs merge.
+- Delete a branch only with the user's approval, and only after confirming it has no commit outside `main`. (`docs/ux-31-done` was checked and deleted that way on 28 October 2026.)
 
 ## Incident record, 26 October 2026
 
