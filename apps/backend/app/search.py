@@ -1,5 +1,4 @@
 import os
-import re
 import uuid
 import logging
 import time
@@ -9,6 +8,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from app.db_config import db_config
+from app.log_safety import current_request_id, redact_exception
 from app.normalizer import Normalizer
 from app.analytics import analytics_tracker
 from app.rerank import rerank_results
@@ -36,14 +36,10 @@ logger = logging.getLogger(__name__)
 
 DB_UNAVAILABLE = "Database unavailable"
 MEILI_UNAVAILABLE = "Meilisearch unavailable"
-_CONNECTION_URL = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
-_PASSWORD_PARAM = re.compile(r"(password\s*=\s*)\S+", re.IGNORECASE)
+FACETS_UNAVAILABLE = "Facets unavailable"
 
-
-def _redacted(error: Exception) -> str:
-    """Exception text for the server log. Driver messages can quote the connection string."""
-    text = _PASSWORD_PARAM.sub(r"\1<redacted>", str(error))
-    return f"{type(error).__name__}: {_CONNECTION_URL.sub('<redacted-url>', text)}"
+# PR #50's helper now lives in app.log_safety, with the same markers.
+_redacted = redact_exception
 
 
 class SearchService:
@@ -430,7 +426,7 @@ class SearchService:
         experience_level: Optional[str] = None,
     ) -> dict[str, Any]:
         start_time = time.time()
-        request_id = str(uuid.uuid4())
+        request_id = current_request_id() or str(uuid.uuid4())
 
         page = max(1, page)
         size = max(1, min(100, size))
@@ -1019,7 +1015,7 @@ class SearchService:
             }
 
         except Exception as e:
-            print(f"Database facets error: {e}")
+            logger.error("Database facets error: %s", redact_exception(e))
             return {
                 "country_iso": {},
                 "level_norm": {},
@@ -1077,9 +1073,9 @@ class SearchService:
                 base["facets"]["mission_tags"] = facets.get("mission_tags", {}) or {}
                 base["facets"]["international_eligible"] = facets.get("international_eligible", {}) or {}
             except Exception as e:
-                logger.error(f"Database facets error: {e}")
+                logger.error("Database facets error: %s", redact_exception(e))
                 base["enabled"] = False
-                base["error"] = str(e)
+                base["error"] = FACETS_UNAVAILABLE
         else:
             base["enabled"] = False
 
@@ -1177,9 +1173,10 @@ class SearchService:
         try:
             conn_params = db_config.get_connection_params()
             if not conn_params:
+                # A malformed database URL: the same answer as before phase 1 (PR #50's message).
                 return {
                     "ok": False,
-                    "error": "Database connection params missing"
+                    "error": DB_UNAVAILABLE
                 }
             
             # Log connection attempt for debugging

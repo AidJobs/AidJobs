@@ -6,9 +6,21 @@ from typing import Optional
 from contextlib import asynccontextmanager
 import os
 import logging
-import traceback
 from pydantic import BaseModel
 
+# Before any app module is imported: some of them log while importing.
+logging.basicConfig(level=logging.INFO)
+from app import log_safety  # noqa: E402
+
+log_safety.install()
+
+from app.errors import (  # noqa: E402
+    InternalError,
+    RequestIdMiddleware,
+    REQUEST_ID_HEADER,
+    internal_error_handler,
+    log_failure,
+)
 from app.config import Capabilities
 from app.search import search_service
 from app.sources import router as sources_router
@@ -25,8 +37,8 @@ from app.query_parser import parse_query
 from app.autocomplete import get_suggestions
 
 load_dotenv()
+log_safety.refresh_secrets()
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +57,7 @@ async def lifespan(app: FastAPI):
     
     aidjobs_env = os.getenv("AIDJOBS_ENV", "production").lower()
     if aidjobs_env == "dev":
-        logger.info("[aidjobs] env: AIDJOBS_ENV=dev (development: tracebacks logged, search debug and analytics on)")
+        logger.info("[aidjobs] env: AIDJOBS_ENV=dev (development: search debug and analytics on)")
         analytics_tracker.enable()
     else:
         logger.info(f"[aidjobs] env: AIDJOBS_ENV={aidjobs_env}")
@@ -60,7 +72,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("[orchestrator] No PostgreSQL database URL configured (need SUPABASE_DB_URL or DATABASE_URL), scheduler not started")
     except Exception as e:
-        logger.error(f"[orchestrator] Failed to start scheduler: {e}")
+        log_failure(logger, "[orchestrator] Failed to start scheduler", e)
     
     yield
     
@@ -100,9 +112,7 @@ async def error_masking_middleware(request: Request, call_next):
         # Let HTTPException propagate untouched (proper status codes like 404, 400, 401, etc.)
         raise
     except Exception as e:
-        logger.error(f"Unhandled error: {str(e)}")
-        if os.getenv("AIDJOBS_ENV", "").lower() == "dev":
-            logger.error(traceback.format_exc())
+        log_failure(logger, "Unhandled error", e)
         return JSONResponse(
             status_code=500,
             content={
@@ -132,7 +142,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=[REQUEST_ID_HEADER],
 )
+# Added last, so it is outermost: every response, preflight and 429 included, gets an ID.
+app.add_middleware(RequestIdMiddleware)
+app.add_exception_handler(InternalError, internal_error_handler)
 
 app.include_router(admin_auth_router)
 app.include_router(sources_router)
