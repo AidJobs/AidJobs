@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below); phase 1 built and reviewed, not merged |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phases 2 and 3 not started; each needs its own approval |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -716,6 +716,39 @@ Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
   - Python's own `--- Logging error ---` dump, `warnings`, and thread excepthooks bypass the formatters;
   - responses from Starlette's and uvicorn's own last-resort error paths carry no `X-Request-ID`;
   - with a malformed URL, facets answer with empty results rather than `enabled: false`.
+
+#### Stage 3, phase 1: live record
+
+Merge approved by the user on 29 October 2026 (India time), at the reviewed head `e582aea`. Every check below was read-only; no error was provoked in production.
+
+- **Before the merge:**
+  - PR head exactly `e582aea`; all 8 checks green. GitHub marks no check as "required" on this repository, so all 8 were treated as required. Mergeable and clean.
+  - Read-only database check (session read-only, `transaction_read_only` on): no crawl lock held, no run marked running. Next scheduled crawl: ICRC on 31 October at 03:59 UTC.
+  - The live backend sent no `X-Request-ID`, the baseline for proving the new code went live.
+- **Merge:** `gh pr merge 63 --merge --match-head-commit e582aea…`, merged as `2de9d53` at 21:11 UTC on 28 October 2026. The branch `security/stage3-phase1` is kept, as the user asked.
+- **CI on `main` (`2de9d53`):** passed. Python 3.11.9: 451 passed and 9 skipped; PostgreSQL 17.6 crawl-ownership tests: 47 passed; frontend: 133 tests passed.
+- **Deployments:**
+  - Render: "Deploy live for 2de9d53", started by Auto-Deploy. The new code answered by 21:13 UTC (read from Render's events and from the `X-Request-ID` header, which only the new code sends).
+  - Vercel: production deployment for `2de9d53` completed at 21:11:46 UTC; the public site answers 200.
+- **Checks on the live backend, 21:13 UTC:**
+
+  | Request | Status | Result |
+  | --- | --- | --- |
+  | `GET /api/healthz` | 200 | `X-Request-ID` present (32 hex characters) |
+  | `GET /api/jobs/<random UUID>` | 404 | "Job not found", `X-Request-ID` present |
+  | `GET /api/db/status` | 200 | `ok: true`; 405 jobs, 282 active, 3 sources |
+  | `GET /api/search/query?q=officer` | 200 | 20 of 38 results, from the database; the body's `request_id` equals the header |
+  | `GET /api/search/query` | 200 | 20 of 282 results, from the database |
+  | `GET /api/admin/session`, no cookie | 200 | `{"authenticated": false}`, `X-Request-ID` present |
+
+  Search comes from the database because Meilisearch was removed on 23 October (ledger). No response contained a credential pattern.
+- **Render's log, searched by request ID** (the design's assumption I2, now confirmed):
+  - the health check's ID: its access-log line;
+  - the 404's ID: its access-log line and the existing `db_config` "Database connection params" line (host, port, database and user name; no password).
+  
+  Neither carries a credential pattern.
+- **Credential search over the last hour of logs:** `postgresql://` appears on one line only: the start-up line, now `postgresql://<redacted>@<pooler host>:5432/postgres`. The redaction replaced the masked `user:***` part, so the user name is hidden there too. A wider search for the word "password" was not run, because it would have loaded any matching log text into the agent's context.
+- **Admin Sources page:** pending. The user logs in and opens the page; the agent then finds that request's ID in Render's log.
 
 ### Stage 4. Frontend proxy error handling
 

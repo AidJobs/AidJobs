@@ -9,18 +9,17 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 28 October 2026, after PR #60 (security stage 2, PR B), the first crawl under it, and the Render start-command change.
-- **`main`:** `f4059f0` (merge of PR #60). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
+**Last verified:** 29 October 2026 (India time), after PR #63 (security stage 3, phase 1).
+- **`main`:** `2de9d53` (merge of PR #63, 21:11 UTC on 28 October). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
 - **Render:**
-  - Auto-Deploy put `f4059f0` live at 17:23 IST.
-  - At 19:03 IST the user changed the start command to `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`. Render redeployed the same commit, and the old instance shut down cleanly.
-  - Auto-Deploy is still "On Commit".
-  - All three read by the agent from Render's settings, events and logs.
-- **Read-only afterwards:**
-  - the health check answers;
+  - Auto-Deploy put `2de9d53` live; the new code answered by 21:13 UTC.
+  - The start command is unchanged since 28 October: `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`.
+  - Read by the agent from Render's events and logs.
+- **Read-only afterwards** (security plan, stage 3, phase 1 live record):
+  - every response carries a server-generated `X-Request-ID`, and Render's log can be searched by it;
   - the database status is ok (405 jobs, 282 active, 3 sources);
-  - no crawl lock is held and no run is marked running, before and after the deploy;
-  - ICRC's crawl, run by the user from the admin at 18:45 IST, ended `ok` and released its lock (security plan, stage 2, live record).
+  - search answers from the database;
+  - no crawl lock was held and no run was marked running before the merge.
 - Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
 Every claim below is marked **Verified** (checked against git, GitHub, CI, or a production query the user ran), **Repository** (true of the code, not checked in production), or **Not verified**.
@@ -170,6 +169,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | PR B specification (security stage 2); contract §5 `interrupted` and crawler-plan decisions; PR #58 recorded live | PR #59, `bb9430c` | 27 Oct 2026 | Merged, CI green |
 | Security stage 2, PR B: crawl-run ownership, takeover and recovery, owner-only finish, slots, time limit, shutdown; issue #5 savepoints; `/fix-undp-urls` removed | PR #60, `f4059f0` | 28 Oct 2026 | Merged, CI green, deployed, live-checked with one ICRC crawl |
 | Security stage 2 recorded done; PR #60 live and its first crawl; Render start command | PR #61, `71939ce` | 28 Oct 2026 | Merged, CI green (docs only, no deploy) |
+| Security stage 3 design approved and recorded; merged branches tidied up | PR #62, `432b62b` | 28 Oct 2026 | Merged, CI green (docs only, no deploy) |
+| Security stage 3, phase 1: the public facets leak, safe database URL handling, log redaction, request IDs | PR #63, `2de9d53` | 28 Oct 2026 | Merged, CI green, deployed, live-checked |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -496,7 +497,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Merge stage 3, phase 1 (the public facets leak, database URL errors in logs, redaction, request IDs); built and independently reviewed on 28 October 2026 | Security plan, stage 3, phase 1 implementation record |
+| Approve stage 3, phase 2 (admin responses: fixed messages with a reference, diagnostic categories) | Security plan, stage 3 design, G and H |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
