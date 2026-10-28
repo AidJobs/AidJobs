@@ -673,7 +673,7 @@ Decisions made while building, each within the approved design or noted against 
   - `/api/jobs/{id}` 500 → 404;
   - `/api/admin/sources`, `/api/admin/sources/{id}` and `/api/admin/organisations` 500 → 503 "Database not configured" (approved).
   
-  `/api/db/status` keeps PR #50's "Database unavailable".
+  `/api/db/status` keeps PR #50's "Database unavailable". The public and admin list statuses are pinned by `test_public_error_leaks.py`. The diagnostic is in the logs only: a warning at startup and an error on every request that needs the database, both "SUPABASE_DB_URL could not be parsed (ValueError)".
 - **Tracebacks are now logged in every environment** through `log_failure`, redacted on output. Before, the middleware logged them only in development.
 - **Redaction's URL patterns are bounded:** the scheme to 32 characters, and the user-and-password runs to 256. Unbounded, they were quadratic inside every log call:
   - 16 KB of dotted text took 9 seconds;
@@ -691,7 +691,7 @@ Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
   - the request-ID test fails on the missing header;
   - the static guard flags `search.py::get_facets`.
 - **On the branch:**
-  - 455 passed in the CI list, with the same 4 skips as before;
+  - 456 passed in the CI list, with the same 4 skips as before;
   - 47 PostgreSQL tests passed;
   - Ruff is clean, and the edited files have no new Pyflakes finding;
   - the offline end-to-end crawl comparison against `main` is identical for all 12 sources.
@@ -710,6 +710,7 @@ Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
     - a static guard that missed helper functions (it now flags the old facets leak);
     - the malformed-URL database status message.
   - **Re-review of the fixes:** 11 of 12 mutations caught, plus a remaining quadratic shape (`x://` repeated). Both were then fixed. All 6 first-pass survivors now fail their tests.
+  - **Pre-merge verification, 29 October 2026:** the admin 503 had no test. One was added for `/api/admin/sources` and `/api/admin/organisations`, and it fails on `main`'s code on the leaked fragment.
 - **Accepted, not changed:**
   - harmless false positives in logs only (`?key=` in job URLs, long `sk-` slugs);
   - Python's own `--- Logging error ---` dump, `warnings`, and thread excepthooks bypass the formatters;

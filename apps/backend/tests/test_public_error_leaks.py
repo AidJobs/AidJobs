@@ -43,6 +43,15 @@ calls = [
 ]
 """ % JOB_ID
 
+ADMIN_CALLS = """
+from app import sources
+app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
+calls = [
+    call("GET", "/api/admin/sources"),
+    call("GET", "/api/admin/organisations"),
+]
+"""
+
 DRIVER_FAILURE = """
 import psycopg2
 import main
@@ -103,6 +112,15 @@ def test_a_malformed_database_url_reaches_no_response_or_log():
     db_status = next(c for c in calls if c["path"] == "/api/db/status")
     assert json.loads(db_status["body"]) == {"ok": False, "error": "Database unavailable"}
     assert "could not be parsed (ValueError)" in logs
+
+
+def test_admin_pages_answer_503_for_a_malformed_database_url():
+    calls, logs = _run(MALFORMED_DB_URL, ADMIN_CALLS)
+    _assert_no_leak(calls, logs)
+    assert _statuses(calls) == {"/api/admin/sources": 503, "/api/admin/organisations": 503}
+    for c in calls:
+        assert json.loads(c["body"]) == {"detail": "Database not configured"}
+    _assert_request_ids(calls)
 
 
 def test_every_public_response_carries_a_new_request_id():
