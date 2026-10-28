@@ -496,7 +496,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Approve stage 3, phase 1's implementation (the public facets leak, database URL errors in logs, redaction, request IDs); the design was approved on 28 October 2026 | Security plan, stage 3, design |
+| Merge stage 3, phase 1 (the public facets leak, database URL errors in logs, redaction, request IDs); built and independently reviewed on 28 October 2026 | Security plan, stage 3, phase 1 implementation record |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |

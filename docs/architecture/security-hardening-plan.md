@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below); phase 1 implementation proposed, not yet approved |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below); phase 1 built and reviewed, not merged |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -661,6 +661,55 @@ Each converts its findings, shrinks the allowlist, and extends the admin-route w
 3. **Redaction cannot catch a secret in an unforeseen format.** That's why prevention comes first and known secrets are matched exactly.
 4. **Whether production sets `GOOGLE_GEOCODING_API_KEY`.** Not verified, and not needed: no code path sends it today, and Phase 1 removes the logging route.
 5. **Cost:** negligible. One context variable, and one string pass per log line.
+
+#### Stage 3, phase 1: implementation record
+
+Implementation approved by the user on 28 October 2026, including the 503 for a malformed database URL. Built on the branch `security/stage3-phase1` from `main` at `432b62b`.
+
+Decisions made while building, each within the approved design or noted against it:
+- **Request IDs for existing bodies are only in the header** (a deviation from B2). PR #50's tests and the W-22 test compare whole bodies: the generic 500 and the public status, parse and autocomplete answers. So those bodies stay byte-identical and their request ID is only in `X-Request-ID`. The `request_id` body field is used only by `InternalError` responses, which phase 2 uses for admin routes.
+- **A malformed `SUPABASE_DB_URL` is treated as "not configured".** The status changes happen only in that case; with an unset, or well-formed but unreachable, URL nothing changes (Verified by the reviewer over all 34 GET routes):
+  - `/api/search/query` 500 → 200 with empty results;
+  - `/api/jobs/{id}` 500 → 404;
+  - `/api/admin/sources`, `/api/admin/sources/{id}` and `/api/admin/organisations` 500 → 503 "Database not configured" (approved).
+  
+  `/api/db/status` keeps PR #50's "Database unavailable".
+- **Tracebacks are now logged in every environment** through `log_failure`, redacted on output. Before, the middleware logged them only in development.
+- **Redaction's URL patterns bound the scheme to 32 characters.** Unbounded, they were quadratic: 16 KB of dotted text took 9 seconds per log call. PR #50's original pattern had the same flaw on one log line. A timing test guards it.
+- **Crawl tasks log under `run-<id>`,** set in `execute_run`, which always runs in its own task.
+
+Evidence, 28 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pinned versions):
+- **On `main`'s code, with a fake malformed database URL:**
+  - the public facets response quoted the password fragment (`Port could not be cast to integer value as '<fragment>'`), and 8 log lines did too;
+  - search and the single job answered 500.
+- **The new tests on `main`'s code:**
+  - both leak tests fail on the leak itself ("responses quoting the database password: `['/api/search/facets']`");
+  - the request-ID test fails on the missing header;
+  - the static guard flags `search.py::get_facets`.
+- **On the branch:**
+  - 451 passed in the CI list, with the same 4 skips as before;
+  - 47 PostgreSQL tests passed;
+  - Ruff is clean, and the edited files have no new Pyflakes finding;
+  - the offline end-to-end crawl comparison against `main` is identical for all 12 sources.
+- **Real uvicorn on 127.0.0.1, with fake settings:**
+  - every response carries `X-Request-ID`, and access-log lines carry the same ID;
+  - a malformed URL is logged as "could not be parsed (ValueError)";
+  - the fake fragment appears nowhere.
+- **Independent review** (separate agent, isolated clone, fake values; verdict: approve with changes; 29 of 33 in-memory mutations caught). Fixed:
+  - the quadratic patterns;
+  - leak tests that failed on `main` only for the missing header;
+  - a URL-credential test that passed for the wrong reason, and untested rules;
+  - no proof of the import-time order;
+  - prevention tested only through the safety net;
+  - a static guard that missed helper functions (it now flags the old facets leak);
+  - the malformed-URL database status message.
+  
+  The four surviving rule mutations now fail their tests.
+- **Accepted, not changed:**
+  - harmless false positives in logs only (`?key=` in job URLs, long `sk-` slugs);
+  - Python's own `--- Logging error ---` dump, `warnings`, and thread excepthooks bypass the formatters;
+  - responses from Starlette's and uvicorn's own last-resort error paths carry no `X-Request-ID`;
+  - with a malformed URL, facets answer with empty results rather than `enabled: false`.
 
 ### Stage 4. Frontend proxy error handling
 
