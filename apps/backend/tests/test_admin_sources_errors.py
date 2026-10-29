@@ -153,6 +153,9 @@ def test_each_reference_leads_to_the_logged_cause():
                    or "RuntimeError" in line]
     for route, c in calls.items():
         assert any(line.startswith(f"[{c['request_id']}]") for line in cause_lines), route
+        if SID in route:
+            mine = [line for line in logs.splitlines() if line.startswith(f"[{c['request_id']}]")]
+            assert any(SID in line for line in mine), f"{route}: no log line names the source"
 
 
 def test_unreadable_database_settings_are_named_and_still_503():
@@ -312,6 +315,20 @@ def test_a_password_with_an_unencoded_separator_is_unreadable(monkeypatch, caplo
     messages = [r.getMessage() for r in caplog.records]
     assert not any(FRAGMENT in m for m in messages), messages
     assert any("could not be parsed (ValueError)" in m for m in messages)
+
+
+def test_the_database_name_is_not_logged(monkeypatch, caplog):
+    """Without "@" a URL cannot be told apart from host:port/db, so the path is never logged."""
+    from app.db_config import DBConfig
+
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://pooler-probe:12/" + FRAGMENT)
+    with caplog.at_level(logging.DEBUG, logger="app.db_config"):
+        params = DBConfig().get_connection_params()
+    assert params is not None and params["database"] == FRAGMENT
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("Database connection params" in m for m in messages)
+    assert any("SUPABASE_DB_URL configured" in m for m in messages)
+    assert not any(FRAGMENT in m for m in messages), messages
 
 
 def test_the_reference_is_never_empty():

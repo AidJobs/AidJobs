@@ -65,7 +65,11 @@ class DBConfig:
                     masked_url = self.supabase_db_url.replace(parsed.password, '***')
                 else:
                     masked_url = self.supabase_db_url
-                logger.info(f"[db_config] SUPABASE_DB_URL configured: {parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}")
+                # The path is not logged: in a malformed URL it can hold the password's tail.
+                logger.info(
+                    "[db_config] SUPABASE_DB_URL configured: %s://%s:***@%s:%s",
+                    parsed.scheme, parsed.username, parsed.hostname, parsed.port or 5432,
+                )
             except Exception as e:
                 # The parser's message can quote part of the password.
                 logger.warning(
@@ -166,7 +170,8 @@ class DBConfig:
             params["password"] = unquote(parsed.password)
         
         # Log the connection parameters (mask password)
-        logger.info(f"[db_config] Database connection params: host={resolved_host}, port={params['port']}, database={params['database']}, user={params['user']}")
+        logger.info("[db_config] Database connection params: host=%s, port=%s, user=%s",
+                    resolved_host, params['port'], params['user'])
         
         return params
     

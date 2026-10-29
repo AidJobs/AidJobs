@@ -59,6 +59,12 @@ def _connection_params() -> dict:
     raise HTTPException(status_code=503, detail=DB_NOT_CONFIGURED)
 
 
+def _source_error(message: str, source_id: str, cause: BaseException) -> InternalError:
+    """InternalError for a route about one source: the ID goes to the log, not the response."""
+    logger.error("[sources] %s: source %s", message, source_id)
+    return InternalError(message, cause=cause)
+
+
 def fetch_message(error: BaseException) -> str | None:
     """A FetchError's message when it is one of the fixed messages above; otherwise None."""
     reason = str(error)
@@ -270,7 +276,7 @@ def get_source(source_id: str, admin: str = Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        raise InternalError("Failed to load source", cause=e)
+        raise _source_error("Failed to load source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -497,7 +503,7 @@ def update_source(
     except Exception as e:
         if conn:
             conn.rollback()
-        raise InternalError("Failed to update source", cause=e)
+        raise _source_error("Failed to update source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -575,7 +581,7 @@ def delete_source(
     except Exception as e:
         if conn:
             conn.rollback()
-        raise InternalError("Failed to delete source", cause=e)
+        raise _source_error("Failed to delete source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -650,7 +656,7 @@ def permanently_delete_source(
     except Exception as e:
         if conn:
             conn.rollback()
-        raise InternalError("Failed to permanently delete source", cause=e)
+        raise _source_error("Failed to permanently delete source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -874,7 +880,7 @@ def export_source(
     except HTTPException:
         raise
     except Exception as e:
-        raise InternalError("Failed to export source", cause=e)
+        raise _source_error("Failed to export source", source_id, e)
     finally:
         if cursor:
             cursor.close()
