@@ -780,7 +780,8 @@ What changes:
   - The admin routes answer 503 "Database settings could not be read" when `SUPABASE_DB_URL` is set but cannot be read, and keep 503 "Database not configured" when it is absent.
 - **A password with an unencoded `/`, `?` or `#` is now unreadable** (found by the independent review). urllib could read the start of such a password as an empty or numeric port, so the URL looked valid. The rest of the password then reached two existing INFO lines as the "database" name. `db_config._parse_url` refuses an `@` in the path or fragment, or in the query when no `=` comes before it. A query value such as `application_name=a@b` stays readable.
 - **The database name is no longer logged.** The start-up line and the connection-parameters line in `db_config.py` now carry scheme, user, host and port only. In a URL without `@`, a password's tail cannot be told apart from a database name, so no parsing rule could cover it. Supabase's database is always `postgres`, so operators lose nothing. Added with the user's approval after the reviews.
-- **A failure in a route about one source logs the source ID** under the request ID (`_source_error`), so the log names the source again; the admin's message stays fixed text. Added with the user's approval after the reviews.
+- **A failure in a route about one source logs the source ID** under the request ID (`_source_error`), so the log names the source again; the admin's message stays fixed text. Added with the user's approval after the reviews. The ID is logged with `%r`, so a path parameter carrying an encoded line break cannot forge a log line.
+- **A user name containing `@` is unreadable too:** it means the `:` before the password is missing, and the password would be logged as the user.
 - **The static guard** trusts two reviewed functions, `describe_failure` and `fetch_message`, but only as direct calls with the exception as their one argument. A test checks that each is defined once, in `app/sources.py`, and bound nowhere else. The allowlist loses the 13 converted functions and the reviewed `_policy_head`, which now uses `fetch_message`.
 - **Known bug, not fixed here (ledger W-33):** the source test of a v1 API source calls `fetch_api` with a signature it does not have. It now fails safely with "Unexpected error (ref …)" and logs the `TypeError`.
 
@@ -795,13 +796,18 @@ Evidence, 29 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
   - The `describe_failure` unit tests fail because the function does not exist.
   - All 23 contract tests pass, on `main` and on the branch.
 - **On the branch:**
-  - CI list: 516 passed, with the same 4 skips as before. PostgreSQL ownership tests: 47 passed. Ruff is clean on CI's list.
+  - CI list: 518 passed, with the same 4 skips as before. PostgreSQL ownership tests: 47 passed. Ruff is clean on CI's list.
   - The three changed modules have no new Ruff finding; `sources.py` drops from 22 to 16, `db_config.py` from 7 to 5.
   - Offline crawl comparison against `main` on the 12 saved sources: identical. No crawl-path module imports a changed file.
 - **Independent review** (separate agent, isolated clone with no remote, fake values; the repository's fingerprint was unchanged afterwards):
   - **First pass:** approve with changes; 19 of 21 mutations caught. Fixed: the unencoded-separator URLs above; an untested log line on the source test's known-bug branch; a guard that trusted any call with a describer's name; `_policy_head` repeating fetch text without the list; a possibly empty reference; a reference test that could pass with nothing checked.
   - **Re-review of the fixes:** approve; 5 of 6 mutations caught. The survivor, the empty-reference fallback, now has a test. Two of its notes were fixed: `@` in a query value is accepted again, and the guard also fails on a describer name bound by assignment or import.
 - **After the reviews, with the user's approval:** the two last notes were resolved rather than accepted. The database name is out of the logs, and single-source failures log the source ID. Each new test fails on its mutation: `main`'s logging, and a `_source_error` that does not log.
+- **Third review round, of that delta:** approve; both mutations caught. It found two small issues, and both were fixed, each with a test that fails on its mutation:
+  - a source ID could forge a log line; it is now logged with `%r`;
+  - a URL missing the `:` before the password logged the password as the user.
+  
+  The same line-break weakness exists in older f-string log lines that print a source ID. The general fix, escaping line breaks in the redacting formatter, belongs to phase 3 (the remaining log paths).
 - **Accepted, not changed:** bracketed IPv6 hosts are unreadable, as before; Supabase hosts are names.
 - **Left for later, outside this PR:** W-33 and the richer source-test categories, which are one functional decision (ledger W-33); `X-Request-ID` reaching the browser through the proxies (stage 4).
 
