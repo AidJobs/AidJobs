@@ -19,11 +19,80 @@ try:
 except ImportError:
     httpx = None
 
+import json
+
 from app.db_config import db_config
+from app.errors import InternalError, log_failure
+from app.log_safety import current_request_id
 from security.admin_auth import admin_required
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+DB_NOT_CONFIGURED = "Database not configured"
+DB_SETTINGS_UNREADABLE = "Database settings could not be read"
+
+# contracts.outbound.FetchError's messages: fixed text we wrote. Anything else is not repeated.
+_FETCH_MESSAGES = frozenset({
+    "unix sockets are not used",
+    "DNS resolution failed",
+    "URL scheme or host is not permitted",
+    "destination host is not permitted",
+    "destination address is not permitted",
+    "response exceeds size limit",
+    "content encoding failed",
+    "content encoding is not permitted",
+    "timeout",
+    "redirect limit",
+    "redirect destination is missing",
+    "redirect destination is not permitted",
+})
+
+
+def _connection_params() -> dict:
+    """The database connection settings, or a 503 that says why there are none."""
+    params = db_config.get_connection_params()
+    if params:
+        return params
+    if db_config.settings_unreadable:
+        raise HTTPException(status_code=503, detail=DB_SETTINGS_UNREADABLE)
+    raise HTTPException(status_code=503, detail=DB_NOT_CONFIGURED)
+
+
+def _source_error(message: str, source_id: str, cause: BaseException) -> InternalError:
+    """InternalError for a route about one source: the ID goes to the log, not the response."""
+    logger.error("[sources] %s: source %r", message, source_id)
+    return InternalError(message, cause=cause)
+
+
+def fetch_message(error: BaseException) -> str | None:
+    """A FetchError's message when it is one of the fixed messages above; otherwise None."""
+    reason = str(error)
+    return reason if reason in _FETCH_MESSAGES else None
+
+
+def describe_failure(error: BaseException) -> str:
+    """Why a source check failed, in our own words, chosen by the exception's type.
+
+    Never the exception's text: third-party messages can quote URLs, headers or credentials.
+    """
+    from contracts.outbound import FetchError
+
+    if isinstance(error, FetchError):
+        reason = fetch_message(error)
+        return f"Fetch failed: {reason}" if reason else "Fetch failed"
+    if isinstance(error, json.JSONDecodeError):
+        return f"Invalid JSON at line {error.lineno}, column {error.colno}"
+    if httpx is not None:
+        if isinstance(error, httpx.HTTPStatusError):
+            return f"The source answered HTTP {error.response.status_code}"
+        if isinstance(error, httpx.TimeoutException):
+            return "Connection timeout. The server took too long to respond."
+        if isinstance(error, httpx.ConnectError):
+            return "Could not connect: the host name did not resolve or the connection was refused."
+        if isinstance(error, httpx.TooManyRedirects):
+            return "Too many redirects"
+    return f"Unexpected error (ref {current_request_id()[:8] or 'unavailable'})"
 
 
 class SourceCreate(BaseModel):
@@ -77,9 +146,7 @@ def list_sources(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     page = max(1, page)
     size = max(1, min(100, size))
@@ -141,8 +208,7 @@ def list_sources(
         }
         
     except Exception as e:
-        logger.error(f"Failed to list sources: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to list sources", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -155,9 +221,7 @@ def list_organisations(admin: str = Depends(admin_required)):
     """Distinct trimmed source names. This does not read or write organisation rows."""
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     conn = None
     cursor = None
     try:
@@ -175,8 +239,7 @@ def list_organisations(admin: str = Depends(admin_required)):
         items = [dict(row) for row in cursor.fetchall()]
         return {"status": "ok", "data": {"items": items}, "error": None}
     except Exception as e:
-        logger.error(f"Failed to list organisations: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to list organisations", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -189,9 +252,7 @@ def get_source(source_id: str, admin: str = Depends(admin_required)):
     """One source for the detail page."""
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     conn = None
     cursor = None
     try:
@@ -215,8 +276,7 @@ def get_source(source_id: str, admin: str = Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to load source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _source_error("Failed to load source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -234,9 +294,7 @@ def create_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -334,16 +392,15 @@ def create_source(
         
     except HTTPException:
         raise
-    except psycopg2.IntegrityError as e:
+    except psycopg2.IntegrityError:
         if conn:
             conn.rollback()
-        logger.error(f"Duplicate careers_url: {e}")
+        logger.warning("[sources] Create refused: a source with this careers_url exists")
         raise HTTPException(status_code=409, detail="Source with this URL already exists")
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Failed to create source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to create source", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -362,9 +419,7 @@ def update_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -438,18 +493,17 @@ def update_source(
             "error": None
         }
         
-    except psycopg2.IntegrityError as e:
+    except psycopg2.IntegrityError:
         if conn:
             conn.rollback()
-        logger.error(f"Duplicate careers_url on update: {e}")
+        logger.warning("[sources] Update refused: a source with this careers_url exists")
         raise HTTPException(status_code=409, detail="Source with this URL already exists")
     except HTTPException:
         raise
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Failed to update source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _source_error("Failed to update source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -467,9 +521,7 @@ def delete_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -529,8 +581,7 @@ def delete_source(
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Failed to delete source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _source_error("Failed to delete source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -548,9 +599,7 @@ def permanently_delete_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -607,8 +656,7 @@ def permanently_delete_source(
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Failed to permanently delete source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _source_error("Failed to permanently delete source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -628,7 +676,7 @@ async def _policy_head(url: str) -> dict:
             timeout=10.0,
         )
     except FetchError as exc:
-        return {"ok": False, "status": 0, "error": str(exc)}
+        return {"ok": False, "status": 0, "error": fetch_message(exc) or "Fetch failed"}
     return {
         "ok": result.status_code < 400,
         "status": result.status_code,
@@ -648,12 +696,11 @@ async def test_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
+    host = None
     
     try:
         # Fetch source
@@ -687,7 +734,6 @@ async def test_source(
         # For API sources, test with actual API call
         if source_type == 'api' and parser_hint:
             try:
-                import json
                 import os
                 from crawler_v2.api_crawler import SimpleAPICrawler
                 from core.secrets import check_required_secrets, mask_secrets
@@ -711,7 +757,7 @@ async def test_source(
                     # Test API call (limit to 1 page for testing)
                     db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
                     if not db_url:
-                        raise HTTPException(status_code=500, detail="Database not configured")
+                        raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
                     
                     api_crawler = SimpleAPICrawler(db_url)
                     # Temporarily limit to 1 page for testing
@@ -737,26 +783,21 @@ async def test_source(
                     headed = await _policy_head(url)
                     headed["host"] = host
                     return headed
+            except HTTPException:
+                raise
             except json.JSONDecodeError as e:
                 return {
                     "ok": False,
                     "status": 0,
-                    "error": f"Invalid JSON schema: {str(e)}",
-                    "host": host
-                }
-            except ValueError as e:
-                return {
-                    "ok": False,
-                    "status": 0,
-                    "error": str(e),
+                    "error": f"API configuration: {describe_failure(e)}",
                     "host": host
                 }
             except Exception as e:
-                logger.error(f"Failed to test API source {source_id}: {e}")
+                log_failure(logger, f"[sources] Test of API source {source_id} failed", e)
                 return {
                     "ok": False,
                     "status": 0,
-                    "error": str(e),
+                    "error": describe_failure(e),
                     "host": host
                 }
         else:
@@ -764,37 +805,15 @@ async def test_source(
             headed["host"] = host
             return headed
         
-    except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.error(f"Failed to test source {source_id}: {e}")
-        error_msg = str(e)
-        # Provide more user-friendly error messages
-        if "Name or service not known" in error_msg or "getaddrinfo failed" in error_msg:
-            error_msg = f"DNS resolution failed for host. Please check if the URL is correct and the hostname is valid."
-        elif "Connection refused" in error_msg:
-            error_msg = f"Connection refused. The server may be down or not accepting connections."
-        elif "timeout" in error_msg.lower():
-            error_msg = f"Connection timeout. The server took too long to respond."
-        
-        return {
-            "ok": False,
-            "status": 0,
-            "error": error_msg,
-            "host": host if 'host' in locals() else None
-        }
     except HTTPException:
         raise
     except Exception as e:
-        # Catch any other network/DNS errors
-        error_msg = str(e)
-        if "Name or service not known" in error_msg or "getaddrinfo" in error_msg:
-            error_msg = f"DNS resolution failed for host. Please check if the URL is correct and the hostname is valid."
-        
-        logger.error(f"Failed to test source {source_id}: {e}")
+        log_failure(logger, f"[sources] Test of source {source_id} failed", e)
         return {
             "ok": False,
             "status": 0,
-            "error": error_msg,
-            "host": host if 'host' in locals() else None
+            "error": describe_failure(e),
+            "host": host
         }
     finally:
         if cursor:
@@ -818,9 +837,7 @@ def export_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -863,8 +880,7 @@ def export_source(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to export source {source_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _source_error("Failed to export source", source_id, e)
     finally:
         if cursor:
             cursor.close()
@@ -890,9 +906,7 @@ def import_source(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     # Validate source_type
     if source.source_type not in ["html", "rss", "api"]:
@@ -901,14 +915,15 @@ def import_source(
     # Validate parser_hint for API sources
     if source.source_type == "api" and source.parser_hint:
         try:
-            import json
             parser_hint = json.loads(source.parser_hint) if isinstance(source.parser_hint, str) else source.parser_hint
             if isinstance(parser_hint, dict) and parser_hint.get("v") != 1:
                 raise HTTPException(status_code=400, detail="API sources must use v1 schema (v=1)")
+        except HTTPException:
+            raise
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid JSON in parser_hint")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid parser_hint: {e}")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid parser_hint")
     
     conn = None
     cursor = None
@@ -949,18 +964,17 @@ def import_source(
             "error": None
         }
         
-    except psycopg2.IntegrityError as e:
+    except psycopg2.IntegrityError:
         if conn:
             conn.rollback()
-        logger.error(f"Duplicate careers_url: {e}")
+        logger.warning("[sources] Import refused: a source with this careers_url exists")
         raise HTTPException(status_code=409, detail="Source with this URL already exists")
     except HTTPException:
         raise
     except Exception as e:
         if conn:
             conn.rollback()
-        logger.error(f"Failed to import source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to import source", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -978,9 +992,7 @@ async def simulate_extract(
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
-    conn_params = db_config.get_connection_params()
-    if not conn_params:
-        raise HTTPException(status_code=503, detail="Database not configured")
+    conn_params = _connection_params()
     
     conn = None
     cursor = None
@@ -1015,7 +1027,7 @@ async def simulate_extract(
             import os
             db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
             if not db_url:
-                raise HTTPException(status_code=500, detail="Database not configured")
+                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             html_crawler = SimpleCrawler(db_url)
             # Fetch and extract jobs
             status, html = await html_crawler.fetch_html(source['careers_url'])
@@ -1028,7 +1040,7 @@ async def simulate_extract(
             import os
             db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
             if not db_url:
-                raise HTTPException(status_code=500, detail="Database not configured")
+                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             rss_crawler = SimpleRSSCrawler(db_url)
             feed = await rss_crawler.fetch_feed(source['careers_url'])
             if feed:
@@ -1040,7 +1052,7 @@ async def simulate_extract(
             import os
             db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
             if not db_url:
-                raise HTTPException(status_code=500, detail="Database not configured")
+                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             api_crawler = SimpleAPICrawler(db_url)
             # For simulate, fetch API and extract jobs
             data = await api_crawler.fetch_api(source['careers_url'])
@@ -1065,30 +1077,18 @@ async def simulate_extract(
         
     except HTTPException:
         raise
-    except ValueError as e:
-        # Validation errors
-        error_msg = str(e)
-        logger.error(f"Validation error in simulate_extract for source {source_id}: {error_msg}")
-        return {
-            "ok": False,
-            "error": error_msg,
-            "error_category": "validation"
-        }
-    except RuntimeError as e:
-        # Runtime errors (network, API failures)
-        error_msg = str(e)
-        logger.error(f"Runtime error in simulate_extract for source {source_id}: {error_msg}")
-        return {
-            "ok": False,
-            "error": error_msg,
-            "error_category": "runtime"
-        }
     except Exception as e:
-        logger.error(f"Failed to simulate extract for source {source_id}: {e}")
+        log_failure(logger, f"[sources] Simulated extraction for source {source_id} failed", e)
+        if isinstance(e, ValueError):
+            category = "validation"
+        elif isinstance(e, RuntimeError):
+            category = "runtime"
+        else:
+            category = "unknown"
         return {
             "ok": False,
-            "error": str(e),
-            "error_category": "unknown"
+            "error": describe_failure(e),
+            "error_category": category
         }
     finally:
         if cursor:

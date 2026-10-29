@@ -9,6 +9,9 @@ other variables; it is not a proof of absence, and the runtime leak tests remain
 
 ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
 convert them and shrink this list to nothing. A converted function must be removed from it.
+
+DESCRIBERS are reviewed functions that turn an exception into our own words by its type and never
+repeat its text; a direct call DESCRIBER(NAME) is not a finding.
 """
 import ast
 from collections import Counter
@@ -45,21 +48,8 @@ ALLOWED = {
     "app/job_management.py::restore_jobs": 1,
     "app/job_management.py::search_jobs": 1,
     "app/data_quality.py::validate_job": 1,  # a job URL's parse error, in the quality report
-    "app/presets.py::get_source_preset": 1,
-    "app/presets.py::get_source_presets": 1,
     "app/search.py::get_search_settings": 1,
     "app/search.py::reindex_jobs": 1,
-    "app/sources.py::create_source": 1,
-    "app/sources.py::delete_source": 1,
-    "app/sources.py::export_source": 1,
-    "app/sources.py::get_source": 1,
-    "app/sources.py::import_source": 2,
-    "app/sources.py::list_organisations": 1,
-    "app/sources.py::list_sources": 1,
-    "app/sources.py::permanently_delete_source": 1,
-    "app/sources.py::simulate_extract": 3,
-    "app/sources.py::test_source": 5,
-    "app/sources.py::update_source": 1,
     "main.py::admin_search_init": 1,
     # Internal-key routes; phase 2.
     "app/pipeline_api.py::get_extracted_job": 1,
@@ -73,9 +63,8 @@ ALLOWED = {
     "app/enrichment_ground_truth.py::validate_enrichment_accuracy": 1,
     "app/shortlist.py::get_shortlist": 1,
     "app/shortlist.py::toggle_shortlist": 1,
-    # Reviewed, not leaks: the except branch cannot run; only our own fixed fetch messages.
+    # Reviewed, not a leak: the except branch cannot run.
     "main.py::healthz": 1,
-    "app/sources.py::_policy_head": 1,
     # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;
     # _search_meilisearch uses the text only for keyword matching).
     "app/ai_service.py::_call_openrouter": 6,
@@ -83,19 +72,30 @@ ALLOWED = {
 }
 
 
-def _refs(node, name):
-    for sub in ast.walk(node):
-        if isinstance(sub, ast.Name) and sub.id == name:
-            return True
-        if (isinstance(sub, ast.Attribute) and sub.attr == "format_exc"
-                and isinstance(sub.value, ast.Name) and sub.value.id == "traceback"):
-            return True
-    return False
+DESCRIBERS = {"describe_failure": "app/sources.py", "fetch_message": "app/sources.py"}
 
 
 def _call_name(call):
     f = call.func
     return f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
+
+
+def _describes(node, name):
+    """A direct call DESCRIBER(NAME): the exception goes in, only our own words come out."""
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in DESCRIBERS and not node.keywords
+            and [type(a) for a in node.args] == [ast.Name] and node.args[0].id == name)
+
+
+def _refs(node, name):
+    if _describes(node, name):
+        return False
+    if isinstance(node, ast.Name) and node.id == name:
+        return True
+    if (isinstance(node, ast.Attribute) and node.attr == "format_exc"
+            and isinstance(node.value, ast.Name) and node.value.id == "traceback"):
+        return True
+    return any(_refs(child, name) for child in ast.iter_child_nodes(node))
 
 
 def _stored(node, name):
@@ -148,6 +148,29 @@ def test_no_new_exception_text_in_responses():
     found = findings()
     new = {k: v for k, v in found.items() if v > ALLOWED.get(k, 0)}
     assert not new, f"exception text reaches a response in new places (use InternalError): {new}"
+
+
+def test_each_describer_is_the_reviewed_one():
+    """Each trusted name is defined once, where it was reviewed, and bound nowhere else."""
+    defined = Counter()
+    for path in [BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py")):
+        rel = path.relative_to(BACKEND).as_posix()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                names = [node.name]
+            elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                names = [t.id for t in targets if isinstance(t, ast.Name)]
+            elif isinstance(node, ast.ImportFrom) and node.module != "app.sources":
+                names = [alias.asname or alias.name for alias in node.names]
+            elif isinstance(node, ast.Import):
+                names = [alias.asname or alias.name for alias in node.names]
+            else:
+                continue
+            for name in names:
+                if name in DESCRIBERS:
+                    defined[(name, rel)] += 1
+    assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
 
 
 def test_converted_functions_leave_the_allowlist():

@@ -119,7 +119,7 @@ def test_admin_pages_answer_503_for_a_malformed_database_url():
     _assert_no_leak(calls, logs)
     assert _statuses(calls) == {"/api/admin/sources": 503, "/api/admin/organisations": 503}
     for c in calls:
-        assert json.loads(c["body"]) == {"detail": "Database not configured"}
+        assert json.loads(c["body"]) == {"detail": "Database settings could not be read"}
     _assert_request_ids(calls)
 
 
