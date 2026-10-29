@@ -10,6 +10,8 @@ from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
 
+URL_HINT = "Check the port, and percent-encode special characters in the password (/ as %2F)"
+
 
 class DBConfig:
     """Database configuration with Supabase-first logic"""
@@ -52,8 +54,8 @@ class DBConfig:
             except Exception as e:
                 # The parser's message can quote part of the password.
                 logger.warning(
-                    "[db_config] SUPABASE_DB_URL is set but could not be parsed (%s)",
-                    type(e).__name__,
+                    "[db_config] SUPABASE_DB_URL is set but could not be parsed (%s). %s",
+                    type(e).__name__, URL_HINT,
                 )
         else:
             logger.warning("[db_config] SUPABASE_DB_URL not set - database connections will fail")
@@ -68,6 +70,18 @@ class DBConfig:
     def is_db_enabled(self) -> bool:
         """Check if database is available via Supabase (requires SUPABASE_DB_URL for direct connections)"""
         return bool(self.supabase_db_url)
+
+    @property
+    def settings_unreadable(self) -> bool:
+        """SUPABASE_DB_URL is set, but no host and port can be read from it."""
+        if not self.supabase_db_url:
+            return False
+        try:
+            parsed = urlparse(self.supabase_db_url.replace('[', '').replace(']', ''))
+            parsed.port
+        except Exception:
+            return True
+        return not parsed.hostname
     
     def get_connection_params(self) -> dict | None:
         """
@@ -90,7 +104,8 @@ class DBConfig:
             parsed = urlparse(cleaned_url)
             port = parsed.port or 5432
         except Exception as e:
-            logger.error("[db_config] SUPABASE_DB_URL could not be parsed (%s)", type(e).__name__)
+            logger.error("[db_config] SUPABASE_DB_URL could not be parsed (%s). %s",
+                         type(e).__name__, URL_HINT)
             return None
         
         if not parsed.hostname:

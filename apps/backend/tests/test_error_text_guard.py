@@ -9,6 +9,9 @@ other variables; it is not a proof of absence, and the runtime leak tests remain
 
 ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
 convert them and shrink this list to nothing. A converted function must be removed from it.
+
+DESCRIBERS are reviewed functions that turn an exception into our own words by its type and never
+repeat its text; NAME passed to one of them is not a finding.
 """
 import ast
 from collections import Counter
@@ -45,21 +48,8 @@ ALLOWED = {
     "app/job_management.py::restore_jobs": 1,
     "app/job_management.py::search_jobs": 1,
     "app/data_quality.py::validate_job": 1,  # a job URL's parse error, in the quality report
-    "app/presets.py::get_source_preset": 1,
-    "app/presets.py::get_source_presets": 1,
     "app/search.py::get_search_settings": 1,
     "app/search.py::reindex_jobs": 1,
-    "app/sources.py::create_source": 1,
-    "app/sources.py::delete_source": 1,
-    "app/sources.py::export_source": 1,
-    "app/sources.py::get_source": 1,
-    "app/sources.py::import_source": 2,
-    "app/sources.py::list_organisations": 1,
-    "app/sources.py::list_sources": 1,
-    "app/sources.py::permanently_delete_source": 1,
-    "app/sources.py::simulate_extract": 3,
-    "app/sources.py::test_source": 5,
-    "app/sources.py::update_source": 1,
     "main.py::admin_search_init": 1,
     # Internal-key routes; phase 2.
     "app/pipeline_api.py::get_extracted_job": 1,
@@ -83,19 +73,23 @@ ALLOWED = {
 }
 
 
-def _refs(node, name):
-    for sub in ast.walk(node):
-        if isinstance(sub, ast.Name) and sub.id == name:
-            return True
-        if (isinstance(sub, ast.Attribute) and sub.attr == "format_exc"
-                and isinstance(sub.value, ast.Name) and sub.value.id == "traceback"):
-            return True
-    return False
+DESCRIBERS = {"describe_failure"}  # app/sources.py
 
 
 def _call_name(call):
     f = call.func
     return f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
+
+
+def _refs(node, name):
+    if isinstance(node, ast.Call) and _call_name(node) in DESCRIBERS:
+        return False
+    if isinstance(node, ast.Name) and node.id == name:
+        return True
+    if (isinstance(node, ast.Attribute) and node.attr == "format_exc"
+            and isinstance(node.value, ast.Name) and node.value.id == "traceback"):
+        return True
+    return any(_refs(child, name) for child in ast.iter_child_nodes(node))
 
 
 def _stored(node, name):

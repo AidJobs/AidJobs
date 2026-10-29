@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any
 
+from app.errors import InternalError
 from security.admin_auth import admin_required
 
 logger = logging.getLogger(__name__)
@@ -167,8 +168,7 @@ def get_source_presets(admin: str = Depends(admin_required)):
             "error": None
         }
     except Exception as e:
-        logger.error(f"Failed to get presets: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to load presets", cause=e)
 
 
 @router.get("/api/admin/presets/sources/{preset_name}")
@@ -202,6 +202,5 @@ def get_source_preset(preset_name: str, admin: str = Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get preset: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to load preset", cause=e)
 
