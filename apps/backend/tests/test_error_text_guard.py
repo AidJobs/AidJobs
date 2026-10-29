@@ -151,12 +151,25 @@ def test_no_new_exception_text_in_responses():
 
 
 def test_each_describer_is_the_reviewed_one():
+    """Each trusted name is defined once, where it was reviewed, and bound nowhere else."""
     defined = Counter()
     for path in [BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py")):
+        rel = path.relative_to(BACKEND).as_posix()
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            is_function = isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            if is_function and node.name in DESCRIBERS:
-                defined[(node.name, path.relative_to(BACKEND).as_posix())] += 1
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                names = [node.name]
+            elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                names = [t.id for t in targets if isinstance(t, ast.Name)]
+            elif isinstance(node, ast.ImportFrom) and node.module != "app.sources":
+                names = [alias.asname or alias.name for alias in node.names]
+            elif isinstance(node, ast.Import):
+                names = [alias.asname or alias.name for alias in node.names]
+            else:
+                continue
+            for name in names:
+                if name in DESCRIBERS:
+                    defined[(name, rel)] += 1
     assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
 
 

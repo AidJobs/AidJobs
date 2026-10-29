@@ -314,6 +314,32 @@ def test_a_password_with_an_unencoded_separator_is_unreadable(monkeypatch, caplo
     assert any("could not be parsed (ValueError)" in m for m in messages)
 
 
+def test_the_reference_is_never_empty():
+    from app.sources import describe_failure
+
+    token = REQUEST_ID.set("")
+    try:
+        assert describe_failure(RuntimeError(FRAGMENT)) == "Unexpected error (ref unavailable)"
+    finally:
+        REQUEST_ID.reset(token)
+
+
+@pytest.mark.parametrize("url, readable", [
+    ("postgresql://postgres.abcdef:FAKE%2Fpw@pooler.example.com:6543/postgres", True),
+    ("postgresql://postgres.abcdef:FAKEpw@pooler.example.com:6543/postgres?sslmode=require", True),
+    ("postgresql://u:FAKEpw@127.0.0.1:5432/db?application_name=a@b", True),
+    ("postgresql://u:12?" + FRAGMENT + "@127.0.0.1:5432/db", False),
+])
+def test_well_formed_urls_stay_readable(monkeypatch, url, readable):
+    """Pooler names and IP addresses only: other host names would be resolved over DNS."""
+    from app.db_config import DBConfig
+
+    monkeypatch.setenv("SUPABASE_DB_URL", url)
+    config = DBConfig()
+    assert config.settings_unreadable is (not readable)
+    assert (config.get_connection_params() is not None) is readable
+
+
 def test_fetch_messages_are_repeated_only_when_they_are_ours():
     from app.sources import fetch_message
 

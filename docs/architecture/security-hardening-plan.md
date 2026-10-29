@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phases 2 and 3 not started; each needs its own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026; its PR 1 (sources and presets) built and reviewed, not merged. Later phase 2 PRs and phase 3 each need their own approval |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -757,6 +757,52 @@ Merge approved by the user on 29 October 2026 (India time), at the reviewed head
   - the branch `docs/stage3-design` (PR #62) was deleted on 29 October 2026, after checking it had no commit outside `main`;
   - issue #5 was closed as completed (crawler plan, "Parked decision");
   - the agent's local review clones, worktree and review database were removed.
+
+#### Stage 3, phase 2, PR 1: implementation record
+
+Plan approved by the user on 29 October 2026 (India time), with PR 1 only authorised: the 13 functions in `app/sources.py` and `app/presets.py`, plus the two phase 1 follow-ups. PRs 2 to 5 stay separate and each needs its own approval. Built on the branch `security/stage3-phase2-sources` from `main` at `a8bf743`.
+
+Files changed, as authorised: `app/sources.py`, `app/presets.py`, `app/db_config.py` (follow-ups only), the tests, and `ci.yml`'s test lists. No crawler, frontend or other module changed.
+
+What changes:
+- **Unexpected failures (500)** in the 11 data routes and both preset routes raise `InternalError`: `{"detail": "Failed to list sources (ref 3f9a12bc)", "request_id": "<id>"}`, with the same status. The cause is logged through `log_failure`, redacted, under the request ID.
+- **Expected answers are unchanged:** the 400, 404, 409 and 503 answers keep their status and wording, with one approved exception. `import_source` no longer re-wraps its own 400, so a schema other than v1 now answers "API sources must use v1 schema (v=1)" instead of "Invalid parser_hint: 400: API sources must use v1 schema (v=1)". Its other parser failure no longer quotes the exception.
+- **The source test and the extraction simulation** keep their response shapes (200, `ok: false`, `error`, and the simulation's `error_category`). The error text is chosen by the exception's type in `describe_failure`:
+  - outbound-fetch errors repeat their fixed messages only if they are on a known list (`fetch_message`);
+  - an HTTP error becomes "The source answered HTTP <status>";
+  - invalid JSON becomes "Invalid JSON at line X, column Y";
+  - a timeout, connection failure or redirect loop gets a fixed phrase;
+  - anything else becomes "Unexpected error (ref <id>)".
+  
+  The crawler's fetch functions catch their own network errors and return nothing, so for the API test and the simulation a network failure arrives as "nothing came back". The categories are limited to what reaches `sources.py`.
+- **The two phase 1 follow-ups:**
+  - The malformed-URL log lines add: "Check the port, and percent-encode special characters in the password (/ as %2F)".
+  - The admin routes answer 503 "Database settings could not be read" when `SUPABASE_DB_URL` is set but cannot be read, and keep 503 "Database not configured" when it is absent.
+- **A password with an unencoded `/`, `?` or `#` is now unreadable** (found by the independent review). urllib could read the start of such a password as an empty or numeric port, so the URL looked valid. The rest of the password then reached two existing INFO lines as the "database" name. `db_config._parse_url` refuses an `@` in the path or fragment, or in the query when no `=` comes before it. A query value such as `application_name=a@b` stays readable.
+- **The static guard** trusts two reviewed functions, `describe_failure` and `fetch_message`, but only as direct calls with the exception as their one argument. A test checks that each is defined once, in `app/sources.py`, and bound nowhere else. The allowlist loses the 13 converted functions and the reviewed `_policy_head`, which now uses `fetch_message`.
+- **Known bug, not fixed here (ledger W-33):** the source test of a v1 API source calls `fetch_api` with a signature it does not have. It now fails safely with "Unexpected error (ref …)" and logs the `TypeError`.
+
+Evidence, 29 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pinned versions):
+- **New tests:**
+  - `test_admin_sources_errors.py`: a fresh-process walk of all 13 routes with a failing fake driver and preset list; references leading to the logged cause; the 503 wording for set-but-unreadable and absent URLs; categories by type; the URL shapes; the import 400.
+  - `test_admin_sources_contract.py`: 401 without a session on all 13 routes; the existing 400, 404 and 409 answers; the success shapes.
+  
+  No test uses a network or a real database.
+- **On `main`'s code:**
+  - The security tests fail on the behaviour they target. The walk fails on "responses quoting the fake database password", on every route. The source test shows `SimpleAPICrawler.fetch_api() got an unexpected keyword argument …`. The simulation shows the raw text, and the import gives the re-wrapped 400.
+  - The `describe_failure` unit tests fail because the function does not exist.
+  - All 23 contract tests pass, on `main` and on the branch.
+- **On the branch:**
+  - CI list: 515 passed, with the same 4 skips as before. PostgreSQL ownership tests: 47 passed. Ruff is clean on CI's list.
+  - The three changed modules have no new Ruff finding; `sources.py` drops from 22 to 16.
+  - Offline crawl comparison against `main` on the 12 saved sources: identical. No crawl-path module imports a changed file.
+- **Independent review** (separate agent, isolated clone with no remote, fake values; the repository's fingerprint was unchanged afterwards):
+  - **First pass:** approve with changes; 19 of 21 mutations caught. Fixed: the unencoded-separator URLs above; an untested log line on the source test's known-bug branch; a guard that trusted any call with a describer's name; `_policy_head` repeating fetch text without the list; a possibly empty reference; a reference test that could pass with nothing checked.
+  - **Re-review of the fixes:** approve; 5 of 6 mutations caught. The survivor, the empty-reference fallback, now has a test. Two of its notes were fixed: `@` in a query value is accepted again, and the guard also fails on a describer name bound by assignment or import.
+- **Accepted, not changed:**
+  - some failure log lines no longer name the source ID; the request ID links them to the access-log line, which has the path;
+  - a URL with no `@` at all (the host left out) can still log its path as the database name; this is pre-existing and needs a URL with no host;
+  - bracketed IPv6 hosts are unreadable, as before.
 
 ### Stage 4. Frontend proxy error handling
 

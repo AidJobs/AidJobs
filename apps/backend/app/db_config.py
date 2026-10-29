@@ -18,10 +18,12 @@ def _parse_url(url: str):
 
     urllib then reads the start of the password as the port and the rest as the path, query or
     fragment, so the URL looks valid while the password's tail would be logged as the database.
+    A query value may contain "@" (application_name=a@b); a password's tail has no "=" before it.
     """
     parsed = urlparse(url.replace('[', '').replace(']', ''))
     parsed.port
-    if "@" in parsed.path or "@" in parsed.query or "@" in parsed.fragment:
+    query_tail = "@" in parsed.query and "=" not in parsed.query.split("@", 1)[0]
+    if "@" in parsed.path or query_tail or "@" in parsed.fragment:
         raise ValueError("credentials outside the user-information part")
     return parsed
 

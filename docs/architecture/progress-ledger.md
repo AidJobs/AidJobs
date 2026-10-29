@@ -360,6 +360,8 @@ Decided by the user on 27 October 2026: no AI in the crawl, with the contract am
 
 **W-16. Issue #4, parked.** Test-suite cleanup, including the JSON-LD circular import that stops `tests/test_pipeline_extractor.py` and `tests/test_pipeline_integration.py` from being collected.
 
+**W-33. The admin source test cannot test a v1 API source.** Found 29 October 2026, in security stage 3, phase 2. `test_source` (`app/sources.py`) calls `api_crawler.fetch_api(url, json.dumps(test_schema), last_success_at=None)`, but the function is `fetch_api(url, headers=None)`, so every such test fails with a `TypeError` (Repository). Before phase 2, the admin saw that raw text; since PR 1 the admin sees "Unexpected error (ref …)" and the cause is logged. Not fixed in the security work, by the user's decision; a functional fix needs its own approval. The current sources use HTML pages, so no live source is affected (Not verified for every source).
+
 **W-21. Geocoding refused by Nominatim.** Done. Fix merged as PR #15 (`bcdadd3`), 19 October 2026. Verified in the Render log of the 19:24 UTC Oxfam crawl, from the lines the user pasted: the first lookup, `London, London, United Kingdom`, returned `HTTP 429 Too many requests`, then `Nominatim refused geocoding (HTTP 429); pausing Nominatim lookups for 3600s`, and no further Nominatim request in that crawl. This closes the repeated-request failure only. Geocoding itself still does not work in production (W-27).
 The 19 October UNICEF crawl spent about 4.5 minutes on location lookups, and every one returned `HTTP 429 Too many requests` from `nominatim.openstreetmap.org` (Verified from the Render log). The geocoder treated a 429 like any failure and remembered only successes, so it asked about the same country many times. Nominatim's usage policy expects clients to stop when refused; continued requests risk a lasting ban. The fix: a 429 or 403 pauses Nominatim lookups for an hour, or longer if `Retry-After` says so; a lookup that was attempted and failed is not repeated for an hour. Jobs are still saved without coordinates. The geocoder calls the network through `httpx` directly, not through `fetch_url`; the host is fixed, so the risk is low, but it is a gap against contract §9 (Repository).
 
@@ -497,7 +499,8 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Approve stage 3, phase 2 (admin responses: fixed messages with a reference, diagnostic categories) | Security plan, stage 3 design, G and H |
+| Merge stage 3, phase 2, PR 1 (sources and presets admin responses); plan approved 29 October 2026 | Security plan, stage 3, phase 2, PR 1 implementation record |
+| Fix the API-source test's `fetch_api` call, separately from the security work | W-33 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
