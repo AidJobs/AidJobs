@@ -11,7 +11,7 @@ ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function.
 convert them and shrink this list to nothing. A converted function must be removed from it.
 
 DESCRIBERS are reviewed functions that turn an exception into our own words by its type and never
-repeat its text; NAME passed to one of them is not a finding.
+repeat its text; a direct call DESCRIBER(NAME) is not a finding.
 """
 import ast
 from collections import Counter
@@ -63,9 +63,8 @@ ALLOWED = {
     "app/enrichment_ground_truth.py::validate_enrichment_accuracy": 1,
     "app/shortlist.py::get_shortlist": 1,
     "app/shortlist.py::toggle_shortlist": 1,
-    # Reviewed, not leaks: the except branch cannot run; only our own fixed fetch messages.
+    # Reviewed, not a leak: the except branch cannot run.
     "main.py::healthz": 1,
-    "app/sources.py::_policy_head": 1,
     # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;
     # _search_meilisearch uses the text only for keyword matching).
     "app/ai_service.py::_call_openrouter": 6,
@@ -73,7 +72,7 @@ ALLOWED = {
 }
 
 
-DESCRIBERS = {"describe_failure"}  # app/sources.py
+DESCRIBERS = {"describe_failure": "app/sources.py", "fetch_message": "app/sources.py"}
 
 
 def _call_name(call):
@@ -81,8 +80,15 @@ def _call_name(call):
     return f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute) else "")
 
 
+def _describes(node, name):
+    """A direct call DESCRIBER(NAME): the exception goes in, only our own words come out."""
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in DESCRIBERS and not node.keywords
+            and [type(a) for a in node.args] == [ast.Name] and node.args[0].id == name)
+
+
 def _refs(node, name):
-    if isinstance(node, ast.Call) and _call_name(node) in DESCRIBERS:
+    if _describes(node, name):
         return False
     if isinstance(node, ast.Name) and node.id == name:
         return True
@@ -142,6 +148,16 @@ def test_no_new_exception_text_in_responses():
     found = findings()
     new = {k: v for k, v in found.items() if v > ALLOWED.get(k, 0)}
     assert not new, f"exception text reaches a response in new places (use InternalError): {new}"
+
+
+def test_each_describer_is_the_reviewed_one():
+    defined = Counter()
+    for path in [BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            is_function = isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            if is_function and node.name in DESCRIBERS:
+                defined[(node.name, path.relative_to(BACKEND).as_posix())] += 1
+    assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
 
 
 def test_converted_functions_leave_the_allowlist():

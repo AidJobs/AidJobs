@@ -6,6 +6,7 @@ preset list that fail with fake connection-string text. Every secret is assemble
 nothing touches a network or a database.
 """
 import json
+import logging
 import os
 import re
 import subprocess
@@ -147,6 +148,7 @@ def test_failures_return_a_fixed_message_with_a_reference_and_no_secret():
 
 def test_each_reference_leads_to_the_logged_cause():
     calls, logs = _run(WELL_FORMED_DB_URL, FAILURES + SOURCE_CALLS + PRESET_CALLS)
+    assert len(calls) == 13
     cause_lines = [line for line in logs.splitlines() if "OperationalError" in line
                    or "RuntimeError" in line]
     for route, c in calls.items():
@@ -282,14 +284,41 @@ def test_source_test_lists_missing_secret_names_only(monkeypatch):
     assert body["missing_secrets"] == ["AJ_TEST_MISSING_TOKEN"]
 
 
-def test_source_test_of_a_v1_api_source_fails_safely(monkeypatch):
+def test_source_test_of_a_v1_api_source_fails_safely(monkeypatch, caplog):
     """Known bug, recorded in the ledger: the test calls fetch_api with a signature it lacks."""
     client = _diagnostic_client(monkeypatch, _api_source(json.dumps({"v": 1})))
-    response = client.post(f"/api/admin/sources/{SOURCE_ID}/test")
+    with caplog.at_level(logging.ERROR, logger="app.sources"):
+        response = client.post(f"/api/admin/sources/{SOURCE_ID}/test")
     body = response.json()
     assert response.status_code == 200 and body["ok"] is False
     assert body["error"] == f"Unexpected error (ref {response.headers['X-Request-ID'][:8]})"
     assert "fetch_api" not in response.text
+    logged = [r for r in caplog.records if "Test of API source" in r.getMessage()]
+    assert logged and logged[0].exc_info and logged[0].exc_info[0] is TypeError
+
+
+@pytest.mark.parametrize("separator", ["/", "?", "#"])
+@pytest.mark.parametrize("port", ["", "12"])
+def test_a_password_with_an_unencoded_separator_is_unreadable(monkeypatch, caplog, separator, port):
+    """urllib would read the password's start as the port and log its tail as the database."""
+    from app.db_config import DBConfig
+
+    url = f"postgresql://u:{port}{separator}{FRAGMENT}tail@127.0.0.1:5432/db"
+    monkeypatch.setenv("SUPABASE_DB_URL", url)
+    with caplog.at_level(logging.DEBUG, logger="app.db_config"):
+        config = DBConfig()
+        assert config.get_connection_params() is None
+        assert config.settings_unreadable is True
+    messages = [r.getMessage() for r in caplog.records]
+    assert not any(FRAGMENT in m for m in messages), messages
+    assert any("could not be parsed (ValueError)" in m for m in messages)
+
+
+def test_fetch_messages_are_repeated_only_when_they_are_ours():
+    from app.sources import fetch_message
+
+    assert fetch_message(FetchError("timeout")) == "timeout"
+    assert fetch_message(FetchError("upstream said " + FRAGMENT)) is None
 
 
 @pytest.mark.parametrize("raised, category, message", [

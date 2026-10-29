@@ -59,6 +59,12 @@ def _connection_params() -> dict:
     raise HTTPException(status_code=503, detail=DB_NOT_CONFIGURED)
 
 
+def fetch_message(error: BaseException) -> str | None:
+    """A FetchError's message when it is one of the fixed messages above; otherwise None."""
+    reason = str(error)
+    return reason if reason in _FETCH_MESSAGES else None
+
+
 def describe_failure(error: BaseException) -> str:
     """Why a source check failed, in our own words, chosen by the exception's type.
 
@@ -67,8 +73,8 @@ def describe_failure(error: BaseException) -> str:
     from contracts.outbound import FetchError
 
     if isinstance(error, FetchError):
-        reason = str(error)
-        return f"Fetch failed: {reason}" if reason in _FETCH_MESSAGES else "Fetch failed"
+        reason = fetch_message(error)
+        return f"Fetch failed: {reason}" if reason else "Fetch failed"
     if isinstance(error, json.JSONDecodeError):
         return f"Invalid JSON at line {error.lineno}, column {error.colno}"
     if httpx is not None:
@@ -80,7 +86,7 @@ def describe_failure(error: BaseException) -> str:
             return "Could not connect: the host name did not resolve or the connection was refused."
         if isinstance(error, httpx.TooManyRedirects):
             return "Too many redirects"
-    return f"Unexpected error (ref {current_request_id()[:8]})"
+    return f"Unexpected error (ref {current_request_id()[:8] or 'unavailable'})"
 
 
 class SourceCreate(BaseModel):
@@ -664,7 +670,7 @@ async def _policy_head(url: str) -> dict:
             timeout=10.0,
         )
     except FetchError as exc:
-        return {"ok": False, "status": 0, "error": str(exc)}
+        return {"ok": False, "status": 0, "error": fetch_message(exc) or "Fetch failed"}
     return {
         "ok": result.status_code < 400,
         "status": result.status_code,

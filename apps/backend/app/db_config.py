@@ -13,6 +13,19 @@ logger = logging.getLogger(__name__)
 URL_HINT = "Check the port, and percent-encode special characters in the password (/ as %2F)"
 
 
+def _parse_url(url: str):
+    """urlparse, refusing a URL whose password holds an unencoded /, ? or #.
+
+    urllib then reads the start of the password as the port and the rest as the path, query or
+    fragment, so the URL looks valid while the password's tail would be logged as the database.
+    """
+    parsed = urlparse(url.replace('[', '').replace(']', ''))
+    parsed.port
+    if "@" in parsed.path or "@" in parsed.query or "@" in parsed.fragment:
+        raise ValueError("credentials outside the user-information part")
+    return parsed
+
+
 class DBConfig:
     """Database configuration with Supabase-first logic"""
     
@@ -45,7 +58,7 @@ class DBConfig:
         if self.supabase_db_url:
             # Mask password in log for security
             try:
-                parsed = urlparse(self.supabase_db_url.replace('[', '').replace(']', ''))
+                parsed = _parse_url(self.supabase_db_url)
                 if parsed.password:
                     masked_url = self.supabase_db_url.replace(parsed.password, '***')
                 else:
@@ -77,8 +90,7 @@ class DBConfig:
         if not self.supabase_db_url:
             return False
         try:
-            parsed = urlparse(self.supabase_db_url.replace('[', '').replace(']', ''))
-            parsed.port
+            parsed = _parse_url(self.supabase_db_url)
         except Exception:
             return True
         return not parsed.hostname
@@ -93,15 +105,11 @@ class DBConfig:
         if not self.supabase_db_url:
             return None
         
-        # Clean up the URL by removing any square brackets around hostname
-        # This handles URLs like: postgresql://user:pass@[hostname]:port/db
-        cleaned_url = self.supabase_db_url.replace('[', '').replace(']', '')
-        
-        # Parse the database connection URL
+        # Square brackets around the host are removed: postgresql://user:pass@[hostname]:port/db
         # Never let a parse error escape or be logged with its text: urllib's and libpq's
         # messages can quote part of the password, and callers once put them in responses.
         try:
-            parsed = urlparse(cleaned_url)
+            parsed = _parse_url(self.supabase_db_url)
             port = parsed.port or 5432
         except Exception as e:
             logger.error("[db_config] SUPABASE_DB_URL could not be parsed (%s). %s",
