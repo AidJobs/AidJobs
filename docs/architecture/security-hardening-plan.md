@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026; its PR 1 (sources and presets) built and reviewed, not merged. Later phase 2 PRs and phase 3 each need their own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -810,6 +810,31 @@ Evidence, 29 October 2026 (local, Python 3.14; CI checks Python 3.11 with the pi
   The same line-break weakness exists in older f-string log lines that print a source ID. The general fix, escaping line breaks in the redacting formatter, belongs to phase 3 (the remaining log paths).
 - **Accepted, not changed:** bracketed IPv6 hosts are unreadable, as before; Supabase hosts are names.
 - **Left for later, outside this PR:** W-33 and the richer source-test categories, which are one functional decision (ledger W-33); `X-Request-ID` reaching the browser through the proxies (stage 4).
+
+#### Stage 3, phase 2, PR 1: live record
+
+Merge approved by the user on 29 October 2026, at the reviewed head `1f8df7f`. Every check below was read-only; no error was provoked in production, and the Test and Simulate buttons were not used.
+
+- **Before the merge:** head exactly `1f8df7f`; all 8 checks green; mergeable and clean; `main` still `a8bf743`. The read-only database check found no crawl lock and no run marked running. The next scheduled crawl is ICRC, on 31 October at 03:59 UTC.
+- **Merge:** `gh pr merge 65 --merge --match-head-commit 1f8df7f…`, merged as `f8bedf9` at 16:41:55 UTC. The branch is kept.
+- **CI on `main` (`f8bedf9`):** passed. Backend tests: 513 passed, 9 skipped. PostgreSQL tests: 47 passed. Frontend tests: 133 passed.
+- **Deployments:**
+  - Render: "Deploy live for f8bedf9" (Auto-Deploy). The new instance started at 16:43:26 UTC.
+  - Vercel: the production deployment completed at 16:43:12 UTC, and the public site answers 200.
+- **Checks on the live backend, 16:44 UTC, GET only, no session:**
+  - health 200;
+  - database status `ok: true` (405 jobs, 257 active, 3 sources);
+  - search 200, from the database;
+  - `/api/admin/session` gives `{"authenticated": false}`;
+  - `/api/admin/sources`, `/organisations`, `/sources/<random id>`, `/sources/<random id>/export`, `/presets/sources` and `/presets/sources/ReliefWeb Jobs` all answer 401 "Authentication required".
+  
+  Every response carried its own 32-character `X-Request-ID`, and none contained a credential pattern. Render's log has the 401 lines under the same IDs.
+- **Admin Sources page:**
+  - Opened in the user's signed-in tab with the read-only browser guard installed and tested; a dummy POST was blocked.
+  - Going to the Dashboard through the sidebar did a full page load, which removed the guard. Only the Dashboard's read requests ran, and no control was used. The guard was reinstalled and tested before Sources was opened through the sidebar.
+  - The page listed the 3 sources. Its `GET /api/admin/sources?page=1&size=20&status=active` returned 200. Render's log has that request at 16:46:35 UTC under `3f066fa7…`, on two lines: the access line, and the connection-parameters line, which now carries host, port and user only. Neither line has a credential pattern.
+  - The guard blocked only the test POST and Vercel's page-view ping. The tab was reloaded afterwards to remove it.
+- **The database name is out of the start-up line, confirmed:** the old instance woke at 16:42:52 UTC and still logged `…:5432/postgres`. The new instance logs `…:5432`.
 
 ### Stage 4. Frontend proxy error handling
 
