@@ -748,7 +748,15 @@ Merge approved by the user on 29 October 2026 (India time), at the reviewed head
   
   Neither carries a credential pattern.
 - **Credential search over the last hour of logs:** `postgresql://` appears on one line only: the start-up line, now `postgresql://<redacted>@<pooler host>:5432/postgres`. The redaction replaced the masked `user:***` part, so the user name is hidden there too. A wider search for the word "password" was not run, because it would have loaded any matching log text into the agent's context.
-- **Admin Sources page:** pending. The user logs in and opens the page; the agent then finds that request's ID in Render's log.
+- **Admin sign-in and Sources page, 29 October 2026 (India time):**
+  - The user signed in at 15:45:43 IST. Render's log shows the login request under one ID with three lines: "Login attempt", "Login successful" and the access line `POST /api/admin/login` 200. None contains a password or other credential pattern.
+  - The agent opened Sources in the user's signed-in tab, with the read-only browser guard installed and tested first (a dummy POST was blocked). It went through the sidebar, used no control, and reloaded the tab afterwards to remove the guard. The guard blocked only the test POST and Vercel's page-view analytics ping.
+  - The page's `GET /api/admin/sources?page=1&size=20&status=active` returned 200. Render's log has it at 15:51:43 IST under `a6cefde3…`, on two lines: the access line and the `db_config` connection-parameters line (no password). Neither carries a credential pattern.
+  - The browser never received `X-Request-ID` for this call: the site's server-side proxy does not forward it yet (stage 4). The ID was found in Render's log by path and time.
+- **Tidy-up after the merge, with the user's approval:**
+  - the branch `docs/stage3-design` (PR #62) was deleted on 29 October 2026, after checking it had no commit outside `main`;
+  - issue #5 was closed as completed (crawler plan, "Parked decision");
+  - the agent's local review clones, worktree and review database were removed.
 
 ### Stage 4. Frontend proxy error handling
 

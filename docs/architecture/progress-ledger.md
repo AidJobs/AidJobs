@@ -203,7 +203,7 @@ From the crawler plan. The crawler plan is complete only when every line is met.
 | HTML, RSS, and API use the same admission and persistence contract | Repository (Gate 11) |
 | Identity unchanged, one writer, suppression survives recrawl | Repository (B3). Live: no duplicate links after the UNICEF and ICRC crawls |
 | Failed or partial crawls cannot expire or delete jobs | Repository. Live: the failed UNICEF crawl on 18 October changed no jobs |
-| Adapter persistence failures counted; RSS/API save failures not swallowed | Repository (`28b9efc`). The HTML all-rows-fail case is parked (Issue #5) |
+| Adapter persistence failures counted; RSS/API save failures not swallowed | Repository (`28b9efc`). The HTML all-rows-fail case is fixed in PR #60 (`f4059f0`): such a crawl is recorded `fail`. Issue #5 closed on 29 October 2026 |
 | A search-projection failure does not undo a PostgreSQL commit | Repository (Gate 7 test) |
 | Relevant tests pass, and the fetch policy is checked on the deployed backend | Tests pass (CI on `7b13a9e`). The deployed check is not done |
 
@@ -356,7 +356,7 @@ Decided by the user on 27 October 2026: no AI in the crawl, with the contract am
 - **After merge:** the crawler no longer uses `OPENROUTER_API_KEY`, but the old public search bar's query parsing and suggestions still do. They send the visitor's search text to OpenRouter, are refused, and fall back to rule-based results. Deleting the key from Render (the user's action) stops that traffic and keeps the same results. The admin Settings card then shows "No key" if `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are not set either (`main.py` checks all three).
 **Done, 27 October 2026.** The user removed `OPENROUTER_API_KEY` from Render and redeployed. PR #58 was merged as `51c6299` and went live at 21:54 IST. The new instance's log shows no AI extractor or normaliser, and the public search helpers using their rule-based fallback (Verified). The next scheduled crawls of each source are the first on this path.
 
-**W-15. Issue #5, parked.** HTML can report `ok` when every row failed to save. "Failed persistence can still advance next_run_at."
+**W-15. Issue #5.** Done. HTML could report `ok` when every row failed to save ("Failed persistence can still advance next_run_at"). Fixed in PR #60 (`31d1b7a`, merged as `f4059f0`, live on 28 October 2026). Each job's save has its own savepoint; a crawl whose every job failed to save is recorded `fail`, and one where some failed is recorded `warn` with "N of M jobs failed to save". A healthy crawl with nothing new still returns `ok`, as intended. Issue #5 was closed with the user's approval on 29 October 2026.
 
 **W-16. Issue #4, parked.** Test-suite cleanup, including the JSON-LD circular import that stops `tests/test_pipeline_extractor.py` and `tests/test_pipeline_integration.py` from being collected.
 
