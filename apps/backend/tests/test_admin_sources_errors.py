@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import httpx
+import psycopg2
 import pytest
 
 from app.log_safety import REQUEST_ID
@@ -331,6 +332,30 @@ def test_the_database_name_is_not_logged(monkeypatch, caplog):
     assert not any(FRAGMENT in m for m in messages), messages
 
 
+def test_a_source_id_cannot_forge_a_log_line(monkeypatch, caplog):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import sources
+    from app.errors import InternalError, internal_error_handler
+
+    def refuse(**kwargs):
+        raise psycopg2.OperationalError("refused")
+
+    app = FastAPI()
+    app.include_router(sources.router)
+    app.add_exception_handler(InternalError, internal_error_handler)
+    app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
+    monkeypatch.setattr(sources.db_config, "get_connection_params", lambda: {"host": "unused"})
+    monkeypatch.setattr(sources.psycopg2, "connect", refuse)
+    with caplog.at_level(logging.ERROR, logger="app.sources"):
+        response = TestClient(app, raise_server_exceptions=False).get(
+            "/api/admin/sources/abc%0D%0A%5Bforged%5D%20INFO%20line")
+    assert response.status_code == 500
+    named = [r.getMessage() for r in caplog.records if "Failed to load source" in r.getMessage()]
+    assert named and not any("\n" in m or "\r" in m for m in named), named
+
+
 def test_the_reference_is_never_empty():
     from app.sources import describe_failure
 
@@ -346,6 +371,7 @@ def test_the_reference_is_never_empty():
     ("postgresql://postgres.abcdef:FAKEpw@pooler.example.com:6543/postgres?sslmode=require", True),
     ("postgresql://u:FAKEpw@127.0.0.1:5432/db?application_name=a@b", True),
     ("postgresql://u:12?" + FRAGMENT + "@127.0.0.1:5432/db", False),
+    ("postgresql://postgres.abc@" + FRAGMENT + "@127.0.0.1:5432/db", False),
 ])
 def test_well_formed_urls_stay_readable(monkeypatch, url, readable):
     """Pooler names and IP addresses only: other host names would be resolved over DNS."""

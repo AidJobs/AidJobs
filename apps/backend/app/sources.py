@@ -61,7 +61,7 @@ def _connection_params() -> dict:
 
 def _source_error(message: str, source_id: str, cause: BaseException) -> InternalError:
     """InternalError for a route about one source: the ID goes to the log, not the response."""
-    logger.error("[sources] %s: source %s", message, source_id)
+    logger.error("[sources] %s: source %r", message, source_id)
     return InternalError(message, cause=cause)
 
 
