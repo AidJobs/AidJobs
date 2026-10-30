@@ -37,33 +37,6 @@ jobs:
           pip install -r requirements-test.txt
           pip install ruff
 
-      # Report only, not a gate (security plan, stage 3A): the exact installed set and what
-      # pip-audit knows about it, kept as an artifact. The tool runs in its own environment
-      # so it is not part of the set it audits.
-      - name: Audit installed packages
-        shell: bash
-        run: |
-          mkdir -p audit
-          date -u +%Y-%m-%dT%H:%M:%SZ > audit/audited-at.txt
-          python --version >> audit/audited-at.txt
-          pip freeze --all > audit/installed-packages.txt
-          python -m venv /tmp/audit-tool
-          /tmp/audit-tool/bin/pip install --quiet pip-audit==2.10.1
-          set +e
-          /tmp/audit-tool/bin/pip-audit -r audit/installed-packages.txt --no-deps --disable-pip \
-            --progress-spinner off --format json --output audit/pip-audit.json
-          echo "pip-audit exit code: $?" >> audit/audited-at.txt
-          /tmp/audit-tool/bin/pip-audit -r audit/installed-packages.txt --no-deps --disable-pip \
-            --progress-spinner off --desc on --output audit/pip-audit.txt
-          set -e
-          test -s audit/pip-audit.json
-          cat audit/audited-at.txt audit/pip-audit.txt
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: backend-dependency-audit
-          path: apps/backend/audit/
-
       - name: Lint executed suite
         run: >
           ruff check
@@ -120,6 +93,44 @@ jobs:
             echo "Crawl ownership tests must not be skipped"
             exit 1
           fi
+
+      # Report only, not a gate (security plan, stage 3A): the exact installed set and what
+      # pip-audit knows about it, kept as an artifact. Findings never fail CI; if the audit
+      # cannot run, this step shows as failed but the job still passes. The tool runs in its
+      # own environment so it is not part of the set it audits.
+      - name: Audit installed packages
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p audit
+          date -u +%Y-%m-%dT%H:%M:%SZ > audit/audited-at.txt
+          python --version >> audit/audited-at.txt
+          pip freeze --all > audit/installed-packages.txt
+          python -m venv /tmp/audit-tool
+          /tmp/audit-tool/bin/pip install --quiet pip-audit==2.10.1
+          set +e
+          /tmp/audit-tool/bin/pip-audit -r audit/installed-packages.txt --no-deps --disable-pip \
+            --progress-spinner off --format json --output audit/pip-audit.json
+          code=$?
+          set -e
+          echo "pip-audit exit code: $code (0 no findings, 1 findings or error)" >> audit/audited-at.txt
+          python - <<'EOF' > audit/pip-audit.txt
+          import json
+          deps = json.load(open("audit/pip-audit.json"))["dependencies"]
+          print(f"{len(deps)} packages audited")
+          for d in deps:
+              for v in d.get("vulns", []):
+                  print(d["name"], d["version"], v["id"], "fixed in", ", ".join(v["fix_versions"]) or "-")
+          EOF
+          cat audit/audited-at.txt audit/pip-audit.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: backend-dependency-audit
+          path: apps/backend/audit/
 
   frontend:
     runs-on: ubuntu-latest

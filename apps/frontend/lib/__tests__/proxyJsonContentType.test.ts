@@ -33,8 +33,11 @@ function callArguments(text: string, open: number): string[] {
       else if (ch === quote) quote = null;
       continue;
     }
-    if (ch === '/' && text[i + 1] === '/') i = text.indexOf('\n', i);
-    else if (ch === '/' && text[i + 1] === '*') i = text.indexOf('*/', i) + 1;
+    if (ch === '/' && (text[i + 1] === '/' || text[i + 1] === '*')) {
+      const end = text.indexOf(text[i + 1] === '/' ? '\n' : '*/', i + 2);
+      if (end === -1) break;
+      i = text[i + 1] === '/' ? end : end + 1;
+    }
     else if (ch === '"' || ch === "'" || ch === '`') quote = ch;
     else if (ch === '(' || ch === '{' || ch === '[') depth++;
     else if (ch === ')' || ch === '}' || ch === ']') {
@@ -69,13 +72,15 @@ describe('proxy routes', () => {
   const calls = backendCalls();
 
   it('pass their request options inline, so this check can read them', () => {
-    const unreadable = calls.filter((c) => c.options !== undefined && !c.options.startsWith('{'));
+    const unreadable = calls.filter(
+      (c) => c.options !== undefined && (!c.options.startsWith('{') || c.options.includes('...'))
+    );
     expect(unreadable.map((c) => c.where)).toEqual([]);
   });
 
   it('label every body they send to the backend as JSON', () => {
-    const withBody = calls.filter((c) => c.options && /\bbody\s*:/.test(c.options));
-    expect(withBody.length).toBeGreaterThanOrEqual(10);
+    const withBody = calls.filter((c) => c.options && /\bbody\s*(:|,|\})/.test(c.options));
+    expect(withBody.length).toBeGreaterThanOrEqual(12);
     const unlabelled = withBody.filter(
       (c) => !/['"]content-type['"]\s*:\s*['"]application\/json['"]/i.test(c.options ?? '')
     );

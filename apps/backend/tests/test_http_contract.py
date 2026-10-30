@@ -25,7 +25,8 @@ def client(monkeypatch):
     monkeypatch.setenv("COOKIE_SECRET", "http-contract-test-secret")
     monkeypatch.setenv("ADMIN_PASSWORD", PASSWORD)
     limiter.reset()
-    yield TestClient(app, raise_server_exceptions=False)
+    # https, so the client sends back the Secure session cookie a production sign-in sets.
+    yield TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
     limiter.reset()
 
 
@@ -53,6 +54,7 @@ def test_login_body_not_labelled_json_is_refused(client, password_checks, conten
     response = client.post("/api/admin/login", content=LOGIN_BODY, headers=headers)
 
     assert response.status_code == 422
+    assert [error["type"] for error in response.json()["detail"]] == ["model_attributes_type"]
     assert password_checks == []
     _no_session(response)
     assert client.get("/api/admin/session").json() == {"authenticated": False}
@@ -76,6 +78,7 @@ def test_login_body_labelled_json_reaches_sign_in(client, password_checks, conte
     assert right.json() == {"authenticated": True}
     assert right.headers[admin_auth.SESSION_HEADER]
     assert password_checks == [1, 1]
+    assert client.get("/api/admin/session").json() == {"authenticated": True}
 
 
 @pytest.fixture
@@ -124,5 +127,7 @@ def test_debug_route_list_is_removed(client):
 
     login = client.post("/api/admin/login", json={"password": PASSWORD})
     token = login.headers[admin_auth.SESSION_HEADER]
+    session = client.get("/api/admin/session", headers={admin_auth.SESSION_HEADER: token})
+    assert session.json() == {"authenticated": True}
     signed_in = client.get("/api/debug/routes", headers={admin_auth.SESSION_HEADER: token})
     assert signed_in.status_code == 404

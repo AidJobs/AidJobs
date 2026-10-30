@@ -577,7 +577,6 @@ UNICEF job 596646, "Partnerships Consultant – Faith-based and Membership Organ
 | Stage 3A, in turn: merge the FastAPI upgrade (PR #73, FastAPI 0.141.1 and Starlette 1.3.1, built), then the Next.js upgrade investigation and plan, and the continuous checks, which also decide the audit gate, a lockfile, and Render's build tools (`pip` 24.0, `setuptools`). Parts 1 and 1b are done (PRs #69 and #71, Render's build cache cleared) | Security plan, stage 3A |
 | The C3 amendment and fix for real jobs rejected by the "membership" rule, in the crawler foundation | W-44 |
 | Later: change Render's Build Command to `pip install -r requirements.txt` (the user), then remove `playwright`, whose browser crawler nothing imports | Security plan, stage 3A, part 1 record |
-| Later in stage 3A: upgrade FastAPI 0.115.0, which pins `starlette` 0.38.6 (two multipart advisories the app cannot reach today) | Security plan, stage 3A, part 1 record |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process; placed on 30 October 2026 in the growth plan's step 4, before twice-daily crawling | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
