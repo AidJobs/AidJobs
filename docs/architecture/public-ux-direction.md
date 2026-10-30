@@ -150,6 +150,8 @@ The demo (UX-00) was built in twelve rounds on the branch `demo/ux-design` and a
 
 ## Search engines and AI search
 
+**Widened on 30 October 2026** by `growth-and-seo-plan.md`: the market includes domestic nonprofit and charity jobs (US, UK, Australia, Canada, Europe); the searches to lead, the page types, addresses, thresholds, structured-data and closed-job rules, and the order are there. Where this section and that plan disagree, the plan applies.
+
 No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Idealist are established. A new site wins first on specific searches and in Google's job panel, then on broad terms as authority grows.
 
 **Foundation, before launch:**
@@ -161,7 +163,7 @@ No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Ideali
 - Fix the slow first load: the first three requests took about 20 seconds on 20 October, likely the backend waking from sleep on Render (not verified). A hosting decision.
 - Google Search Console and Bing Webmaster Tools, verified by the user.
 
-**Growth, after launch:**
+**Growth, after launch:** (changed 30 October 2026: job pages and the landing pages per organisation, per country, and for the hubs come before the switch; the rest after launch, `growth-and-seo-plan.md`, section 7)
 
 - Job pages with JobPosting structured data, for Google's job search panel. Google requires a description and a posting date; the crawler stores neither today.
 - Landing pages from real data, by organisation, country, function, and contract type, only where enough jobs exist.
@@ -188,14 +190,16 @@ Every number and chart comes from the database; nothing is decorative.
 
 ## Data the design needs from the crawler
 
+Since 30 October 2026 the full list, and what is captured versus worked out, is the field contract in `growth-and-seo-plan.md`, section 4.4.
+
 - Descriptions and posting dates, for the job page and Google's job panel.
 - Clean titles without glued place and date (W-24).
-- Facts from titles (grade, contract, duration, eligibility) stored at save time.
+- Facts from titles (grade, contract, duration, eligibility) stored at save time. (Changed 30 October 2026: worked out when read, on the server, in one shared module, not stored; UX-08 item 11 amended.)
 - The expiry policy (W-06), so closed jobs leave search and the sitemap; Google penalises listings that stay up after closing.
 
 ## Order of work
 
-`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status. Its revision of 21 October 2026 sets the order: the docs record of the demo, admin fixes alongside the decision gate (UX-08), the new public site built beside the current one (Stage B), the switch (UX-29) and launch check (UX-18), the admin redesign (Stage C), and growth with the crawler (Stage D).
+`docs/architecture/ux-build-plan.md` holds the steps, their order, dependencies, acceptance criteria, and status. Its revision of 21 October 2026 sets the order: the docs record of the demo, admin fixes alongside the decision gate (UX-08), the new public site built beside the current one (Stage B), the switch (UX-29) and launch check (UX-18), the admin redesign (Stage C), and growth with the crawler (Stage D). Changed 30 October 2026: the order of all work, UX steps included, is `growth-and-seo-plan.md`, section 7, and the UX plan's revision of 30 October 2026.
 
 ## The paused UX branch
 

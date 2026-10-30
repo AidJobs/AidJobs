@@ -85,6 +85,8 @@ Out of scope for this migration: payments, CV processing, rewards, user accounts
 
 Amended by the user on 21 October 2026 (`ux-08-launch-decisions.md`, item 2): the public site approved in the design demo may add the Sector, Organisation, Country, and Deadline filters with several choices each, the title-fact filters, and the 10-day view (new public search features); facts read from job titles by fixed rules without AI (enrichment); and the Recommended order and "Similar jobs", which are the same for every visitor and use no personal data. Everything else above stays out of scope.
 
+Amended on 30 October 2026 (`growth-and-seo-plan.md`, sections 3 and 6), effective when the user explicitly approves merging that record. Decided by the user: the market includes domestic nonprofit and charity jobs in the US, UK, Australia, Canada, and Europe, beside international aid and development; no advertising. Delegated by the user to the agent: the public site may have a permanent page per job and landing pages built from real data (per organisation, country, and hub; sector, function, contract, grade, and job-title pages above a minimum job count); facts are read from job titles and descriptions by fixed rules without AI, worked out when read, on the server, in one shared module, and not stored on the jobs. Employer submissions, alerts, and user accounts stay out of scope until their own decisions; "Users do not submit career sources" still holds.
+
 ---
 
 ## 3. Target flow
@@ -160,6 +162,8 @@ Minimum conceptual fields: `id`, `name`, `slug`, `type`, `website_url`, `status`
 
 `type` may preserve existing labels such as UN, INGO, NGO, academic, private, and other. Do not build a taxonomy product in this migration.
 
+Amendment of 30 October 2026 (`growth-and-seo-plan.md`, decision 14 and section 6; delegated by the user to the agent, effective when the user explicitly approves merging that record): fixed lists kept in code, with tests, are allowed for organisation types, sectors and SDGs, functions, levels and grades, and contract types, so that search, job pages, and landing pages share one classification. There is no editor, no taxonomy table, and `seed_taxonomy.sql` and the `levels` and `org_types` tables are not revived. Changing a list is a code change with its tests.
+
 Today the repository stores `sources.org_name` and `jobs.org_name` as text. Keep that text until an organisation backfill has been verified. Do not guess that similar names are the same organisation. Do not drop `org_name` in the same change that adds `organisation_id`.
 
 For new writes, `job.organisation_id` is derived from `source.organisation_id`. The job must not independently choose an unrelated organisation.
@@ -222,6 +226,15 @@ A transition from `ACTIVE` to `EXPIRED` because a crawl did not see the job requ
 2. explicit user approval of that policy as a decision separate from the implementation pull request.
 
 Until that approval exists, no gate may move an active job to expired, deleted, or hidden because it was absent from a crawl. Stale active rows are the required behaviour.
+
+Policy recorded on 30 October 2026 (`growth-and-seo-plan.md`, section 4.3, which is the full text). The user delegated the choice to the agent; it is the separate decision this section requires, and it takes effect when the user explicitly approves merging that record. In short:
+- **Trust:** only a crawl whose listing was read completely (`listing_complete` true) counts as evidence of absence. A source without a completeness report cannot expire anything by absence. A complete crawl with zero valid jobs never counts, nor does one whose rows (admitted or observed) match fewer than half of the source's jobs that were active when it started; that crawl is recorded on its crawl run for the user.
+- **Threshold:** a job expires by absence when the counting crawls of its source since it was last seen number at least two, span at least 24 hours, and none of them saw it.
+- **Deadline:** a job also expires when its stored deadline is earlier than the database's current date (`deadline < CURRENT_DATE`, as public search applies); being seen again does not reverse that, only a newer reading that stores a deadline on or after the current date does.
+- **Effect:** expiry changes lifecycle only; it never deletes or suppresses the row. A job expired by absence returns to active when any crawl sees it again, unless its stored deadline has passed.
+- **Observation:** a thin listing row whose normalised apply link matches exactly one saved, not-suppressed job of the same source that is active or expired by absence counts as that job seen, through a narrow observation path in the one writer that updates only `last_seen_at`. A job expired by a passed deadline is not matched.
+
+The implementation is its own pull request (ledger W-06, W-36), with its own approval, and adds no rule beyond these.
 
 Gate 6 without that approval may add explicit lifecycle state fields, record CrawlRun observations, and identify jobs that were not rediscovered. It must not expire currently active jobs. “Implement trusted reconciliation” is not permission to invent a trust ratio, an empty-catalogue rule, or a consecutive-missing threshold inside the implementation pull request.
 

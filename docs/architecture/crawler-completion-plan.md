@@ -381,6 +381,12 @@ AI credits are exhausted. In that state AI extraction fails and `crawl_source` f
 
 Re-scope of the confirmation fetch. `crawl_source` already fetches every detail page when a listing has 1–50 candidates and is not UNICEF, and the reader now reads those pages. A thin row from such a listing is rejected as `thin_vacancy`, not `detail_unconfirmed`. The confirmation fetch therefore adds work only for a listing above 50 candidates that is not UNDP or UNICEF, and for recording `detail_unconfirmed`. Its rules above still hold when it is built: thin rows only, a cap of 50, the existing outbound client, and one `admit_batch`. It is not implemented and needs its own approval.
 
+**Amendment to C3 and C4, of 30 October 2026** (`growth-and-seo-plan.md`, section 4.3; the user delegated the choice to the agent; effective when the user explicitly approves merging that record). Implementation needs its own approval (ledger W-36, W-09, W-06).
+- **Known jobs.** A listing row rejected as too thin, whose normalised apply link matches exactly one saved, not-suppressed job of the same source that is active or expired by absence, counts as that job seen; a job expired by a passed deadline is not matched. Today `persist_candidate` rejects any row that is not admitted and finds jobs by `canonical_hash` (`contracts/persist.py`), so this is a new, narrow observation path in the one writer that updates only `last_seen_at`. If more than one such row of the source has the link, nothing is observed. A new job still needs the full C3 evidence. Identity is unchanged (C3 point 5); an unknown URL is still not newly admitted on this rule.
+- **Job pages for new jobs only.** A listing's job pages are opened for rows that are not yet saved, within a cap per crawl and in the one admission batch; rows beyond the cap are logged `detail_unconfirmed`, not saved, and read by a later crawl. This replaces reopening every job page of a 1–50 candidate listing on every crawl, and covers listings above 50.
+- **Known jobs' pages,** within each crawl's budget: reopened when the job's deadline is within 3 days or has just passed, so an extension is caught, plus a slow rotation through all other known jobs.
+- The UNICEF skip and the UNDP behaviour stay until platform readers replace them (ledger W-19).
+
 #### C5. Exit on the six sites
 
 | Site | Done when |
@@ -484,6 +490,8 @@ The crawler is complete for this plan only when the completion criteria below ar
 
 Only then: extract remaining stages from `SimpleCrawler`, consolidate normalisation, complete the Organisation model, remove verified legacy paths, and make the separate search-architecture decision.
 
+**Amendment of 30 October 2026** (`growth-and-seo-plan.md`, sections 4.1, 6, and 7; part of the order the user asked the agent to choose; effective when the user explicitly approves merging that record): the reader interface (one interface for every reader, ledger W-35) and the Organisation model (Gate 8) may start once B4 and B5 are recorded. C5's remaining sites (ledger W-08) no longer gate them; those sites are handled through the employer survey (W-31) and the admin's add-source flow (W-40). Every change still follows contract §11, one stage at a time with today's output proven unchanged.
+
 Discovery Fabric remains later: Scout, Mapper, Frontier, Source Profiles, and Drift Detection.
 
 ## Do not divert into
@@ -494,6 +502,6 @@ Discovery Fabric remains later: Scout, Mapper, Frontier, Source Profiles, and Dr
 - Raising admission thresholds to make a fixture pass.
 - An identity, canonical-key, or expiry redesign.
 - A new normalisation stage.
-- Playwright or broader AI extraction. Detail-page fetching stays limited to the behaviour already in `crawl_source` until C4 is separately approved. C4 is the only added detail fetch, and it stays inside the one `admit_batch`.
+- Playwright or broader AI extraction. Detail-page fetching stays limited to the behaviour already in `crawl_source` until C4 is separately approved. C4 is the only added detail fetch, and it stays inside the one `admit_batch`. Amended on 30 October 2026: detail fetching follows the C3 and C4 amendment under "C4 status" when its implementation is approved; the expiry policy is the one recorded in contract §6 on that date, not a redesign.
 - Issue #4 test-suite cleanup, except where a crawler gate needs a test it directly owns.
 - The two unrelated local files recorded under B1: `apps/backend/scripts/diagnose_enrichment_bias.py` and `tests/test_link_heuristics.py`. Leave their Pyright-ignore diffs untouched and out of every crawler commit.
