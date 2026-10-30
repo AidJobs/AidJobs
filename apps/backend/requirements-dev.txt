@@ -4,7 +4,9 @@
 # Web UI for labeling (optional)
 flask==3.0.0
 
-# Already in requirements.txt but listed here for clarity
+# Classifier training only (scripts/build_classifier.py, scripts/retrain-classifier.py,
+# tests/test_classifier_training.py); not installed in production
 scikit-learn==1.5.0
+# Also in requirements.txt
 beautifulsoup4==4.12.3
 

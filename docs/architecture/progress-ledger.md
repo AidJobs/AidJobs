@@ -570,6 +570,7 @@ One Python module works out sector and SDG, function, level, UN grade and typica
 | Switch on Dependabot alerts (repository Settings, Code security; free) | Security plan, stage 3A |
 | Approve merging stage 3A part 1 (backend pins, PR #69); then the test-tools pull request, the Next.js upgrade investigation and plan, and the continuous checks, each in turn | Security plan, stage 3A |
 | Later: change Render's Build Command to `pip install -r requirements.txt` (the user), then remove `playwright`, whose browser crawler nothing imports | Security plan, stage 3A, part 1 record |
+| Later in stage 3A: upgrade FastAPI 0.115.0, which pins `starlette` 0.38.6 (two multipart advisories the app cannot reach today) | Security plan, stage 3A, part 1 record |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process; placed on 30 October 2026 in the growth plan's step 4, before twice-daily crawling | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
