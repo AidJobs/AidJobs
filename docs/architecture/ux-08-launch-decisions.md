@@ -179,7 +179,7 @@ Sixteen active UNICEF rows from 6 December 2025 have no deadline and stay listed
 
 - **Recommendation:** move W-06 ahead of the other crawler items, so it is decided and validated before UX-29. W-02, the read-only inspection of those rows, comes first.
 - **Decision:** 21 October 2026, the user approved the recommendation: W-06 moves ahead of the other crawler items and is decided and validated before the switch (UX-29); W-02 comes first.
-- **Changed 30 October 2026** (`growth-and-seo-plan.md`, section 7; part of the order the user asked the agent to choose): the policy is recorded now (contract §6), and its implementation comes at the growth plan's step 4.6, after the crawler identity, the Clinch reader, B5, and the captured fields, because it depends on the observation rule and on completeness reports. W-02 still comes first, and both still land before the switch.
+- **Changed 30 October 2026** (`growth-and-seo-plan.md`, section 7; part of the order the user asked the agent to choose): the policy is recorded now (contract §6), and its implementation comes at the growth plan's step 4.6, with the observation rule, after the Clinch reader gives UNICEF its completeness report. Other sources can expire by absence only once W-39 gives them a completeness report (step 4.10); expiry by a passed deadline applies to every source from step 4.6. W-02 still comes first, and both still land before the switch.
 
 ## 13. A saved job that closes
 

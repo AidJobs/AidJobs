@@ -493,7 +493,7 @@ Approved plan, 23 October 2026:
 
 ### UX-17. Speed
 
-**Status:** Not started.
+**Status:** Not started. Changed 30 October 2026: server-side search before launch (UX-11) needs the always-on instance at launch, so the "paid instance deferred" wording below no longer holds at launch (growth plan, sections 4.5 and 8).
 
 - **Scope:** carry out the slow-first-load decision from UX-08 (item 5: the cached page; the paid always-on instance is deferred for budget and the keep-alive skipped until after launch, so the cached page must never wait for the backend); images, fonts, and the flag icons sized for phones; the page weight of all open jobs measured against the UX-08 item 10 threshold.
 - **Depends on:** UX-16; the UX-08 hosting decision.

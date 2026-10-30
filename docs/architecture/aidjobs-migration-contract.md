@@ -228,11 +228,11 @@ A transition from `ACTIVE` to `EXPIRED` because a crawl did not see the job requ
 Until that approval exists, no gate may move an active job to expired, deleted, or hidden because it was absent from a crawl. Stale active rows are the required behaviour.
 
 Policy recorded on 30 October 2026 (`growth-and-seo-plan.md`, section 4.3, which is the full text). The user delegated the choice to the agent; it is the separate decision this section requires, and it takes effect when the user explicitly approves merging that record. In short:
-- **Trust:** only a crawl whose listing was read completely (`listing_complete` true) counts as evidence of absence. A source without a completeness report cannot expire anything by absence. A complete crawl with zero valid jobs never counts, nor does one that finds fewer than half of the source's open jobs (flagged for the user).
-- **Threshold:** a job expires by absence when it is missing from every counting crawl of its source over at least 24 hours, and from at least two of them.
-- **Deadline:** a job also expires when its stored deadline has passed; being seen again does not reverse that, only a newer reading with a future deadline does.
-- **Effect:** expiry changes lifecycle only; it never deletes or suppresses the row. A job expired by absence returns to active when any crawl sees it again.
-- **Observation:** a thin listing row whose normalised apply link matches exactly one saved, open, not-suppressed job of the same source counts as that job seen, through a narrow observation path in the one writer that updates only `last_seen_at`.
+- **Trust:** only a crawl whose listing was read completely (`listing_complete` true) counts as evidence of absence. A source without a completeness report cannot expire anything by absence. A complete crawl with zero valid jobs never counts, nor does one whose rows (admitted or observed) match fewer than half of the source's jobs that were active when it started; that crawl is recorded on its crawl run for the user.
+- **Threshold:** a job expires by absence when the counting crawls of its source since it was last seen number at least two, span at least 24 hours, and none of them saw it.
+- **Deadline:** a job also expires when its stored deadline is earlier than the database's current date (`deadline < CURRENT_DATE`, as public search applies); being seen again does not reverse that, only a newer reading that stores a deadline on or after the current date does.
+- **Effect:** expiry changes lifecycle only; it never deletes or suppresses the row. A job expired by absence returns to active when any crawl sees it again, unless its stored deadline has passed.
+- **Observation:** a thin listing row whose normalised apply link matches exactly one saved, not-suppressed job of the same source that is active or expired by absence counts as that job seen, through a narrow observation path in the one writer that updates only `last_seen_at`. A job expired by a passed deadline is not matched.
 
 The implementation is its own pull request (ledger W-06, W-36), with its own approval, and adds no rule beyond these.
 
