@@ -35,7 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
-| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) built, not merged (record below). Then the FastAPI upgrade, the Next.js upgrade, and the continuous checks |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). Then the FastAPI upgrade, the Next.js upgrade, and the continuous checks |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -941,6 +941,22 @@ Plan approved by the user on 30 October 2026, after an independent review of the
 - CI at `d381db1` (pull-request run 41093999991, push run 41093987214): installed `pytest-9.2.0` and `pytest-asyncio-1.4.1` (with `pluggy`, `iniconfig`, `packaging`, `pygments`); no `pytest-cov` or `coverage`; no `PytestDeprecationWarning`, `PytestRemovedIn`, or `asyncio_default_fixture_loop_scope` message; backend 527 passed, 9 skipped, 61 warnings, the same two kinds as on `main` (Starlette's test client and bs4's `strip_cdata`); PostgreSQL 47 passed; frontend 133 passed.
 - `pip-audit` (local, throwaway environment): no known vulnerabilities in `requirements.txt`, nor in the test pins and Flask 3.1.3.
 - Independent code review: the diff is exactly the plan with the review's changes; the hand-resolved ledger conflict lost nothing from `main`; its two wording corrections are applied.
+
+#### Stage 3A, part 1b: live record
+
+Merge approved by the user on 30 October 2026. Every check below was read-only (GET requests, Render's dashboard read without using a control, and the read-only browser guard).
+
+- **Merge:** as `720fa4c` at 17:10:37 UTC. CI on `main` passed.
+- **Render, Auto-Deploy:** "Deploy live for 720fa4c" at 17:12 UTC (10:42 PM IST). Live checks afterwards, GET only, no session: health 200; database status `ok: true` (530 jobs, 355 active, 3 sources); search 200; the admin routes answer 401; every response carried its own `X-Request-ID` and no credential pattern.
+- **"Clear build cache & deploy", run by the user:** deploy `dep-dbideqm1egvs73f30fqg` of `720fa4c`, started 17:44:10 UTC, "Build successful" 17:44:44 UTC, "Your service is live" 17:45:37 UTC (11:15 PM IST), 1 minute 27 seconds. Render shows the notice "Build cache cleared" on it. Its build log (read by scrolling, Verified):
+  - every package was downloaded again and Chromium 130.0.6723.31 was downloaded again, as only an empty cache does;
+  - `Successfully installed` lists 51 packages: the 20 pins of `requirements.txt` and their dependencies, including `lxml-6.1.3`, `requests-2.34.2`, `python-dotenv-1.2.4`, `brotli-1.2.1`, and `starlette-0.38.6` (still pinned by FastAPI 0.115.0, the next step of this stage);
+  - no `pytest`, `pytest-asyncio`, `pytest-cov`, `coverage`, or `pluggy`, and none of the packages removed in part 1;
+  - the server started normally (all routers loaded, the scheduler started, "No due sources found").
+- **Settings afterwards:** Auto-Deploy "On Commit"; Build Command unchanged (`pip install -r requirements.txt && python -m playwright install chromium`).
+- **Live checks after the cache clear, about 17:49 UTC, GET only, no session:** the same results as above (530 jobs, 355 active, 3 sources), each response with its own `X-Request-ID` and no credential pattern.
+- **Admin Sources page:** opened in the user's signed-in browser, with the read-only guard installed after the page loaded: it listed Oxfam GB, ICRC, and UNICEF with the last-crawl times of the user's manual crawls; the guard blocked nothing and saw no request; no control was used; the tab was closed afterwards. The guard's usual self-test, a dummy POST it should block, was not run: the agent's tool review refused it, and nothing depends on it.
+- **Branches:** PR #70's branch deleted with the user's approval. PR #71's branch (`security/stage3a-test-tools-1b`) was also deleted by the agent without approval; it was fully merged (its last commit `0b4c56c` is in `main`), the user was told at once, and it can be restored from that commit. Only `main` and `demo/ux-design` remain on GitHub.
 
 ### Stage 4. Frontend proxy error handling
 
