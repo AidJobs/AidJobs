@@ -35,7 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
-| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below) |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) built in [PR #69](https://github.com/AidJobs/AidJobs/pull/69), not merged |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -849,7 +849,7 @@ Added on 30 October 2026 after a read-only backlog sweep; placed by the user the
 - **No warning system.** Dependabot alerts are disabled for the repository (GitHub API, HTTP 403), and CI audits no dependencies.
 
 **Parts, in order:**
-1. **Backend pins.** Raise each vulnerable pin to a fixed version; move test-only packages (`pytest`, `pytest-asyncio`, `pytest-cov`) to `requirements-dev.txt` if Render does not need them; remove packages proven unused, each with its evidence. `lxml` 6 changes the HTML parser, so the offline whole-crawl comparison on the saved pages must show identical saved jobs, as in stage 3's method. CI, an independent review, and a read-only live check after merge (health, database status, search, admin sign-in with the guard), with the next scheduled crawl watched in Render's log.
+1. **Backend pins.** Raise each vulnerable pin to a fixed version; move test-only packages (`pytest`, `pytest-asyncio`, `pytest-cov`) to `requirements-dev.txt` if Render does not need them; remove packages proven unused, each with its evidence. `lxml` 6 changes the HTML parser, so the offline whole-crawl comparison on the saved pages must show identical saved jobs, as in stage 3's method. CI, an independent review, and a read-only live check after merge (health, database status, search, admin sign-in with the guard), with the next scheduled crawl watched in Render's log. Two follow-up pull requests, each with its own plan: the test tools (`pytest` and its plugins, into a test-only requirements file, then upgraded), and a FastAPI upgrade, because FastAPI 0.115.0 pins `starlette` 0.38.6 (added 30 October 2026, implementation record below).
 2. **Next.js upgrade.** An investigation first: which advisories apply on Vercel, the target version (the latest patched 15.5.x, or 16), what React 19 and the new major version change in this code (request APIs, caching, the cached server-rendered page of UX-10, the admin proxies), and the test plan: the frontend tests, the build, the UX plan's fidelity check against the demo tag on the preview, the admin pages with the read-only guard, and the launch-check phone flows. Then a plan for approval, then the upgrade in its own pull request. Stage 4 (the proxies) follows on the upgraded version.
 3. **Continuous checks.** A CI job that runs `npm audit --omit=dev` and `pip-audit` on the pinned requirements and fails on high or critical findings, kept within the GitHub Actions minutes; and the user switches on Dependabot alerts (repository Settings, Code security; free).
 
@@ -858,6 +858,44 @@ Added on 30 October 2026 after a read-only backlog sweep; placed by the user the
 - admin routes parse a request body before the authentication guard runs: the same extra pull request, which makes the guard run first for admin routes and caps body size;
 - `app/job_management.py`'s router is included twice: in stage 3, phase 2, PR 3 (`job_management.py`);
 - `app/shortlist.py` is unreferenced: removed in the same extra pull request, after confirming no route, import, or frontend call uses it.
+
+#### Stage 3A, part 1: implementation record
+
+Plan approved by the user on 30 October 2026; built the same day in [PR #69](https://github.com/AidJobs/AidJobs/pull/69). The test tools (`pytest`, `pytest-asyncio`, `pytest-cov`) follow in a separate pull request, as planned.
+
+**Changes (`apps/backend/requirements.txt`):**
+- `lxml` 5.3.0 to 6.1.3, `requests` 2.32.3 to 2.34.2, `python-dotenv` 1.0.0 to 1.2.4, `brotli` 1.2.0 to 1.2.1 (Dependabot rates its advisory critical).
+- Removed, because the running app imports none of them (Repository, import search):
+  - `pdfminer.six`, `pdf2image`, `pytesseract`: only `pipeline/pdf_extractor.py`, which nothing imports;
+  - `statsd`: only `pipeline/monitoring.py`, which nothing imports;
+  - `jsonpath-ng`: imported nowhere;
+  - `scikit-learn`: only `tests/test_classifier_training.py` (which CI does not run) and two offline scripts, `scripts/build_classifier.py` and `scripts/retrain-classifier.py`; it stays in `requirements-dev.txt`, whose comment now says so.
+  - Removing these also drops what they pulled in (`numpy`, `scipy`, `Pillow`, `joblib`, `threadpoolctl`, `ply`, `cryptography`, `cffi`, `pycparser`), none of which app code imports (independent review).
+- Kept:
+  - `playwright`: Render's Build Command is `pip install -r requirements.txt && python -m playwright install chromium` (Verified, read by the agent on the Settings page in the user's signed-in browser with a read-only guard, nothing clicked), so removing the package would fail every build. Every build downloads Chromium for `crawler/browser_crawler.py`, which nothing imports. Removing it is a later small step: the user changes the Build Command, then a pull request removes the package.
+  - `meilisearch`: still imported by three app files; removed with the old search code (W-18, Gate 10).
+  - `prometheus-client`: an optional import, with no known advisory.
+
+**Why `lxml` needed proof.** The UNICEF reader, a live source, parses with `lxml` (`crawler/plugins/base.py`, `get_soup`); every other reader uses Python's `html.parser`. The upgrade does change the parser: the Linux wheels bundle libxml2 2.12.9 in `lxml` 5.3.0 and 2.14.6 in 6.1.3 (read from the wheels' version headers by the independent review), and libxml2 2.14 rewrote its HTML tokenizer to the HTML5 rules, including how character references such as `&amp;` and a bare `&` are read.
+
+**Proof (Verified):**
+- `tests/test_unicef_saved_excerpts.py` pins the reader's rows on job cards from saved UNICEF listing pages, verbatim with line endings normalised, inside a minimal wrapper (`tests/fixtures/unicef_listing/`). No email, phone number, or script is in the excerpts. 14 tests:
+  - three saved pages (18 and 19 October 2026): six real cards and one repeated card each, plus the real "More Jobs" link;
+  - every saved card whose title has an ampersand: 10 cards from four saved pages (6 December 2025, 18 and 19 October 2026), 7 with a bare `&` (for example "Gender& Education") and 3 with `&amp;`. Added after the independent review found that about one title in ten has one, and that none of the first fixtures did.
+- Commit 1 (`12dc23c`, tests only): CI installed `lxml-5.3.0-cp311-cp311-manylinux_2_28_x86_64`, the build Render installs today, and the recorded rows matched.
+- Commit 2 (`7b75cec`, the pins): CI installed `lxml` 6.1.3 and the same rows matched exactly.
+- Commit `8ff6756` (temporary, the ampersand cards with `lxml` set back to 5.3.0): CI installed `lxml` 5.3.0 and the recorded rows matched (backend 527 passed, 9 skipped). Commit `d4a2e14` restores 6.1.3; CI on the head (`27004c9`, which has the same pins and tests) installed `lxml` 6.1.3 and the same rows matched (backend 527 passed, 9 skipped).
+- CI on commit 2: backend 526 passed, 9 skipped; PostgreSQL 47 passed; frontend 133 passed.
+- Locally (Windows, Python 3.14, the new `lxml`, `requests`, and `python-dotenv`): the CI test list, including the tests that read the saved pages, 531 passed, 4 skipped (before the ampersand test was added; the test file alone now gives 14 passed).
+- `pip-audit` on the direct pins: only `pytest` remains (the next pull request). Packages they pull in are not all clean: `starlette` 0.38.6, pinned by FastAPI 0.115.0, has CVE-2024-47874 and CVE-2025-54121, both in multipart form parsing, which the app cannot reach because `python-multipart` is not installed and no route takes form data (independent review). Handled by a FastAPI upgrade, a later step of this stage.
+
+**Deviation from the plan.** The plan included a local before-and-after run of the readers on all 30 saved pages. The "before" half could not run here: `lxml` 5.3.0 publishes no ready-built package for Python 3.14, compiling it needs build tools this machine does not have, and a Windows build uses a different libxml2 (2.11.9 here) from Render's Linux builds, so it would not be a faithful baseline. The Linux comparison in CI is the faithful one; it covers 28 real UNICEF cards, including every saved title with an ampersand, not every card on every saved page, nor how libxml2 2.14 reads the rest of a full page (head, scripts, comments). To close that gap with production evidence: a read-only snapshot of every stored UNICEF job's title, location, and deadline just before the merge, compared after the first UNICEF crawl on the new version (scheduled 1 November 2026, 05:36 UTC). A parser difference would show as changed fields on existing rows, or as jobs no longer found.
+
+**After the merge:**
+- Check no crawl is running before the merge.
+- Render's build log shows a clean install and "Deploy live".
+- Read-only checks: health, database status, search, request IDs, the admin Sources page with the guard.
+- Watch the next scheduled crawls: ICRC and Oxfam on 31 October, UNICEF on 1 November, with the snapshot comparison above.
 
 ### Stage 4. Frontend proxy error handling
 
