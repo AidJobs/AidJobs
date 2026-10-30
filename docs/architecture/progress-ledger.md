@@ -9,16 +9,17 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
-**Last verified:** 29 October 2026 (India time), after PR #63 (security stage 3, phase 1).
-- **`main`:** `2de9d53` (merge of PR #63, 21:11 UTC on 28 October). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
+**Last verified:** 29 October 2026, after PR #65 (security stage 3, phase 2, PR 1).
+- **`main`:** `f8bedf9` (merge of PR #65, 16:41 UTC). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
 - **Render:**
-  - Auto-Deploy put `2de9d53` live; the new code answered by 21:13 UTC.
+  - Auto-Deploy put `f8bedf9` live; the new instance started at 16:43 UTC.
   - The start command is unchanged since 28 October: `uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-graceful-shutdown 5`.
   - Read by the agent from Render's events and logs.
-- **Read-only afterwards** (security plan, stage 3, phase 1 live record):
+- **Read-only afterwards** (security plan, stage 3, phase 2, PR 1 live record):
   - every response carries a server-generated `X-Request-ID`, and Render's log can be searched by it;
-  - the database status is ok (405 jobs, 282 active, 3 sources);
+  - the database status is ok (405 jobs, 257 active, 3 sources);
   - search answers from the database;
+  - the converted admin routes answer 401 without a session, and the Sources page loads for the signed-in user;
   - no crawl lock was held and no run was marked running before the merge.
 - Merging to `main` publishes the frontend on Vercel and redeploys the backend on Render (Verified from GitHub deployments for the frontend; the user for the backend).
 
@@ -171,6 +172,8 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Security stage 2 recorded done; PR #60 live and its first crawl; Render start command | PR #61, `71939ce` | 28 Oct 2026 | Merged, CI green (docs only, no deploy) |
 | Security stage 3 design approved and recorded; merged branches tidied up | PR #62, `432b62b` | 28 Oct 2026 | Merged, CI green (docs only, no deploy) |
 | Security stage 3, phase 1: the public facets leak, safe database URL handling, log redaction, request IDs | PR #63, `2de9d53` | 28 Oct 2026 | Merged, CI green, deployed, live-checked |
+| Stage 3, phase 1 live record; admin sign-in and Sources check; issue #5 closed; tidy-up | PR #64, `a8bf743` | 29 Oct 2026 | Merged, CI green (docs only, no deploy) |
+| Security stage 3, phase 2, PR 1: sources and presets admin responses without exception text; database name out of the logs | PR #65, `f8bedf9` | 29 Oct 2026 | Merged, CI green, deployed, live-checked |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 
@@ -503,7 +506,7 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
 | Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
 | After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
-| Merge stage 3, phase 2, PR 1 (sources and presets admin responses); plan approved 29 October 2026 | Security plan, stage 3, phase 2, PR 1 implementation record |
+| Approve building stage 3, phase 2, PR 2 (`crawler_admin.py`, including link validation, and `data_quality.validate_job`) | Security plan, stage 3, phase 2 |
 | What API sources should be: honest simple JSON, configurable schemas, or per-platform readers; then the source-test fix | W-33, W-19 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
 | Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
