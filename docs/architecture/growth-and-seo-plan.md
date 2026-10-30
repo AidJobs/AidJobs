@@ -257,7 +257,7 @@ W-06, which UX-08 item 12 (21 October 2026) moved ahead of the other crawler ite
 3. **The employer survey** (security stage 8, W-31), widened to the charity registers (decision 4), with two more columns: which keyword families each employer serves, and which fields and terms its recruitment system exposes. It decides which readers come first.
 4. **Crawler foundation:**
    1. B4, the failure and lifecycle audit, and W-05 (read-only);
-   2. W-34: one honest identity, no disguised retry, `robots.txt` inside the fetch policy, a delay per host;
+   2. W-34: one honest identity, no disguised retry, `robots.txt` inside the fetch policy, a delay per host; and W-44 (added 30 October 2026): real jobs rejected because their link contains "membership", a C3 amendment;
    3. W-04: the Clinch reader for UNICEF;
    4. B5, the completion record (W-10);
    5. W-37: production schema check, then the new columns and capture (description, the three dates, contract type, all locations, salary, remote, language);
