@@ -108,6 +108,28 @@ def _concrete(path):
     return re.sub(r"\{[^}]+\}", "00000000-0000-0000-0000-000000000000", path)
 
 
+def _leaf_types(routes):
+    """Class names of every route the walker above reaches, through included routers."""
+    for route in routes:
+        if type(route).__name__ == "_IncludedRouter":
+            yield from _leaf_types(_router_routes(route.original_router))
+        else:
+            yield type(route).__name__
+
+
+def _fastapi_listing(routes):
+    """(method, full path) for every route, as FastAPI's public route listing reports them."""
+    from fastapi.routing import iter_route_contexts
+
+    for context in iter_route_contexts(routes):
+        methods = context.methods
+        if not methods:
+            yield "*", context.path
+            continue
+        for method in sorted(methods if methods == {"HEAD"} else methods - {"HEAD"}):
+            yield method, context.path
+
+
 PROBE_PREAMBLE = "\n".join(
     [
         "import json, sys, types",
@@ -124,12 +146,21 @@ PROBE_PREAMBLE = "\n".join(
     ]
     + [
         inspect.getsource(f)
-        for f in (_guard_calls, _dependency_calls, _router_routes, _routes, _concrete)
+        for f in (
+            _guard_calls, _dependency_calls, _router_routes, _routes, _concrete,
+            _leaf_types, _fastapi_listing,
+        )
     ]
     + ["ROUTES = sorted(set(_routes(_router_routes(app.router), _guard_calls())))"]
 )
 
-ROUTES_PROBE = 'print(json.dumps({"routes": ROUTES}))'
+ROUTES_PROBE = """
+print(json.dumps({
+    "routes": ROUTES,
+    "fastapi": sorted(set(_fastapi_listing(_router_routes(app.router)))),
+    "leaf_types": sorted(set(_leaf_types(_router_routes(app.router)))),
+}))
+"""
 
 REFUSALS_PROBE = """
 from security import admin_auth
@@ -210,6 +241,23 @@ def _probe(body, env_value):
 
 def _production_routes():
     return {tuple(r) for r in _probe(ROUTES_PROBE, "production")["routes"]}
+
+
+def test_checked_routes_are_exactly_what_fastapi_registers():
+    """The walker reads FastAPI internals; FastAPI's public listing must agree with it exactly."""
+    listing = _probe(ROUTES_PROBE, "production")
+    walked = {(m, p) for m, p, _ in listing["routes"]}
+    registered = {tuple(r) for r in listing["fastapi"]}
+    assert walked == registered, (
+        f"registered but not checked: {sorted(registered - walked)}; "
+        f"checked but not registered: {sorted(walked - registered)}"
+    )
+    assert ("GET", "/api/admin/sources") in walked
+    assert ("GET", "/_internal/jobs") in walked
+
+
+def test_every_route_is_a_kind_the_guard_check_understands():
+    assert _probe(ROUTES_PROBE, "production")["leaf_types"] == ["APIRoute"]
 
 
 def test_public_routes_are_exactly_the_reviewed_list():
