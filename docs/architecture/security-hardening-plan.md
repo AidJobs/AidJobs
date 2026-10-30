@@ -35,7 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
-| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Next: the test-tools pull request, plan first |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) built, not merged (record below). Then the FastAPI upgrade, the Next.js upgrade, and the continuous checks |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -919,6 +919,23 @@ Merge approved by the user on 30 October 2026. Every check below was read-only (
 - **Quality of the 119 new UNICEF rows (the parser's live evidence):** all 119 have a deadline and 118 a location; all 119 links are distinct; 25 titles contain `&`, every one decoded (for example "Health & Nutrition Officer", "Port of Spain, T&T"), none with an undecoded entity; no title has markup, a line break, or a double space; 26 titles with accented letters or dashes read correctly.
 - **Limit:** UNICEF's listing shows the newest jobs first and the crawl reads about 120 of them before the bot challenge. UNICEF posted enough since 26 October to fill those places, so the crawl re-read none of the 378 jobs stored before the upgrade, and the planned before-and-after comparison of the same stored jobs cannot be made from production; the scheduled crawl of 1 November will not change that. The evidence for unchanged parsing is the CI proof on 28 real cards and the clean new rows above.
 - **Found, not caused by the upgrade:** one real UNICEF job was rejected as `non_vacancy_destination`, "Partnerships Consultant – Faith-based and Membership Organisations" (job 596646), because the admission rule denies any link containing "membership" (meant for membership sign-up pages) and this job's link carries the word in its title. Recorded as ledger W-44.
+
+#### Stage 3A, part 1b: implementation record (test tools)
+
+Plan approved by the user on 30 October 2026, after an independent review of the plan that tested the exact pins on Python 3.11.9 and asked for four amendments, all adopted.
+
+**Changes:**
+- `apps/backend/requirements.txt`: `pytest`, `pytest-asyncio`, and `pytest-cov` removed, so Render no longer installs test tools. No code outside `tests/` imports `pytest`, `_pytest`, `pytest_asyncio`, `pytest_cov`, or `coverage` (Repository; confirmed by the review, which also found `main` imports with all 79 routes with the test tools blocked).
+- New `apps/backend/requirements-test.txt`: `-r requirements.txt`, `pytest==9.2.0` (latest; the advisory is fixed in 9.0.3), `pytest-asyncio==1.4.1` (latest; requires pytest 8.4 to below 10 and Python 3.10 or later). The plugin is kept because some tests outside CI use `@pytest.mark.asyncio`; no CI-run test is async.
+- `pytest-cov` dropped: nothing that runs uses it. The only mention is the inactive `apps/backend/.github/workflows/extraction-tests.yml` (`--cov=pipeline`), which GitHub does not run; the contract already records that a workflow outside the root `.github/workflows/` is not GitHub Actions (§16).
+- `apps/backend/pyproject.toml`: `asyncio_default_fixture_loop_scope = "function"`. pytest-asyncio already printed a warning in CI that this was unset; with pytest 9.2.0 and pytest-asyncio 1.4.1, running with `-W error::pytest.PytestDeprecationWarning` stopped pytest before any test until it was set (independent review).
+- `.github/workflows/ci.yml`: the backend job installs `requirements-test.txt` instead of `requirements.txt`.
+- `apps/backend/requirements-dev.txt`: Flask 3.0.0 to 3.1.3 (Dependabot alert #1, low; offline classifier training only).
+- README and the ledger's local-test convention name `requirements-test.txt`.
+
+**Render's cached environment.** Render keeps the Python virtual environment between builds by default, and `pip install -r requirements.txt` never uninstalls, so the old pytest 8.3.0 and the packages removed in part 1 probably stay installed on the live service until a "Clear build cache & deploy" (independent review; the service's own cache state is Not verified). None of them is imported at runtime. Decided by the agent at the user's request (30 October 2026): after this merge, the user runs "Clear build cache & deploy" once, then confirms Auto-Deploy is still "On Commit" (ledger operating conventions), and the build log is checked for no `pytest` lines.
+
+**Proof required before the merge:** CI's install shows `pytest-9.2.0` and `pytest-asyncio-1.4.1` and no `pytest-cov` or `coverage`; neither pytest step prints `PytestDeprecationWarning`; the counts stay at backend 527 passed and 9 skipped, PostgreSQL 47 passed, frontend 133 passed; `pip-audit` on both files finds nothing; an independent code review.
 
 ### Stage 4. Frontend proxy error handling
 
