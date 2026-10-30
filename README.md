@@ -23,7 +23,7 @@ scripts/         pre-deploy checks
 ## Local development
 
 1. Copy `.env.sample` to `apps/backend/.env` and `apps/frontend/.env.local` and fill in the values. It lists names only.
-2. `npm install`, then `pip install -r apps/backend/requirements.txt`.
+2. `npm install`, then `pip install -r apps/backend/requirements.txt` (to run the backend tests: `pip install -r apps/backend/requirements-test.txt`, which includes it).
 3. `npm run dev` starts the frontend on port 5000 and the backend on port 8000.
 
 Other scripts: `npm run lint`, `npm run test`, `npm run build`, `npm run pre-deploy`.

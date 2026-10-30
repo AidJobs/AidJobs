@@ -1,0 +1,5 @@
+# Running the tests: the production requirements plus the test tools. Render installs only
+# requirements.txt.
+-r requirements.txt
+pytest==9.2.0
+pytest-asyncio==1.4.1
