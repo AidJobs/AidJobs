@@ -1,7 +1,9 @@
-"""The UNICEF reader on verbatim card excerpts from saved listing pages (18 and 19 October 2026).
+"""The UNICEF reader on job cards from saved listing pages, verbatim with line endings normalised.
 
 The reader parses with lxml. The expected rows were recorded once from these excerpts, so a
-change of lxml or of the libxml2 it bundles must leave every row identical.
+change of lxml or of the libxml2 it bundles must leave every row identical. Titles with a raw
+or escaped ampersand get their own excerpt, because character references are where HTML
+tokenizers differ.
 """
 import json
 from pathlib import Path
@@ -53,3 +55,16 @@ def test_every_recorded_row_is_admitted(name):
     assert rejected == []
     assert len(admitted) == len(expected) == 6
     assert all(job.get("location_raw") and job.get("deadline") for job in jobs)
+
+
+def test_titles_with_ampersands_read_exactly_the_recorded_rows():
+    html, url, expected = _load("ampersands")
+    jobs = UNICEFPlugin().read_job_cards(html, url)
+    assert jobs == expected
+    assert UNICEFPlugin().extract(html, url).jobs == expected
+    assert len(jobs) == 10
+    assert all("&" in job["title"] for job in jobs)
+    assert "&amp;" in html and "Gender& Education" in html
+    admitted, rejected = admit_batch([dict(job) for job in jobs], "html")
+    assert rejected == []
+    assert len(admitted) == 10
