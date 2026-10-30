@@ -19,6 +19,3 @@ dateparser==1.2.0
 # Already installed through uvicorn[standard]; the crawler's link scoring reads YAML domain config.
 PyYAML==6.0.3
 prometheus-client==0.20.0
-pytest==8.3.0
-pytest-asyncio==0.24.0
-pytest-cov==5.0.0
