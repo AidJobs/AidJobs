@@ -1,6 +1,6 @@
 # AidJobs — UX-08 launch decisions
 
-**Status:** Decided 21 October 2026. Assessed read-only from `main` at `fbcfffe`; the user's decisions are recorded in each item. Item 9 (domain) stays open by the user's choice and is needed only by UX-18. Nothing here is decided until the user records it in the "Decision" line of each item. Once all thirteen are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
+**Status:** Decided 21 October 2026. Assessed read-only from `main` at `fbcfffe`; the user's decisions are recorded in each item. Item 9 (domain) stayed open by the user's choice until 30 October 2026, when the user chose `aidjobs.app`. Items 4, 5, 9, 10, 11, and 12 were changed or updated on 30 October 2026 by `growth-and-seo-plan.md`; each change is noted in its item. Nothing here is decided until the user records it in the "Decision" line of each item. Once all thirteen are recorded, UX-08 is Done and Stage B of `ux-build-plan.md` can start.
 
 Already decided by the user on 21 October 2026, and assumed throughout: the public site is exactly the approved demo (`ux-build-plan.md`, revision item 7). Every recommendation below keeps the demo's look and behaviour; none adds a feature the demo does not have.
 
@@ -16,14 +16,14 @@ Every recommendation below was approved by the user on 21 October 2026, except w
 | 2 | Contract | Approve the five amendments in item 2 |
 | 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
 | 4 | Launch date | Set when the domain is settled and Stage B is half done. **Changed 30 October 2026:** launch after the crawler foundation, with thousands of jobs (`growth-and-seo-plan.md`, decision 6) |
-| 5 | Slow first load | **Decided:** cached server-rendered page. Paid instance deferred (budget); keep-alive skipped until after launch |
+| 5 | Slow first load | **Decided:** cached server-rendered page. Paid instance deferred (budget); keep-alive skipped until after launch. **Updated 30 October 2026:** code built for an always-on instance; paid plan when a recorded signal appears |
 | 6 | AI crawlers | **Decided:** allow search, user-triggered, and training crawlers; block only `Bytespider` |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
 | 8 | Deployment | **Decided:** no ads or payments at launch, free Vercel plan fits; Netlify production locked, "do not index" on Netlify at UX-10 |
 | 9 | Domain | **Decided 30 October 2026:** `aidjobs.app`, treated as owned, connected at the launch check (`growth-and-seo-plan.md`, decision 1) |
-| 10 | Filtering | In the browser for launch, with a threshold to move to the server |
+| 10 | Filtering | In the browser for launch, with a threshold to move to the server. **Updated 30 October 2026:** the launch passes the threshold, so server-side search comes before launch |
 | 11 | Title facts | Read when the page is built, with the demo's code; store later if needed. **Amended 30 October 2026:** worked out when read, on the server, in one shared module; not stored |
-| 12 | W-06 | Move ahead, before launch |
+| 12 | W-06 | Move ahead, before launch. **Changed 30 October 2026:** still before the switch, at the growth plan's step 4.6, after the work it depends on |
 | 13 | A saved job that closes | Keep the demo's behaviour for launch: it leaves Saved with the list |
 
 ## 1. Direction approval
@@ -83,7 +83,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 
 - **Recommendation:** C, which the Stage B design needs anyway, so visitors never wait on the backend for the list. Add A: the 42.9-second first request points to the free plan (the user confirms in the dashboard), and sleeping also stops scheduled crawls, a crawler reliability problem a cache does not solve. A costs from $7 a month.
 - **Decision:** 21 October 2026, the user approved C, the cached page, in Stage B. A, the paid instance, is deferred: no budget for now. B, a free keep-alive monitor, is skipped until after launch. Consequence accepted: until then scheduled crawls run only while the backend is awake, so job data may refresh less often than scheduled; visitors to the new site are not affected, because the cached page does not wait for the backend. Revisit A or B after launch. The free keep-alive (UptimeRobot, HTTP monitor on `/api/healthz` of the Render address every 5 minutes) uses 720 to 744 of the workspace's 750 free hours a month, so it suits only a workspace with one free web service; running out suspends every free service until the next month.
-- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 3 and section 8): the free plan stays for now and sources are added gradually; the code is built for one always-on instance, with the scheduler kept inside the backend; the paid instance is taken when a recorded signal appears (sources regularly about 24 hours overdue, new jobs taking more than a day to appear, Render warnings about traffic or memory, or launch approaching with many sources). Job pages and landing pages, like the list, never wait for the backend.
+- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 3 and section 8): the free plan stays for now and sources are added gradually; the code is built for one always-on instance, with the scheduler kept inside the backend; the paid instance is taken when a recorded signal appears (sources regularly about 24 hours overdue, new jobs taking more than a day to appear, Render warnings about traffic or memory, or launch approaching with many sources). Job pages and landing pages, like the list, never wait for the backend. The keep-alive monitor stays skipped until after launch, as decided on 21 October 2026, unless the user decides otherwise.
 
 ## 6. AI crawlers
 
@@ -157,6 +157,7 @@ Established 21 October 2026:
 
 - **Recommendation:** in the browser for launch. Move to the server when open jobs pass about 1,500 or the job data passes about 200 KB compressed, measured at each launch check. UX-11 narrows to what the server-rendered page needs. The public list then reads PostgreSQL through the existing database path; the Meilisearch decision (W-18) is not needed for launch.
 - **Decision:** 21 October 2026, the user approved the recommendation: filtering in the browser for launch; move to the server at about 1,500 open jobs or 200 KB compressed, measured at each launch check.
+- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 6 and section 4.5): the launch now comes with thousands of jobs, past that threshold, so UX-11 includes server-side search and paging before launch. Because server-side search waits on the backend, it needs the always-on instance at launch.
 
 ## 11. Where title facts are read
 
@@ -170,7 +171,7 @@ Established 21 October 2026:
 
 - **Recommendation:** A for launch. Move to C together with server filtering (item 10) or landing pages (UX-25), whichever comes first.
 - **Decision:** 21 October 2026, the user approved the recommendation: A, read when the page is built, with the demo's code and its new tests; move to C with server filtering or landing pages.
-- **Amended 30 October 2026** (`growth-and-seo-plan.md`, decision 14; the user delegated the choice to the agent and approves it by merging that record): option C is withdrawn, because storing facts on existing jobs would be the historical normalisation rewrite the contract rules out (§4). Title facts are worked out when read, on the server, in one shared Python module (option B), used by search, job pages, landing pages, and the admin, with results cached after each crawl. The demo's rules and their tests move into it, and it handles more than English as the market widens (ledger W-42).
+- **Amended 30 October 2026** (`growth-and-seo-plan.md`, decision 14; the user delegated the choice to the agent; effective when the user explicitly approves merging that record): option C is withdrawn, because storing facts on existing jobs would be a historical normalisation rewrite, which the contract does not authorise (§4) and which would need its own approval. Facts are worked out when read, on the server, in one shared Python module (option B), from titles and, once stored, descriptions; used by search, job pages, landing pages, and the admin; kept in an in-memory cache rebuilt after each crawl, not in a database table. The demo's rules and their tests move into it, and it handles more than English as the market widens (ledger W-42).
 
 ## 12. W-06 before launch
 
@@ -178,6 +179,7 @@ Sixteen active UNICEF rows from 6 December 2025 have no deadline and stay listed
 
 - **Recommendation:** move W-06 ahead of the other crawler items, so it is decided and validated before UX-29. W-02, the read-only inspection of those rows, comes first.
 - **Decision:** 21 October 2026, the user approved the recommendation: W-06 moves ahead of the other crawler items and is decided and validated before the switch (UX-29); W-02 comes first.
+- **Changed 30 October 2026** (`growth-and-seo-plan.md`, section 7; part of the order the user asked the agent to choose): the policy is recorded now (contract §6), and its implementation comes at the growth plan's step 4.6, after the crawler identity, the Clinch reader, B5, and the captured fields, because it depends on the observation rule and on completeness reports. W-02 still comes first, and both still land before the switch.
 
 ## 13. A saved job that closes
 

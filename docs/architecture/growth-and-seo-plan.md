@@ -1,6 +1,6 @@
 # AidJobs — Growth, crawler, and SEO plan
 
-**Status:** Decided by the user on 29 and 30 October 2026, after a read-only investigation of how UNjobs.org collects jobs, a scale analysis of the current crawler, and an independent review of the plan (29 October 2026). Where the user delegated a choice to the agent ("you decide"), this record says so; the user approves those choices by merging this record. This is approval of the direction and the order. Every step below still needs the user's explicit approval to plan, implement, and merge, and follows the working method in the ledger.
+**Status:** Recorded on 30 October 2026 from the user's decisions and delegations of 29 and 30 October 2026, after a read-only investigation of how UNjobs.org collects jobs, a scale analysis of the current crawler, and an independent review of the plan (29 October 2026). Where the user delegated a choice to the agent ("you decide", "do what is the best correct way to move forward"), this record says so; those choices are approved when the user explicitly approves merging this record (PR #67), and the merge request names them. This is approval of the direction and the order. Every step below still needs the user's explicit approval to plan, implement, and merge, and follows the working method in the ledger.
 
 **Authority:** the contract (`aidjobs-migration-contract.md`) and the crawler plan (`crawler-completion-plan.md`) still govern. The amendments this plan needs are listed in section 6 and recorded in those documents with this plan. Where this plan and an older plan's order disagree, this plan's order (section 7) applies from 30 October 2026.
 
@@ -35,9 +35,11 @@ UNjobs cannot be a data source: its `robots.txt`, its bot challenge, and its ter
 - **Job pages:** when a listing has 1 to 50 candidates, every job page is reopened on every crawl; above 50, none is opened (any count for UNDP; skipped for UNICEF) (`crawler_v2/simple_crawler.py`, about lines 2110 to 2139). The ICRC crawl of 27 October 2026 took 2.4 minutes for 33 jobs, about 96 seconds of it opening job pages and about 23 seconds geocoding (ledger W-14). At about 10,000 jobs, reopening every page daily would take about 8 hours.
 - **Scheduler:** inside the Render web service: every 5 minutes, 3 crawls at a time, 20 sources per pass, a 15-minute limit per crawl, a 25-minute lock (`orchestrator.py`, lines 32 to 34 and 64 to 65). Defaults by organisation type: UN every day, INGO every 2 days, NGO every 3 days, with adjustment by activity and health; in practice each live source is crawled about every 3 days. On Render's free plan the service, and so the scheduler, sleeps after 15 minutes without traffic.
 - **Fields saved:** the writer's validated fields are title, apply link, description snippet, location, country, country code, city, remote, and deadline (`contracts/upsert.py`, lines 8 to 18). Contract or employment type helps admit a job and is then discarded. The repository schema has no `first_seen_at` (contract §5 names it), no full description (only `description_snippet`), and no posting date (`infra/supabase.sql`). The production schema is not verified (contract §15).
-- **Admission today** (`contracts/admission.py`): an HTML link with a vacancy shape needs a title plus a location, deadline, or employment type, otherwise `thin_vacancy`; a repeated family of numeric-id or UUID links is admitted with no fields; an API candidate needs a deadline or a location; an RSS candidate needs a deadline. A single UUID job link (Lever, Ashby) is not a repeated family, so a reader must supply its fields.
-- **Seen and updated:** a job is marked seen, and its fields updated, only when its listing row is admitted (`contracts/persist.py`). A field captured later fills in for any job that is still open; only jobs that close before a field is captured never get it.
-- **Politeness and identity:** `core/robots.py` (`RobotsChecker`) and `core/domain_limits.py` (`DomainLimiter`) exist but nothing calls them, and neither is fit to switch on as is: the robots checker fetches through raw `httpx` outside the fetch policy (contract §9), has no `Allow` rule, wildcards, or longest-match, and treats server errors as "allowed"; the limiter holds one global lock across all hosts and queries the database on every call. On a 403 the HTML crawler retries with a Chrome browser user-agent and browser headers (`simple_crawler.py`, lines 109 to 127 and 289 to 292). The crawler identities point at the expired domain: `Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)` in `simple_crawler.py` (line 210), `rss_crawler.py` (line 31), and `api_crawler.py` (line 30); `AidJobsBot/1.0 (+contact@aidjobs.app)` in `core/net.py` (line 18) and the admin source test (`app/sources.py`, line 675); `AidJobs/1.0 (contact@aidjobs.app)` in the geocoder (`core/geocoder.py`, line 109).
+- **Admission today** (`contracts/admission.py`): an HTML link with a vacancy shape needs a title plus a location, deadline, or employment type, otherwise `thin_vacancy`; a repeated family of numeric-id or UUID links is admitted with no fields; an API candidate needs a deadline or a location; an RSS candidate needs a deadline. Two or more Lever or Ashby job links on one listing form a repeated UUID family and are admitted with no fields; a listing with only one such job is not a family, so a reader must supply its fields.
+- **Seen and updated:** a job is marked seen, and its fields updated, only when its listing row is admitted: `persist_candidate` returns `rejected` for any row that is not admitted, and it finds existing jobs by `canonical_hash` (title plus link), not by apply link (`contracts/persist.py`, lines 69 to 86). A field captured later fills in for any job that is still open; only jobs that close before a field is captured never get it. `created_at` is never changed when a job is matched again (`contracts/upsert.py`, lines 20 to 31), so it already records when AidJobs first saved the job.
+- **Unused columns already in the repository schema:** `contract_type`, `work_modality`, the `compensation_*` columns, `duplicate_of`, and `raw_metadata` (`infra/supabase.sql`, lines 318 to 349). `jobs.id` is a UUID (line 293). The Gate 8 migrations exist (`infra/migrations/gate8_organisations.sql`, `gate8_organisation_foreign_keys.sql`); whether they are applied in production is Not verified.
+- **Event loop:** the scheduler runs inside the web server's event loop. Since PR #60, database steps and saves run in worker threads; parsing still runs on the event loop, and a cold process can still stall it for 1 to 2 seconds (security plan, stage 2; A2 is open).
+- **Politeness and identity:** `core/robots.py` (`RobotsChecker`) and `core/domain_limits.py` (`DomainLimiter`) exist but nothing calls them, and neither is fit to switch on as is: the robots checker fetches through raw `httpx` outside the fetch policy (contract §9), has no `Allow` rule, wildcards, or longest-match, and treats server errors as "allowed"; the limiter holds one global lock across all hosts and queries the database on every call. On a 403 the HTML crawler retries with a Chrome browser user-agent and browser headers (`simple_crawler.py`, lines 109 to 127 and 289 to 292). The crawler identities point at the expired domain: `Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)` in `simple_crawler.py` (line 210), `rss_crawler.py` (line 31), and `api_crawler.py` (line 30); `AidJobsBot/1.0 (+contact@aidjobs.app)` in `core/net.py` (line 18) and the admin source test (`app/sources.py`, line 675); `AidJobs/1.0 (contact@aidjobs.app)` in the geocoder (`core/geocoder.py`, line 109); `core/net.py` also sends `contact@aidjobs.app` as a `From` header (lines 19 and 135) and lets the settings `AIDJOBS_CRAWLER_UA` and `AIDJOBS_CONTACT_EMAIL` override both (lines 77 and 78; their values on Render are Not verified); `scripts/smoke_test_new_extractor.py` (line 44) uses the old identity; `tests/test_site_reader_fallback.py` (lines 727 to 730) asserts the Chrome retry. The robots checker reads and writes a `robots_cache` table on every call (`core/robots.py`); the table is in the repository schema (`infra/supabase.sql`, line 262) and Not verified in production.
 - **Personal data:** the HTML crawler extracts emails and phone numbers from listing pages and logs how many it found (`simple_crawler.py`, about lines 700 to 703).
 - **Public site:** the job loader stops at 50 pages of 100, 5,000 jobs (`apps/frontend/lib/site/loadJobs.ts`, line 5), but the decided move to server-side filtering comes first, at about 1,500 open jobs or 200 KB compressed (UX-08 item 10).
 
@@ -96,13 +98,13 @@ An independent agent reviewed the plan against the repository, the contract, and
 
 Details, by decision number:
 
-**1. Domain.** The user treats `aidjobs.app` as owned and not yet in use. Until it is connected, nothing answers at that address, so the crawler's identity uses decision 2.
+**1. Domain.** "I will buy aidjobs.app later … this is the domain we will use", then "think that we already own it, but are not using it" (user, 30 October 2026). It stays in the code and in the backend's trusted origins (`main.py`, lines 128 and 129). Accepted risk, recorded: until it is bought, anyone could register the name while it is still a trusted origin. Buying it is a dependency of the launch check (UX-18). Until it is connected, nothing answers at that address, so the crawler's identity uses decision 2.
 
 **2. Contact.** For example `AidJobsBot/1.0 (+mailto:aidjobz@gmail.com)`. It is not a secret and may live in the code. It replaces `contact@aidjobs.app` in the geocoder too, until the offline country lookup replaces the geocoder. It moves to the domain at launch.
 
-**3. Hosting.** Built for always-on: the scheduler stays inside the backend and crawling stays in the one process, sized for one instance with 512 MB, so no second crawl process is needed and contract §12's second-worker approval is not triggered. While on the free plan, crawling stays light and sources are added gradually (section 8). If a separate crawl process is ever needed, it needs the §12 record and approval, and it must install the same redacting log setup and refresh it after the environment loads, as `main.py` does (`log_safety.install()`, then `log_safety.refresh_secrets()`). GitHub Actions is not used to run crawls (2.4).
+**3. Hosting.** The user's words: "we should build for $7", "we will add sources gradually, and when the need arises we will opt for a paid plan". The agent's design under that decision: built for always-on, with the scheduler staying inside the backend and crawling in the one process, sized for one instance with 512 MB, so no second crawl process is needed and contract §12's second-worker approval is not triggered. Because the crawl shares the web server's event loop, A2 (parsing off the event loop, security plan stage 2) is carried out in the crawler foundation before twice-daily crawling and server-side search share that process. While on the free plan, crawling stays light and sources are added gradually (section 8). If a separate crawl process is ever needed, it needs the §12 record and approval, and it must install the same redacting log setup and refresh it after the environment loads, as `main.py` does (`log_safety.install()`, then `log_safety.refresh_secrets()`). GitHub Actions is not used to run crawls (2.4).
 
-**4. Market.** Domestic nonprofit coverage is built systematically, not employer by employer: public charity registers with income figures (the US tax-exempt organisations list, the IRS Business Master File; the UK Charity Commission register; Australia's ACNC register; Canada's list of registered charities; European national registers and networks) rank employers by size for the survey, and readers per recruitment system cover many employers each. At launch: international aid plus English-language nonprofits (US, UK, Canada, Australia). After launch: non-English Europe, which needs title rules per language and, later, landing pages per language. This amends contract §2 (section 6).
+**4. Market.** Domestic nonprofit coverage is built systematically, not employer by employer: public charity registers with income figures (the US tax-exempt organisations list, the IRS Business Master File; the UK Charity Commission register; Australia's ACNC register; Canada's list of registered charities; European national registers and networks) rank employers by size for the survey, and readers per recruitment system cover many employers each. Sequencing (the agent's; the market decision covers all of Europe): at launch, international aid plus English-language nonprofits (US, UK, Canada, Australia, and English-language employers elsewhere); after launch, non-English Europe, which needs title rules per language and, later, landing pages per language. This amends contract §2 (section 6).
 
 **5. Descriptions.** Classification, search, the job page, and Google's job panel all need the full text, so it is stored and shown in full, with:
 - attribution ("Published by {employer}"), a link to the original advert, and the apply button;
@@ -115,8 +117,8 @@ AidJobs adds what neither UNjobs nor the employer shows: a facts summary at the 
 
 **6. Launch.** After the crawler foundation (section 7, step 4), the admin's add-source flow (step 5), and gradual source growth (step 6), so the site launches with thousands of jobs.
 
-**7. Demo differences** (approved by merging this record; added to the UX plan's revision of 30 October 2026):
-- a permanent, server-rendered page per job at `/jobs/{readable-title}-{id}`, built from the job's database id, never from the identity key, so cleaning a title never changes the address;
+**7. Demo differences** (delegated to the agent; approved with this record; added to the UX plan's revision of 30 October 2026):
+- a permanent, server-rendered page per job at `/jobs/{readable-title}-{id}`, where the id is the job's database id (`jobs.id`, a UUID, or a short unique form of it fixed in UX-24's plan), never the identity key. Tidying how a title is displayed never changes the address. A job whose identity changes (a title change at the employer, or W-24's cleaning at save time) is a new row with a new address; redirecting the old address uses `jobs.duplicate_of` and is its own database-write decision;
 - opening a job from the list still opens the sheet without a page load, but the address becomes the job page's address, so every shared link is the indexable page;
 - landing pages per organisation and per country, and the hubs (UN, NGO, nonprofit, charity, humanitarian, international development); sector, function, contract, grade, and job-title pages only above the minimum job count, with "do not index" below it;
 - filter combinations stay in the browser; only combinations that become landing pages get their own address;
@@ -125,13 +127,13 @@ AidJobs adds what neither UNjobs nor the employer shows: a facts summary at the 
 
 **8. Order.** Section 7. **9. Posting date.** Section 4.4. **10. Known jobs and expiry.** Section 4.3.
 
-**11. ReliefWeb.** API v2 (the user requests the `appname`) for discovery (which organisations post jobs, how many) and as the job feed only for organisations AidJobs does not crawl directly, often small NGOs that post only there. One primary source per organisation avoids guessing which jobs are duplicates; a duplicate report covers the remaining overlap, and nothing is merged automatically. Links go to the original advert; ReliefWeb's terms are checked in the survey. UN Talent (`untalent.org/open`) is a benchmark only. The UN careers site is read through its official RSS feed.
+**11. ReliefWeb.** The user's words: "relief web is reliable, what do you say or is there a better way out, no hot fixes though". The agent's choice, a lasting design rather than a quick feed: API v2 (the user requests the `appname`) for discovery (which organisations post jobs, how many) and as the job feed only for organisations AidJobs does not crawl directly, often small NGOs that post only there. One primary source per organisation avoids guessing which jobs are duplicates; a duplicate report covers the remaining overlap, and nothing is merged automatically. Links go to the original advert; ReliefWeb's terms are checked in the survey. UN Talent (`untalent.org/open`) is a benchmark only. The UN careers site is read through its official RSS feed.
 
 **12. Features.** No ads. After launch, employer submissions come first (moderated, for organisations without a recruitment system), then alerts; each changes contract §2 (it says "Users do not submit career sources" and rules out user accounts) and needs its own scope decision then.
 
 **13. Crawl frequency.** Twice a day for UN agencies and large NGOs, daily for the rest; the adaptive scheduler slows sources that rarely change (every 2 or 3 days) and speeds up busy ones. The aim is to keep crawling without being blocked (section 4.2). Full frequency depends on the always-on instance. The new targets replace today's defaults (UN 1 day, INGO 2, NGO 3) as part of W-39.
 
-**14. Title facts.** One Python module in the backend works out sector and SDG, function, level, UN grade and typical experience, contract, eligibility, remote work, and advert language. Search, job pages, landing pages, and the admin use it; results are cached after each crawl. Nothing is stored, so an improvement applies to every job at once without the historical rewrite contract §4 forbids. The demo's TypeScript rules and their tests move into it. Because the market includes Europe, the rules handle French, Spanish, German, and other languages, added language by language. Fixed lists in code with tests; no editor and no tables (section 6).
+**14. Title facts.** One Python module in the backend works out sector and SDG, function, level, UN grade and typical experience, contract, eligibility, remote work, and advert language, from the title and, once stored, the description (fixed rules, no AI; the contract §2 amendment covers both). Search, job pages, landing pages, and the admin use it. Its results are kept in an in-memory cache, rebuilt after each crawl and on start-up; it is not a database table. Server-side filtering by these facts (UX-11) runs on that cache, not in SQL. Nothing is stored on the jobs, so an improvement applies to every job at once; storing facts on existing jobs would be a historical normalisation rewrite, which the contract does not authorise (§4). The demo's TypeScript rules and their tests move into it. Because the market includes Europe, the rules handle French, Spanish, German, and other languages, added language by language. Fixed lists in code with tests; no editor and no tables (section 6).
 
 ## 4. Design rules, built in from the start
 
@@ -147,6 +149,7 @@ What changes:
 4. **Job pages opened only for new jobs**, within a cap per crawl, together with the observation rule (4.3).
 5. **Completeness for every source:** found against expected, and how many of the required fields each source fills. That fill rate is a quality measure in the admin, not a gate.
 6. **A daily crawl-health message** to the user, so failed crawls are not silent.
+7. **Parsing off the event loop (A2),** before twice-daily crawling and server-side search share the process (decision 3).
 
 Done when: adding a source on a known system needs no code; a new system is one new reader with fixtures; a new classification or page type is a change outside the crawler, unless it needs a field that is not captured yet.
 
@@ -154,18 +157,20 @@ Done when: adding a source on a known system needs no code; a new system is one 
 
 - One honest crawler identity everywhere (decision 2); the disguised browser retry removed in the first crawler pull request.
 - `robots.txt` honoured inside the fetch policy (§9), rewritten rather than switching on `RobotsChecker` as it is: proper `Allow` and wildcard rules, and a defined behaviour for server errors.
-- One request at a time per host with a few seconds between requests, a simple delay in the process (not the database-backed `DomainLimiter`), any requested crawl delay honoured, and a time and request budget per source.
+- One request at a time per host with a few seconds between requests, a simple delay in the process (not the database-backed `DomainLimiter`), any requested crawl delay honoured, and a time and request budget per source. Recruitment-system hosts shared by many employers (Greenhouse, Ashby, Lever, Workday and others) get a budget per host set from that vendor's documented limits, so twice-daily crawling of many employers on one host stays within them.
 - Stop early when a listing's set of job ids has not changed.
 - On a refusal or challenge (403, 429, a challenge page): stop that source, record it, and try again the next day. A challenge is never solved or bypassed (ledger W-04, W-31).
 - The offline country lookup, reusing the frontend's country table, replaces Nominatim; it also closes the geocoder's gap against §9 (W-27).
 
 ### 4.3 Known jobs, deadlines, and expiry
 
-This amends crawler plan C3 and C4 and gives the W-06 policy the contract requires (§6). It is the agent's choice, delegated by the user, approved by merging this record; the implementation is a separate pull request.
+This amends crawler plan C3 and C4 and is the written W-06 policy the contract requires (§6): a trust policy and a consecutive-missing threshold, as a decision separate from any implementation pull request. The user delegated the choice to the agent ("you decide"); it is approved when the user explicitly approves merging this record. The implementation is a separate pull request with its own approval, and it may not add rules beyond these.
 
-- **Observation rule.** A listing row whose apply link matches an already-saved, open, not-hidden job of the same source counts as that job seen: its last-seen date advances through the existing writer, even when the row is too thin to admit a new job. New jobs still need full admission evidence. Hidden jobs stay hidden. Identity is unchanged (C3 point 5).
-- **Trust.** Only a complete crawl counts as evidence of absence: `listing_complete` true, as agreed on 18 October 2026; the crawl status and failure counter never decide it.
-- **Expiry threshold.** A job closes when its deadline has passed, or when it is missing from two consecutive complete crawls of its source at least 24 hours apart. Closing changes the job's lifecycle status; it never deletes the row and is reversed if the job is seen again. Partial or failed crawls never count.
+- **Observation rule.** A listing row rejected as too thin, whose normalised apply link matches exactly one saved, open, not-suppressed job of the same source, counts as that job seen. This needs a new, narrow observation path in the one writer (`contracts/persist.py`), because today `persist_candidate` rejects any row that is not admitted and finds jobs by `canonical_hash`, not by apply link. That path updates only `last_seen_at`; it changes no other field, no identity, and no suppression. If more than one open row of the source has the link, nothing is observed, as with B3's two-row conflict. A new job still needs full admission evidence (C3); an unknown URL is still not admitted on this rule.
+- **Trust.** Only a complete crawl counts as evidence of absence: `listing_complete` true, as agreed on 18 October 2026; the crawl status and failure counter never decide it. A source without a completeness report cannot expire anything by absence until its own completeness rule exists (W-39 or its reader, W-35); today only UNICEF reports completeness. A complete crawl with zero valid jobs never counts (§6). A complete crawl that finds fewer than half of the source's open jobs does not count as evidence either, and is flagged in crawl review for the user.
+- **Missing threshold.** A job expires by absence when it is missing from every counting crawl of its source over at least 24 hours, and from at least two of them.
+- **Passed deadline.** A job expires when its stored deadline has passed. Being seen on the listing again does not reverse that closure; only a newer reading that gives a future deadline does. A past deadline is information, not permission to destroy the row (§6, "Deadline").
+- **What expiry does.** It changes lifecycle to expired only; it never deletes or suppresses the row. A job expired by absence returns to active when any crawl sees it again: being seen is evidence on its own; only absence needs a counting crawl.
 - **Deadline changes.** Within each crawl's budget, the crawler reopens known jobs' pages when their deadline is within 3 days or has just passed, so extensions are caught, plus a slow rotation through all other known jobs.
 
 ### 4.4 The field contract
@@ -177,7 +182,7 @@ The minimum needed to save a job is today's admission rule, unchanged (2.2). Eve
 | Title, apply link, organisation (via the source) | Captured; required as today |
 | Description (full text, cleaned, capped, contacts removed) | Captured when published |
 | Employer's posting date | Captured when published; each reader documents its field |
-| First seen, last seen | Recorded by AidJobs on every job |
+| First seen (`created_at`), last seen (`last_seen_at`) | Recorded by AidJobs on every job |
 | Deadline | Captured when published |
 | Contract or employment type | Captured when published; stored, no longer discarded |
 | Locations, all of them, as written | Captured; several locations stay several |
@@ -190,19 +195,19 @@ The minimum needed to save a job is today's admission rule, unchanged (2.2). Eve
 - On the site: "Posted {date}" when the employer's date exists, otherwise "First seen {date}".
 - In Google's structured data: the employer's date, or first seen when the previous complete crawl of that source was at most 3 days earlier, so the true date is within 3 days. Jobs from a new source's first crawl get no structured data until they have an employer date.
 
-New columns are a database change: the production schema is verified first (§15), and the migration needs its own approval. A manual backup is taken before it (section 8).
+First seen comes from `created_at`, which already records when AidJobs first saved each job; no `first_seen_at` column is backfilled, because the migration date would be wrong for existing jobs and would reach Google's structured data. Existing unused columns (`contract_type`, `work_modality`, `compensation_*`, `raw_metadata`, `duplicate_of`) are reused where they fit, after the production schema is verified (§15); contract §5 says not to invent columns. Any new column is a database change with its own approval, after a manual backup (section 8).
 
 ### 4.5 Search-engine design
 
-- **Page types:** job pages; landing pages per organisation, country, and hub at launch; sector, function, contract, grade, job-title, and pair pages (for example "WASH jobs in Kenya") as they pass the minimum job count; guides later.
+- **Page types:** at launch, job pages and landing pages per organisation, per country, and for the hubs. After launch (section 7, step 8): sector, function, contract, grade, and job-title pages, then pairs (for example "WASH jobs in Kenya"), each only as it passes the minimum job count; guides later. SDG pages and the salary calculator are deferred.
 - **Thresholds:** each landing page needs a minimum number of open jobs to be indexed, with a gap between the count that switches it to "do not index" and the count that switches it back, so pages do not flip. This guards against Google's thin-content and scaled-content policies.
 - **Each page's title, heading, short factual introduction, and structured data come from the same fixed lists** (decision 14), so the hundredth page is as complete as the first.
 - **Job pages carry JobPosting structured data** only when the required fields exist (title, description, posting date, organisation, location or remote markers); `validThrough`, `employmentType`, and `baseSalary` when known; several `jobLocation` entries for several places.
 - **Closed jobs:** structured data removed at once; the page kept for a while saying the job has closed, with similar open jobs, marked "do not index"; then 410 Gone. The timings are set in UX-24's plan.
 - **Pages never wait for the backend.** The job list is already a cached page (UX-08 item 5). Job pages and landing pages are built and cached ahead of time and refreshed after crawls, so visitors and Google never meet a cold start, on either plan.
-- **Indexing:** sitemaps split by type with accurate last-modified dates are the baseline. IndexNow for Bing and others. Google's Indexing API only for a priority subset, if at all, within its quota.
-- **Server-side search and paging** before open jobs pass about 1,500 (UX-08 item 10), which also removes the 5,000-job loader cap.
-- **No website-to-database read path.** The backend stays the one reader of the database for the public site. If such a path is ever needed, it reads one database view that defines which jobs are public, with a read-only role granted on that view only (contract §13, Gate 7).
+- **Indexing:** sitemaps split by type with accurate last-modified dates are the baseline. IndexNow for Bing and others. Google's Indexing API, which Google recommends for job pages, for new and closed job pages first, within its quota of 200 a day including removals.
+- **Server-side search and paging** before open jobs pass about 1,500 (UX-08 item 10), which also removes the 5,000-job loader cap. Server-side search answers each visitor's search through the backend, so at launch it needs the always-on instance (section 8); the cached pages do not.
+- **No website-to-database read path.** The backend stays the one reader of the database for the public site. If such a path is ever needed, it reads one database view that defines which jobs are public, with a read-only role granted on that view only (contract §13 and Gate 7 for which jobs are public; security stage 6 and contract §15 for the role).
 - **Keyword families:** the agent drafts them from public sources (autocomplete, "People also ask", competitors' category pages, AidJobs' own titles); the user adds Google Keyword Planner and Trends data with their Google account and sets the order of markets; Search Console revises them after launch.
 - **Accessibility** covers job pages and landing pages too, not only the list.
 
@@ -210,7 +215,7 @@ New columns are a database change: the production schema is verified first (§15
 
 - Recruiters' emails and phone numbers are never stored; the crawler stops collecting them; the Privacy page says so.
 - Attribution and the opt-out route (decision 5).
-- `raw_pages` and the extraction logs are kept small: no raw HTML stored for every page, and old rows trimmed.
+- `raw_pages` and the extraction logs are kept small: no raw HTML stored for every page, and old rows trimmed, always keeping at least the last few runs per source, because their `listing_complete` records are the expiry rule's evidence.
 
 ## 5. What is new compared with the existing plans
 
@@ -229,21 +234,23 @@ Existing items this plan uses: W-02, W-04, W-05, W-06, W-09, W-10 (B5), W-18, W-
 
 ## 6. Amendments recorded with this plan
 
-Each is written into its document in the same pull request as this record:
+Each is written into its document in the same pull request as this record. "Delegated" means the user asked the agent to choose; every item takes effect only when the user explicitly approves merging this record.
 
-1. **Contract §2, product scope:** the market includes domestic nonprofit and charity jobs in the US, UK, Australia, Canada, and Europe; job pages and landing pages built from real data are part of the public site. Employer submissions, alerts, and accounts stay out until their own decisions. No ads.
-2. **Contract §5, organisation type and classification:** fixed lists in code with tests are allowed (organisation types, sectors and SDGs, functions, levels and grades, contract types). No editor, no taxonomy tables, and `seed_taxonomy.sql`, `levels`, and `org_types` are not revived.
-3. **Crawler plan, C3 and C4:** the observation rule and the reopening of known jobs' pages (4.3), and job pages opened only for new jobs within a cap (W-09 re-scoped).
-4. **Crawler plan, "After this plan":** the reader interface and Gate 8 may start after B4 and B5 are recorded; C5's remaining sites (W-08) no longer gate them and are handled through the survey and the add-source flow.
-5. **UX-08 item 11:** title facts are worked out when read, on the server, in one shared module; option C (stored) is withdrawn.
-6. **UX plan:** a revision of 30 October 2026 with the demo differences (decision 7) and the new order.
-7. **W-06:** the expiry policy in 4.3.
+1. **Contract §2, product scope:** the market (decided by the user) includes domestic nonprofit and charity jobs in the US, UK, Australia, Canada, and Europe; no advertising (user). Job pages and landing pages built from real data (decision 7, delegated), and facts read from titles and descriptions by fixed rules, worked out when read (decision 14, delegated). Employer submissions, alerts, and accounts stay out until their own decisions.
+2. **Contract §5, organisation type and classification** (decision 14 and the review, delegated): fixed lists in code with tests are allowed (organisation types, sectors and SDGs, functions, levels and grades, contract types). No editor, no taxonomy tables, and `seed_taxonomy.sql`, `levels`, and `org_types` are not revived.
+3. **Contract §6, expiry policy** (decision 10, delegated): section 4.3.
+4. **Crawler plan, C3 and C4** (decision 10, delegated): the observation rule and the reopening of known jobs' pages (4.3), and job pages opened only for new jobs within a cap (W-09 re-scoped).
+5. **Crawler plan, "After this plan"** (part of the order, decision 8, delegated): the reader interface and Gate 8 may start after B4 and B5 are recorded; C5's remaining sites (W-08) no longer gate them and are handled through the survey and the add-source flow.
+6. **UX-08:** item 4 (launch timing, user), item 5 (hosting, user), item 9 (domain, user), item 10 (server-side search before launch, order), item 11 (title facts, delegated), item 12 (W-06's place in the order, delegated).
+7. **UX plan:** a revision of 30 October 2026 with the demo differences (decision 7) and the new order (decision 8), both delegated.
 
 Not amended, because the design avoids it: contract §12 (no second crawl process while the scheduler stays in the one always-on backend).
 
 ## 7. Order of work
 
-Chosen on technical grounds: each step needs the one before. Each step is its own pull request or set of pull requests, each approved by the user.
+Chosen by the agent on technical grounds, at the user's request ("do what is the best correct way to move forward", 30 October 2026); approved with this record. Each step needs the one before. Each step is its own pull request or set of pull requests, each approved by the user.
+
+W-06, which UX-08 item 12 (21 October 2026) moved ahead of the other crawler items, now comes at step 4.6, after the crawler identity, the Clinch reader, B5, and the captured fields, because the observation rule and the completeness reports it depends on come first. It still lands well before the switch (UX-29).
 
 1. **Record the decisions.** This pull request (docs only). Before it: PR #66, the stage 3 phase 2 PR 1 live record.
 2. **Finish the security plan as approved:** stage 3 (phase 2 PRs 2 to 5, then phase 3, which also rewrites how crawl messages are stored, so the crawler code is changed once); stage 4 (frontend proxies); stage 5 (secret-printing guard); stage 7 (two decisions); the stage 6 plan (least-privilege database roles), whose implementation timing is decided with that plan.
@@ -258,7 +265,8 @@ Chosen on technical grounds: each step needs the one before. Each step is its ow
    7. W-35: the reader interface;
    8. W-38: Greenhouse, Ashby, and Lever readers;
    9. W-39: completeness for every source, the daily crawl-health message, and the crawl-frequency targets (decision 13);
-   10. W-42: the title-facts module on the server.
+   10. W-42: the title-facts module on the server;
+   11. A2: parsing off the event loop (security plan, stage 2), before twice-daily crawling.
 5. **Admin before launch** (W-40): the add-source flow (paste a careers address, the system is detected, one approved fetch, a report of which fields are filled, then admit) and crawl review (parts of UX-19 and UX-20).
 6. **Sources, added gradually,** in survey order, with more readers (Workday, Oracle, SuccessFactors, iCIMS, Jobvite, W-41 ReliefWeb and the UN careers RSS feed), until there are thousands of jobs. The paid Render plan when a signal in section 8 appears.
 7. **The public site and launch:** server-side search and paging (UX-11, W-18); the rest of Stage B (UX-12 to UX-17, UX-26 to UX-28); job pages (UX-24) and the first landing pages (UX-25); About, Privacy, and the opt-out route (UX-27); the switch (UX-29); the launch check with `aidjobs.app`, Search Console, and Bing (UX-18).
@@ -276,9 +284,9 @@ Free plans now; the code works on both.
 - Render emails about traffic or memory, or a crawl stops for lack of memory;
 - launch approaches with many sources.
 
-A free bridge already on record: a keep-alive monitor every 5 minutes (UX-08 item 5), only while this is the workspace's one free web service. It delays the paid plan but adds no memory.
+A keep-alive monitor every 5 minutes (UX-08 item 5) was skipped by the user until after launch (21 October 2026); using it earlier is the user's decision. It works only while this is the workspace's one free web service, and it delays the paid plan but adds no memory.
 
-**Supabase:** free now. A manual database backup (`pg_dump`, run on the user's machine) weekly and before every database change. Move to Pro (about $25 a month) at about 400 MB, or when backups need to be automatic. Expected size: thousands of jobs with descriptions, roughly 40 to 80 MB; at full scale about 1 GB a year without the 90-day description rule (decision 5).
+**Supabase:** free now. A manual database backup (`pg_dump`, run on the user's machine) weekly and before every database change. The connection string stays on the user's machine and is never printed, and the `pg_dump` client must be at least the server's version (PostgreSQL 17). Move to Pro (about $25 a month) at about 400 MB, or when backups need to be automatic. Expected size: thousands of jobs with descriptions, roughly 40 to 80 MB; at full scale about 1 GB a year without the 90-day description rule (decision 5).
 
 **Vercel:** Hobby stays valid while there are no ads and no income other than donations.
 
@@ -296,3 +304,8 @@ A free bridge already on record: a keep-alive monitor every 5 minutes (UX-08 ite
 - Employer submissions, alerts, and accounts (§2), after launch.
 - Landing-page thresholds, closed-page timings, and the exact heading words, in their steps' plans.
 - Languages after English, and their order.
+- How the daily crawl-health message is delivered (email needs a provider and a secret), in W-39's plan.
+- How job and landing pages are refreshed after crawls (an on-demand refresh route needs a secret and touches security stage 4), in UX-24's plan.
+- Redirecting a replaced job's old address through `jobs.duplicate_of` (a database-write decision), in UX-24's plan.
+- Whether the Gate 8 migrations are already applied in production (Not verified), before Gate 8.
+- A2 itself, recorded as a decision for the user in the security plan (stage 2); placed in step 4.
