@@ -1063,6 +1063,7 @@ Merge approved by the user on 31 October 2026 with conditions: the `setuptools` 
 
 - **Branches:** the branch of PR #73 (`security/stage3a-fastapi-upgrade`, tip `7377e10`, in `main`) deleted on GitHub with the user's approval; `main`, the merged pull request, its reviews, and its CI artifacts untouched. The agent's local copy of the branch is kept. PR #72's branch is still on GitHub.
 - **Dependabot:** 107 open alerts, none in `apps/backend`, unchanged by this upgrade: Starlette was not a direct pin before, so Dependabot never tracked it.
+- **Temporary files:** after this record was first written, `%TEMP%\aj_fastapi_inv` (18,206 files, 384 MB: the reviewers' throwaway environments, the downloaded Python 3.11.9 and its cache, and evidence copies) and the read-only crawl-check script were deleted, as agreed, and confirmed gone; `C:\Users\DELL\.local\bin` is empty. The `backend-dependency-audit` artifacts stay on GitHub: 11, from runs at `f2000a8` to `385c5f8`, none expired, each kept until 28 January 2027 (90 days).
 - **Not done here, as planned:** Render's build tools (`pip` 24.0 and any `setuptools`), the audit gate, and a lockfile, all in part 3.
 
 ### Stage 4. Frontend proxy error handling
