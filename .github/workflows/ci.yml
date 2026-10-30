@@ -37,6 +37,33 @@ jobs:
           pip install -r requirements-test.txt
           pip install ruff
 
+      # Report only, not a gate (security plan, stage 3A): the exact installed set and what
+      # pip-audit knows about it, kept as an artifact. The tool runs in its own environment
+      # so it is not part of the set it audits.
+      - name: Audit installed packages
+        shell: bash
+        run: |
+          mkdir -p audit
+          date -u +%Y-%m-%dT%H:%M:%SZ > audit/audited-at.txt
+          python --version >> audit/audited-at.txt
+          pip freeze --all > audit/installed-packages.txt
+          python -m venv /tmp/audit-tool
+          /tmp/audit-tool/bin/pip install --quiet pip-audit==2.10.1
+          set +e
+          /tmp/audit-tool/bin/pip-audit -r audit/installed-packages.txt --no-deps --disable-pip \
+            --progress-spinner off --format json --output audit/pip-audit.json
+          echo "pip-audit exit code: $?" >> audit/audited-at.txt
+          /tmp/audit-tool/bin/pip-audit -r audit/installed-packages.txt --no-deps --disable-pip \
+            --progress-spinner off --desc on --output audit/pip-audit.txt
+          set -e
+          test -s audit/pip-audit.json
+          cat audit/audited-at.txt audit/pip-audit.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-audit
+          path: apps/backend/audit/
+
       - name: Lint executed suite
         run: >
           ruff check
@@ -66,6 +93,8 @@ jobs:
           tests/test_error_text_guard.py
           tests/test_admin_sources_errors.py
           tests/test_admin_sources_contract.py
+          tests/test_admin_session.py
+          tests/test_http_contract.py
           app/log_safety.py
           app/errors.py
           app/search_projection.py
@@ -76,7 +105,7 @@ jobs:
           app/admin_auth_routes.py
 
       - name: Executed backend tests
-        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_reliability_persist.py tests/test_outbound_fetch.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py tests/test_link_admission.py tests/test_detail_reader.py tests/test_site_reader_fallback.py tests/test_unicef_saved_excerpts.py tests/test_geocoder_backoff.py tests/test_production_mode.py tests/test_data_quality_listing.py tests/test_public_surface.py tests/test_deadline_parsing.py tests/test_log_safety.py tests/test_public_error_leaks.py tests/test_error_text_guard.py tests/test_admin_sources_errors.py tests/test_admin_sources_contract.py -q
+        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_reliability_persist.py tests/test_outbound_fetch.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py tests/test_link_admission.py tests/test_detail_reader.py tests/test_site_reader_fallback.py tests/test_unicef_saved_excerpts.py tests/test_geocoder_backoff.py tests/test_production_mode.py tests/test_data_quality_listing.py tests/test_public_surface.py tests/test_deadline_parsing.py tests/test_log_safety.py tests/test_public_error_leaks.py tests/test_error_text_guard.py tests/test_admin_sources_errors.py tests/test_admin_sources_contract.py tests/test_admin_session.py tests/test_http_contract.py -q
 
       # Its own process, with no production database variable, against the service above.
       # A skipped test fails the step.
