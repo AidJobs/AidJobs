@@ -35,7 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
-| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) built in [PR #69](https://github.com/AidJobs/AidJobs/pull/69), not merged |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Next: the test-tools pull request, plan first |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -896,6 +896,29 @@ Plan approved by the user on 30 October 2026; built the same day in [PR #69](htt
 - Render's build log shows a clean install and "Deploy live".
 - Read-only checks: health, database status, search, request IDs, the admin Sources page with the guard.
 - Watch the next scheduled crawls: ICRC and Oxfam on 31 October, UNICEF on 1 November, with the snapshot comparison above.
+
+#### Stage 3A, part 1: live record
+
+Merge approved by the user on 30 October 2026. Every check below was read-only (an enforced read-only database session, GET requests, and the read-only browser guard); the three crawls were run by the user from the admin.
+
+- **Before the merge (14:43 UTC):** no crawl lock and no run marked running. A snapshot of every stored UNICEF job (378 rows: 362 active, 16 suppressed: id, title, link, location, deadline, status, last seen) was saved outside the repository, in the agent's store.
+- **Merge:** at the reviewed head `76cbc8d`, with `--match-head-commit`, as `6b657c4` at 14:43:41 UTC. CI on `main` passed.
+- **Render:** "Deploy started for 6b657c4" at 14:43 UTC and "Deploy live for 6b657c4" at 14:45 UTC (8:13 and 8:15 PM IST), Auto-Deploy, a clean build with the Chromium install.
+- **Live checks, 14:47 UTC, GET only, no session:** health 200; database status `ok: true` (405 jobs, 230 active, 3 sources); search 200 from the database; `/api/admin/session` gives `{"authenticated": false}`; `/api/admin/sources` and `/api/admin/presets/sources` answer 401. Every response carried its own `X-Request-ID` and no credential pattern.
+- **Admin Sources page:** opened in the user's signed-in browser with the read-only guard (which blocks every non-GET request): it listed the three sources; the guard blocked nothing; no control was used; the tab was closed afterwards.
+- **Snapshots of ICRC (15 rows) and Oxfam (12 rows)** were taken the same way at 14:50 UTC, before the user's manual crawls.
+
+**Three manual crawls on the new version, run by the user from the admin, one at a time (Verified, read-only afterwards):**
+
+| Source | Run (UTC) | Result | Against its snapshot |
+| --- | --- | --- | --- |
+| ICRC | 14:54, 103 s | `ok`: 34 found, 0 inserted, 0 updated | 14 of 15 stored jobs seen again, none changed; the one not seen is the long-standing ICRC case (W-06). The usual 20 rejections (17 `no_qualifying_family`, 2 `root_careers_page`, 1 `social_profile`) |
+| Oxfam GB | 15:48, 20 s | `ok`: 6 found, 6 inserted | Oxfam's listing now shows six other jobs (new links, not changed identities); the 12 stored jobs were not on it, and none changed |
+| UNICEF | 15:55, 150 s | `warn`: `Found 120 jobs; listing partial: 6 pages, expected 286, stopped: HTTP 202 on …?page=7&page-items=20 after one retry`; 119 inserted, 0 updated | The known bot challenge (W-04). No stored job changed; no job was stored again under a changed title (0 new rows whose link already existed) |
+
+- **Quality of the 119 new UNICEF rows (the parser's live evidence):** all 119 have a deadline and 118 a location; all 119 links are distinct; 25 titles contain `&`, every one decoded (for example "Health & Nutrition Officer", "Port of Spain, T&T"), none with an undecoded entity; no title has markup, a line break, or a double space; 26 titles with accented letters or dashes read correctly.
+- **Limit:** UNICEF's listing shows the newest jobs first and the crawl reads about 120 of them before the bot challenge. UNICEF posted enough since 26 October to fill those places, so the crawl re-read none of the 378 jobs stored before the upgrade, and the planned before-and-after comparison of the same stored jobs cannot be made from production; the scheduled crawl of 1 November will not change that. The evidence for unchanged parsing is the CI proof on 28 real cards and the clean new rows above.
+- **Found, not caused by the upgrade:** one real UNICEF job was rejected as `non_vacancy_destination`, "Partnerships Consultant – Faith-based and Membership Organisations" (job 596646), because the admission rule denies any link containing "membership" (meant for membership sign-up pages) and this job's link carries the word in its title. Recorded as ledger W-44.
 
 ### Stage 4. Frontend proxy error handling
 
