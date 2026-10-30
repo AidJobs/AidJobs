@@ -15,14 +15,14 @@ Every recommendation below was approved by the user on 21 October 2026, except w
 | 1 | Direction | Approve `public-ux-direction.md` with the demo section |
 | 2 | Contract | Approve the five amendments in item 2 |
 | 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
-| 4 | Launch date | Set when the domain is settled and Stage B is half done |
+| 4 | Launch date | Set when the domain is settled and Stage B is half done. **Changed 30 October 2026:** launch after the crawler foundation, with thousands of jobs (`growth-and-seo-plan.md`, decision 6) |
 | 5 | Slow first load | **Decided:** cached server-rendered page. Paid instance deferred (budget); keep-alive skipped until after launch |
 | 6 | AI crawlers | **Decided:** allow search, user-triggered, and training crawlers; block only `Bytespider` |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
 | 8 | Deployment | **Decided:** no ads or payments at launch, free Vercel plan fits; Netlify production locked, "do not index" on Netlify at UX-10 |
-| 9 | Domain | **Open:** the user is choosing, probably an `.org`; needed only by the launch check |
+| 9 | Domain | **Decided 30 October 2026:** `aidjobs.app`, treated as owned, connected at the launch check (`growth-and-seo-plan.md`, decision 1) |
 | 10 | Filtering | In the browser for launch, with a threshold to move to the server |
-| 11 | Title facts | Read when the page is built, with the demo's code; store later if needed |
+| 11 | Title facts | Read when the page is built, with the demo's code; store later if needed. **Amended 30 October 2026:** worked out when read, on the server, in one shared module; not stored |
 | 12 | W-06 | Move ahead, before launch |
 | 13 | A saved job that closes | Keep the demo's behaviour for launch: it leaves Saved with the list |
 
@@ -61,6 +61,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 
 - **Recommendation:** set the date when the domain is settled and Stage B is about half done, when the remaining work can be counted in pull requests.
 - **Decision:** 21 October 2026, the user approved the recommendation: the date is set when the domain is settled and Stage B is about half done.
+- **Changed 30 October 2026:** the launch comes after the crawler foundation, the admin's add-source flow, and gradual source growth, with thousands of jobs (`growth-and-seo-plan.md`, decision 6 and section 7).
 
 ## 5. Slow first load
 
@@ -82,6 +83,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 
 - **Recommendation:** C, which the Stage B design needs anyway, so visitors never wait on the backend for the list. Add A: the 42.9-second first request points to the free plan (the user confirms in the dashboard), and sleeping also stops scheduled crawls, a crawler reliability problem a cache does not solve. A costs from $7 a month.
 - **Decision:** 21 October 2026, the user approved C, the cached page, in Stage B. A, the paid instance, is deferred: no budget for now. B, a free keep-alive monitor, is skipped until after launch. Consequence accepted: until then scheduled crawls run only while the backend is awake, so job data may refresh less often than scheduled; visitors to the new site are not affected, because the cached page does not wait for the backend. Revisit A or B after launch. The free keep-alive (UptimeRobot, HTTP monitor on `/api/healthz` of the Render address every 5 minutes) uses 720 to 744 of the workspace's 750 free hours a month, so it suits only a workspace with one free web service; running out suspends every free service until the next month.
+- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 3 and section 8): the free plan stays for now and sources are added gradually; the code is built for one always-on instance, with the scheduler kept inside the backend; the paid instance is taken when a recorded signal appears (sources regularly about 24 hours overdue, new jobs taking more than a day to appear, Render warnings about traffic or memory, or launch approaching with many sources). Job pages and landing pages, like the list, never wait for the backend.
 
 ## 6. AI crawlers
 
@@ -140,6 +142,7 @@ Established 21 October 2026:
 
 - **Recommendation:** if you want `aidjobs.app`, renew it now, even though launch is weeks away; connect it at UX-18. If you move Vercel to Pro anyway (item 8), its free first-year `.app` domain could cover a new registration, but not necessarily a renewal of a name held at another registrar; check before relying on it.
 - **Decision:** open, 21 October 2026. The user is unsure about renewing `aidjobs.app` and is looking at an `.org` domain, which suits a non-profit job site better. Nothing before UX-18 depends on the choice: the site address is one setting, and search engines are kept out until the domain is connected. If the name itself changes, not only the ending, the brand text in the menu and the phone brand bar changes with it. Vercel Pro's free domain does not cover `.org`.
+- **Decided 30 October 2026:** `aidjobs.app`. The user treats it as owned and not yet in use; it stays in the code and the backend's trusted origins, and is connected at UX-18. Until then the crawler's contact is `aidjobz@gmail.com` (`growth-and-seo-plan.md`, decisions 1 and 2).
 
 ## 10. Filtering approach
 
@@ -167,6 +170,7 @@ Established 21 October 2026:
 
 - **Recommendation:** A for launch. Move to C together with server filtering (item 10) or landing pages (UX-25), whichever comes first.
 - **Decision:** 21 October 2026, the user approved the recommendation: A, read when the page is built, with the demo's code and its new tests; move to C with server filtering or landing pages.
+- **Amended 30 October 2026** (`growth-and-seo-plan.md`, decision 14; the user delegated the choice to the agent and approves it by merging that record): option C is withdrawn, because storing facts on existing jobs would be the historical normalisation rewrite the contract rules out (§4). Title facts are worked out when read, on the server, in one shared Python module (option B), used by search, job pages, landing pages, and the admin, with results cached after each crawl. The demo's rules and their tests move into it, and it handles more than English as the market widens (ledger W-42).
 
 ## 12. W-06 before launch
 

@@ -85,6 +85,8 @@ Out of scope for this migration: payments, CV processing, rewards, user accounts
 
 Amended by the user on 21 October 2026 (`ux-08-launch-decisions.md`, item 2): the public site approved in the design demo may add the Sector, Organisation, Country, and Deadline filters with several choices each, the title-fact filters, and the 10-day view (new public search features); facts read from job titles by fixed rules without AI (enrichment); and the Recommended order and "Similar jobs", which are the same for every visitor and use no personal data. Everything else above stays out of scope.
 
+Amended by the user on 30 October 2026 (`growth-and-seo-plan.md`, sections 3 and 6): the market includes domestic nonprofit and charity jobs in the US, UK, Australia, Canada, and Europe, beside international aid and development. The public site may have a permanent page per job and landing pages built from real data (per organisation, country, and hub; sector, function, contract, grade, and job-title pages above a minimum job count). Title facts are worked out when read, on the server, in one shared module, by fixed rules without AI. No advertising. Employer submissions, alerts, and user accounts stay out of scope until their own decisions; "Users do not submit career sources" still holds.
+
 ---
 
 ## 3. Target flow
@@ -160,6 +162,8 @@ Minimum conceptual fields: `id`, `name`, `slug`, `type`, `website_url`, `status`
 
 `type` may preserve existing labels such as UN, INGO, NGO, academic, private, and other. Do not build a taxonomy product in this migration.
 
+Amendment, decided by the user on 30 October 2026 (`growth-and-seo-plan.md`, section 6): fixed lists kept in code, with tests, are allowed for organisation types, sectors and SDGs, functions, levels and grades, and contract types, so that search, job pages, and landing pages share one classification. There is no editor, no taxonomy table, and `seed_taxonomy.sql` and the `levels` and `org_types` tables are not revived. Changing a list is a code change with its tests.
+
 Today the repository stores `sources.org_name` and `jobs.org_name` as text. Keep that text until an organisation backfill has been verified. Do not guess that similar names are the same organisation. Do not drop `org_name` in the same change that adds `organisation_id`.
 
 For new writes, `job.organisation_id` is derived from `source.organisation_id`. The job must not independently choose an unrelated organisation.
@@ -222,6 +226,8 @@ A transition from `ACTIVE` to `EXPIRED` because a crawl did not see the job requ
 2. explicit user approval of that policy as a decision separate from the implementation pull request.
 
 Until that approval exists, no gate may move an active job to expired, deleted, or hidden because it was absent from a crawl. Stale active rows are the required behaviour.
+
+Policy recorded on 30 October 2026 (`growth-and-seo-plan.md`, section 4.3; the user delegated the choice to the agent and approves it by merging that record): only a crawl whose listing was read completely counts as evidence of absence; a job expires when it is missing from two consecutive complete crawls of its source at least 24 hours apart, or when its deadline has passed; expiry changes lifecycle only, never deletes the row, and is reversed if the job is seen again; a listing row whose apply link matches a saved, open, not-suppressed job of the same source counts as that job seen. The implementation is its own pull request (ledger W-06, W-36), with its own approval.
 
 Gate 6 without that approval may add explicit lifecycle state fields, record CrawlRun observations, and identify jobs that were not rediscovered. It must not expire currently active jobs. “Implement trusted reconciliation” is not permission to invent a trust ratio, an empty-catalogue rule, or a consecutive-missing threshold inside the implementation pull request.
 

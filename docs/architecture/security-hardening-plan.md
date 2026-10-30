@@ -2,7 +2,7 @@
 
 **Status:** approved in principle by the user on 26 October 2026, including the order below. This is approval of the direction only. Each stage needs its own defined scope, reviewable changes, tests, and the user's explicit approval at every step (plan, implement, merge). Nothing here approves a database change, a credential change, a production setting change, or a crawl.
 
-**Priority:** set by the user on 26 October 2026. This plan runs before UX-11. The employer survey (ledger W-31) follows the security stages as stage 8, placed there by the user the same day; UX-11 resumes as stage 9, with a plan for the user's approval.
+**Priority:** set by the user on 26 October 2026. This plan runs before UX-11. The employer survey (ledger W-31) follows the security stages as stage 8, placed there by the user the same day; UX-11 resumes as stage 9, with a plan for the user's approval. **Updated 30 October 2026** (`growth-and-seo-plan.md`, section 7): the rest of stage 3, stages 4, 5, and 7, and the stage 6 plan run as approved; stage 8, the survey, is widened; after it, work follows the growth plan's step 4 (the crawler foundation), and UX-11 comes later, in its step 7.
 
 Every claim is marked as in the ledger: **Verified** (checked against git, GitHub, CI, the code, or a read-only production request), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -39,8 +39,8 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
 | 7 | Two design decisions: readiness check, public database status | Each its own decision |
-| 8 | Employer survey (ledger W-31) | After stages 0 to 7; read-only; each step for the user's approval |
-| 9 | Resume UX-11 | Plan first, for the user's approval |
+| 8 | Employer survey (ledger W-31) | After stages 0 to 7; read-only; each step for the user's approval. Widened on 30 October 2026 (`growth-and-seo-plan.md`, decision 4 and section 7, step 3) |
+| 9 | After this plan: the growth plan's step 4, the crawler foundation | Changed 30 October 2026; UX-11 moves to the growth plan's step 7 |
 
 The documentation is updated after each stage is merged and verified live. It records what was done; it is not a substitute for the control itself.
 
@@ -856,6 +856,8 @@ A plan, after stages 3 and 4 are reviewed. It inventories the tables the backend
 ### Stage 8. Employer survey
 
 Not a security stage. Placed here by the user on 26 October 2026 so that it follows the security work and comes before UX-11. The scope, sources, and rules are in the ledger, W-31. It is read-only: no source is added, nothing is crawled, and no database is touched. The ReliefWeb `appname` it needs is kept like a setting, never in a tracked file, and contact details from the organisation lists are not stored.
+
+Widened on 30 October 2026 (`growth-and-seo-plan.md`, decision 4): it also covers domestic nonprofit and charity employers in the US, UK, Australia, Canada, and Europe, found and ranked by size through the public charity registers (the IRS Business Master File, the UK Charity Commission register, Australia's ACNC register, Canada's list of registered charities, and European registers and networks). Each record gains two columns: which keyword families the employer serves, and which fields and reuse terms its recruitment system exposes. Requests to employers' own sites stay at one or two, spaced, per organisation; search-engine results are used first.
 
 ## Open risks after stage 1 (26 October 2026)
 

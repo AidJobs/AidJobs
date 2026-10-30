@@ -150,6 +150,8 @@ The demo (UX-00) was built in twelve rounds on the branch `demo/ux-design` and a
 
 ## Search engines and AI search
 
+**Widened on 30 October 2026** by `growth-and-seo-plan.md`: the market includes domestic nonprofit and charity jobs (US, UK, Australia, Canada, Europe); the searches to lead, the page types, addresses, thresholds, structured-data and closed-job rules, and the order are there. Where this section and that plan disagree, the plan applies.
+
 No one can promise first place. ReliefWeb, UNjobs, Impactpool, Devex, and Idealist are established. A new site wins first on specific searches and in Google's job panel, then on broad terms as authority grows.
 
 **Foundation, before launch:**
@@ -187,6 +189,8 @@ What improves is inside the pages:
 Every number and chart comes from the database; nothing is decorative.
 
 ## Data the design needs from the crawler
+
+Since 30 October 2026 the full list, and what is captured versus worked out, is the field contract in `growth-and-seo-plan.md`, section 4.4.
 
 - Descriptions and posting dates, for the job page and Google's job panel.
 - Clean titles without glued place and date (W-24).

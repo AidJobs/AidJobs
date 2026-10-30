@@ -9,6 +9,8 @@ User-experience work has three documents: `docs/architecture/ux-build-plan.md`, 
 
 Security work has `docs/architecture/security-hardening-plan.md` (26 October 2026): the stages in order, their state, and the incident record of 26 October 2026.
 
+Growth, crawler scale, and search-engine work has `docs/architecture/growth-and-seo-plan.md` (30 October 2026): the goal, the decisions of 29 and 30 October 2026, the design rules built in from the start (crawler foundation, field contract, known jobs and expiry, search-engine design), and the order of all work from that date (its section 7).
+
 **Last verified:** 29 October 2026, after PR #65 (security stage 3, phase 2, PR 1).
 - **`main`:** `f8bedf9` (merge of PR #65, 16:41 UTC). CI passed on it, including the 47 PostgreSQL crawl-ownership tests (Python 3.11.9, PostgreSQL 17.6).
 - **Render:**
@@ -27,7 +29,7 @@ Every claim below is marked **Verified** (checked against git, GitHub, CI, or a 
 
 ## How to resume
 
-1. **Current priority, set by the user on 26 October 2026: security hardening.** Open `docs/architecture/security-hardening-plan.md` and take the first stage in its order table that is not done; each stage needs its own approval at every step. Its stage 8 is the employer survey (W-31, set by the user on 26 October 2026), and UX-11 resumes as its last stage. **After that, the priority set on 20 October 2026: user experience.** Open `docs/architecture/ux-build-plan.md`, read its "Revision of 21 October 2026", and take the first step in its order table that is not Done and whose dependencies are met, following the working method at the top of that file. Crawler items (the "Open work" list below) resume in their order after Stage C of that plan, or when the user changes the priority. Without a UX priority, read the "Open work" list and take the lowest-numbered item that is not blocked.
+1. **Current order, set by the user on 30 October 2026: `docs/architecture/growth-and-seo-plan.md`, section 7.** Take the first step there that is not done and whose dependencies are met; each needs the user's approval to plan, implement, and merge. Its step 2 is the rest of `docs/architecture/security-hardening-plan.md` (the rest of stage 3, stages 4, 5, and 7, and the stage 6 plan); its step 3 is that plan's stage 8, the employer survey (W-31, widened); its step 4 is the crawler foundation; its step 5 the admin's add-source flow and crawl review (W-40); its step 6 gradual source growth; its step 7 the public site from `docs/architecture/ux-build-plan.md` (read its revisions of 21 and 30 October 2026 and follow the working method at the top of that file) up to the launch; its step 8 the work after launch. This replaces the priorities of 20 and 26 October 2026.
 2. Check the current state before acting: `git status -sb`, `git log -1 origin/main`, and `gh pr list --state open`. If `main` has moved past the commit named under "Last verified", find out why before trusting this file.
 3. Follow the operating conventions below.
 4. When an item is finished, update this file in the same pull request as the work, or in the next docs pull request. For a UX step, also update its status line in `ux-build-plan.md`; a UX step is Done only after its live check.
@@ -238,6 +240,8 @@ UX-04 approved by the user on 24 October 2026, with safeguards: a narrow fix, re
 
 Found during the UX-04 comparison (Verified, 24 October 2026): the read-only connection option `options="-c default_transaction_read_only=on"` is ignored through the Supabase pooler; the database reported `transaction_read_only = off`. The eight earlier read-only scripts that used it (W-30 checks, status checks, link shapes) ran only `SELECT` and catalogue queries, so nothing was written, but read-only was not enforced. The first UX-04 run was the same: `SELECT` only. Read-only is now enforced as in the operating conventions, and the UX-04 figures come from the enforced run.
 
+Changed on 30 October 2026, by the user: the order of all work is now `growth-and-seo-plan.md`, section 7. In short: record the decisions (that plan's pull request); finish the security plan as approved (the rest of stage 3, stages 4, 5, and 7, and the stage 6 plan); the employer survey (stage 8, W-31), widened to domestic nonprofit and charity employers; the crawler foundation (B4 and W-05, W-34, W-04, B5, W-37, W-36 with W-02 and W-06, W-35, W-38, W-39, W-42); the admin's add-source flow and crawl review (W-40); sources added gradually, with more readers (W-41); then the public site, job pages and first landing pages, the switch, and the launch with `aidjobs.app` and thousands of jobs; after launch, employer submissions, then alerts. The reasons, the evidence (how UNjobs collects jobs, the crawler's limits at scale, a sample of employers' recruitment systems), and an independent review's corrections are in that plan. The decisions: `aidjobs.app` (treated as owned), the crawler's contact `aidjobz@gmail.com`, free plans now with the code built for an always-on instance, the wider market, full descriptions with attribution and an opt-out, launch after the crawler foundation, the demo differences, the three dates, the observation and expiry rules, ReliefWeb for discovery and for organisations not crawled directly, no ads, the crawl frequency, and title facts worked out on the server. The contract (§2, §5, §6), the crawler plan (C3 and C4, "After this plan"), UX-08 items 4, 5, 9, and 11, the UX plan, and the security plan record their amendments with that plan.
+
 ### Now
 
 **W-01. Revoke the leaked OpenRouter key.** Done 18 October 2026. The user deleted every OpenRouter key and closed the GitHub alert; GitHub shows it resolved as revoked, with no open secret-scanning alerts (Verified). Whether the activity log showed unrecognised use was not reported. Render may still hold the old, now invalid, key; AI calls fail into the same fallback as before. A new key is a W-14 decision.
@@ -308,6 +312,8 @@ Agreed rule (18 October 2026): absence from a listing counts as evidence only af
 
 Evidence, 27 October 2026: after the ICRC crawl of that day (`ok`, 33 found, one fewer than before), Health Delegate and Pashto Interpreter were not seen; both stay active without a deadline, so the public site still shows them. Health Delegate's listed deadline was 25 October 2026 (saved listing of 12 October), so it has almost certainly closed. Not edited (W-32).
 
+Policy recorded on 30 October 2026 (`growth-and-seo-plan.md`, section 4.3; contract §6): the user delegated the choice to the agent and approves it by merging that record. A job expires when it is missing from two consecutive complete crawls of its source at least 24 hours apart, or when its deadline has passed; only a crawl with `listing_complete` true counts; expiry changes lifecycle only, never deletes, and is reversed if the job is seen again. It ships with the observation rule (W-36), so known jobs on a listing count as seen. Implementation needs its own approval, after W-02.
+
 **W-07. Oxfam GB as a live source.** C5.
 Listing `https://jobs.oxfam.org.uk/jobs/home/`. Its three saved job pages gave all three fields offline. Approved on 19 October 2026: add it as an HTML source and check one crawl the way ICRC was checked. Creating a source sets its next run to now (`POST /api/admin/sources`), so the scheduler crawls it within about five minutes; that automatic crawl is the single test, and Crawl is not pressed. Check: crawl status and counts, saved titles, locations, and deadlines, rejection reasons, links to real vacancies, and no duplicates.
 
@@ -321,6 +327,7 @@ Result, 19 October 2026 at 10:08 UTC (Verified): `ok`, 5 found, 5 inserted, no r
 - ReliefWeb HTML stays out: it returns a challenge page.
 
 **W-09. C4 confirmation fetch.** Only for listings above 50 candidates that are not UNDP or UNICEF, plus `detail_unconfirmed` logging. The rules are in the plan.
+Re-scoped on 30 October 2026 (crawler plan, C3 and C4 amendment): job pages are opened for rows not yet saved, within a cap per crawl, for listings of any size; known jobs' pages are reopened only near or after their deadline and in a slow rotation. Built with W-36 and W-35.
 
 **W-10. B5 completion record**, including a check of the fetch policy on the deployed backend.
 
@@ -445,6 +452,7 @@ Fixes are separate steps. Every finding above has a step in `ux-build-plan.md` (
 
 **W-29. The domain `aidjobs.app` has expired.** Record. Added 21 October 2026.
 The user reported on 20 October 2026 that the domain was not renewed; `www.aidjobs.app` does not resolve. Production still deploys to Vercel on each merge. Until a domain is connected, live checks use the Vercel production address, and the new site tells search engines not to index it. Registrars release expired names after their grace and redemption periods, so renewing late may cost more or fail. Decision at UX-08.
+Decided by the user on 30 October 2026: `aidjobs.app`, treated as owned and not yet in use; it stays in the code and the backend's trusted origins and is connected at UX-18. Until then the crawler's contact is `aidjobz@gmail.com` (W-34).
 
 ### Scaling to hundreds of sites
 
@@ -460,11 +468,14 @@ Platform readers are chosen by what the page shows, for example Clinch job cards
 
 The plan's "After this plan" section lists the later work: extracting stages from `SimpleCrawler`, consolidating normalisation, the Organisation model, removing legacy paths, and the Discovery Fabric (Scout, Mapper, Frontier, Source Profiles, Drift Detection).
 
+Direction decided on 30 October 2026 (`growth-and-seo-plan.md`, section 4.1): step 1 above is replaced by the crawler plan's amended gate (B4 and B5 recorded; C5's remaining sites go through the survey and the add-source flow). Readers share one interface (W-35), each with fixtures and a canary check. Order: Clinch (W-04); Greenhouse, Ashby, and Lever (W-38); then, in the survey's order, Workday, Oracle, SuccessFactors, iCIMS, Jobvite, the UN careers RSS feed, and ReliefWeb (W-41). Workday and Oracle use undocumented endpoints and come later; Workday's job search is a POST request, its own decision under contract §9. Each reader is still planned and approved on its own.
+
 **W-20. ICRC's other lists.** User decision.
 The Global Opportunities source does not cover ICRC's HQ, Local, or Graduates and Students lists. Each would be its own source.
 
 **W-31. Employer discovery and coverage survey.** Added 26 October 2026. Placed by the user the same day after the security hardening stages and before UX-11 (security plan, stage 8). Read-only: no source is added, nothing is crawled, and no database is touched. Each step needs the user's approval.
 The goal set by the user is to capture the jobs of every relevant employer, systematically and without gaps. This is W-19's step 2 (survey and group by recruitment system), widened from the six-site gate to the whole sector. The unit of record is one careers site: an affiliate or national office with its own careers site is its own record, and organisations that share one site (for example, probably, the UN Secretariat offices on `careers.un.org`) are one record.
+- **Widened on 30 October 2026** (`growth-and-seo-plan.md`, decision 4): the survey also covers domestic nonprofit and charity employers in the US, UK, Australia, Canada, and Europe, found and ranked by size through public charity registers (the IRS Business Master File, the UK Charity Commission register, Australia's ACNC register, Canada's list of registered charities, European registers and networks). Each record gains two columns: which keyword families the employer serves, and which fields and reuse terms its recruitment system exposes. National-staff careers sites (for example Save the Children's country sites) are their own records. Search-engine results come first; requests to employers' own sites stay at one or two, spaced. The sample of 12 employers in the growth plan (section 2.3) is a starting point, not verified. ReliefWeb: decided as in the growth plan, decision 11 (W-41); UN Talent is a benchmark only.
 - **Master lists, ready (from the user, 26 October 2026):**
   - UNjobs "UN and Intergovernmental Organizations" (`unjobs.org/organizations`): 108 entries, 107 distinct (UNICEF listed twice), about 2,052 jobs shown.
   - UNjobs "Non-UN and other International Organizations" (`unjobs.org/non-un-organizations`, the full list pasted by the user because the site serves a Cloudflare challenge to scripts): 539 entries, about 535 distinct, about 7,326 jobs shown. Duplicates: Conciliation Resources, Prosper Global, Norwegian Refugee Council, and Antora Energy each appear twice. The Global Fund and BIPM are also on the UN page. Nine entries are UN offices and join the UN Secretariat group.
@@ -486,6 +497,47 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 - **Known crawler limits that would lose jobs at this scale,** each its own item: job pages are not opened above 50 candidates (W-09); closed jobs without a deadline never leave search (W-06); scheduled crawls run only while the free Render backend is awake (UX-08 item 5); no per-site time budget; found against expected is reported only for UNICEF (W-04).
 - **Background:** the MSF and UNDP sources the user added and removed on 26 October 2026 are recorded in the security plan's incident record.
 
+### Growth plan (30 October 2026)
+
+Added on 30 October 2026 from `growth-and-seo-plan.md`, which holds the reasons, the evidence, and the rules. Each item needs its own plan and approval, in that plan's order (section 7). Repository facts below were checked on 29 and 30 October 2026.
+
+**W-34. Honest crawler identity and polite crawling.** Crawler foundation.
+- One crawler identity everywhere, with the contact `aidjobz@gmail.com` until `aidjobs.app` is connected (for example `AidJobsBot/1.0 (+mailto:aidjobz@gmail.com)`). Today the identities point at the expired domain: `Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)` in `simple_crawler.py`, `rss_crawler.py`, and `api_crawler.py`; `AidJobsBot/1.0 (+contact@aidjobs.app)` in `core/net.py` and the admin source test (`app/sources.py`); `AidJobs/1.0 (contact@aidjobs.app)` in `core/geocoder.py` (Repository).
+- Remove the retry that disguises the crawler as Chrome after a 403 (`simple_crawler.py`, about lines 109 to 127 and 289 to 292). A refusal or challenge stops that source until the next day; it is recorded and never bypassed.
+- `robots.txt` honoured inside the fetch policy (contract §9). `core/robots.py` is not used and not fit as is: it fetches outside the policy, has no `Allow` or wildcard rules, and treats server errors as allowed.
+- One request at a time per host, a few seconds apart, as a simple delay in the process; `core/domain_limits.py` (unused, one global lock, a database query per call) is not switched on. A time and request budget per source; early stop when a listing's job ids have not changed.
+- The crawler stops collecting recruiters' emails and phone numbers (`simple_crawler.py`, about lines 700 to 703).
+
+**W-35. One reader interface.** Crawler foundation, after B4 and B5 (crawler plan, "After this plan", amended).
+Every reader returns candidate jobs in the field-contract shape, whether the listing was read completely, and the expected total. The UNICEF reader and the general reader move behind it with identical output, following contract §11. Each reader has small fixtures and a canary check that warns when its system changes. Done when adding a source on a known system needs no code.
+
+**W-36. Known jobs seen on a listing.** Crawler foundation, with W-02 and W-06.
+The observation rule (crawler plan, C3 and C4 amendment): a listing row matching a saved, open, not-hidden job of the same source counts as seen, even when too thin to admit a new job. Job pages are opened for new rows within a cap per crawl (W-09 re-scoped); known jobs' pages near or after their deadline, and in a slow rotation. Without this rule, an expiry rule would retire open ICRC and Oxfam jobs, whose listing rows are thin.
+
+**W-37. Captured fields and the three dates.** Crawler foundation; replaces UX-23.
+Store the full description (cleaned, capped, contacts removed; dropped 90 days after a job closes), the employer's posting date, first seen, last seen, contract or employment type, every location, salary, remote, and advert language. Today the writer keeps title, apply link, description snippet, location, country, country code, city, remote, and deadline only (`contracts/upsert.py`); contract type is discarded; the repository schema has no `first_seen_at` and no full description (Repository). First, the production schema is verified (contract §15); then a migration with its own approval, after a manual backup (W-43). Dates rules: `growth-and-seo-plan.md`, section 4.4.
+
+**W-38. Greenhouse, Ashby, and Lever readers.** Crawler foundation, after W-35.
+Documented public job APIs with no key. Each reader supplies the fields admission needs, because a single UUID job link is not a repeated family (`contracts/admission.py`). Greenhouse's `first_published` is on the single-job endpoint; Ashby's `publishedAt` is the last publication date.
+
+**W-39. Completeness for every source, and a daily crawl-health message.** Crawler foundation.
+Every crawl reports found against expected and whether the listing was read completely (today only UNICEF, W-04), and how many of the required fields each source fills. A daily message to the user lists failed, partial, blocked, and overdue sources. The crawl-frequency targets (growth plan, decision 13: twice a day for UN agencies and large NGOs, daily for the rest, slower for sources that rarely change) replace today's defaults (`DEFAULT_FREQ_DAYS` in `orchestrator.py`: UN 1 day, INGO 2, NGO 3).
+
+**W-40. Add-source flow and crawl review.** Admin, before launch; parts of UX-19 and UX-20.
+Paste a careers address; the recruitment system is detected; one approved fetch; a report of what was found and which fields are filled; then admit. Crawl review shows found against expected, rejections with reasons, completeness, and field fill rates.
+
+**W-41. ReliefWeb API v2 and the UN careers RSS feed.** Source growth.
+ReliefWeb for discovery and as the feed only for organisations not crawled directly (one primary source per organisation; a duplicate report; nothing merged automatically; links to the original advert; terms checked). Needs the `appname` the user requests. The UN careers site through its official RSS feed (`careers.un.org/jobfeed`); no documented JSON API was found. UN Talent is a benchmark only.
+
+**W-42. Title facts on the server.** Crawler foundation; replaces UX-22.
+One Python module works out sector and SDG, function, level, UN grade and typical experience, contract, eligibility, remote work, and advert language from title and description; used by search, job pages, landing pages, and the admin; cached after each crawl; nothing stored (UX-08 item 11 amended). The demo's TypeScript rules and tests move into it; more languages are added as the market widens. Fixed lists in code with tests (contract §5 amendment).
+
+**W-43. Backups, storage, and hosting signals.** Operations, from now.
+- A manual database backup (`pg_dump` on the user's machine) weekly and before every database change; Supabase free has no automatic backups.
+- Supabase Pro at about 400 MB or when automatic backups are wanted.
+- The always-on Render instance when a signal appears: sources regularly about 24 hours overdue, new jobs taking more than a day to appear, Render warnings about traffic or memory, or launch approaching with many sources. Render may suspend a free service with unusually heavy outbound traffic, so sources are added gradually while on the free plan.
+- Keep `raw_pages` and the extraction logs small.
+
 ### Known and deliberately left alone
 
 - UNICEF job `596188` has two rows, because UNICEF renamed it and the link changed. Fixing it would mean an identity redesign, which the contract rules out.
@@ -497,25 +549,25 @@ The goal set by the user is to capture the jobs of every relevant employer, syst
 | --- | --- |
 | Whether to hide the December 2025 UNICEF rows, after inspection and the W-06 rule | W-02 |
 | Approve the Clinch platform-reader plan, then its implementation | W-04, W-19 |
-| The expiry trust policy and missing-crawl threshold | W-06 |
+| Approve the expiry policy and the observation rule by merging the growth plan record; then approve their implementation | W-06, W-36 |
 | Add ICRC's other lists | W-20 |
 | Whether to switch off or remove the dormant extraction rollout settings in Render | W-23 |
-| Which platform readers follow Clinch (SuccessFactors, Oracle) | W-19 |
+| Each platform reader's plan, in the growth plan's order (Greenhouse, Ashby, and Lever after Clinch; then the survey's order) | W-19, W-38, W-41 |
+| Whether Workday's POST job search is allowed under the fetch policy | W-19, contract §9 |
 | How to get coordinates in production, or whether to go without | W-27 |
-| Choose the domain (probably an `.org`); needed by UX-18 only | UX-08 item 9, W-29 |
 | Provide the logo, with the domain | UX-08 item 3, UX-18 |
-| Set the launch date, once the domain is settled and Stage B is about half done | UX-08 item 4 |
-| After launch: an always-on Render instance (from $7 a month), or a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service), so scheduled crawls run on time | UX-08 item 5 |
+| Set the launch date, after the crawler foundation and source growth | UX-08 item 4, growth plan decision 6 |
+| When a hosting signal appears: an always-on Render instance (from $7 a month), or meanwhile a free keep-alive monitor (UptimeRobot, every 5 minutes, only if this is the workspace's one free web service) | UX-08 item 5, W-43 |
+| Keyword research with Google Keyword Planner and Trends (the user's Google account), and the order of markets | Growth plan, section 4.5 |
 | Approve building stage 3, phase 2, PR 2 (`crawler_admin.py`, including link validation, and `data_quality.validate_job`) | Security plan, stage 3, phase 2 |
 | What API sources should be: honest simple JSON, configurable schemas, or per-platform readers; then the source-test fix | W-33, W-19 |
 | A2 or parsing each deadline once, for the remaining 1–2 second stall in a cold process | Security plan, stage 2 |
-| Whether to move crawling out of the web server into its own scheduled process, before adding many sources | Security plan, stage 2 |
 | Readiness check, and what the public database status should show | Security plan, stage 7 |
 | Request the ReliefWeb `appname` (form at `apidoc.reliefweb.int`) | W-31 |
-| Whether to use ReliefWeb as a jobs feed as well as for discovery | W-31 |
-| Which non-aid organisations, and which proposed missing NGOs, the survey keeps | W-31 |
+| Which for-profit entries (for example Zipline, Control Risks, Mozilla, Euroclear), and which proposed missing NGOs, the survey keeps | W-31 |
 | Agree the revised admin menu, which keeps the contract's admin V1 navigation | UX-19 |
-| Whether to store title facts in the database later, with server filtering or landing pages | UX-22 |
+| Landing-page thresholds, closed-job page timings, and the widened heading's exact words, in their steps' plans | UX-24, UX-25, growth plan decision 7 |
+| After launch: employer submissions, then alerts, each a scope decision under contract §2 | Growth plan decision 12 |
 
 ## Terms used in this project
 

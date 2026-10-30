@@ -12,6 +12,8 @@
 
 **Revised:** 21 October 2026, from `main` at `3d688ec`, approved by the user. The revision below replaces the order of the steps; where it and a step disagree, the revision applies.
 
+**Revised again:** 30 October 2026 (`growth-and-seo-plan.md`). The order of all work, UX steps included, is now that plan's section 7; see "Revision of 30 October 2026" below.
+
 ## Revision of 21 October 2026
 
 The user approved the look of the design demo (UX-00) on their phone on 21 October 2026. The approved choices are recorded in `public-ux-direction.md` under "Approved in the design demo". The demo code is kept at the git tag `ux-demo-approved-2026-10-21` (commit `acb1fcf`, branch `demo/ux-design`, draft PR #22).
@@ -73,6 +75,29 @@ UX-31, the repository tidy-up, can run at any point with the user's approval of 
 - Where title facts are read (sector, SDG, level, contract, open to, work style, language, UN grade, typical experience). Stored on each job at save time needs crawler changes and a one-off write to every existing job, which needs its own approval. Read from the title each time the backend returns a job needs no storage and no write. Either way it is enrichment under contract §2 and needs a recorded contract decision.
 - Moving W-06, the expiry rule, ahead of the other crawler items. Sixteen jobs have not been seen since 6 December 2025 (W-02); a launch that shows them undermines trust. This changes the crawler order the user set, so it is the user's decision.
 - Whether to renew `aidjobs.app`, which registrars release after their grace and redemption periods, or to choose another domain.
+
+## Revision of 30 October 2026
+
+Decided by the user on 29 and 30 October 2026; recorded in `growth-and-seo-plan.md`, which holds the reasons. Where this revision and the revision of 21 October 2026 disagree, this one applies.
+
+**Order.** The growth plan's section 7 sets the order of all work. For UX steps:
+- UX-11 to UX-17, UX-26 to UX-28, UX-29, and UX-18 come in its step 7, after the security stages, the employer survey, the crawler foundation, the admin's add-source flow and crawl review, and gradual source growth. The site launches with thousands of jobs (decision 6).
+- UX-11 includes server-side search and paging: open jobs will pass the 1,500-job threshold of UX-08 item 10 before launch.
+- UX-24 (job pages) and the first part of UX-25 (landing pages per organisation, per country, and the hubs) move before the switch (UX-29).
+- From Stage C, the add-source flow and crawl review (parts of UX-19 and UX-20, ledger W-40) come before launch; the rest of Stage C (UX-19 to UX-21) after launch.
+- UX-22 is replaced by ledger W-42 (below). UX-23 is carried out as ledger W-37.
+
+**Approved differences from the demo** (decision 7, delegated by the user to the agent, approved by merging the growth plan). Each Stage B pull request marks them "intended" in its fidelity check:
+- a permanent, server-rendered page per job at `/jobs/{readable-title}-{id}`, built from the job's database id;
+- opening a job from the list still opens the sheet without a page load, but the address becomes the job page's address instead of `?job=`;
+- landing pages per organisation, per country, and for the hubs (UN, NGO, nonprofit, charity, humanitarian, international development); sector, function, contract, grade, and job-title pages only above a minimum job count, with "do not index" below it;
+- filter combinations stay in the browser; only combinations that become landing pages get their own address;
+- the heading widened to include nonprofit and charity jobs; the exact words are shown to the user in the fidelity check;
+- everything else stays exactly the demo's look and behaviour (revision of 21 October 2026, item 7).
+
+**Title facts.** UX-08 item 11 is amended: facts are worked out when read, on the server, in one shared module (ledger W-42), not stored. The demo's TypeScript rules and their tests move into it.
+
+**Pages never wait for the backend.** Job pages and landing pages are built and cached ahead of time and refreshed after crawls, like the list (UX-08 item 5).
 
 ## How every step is run
 
@@ -570,12 +595,16 @@ Approved plan, 23 October 2026:
 
 ### UX-22. Facts read from titles
 
+**Replaced on 30 October 2026** by ledger W-42: facts are worked out when read, on the server, in one shared module, and not stored (UX-08 item 11 amended; revision of 30 October 2026). The text below is kept as the record.
+
 **Status:** Not started. **Contract decision:** enrichment expansion is out of scope in §2. The decision is brought forward to UX-08 (item 2), because the approved design uses title facts at launch; where the facts are read is UX-08 item 11.
 
 - **Scope:** at save time, read UN grade, contract type, duration, eligibility, and remote work from titles, stored on the job.
 - **Depends on:** the contract decision; W-24 (clean titles) planned alongside.
 
 ### UX-23. Descriptions and posting dates
+
+**Carried out as ledger W-37** from 30 October 2026, in the crawler foundation (`growth-and-seo-plan.md`, section 4.4: full descriptions, three dates, contract type, all locations, salary, remote, language).
 
 **Status:** Not started.
 
@@ -584,6 +613,8 @@ Approved plan, 23 October 2026:
 
 ### UX-24. Job pages with structured data
 
+**Moved before the switch (UX-29)** on 30 October 2026; rules for addresses, structured data, closed jobs, and caching in `growth-and-seo-plan.md`, section 4.5.
+
 **Status:** Not started.
 
 - **Scope:** a permanent server-rendered page per job, such as `/jobs/child-protection-officer-unicef-ethiopia-596228`, with JobPosting structured data, listed in the sitemap while open and removed when closed.
@@ -591,6 +622,8 @@ Approved plan, 23 October 2026:
 - **Acceptance:** Google's Rich Results Test passes for a sample of jobs.
 
 ### UX-25. Landing pages, keywords, AI search
+
+**Split on 30 October 2026:** landing pages per organisation, per country, and the hubs come before the switch (UX-29); the rest after launch (`growth-and-seo-plan.md`, sections 4.5 and 7).
 
 **Status:** Not started.
 
