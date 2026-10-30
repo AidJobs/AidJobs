@@ -574,7 +574,7 @@ UNICEF job 596646, "Partnerships Consultant – Faith-based and Membership Organ
 | Keyword research with Google Keyword Planner and Trends (the user's Google account), and the order of markets | Growth plan, section 4.5 |
 | After stage 3A: approve building stage 3, phase 2, PR 2 (`crawler_admin.py`, including link validation, and `data_quality.validate_job`) | Security plan, stage 3, phase 2 |
 | W-33's fix, built with the reader interface (direction updated 30 October 2026) | W-33, W-35 |
-| Stage 3A, in turn: the FastAPI upgrade, the Next.js upgrade investigation and plan, and the continuous checks. Parts 1 and 1b are done (PRs #69 and #71, Render's build cache cleared) | Security plan, stage 3A |
+| Stage 3A, in turn: merge the FastAPI upgrade (PR #73, FastAPI 0.141.1 and Starlette 1.3.1, built), then the Next.js upgrade investigation and plan, and the continuous checks, which also decide the audit gate, a lockfile, and Render's build tools (`pip` 24.0, `setuptools`). Parts 1 and 1b are done (PRs #69 and #71, Render's build cache cleared) | Security plan, stage 3A |
 | The C3 amendment and fix for real jobs rejected by the "membership" rule, in the crawler foundation | W-44 |
 | Later: change Render's Build Command to `pip install -r requirements.txt` (the user), then remove `playwright`, whose browser crawler nothing imports | Security plan, stage 3A, part 1 record |
 | Later in stage 3A: upgrade FastAPI 0.115.0, which pins `starlette` 0.38.6 (two multipart advisories the app cannot reach today) | Security plan, stage 3A, part 1 record |
