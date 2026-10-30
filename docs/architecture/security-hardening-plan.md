@@ -846,7 +846,7 @@ Added on 30 October 2026 after a read-only backlog sweep; placed by the user the
 - **Frontend.** The site runs Next.js 14.2.33 with React 18.3.1 (`npm ls`). `npm audit --omit=dev` reports 4 vulnerable packages in production dependencies: 1 critical (`next`) and 3 high (`postcss`, `nanoid`, `source-map-js`). The Next.js advisories include denial of service in Server Components and Server Actions, cache poisoning, cross-site scripting, server-side request forgery, request smuggling in rewrites, a middleware bypass, and remote code execution in the image optimiser and on Windows-hosted servers. Fixed versions exist only in Next.js 15.5.x or later; npm suggests 16.4.3, a major upgrade, which also means React 19. Some advisories apply only to self-hosted Next.js (for example Windows hosting or the self-hosted image optimiser); which apply to AidJobs on Vercel is Not verified.
 - **Backend.** `pip-audit` on the versions pinned in `apps/backend/requirements.txt`, which Render installs at each deploy, reports known vulnerabilities with fixes in `requests` 2.32.3 (fixed in 2.32.4 and 2.33.0), `lxml` 5.3.0 (6.1.0, a major version), `python-dotenv` 1.0.0 (1.2.2), `brotli` 1.2.0 (1.2.1), `pdfminer.six` 20231228 (20251230), and `pytest` 8.3.0 (9.0.3; a test tool installed in production). The local environment differs from production (Python 3.14, newer FastAPI), so its own audit result (also `certifi`, `opentelemetry-api`) is not production evidence.
 - **Unused or doubtful packages in production requirements** (Repository, import search outside tests and scripts): `scikit-learn`, `jsonpath-ng`, and `pytesseract` are imported nowhere; `meilisearch` (removed service, W-30), `playwright`, `pdfminer.six`, `pdf2image`, `prometheus-client`, and `statsd` are imported by modules whose use on the production path is to be checked.
-- **No warning system.** Dependabot alerts are disabled for the repository (GitHub API, HTTP 403), and CI audits no dependencies. Updated the same afternoon: Dependabot alerts are on (the alerts API answers; 114 open alerts on `main`, most in development and build tools); the CI audit is still part 3.
+- **No warning system.** Dependabot alerts are disabled for the repository (GitHub API, HTTP 403), and CI audits no dependencies. Updated the same afternoon: Dependabot alerts are on (the alerts API answers; 114 alerts when switched on; 5 fixed by part 1 (`brotli`, `lxml`, `python-dotenv`, and two for `requests`); 109 open: 61 in runtime dependencies, 52 of them Next.js, and 48 in development tools); the CI audit is still part 3.
 
 **Parts, in order:**
 1. **Backend pins.** Raise each vulnerable pin to a fixed version; move test-only packages (`pytest`, `pytest-asyncio`, `pytest-cov`) out of `requirements.txt` if Render does not need them (done in part 1b, into a test-only `requirements-test.txt`, not `requirements-dev.txt`, which holds the classifier-training tools); remove packages proven unused, each with its evidence. `lxml` 6 changes the HTML parser, so the offline whole-crawl comparison on the saved pages must show identical saved jobs, as in stage 3's method. CI, an independent review, and a read-only live check after merge (health, database status, search, admin sign-in with the guard), with the next scheduled crawl watched in Render's log. Two follow-up pull requests, each with its own plan: the test tools (`pytest` and its plugins, into a test-only requirements file, then upgraded), and a FastAPI upgrade, because FastAPI 0.115.0 pins `starlette` 0.38.6 (added 30 October 2026, implementation record below).
@@ -922,7 +922,7 @@ Merge approved by the user on 30 October 2026. Every check below was read-only (
 
 #### Stage 3A, part 1b: implementation record (test tools)
 
-Plan approved by the user on 30 October 2026, after an independent review of the plan that tested the exact pins on Python 3.11.9 and asked for four amendments, all adopted.
+Plan approved by the user on 30 October 2026, after an independent review of the plan that tested the exact pins on Python 3.11.9; its recommended changes were all adopted (the Flask bump was its "bump or defer" option).
 
 **Changes:**
 - `apps/backend/requirements.txt`: `pytest`, `pytest-asyncio`, and `pytest-cov` removed, so Render no longer installs test tools. No code outside `tests/` imports `pytest`, `_pytest`, `pytest_asyncio`, `pytest_cov`, or `coverage` (Repository; confirmed by the review, which also found `main` imports with all 79 routes with the test tools blocked).
@@ -930,12 +930,17 @@ Plan approved by the user on 30 October 2026, after an independent review of the
 - `pytest-cov` dropped: nothing that runs uses it. The only mention is the inactive `apps/backend/.github/workflows/extraction-tests.yml` (`--cov=pipeline`), which GitHub does not run; the contract already records that a workflow outside the root `.github/workflows/` is not GitHub Actions (§16).
 - `apps/backend/pyproject.toml`: `asyncio_default_fixture_loop_scope = "function"`. pytest-asyncio already printed a warning in CI that this was unset; with pytest 9.2.0 and pytest-asyncio 1.4.1, running with `-W error::pytest.PytestDeprecationWarning` stopped pytest before any test until it was set (independent review).
 - `.github/workflows/ci.yml`: the backend job installs `requirements-test.txt` instead of `requirements.txt`.
-- `apps/backend/requirements-dev.txt`: Flask 3.0.0 to 3.1.3 (Dependabot alert #1, low; offline classifier training only).
+- `apps/backend/requirements-dev.txt`: Flask 3.0.0 to 3.1.3 (Dependabot alert #1, low; the optional labeling web UI, not installed in production or CI).
 - README and the ledger's local-test convention name `requirements-test.txt`.
 
 **Render's cached environment.** Render keeps the Python virtual environment between builds by default, and `pip install -r requirements.txt` never uninstalls, so the old pytest 8.3.0 and the packages removed in part 1 probably stay installed on the live service until a "Clear build cache & deploy" (independent review; the service's own cache state is Not verified). None of them is imported at runtime. Decided by the agent at the user's request (30 October 2026): after this merge, the user runs "Clear build cache & deploy" once, then confirms Auto-Deploy is still "On Commit" (ledger operating conventions), and the build log is checked for no `pytest` lines.
 
 **Proof required before the merge:** CI's install shows `pytest-9.2.0` and `pytest-asyncio-1.4.1` and no `pytest-cov` or `coverage`; neither pytest step prints `PytestDeprecationWarning`; the counts stay at backend 527 passed and 9 skipped, PostgreSQL 47 passed, frontend 133 passed; `pip-audit` on both files finds nothing; an independent code review.
+
+**Results (Verified, [PR #71](https://github.com/AidJobs/AidJobs/pull/71)):**
+- CI at `d381db1` (pull-request run 41093999991, push run 41093987214): installed `pytest-9.2.0` and `pytest-asyncio-1.4.1` (with `pluggy`, `iniconfig`, `packaging`, `pygments`); no `pytest-cov` or `coverage`; no `PytestDeprecationWarning`, `PytestRemovedIn`, or `asyncio_default_fixture_loop_scope` message; backend 527 passed, 9 skipped, 61 warnings, the same two kinds as on `main` (Starlette's test client and bs4's `strip_cdata`); PostgreSQL 47 passed; frontend 133 passed.
+- `pip-audit` (local, throwaway environment): no known vulnerabilities in `requirements.txt`, nor in the test pins and Flask 3.1.3.
+- Independent code review: the diff is exactly the plan with the review's changes; the hand-resolved ledger conflict lost nothing from `main`; its two wording corrections are applied.
 
 ### Stage 4. Frontend proxy error handling
 
@@ -973,7 +978,7 @@ Widened on 30 October 2026 (`growth-and-seo-plan.md`, decision 4): it also cover
 - The backend and diagnostic checks connect as `postgres` (stage 6); the rule against printing secrets is not enforced by tooling (stage 5).
 - Closed on 28 October 2026 by PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)): crawl locks now expire and are recovered, and a run writes only while it owns its source. The known stall is reduced by PR A (#55) but not removed: about 1–2 seconds when a process is cold.
 - Found in the stage 1 reviews, not yet assigned: `verify_internal_api_key` compares keys with `!=` rather than a constant-time comparison; an unauthenticated caller can make the server parse a request body on admin routes before the guard runs; `app/job_management.py`'s router is included twice; `app/shortlist.py` remains in the repository, unreferenced. Assigned on 30 October 2026 (stage 3A, "Assigned the same day").
-- Found on 30 October 2026: known vulnerabilities in the frontend's and backend's dependencies, and no dependency alerts or audit (stage 3A).
+- Found on 30 October 2026: known vulnerabilities in the frontend's and backend's dependencies, and no dependency alerts or audit (stage 3A). Dependabot alerts on since the same day; the backend's direct pins fixed by parts 1 and 1b; the CI audit is still part 3, and Next.js is part 2.
 
 ## Safeguards for every stage
 
