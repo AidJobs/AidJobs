@@ -253,7 +253,7 @@ Chosen by the agent on technical grounds, at the user's request ("do what is the
 W-06, which UX-08 item 12 (21 October 2026) moved ahead of the other crawler items, now comes at step 4.6, with the observation rule, after the Clinch reader gives UNICEF its completeness report. Other sources can expire by absence only once W-39 gives them a completeness report (step 4.10); expiry by a passed deadline applies to every source from step 4.6. It still lands well before the switch (UX-29).
 
 1. **Record the decisions.** This pull request (docs only). Before it: PR #66, the stage 3 phase 2 PR 1 live record.
-2. **Finish the security plan as approved:** stage 3 (phase 2 PRs 2 to 5, then phase 3, which also rewrites how crawl messages are stored, so the crawler code is changed once); stage 4 (frontend proxies); stage 5 (secret-printing guard); stage 7 (two decisions); the stage 6 plan (least-privilege database roles), whose implementation timing is decided with that plan.
+2. **Finish the security plan as approved:** stage 3A (dependency security, added by the user on 30 October 2026: backend pins, the Next.js upgrade, continuous dependency checks); stage 3 (phase 2 PRs 2 to 5 and its small extra pull request, then phase 3, which also rewrites how crawl messages are stored, so the crawler code is changed once); stage 4 (frontend proxies); stage 5 (secret-printing guard); stage 7 (two decisions); the stage 6 plan (least-privilege database roles), whose implementation timing is decided with that plan.
 3. **The employer survey** (security stage 8, W-31), widened to the charity registers (decision 4), with two more columns: which keyword families each employer serves, and which fields and terms its recruitment system exposes. It decides which readers come first.
 4. **Crawler foundation:**
    1. B4, the failure and lifecycle audit, and W-05 (read-only);
@@ -298,7 +298,7 @@ A keep-alive monitor every 5 minutes (UX-08 item 5) was skipped by the user unti
 
 ## 10. Still open, for later decisions
 
-- W-33, what the API source type should be (per-platform readers fit this plan).
+- W-33: direction updated on 30 October 2026 (ledger W-33): fixed together with the reader interface (W-35), with no separate "plain public JSON" step.
 - Workday's POST search under §9.
 - Stage 6 implementation timing.
 - Employer submissions, alerts, and accounts (§2), after launch.

@@ -2,7 +2,7 @@
 
 **Status:** approved in principle by the user on 26 October 2026, including the order below. This is approval of the direction only. Each stage needs its own defined scope, reviewable changes, tests, and the user's explicit approval at every step (plan, implement, merge). Nothing here approves a database change, a credential change, a production setting change, or a crawl.
 
-**Priority:** set by the user on 26 October 2026. This plan runs before UX-11. The employer survey (ledger W-31) follows the security stages as stage 8, placed there by the user the same day; UX-11 resumes as stage 9, with a plan for the user's approval. **Updated 30 October 2026** (`growth-and-seo-plan.md`, section 7): the rest of stage 3, stages 4, 5, and 7, and the stage 6 plan run as approved; stage 8, the survey, is widened; after it, work follows the growth plan's step 4 (the crawler foundation), and UX-11 comes later, in its step 7.
+**Priority:** set by the user on 26 October 2026. This plan runs before UX-11. The employer survey (ledger W-31) follows the security stages as stage 8, placed there by the user the same day; UX-11 resumes as stage 9, with a plan for the user's approval. **Updated 30 October 2026** (`growth-and-seo-plan.md`, section 7): stage 3A (dependency security, added 30 October 2026), then the rest of stage 3, stages 4, 5, and 7, and the stage 6 plan run as approved; stage 8, the survey, is widened; after it, work follows the growth plan's step 4 (the crawler foundation), and UX-11 comes later, in its step 7.
 
 Every claim is marked as in the ledger: **Verified** (checked against git, GitHub, CI, the code, or a read-only production request), **Repository** (true of the code, not checked in production), or **Not verified**.
 
@@ -35,6 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below) |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -620,9 +621,10 @@ Method: an `ast` scan of every backend module for exception text reaching a resp
 **Phase 2: admin responses.** One pull request per group:
 - `crawler_admin.py`, including link validation;
 - `sources.py` and `presets.py`, including the diagnostic categories;
-- `job_management.py`;
+- `job_management.py` (since 30 October 2026, also removing the duplicate inclusion of its router);
 - the admin parts of `main.py` and `search.py`;
-- `pipeline_api.py`.
+- `pipeline_api.py`;
+- added 30 October 2026: one small extra pull request for the constant-time key comparison, the guard before body parsing on admin routes, and the removal of `app/shortlist.py` (stage 3A, "Assigned the same day").
 
 Each converts its findings, shrinks the allowlist, and extends the admin-route walk.
 
@@ -836,6 +838,27 @@ Merge approved by the user on 29 October 2026, at the reviewed head `1f8df7f`. E
   - The guard blocked only the test POST and Vercel's page-view ping. The tab was reloaded afterwards to remove it.
 - **The database name is out of the start-up line, confirmed:** the old instance woke at 16:42:52 UTC and still logged `…:5432/postgres`. The new instance logs `…:5432`.
 
+### Stage 3A. Dependency security
+
+Added on 30 October 2026 after a read-only backlog sweep; placed by the user the same day before stage 3, phase 2, PR 2, because these are known, published vulnerabilities, while stage 3's remaining work removes raw error text. Each part needs its own plan and approval at every step.
+
+**Findings, 30 October 2026 (Verified locally; nothing changed):**
+- **Frontend.** The site runs Next.js 14.2.33 with React 18.3.1 (`npm ls`). `npm audit --omit=dev` reports 4 vulnerable packages in production dependencies: 1 critical (`next`) and 3 high (`postcss`, `nanoid`, `source-map-js`). The Next.js advisories include denial of service in Server Components and Server Actions, cache poisoning, cross-site scripting, server-side request forgery, request smuggling in rewrites, a middleware bypass, and remote code execution in the image optimiser and on Windows-hosted servers. Fixed versions exist only in Next.js 15.5.x or later; npm suggests 16.4.3, a major upgrade, which also means React 19. Some advisories apply only to self-hosted Next.js (for example Windows hosting or the self-hosted image optimiser); which apply to AidJobs on Vercel is Not verified.
+- **Backend.** `pip-audit` on the versions pinned in `apps/backend/requirements.txt`, which Render installs at each deploy, reports known vulnerabilities with fixes in `requests` 2.32.3 (fixed in 2.32.4 and 2.33.0), `lxml` 5.3.0 (6.1.0, a major version), `python-dotenv` 1.0.0 (1.2.2), `brotli` 1.2.0 (1.2.1), `pdfminer.six` 20231228 (20251230), and `pytest` 8.3.0 (9.0.3; a test tool installed in production). The local environment differs from production (Python 3.14, newer FastAPI), so its own audit result (also `certifi`, `opentelemetry-api`) is not production evidence.
+- **Unused or doubtful packages in production requirements** (Repository, import search outside tests and scripts): `scikit-learn`, `jsonpath-ng`, and `pytesseract` are imported nowhere; `meilisearch` (removed service, W-30), `playwright`, `pdfminer.six`, `pdf2image`, `prometheus-client`, and `statsd` are imported by modules whose use on the production path is to be checked.
+- **No warning system.** Dependabot alerts are disabled for the repository (GitHub API, HTTP 403), and CI audits no dependencies.
+
+**Parts, in order:**
+1. **Backend pins.** Raise each vulnerable pin to a fixed version; move test-only packages (`pytest`, `pytest-asyncio`, `pytest-cov`) to `requirements-dev.txt` if Render does not need them; remove packages proven unused, each with its evidence. `lxml` 6 changes the HTML parser, so the offline whole-crawl comparison on the saved pages must show identical saved jobs, as in stage 3's method. CI, an independent review, and a read-only live check after merge (health, database status, search, admin sign-in with the guard), with the next scheduled crawl watched in Render's log.
+2. **Next.js upgrade.** An investigation first: which advisories apply on Vercel, the target version (the latest patched 15.5.x, or 16), what React 19 and the new major version change in this code (request APIs, caching, the cached server-rendered page of UX-10, the admin proxies), and the test plan: the frontend tests, the build, the UX plan's fidelity check against the demo tag on the preview, the admin pages with the read-only guard, and the launch-check phone flows. Then a plan for approval, then the upgrade in its own pull request. Stage 4 (the proxies) follows on the upgraded version.
+3. **Continuous checks.** A CI job that runs `npm audit --omit=dev` and `pip-audit` on the pinned requirements and fails on high or critical findings, kept within the GitHub Actions minutes; and the user switches on Dependabot alerts (repository Settings, Code security; free).
+
+**Assigned the same day: the four stage 1 review findings that had no stage** (open risks, below):
+- `verify_internal_api_key` compares with `!=`: a constant-time comparison (`hmac.compare_digest`), in a small extra pull request after stage 3, phase 2, PR 5;
+- admin routes parse a request body before the authentication guard runs: the same extra pull request, which makes the guard run first for admin routes and caps body size;
+- `app/job_management.py`'s router is included twice: in stage 3, phase 2, PR 3 (`job_management.py`);
+- `app/shortlist.py` is unreferenced: removed in the same extra pull request, after confirming no route, import, or frontend call uses it.
+
 ### Stage 4. Frontend proxy error handling
 
 One shared proxy helper for the route files under `apps/frontend/app/api/`: the intended status codes and response shapes pass through; the backend's error text and Node's error messages do not. Tested.
@@ -871,7 +894,8 @@ Widened on 30 October 2026 (`growth-and-seo-plan.md`, decision 4): it also cover
 - `/api/db/status` is public and lists every source's internal ID and job count (stage 7).
 - The backend and diagnostic checks connect as `postgres` (stage 6); the rule against printing secrets is not enforced by tooling (stage 5).
 - Closed on 28 October 2026 by PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60)): crawl locks now expire and are recovered, and a run writes only while it owns its source. The known stall is reduced by PR A (#55) but not removed: about 1–2 seconds when a process is cold.
-- Found in the stage 1 reviews, not yet assigned: `verify_internal_api_key` compares keys with `!=` rather than a constant-time comparison; an unauthenticated caller can make the server parse a request body on admin routes before the guard runs; `app/job_management.py`'s router is included twice; `app/shortlist.py` remains in the repository, unreferenced.
+- Found in the stage 1 reviews, not yet assigned: `verify_internal_api_key` compares keys with `!=` rather than a constant-time comparison; an unauthenticated caller can make the server parse a request body on admin routes before the guard runs; `app/job_management.py`'s router is included twice; `app/shortlist.py` remains in the repository, unreferenced. Assigned on 30 October 2026 (stage 3A, "Assigned the same day").
+- Found on 30 October 2026: known vulnerabilities in the frontend's and backend's dependencies, and no dependency alerts or audit (stage 3A).
 
 ## Safeguards for every stage
 
