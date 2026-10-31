@@ -96,7 +96,7 @@ export default function AdminSourcesPage() {
   const [simulateModalPosition, setSimulateModalPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [activeModalRef, setActiveModalRef] = useState<React.RefObject<HTMLDivElement> | null>(null);
+  const [activeModalRef, setActiveModalRef] = useState<React.RefObject<HTMLDivElement | null> | null>(null);
   const addEditModalRef = useRef<HTMLDivElement>(null);
   const testModalRef = useRef<HTMLDivElement>(null);
   const simulateModalRef = useRef<HTMLDivElement>(null);
@@ -104,7 +104,7 @@ export default function AdminSourcesPage() {
   const pageSize = 20;
 
   // Draggable modal handlers
-  const handleMouseDown = (e: React.MouseEvent, modalRef: React.RefObject<HTMLDivElement>, getPosition: () => { x: number; y: number }) => {
+  const handleMouseDown = (e: React.MouseEvent, modalRef: React.RefObject<HTMLDivElement | null>, getPosition: () => { x: number; y: number }) => {
     const target = e.target as HTMLElement;
     const header = target.closest('.modal-header');
     if (header && !target.closest('button') && modalRef.current) {

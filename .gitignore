@@ -6,6 +6,8 @@ Thumbs.db
 node_modules/
 .next
 *.tsbuildinfo
+# Rewritten by Next.js 16 on every dev and build run.
+next-env.d.ts
 
 # Python
 .venv/

@@ -18,5 +18,7 @@ export default async function SitePage() {
     if (!building) throw error;
     console.warn(`Building /v2 without jobs: ${error instanceof Error ? error.message : String(error)}`);
   }
+  // A server page rendered once per rebuild; the date it was built on is the point.
+  // eslint-disable-next-line react-hooks/purity
   return <PublicSite initialJobs={jobs} serverToday={utcDay(Date.now())} />;
 }

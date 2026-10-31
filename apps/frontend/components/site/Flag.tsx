@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import * as Flags from 'country-flag-icons/react/3x2';
 
 type FlagComponent = (props: { title?: string; className?: string }) => JSX.Element;

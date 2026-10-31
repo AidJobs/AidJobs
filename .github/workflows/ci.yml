@@ -139,11 +139,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # Next.js 16's build no longer lints. 42 warnings are the reviewed baseline (progress ledger);
+      # more fail the job.
+      - name: Frontend lint
+        run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 42
 
       - name: Frontend tests
         run: npm run test --workspace=@aidjobs/frontend

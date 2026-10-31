@@ -2,10 +2,11 @@ import { Metadata } from 'next';
 import { getCollection, getAllCollectionSlugs } from '@/lib/collections';
 
 type Props = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const collection = getCollection(params.slug);
   
   if (!collection) {

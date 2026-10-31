@@ -3,10 +3,8 @@ import { adminAuthHeaders } from '@/lib/adminBackend';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { sourceId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ sourceId: string }> }) {
+  const params = await props.params;
   try {
     const { sourceId } = params;
     const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
