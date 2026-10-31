@@ -67,7 +67,7 @@ export type BulkDeleteDecision =
   | { action: 'blocked'; message: string }
   | { action: 'send'; body: BulkDeleteRequest };
 
-function jobs(n: number): string {
+function selectedJobsText(n: number): string {
   return `${n} selected job${n === 1 ? '' : 's'}`;
 }
 
@@ -78,7 +78,7 @@ export function decideBulkDelete(input: BulkDeleteInput): BulkDeleteDecision {
     return {
       action: 'reconfirm',
       ids,
-      message: `${jobs(input.hiddenCount)} ${input.hiddenCount === 1 ? 'is' : 'are'} no longer on screen and ${input.hiddenCount === 1 ? 'was' : 'were'} removed from your selection. Nothing was deleted. Review the selection and confirm again.`,
+      message: `${selectedJobsText(input.hiddenCount)} ${input.hiddenCount === 1 ? 'is' : 'are'} no longer on screen and ${input.hiddenCount === 1 ? 'was' : 'were'} removed from your selection. Nothing was deleted. Review the selection and confirm again.`,
     };
   }
   if (ids.length === 0) {
@@ -91,7 +91,7 @@ export function decideBulkDelete(input: BulkDeleteInput): BulkDeleteDecision {
     return {
       action: 'reconfirm',
       ids,
-      message: 'The selection changed after the impact was analysed. Nothing was deleted. Analyse the impact again and confirm.',
+      message: 'The selection changed after the impact was analysed. Nothing was deleted. Analyze the impact again and confirm.',
     };
   }
   if (input.deletionType === 'hard' && !input.deletionReason.trim()) {
@@ -101,11 +101,13 @@ export function decideBulkDelete(input: BulkDeleteInput): BulkDeleteDecision {
     return { action: 'blocked', message: `Type ${ids.length} to confirm the Hard Delete.` };
   }
   const body: BulkDeleteRequest = {
-    ...impactAnalysisRequest(ids, input.dateFrom, input.dateTo)!,
+    job_ids: ids,
     deletion_type: input.deletionType,
     export_data: input.exportData,
     dry_run: false,
   };
   if (input.deletionReason) body.deletion_reason = input.deletionReason;
+  if (input.dateFrom) body.date_from = input.dateFrom;
+  if (input.dateTo) body.date_to = input.dateTo;
   return { action: 'send', body };
 }
