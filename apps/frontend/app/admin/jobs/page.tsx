@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { jobsCountScope } from '@/lib/admin/status';
 import { hardDeleteConfirmationMatches } from '@/lib/admin/danger';
+import {
+  decideBulkDelete,
+  hiddenSelectionCount,
+  impactAnalysisRequest,
+  pruneSelection,
+  visibleSelection,
+} from '@/lib/admin/bulkDelete';
 import { adminDate, adminDateTime } from '@/lib/dates';
 import {
   Search, Filter, Trash2, RefreshCw, Download, RotateCcw, AlertTriangle,
@@ -87,7 +94,9 @@ export default function JobManagementPage() {
   const [deletionReason, setDeletionReason] = useState('');
   const [exportData, setExportData] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [analyzedIds, setAnalyzedIds] = useState<string[] | null>(null);
+  const hasAnalyzed = analyzedIds !== null;
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
   const [showJobDetails, setShowJobDetails] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
 
@@ -106,6 +115,13 @@ export default function JobManagementPage() {
   });
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedJobsRef = useRef(selectedJobs);
+  useEffect(() => {
+    selectedJobsRef.current = selectedJobs;
+  }, [selectedJobs]);
+
+  const visibleSelectedIds = useMemo(() => visibleSelection(selectedJobs, jobs.map((j) => j.id)), [selectedJobs, jobs]);
+  const hiddenSelectedCount = selectedJobs.size - visibleSelectedIds.length;
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -154,16 +170,14 @@ export default function JobManagementPage() {
         setJobs(newJobs);
         setTotal(data.data.total || 0);
         
-        // Clear selections for jobs that no longer exist in current results
-        const currentJobIds = new Set(newJobs.map((j: Job) => j.id));
-        const validSelections = Array.from(selectedJobs).filter(id => currentJobIds.has(id));
-        if (validSelections.length !== selectedJobs.size) {
-          const removedCount = selectedJobs.size - validSelections.length;
-          console.warn(`[fetchJobs] Removed ${removedCount} stale job selection(s) that are no longer in current results`);
-          setSelectedJobs(new Set(validSelections));
-          if (removedCount > 0) {
-            toast.info(`${removedCount} selected job${removedCount !== 1 ? 's' : ''} no longer visible. Selection cleared.`);
-          }
+        // Drop selected jobs that are no longer in the results. This callback can be an older
+        // render's copy (Refresh, timers), so it reads the selection through a ref and updates it
+        // from the latest state, never from its own closure.
+        const newIds = newJobs.map((j: Job) => j.id);
+        const removedCount = hiddenSelectionCount(selectedJobsRef.current, newIds);
+        setSelectedJobs(prev => pruneSelection(prev, newIds));
+        if (removedCount > 0) {
+          toast.info(`${removedCount} selected job${removedCount !== 1 ? 's are' : ' is'} no longer shown and ${removedCount !== 1 ? 'were' : 'was'} removed from your selection.`);
         }
       } else {
         throw new Error(data.error || 'Failed to fetch jobs');
@@ -198,20 +212,11 @@ export default function JobManagementPage() {
     };
   }, [filters.query, filters.org_name, filters.source_id, filters.status]);
 
-  const fetchImpactAnalysis = useCallback(async () => {
+  const fetchImpactAnalysis = async (ids: string[]) => {
+    const requestBody = impactAnalysisRequest(ids, filters.date_from, filters.date_to);
+    if (!requestBody) return;
     setLoadingImpact(true);
     try {
-      const requestBody: any = {};
-      if (selectedJobs.size > 0) {
-        requestBody.job_ids = Array.from(selectedJobs);
-      } else if (filters.org_name) {
-        requestBody.org_name = filters.org_name;
-      } else if (filters.source_id) {
-        requestBody.source_id = filters.source_id;
-      }
-      if (filters.date_from) requestBody.date_from = filters.date_from;
-      if (filters.date_to) requestBody.date_to = filters.date_to;
-
       const response = await fetch('/api/admin/jobs/impact-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,7 +231,8 @@ export default function JobManagementPage() {
       const data = await response.json();
       if (data.status === 'ok') {
         setImpactAnalysis(data.data);
-        setHasAnalyzed(true);
+        setAnalyzedIds(ids);
+        setDeleteNotice(null);
         toast.success('Impact analyzed. Review details and click Delete to proceed.');
       } else {
         throw new Error(data.error || 'Failed to analyze impact');
@@ -237,75 +243,48 @@ export default function JobManagementPage() {
     } finally {
       setLoadingImpact(false);
     }
-  }, [selectedJobs, filters]);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setImpactAnalysis(null);
+    setAnalyzedIds(null);
+    setDeleteNotice(null);
+  };
 
   const handleDelete = async () => {
-    // If impact hasn't been analyzed yet, analyze first
-    if (!hasAnalyzed) {
-      await fetchImpactAnalysis();
+    const decision = decideBulkDelete({
+      visibleIds: visibleSelectedIds,
+      hiddenCount: hiddenSelectedCount,
+      analyzedIds,
+      deletionType,
+      deletionReason,
+      hardConfirmText,
+      exportData,
+      dateFrom: filters.date_from,
+      dateTo: filters.date_to,
+    });
+
+    if (decision.action === 'analyze') {
+      await fetchImpactAnalysis(decision.ids);
       return;
     }
-
-    // Deleting needs a selection; the window opens only from "Delete selected".
-    if (selectedJobs.size === 0) {
-      toast.error('Select the jobs to delete first.');
+    if (decision.action === 'reconfirm') {
+      setSelectedJobs(new Set(decision.ids));
+      setImpactAnalysis(null);
+      setAnalyzedIds(null);
+      setHardConfirmText('');
+      setDeleteNotice(decision.message);
       return;
     }
-
-    if (deletionType === 'hard' && !hardDeleteConfirmationMatches(hardConfirmText, selectedJobs.size)) {
-      toast.error(`Type ${selectedJobs.size} to confirm the Hard Delete.`);
-      return;
-    }
-    
-    // Validate selected job IDs exist in current jobs list
-    if (selectedJobs.size > 0) {
-      const currentJobIds = new Set(jobs.map(j => j.id));
-      const validJobIds = Array.from(selectedJobs).filter(id => currentJobIds.has(id));
-      const invalidJobIds = Array.from(selectedJobs).filter(id => !currentJobIds.has(id));
-      
-      if (invalidJobIds.length > 0) {
-        console.warn(`[delete] ${invalidJobIds.length} selected job ID(s) not found in current results:`, invalidJobIds);
-        toast.warning(`${invalidJobIds.length} selected job${invalidJobIds.length !== 1 ? 's' : ''} no longer visible. Only deleting ${validJobIds.length} valid job${validJobIds.length !== 1 ? 's' : ''}.`);
-        
-        if (validJobIds.length === 0) {
-          toast.error('None of the selected jobs are visible. Please refresh and select jobs again.');
-          setSelectedJobs(new Set());
-          return;
-        }
-        
-        // Update selection to only valid IDs
-        setSelectedJobs(new Set(validJobIds));
-      }
-    }
-
-    // Validate hard delete requires reason
-    if (deletionType === 'hard' && !deletionReason.trim()) {
-      toast.error('Deletion reason is required for hard delete');
+    if (decision.action === 'blocked') {
+      toast.error(decision.message);
       return;
     }
 
     setDeleting(true);
     try {
-      const requestBody: any = {
-        deletion_type: deletionType,
-        deletion_reason: deletionReason || undefined,
-        export_data: exportData,
-        dry_run: false, // Always false for actual deletion
-      };
-
-      if (selectedJobs.size > 0) {
-        requestBody.job_ids = Array.from(selectedJobs);
-        console.log('[delete] Deleting selected jobs:', Array.from(selectedJobs));
-      } else if (filters.org_name) {
-        requestBody.org_name = filters.org_name;
-        console.log('[delete] Deleting by org_name:', filters.org_name);
-      } else if (filters.source_id) {
-        requestBody.source_id = filters.source_id;
-        console.log('[delete] Deleting by source_id:', filters.source_id);
-      }
-      if (filters.date_from) requestBody.date_from = filters.date_from;
-      if (filters.date_to) requestBody.date_to = filters.date_to;
-
+      const requestBody = decision.body;
       console.log('[delete] Request body:', requestBody);
       
       const response = await fetch('/api/admin/jobs/delete-bulk', {
@@ -352,7 +331,7 @@ export default function JobManagementPage() {
         setDeletionReason('');
         setExportData(false);
         setImpactAnalysis(null);
-        setHasAnalyzed(false);
+        setAnalyzedIds(null);
         
         // Immediately remove deleted jobs from UI state for instant feedback
         if (data.data?.deleted_ids && data.data.deleted_ids.length > 0) {
@@ -496,7 +475,7 @@ export default function JobManagementPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedJobs.size === jobs.length) {
+    if (visibleSelectedIds.length === jobs.length) {
       setSelectedJobs(new Set());
     } else {
       setSelectedJobs(new Set(jobs.map(j => j.id)));
@@ -705,11 +684,11 @@ export default function JobManagementPage() {
           )}
 
           {/* Selection Actions */}
-          {selectedJobs.size > 0 && (
+          {visibleSelectedIds.length > 0 && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-medium text-blue-900">
-                  {selectedJobs.size} job{selectedJobs.size !== 1 ? 's' : ''} selected
+                  {visibleSelectedIds.length} job{visibleSelectedIds.length !== 1 ? 's' : ''} selected
                 </span>
                 <button
                   onClick={() => setSelectedJobs(new Set())}
@@ -721,8 +700,8 @@ export default function JobManagementPage() {
               <div className="flex items-center gap-2">
                 {jobs.filter(j => j.deleted_at).length > 0 && (
                   <button
-                    onClick={() => handleRestore(Array.from(selectedJobs))}
-                    disabled={selectedJobs.size === 0}
+                    onClick={() => handleRestore(visibleSelectedIds)}
+                    disabled={visibleSelectedIds.length === 0}
                     className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                     title="Restore selected jobs"
                     aria-label="Restore selected jobs"
@@ -730,12 +709,13 @@ export default function JobManagementPage() {
                     <RotateCcw className="w-4 h-4" />
                   </button>
                 )}
-                {selectedJobs.size > 0 && (
+                {visibleSelectedIds.length > 0 && (
                   <button
                     onClick={() => {
                       setShowDeleteModal(true);
                       setImpactAnalysis(null);
-                      setHasAnalyzed(false);
+                      setAnalyzedIds(null);
+                      setDeleteNotice(null);
                     }}
                     className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors group relative"
                     title="Delete selected jobs"
@@ -758,7 +738,7 @@ export default function JobManagementPage() {
                   <th className="px-3 py-2 text-left w-10">
                     <input
                       type="checkbox"
-                      checked={selectedJobs.size === jobs.length && jobs.length > 0}
+                      checked={visibleSelectedIds.length === jobs.length && jobs.length > 0}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
                     />
@@ -939,11 +919,7 @@ export default function JobManagementPage() {
                 Delete Jobs
               </h2>
               <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setImpactAnalysis(null);
-                  setHasAnalyzed(false);
-                }}
+                onClick={closeDeleteModal}
                 className="p-1.5 hover:bg-[#F5F5F7] rounded-lg transition-colors"
               >
                 <X className="w-4 h-4 text-[#86868B]" />
@@ -951,6 +927,12 @@ export default function JobManagementPage() {
             </div>
 
             <div className="p-4 space-y-4">
+              {deleteNotice && (
+                <div role="alert" className="p-3 rounded-lg border border-yellow-300 bg-yellow-50 text-xs text-yellow-900">
+                  {deleteNotice}
+                </div>
+              )}
+
               {/* Impact Analysis Preview */}
               {loadingImpact ? (
                 <div className="p-3 bg-[#F5F5F7] rounded-lg border border-[#D2D2D7]">
@@ -1043,10 +1025,10 @@ export default function JobManagementPage() {
                   />
                   <div className="p-2.5 rounded-lg border border-red-300 bg-red-50">
                     <p className="text-xs font-semibold text-red-800">
-                      Hard Delete cannot be undone. {selectedJobs.size} job{selectedJobs.size === 1 ? '' : 's'} will be removed permanently.
+                      Hard Delete cannot be undone. {visibleSelectedIds.length} job{visibleSelectedIds.length === 1 ? '' : 's'} will be removed permanently.
                     </p>
                     <label className="block text-xs text-red-900 mt-1.5">
-                      Type <span className="font-mono font-semibold">{selectedJobs.size}</span> to confirm:
+                      Type <span className="font-mono font-semibold">{visibleSelectedIds.length}</span> to confirm:
                       <input
                         value={hardConfirmText}
                         onChange={(e) => setHardConfirmText(e.target.value)}
@@ -1082,9 +1064,10 @@ export default function JobManagementPage() {
                   disabled={
                     deleting ||
                     loadingImpact ||
+                    visibleSelectedIds.length === 0 ||
                     (hasAnalyzed &&
                       deletionType === 'hard' &&
-                      (!deletionReason.trim() || !hardDeleteConfirmationMatches(hardConfirmText, selectedJobs.size)))
+                      (!deletionReason.trim() || !hardDeleteConfirmationMatches(hardConfirmText, visibleSelectedIds.length)))
                   }
                   className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-1.5"
                 >
@@ -1115,11 +1098,7 @@ export default function JobManagementPage() {
                   )}
                 </button>
                 <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setImpactAnalysis(null);
-                    setHasAnalyzed(false);
-                  }}
+                  onClick={closeDeleteModal}
                   className="px-3 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg hover:bg-[#E5E5E7] transition-colors text-sm font-medium"
                 >
                   Cancel
