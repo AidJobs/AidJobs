@@ -24,7 +24,10 @@ const PathContext = navigation.__PathContext;
 const router = navigation.__router;
 
 let session: { status: number; body: unknown };
-const harness = { setPath: (path: string) => void path };
+const notMounted = (path: string) => {
+  throw new Error(`harness not mounted (setPath ${path})`);
+};
+const harness = { setPath: notMounted };
 /** Pages on which the next render throws once, so React discards it and renders again. */
 const discardOnce = new Set<string>();
 let container: HTMLDivElement;
@@ -85,6 +88,7 @@ beforeEach(() => {
   router.replace.mockClear();
   router.push.mockClear();
   discardOnce.clear();
+  harness.setPath = notMounted;
   session = { status: 200, body: { authenticated: false, reason: 'missing' } };
   global.fetch = jest.fn(async () => ({
     ok: session.status === 200,
@@ -132,6 +136,7 @@ describe('admin sign-in (W-46)', () => {
 
     session = { status: 200, body: { authenticated: true } };
     const tryAgain = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Try again');
+    expect(tryAgain).toBeDefined();
     tryAgain?.click();
     await until(showsAdminPage, 'the admin page after Try again');
     expect(loginRedirects()).toEqual([]);

@@ -145,8 +145,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Next.js 16's build no longer lints. 42 warnings are the reviewed baseline (progress ledger);
-      # more fail the job.
+      # Next.js 16's build no longer lints. The ceiling is the reviewed baseline (progress ledger, W-47);
+      # more warnings fail the job, and it only goes down.
       - name: Frontend lint
         run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 37
 
