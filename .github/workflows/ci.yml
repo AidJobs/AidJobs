@@ -148,7 +148,7 @@ jobs:
       # Next.js 16's build no longer lints. 42 warnings are the reviewed baseline (progress ledger);
       # more fail the job.
       - name: Frontend lint
-        run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 41
+        run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 37
 
       - name: Frontend tests
         run: npm run test --workspace=@aidjobs/frontend

@@ -218,14 +218,18 @@ export default function AdminLayoutClient({
   const [slow, setSlow] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const loginPath = useRef(loginPathFor('signed-out'));
-  const wasLoginPage = useRef(isLoginPage);
   // A failed check leaves session as "no". The layout does not remount on the
   // way back from login, so that stale "no" would bounce a successful sign-in
   // before the new check finishes. Clear it during render, before the redirect.
-  if (wasLoginPage.current && !isLoginPage && (session === 'no' || session === 'gave-up')) {
-    setSession('pending');
+  // The previous page is kept in state, not a ref, so that if React discards
+  // this render both updates are discarded together and the restart clears it.
+  const [prevIsLoginPage, setPrevIsLoginPage] = useState(isLoginPage);
+  if (prevIsLoginPage !== isLoginPage) {
+    setPrevIsLoginPage(isLoginPage);
+    if (!isLoginPage && (session === 'no' || session === 'gave-up')) {
+      setSession('pending');
+    }
   }
-  wasLoginPage.current = isLoginPage;
 
   useEffect(() => {
     if (isLoginPage) {
