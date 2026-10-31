@@ -5,10 +5,8 @@ export const dynamic = 'force-dynamic';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { host: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ host: string }> }) {
+  const params = await props.params;
   try {
     // Ensure BACKEND_URL doesn't have trailing /api
     const backendUrl = BACKEND_URL.replace(/\/api$/, '');
@@ -27,10 +25,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { host: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ host: string }> }) {
+  const params = await props.params;
   try {
     const body = await req.json();
     // Ensure BACKEND_URL doesn't have trailing /api
