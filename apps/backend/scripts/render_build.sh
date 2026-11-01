@@ -6,6 +6,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The lock is for exactly this Python; stop before downloading anything if it differs.
+wanted="$(tr -d '[:space:]' < .python-version)"
+running="$(python -c 'import platform; print(platform.python_version())')"
+if [ "$running" != "$wanted" ]; then
+  echo "Python $running is not the locked $wanted (.python-version)" >&2
+  exit 1
+fi
+
 python -m pip install --no-cache-dir --require-hashes -r build-tools.txt
 python -m pip install --no-cache-dir --require-hashes --build-constraint build-tools.txt -r requirements.txt
 
@@ -28,9 +36,6 @@ def normalise(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 print("python", sys.executable, platform.python_version())
-wanted = open(".python-version", encoding="utf-8").read().strip()
-if platform.python_version() != wanted:
-    sys.exit(f"Python {platform.python_version()} is not the locked {wanted} (.python-version)")
 
 locked = {}
 for path in ("build-tools.txt", "requirements.txt"):
