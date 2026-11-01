@@ -35,7 +35,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
 | 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
-| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, built in [PR #80](https://github.com/AidJobs/AidJobs/pull/80), not merged (record below); step 2, the development tools; step 3, a backend lockfile and Render's build tools |
+| 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, done: [PR #80](https://github.com/AidJobs/AidJobs/pull/80), merged as `4d404ae`, live-checked (records below); step 2, the development tools, built in [PR #81](https://github.com/AidJobs/AidJobs/pull/81), not merged, with three advisories formally accepted (record below); step 3, a backend lockfile and Render's build tools |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
 | 6 | Least-privilege database roles | Plan only, after stages 3 and 4 are reviewed |
@@ -1180,6 +1180,51 @@ Investigation approved by the user on 1 November 2026; the split into three step
 - CI resolves the backend's indirect packages fresh at each run, while Render keeps what its last build resolved; until step 3's lockfile, a green gate does not prove Render's installed set.
 - Render's build tools are not gated (step 3).
 - The development-tool findings remain (step 2); Dependabot keeps alerting on them.
+
+#### Stage 3A, part 3, step 1: live record
+
+Merge approved by the user on 1 November 2026 at `ad4aabb`, with the follow-ups. Times UTC.
+
+- Merged at exactly `ad4aabb` with `--match-head-commit`, as `4d404ae`, at 10:13:34.
+- CI on `main` at `4d404ae` passed, both gates included.
+- The weekly workflow, started by hand from `main` (`workflow_dispatch`, run 41296692210): both jobs passed, "Dependency audit: npm" and "Dependency audit: pypi" each "Passed", both evidence artifacts uploaded. This was a manual run; the first scheduled run is Monday 2 November 2026, 03:23 UTC, checked separately.
+- Vercel's production deployment of `4d404ae` successful; no site code changed; Render did not deploy.
+- The branch (tip `ad4aabb`, in `main`) and `%TEMP%\aj_gate` (2,836 files) deleted, with the user's approval.
+
+#### Stage 3A, part 3, step 2: development tools, implementation record
+
+Investigation approved by the user on 1 November 2026; after the user asked how significant the remaining advisories were, the user approved fixing everything that has a proper fix and formally accepting the rest, with no forced versions ("no hotfixes or fixes that are not enterprise grade"), and asked for thoroughness. Plan reviewed independently, sound with changes, nothing blocking; its changes applied.
+
+**State before (Verified):** full `npm audit` 47 vulnerable packages, 30 distinct advisories (3 critical, 16 high, 9 moderate, 2 low), all development tools; runtime audit 0; Dependabot 39 open alerts, all development tools.
+
+**Changes (`package.json`, `apps/frontend/package.json`, `package-lock.json`):**
+- `ts-jest` ^29.4.14 to ^29.4.15, which needs `handlebars` 4.7.10, past the critical advisory (up to 4.7.9). No behaviour change for this configuration (the review compared the code: only its migration command and full type-checking mode changed; ours uses `isolatedModules`).
+- `concurrently` ^8.2.2 to ^10.0.6 at the root, for `npm run dev` (documented in the README): `shell-quote` 1.12.0 and no `lodash`. Its breaking changes (Node 22 or later, ESM only, automatic prefix colours, `--name-separator` removed) do not affect the `dev` script; the project uses Node 24.
+- Targeted in-range updates, rather than `npm audit fix`, which changes about ten times more of the lockfile (45 added, 71 removed, 31 changed, including packages with no advisory): `npm update brace-expansion browserslist flatted glob minimatch picomatch postcss-selector-parser`. Lockfile: 12 entries added, 9 removed, 20 changed. Resolved: `handlebars` 4.7.10, `shell-quote` 1.12.0, `brace-expansion` 1.1.21 and 2.1.7, `browserslist` 4.29.5, `caniuse-lite` 1.0.30001820, `flatted` 3.4.4, `glob` 10.5.0, `minimatch` 9.0.9, `picomatch` 2.3.2 and 4.0.7, `postcss-selector-parser` 6.1.5; `lodash`, `date-fns`, `spawn-command`, and `@babel/runtime` removed with `concurrently` 8.
+- The only change to a package the live site uses is `caniuse-lite` (1.0.30001753 to 1.0.30001820), the browser data Next.js reads at build time; it is required by `browserslist` 4.29.5, which fixes two high advisories.
+- Not changed, deliberately: the ESLint 8.57.1 copy at the root of `node_modules`, which satisfies the `eslint` peer of `eslint-plugin-import` and `eslint-import-resolver-typescript` (so that plugin runs on ESLint 8 while the lint itself runs ESLint 9.39.5). `npm audit fix` would remove it as a side effect; it is a separate, deliberate change, with no advisory of its own left after this step.
+
+**Results (Verified, 1 November 2026, Node 24.11.0, npm 11.6.1):**
+- Audits on the branch: runtime 0; full 40 packages, 3 advisories (2 moderate, 1 low), 0 critical, 0 high.
+- In two isolated worktrees, `main` (`4d404ae`) and the branch (`597258f`), each without `.env.local`, after a clean `npm ci` that left the lockfile unchanged: lint 0 errors and 37 warnings in both, the same findings by file, line, and rule; 169 tests passed in both; `next build` (Turbopack, `NEXT_PUBLIC_API_URL` a closed local port) succeeded in both; the 65-line route table identical.
+- Build output compared file by file: all 38 browser files identical; of 947 server files, 881 identical, 63 different only by the build ID, and 3 (`preview-props.json` and the server-reference manifest, twice) only by the keys Next.js generates for every build. `main`'s build printed "browsers data (caniuse-lite) is 13 months old"; the branch's did not.
+- iOS 15: no class static block and no regular-expression lookbehind in the 30 browser JavaScript files.
+- `concurrently` 10.0.6, run as `npm run dev` runs it (two commands, each `cd … && …`): both ran, output prefixed, exit 0; with one command failing, exit 1.
+- The trial folder `%TEMP%\aj_step2`, both worktrees, and the comparison files deleted.
+
+**Risk acceptance: the three remaining advisories (decided by the user, 1 November 2026; review by 1 February 2027):**
+
+| Advisory | Package and where | Why it cannot be fixed now |
+| --- | --- | --- |
+| GHSA-gcqx-w48m-w2h4, low (prototype poisoning in `mergeObject()`) | `deepmerge` 4.3.1, used only by `jest-config` to merge Jest's settings | No fixed release exists: 4.3.1, from March 2023, is the latest, and the advisory covers "through 4.3.1" |
+| GHSA-3g3m-2fjr-6pw4, moderate (an aborted search keeps reading directories) | `glob` 13.0.6 in Jest 30; also `glob` 10.5.0 in `sucrase` (Tailwind 3) and `test-exclude` (Jest coverage) | Fixed in 14.0.2, but Jest 30.5.2, the latest, requires `glob` ^13.0.6; `sucrase` and `test-exclude` require version 10 |
+| GHSA-g3hv-75wg-m249, moderate (denial of service through pattern amplification) | `minimatch` 10.2.6 in `glob` 13 and `@typescript-eslint/typescript-estree` 8.72.1; also 9.0.9 in `glob` 10, and 3.1.5 in ESLint 9, `@eslint/config-array`, `@eslint/eslintrc`, and the import, jsx-a11y, and react ESLint plugins | Fixed in 11.0.1, but those packages, in their latest versions, require 10, 9, or 3 |
+
+- **Why the risk is accepted:** none is in the live site or the backend; the lockfile lists every vulnerable copy as development only, and the runtime audit is 0. They run in CI, in Vercel's build (Tailwind and PostCSS), and on developers' machines. Each needs attacker-controlled input (the objects merged, a cancelled search, a crafted pattern), and here that input is our own configuration in a private repository, where only we run CI, so a change to it is already a change to the code. The worst case is a slow or stuck build or test run; no data access or code execution. Forcing versions the parents do not support (npm `overrides`) would risk the test and lint tools that protect the code, and is not done.
+- **No entry in `.github/audit-exceptions.json` is needed:** the gate fails only on runtime high and critical findings.
+- **Triggers to act before the review date:** Jest, typescript-eslint, ESLint (10, with `eslint-config-next` support), Tailwind (4) or `sucrase`, or `test-exclude` releasing a version that allows the fixed `glob` or `minimatch`; `deepmerge` fixed or replaced in Jest; any of the three re-rated high or critical, or a public exploit; any of them appearing in a package the live site uses.
+- **Monitoring:** monthly, at the first working session of the month: read the latest weekly "Dependency audit" run's report artifact (the full `npm audit`) and the Dependabot alerts, dismissed ones included (a dismissed alert does not reopen if its advisory is re-rated), and check the triggers. Dependabot's automatic security pull requests are off, and there is no `dependabot.yml`.
+- **Dependabot:** after the merge, once the other 36 alerts show as fixed, the three alerts for these advisories (#114 `deepmerge`, #115 `glob`, #116 `minimatch`) are dismissed as "risk is tolerable" with a comment pointing here; reversible.
 
 ### Stage 4. Frontend proxy error handling
 
