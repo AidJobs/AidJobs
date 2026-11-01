@@ -1,0 +1,77 @@
+name: Dependency audit
+
+# Weekly, so a new advisory against unchanged code shows up without a pull request (security
+# plan, stage 3A, part 3); also runnable by hand. Kept out of ci.yml because gitleaks scans the
+# whole history on scheduled runs, and older history holds values rotated on 23 October 2026.
+on:
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+
+      # The same installed set as CI's backend job.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+          pip install ruff==0.17.3
+
+      - name: Prepare dependency audit
+        run: bash ../../.github/scripts/prepare_pypi_audit.sh
+
+      - name: Dependency audit gate
+        if: ${{ !cancelled() }}
+        run: >
+          python ../../.github/scripts/audit_gate.py
+          --exceptions ../../.github/audit-exceptions.json
+          pypi --pip-audit /tmp/audit-tool/bin/pip-audit
+          --installed audit/installed-packages.txt
+          --runtime-report audit/runtime-report.json
+          --output audit/pip-audit.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: backend-dependency-audit
+          path: apps/backend/audit/
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # npm audit reads package-lock.json; no install is needed. CI's `npm ci` keeps the lockfile
+      # in step with package.json on every push.
+      - name: Dependency audit gate
+        run: python3 .github/scripts/audit_gate.py npm --output audit/npm-audit-runtime.json
+
+      - name: Development tools audit (report only)
+        if: ${{ !cancelled() }}
+        run: mkdir -p audit && (npm audit --json > audit/npm-audit-full.json || true)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: frontend-dependency-audit
+          path: audit/
