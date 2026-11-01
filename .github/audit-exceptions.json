@@ -1,4 +1,19 @@
 {
   "version": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "ecosystem": "npm",
+      "package": "marked",
+      "advisory": "GHSA-rrrm-qjm4-v8hf",
+      "reason": "Proof commit only: covers one of marked's two advisories; the other must still fail.",
+      "review_by": "2026-12-01"
+    },
+    {
+      "ecosystem": "pypi",
+      "package": "PyJWT",
+      "advisory": "GHSA-ffqj-6fqr-9h24",
+      "reason": "Proof commit only: an expired exception must fail on its own.",
+      "review_by": "2026-10-01"
+    }
+  ]
 }
