@@ -384,10 +384,26 @@ def test_well_formed_urls_stay_readable(monkeypatch, url, readable):
 
 
 def test_fetch_messages_are_repeated_only_when_they_are_ours():
-    from app.sources import fetch_message
+    from contracts.outbound import fetch_message
 
     assert fetch_message(FetchError("timeout")) == "timeout"
     assert fetch_message(FetchError("upstream said " + FRAGMENT)) is None
+    assert fetch_message(TimeoutError("timeout")) is None
+
+
+def test_the_fetch_message_list_is_what_outbound_raises():
+    """Every FetchError("...") in contracts/outbound.py is on the list, and nothing else is."""
+    import ast
+
+    from contracts.outbound import FETCH_MESSAGES
+
+    tree = ast.parse((BACKEND_DIR / "contracts" / "outbound.py").read_text(encoding="utf-8"))
+    raised = {
+        node.args[0].value for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "FetchError"
+    }
+    assert raised == set(FETCH_MESSAGES)
 
 
 @pytest.mark.parametrize("raised, category, message", [

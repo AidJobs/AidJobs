@@ -153,6 +153,7 @@ def test_public_destination_connects_to_pinned_address_and_keeps_sni():
     events, result = _run("https://jobs.example/listing", [_response(200, b"ok")])
     assert result.status_code == 200
     assert result.body == b"ok"
+    assert result.redirects == 0
     assert ("connect", "8.8.8.8") in events
     assert ("sni", "jobs.example") in events
     assert ("connect", "jobs.example") not in events
@@ -219,6 +220,7 @@ def test_two_hops_use_two_pinned_addresses():
         {"one.example": ["1.1.1.1"], "two.example": ["8.8.8.8"]},
     )
     assert result.body == b"done"
+    assert result.redirects == 1
     assert [item for item in events if item[0] == "connect"] == [
         ("connect", "1.1.1.1"),
         ("connect", "8.8.8.8"),
@@ -234,6 +236,7 @@ def test_exactly_twenty_redirects_are_followed_and_the_twenty_first_is_not():
     events, result = _run(hops[0], allowed)
     assert result.body == b"end"
     assert result.url == hops[MAX_REDIRECTS]
+    assert result.redirects == MAX_REDIRECTS
     assert sum(item[0] == "connect" for item in events) == MAX_REDIRECTS + 1
 
     blocked = [_redirect(f"https://hop{i}.example/") for i in range(1, MAX_REDIRECTS + 2)]

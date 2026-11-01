@@ -38,12 +38,36 @@ class FetchError(Exception):
     """The URL was not fetched. Callers keep their existing failure results."""
 
 
+# FetchError's messages in this module: fixed text we wrote. Anything else is not repeated.
+FETCH_MESSAGES = frozenset({
+    "unix sockets are not used",
+    "DNS resolution failed",
+    "URL scheme or host is not permitted",
+    "destination host is not permitted",
+    "destination address is not permitted",
+    "response exceeds size limit",
+    "content encoding failed",
+    "content encoding is not permitted",
+    "timeout",
+    "redirect limit",
+    "redirect destination is missing",
+    "redirect destination is not permitted",
+})
+
+
+def fetch_message(error: BaseException) -> str | None:
+    """A FetchError's message when it is one of the fixed messages above; otherwise None."""
+    reason = str(error)
+    return reason if isinstance(error, FetchError) and reason in FETCH_MESSAGES else None
+
+
 @dataclass(frozen=True)
 class FetchResult:
     status_code: int
     headers: dict[str, str]
     body: bytes
     url: str
+    redirects: int = 0
 
     @property
     def text(self) -> str:
@@ -346,7 +370,7 @@ async def fetch_url(
         )
         if location is None:
             decoded = _decode_content(body or b"", mapped, max_bytes)
-            return FetchResult(status, mapped, decoded, current)
+            return FetchResult(status, mapped, decoded, current, followed)
         followed += 1
         if followed > max_redirects:
             raise FetchError("redirect limit")

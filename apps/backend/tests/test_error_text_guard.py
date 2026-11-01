@@ -1,10 +1,11 @@
 """Security stage 3: no new place may put exception text into an API response.
 
-A static tripwire over app/ and main.py. Inside every `except ... as NAME:` block, in any
-function, it finds where NAME (or traceback.format_exc()) reaches a `raise HTTPException(...)`, a
-`return`, a `JSONResponse(...)`, a dict entry, an error/message variable, or an append/update.
-The last three are counted in every function, not only routes, because the facets leak was a
-helper's `base["error"] = str(e)` returned by a public route. It does not follow values through
+A static tripwire over app/, main.py and the link validator. Inside every `except ... as NAME:`
+block, in any function, it finds where NAME (or traceback.format_exc()) reaches a
+`raise HTTPException(...)`, a `return`, a `JSONResponse(...)`, a dict entry or dict literal, an
+error/message variable, or an append/update. The last four are counted in every function, not only
+routes, because the facets leak was a helper's `base["error"] = str(e)` returned by a public route,
+and the link validator's was a result dict returned later. It does not follow values through
 other variables; it is not a proof of absence, and the runtime leak tests remain the proof.
 
 ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
@@ -21,25 +22,6 @@ BACKEND = Path(__file__).resolve().parents[1]
 
 ALLOWED = {
     # Admin routes (session required); phase 2.
-    "app/crawler_admin.py::backfill_quality_scores": 3,
-    "app/crawler_admin.py::delete_jobs_by_org": 1,
-    "app/crawler_admin.py::get_coverage_issues": 1,
-    "app/crawler_admin.py::get_coverage_stats": 1,
-    "app/crawler_admin.py::get_crawl_analytics_overview": 1,
-    "app/crawler_admin.py::get_extraction_stats": 1,
-    "app/crawler_admin.py::get_failed_inserts": 1,
-    "app/crawler_admin.py::get_global_quality": 1,
-    "app/crawler_admin.py::get_source_analytics": 1,
-    "app/crawler_admin.py::get_source_coverage": 1,
-    "app/crawler_admin.py::get_source_quality": 1,
-    "app/crawler_admin.py::get_status": 1,
-    "app/crawler_admin.py::get_validation_errors": 1,
-    "app/crawler_admin.py::get_validation_stats": 1,
-    "app/crawler_admin.py::sync_meilisearch": 1,
-    "app/crawler_admin.py::undp_diagnostics": 1,
-    "app/crawler_admin.py::unesco_diagnostics": 1,
-    "app/crawler_admin.py::validate_job_link": 1,
-    "app/crawler_admin.py::validate_links": 1,
     "app/job_management.py::bulk_delete_jobs": 2,
     "app/job_management.py::diagnose_job_id": 11,
     "app/job_management.py::diagnose_search_vs_db": 1,
@@ -47,7 +29,6 @@ ALLOWED = {
     "app/job_management.py::get_deletion_impact": 1,
     "app/job_management.py::restore_jobs": 1,
     "app/job_management.py::search_jobs": 1,
-    "app/data_quality.py::validate_job": 1,  # a job URL's parse error, in the quality report
     "app/search.py::get_search_settings": 1,
     "app/search.py::reindex_jobs": 1,
     "main.py::admin_search_init": 1,
@@ -72,7 +53,23 @@ ALLOWED = {
 }
 
 
-DESCRIBERS = {"describe_failure": "app/sources.py", "fetch_message": "app/sources.py"}
+DESCRIBERS = {
+    "describe_failure": "app/sources.py",
+    "describe_link_failure": "core/link_validator.py",
+    "fetch_message": "contracts/outbound.py",
+}
+
+# Outside app/: modules that build admin responses from exception handling.
+EXTRA_SCANNED = ["core/link_validator.py"]
+
+
+def _scanned_files():
+    return ([BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py"))
+            + [BACKEND / rel for rel in EXTRA_SCANNED])
+
+
+def _module(rel):
+    return rel.removesuffix(".py").replace("/", ".")
 
 
 def _call_name(call):
@@ -125,10 +122,26 @@ def _reaches_response(node, name):
     return _stored(node, name)
 
 
+def _dict_literal(node, name):
+    """A dict literal (or dict(...) call) holding the text, e.g. result = {"error": str(e)}."""
+    if isinstance(node, ast.Dict):
+        return any(value is not None and _refs(value, name) for value in node.values)
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == "dict" and _refs(node, name))
+
+
+def _count(node, name, covered=False):
+    """Findings in one statement. A dict literal inside another finding is part of it."""
+    found = _reaches_response(node, name)
+    literal = not covered and not found and _dict_literal(node, name)
+    inside = covered or found or literal
+    return found + literal + sum(_count(child, name, inside)
+                                 for child in ast.iter_child_nodes(node))
+
+
 def findings():
     counts = Counter()
-    files = [BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py"))
-    for path in files:
+    for path in _scanned_files():
         rel = path.relative_to(BACKEND).as_posix()
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for func in ast.walk(tree):
@@ -138,9 +151,9 @@ def findings():
                 if not isinstance(handler, ast.ExceptHandler) or not handler.name:
                     continue
                 for stmt in handler.body:
-                    for node in ast.walk(stmt):
-                        if _reaches_response(node, handler.name):
-                            counts[f"{rel}::{func.name}"] += 1
+                    hits = _count(stmt, handler.name)
+                    if hits:
+                        counts[f"{rel}::{func.name}"] += hits
     return counts
 
 
@@ -150,27 +163,77 @@ def test_no_new_exception_text_in_responses():
     assert not new, f"exception text reaches a response in new places (use InternalError): {new}"
 
 
+def _bindings(path):
+    """Each name a file defines or binds, except an import of a describer from its reviewed home."""
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            yield node.name
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            yield from (t.id for t in targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                home = DESCRIBERS.get(alias.name)
+                if alias.asname or home is None or node.module != _module(home):
+                    yield alias.asname or alias.name
+        elif isinstance(node, ast.Import):
+            yield from (alias.asname or alias.name for alias in node.names)
+
+
 def test_each_describer_is_the_reviewed_one():
     """Each trusted name is defined once, where it was reviewed, and bound nowhere else."""
     defined = Counter()
-    for path in [BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py")):
+    homes = [BACKEND / rel for rel in sorted(set(DESCRIBERS.values()))]
+    for path in sorted(set(_scanned_files()) | set(homes)):
         rel = path.relative_to(BACKEND).as_posix()
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                names = [node.name]
-            elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-                names = [t.id for t in targets if isinstance(t, ast.Name)]
-            elif isinstance(node, ast.ImportFrom) and node.module != "app.sources":
-                names = [alias.asname or alias.name for alias in node.names]
-            elif isinstance(node, ast.Import):
-                names = [alias.asname or alias.name for alias in node.names]
-            else:
-                continue
-            for name in names:
-                if name in DESCRIBERS:
-                    defined[(name, rel)] += 1
+        for name in _bindings(path):
+            if name in DESCRIBERS:
+                defined[(name, rel)] += 1
     assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
+
+
+def _findings_in(source, rel="core/link_validator.py"):
+    """findings() over one in-memory source, for the tests of the rules themselves."""
+    counts = Counter()
+    for func in ast.walk(ast.parse(source)):
+        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for handler in ast.walk(func):
+            if isinstance(handler, ast.ExceptHandler) and handler.name:
+                for stmt in handler.body:
+                    counts[f"{rel}::{func.name}"] += _count(stmt, handler.name)
+    return +counts
+
+
+def test_a_result_dict_with_exception_text_is_found():
+    """Link validation's shape on main: the text in a dict literal, returned after the except."""
+    source = (
+        "def validate_url(url):\n"
+        "    try:\n"
+        "        check(url)\n"
+        "    except Exception as e:\n"
+        "        result = {'valid': False, 'error': f'Validation error: {str(e)}'}\n"
+        "        return result\n"
+    )
+    assert _findings_in(source) == {"core/link_validator.py::validate_url": 1}
+    described = source.replace("f'Validation error: {str(e)}'", "describe_link_failure(e)")
+    assert _findings_in(described) == {}
+
+
+def test_a_dict_inside_a_finding_is_counted_once():
+    source = (
+        "def route():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception as e:\n"
+        "        return {'error': str(e), 'nested': {'why': str(e)}}\n"
+    )
+    assert _findings_in(source) == {"core/link_validator.py::route": 1}
+
+
+def test_the_link_validator_is_scanned():
+    assert BACKEND / "core/link_validator.py" in _scanned_files()
+    assert not {k for k in findings() if k.startswith("core/link_validator.py::")}
 
 
 def test_converted_functions_leave_the_allowlist():
