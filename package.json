@@ -24,6 +24,6 @@
     "pre-deploy": "node scripts/pre-deploy-check.js || bash scripts/pre-deploy-check.sh || powershell -ExecutionPolicy Bypass -File scripts/pre-deploy-check.ps1"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^10.0.6"
   }
 }
