@@ -1,0 +1,14 @@
+{
+  "dependencies": [
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "vulns": []
+    },
+    {
+      "name": "zz-aidjobs-no-such-package",
+      "skip_reason": "Dependency not found on PyPI and could not be audited: zz-aidjobs-no-such-package (1.0.0)"
+    }
+  ],
+  "fixes": []
+}
