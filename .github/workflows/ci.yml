@@ -117,8 +117,8 @@ jobs:
           git diff --exit-code -- '*.txt'
 
       # Render's Build Command in a fresh environment like Render's (Python's bundled pip 24.0 and
-      # setuptools 65.5.0), without pip's cache (so sgmllib3k is built from source, as after
-      # Render's cache clear) or the browser download; it must install exactly the lock.
+      # setuptools 65.5.0), without pip's cache (so sgmllib3k is built from source, as on
+      # Render); it must install exactly the lock.
       - name: Rehearse Render's build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -126,7 +126,7 @@ jobs:
         run: |
           python -m venv /tmp/render-venv
           /tmp/render-venv/bin/python -m pip --version
-          PATH="/tmp/render-venv/bin:$PATH" AIDJOBS_SKIP_BROWSER_DOWNLOAD=1 bash scripts/render_build.sh
+          PATH="/tmp/render-venv/bin:$PATH" bash scripts/render_build.sh
 
       - name: Prepare dependency audit
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
