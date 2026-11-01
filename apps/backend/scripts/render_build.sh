@@ -17,11 +17,6 @@ fi
 python -m pip install --no-cache-dir --require-hashes -r build-tools.txt
 python -m pip install --no-cache-dir --require-hashes --build-constraint build-tools.txt -r requirements.txt
 
-# Until playwright is removed from requirements.in (stage 3A, part 3, step 3, pull request B).
-if [ "${AIDJOBS_SKIP_BROWSER_DOWNLOAD:-}" != "1" ]; then
-  python -m playwright install chromium
-fi
-
 python -m pip --version
 python - <<'EOF'
 # The environment must run the locked Python and hold every locked package at its locked version,
