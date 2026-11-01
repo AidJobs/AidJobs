@@ -93,7 +93,7 @@ class Decision:
 
 
 def normalise_pypi(name: str) -> str:
-    return re.sub(r"[-_.]+", "-", name).lower()
+    return re.sub(r"[-_.]+", "-", name.strip()).lower()
 
 
 def normalise_package(ecosystem: str, name: str) -> str:
@@ -112,7 +112,7 @@ def _load_json(text: str, what: str, retry: bool = True) -> object:
 def load_exceptions(text: str) -> list[AuditException]:
     """Parse the exceptions file; anything unexpected is an error, never a silent pass."""
     data = _load_json(text, "the exceptions file", retry=False)
-    if not isinstance(data, dict) or set(data) != {"version", "exceptions"} or data.get("version") != 1:
+    if not isinstance(data, dict) or set(data) != {"version", "exceptions"} or type(data["version"]) is not int or data["version"] != 1:
         raise AuditError('the exceptions file must be {"version": 1, "exceptions": [...]}', retry=False)
     entries = data["exceptions"]
     if not isinstance(entries, list):
@@ -220,9 +220,10 @@ def read_runtime_report(text: str | None) -> set[str] | None:
         return None
     try:
         data = json.loads(text)
-        return {normalise_pypi(item["metadata"]["name"]) for item in data["install"]}
-    except (json.JSONDecodeError, KeyError, TypeError):
+        names = {normalise_pypi(item["metadata"]["name"]) for item in data["install"]}
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
         return None
+    return names or None
 
 
 def parse_pip_audit(text: str, installed: dict[str, str], runtime: set[str] | None) -> list[Finding]:
@@ -230,10 +231,12 @@ def parse_pip_audit(text: str, installed: dict[str, str], runtime: set[str] | No
     data = _load_json(text, "the pip-audit output")
     if not isinstance(data, dict) or not isinstance(data.get("dependencies"), list) or not data["dependencies"]:
         raise AuditError("the pip-audit output has no dependencies")
-    skipped = [f"{d.get('name')}: {d['skip_reason']}" for d in data["dependencies"] if isinstance(d, dict) and "skip_reason" in d]
+    if not all(isinstance(d, dict) and isinstance(d.get("name"), str) for d in data["dependencies"]):
+        raise AuditError("the pip-audit output has a malformed dependency entry")
+    skipped = [f"{d.get('name')}: {d['skip_reason']}" for d in data["dependencies"] if "skip_reason" in d]
     if skipped:
         raise AuditError("pip-audit skipped packages: " + "; ".join(skipped), retry=False)
-    audited = {normalise_pypi(str(d.get("name"))) for d in data["dependencies"] if isinstance(d, dict)}
+    audited = {normalise_pypi(d["name"]) for d in data["dependencies"]}
     if audited != set(installed):
         missing = sorted(set(installed) - audited)
         extra = sorted(audited - set(installed))
@@ -280,23 +283,21 @@ def parse_pip_audit(text: str, installed: dict[str, str], runtime: set[str] | No
 def decide(ecosystem: str, findings: list[Finding], exceptions: list[AuditException], today: dt.date) -> Decision:
     decision = Decision()
     mine = [e for e in exceptions if e.ecosystem == ecosystem]
+    decision.expired = [e for e in mine if e.review_by < today]
+    current = [e for e in mine if e.review_by >= today]
     used: set[AuditException] = set()
     for finding in findings:
         gated = finding.severity in NPM_GATED if ecosystem == "npm" else finding.label != LABEL_BUILD_TOOL
         if not gated:
             decision.reported.append(finding)
             continue
-        match = next((e for e in mine if e.package == finding.package and e.advisory in finding.ids()), None)
+        match = next((e for e in current if e.package == finding.package and e.advisory in finding.ids()), None)
         if match is None:
             decision.failures.append(finding)
         else:
             used.add(match)
             decision.excepted.append((finding, match))
-    for exception in mine:
-        if exception.review_by < today:
-            decision.expired.append(exception)
-        elif exception not in used:
-            decision.unused.append(exception)
+    decision.unused = [e for e in current if e not in used]
     return decision
 
 
@@ -324,11 +325,14 @@ def _run(command: list[str]) -> subprocess.CompletedProcess:
     try:
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", check=False)
     except OSError as exc:
-        raise AuditError(f"{command[0]} could not be started ({exc})") from exc
+        raise AuditError(f"{command[0]} could not be started ({exc})", retry=False) from exc
     if result.returncode not in (0, 1):
-        tail = (result.stderr or "").strip().splitlines()[-3:]
-        raise AuditError(f"{command[0]} exited with {result.returncode}: {' | '.join(tail)}")
+        raise AuditError(f"{command[0]} exited with {result.returncode}: {_stderr_tail(result)}")
     return result
+
+
+def _stderr_tail(result: subprocess.CompletedProcess) -> str:
+    return " | ".join((result.stderr or "").strip().splitlines()[-3:]) or "no error output"
 
 
 def audit_npm(output: Path) -> list[Finding]:
@@ -350,17 +354,18 @@ def audit_pypi(pip_audit: str, installed_file: Path, runtime_report: Path | None
 
     def attempt() -> list[Finding]:
         output.unlink(missing_ok=True)
-        _run([pip_audit, "-r", str(installed_file), "--no-deps", "--disable-pip",
-              "--progress-spinner", "off", "--format", "json", "--output", str(output)])
+        result = _run([pip_audit, "-r", str(installed_file), "--no-deps", "--disable-pip",
+                       "--progress-spinner", "off", "--format", "json", "--output", str(output)])
         if not output.exists():
-            raise AuditError("pip-audit wrote no output")
+            raise AuditError(f"pip-audit wrote no output (exit {result.returncode}: {_stderr_tail(result)})")
         return parse_pip_audit(output.read_text(encoding="utf-8-sig"), installed, runtime)
 
     return run_with_retries(attempt, "pip-audit")  # type: ignore[return-value]
 
 
 def _annotate(level: str, message: str) -> None:
-    print(f"::{level}::{message}")
+    escaped = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::{level}::{escaped}")
 
 
 def _line(finding: Finding) -> str:
@@ -431,6 +436,9 @@ def main(argv: list[str] | None = None) -> int:
             findings = audit_pypi(args.pip_audit, args.installed, args.runtime_report, args.output)
     except AuditError as exc:
         _annotate("error", f"{args.ecosystem} audit could not be trusted: {exc}")
+        return EXIT_ERROR
+    except Exception as exc:  # noqa: BLE001  any other failure means the audit did not run
+        _annotate("error", f"{args.ecosystem} audit could not run: {type(exc).__name__}: {exc}")
         return EXIT_ERROR
 
     decision = decide(args.ecosystem, findings, exceptions, today)

@@ -178,6 +178,16 @@ def test_pypi_missing_or_broken_output_could_not_run(text):
         gate.parse_pip_audit(text, {"six": "1.17.0"}, None)
 
 
+@pytest.mark.parametrize("text", [None, "", "{}", '{"install": []}', '{"install": [1]}'])
+def test_an_unusable_runtime_report_gives_no_labels(text):
+    assert gate.read_runtime_report(text) is None
+
+
+def test_pypi_malformed_dependency_entry_could_not_run():
+    with pytest.raises(gate.AuditError):
+        gate.parse_pip_audit('{"dependencies": ["six"]}', {"six": "1.17.0"}, None)
+
+
 def test_installed_list_names_are_normalised_and_must_be_exact_pins():
     assert gate.read_installed("PyJWT==2.3.0\nprometheus_client==0.20.0\r\n") == {"pyjwt": "2.3.0", "prometheus-client": "0.20.0"}
     with pytest.raises(gate.AuditError):
@@ -198,6 +208,23 @@ def test_exceptions_expire_after_their_review_date_in_utc():
     assert len(later.expired) == 2
 
 
+def test_a_finding_under_an_expired_exception_is_a_failure_not_accepted():
+    findings = gate.parse_npm(fixture("npm-marked-4.0.9.json"))
+    rules = exceptions(entry("npm", "marked", "GHSA-rrrm-qjm4-v8hf", "2026-10-01"))
+    decision = gate.decide("npm", findings, rules, TODAY)
+    assert decision.excepted == []
+    assert len(decision.failures) == 2
+    assert len(decision.expired) == 1
+    assert decision.unused == []
+
+
+def test_pypi_exception_names_are_trimmed_and_normalised():
+    installed = gate.read_installed(fixture("pypi-pyjwt-installed.txt"))
+    findings = gate.parse_pip_audit(fixture("pypi-pyjwt-audit.json"), installed, runtime())
+    rules = exceptions(entry("pypi", " PyJWT ", "GHSA-ffqj-6fqr-9h24"))
+    assert len(gate.decide("pypi", findings, rules, TODAY).excepted) == 1
+
+
 def test_unused_exception_only_warns():
     decision = gate.decide("npm", [], exceptions(entry("npm", "marked", "GHSA-rrrm-qjm4-v8hf")), TODAY)
     assert decision.exit_code == gate.EXIT_PASS
@@ -212,6 +239,7 @@ def test_unused_exception_only_warns():
         "not json",
         "[]",
         '{"version": 2, "exceptions": []}',
+        '{"version": true, "exceptions": []}',
         '{"version": 1}',
         '{"version": 1, "exceptions": [], "extra": 1}',
         json.dumps({"version": 1, "exceptions": [{**entry("npm", "marked", "GHSA-rrrm-qjm4-v8hf"), "note": "x"}]}),
@@ -276,3 +304,19 @@ def test_main_fails_closed_without_an_exceptions_file(tmp_path, capsys):
     code = gate.main(["--exceptions", str(tmp_path / "missing.json"), "npm", "--output", str(tmp_path / "out.json")])
     assert code == gate.EXIT_ERROR
     assert "missing" in capsys.readouterr().out
+
+
+def test_main_reports_any_other_failure_as_could_not_run(tmp_path, capsys):
+    rules = tmp_path / "exceptions.json"
+    rules.write_text('{"version": 1, "exceptions": []}', encoding="utf-8")
+    code = gate.main([
+        "--exceptions", str(rules), "pypi", "--pip-audit", "pip-audit",
+        "--installed", str(tmp_path / "no-installed-list.txt"), "--output", str(tmp_path / "out.json"),
+    ])
+    assert code == gate.EXIT_ERROR
+    assert "::error::pypi audit could not run" in capsys.readouterr().out
+
+
+def test_annotations_escape_line_breaks(capsys):
+    gate._annotate("error", "a%b\nc")
+    assert capsys.readouterr().out == "::error::a%25b%0Ac\n"
