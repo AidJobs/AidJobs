@@ -1,0 +1,7 @@
+# Running the tests and lint: the production requirements plus the test tools. Compiled into
+# requirements-test.txt by scripts/lock.sh, constrained to requirements.txt so the shared
+# packages stay at the versions Render runs. Render installs only requirements.txt.
+-r requirements.in
+pytest==9.2.0
+pytest-asyncio==1.4.1
+ruff==0.17.3

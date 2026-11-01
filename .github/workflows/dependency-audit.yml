@@ -23,15 +23,14 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11.9'
+          python-version-file: apps/backend/.python-version
 
       # The same installed set as CI's backend job.
       - name: Install dependencies
         id: install
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
-          pip install ruff==0.17.3
+          python -m pip install --require-hashes -r build-tools.txt
+          python -m pip install --require-hashes --build-constraint build-tools.txt -r requirements-test.txt
 
       - name: Prepare dependency audit
         run: bash ../../.github/scripts/prepare_pypi_audit.sh
@@ -43,7 +42,7 @@ jobs:
           --exceptions ../../.github/audit-exceptions.json
           pypi --pip-audit /tmp/audit-tool/bin/pip-audit
           --installed audit/installed-packages.txt
-          --runtime-report audit/runtime-report.json
+          --runtime-lock requirements.txt
           --output audit/pip-audit.json
 
       - uses: actions/upload-artifact@v4

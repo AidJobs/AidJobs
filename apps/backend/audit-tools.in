@@ -1,0 +1,4 @@
+# pip-audit for CI's dependency audit gate (.github/scripts/prepare_pypi_audit.sh), installed in
+# its own environment so it is not part of the set it audits. Compiled with hashes into
+# audit-tools.txt.
+pip-audit==2.10.1

@@ -32,14 +32,15 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11.9'
+          python-version-file: apps/backend/.python-version
 
+      # Locked files, every download checked against its hash (security plan, stage 3A, part 3,
+      # step 3); the test lock holds Render's locked set plus the test tools and ruff.
       - name: Install dependencies
         id: install
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
-          pip install ruff==0.17.3
+          python -m pip install --require-hashes -r build-tools.txt
+          python -m pip install --require-hashes --build-constraint build-tools.txt -r requirements-test.txt
 
       - name: Lint executed suite
         run: >
@@ -105,13 +106,31 @@ jobs:
           ruff check .github/scripts
           python -m pytest .github/scripts -q -p no:cacheprovider
 
+      # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
+      - name: Lock files are up to date
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m venv /tmp/lock-tool
+          /tmp/lock-tool/bin/python -m pip install --quiet --require-hashes -r lock-tools.txt
+          PATH="/tmp/lock-tool/bin:$PATH" bash scripts/lock.sh
+          git diff --exit-code -- '*.txt'
+
+      # Render's Build Command in a fresh environment like Render's (Python's bundled pip 24.0 and
+      # setuptools 65.5.0), without the browser download; it must install exactly the lock.
+      - name: Rehearse Render's build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          python -m venv /tmp/render-venv
+          /tmp/render-venv/bin/python -m pip --version
+          PATH="/tmp/render-venv/bin:$PATH" AIDJOBS_SKIP_BROWSER_DOWNLOAD=1 bash scripts/render_build.sh
+
       - name: Prepare dependency audit
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bash ../../.github/scripts/prepare_pypi_audit.sh
 
-      # Security plan, stage 3A, part 3: any finding in an installed package fails, except in the
-      # runner's pip, setuptools, and wheel (reported), unless .github/audit-exceptions.json
-      # accepts it. A missing, broken, or incomplete audit also fails.
+      # Security plan, stage 3A, part 3: any finding in an installed package fails, the locked
+      # build tools included, unless .github/audit-exceptions.json accepts it. A missing, broken,
+      # or incomplete audit also fails.
       - name: Dependency audit gate
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: >
@@ -119,7 +138,7 @@ jobs:
           --exceptions ../../.github/audit-exceptions.json
           pypi --pip-audit /tmp/audit-tool/bin/pip-audit
           --installed audit/installed-packages.txt
-          --runtime-report audit/runtime-report.json
+          --runtime-lock requirements.txt
           --output audit/pip-audit.json
 
       - uses: actions/upload-artifact@v4
