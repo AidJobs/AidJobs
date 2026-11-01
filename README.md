@@ -24,8 +24,8 @@ scripts/         pre-deploy checks
 
 1. Copy `.env.sample` to `apps/backend/.env` and `apps/frontend/.env.local` and fill in the values. It lists names only.
 2. `npm install`, then the backend's Python packages:
-   - On Linux with Python 3.11.9, as Render and CI do: from `apps/backend`, `bash scripts/render_build.sh` (`AIDJOBS_SKIP_BROWSER_DOWNLOAD=1` skips the browser download), then, for the tests, `python -m pip install --require-hashes --build-constraint build-tools.txt -r requirements-test.txt`.
-   - On Windows or another Python: `pip install -r apps/backend/requirements-test.in`, the direct pins without the lock. The lock files are for Linux and Python 3.11.9 only (some locked packages, such as `uvloop`, do not install on Windows), so CI is the faithful test.
+   - On Linux with Python 3.11.9, as Render and CI do: in a fresh virtual environment (the script upgrades `pip` and `setuptools` in whichever `python` is on the path), from `apps/backend`, `bash scripts/render_build.sh` (`AIDJOBS_SKIP_BROWSER_DOWNLOAD=1` skips the browser download), then, for the tests, `python -m pip install --require-hashes --build-constraint build-tools.txt -r requirements-test.txt`.
+   - On Windows, with Python 3.11 in a virtual environment: `pip install -r apps/backend/requirements-test.in`, the direct pins without the lock. The lock files are for Linux and Python 3.11.9 only (some locked packages, such as `uvloop`, do not install on Windows), and several pins do not install on Python 3.14, so CI is the faithful test.
 3. `npm run dev` starts the frontend on port 5000 and the backend on port 8000.
 
 Other scripts: `npm run lint`, `npm run test`, `npm run build`, `npm run pre-deploy`.

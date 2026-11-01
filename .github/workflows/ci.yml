@@ -34,8 +34,9 @@ jobs:
         with:
           python-version-file: apps/backend/.python-version
 
-      # Locked files, every download checked against its hash (security plan, stage 3A, part 3,
-      # step 3); the test lock holds Render's locked set plus the test tools and ruff.
+      # Locked files, every package installed here checked against its hash (security plan, stage
+      # 3A, part 3, step 3); the pip that setup-python provides is not, which is why the rehearsal
+      # below starts from Python's own pip. The test lock holds Render's set plus the test tools.
       - name: Install dependencies
         id: install
         run: |
