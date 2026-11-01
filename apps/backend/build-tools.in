@@ -1,0 +1,5 @@
+# The installers used to build the environment on Render and in CI (scripts/render_build.sh).
+# Compiled with hashes into build-tools.txt by scripts/lock.sh; also the build constraint for
+# packages built from source (sgmllib3k), so nothing is fetched unchecked.
+pip==26.2.2
+setuptools==84.2.1

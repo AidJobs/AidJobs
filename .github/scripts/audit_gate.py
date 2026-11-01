@@ -4,9 +4,9 @@ Runs one audit, checks that its output can be trusted, and decides:
 
 - npm: `npm audit --omit=dev`. Each advisory is judged on its own; high and critical fail.
 - pypi: pip-audit on the installed set. Any finding fails, because pip-audit reports no severity.
-  `pip`, `setuptools`, and `wheel` come with the runner and are reported, not gated (Render's own
-  build tools are part 3's later step). Other packages are labelled "runtime (Render)" when
-  `requirements.txt` resolves to them, otherwise "CI only".
+  Findings are labelled "build tool (Render)" for `pip`, `setuptools`, and `wheel` (installed from
+  the locked build-tools.txt on Render and in CI), "runtime (Render)" for packages in the locked
+  requirements.txt, and "CI only" otherwise.
 
 An accepted finding needs an entry in `.github/audit-exceptions.json` with a reason and a review
 date; an expired entry fails, an unused one warns. A missing, broken, or incomplete audit output
@@ -43,7 +43,7 @@ EXCEPTION_KEYS = {"ecosystem", "package", "advisory", "reason", "review_by"}
 
 LABEL_RUNTIME = "runtime (Render)"
 LABEL_CI_ONLY = "CI only"
-LABEL_BUILD_TOOL = "build tool, not gated"
+LABEL_BUILD_TOOL = "build tool (Render)"
 LABEL_UNKNOWN = "unlabelled"
 
 
@@ -214,15 +214,12 @@ def read_installed(text: str) -> dict[str, str]:
     return installed
 
 
-def read_runtime_report(text: str | None) -> set[str] | None:
-    """Names `pip install --dry-run --report` resolves for requirements.txt; None if unusable."""
+def read_runtime_lock(text: str | None) -> set[str] | None:
+    """Package names pinned in the locked requirements.txt Render installs; None if unusable."""
     if not text:
         return None
-    try:
-        data = json.loads(text)
-        names = {normalise_pypi(item["metadata"]["name"]) for item in data["install"]}
-    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
-        return None
+    pinned = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==\S+")
+    names = {normalise_pypi(match.group(1)) for line in text.splitlines() if (match := pinned.match(line))}
     return names or None
 
 
@@ -287,7 +284,7 @@ def decide(ecosystem: str, findings: list[Finding], exceptions: list[AuditExcept
     current = [e for e in mine if e.review_by >= today]
     used: set[AuditException] = set()
     for finding in findings:
-        gated = finding.severity in NPM_GATED if ecosystem == "npm" else finding.label != LABEL_BUILD_TOOL
+        gated = finding.severity in NPM_GATED if ecosystem == "npm" else True
         if not gated:
             decision.reported.append(finding)
             continue
@@ -345,12 +342,12 @@ def audit_npm(output: Path) -> list[Finding]:
     return run_with_retries(attempt, "npm audit")  # type: ignore[return-value]
 
 
-def audit_pypi(pip_audit: str, installed_file: Path, runtime_report: Path | None, output: Path) -> list[Finding]:
+def audit_pypi(pip_audit: str, installed_file: Path, runtime_lock: Path | None, output: Path) -> list[Finding]:
     installed = read_installed(installed_file.read_text(encoding="utf-8-sig"))
-    report_text = runtime_report.read_text(encoding="utf-8-sig") if runtime_report and runtime_report.exists() else None
-    runtime = read_runtime_report(report_text)
+    lock_text = runtime_lock.read_text(encoding="utf-8-sig") if runtime_lock and runtime_lock.exists() else None
+    runtime = read_runtime_lock(lock_text)
     if runtime is None:
-        _annotate("warning", "Could not resolve requirements.txt, so findings are not labelled runtime or CI only.")
+        _annotate("warning", "Could not read the locked requirements.txt, so findings are not labelled runtime or CI only.")
 
     def attempt() -> list[Finding]:
         output.unlink(missing_ok=True)
@@ -420,7 +417,7 @@ def main(argv: list[str] | None = None) -> int:
     pypi = sub.add_parser("pypi")
     pypi.add_argument("--pip-audit", required=True)
     pypi.add_argument("--installed", type=Path, required=True)
-    pypi.add_argument("--runtime-report", type=Path)
+    pypi.add_argument("--runtime-lock", type=Path)
     pypi.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     today = args.today or dt.datetime.now(dt.UTC).date()
@@ -433,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.ecosystem == "npm":
             findings = audit_npm(args.output)
         else:
-            findings = audit_pypi(args.pip_audit, args.installed, args.runtime_report, args.output)
+            findings = audit_pypi(args.pip_audit, args.installed, args.runtime_lock, args.output)
     except AuditError as exc:
         _annotate("error", f"{args.ecosystem} audit could not be trusted: {exc}")
         return EXIT_ERROR

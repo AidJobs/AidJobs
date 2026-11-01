@@ -4,7 +4,8 @@ npm: today's runtime audit (clean), `marked` 4.0.9 and `nanoid` 3.3.7 in throwaw
 unreachable registry, and a project without a lockfile. pip-audit 2.10.1: CI's audit of `main`
 (run 41289869648), the same set plus `PyJWT==2.3.0`, a package not on PyPI, and the build tools
 Render's Python ships. Advisory descriptions were removed from the pip-audit files to keep them
-small; nothing the gate reads was changed.
+small; nothing the gate reads was changed. `pypi-runtime-lock.txt` is an excerpt of the locked
+apps/backend/requirements.txt.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def entry(ecosystem: str, package: str, advisory: str, review_by: str = "2026-12
 
 
 def runtime(*names: str) -> set[str]:
-    return gate.read_runtime_report(fixture("pypi-runtime-report.json")) | set(names)
+    return gate.read_runtime_lock(fixture("pypi-runtime-lock.txt")) | set(names)
 
 
 # npm
@@ -106,14 +107,15 @@ def test_npm_empty_tree_is_not_a_pass():
 # pypi
 
 
-def test_pypi_main_today_passes_and_reports_build_tools():
+def test_pypi_build_tools_are_gated_like_everything_else():
     installed = gate.read_installed(fixture("pypi-ci-installed.txt"))
     findings = gate.parse_pip_audit(fixture("pypi-ci-audit.json"), installed, runtime())
     assert {f.package for f in findings} == {"setuptools"}
     assert len(findings) == 5
     decision = gate.decide("pypi", findings, [], TODAY)
-    assert decision.exit_code == gate.EXIT_PASS
-    assert {f.label for f in decision.reported} == {gate.LABEL_BUILD_TOOL}
+    assert decision.exit_code == gate.EXIT_FINDINGS
+    assert {f.label for f in decision.failures} == {gate.LABEL_BUILD_TOOL}
+    assert decision.reported == []
 
 
 def test_pypi_any_finding_fails_with_duplicates_merged_and_labelled():
@@ -124,7 +126,8 @@ def test_pypi_any_finding_fails_with_duplicates_merged_and_labelled():
     assert {f.label for f in pyjwt} == {gate.LABEL_CI_ONLY}
     decision = gate.decide("pypi", findings, [], TODAY)
     assert decision.exit_code == gate.EXIT_FINDINGS
-    assert {f.package for f in decision.failures} == {"pyjwt"}
+    # The recorded CI set still has the runner's setuptools 65.5.0, now gated too.
+    assert {f.package for f in decision.failures} == {"pyjwt", "setuptools"}
 
     as_runtime = gate.parse_pip_audit(fixture("pypi-pyjwt-audit.json"), installed, runtime("pyjwt"))
     assert {f.label for f in as_runtime if f.package == "pyjwt"} == {gate.LABEL_RUNTIME}
@@ -137,23 +140,24 @@ def test_pypi_exception_matches_an_alias():
     assert "GHSA-FFQJ-6FQR-9H24" in target.aliases
     decision = gate.decide("pypi", findings, exceptions(entry("pypi", "PyJWT", "ghsa-ffqj-6fqr-9h24")), TODAY)
     assert [f.advisory for f, _ in decision.excepted] == ["PYSEC-2022-202"]
-    assert len(decision.failures) == 13
+    assert len([f for f in decision.failures if f.package == "pyjwt"]) == 13
 
 
-def test_pypi_without_a_runtime_report_still_gates():
+def test_pypi_without_a_runtime_lock_still_gates():
     installed = gate.read_installed(fixture("pypi-pyjwt-installed.txt"))
     findings = gate.parse_pip_audit(fixture("pypi-pyjwt-audit.json"), installed, None)
     assert {f.label for f in findings if f.package == "pyjwt"} == {gate.LABEL_UNKNOWN}
     assert gate.decide("pypi", findings, [], TODAY).exit_code == gate.EXIT_FINDINGS
 
 
-def test_pypi_build_tools_are_reported_not_gated():
+def test_pypi_render_old_build_tools_fail_the_gate():
     installed = gate.read_installed(fixture("pypi-build-tools-installed.txt"))
     findings = gate.parse_pip_audit(fixture("pypi-build-tools-audit.json"), installed, runtime())
     assert {f.package for f in findings} == {"pip", "setuptools", "wheel"}
+    assert {f.label for f in findings} == {gate.LABEL_BUILD_TOOL}
     decision = gate.decide("pypi", findings, [], TODAY)
-    assert decision.exit_code == gate.EXIT_PASS
-    assert len(decision.reported) == len(findings)
+    assert decision.exit_code == gate.EXIT_FINDINGS
+    assert len(decision.failures) == len(findings)
 
 
 def test_pypi_skipped_package_is_never_a_pass():
@@ -178,9 +182,15 @@ def test_pypi_missing_or_broken_output_could_not_run(text):
         gate.parse_pip_audit(text, {"six": "1.17.0"}, None)
 
 
-@pytest.mark.parametrize("text", [None, "", "{}", '{"install": []}', '{"install": [1]}'])
-def test_an_unusable_runtime_report_gives_no_labels(text):
-    assert gate.read_runtime_report(text) is None
+def test_runtime_lock_names_are_read_and_normalised():
+    assert runtime() == {"certifi", "charset-normalizer", "idna", "requests", "urllib3", "uvicorn"}
+    text = "uvicorn[standard]==0.32.0 \\\n    --hash=sha256:abc\nPyJWT==2.3.0\n    # via -r requirements.in\n"
+    assert gate.read_runtime_lock(text) == {"uvicorn", "pyjwt"}
+
+
+@pytest.mark.parametrize("text", [None, "", "# only a comment\n", "    --hash=sha256:abc\n", "six>=1.0\n"])
+def test_an_unusable_runtime_lock_gives_no_labels(text):
+    assert gate.read_runtime_lock(text) is None
 
 
 def test_pypi_malformed_dependency_entry_could_not_run():
