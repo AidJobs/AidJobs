@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Dependency audit gate (security plan, stage 3A, part 3).
 
 Runs one audit, checks that its output can be trusted, and decides:
@@ -419,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
     pypi.add_argument("--runtime-report", type=Path)
     pypi.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
-    today = args.today or dt.datetime.now(dt.timezone.utc).date()
+    today = args.today or dt.datetime.now(dt.UTC).date()
 
     try:
         exceptions = load_exceptions(args.exceptions.read_text(encoding="utf-8-sig")) if args.exceptions.exists() else None
