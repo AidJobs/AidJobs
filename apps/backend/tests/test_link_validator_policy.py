@@ -24,6 +24,8 @@ from core.link_validator import MAX_REDIRECT_HOPS, LinkValidator, describe_link_
 FRAGMENT = "FAKEPW3k"
 RESULT_KEYS = {"valid", "status_code", "final_url", "redirect_count", "error", "cached",
                "validated_at"}
+# One TLS context for every fake pool; without it httpcore loads its certificate bundle per pool.
+TEST_SSL_CONTEXT = httpcore.default_ssl_context()
 
 
 _LOOP = []
@@ -133,7 +135,8 @@ def _validator(monkeypatch, responses=(), addresses=None, failure=None, fake_cac
 
     def pool_factory(network_backend):
         return httpcore.AsyncConnectionPool(network_backend=network_backend, max_connections=1,
-                                            max_keepalive_connections=0, retries=0)
+                                            max_keepalive_connections=0, retries=0,
+                                            ssl_context=TEST_SSL_CONTEXT)
 
     monkeypatch.setattr(link_validator, "fetch_url", functools.partial(
         outbound.fetch_url, resolver=resolver, backend_factory=backend_factory,

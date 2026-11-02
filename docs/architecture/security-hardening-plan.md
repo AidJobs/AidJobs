@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is done: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), built after an independent plan review and code review, merged as `00fee1a`, deployed and live-checked (implementation and live records below). Next, placed by the user: the shared fetch policy's gaps, investigated as their own pull request (PR 2 record, "Recorded for later"). PRs 3 to 5 and phase 3 each need their own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is done: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), built after an independent plan review and code review, merged as `00fee1a`, deployed and live-checked (implementation and live records below). Then, placed by the user: the shared fetch policy's gaps, investigated and built on 2 November 2026 as their own pull request, [PR #88](https://github.com/AidJobs/AidJobs/pull/88), not merged ("Shared fetch policy gaps" record below). PRs 3 to 5 and phase 3 each need their own approval |
 | 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, done: [PR #80](https://github.com/AidJobs/AidJobs/pull/80), merged as `4d404ae`, live-checked (records below); step 2, the development tools, done: [PR #81](https://github.com/AidJobs/AidJobs/pull/81), merged as `c046bce`, live-checked; Dependabot closed 36 alerts; the three remaining advisories formally accepted and their alerts dismissed (records below); step 3, a backend lockfile and Render's build tools: pull request A done ([PR #83](https://github.com/AidJobs/AidJobs/pull/83), merged as `9ed0561`, live-checked), Render's Build Command changed by the user and verified, pull request B done ([PR #84](https://github.com/AidJobs/AidJobs/pull/84), merged as `6fee7e0`, live-checked with a production crawl) (records below) |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -898,7 +898,7 @@ Evidence, 1 November 2026 (local, Python 3.11.9 with the locked test requirement
 - **A local evidence demo made two connection attempts from the development machine.** The demo first blocked only Python's socket functions, and Windows' event loop connects without them. So `main`'s validator tried `10.0.0.5:80` and `169.254.169.254:80` from the development machine, and both failed at once. Nothing reached production. The demo and both new test files now also block the event loop's connect functions.
 
 Recorded for later, outside this pull request:
-- **The shared fetch policy's gaps** (found by the reviews): `100.64.0.0/10`, including `100.100.100.200`, and `fec0::/10` are permitted. Private-range results depend on the Python patch release. There is no port restriction, no DNS timeout, and no total time limit per URL: the 10-second timeout applies to each network step of each of up to 11 hops, as on `main`. The user placed this investigation right after this pull request, as its own pull request.
+- **The shared fetch policy's gaps** (found by the reviews): `100.64.0.0/10`, including `100.100.100.200`, and `fec0::/10` are permitted. Private-range results depend on the Python patch release. There is no port restriction, no DNS timeout, and no total time limit per URL: the 10-second timeout applies to each network step of each of up to 11 hops, as on `main`. The user placed this investigation right after this pull request, as its own pull request. Done as PR #88 ("Shared fetch policy gaps" record below).
 - **The link validator:**
   - errors are cached for 24 hours, although 1 hour was intended (`ttl_hours` is ignored);
   - there is no GET fallback for servers that refuse HEAD;
@@ -933,6 +933,81 @@ Merge approved by the user on 2 November 2026, at the reviewed head `eff6983`. E
   - Data Quality: the page loaded and listed the 3 sources ("No issues found in 3 sources"); `GET /api/admin/data-quality/global` returned 200 (515 jobs, 3 sources, 0 null URLs, 0 listing-page URLs, 0 sources with issues, score 100), and each source's report returned 200.
   - The guard blocked only the dummy POST. Three probes of addresses that do not exist (`/api/admin/data-quality/summary`, `/api/admin/data-quality`, `/api/admin/data_quality`) answered 404 from Vercel; they were the agent's guesses, not page requests. The user signed out afterwards.
 - **Not checked:** the Vercel proxies do not pass `X-Request-ID` to the browser (stage 4), so the admin pages' requests could not be matched to Render's log by ID. The link-validation routes were not called in production, because no page uses them and a call would make outbound requests.
+
+#### Shared fetch policy gaps: investigation and implementation record
+
+Placed by the user right after stage 3, phase 2, PR 2, as its own pull request. The read-only investigation was approved and done on 2 November 2026, and the plan was approved the same day ("approve and be thorough"). Built on the branch `security/fetch-policy-gaps` from `main` at `1075b55`, as [PR #88](https://github.com/AidJobs/AidJobs/pull/88).
+
+Findings of the investigation (read-only; nothing was sent to production):
+- **Address ranges.** The policy listed five IPv4 ranges and relied on Python's own lists for the rest. Production runs Python 3.11.9. Its `ipaddress` module, loaded from the CPython 3.11.9 source and tested offline, permits:
+  - `100.64.0.0/10` (shared address space), which includes Alibaba Cloud's metadata address `100.100.100.200`;
+  - `fec0::/10` (the old IPv6 site-local range);
+  - `2002::/16` (6to4), which can carry a private IPv4 address (`2002:a00:1::` is `10.0.0.1`);
+  - `3fff::/20` (IPv6 documentation);
+  - and, found by the new tests, `192.0.0.9` and `192.88.99.0/24`.
+
+  Python 3.14 refuses `2002::/16` and `3fff::/20`, so the result depended on the Python release.
+- **Ports:** none was refused. A read-only query (`transaction_read_only: on`) found that all 3 sources and all 531 job links use `https` with no port in the address.
+- **DNS:** `getaddrinfo` ran in asyncio's default thread pool with no time limit, and a lookup cannot be stopped once it starts. That pool also runs the orchestrator's database steps (starting a run, the health score, recovery) and the crawlers' saves.
+- **Time:** the per-step timeout (10 or 30 seconds) applied to each network step of each hop, up to 11 or 21 hops, and a body read restarted it with every piece received. Crawls are bounded by their own 15-minute limit (`CRAWL_TIME_LIMIT_MINUTES`). The admin source test and link validation (up to 100 links, 10 at once) were not bounded.
+- **Headers after a redirect:** only `Authorization`, `Proxy-Authorization` and `Cookie` were dropped, and only when the host changed, so a redirect from `https` to `http` on the same host kept them. No caller sends a credential today; the API crawler sends only `User-Agent`.
+- **Not gaps:**
+  - No live outbound path skips the policy. `core/net.py`'s own `httpx` requests are reached only through `RobotsChecker`, which nothing creates, and the link validator takes only its user-agent string from it.
+  - The AI and geocoder clients call their own services; they were not part of this review.
+
+What changes:
+- **`contracts/fetch.py` lists the refused ranges itself,** from IANA's special-purpose registries:
+  - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.0.2.0/24`, `192.88.99.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`, `224.0.0.0/4`, `240.0.0.0/4`;
+  - IPv6: only global unicast (`2000::/3`), without `2001::/23`, `2001:db8::/32`, `2002::/16` and `3fff::/20`. That refuses loopback, IPv4-compatible, NAT64, unique local, link-local, site-local, multicast and SRv6 addresses whole. IPv4-mapped addresses are unwrapped first, as before.
+
+  Python's own checks still apply, so a later Python can only refuse more.
+- **Only ports 80 and 443.** Another port, or one that cannot be read, gets "destination port is not permitted". This is checked on every hop and on every redirect destination before DNS.
+- **DNS lookups** run on their own pool of 8 threads and get 10 seconds; then "DNS resolution timed out". A resolver that reports its own timeout gets "DNS resolution failed". The plan said 5 seconds; the review showed that equals one try of the usual Linux resolver's 5-second timeout, so one lost packet would fail a lookup that works today. 10 seconds allows two tries; the value is part of the merge approval.
+- **A total time limit per fetch** (`total_timeout`) covers DNS, every hop and the whole body; then "time limit".
+  - Crawl fetches keep the default, 60 seconds: HTML listing and job pages, RSS and API. The admin extraction simulation uses the crawler's fetch, so it gets 60 seconds too.
+  - The admin source test's HEAD and each link-validation check get 20 seconds.
+  - A caller's own deadline that expires first, such as a crawl's 15 minutes, is not converted: the caller gets its own timeout or cancellation unchanged. A transport's own `TimeoutError` is not called "time limit" either.
+- **After a redirect to another origin** (scheme, host or port), only known headers are sent again: the 11 the HTML crawler sends (`User-Agent`, `Accept`, `Accept-Language`, `Accept-Encoding`, `Cache-Control`, `Connection`, `Upgrade-Insecure-Requests`, `Sec-Fetch-Dest`, `-Mode`, `-Site`, `-User`). Anything else, such as a key, a token or a cookie, is dropped, and stays dropped on later hops. A redirect within the same origin keeps every header.
+  - This differs from the plan, which named only `User-Agent`, `Accept` and `Accept-Language`. Dropping the crawler's other browser headers after a cross-site redirect could change what employer sites send back, so the agent kept them. No current caller sends any other header, so no request changes today.
+- **The three new messages** reach the admin through the existing describers: "Fetch failed: …" for the source test and "Validation error: …" for link validation.
+- **The B1 note in `crawler-completion-plan.md`** points here.
+
+Evidence, 2 November 2026 (local, Python 3.11.9 with the locked test requirements, `uvloop` excepted on Windows):
+- **New tests,** in `test_outbound_policy_gaps.py` (208), using `test_outbound_fetch.py`'s fake DNS and scripted transport. Three run httpcore's real AnyIO backend against a test server on loopback, reached by replacing the connection; nothing else leaves the process. They cover:
+  - each range at both ends;
+  - every sample address decided by the tables alone, so the result does not depend on Python's lists;
+  - literals and DNS answers in the new ranges refused before any connection, including after a redirect;
+  - each refused and permitted port, including on a redirect;
+  - a stalled lookup timing out without connecting, lookups running on their own threads, and every DNS thread hung while the shared pool still runs a database step;
+  - a body sent one byte at a time and several quick hops stopped by the total limit (the same hops succeed without it);
+  - a caller's own deadline and a cancellation passing through unchanged;
+  - with the real backend: a dripping body stopped at the total limit, a caller's deadline kept, and a stalled read still reported as "timeout";
+  - the header rules, with the crawler's own header set;
+  - the approved values, and which limit each caller uses.
+- **On `main`'s code:** 123 fail and 71 pass. There the file has 194 tests, because `main`'s range table is shorter; one lookup was relaxed in a temporary copy so it would load at all. The 71 that pass test behaviour that was already right: the permitted addresses, the ranges `main` already refused, same-origin headers, the per-step timeout, and the crawl callers' default.
+- **The existing suite passes unchanged:** 716 passed and 4 skipped locally, and 921 passed with the new file's first 205 tests. Local runs count 5 more passing tests and 5 fewer skips than CI, because git-ignored saved pages exist only here.
+- **Ruff:** no new finding (`sources.py` 16, `link_validator.py` 4, `contracts/` 0); the new test file is clean.
+- **Crawl path:** every current URL is `https` without a port; the headers sent after a redirect are the same for every current caller; ICRC's 33 job pages took about 3 seconds each on 27 October 2026, far below the 60-second limit.
+- **Local test speed:** each `https` hop through the test fakes took about 2 seconds on this Windows machine, on `main` as on the branch (41 seconds for the 20-redirect test on both). That made the first independent review, with its mutation runs, take well over an hour.
+  - The cause: httpcore loads its certificate bundle again for every connection pool that is not given one (`httpcore.default_ssl_context()`, 0.9 seconds here), and the policy opens a pool per hop.
+  - The test fakes now share one context (test files only). The three policy test files then run 297 tests in 24 seconds.
+  - The real backend's limits fire on time (1.0, 1.0 and 0.5 seconds).
+
+Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, removes it. Approved by the user on 3 November 2026 as its own small pull request after this one; built and waiting.
+
+Accepted, not changed:
+- A lookup that hangs inside the operating system's resolver keeps its thread until the resolver gives up. At most 8 do so at once, and further lookups wait in the queue; time spent waiting counts against their 10 seconds. As with Python's default pool, the process waits for such a thread when it exits; Render's 30-second stop still applies.
+- Some addresses IANA marks as globally reachable are refused: 6to4 and NAT64 addresses carrying a public IPv4 address; `192.0.0.9` and `192.0.0.10` (global anycast); and parts of `2001::/23` such as `2001:3::/32` and `2001:20::/28`, which Python 3.14 permits. No source uses any of them. "Python can only refuse more" describes the combined policy: the tables decide first, and Python's checks can add refusals but not remove any.
+- The redirect limits are unchanged: 20 for crawls and 10 for link validation.
+
+- **Independent code review** (separate read-only agent, isolated clone, Python 3.11.9, no network, about 24 minutes, at `0753d17`): "approve with changes", no blocking issue.
+  - Probed and holding: IPv4-mapped, IPv4-translated, IPv4-compatible, Teredo, NAT64, 6to4 and scoped literals (`fe80::1%25eth0`); odd numeric hosts (`2130706433`, `0177.0.0.1`, `0x7f.1`), which pass the pre-DNS check but resolve to `127.0.0.1` and are refused when pinned; odd ports (`+443`, full-width digits, `u:p@host:80@evil:8080`); a caller's deadline against the total limit, both ways; and the header origin rules (case, trailing dot, default port, IDNA).
+  - 23 of 25 mutations caught. The two that survive are expected: the redirect destination's port check is repeated by the next hop's own check before DNS, and the test-only TLS context only changes speed.
+  - Taken: the two dripping-body tests and the slow-lookup test hung for hours without the limit they test; they now run inside a 15-second outer bound and fail at once (checked by removing the total limit: both fail in about 15 seconds). The DNS limit was raised to 10 seconds (above). The two document points: the refused global addresses and the combined-policy wording (above).
+  - Not verified: production runs uvloop, which the tests do not (Windows has none); the live check after merge covers it.
+  - Found, outside this change: `app/sources.py` line 753 calls `fetch_api` with a JSON string as its headers and a keyword it does not accept (an older bug in the API source test). Recorded for later.
+
+Still to do: the user's merge approval; then a read-only live check (health, database status, search, the admin pages under the guard) and the next scheduled crawl, Oxfam GB on 4 November 2026 at 19:30 UTC, watched in Render's log.
 
 ### Stage 3A. Dependency security
 
@@ -1347,6 +1422,13 @@ Merge approved by the user on 1 November 2026 at `6dc5b76`; the follow-ups decid
 - **Comment used:** "Accepted risk (user decision, 1 Nov 2026): development-only, not reachable here; no fixed version is allowed yet by the packages that use it. Record, triggers and monthly check: docs/architecture/security-hardening-plan.md, stage 3A part 3 step 2. Review by 2027-02-01." To reverse: set the alert's `state` to `open`.
 - **Branch:** PR #81's branch (tip `6dc5b76`, in `main`) deleted.
 - **The first scheduled weekly "Dependency audit" run,** due Monday 2 November 2026 at 03:23 UTC: GitHub started it at 11:27:53 UTC, on `main` at `97ea44d` (run 41437039290), and it passed. Its report, read on 2 November 2026: the full frontend audit has the same 39 vulnerable packages (0 critical, 0 high, 38 moderate, 1 low) and only the three accepted advisories; the runtime audit is 0; the backend audit found nothing in 57 installed packages (Python 3.11.9). 0 open Dependabot alerts. The report files were deleted after reading. The comparison with the triggers is the monthly check, not done here.
+- **Monthly check, November 2026** (approved by the user on 2 November 2026; read-only: the GitHub API and the npm registry): no trigger fired.
+  - Alerts #114, #115 and #116 are still dismissed as "tolerable risk", development scope. The advisories are still rated low, moderate and moderate, none is withdrawn, and 0 alerts are open.
+  - `deepmerge` 4.3.1 is still the latest release, with no fix.
+  - Jest 30.5.2, still the latest, requires `glob` ^13.0.6. `babel-plugin-istanbul` 8.0.0 requires `test-exclude` ^7.0.1. `test-exclude` 8.0.0 requires `glob` ^13.0.6.
+  - ESLint 10.14.0 requires `minimatch` ^10.2.6, `@eslint/config-array` ^10.2.4, `@eslint/eslintrc` ^3.1.5, the import, jsx-a11y and react plugins ^3.1.2, and typescript-eslint 8.72.1 ^10.2.2.
+  - The weekly report has no non-development entry (runtime 0).
+  - A wording point: `glob` 14 (14.0.2 on 27 October and 14.0.3 on 28 October 2026, both before the acceptance) allows `minimatch` ^11, and `glob` is on the `minimatch` trigger's list. It does not fire the trigger, because nothing installed here can use `glob` 14 until Jest, `test-exclude` or `babel-plugin-istanbul` allows it, and that is the `glob` trigger.
 
 #### Stage 3A, part 3, step 3: backend lock and Render's build tools
 

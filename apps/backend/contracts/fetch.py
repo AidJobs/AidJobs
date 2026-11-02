@@ -1,13 +1,47 @@
-"""Decide whether an already-resolved address may be connected to."""
+"""Decide whether an already-resolved address may be connected to.
+
+The ranges are listed here because Python's own `is_private` and `is_reserved` lists differ
+between patch releases: Python 3.11.9 permits 6to4 (`2002::/16`) and `3fff::/20`, which later
+releases refuse. Python's checks still apply, and can only refuse more.
+"""
 import ipaddress
 
-_BLOCKED_V4 = (
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
+_BLOCKED_V4 = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "0.0.0.0/8",
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "192.0.2.0/24",
+        "192.88.99.0/24",
+        "192.168.0.0/16",
+        "198.18.0.0/15",
+        "198.51.100.0/24",
+        "203.0.113.0/24",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+    )
 )
+
+# IPv6 outside global unicast is refused whole: loopback, unspecified, IPv4-compatible,
+# NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), discard, unique local, link-local, site-local
+# (`fec0::/10`), multicast and SRv6 (`5f00::/16`). IPv4-mapped addresses are unwrapped first.
+_GLOBAL_V6 = ipaddress.ip_network("2000::/3")
+_BLOCKED_V6 = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "2001::/23",
+        "2001:db8::/32",
+        "2002::/16",
+        "3fff::/20",
+    )
+)
+
+_PERMITTED_PORTS = frozenset({80, 443})
 
 _BLOCKED_HOSTS = frozenset(
     {
@@ -23,12 +57,19 @@ def _unwrap(addr: ipaddress.IPv4Address | ipaddress.IPv6Address):
     return mapped if mapped is not None else addr
 
 
+def _listed_permitted(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """The tables above alone, whatever Python's own lists say."""
+    if addr.version == 4:
+        return not any(addr in network for network in _BLOCKED_V4)
+    return addr in _GLOBAL_V6 and not any(addr in network for network in _BLOCKED_V6)
+
+
 def address_permitted(ip: str) -> bool:
     try:
         addr = _unwrap(ipaddress.ip_address(ip))
     except ValueError:
         return False
-    if addr.version == 4 and any(addr in network for network in _BLOCKED_V4):
+    if not _listed_permitted(addr):
         return False
     if (
         addr.is_unspecified
@@ -60,6 +101,10 @@ def hostname_permitted(host: str) -> bool:
 
 def scheme_permitted(scheme: str) -> bool:
     return scheme in {"http", "https"}
+
+
+def port_permitted(port: int) -> bool:
+    return port in _PERMITTED_PORTS
 
 
 def pin_address(ips: list[str]) -> str | None:

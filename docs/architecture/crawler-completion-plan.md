@@ -85,6 +85,8 @@ Preflight before any edit. Do not change admission, persistence, extraction, ide
 
 Exit: the three live fetchers call the policy, a blocked address never connects, a redirect to a blocked address fails, oversized and timed-out responses fail closed, and tests cover those cases.
 
+Tightened on 2 November 2026, with the user's approval, in the security plan's "Shared fetch policy gaps" pull request: the refused ranges are listed in `contracts/fetch.py` rather than taken from Python's own lists, which differ between patch releases; only ports 80 and 443; DNS lookups limited to 10 seconds on their own threads; a total time limit per fetch; and only known request headers kept after a redirect to another origin. Its record is in `security-hardening-plan.md`.
+
 #### B1 verification record
 
 Recorded 10 October 2026 from a read-only review, then updated the same day after the local commit. No production crawl, reindex, or data change was run. The implementation is local commit `faf00d1`, message `fix: enforce outbound fetch security policy`. It is not pushed or deployed. The verification documentation commit `9ba9eee` remains unchanged.
