@@ -178,21 +178,22 @@ def test_no_route_reaches_a_network(walk):
 
 
 def test_the_network_guard_records_and_refuses_an_attempt():
+    # Aimed at loopback (port 9, discard), so even a broken guard sends nothing off the machine.
     probe = """
 import urllib.request
 import httpx
 try:
-    urllib.request.urlopen("http://192.0.2.1/", timeout=1)
+    urllib.request.urlopen("http://127.0.0.1:9/", timeout=1)
 except OSError:
     pass
 try:
-    socket.create_connection(("192.0.2.1", 80), timeout=1)
+    socket.create_connection(("127.0.0.1", 9), timeout=1)
 except OSError:
     pass
 async def via_the_loop():
     async with httpx.AsyncClient() as http:
         try:
-            await http.head("http://192.0.2.1/")
+            await http.head("http://127.0.0.1:9/")
         except httpx.HTTPError:
             pass
 asyncio.run(via_the_loop())

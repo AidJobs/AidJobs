@@ -18,6 +18,8 @@ import ast
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 BACKEND = Path(__file__).resolve().parents[1]
 
 ALLOWED = {
@@ -110,8 +112,21 @@ def _stored(node, name):
             and node.func.attr in {"append", "extend", "update"} and _refs(node, name))
 
 
+# Their cause argument may hold the exception: it goes only to the log. Any other argument becomes
+# the response's text.
+CAUSE_ARGUMENT = {"InternalError": 1, "_item_error": 3, "_source_error": 2}
+
+
+def _message_refs(call, name):
+    position = CAUSE_ARGUMENT[_call_name(call)]
+    return (any(_refs(arg, name) for i, arg in enumerate(call.args) if i != position)
+            or any(_refs(kw.value, name) for kw in call.keywords if kw.arg != "cause"))
+
+
 def _reaches_response(node, name):
     if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
+        if _call_name(node.exc) in CAUSE_ARGUMENT:
+            return _message_refs(node.exc, name)
         return _call_name(node.exc) == "HTTPException" and _refs(node.exc, name)
     if isinstance(node, ast.Return):
         return node.value is not None and _refs(node.value, name)
@@ -163,21 +178,49 @@ def test_no_new_exception_text_in_responses():
     assert not new, f"exception text reaches a response in new places (use InternalError): {new}"
 
 
-def _bindings(path):
-    """Each name a file defines or binds, except an import of a describer from its reviewed home."""
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+def _import_bindings(node):
+    """An import of a describer from its reviewed home, under its own name, binds nothing new."""
+    if isinstance(node, ast.Import):
+        yield from (alias.asname or alias.name.split(".")[0] for alias in node.names)
+        return
+    for alias in node.names:
+        if alias.name == "*":
+            yield from DESCRIBERS  # the names it binds are unknown, so it binds every describer
+            continue
+        home = DESCRIBERS.get(alias.name)
+        if alias.asname or home is None or node.level or node.module != _module(home):
+            yield alias.asname or alias.name
+
+
+def _bindings(tree):
+    """Every name a module defines or binds, in any form, and names set by attribute or key."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             yield node.name
-        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            yield from (t.id for t in targets if isinstance(t, ast.Name))
-        elif isinstance(node, ast.ImportFrom):
-            for alias in node.names:
-                home = DESCRIBERS.get(alias.name)
-                if alias.asname or home is None or node.module != _module(home):
-                    yield alias.asname or alias.name
-        elif isinstance(node, ast.Import):
-            yield from (alias.asname or alias.name for alias in node.names)
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            yield node.id  # assignment, unpacking, for, with, walrus, del
+        elif isinstance(node, ast.arg):
+            yield node.arg  # parameters, lambda arguments included
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            yield node.name
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            yield node.name
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            yield node.rest
+        elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
+            yield node.attr  # builtins.NAME = ..., module.NAME = ...
+        elif (isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)
+              and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)):
+            yield node.slice.value  # globals()["NAME"] = ...
+        elif (isinstance(node, ast.Call) and _call_name(node) == "setattr" and len(node.args) > 1
+              and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str)):
+            yield node.args[1].value
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            yield from _import_bindings(node)
+
+
+def _describer_bindings(source):
+    return Counter(name for name in _bindings(ast.parse(source)) if name in DESCRIBERS)
 
 
 def test_each_describer_is_the_reviewed_one():
@@ -186,10 +229,63 @@ def test_each_describer_is_the_reviewed_one():
     homes = [BACKEND / rel for rel in sorted(set(DESCRIBERS.values()))]
     for path in sorted(set(_scanned_files()) | set(homes)):
         rel = path.relative_to(BACKEND).as_posix()
-        for name in _bindings(path):
-            if name in DESCRIBERS:
-                defined[(name, rel)] += 1
+        for name, count in _describer_bindings(path.read_text(encoding="utf-8")).items():
+            defined[(name, rel)] += count
     assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
+
+
+@pytest.mark.parametrize("source", [
+    "def describe_failure(error):\n    return str(error)\n",
+    "async def describe_failure(error):\n    return str(error)\n",
+    "class describe_failure:\n    pass\n",
+    "describe_failure = str\n",
+    "describe_failure: object = str\n",
+    "describe_failure, other = str, 1\n",
+    "[describe_failure] = [str]\n",
+    "for describe_failure in [str]:\n    pass\n",
+    "with open('x') as describe_failure:\n    pass\n",
+    "if (describe_failure := str):\n    pass\n",
+    "def route(describe_failure=str):\n    pass\n",
+    "route = lambda describe_failure: describe_failure\n",
+    "try:\n    pass\nexcept Exception as describe_failure:\n    pass\n",
+    "match value:\n    case [*describe_failure]:\n        pass\n",
+    "from app.helpers import describe_failure\n",
+    "from contracts.outbound import fetch_message as describe_failure\n",
+    "from app.sources import describe_failure as describe_failure\n",
+    "from .sources import describe_failure\n",
+    "from app.sources import *\n",
+    "import describe_failure\n",
+    "import app.helpers as describe_failure\n",
+    "globals()['describe_failure'] = str\n",
+    "import builtins\nbuiltins.describe_failure = str\n",
+    "import builtins\nsetattr(builtins, 'describe_failure', str)\n",
+])
+def test_a_second_binding_of_a_describer_is_found(source):
+    assert _describer_bindings(source)["describe_failure"] >= 1
+
+
+def test_an_import_from_the_reviewed_home_binds_nothing_new():
+    assert _describer_bindings("from app.sources import describe_failure\n") == Counter()
+    assert _describer_bindings("from contracts.outbound import fetch_message\n") == Counter()
+    assert _describer_bindings("from contracts.outbound import fetch_message as fm\n") == Counter()
+
+
+def test_exception_text_in_an_internal_error_message_is_found():
+    source = (
+        "def route():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception as e:\n"
+        "        raise InternalError(f'Failed to work: {e}', cause=e)\n"
+    )
+    assert _findings_in(source) == {"core/link_validator.py::route": 1}
+    helper = source.replace("InternalError(f'Failed to work: {e}', cause=e)",
+                            "_item_error(f'Failed: {e}', 'job', job_id, e)")
+    assert _findings_in(helper) == {"core/link_validator.py::route": 1}
+    safe = source.replace("f'Failed to work: {e}'", "'Failed to work'")
+    assert _findings_in(safe) == {}
+    positional = source.replace("cause=e", "e")
+    assert _findings_in(positional.replace("f'Failed to work: {e}'", "'Failed to work'")) == {}
 
 
 def _findings_in(source, rel="core/link_validator.py"):

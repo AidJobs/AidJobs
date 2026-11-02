@@ -1059,10 +1059,13 @@ async def run_deletion_migration(admin: str = Depends(admin_required)):
 
 MAX_LINKS_PER_REQUEST = 100
 MAX_LINK_LENGTH = 2048
+MAX_JOB_ID_LENGTH = 64  # job IDs are 36-character UUIDs
+
+JobId = Annotated[str, StringConstraints(max_length=MAX_JOB_ID_LENGTH)]
 
 
 class ValidateLinksRequest(BaseModel):
-    job_ids: Optional[List[str]] = Field(None, max_length=MAX_LINKS_PER_REQUEST)
+    job_ids: Optional[List[JobId]] = Field(None, max_length=MAX_LINKS_PER_REQUEST)
     urls: Optional[List[Annotated[str, StringConstraints(max_length=MAX_LINK_LENGTH)]]] = Field(
         None, max_length=MAX_LINKS_PER_REQUEST
     )
@@ -1148,7 +1151,10 @@ async def validate_links(request: ValidateLinksRequest, admin=Depends(admin_requ
 
 @link_validation_router.get("/stats")
 async def get_validation_stats(
-    job_ids: Optional[str] = Query(None, description="Comma-separated job IDs"),
+    job_ids: Optional[str] = Query(
+        None, description="Comma-separated job IDs",
+        max_length=MAX_LINKS_PER_REQUEST * (MAX_JOB_ID_LENGTH + 1),
+    ),
     admin=Depends(admin_required)
 ):
     """
@@ -1160,15 +1166,21 @@ async def get_validation_stats(
     Returns:
         Validation statistics
     """
+    job_id_list = None
+    if job_ids:
+        job_id_list = [jid.strip() for jid in job_ids.split(',') if jid.strip()]
+        if len(job_id_list) > MAX_LINKS_PER_REQUEST:
+            raise HTTPException(status_code=422,
+                                detail=f"At most {MAX_LINKS_PER_REQUEST} job IDs")
+        if any(len(jid) > MAX_JOB_ID_LENGTH for jid in job_id_list):
+            raise HTTPException(status_code=422,
+                                detail=f"Each job ID is at most {MAX_JOB_ID_LENGTH} characters")
+
     db_url = get_db_url()
     
     try:
         from core.link_validator import get_link_validator
         link_validator = get_link_validator(db_url)
-        
-        job_id_list = None
-        if job_ids:
-            job_id_list = [jid.strip() for jid in job_ids.split(',') if jid.strip()]
         
         stats = link_validator.get_validation_stats(job_id_list)
         

@@ -63,10 +63,10 @@ def describe_link_failure(error: BaseException) -> str:
         if _caused_by_tls(error):
             return "Validation error: TLS error"
         return "Validation error: connection failed"
-    if isinstance(error, httpcore.RemoteProtocolError):
-        return "Validation error: invalid response"
     if isinstance(error, (httpcore.LocalProtocolError, ValueError)):
         return "Validation error: invalid URL"
+    if isinstance(error, httpcore.ProtocolError):
+        return "Validation error: invalid response"
     return f"Validation error: unexpected error (ref {current_request_id()[:8] or 'unavailable'})"
 
 

@@ -4,6 +4,7 @@ Security stage 3, phase 2, PR 2 changes what an unexpected failure says, routes 
 through the outbound policy and limits its request size. The database and the validator are fakes;
 nothing touches a network.
 """
+import psycopg2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -160,6 +161,7 @@ def test_no_urls_still_answers_ok(monkeypatch):
     {"urls": ["https://jobs.example/" + str(i) for i in range(101)]},
     {"job_ids": [SID] * 101},
     {"urls": ["https://jobs.example/" + "a" * 2049]},
+    {"job_ids": ["j" * 65]},
 ])
 def test_oversized_requests_are_refused_before_any_work(monkeypatch, body):
     from core import link_validator
@@ -175,7 +177,79 @@ def test_oversized_requests_are_refused_before_any_work(monkeypatch, body):
 
 def test_the_limits_accept_their_maximum():
     model = crawler_admin.ValidateLinksRequest(
-        urls=["https://jobs.example/" + "a" * (2048 - 21)] * 100, job_ids=[SID] * 100)
+        urls=["https://jobs.example/" + "a" * (2048 - 21)] * 100, job_ids=["j" * 64] * 100)
     assert len(model.urls) == 100 and len(model.urls[0]) == 2048
+    assert len(model.job_ids) == 100 and len(model.job_ids[0]) == 64
     with pytest.raises(ValidationError):
         crawler_admin.ValidateLinksRequest(urls=["x"] * 101)
+
+
+class StatsValidator:
+    def __init__(self):
+        self.seen = "not called"
+
+    def get_validation_stats(self, job_ids):
+        self.seen = job_ids
+        return {"total": 0}
+
+
+@pytest.mark.parametrize("job_ids, detail", [
+    (",".join([SID] * 101), "At most 100 job IDs"),
+    ("j" * 65, "Each job ID is at most 64 characters"),
+])
+def test_stats_refuses_too_many_or_too_long_job_ids(monkeypatch, job_ids, detail):
+    from core import link_validator
+
+    fake = StatsValidator()
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    monkeypatch.setattr(link_validator, "get_link_validator", lambda db_url: fake)
+    response = _app().get("/api/admin/link-validation/stats", params={"job_ids": job_ids})
+    assert response.status_code == 422
+    assert response.json() == {"detail": detail}
+    assert fake.seen == "not called"
+
+
+def test_stats_refuses_an_oversized_query_before_splitting_it(monkeypatch):
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    response = _app().get("/api/admin/link-validation/stats",
+                          params={"job_ids": "j" * (100 * 65 + 1)})
+    assert response.status_code == 422
+
+
+def test_stats_accepts_its_maximum(monkeypatch):
+    from core import link_validator
+
+    fake = StatsValidator()
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    monkeypatch.setattr(link_validator, "get_link_validator", lambda db_url: fake)
+    ids = ["j" * 64] * 100
+    response = _app().get("/api/admin/link-validation/stats", params={"job_ids": ",".join(ids)})
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "data": {"total": 0}}
+    assert fake.seen == ids
+
+
+class BrokenConnection(FakeConnection):
+    """Fails its statement, then fails its rollback too (a dropped connection does both)."""
+
+    def cursor(self, cursor_factory=None):
+        cursor = FakeCursor()
+
+        def fail(sql, params=None):
+            raise psycopg2.OperationalError("server closed the connection")
+
+        cursor.execute = fail
+        return cursor
+
+    def rollback(self):
+        raise psycopg2.InterfaceError("connection already closed")
+
+
+def test_a_failed_rollback_still_answers_the_fixed_message(monkeypatch):
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    monkeypatch.setattr(crawler_admin.psycopg2, "connect", lambda url: BrokenConnection())
+    response = _app().post("/api/admin/crawl/delete-jobs-by-org", params={"org_name": "Probe"})
+    assert response.status_code == 500
+    request_id = response.json()["request_id"]
+    assert response.json() == {"detail": f"Failed to delete jobs (ref {request_id[:8]})",
+                               "request_id": request_id}

@@ -9,8 +9,10 @@ import functools
 import logging
 import socket
 import ssl
+import threading
 
 import httpcore
+import httpx
 import pytest
 
 from app.log_safety import REQUEST_ID
@@ -35,12 +37,25 @@ def _run(coro):
 def no_network(monkeypatch):
     """Any real connection or DNS lookup is recorded and refused.
 
-    The event loop is made first: on Windows, a new loop connects a loopback socket pair.
+    Only the loopback socket pair that a new event loop (or the test client) makes on Windows may
+    connect, and only from inside socket.socketpair.
     """
     _LOOP[:] = [asyncio.new_event_loop()]
     attempts = []
+    pairing = threading.local()
+    real_connect = socket.socket.connect
+    real_pair = socket.socketpair
+
+    def pair(*args, **kwargs):
+        pairing.on = True
+        try:
+            return real_pair(*args, **kwargs)
+        finally:
+            pairing.on = False
 
     def refuse(*args, **kwargs):
+        if getattr(pairing, "on", False):
+            return real_connect(*args, **kwargs)
         attempts.append(args[:2])
         raise AssertionError(f"real network use attempted: {args[:2]!r}")
 
@@ -51,6 +66,7 @@ def no_network(monkeypatch):
     # Windows' proactor loop connects without socket.connect, so the loop's own entry points too.
     monkeypatch.setattr(asyncio.base_events.BaseEventLoop, "create_connection", refuse_async)
     monkeypatch.setattr(asyncio.base_events.BaseEventLoop, "sock_connect", refuse_async)
+    monkeypatch.setattr(socket, "socketpair", pair)
     monkeypatch.setattr(socket.socket, "connect", refuse)
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
     monkeypatch.setattr(socket, "create_connection", refuse)
@@ -137,6 +153,48 @@ def _validate(validator, url):
 
 def _connects(events):
     return [e for e in events if e[0] == "connect"]
+
+
+def test_the_network_guard_records_and_refuses_every_route_out(no_network):
+    """Plain sockets and the event loop are both covered; aimed at loopback, so nothing leaves."""
+    async def through_the_loop():
+        async with httpx.AsyncClient() as client:
+            await client.head("http://127.0.0.1:9/")
+
+    with pytest.raises(BaseException):
+        _run(through_the_loop())
+    assert no_network, "the event-loop path was not refused"
+    no_network.clear()
+    with pytest.raises(AssertionError):
+        socket.create_connection(("127.0.0.1", 9), timeout=1)
+    with pytest.raises(AssertionError):
+        socket.socket().connect(("127.0.0.1", 9))
+    assert len(no_network) == 2
+    no_network.clear()
+
+
+def test_the_route_refuses_a_blocked_url_through_the_real_validator(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import crawler_admin
+
+    validator, events, _cached = _validator(monkeypatch, [_response(200)])
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    monkeypatch.setattr(link_validator, "get_link_validator", lambda db_url: validator)
+    app = FastAPI()
+    app.include_router(crawler_admin.link_validation_router)
+    app.dependency_overrides[crawler_admin.admin_required] = lambda: "test-admin"
+    urls = ["http://169.254.169.254/latest/meta-data/", "http://localhost:8000/admin"]
+    response = TestClient(app).post("/api/admin/link-validation/validate", json={"urls": urls})
+    body = response.json()
+    assert response.status_code == 200
+    assert (body["total"], body["valid"], body["invalid"]) == (2, 0, 2)
+    assert {r["error"] for r in body["results"].values()} <= {
+        "Validation error: destination address is not permitted",
+        "Validation error: destination host is not permitted",
+    }
+    assert _connects(events) == []
 
 
 @pytest.mark.parametrize("url, addresses", [
@@ -297,6 +355,11 @@ def test_ordinary_connection_failures_keep_a_category(monkeypatch, failure, expe
      "Validation error: invalid response"),
     (httpcore.LocalProtocolError("Illegal target characters " + FRAGMENT),
      "Validation error: invalid URL"),
+    (httpcore.ProtocolError("protocol " + FRAGMENT), "Validation error: invalid response"),
+    (TimeoutError("deadline passed " + FRAGMENT), "Validation error: timeout"),
+    (socket.timeout("timed out " + FRAGMENT), "Validation error: timeout"),
+    (ssl.SSLError("handshake " + FRAGMENT), "Validation error: TLS error"),
+    (ConnectionResetError("reset " + FRAGMENT), "Validation error: connection failed"),
     (ValueError("Port out of range " + FRAGMENT), "Validation error: invalid URL"),
     (UnicodeError("label too long " + FRAGMENT), "Validation error: invalid URL"),
     (RuntimeError("password=" + FRAGMENT), "Validation error: unexpected error (ref abcdef12)"),
