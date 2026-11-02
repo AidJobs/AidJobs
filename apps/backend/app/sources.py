@@ -32,6 +32,8 @@ router = APIRouter()
 
 DB_NOT_CONFIGURED = "Database not configured"
 DB_SETTINGS_UNREADABLE = "Database settings could not be read"
+# The whole check of one source URL, every redirect included
+SOURCE_CHECK_TOTAL_SECONDS = 20.0
 
 
 def _connection_params() -> dict:
@@ -653,6 +655,7 @@ async def _policy_head(url: str) -> dict:
             method="HEAD",
             headers={"User-Agent": "AidJobsBot/1.0 (+contact@aidjobs.app)"},
             timeout=10.0,
+            total_timeout=SOURCE_CHECK_TOTAL_SECONDS,
         )
     except FetchError as exc:
         return {"ok": False, "status": 0, "error": fetch_message(exc) or "Fetch failed"}

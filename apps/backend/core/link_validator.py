@@ -33,6 +33,8 @@ VALID_STATUS_CODES = {200, 201, 202, 301, 302, 303, 307, 308}
 MAX_REDIRECT_HOPS = 10
 
 CHECK_TIMEOUT_SECONDS = 10.0
+# The whole check of one link, every hop included
+CHECK_TOTAL_SECONDS = 20.0
 
 # Failures with a category of their own; anything else is unexpected and logged with its cause
 _EXPECTED_FAILURES = (FetchError, httpcore.TimeoutException, httpcore.NetworkError,
@@ -221,6 +223,7 @@ class LinkValidator:
                 'Accept': '*/*'
             },
             timeout=CHECK_TIMEOUT_SECONDS,
+            total_timeout=CHECK_TOTAL_SECONDS,
             max_redirects=MAX_REDIRECT_HOPS,
         )
         return result.status_code, result.url, result.redirects

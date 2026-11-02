@@ -3,6 +3,9 @@
 Each hop resolves DNS, rejects any prohibited answer, and opens a new
 connection pool whose TCP connect uses only the pinned address. TLS SNI and
 certificate verification keep the URL hostname.
+
+`timeout` bounds each network step; `total_timeout` bounds the whole fetch,
+every hop and the body included.
 """
 from __future__ import annotations
 
@@ -11,17 +14,35 @@ import ipaddress
 import socket
 import zlib
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
 import brotli
 import httpcore
 
-from contracts.fetch import hostname_permitted, pin_address, scheme_permitted
+from contracts.fetch import hostname_permitted, pin_address, port_permitted, scheme_permitted
 
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 20
+TOTAL_TIMEOUT_SECONDS = 60.0
+DNS_TIMEOUT_SECONDS = 5.0
+DNS_WORKERS = 8
 _REDIRECTS = {301, 302, 303, 307, 308}
+# Sent again after a redirect to another origin; any other header (a key, a token) is dropped.
+_CROSS_ORIGIN_HEADERS = frozenset({
+    "user-agent",
+    "accept",
+    "accept-language",
+    "accept-encoding",
+    "cache-control",
+    "connection",
+    "upgrade-insecure-requests",
+    "sec-fetch-dest",
+    "sec-fetch-mode",
+    "sec-fetch-site",
+    "sec-fetch-user",
+})
 _TIMEOUTS = (
     httpcore.ConnectTimeout,
     httpcore.ReadTimeout,
@@ -42,13 +63,16 @@ class FetchError(Exception):
 FETCH_MESSAGES = frozenset({
     "unix sockets are not used",
     "DNS resolution failed",
+    "DNS resolution timed out",
     "URL scheme or host is not permitted",
     "destination host is not permitted",
+    "destination port is not permitted",
     "destination address is not permitted",
     "response exceeds size limit",
     "content encoding failed",
     "content encoding is not permitted",
     "timeout",
+    "time limit",
     "redirect limit",
     "redirect destination is missing",
     "redirect destination is not permitted",
@@ -124,6 +148,11 @@ def _default_pool_factory(backend: httpcore.AsyncNetworkBackend) -> httpcore.Asy
     )
 
 
+# A lookup cannot be stopped once it starts, so lookups get their own threads: a slow resolver
+# then cannot hold up the threads the crawler uses for its database steps.
+_dns_pool = ThreadPoolExecutor(max_workers=DNS_WORKERS, thread_name_prefix="aidjobs-dns")
+
+
 async def _default_resolver(host: str, port: int) -> list[str]:
     def lookup() -> list[str]:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
@@ -135,9 +164,21 @@ async def _default_resolver(host: str, port: int) -> list[str]:
         return ips
 
     try:
-        return await asyncio.to_thread(lookup)
+        return await asyncio.get_running_loop().run_in_executor(_dns_pool, lookup)
     except OSError as exc:
         raise FetchError("DNS resolution failed") from exc
+
+
+def _port(scheme: str, parts) -> int:
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise FetchError("destination port is not permitted") from exc
+    if port is None:
+        port = 443 if scheme == "https" else 80
+    if not port_permitted(port):
+        raise FetchError("destination port is not permitted")
+    return port
 
 
 def _split(url: str) -> tuple[str, str, int, bytes]:
@@ -147,7 +188,7 @@ def _split(url: str) -> tuple[str, str, int, bytes]:
     host = parts.hostname
     if not hostname_permitted(host):
         raise FetchError("destination host is not permitted")
-    port = parts.port or (443 if parts.scheme == "https" else 80)
+    port = _port(parts.scheme, parts)
     path = parts.path or "/"
     if parts.query:
         path = f"{path}?{parts.query}"
@@ -169,18 +210,16 @@ def _header_map(headers: list[tuple[bytes, bytes]]) -> dict[str, str]:
     return mapped
 
 
-def _same_host(left: str, right: str) -> bool:
-    return (urlsplit(left).hostname or "").rstrip(".").lower() == (
-        urlsplit(right).hostname or ""
-    ).rstrip(".").lower()
+def _origin(url: str) -> tuple[str, str, int]:
+    """Scheme, host and port of a URL that `_split` has already accepted."""
+    parts = urlsplit(url)
+    scheme = parts.scheme.lower()
+    host = (parts.hostname or "").rstrip(".").lower()
+    return scheme, host, _port(scheme, parts)
 
 
-def _drop_sensitive(headers: dict[str, str]) -> dict[str, str]:
-    return {key: value for key, value in headers.items() if key.lower() not in {
-        "authorization",
-        "proxy-authorization",
-        "cookie",
-    }}
+def _cross_origin_headers(headers: dict[str, str]) -> dict[str, str]:
+    return {key: value for key, value in headers.items() if key.lower() in _CROSS_ORIGIN_HEADERS}
 
 
 def _raw_headers(host: str, headers: dict[str, str]) -> list[tuple[bytes, bytes]]:
@@ -280,6 +319,18 @@ def _decode_content(body: bytes, headers: dict[str, str], max_decoded: int) -> b
     return _inflate_brotli(body, max_decoded)
 
 
+async def _resolve(resolver: Resolver, host: str, port: int, dns_timeout: float) -> list[str]:
+    try:
+        async with asyncio.timeout(dns_timeout) as limit:
+            return await resolver(host, port)
+    except TimeoutError as exc:
+        if limit.expired():
+            raise FetchError("DNS resolution timed out") from exc
+        raise FetchError("DNS resolution failed") from exc
+    except OSError as exc:
+        raise FetchError("DNS resolution failed") from exc
+
+
 async def _hop(
     url: str,
     method: str,
@@ -289,12 +340,10 @@ async def _hop(
     resolver: Resolver,
     backend_factory: BackendFactory,
     pool_factory: PoolFactory,
+    dns_timeout: float,
 ) -> tuple[int, dict[str, str], bytes | None, str | None]:
     scheme, host, port, target = _split(url)
-    try:
-        addresses = await resolver(host, port)
-    except OSError as exc:
-        raise FetchError("DNS resolution failed") from exc
+    addresses = await _resolve(resolver, host, port, dns_timeout)
     pinned = pin_address(addresses)
     if pinned is None:
         raise FetchError("destination address is not permitted")
@@ -344,17 +393,51 @@ async def fetch_url(
     method: str = "GET",
     headers: dict[str, str] | None = None,
     timeout: float = 30.0,
+    total_timeout: float = TOTAL_TIMEOUT_SECONDS,
+    dns_timeout: float = DNS_TIMEOUT_SECONDS,
     max_bytes: int = MAX_RESPONSE_BYTES,
     max_redirects: int = MAX_REDIRECTS,
     resolver: Resolver | None = None,
     backend_factory: BackendFactory | None = None,
     pool_factory: PoolFactory | None = None,
 ) -> FetchResult:
-    """Fetch one URL. The initial request is not counted as a redirect."""
-    resolve = resolver or _default_resolver
-    backends = backend_factory or _default_backend_factory
-    pools = pool_factory or _default_pool_factory
-    request_headers = dict(headers or {})
+    """Fetch one URL. The initial request is not counted as a redirect.
+
+    Running out of `total_timeout` raises FetchError("time limit"). A caller's own deadline
+    expiring first is not converted: its cancellation reaches the caller unchanged.
+    """
+    try:
+        async with asyncio.timeout(total_timeout) as limit:
+            return await _follow(
+                url,
+                method,
+                dict(headers or {}),
+                timeout,
+                dns_timeout,
+                max_bytes,
+                max_redirects,
+                resolver or _default_resolver,
+                backend_factory or _default_backend_factory,
+                pool_factory or _default_pool_factory,
+            )
+    except TimeoutError as exc:
+        if limit.expired():
+            raise FetchError("time limit") from exc
+        raise
+
+
+async def _follow(
+    url: str,
+    method: str,
+    request_headers: dict[str, str],
+    timeout: float,
+    dns_timeout: float,
+    max_bytes: int,
+    max_redirects: int,
+    resolve: Resolver,
+    backends: BackendFactory,
+    pools: PoolFactory,
+) -> FetchResult:
     current = url
     followed = 0
     while True:
@@ -367,6 +450,7 @@ async def fetch_url(
             resolve,
             backends,
             pools,
+            dns_timeout,
         )
         if location is None:
             decoded = _decode_content(body or b"", mapped, max_bytes)
@@ -381,6 +465,6 @@ async def fetch_url(
         except ValueError as exc:
             raise FetchError("redirect destination is not permitted") from exc
         _split(nxt)
-        if not _same_host(current, nxt):
-            request_headers = _drop_sensitive(request_headers)
+        if _origin(current) != _origin(nxt):
+            request_headers = _cross_origin_headers(request_headers)
         current = nxt
