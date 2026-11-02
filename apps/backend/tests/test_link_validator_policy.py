@@ -392,6 +392,32 @@ def test_an_expected_failure_logs_no_traceback(monkeypatch, caplog):
     assert not any(r.exc_info for r in caplog.records)
 
 
+@pytest.mark.parametrize("error", [
+    FetchError("timeout"),
+    httpcore.ConnectError("refused"),
+    httpcore.ReadTimeout("slow"),
+    httpcore.ProtocolError("protocol"),
+    httpcore.RemoteProtocolError("bad status line"),
+    httpcore.LocalProtocolError("bad target"),
+    ConnectionResetError("reset"),
+    TimeoutError("deadline"),
+    ssl.SSLError("handshake"),
+    ValueError("Port out of range"),
+])
+def test_every_categorised_failure_is_logged_without_a_traceback(monkeypatch, caplog, error):
+    """Only an unexpected failure is logged with its cause; a categorised one is a single line."""
+    async def fail(*args, **kwargs):
+        raise error
+
+    validator, _events, _cached = _validator(monkeypatch)
+    monkeypatch.setattr(link_validator, "fetch_url", fail)
+    with caplog.at_level(logging.WARNING, logger="core.link_validator"):
+        result = _validate(validator, "https://jobs.example/apply")
+    assert "unexpected error" not in result["error"]
+    assert not any(r.exc_info for r in caplog.records)
+    assert not any("Unexpected failure" in r.getMessage() for r in caplog.records)
+
+
 def test_an_unreachable_cache_is_a_miss_and_a_skipped_write(monkeypatch, caplog):
     import psycopg2
 

@@ -867,7 +867,7 @@ What changes:
   - a rule for a dict literal holding exception text (the link validator's shape, missed before);
   - a rule for exception text in the message of `InternalError`, `_item_error` or `_source_error` (their cause argument goes only to the log and is allowed);
   - a scan of `core/link_validator.py`;
-  - a describer check that names each describer's home and accepts an import only from there, under its own name. It counts every other way a module can bind the name: definitions and classes, assignment and unpacking, `for`, `with`, walrus, parameters and lambda arguments, `except` and `match` names, star imports, relative and aliased imports, attribute and `globals()` assignment, and `setattr`. Each form has its own test.
+  - a describer check that names each describer's home and accepts an import only from there, under its own name. It counts every other way a module can bind the name: definitions and classes, assignment and unpacking, `for`, `with`, walrus, parameters and lambda arguments, `except` and `match` names, star imports, relative and aliased imports, attribute and `globals()` assignment, and `setattr`. Each form has its own test. Dynamic forms (`exec`, `locals().update`, a module's `__dict__`) are not seen.
 
   Its count on `main`'s link validator is 2, and on the branch 0. A re-raise rule (`raise Exception(f"…{e}")`) was not added: such text reaches a response only through a later `except`, which the dict and return rules cover.
 
@@ -888,7 +888,12 @@ Evidence, 1 November 2026 (local, Python 3.11.9 with the locked test requirement
   - a route test through the real validator;
   - a test of a failed rollback.
 
-  The five mutations it found uncaught, and three more on the new caps and checks, are now each caught by a test.
+- **Re-review of those follow-ups** (`57a0ed9`; CI 701 passed, 9 skipped): "approve", nothing blocking. 21 of 24 mutations caught. The three it found uncaught are now each caught by a test, with the user's approval:
+  - the overall `/stats` length limit, tested with a query made mostly of commas;
+  - exception text in an `InternalError` keyword argument other than `cause`;
+  - a categorised failure, a base protocol error included, logged with a traceback.
+
+  Before this, the base protocol error was not caught in the expected-failures list (it was caught only as a category). Noted, not changed: `/stats`'s own 422 refusals carry a string `detail`, while FastAPI's carry a list; no page calls `/stats`.
 - **Crawl path:** the only change is the defaulted `FetchResult.redirects` field. CI's crawl-path tests pass unchanged (gates, outbound, the UNICEF saved excerpts, the site-reader fallback). PR 1's offline comparison over 12 saved sources was not repeated: its saved pages are not available in this environment.
 - **A local evidence demo made two connection attempts from the development machine.** The demo first blocked only Python's socket functions, and Windows' event loop connects without them. So `main`'s validator tried `10.0.0.5:80` and `169.254.169.254:80` from the development machine, and both failed at once. Nothing reached production. The demo and both new test files now also block the event loop's connect functions.
 

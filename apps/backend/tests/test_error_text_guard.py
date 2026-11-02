@@ -286,6 +286,12 @@ def test_exception_text_in_an_internal_error_message_is_found():
     assert _findings_in(safe) == {}
     positional = source.replace("cause=e", "e")
     assert _findings_in(positional.replace("f'Failed to work: {e}'", "'Failed to work'")) == {}
+    keyword = source.replace("InternalError(f'Failed to work: {e}', cause=e)",
+                             "InternalError(message=f'Failed to work: {e}', cause=e)")
+    assert _findings_in(keyword) == {"core/link_validator.py::route": 1}
+    status = source.replace("InternalError(f'Failed to work: {e}', cause=e)",
+                            "InternalError('Failed to work', cause=e, status_code=len(str(e)))")
+    assert _findings_in(status) == {"core/link_validator.py::route": 1}
 
 
 def _findings_in(source, rel="core/link_validator.py"):

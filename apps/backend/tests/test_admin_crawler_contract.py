@@ -210,10 +210,18 @@ def test_stats_refuses_too_many_or_too_long_job_ids(monkeypatch, job_ids, detail
 
 
 def test_stats_refuses_an_oversized_query_before_splitting_it(monkeypatch):
+    """Mostly commas, so only the overall length limit refuses it: FastAPI's own 422 shape."""
+    from core import link_validator
+
+    fake = StatsValidator()
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
-    response = _app().get("/api/admin/link-validation/stats",
-                          params={"job_ids": "j" * (100 * 65 + 1)})
+    monkeypatch.setattr(link_validator, "get_link_validator", lambda db_url: fake)
+    query = "," * (100 * 65) + "j"
+    response = _app().get("/api/admin/link-validation/stats", params={"job_ids": query})
     assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert isinstance(detail, list) and detail[0]["type"] == "string_too_long"
+    assert fake.seen == "not called"
 
 
 def test_stats_accepts_its_maximum(monkeypatch):
