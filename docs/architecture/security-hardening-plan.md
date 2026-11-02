@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is done: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), built after an independent plan review and code review, merged as `00fee1a`, deployed and live-checked (implementation and live records below). Then, placed by the user: the shared fetch policy's gaps, investigated and built on 2 November 2026 as their own pull request, [PR #88](https://github.com/AidJobs/AidJobs/pull/88), not merged ("Shared fetch policy gaps" record below). PRs 3 to 5 and phase 3 each need their own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is done: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), built after an independent plan review and code review, merged as `00fee1a`, deployed and live-checked (implementation and live records below). Then, placed by the user: the shared fetch policy's gaps, investigated and built on 2 November 2026 as their own pull request, [PR #88](https://github.com/AidJobs/AidJobs/pull/88), merged as `bb851f1`, deployed and live-checked, with the first crawl on it still to be read ("Shared fetch policy gaps" records below). The TLS context made once per process follows as [PR #89](https://github.com/AidJobs/AidJobs/pull/89). PRs 3 to 5 and phase 3 each need their own approval |
 | 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, done: [PR #80](https://github.com/AidJobs/AidJobs/pull/80), merged as `4d404ae`, live-checked (records below); step 2, the development tools, done: [PR #81](https://github.com/AidJobs/AidJobs/pull/81), merged as `c046bce`, live-checked; Dependabot closed 36 alerts; the three remaining advisories formally accepted and their alerts dismissed (records below); step 3, a backend lockfile and Render's build tools: pull request A done ([PR #83](https://github.com/AidJobs/AidJobs/pull/83), merged as `9ed0561`, live-checked), Render's Build Command changed by the user and verified, pull request B done ([PR #84](https://github.com/AidJobs/AidJobs/pull/84), merged as `6fee7e0`, live-checked with a production crawl) (records below) |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -993,7 +993,7 @@ Evidence, 2 November 2026 (local, Python 3.11.9 with the locked test requirement
   - The test fakes now share one context (test files only). The three policy test files then run 297 tests in 24 seconds.
   - The real backend's limits fire on time (1.0, 1.0 and 0.5 seconds).
 
-Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, removes it. Approved by the user on 3 November 2026 as its own small pull request after this one; built and waiting.
+Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, removes it. Approved by the user on 3 November 2026 as its own small pull request after this one: [PR #89](https://github.com/AidJobs/AidJobs/pull/89). `contracts/outbound.py`'s default pool factory now passes one context, built on first use by `httpcore.default_ssl_context()` with its defaults unchanged. Two tests show it is built once for any number of pools and still requires certificates and matching names. Under the review rule of 3 November 2026 it has self-review, CI and its tests, without an independent review.
 
 Accepted, not changed:
 - A lookup that hangs inside the operating system's resolver keeps its thread until the resolver gives up. At most 8 do so at once, and further lookups wait in the queue; time spent waiting counts against their 10 seconds. As with Python's default pool, the process waits for such a thread when it exits; Render's 30-second stop still applies.
@@ -1007,7 +1007,25 @@ Accepted, not changed:
   - Not verified: production runs uvloop, which the tests do not (Windows has none); the live check after merge covers it.
   - Found, outside this change: `app/sources.py` line 753 calls `fetch_api` with a JSON string as its headers and a keyword it does not accept (an older bug in the API source test). Recorded for later.
 
-Still to do: the user's merge approval; then a read-only live check (health, database status, search, the admin pages under the guard) and the next scheduled crawl, Oxfam GB on 4 November 2026 at 19:30 UTC, watched in Render's log.
+#### Shared fetch policy gaps: live record
+
+Merge approved by the user on 3 November 2026 (IST), at the reviewed head `26057e3`. Every check below was read-only. Times UTC, 2 November 2026.
+
+- **Before the merge:** head exactly `26057e3`; all checks green; mergeable and clean; `main` still `1075b55`. The read-only database check (`transaction_read_only: on`) found no crawl lock and no run marked running. The next scheduled crawl is Oxfam GB, on 4 November at 19:30.
+- **Merge:** `gh pr merge 88 --merge --match-head-commit 26057e3…`, merged as `bb851f1` at 19:57:55.
+- **CI on `main` (`bb851f1`):** passed. Vercel's status for the commit: success.
+- **Render:** "Deploy started for bb851f1" (Auto-Deploy) at 19:57 and "Deploy live for bb851f1" at 19:59, read from Render's events.
+- **Checks on the live backend, GET only, no session:**
+  - health 200;
+  - database status `ok: true` (531 jobs, 322 active, 3 sources);
+  - search 200;
+  - `/api/admin/session` gives `{"authenticated": false}`;
+  - `/api/admin/sources`, `/crawl/status`, `/link-validation/stats` and `/data-quality/global` all answer 401 "Authentication required";
+  - `/v2` and `/api/healthz` on Vercel answer 200 with `noindex, nofollow`.
+
+  Every response carried its own `X-Request-ID`, and none contained a credential pattern.
+- **Not checked yet:** a crawl on the new build. The policy changes what a crawl fetches with, so the next scheduled crawl, Oxfam GB on 4 November 2026 at 19:30 UTC, is to be read in Render's log and the crawl log: its status, jobs found, and any "time limit", "DNS resolution timed out" or "destination port is not permitted" failure. A crawl run by the user from the admin would show the same sooner.
+- **Not checked:** the admin pages under the read-only guard. The change does not alter any admin page, only the fixed messages the source test and link validation can show, and both are covered by tests.
 
 ### Stage 3A. Dependency security
 
