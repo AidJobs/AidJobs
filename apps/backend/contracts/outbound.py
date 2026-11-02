@@ -16,6 +16,7 @@ import zlib
 from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import cache
 from urllib.parse import urljoin, urlsplit
 
 import brotli
@@ -138,8 +139,15 @@ def _default_backend_factory(pinned_ip: str) -> httpcore.AsyncNetworkBackend:
     return PinnedBackend(pinned_ip, httpcore.AnyIOBackend())
 
 
+@cache
+def _tls_context():
+    """httpcore's default context, built once: building it loads the whole certificate bundle."""
+    return httpcore.default_ssl_context()
+
+
 def _default_pool_factory(backend: httpcore.AsyncNetworkBackend) -> httpcore.AsyncConnectionPool:
     return httpcore.AsyncConnectionPool(
+        ssl_context=_tls_context(),
         network_backend=backend,
         max_connections=1,
         max_keepalive_connections=0,
