@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is built after an independent plan review and code review: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), not merged (implementation record below). PRs 3 to 5 and phase 3 each need their own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is done: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), built after an independent plan review and code review, merged as `00fee1a`, deployed and live-checked (implementation and live records below). Next, placed by the user: the shared fetch policy's gaps, investigated as their own pull request (PR 2 record, "Recorded for later"). PRs 3 to 5 and phase 3 each need their own approval |
 | 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, done: [PR #80](https://github.com/AidJobs/AidJobs/pull/80), merged as `4d404ae`, live-checked (records below); step 2, the development tools, done: [PR #81](https://github.com/AidJobs/AidJobs/pull/81), merged as `c046bce`, live-checked; Dependabot closed 36 alerts; the three remaining advisories formally accepted and their alerts dismissed (records below); step 3, a backend lockfile and Render's build tools: pull request A done ([PR #83](https://github.com/AidJobs/AidJobs/pull/83), merged as `9ed0561`, live-checked), Render's Build Command changed by the user and verified, pull request B done ([PR #84](https://github.com/AidJobs/AidJobs/pull/84), merged as `6fee7e0`, live-checked with a production crawl) (records below) |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -908,6 +908,32 @@ Recorded for later, outside this pull request:
 - **Dead code:** the Meilisearch sync route for the removed service.
 - **`delete_jobs_by_org`** matches by `ILIKE` substring, a destructive-control safeguard like W-49.
 
+#### Stage 3, phase 2, PR 2: live record
+
+Merge approved by the user on 2 November 2026, at the reviewed head `eff6983`. Every check below was read-only; no error was provoked in production, and no crawl, link validation, backfill, or delete control was used. Times UTC, 2 November 2026.
+
+- **Before the merge:** head exactly `eff6983`; CI passed on it (backend 711 passed, 9 skipped); `main` still `97ea44d`. The read-only database check (`transaction_read_only: on`) found no crawl lock and no run marked running. The last crawl, ICRC, finished at 15:11 with status ok. The next scheduled crawl is Oxfam GB, on 4 November at 19:30.
+- **Merge:** `gh pr merge 86 --merge --match-head-commit eff6983…`, merged as `00fee1a` at 15:32:03. The branch is kept.
+- **CI on `main` (`00fee1a`):** passed at 15:34:33. Backend tests: 711 passed, 9 skipped. PostgreSQL tests: 47 passed. Frontend tests: 169 passed.
+- **Deployments:**
+  - Render: "Deploy live for 00fee1a" (Auto-Deploy), read from Render's events.
+  - Vercel: the commit's deployment status is success.
+- **Checks on the live backend, GET only, no session:**
+  - health 200;
+  - database status `ok: true` (531 jobs, 322 active, 3 sources);
+  - search 200;
+  - `/api/admin/session` gives `{"authenticated": false}`;
+  - `/api/admin/crawl/status`, `/crawl/analytics/overview`, `/data-quality/global`, `/link-validation/stats` and `/observability/coverage` all answer 401 "Authentication required".
+
+  Every response carried its own 32-character `X-Request-ID`, and none contained a credential pattern.
+- **Admin Crawls and Data Quality pages, signed in by the user:**
+  - The read-only browser guard was installed and tested in the user's tab first: a dummy POST was blocked, and the session read `{"authenticated": true}`.
+  - Going from the Dashboard to Crawls through the sidebar removed the guard. Only the page's own read requests ran, and no control was used. The guard was reinstalled on Crawls, and kept through the sidebar move to Data Quality.
+  - Crawls: the page loaded; `GET /api/admin/crawl/status` returned 200 (scheduler running, 0 due, 0 in flight, 0 locked, 3 of 3 pool slots free). "Run due sources" was not used.
+  - Data Quality: the page loaded and listed the 3 sources ("No issues found in 3 sources"); `GET /api/admin/data-quality/global` returned 200 (515 jobs, 3 sources, 0 null URLs, 0 listing-page URLs, 0 sources with issues, score 100), and each source's report returned 200.
+  - The guard blocked only the dummy POST. Three probes of addresses that do not exist (`/api/admin/data-quality/summary`, `/api/admin/data-quality`, `/api/admin/data_quality`) answered 404 from Vercel; they were the agent's guesses, not page requests. The user signed out afterwards.
+- **Not checked:** the Vercel proxies do not pass `X-Request-ID` to the browser (stage 4), so the admin pages' requests could not be matched to Render's log by ID. The link-validation routes were not called in production, because no page uses them and a call would make outbound requests.
+
 ### Stage 3A. Dependency security
 
 Added on 30 October 2026 after a read-only backlog sweep; placed by the user the same day before stage 3, phase 2, PR 2, because these are known, published vulnerabilities, while stage 3's remaining work removes raw error text. Each part needs its own plan and approval at every step.
@@ -1320,7 +1346,7 @@ Merge approved by the user on 1 November 2026 at `6dc5b76`; the follow-ups decid
 
 - **Comment used:** "Accepted risk (user decision, 1 Nov 2026): development-only, not reachable here; no fixed version is allowed yet by the packages that use it. Record, triggers and monthly check: docs/architecture/security-hardening-plan.md, stage 3A part 3 step 2. Review by 2027-02-01." To reverse: set the alert's `state` to `open`.
 - **Branch:** PR #81's branch (tip `6dc5b76`, in `main`) deleted.
-- **Not checked yet:** the first scheduled weekly "Dependency audit" run, due Monday 2 November 2026 at 03:23 UTC.
+- **The first scheduled weekly "Dependency audit" run,** due Monday 2 November 2026 at 03:23 UTC: GitHub started it at 11:27:53 UTC, on `main` at `97ea44d` (run 41437039290), and it passed. Its report, read on 2 November 2026: the full frontend audit has the same 39 vulnerable packages (0 critical, 0 high, 38 moderate, 1 low) and only the three accepted advisories; the runtime audit is 0; the backend audit found nothing in 57 installed packages (Python 3.11.9). 0 open Dependabot alerts. The report files were deleted after reading. The comparison with the triggers is the monthly check, not done here.
 
 #### Stage 3A, part 3, step 3: backend lock and Render's build tools
 
