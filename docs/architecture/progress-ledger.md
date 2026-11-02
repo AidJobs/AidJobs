@@ -38,6 +38,12 @@ Every claim below is marked **Verified** (checked against git, GitHub, CI, or a 
 These describe how the work is run. The architecture rules are in the contract.
 
 - Every step needs the user's explicit approval: investigate, plan, implement, merge. "Approve" covers the step it answers and nothing more.
+- Independent reviews by risk (decided by the user, 3 November 2026), each by a separate read-only agent in an isolated clone:
+  - **Always:** security boundaries (the fetch policy, sign-in, sessions, secrets, the public surface); anything that writes or deletes data in bulk, or changes crawl locks, run ownership, or expiry; database schema changes; dependency or build changes that reach production; large plans before they are built; contract amendments.
+  - **Self-review, CI, and tests shown to fail on the old code:** small low-risk code changes, admin display fixes, test-only changes.
+  - **None:** docs-only pull requests (live records, ledger updates) and branch tidy-ups.
+  - A re-review only when the fixes to a review's findings change logic, not for wording or added tests.
+  - Each review is limited to about 35 minutes, reruns only the tests the change touches after each mutation, and reports what it has when time runs out.
 - Work happens on a branch, through a pull request into `main`. Do not push `main` directly.
 - **Merging to `main` deploys the backend.** Render redeploys automatically when `main` changes. Merge only with explicit approval. A manual "Deploy a specific commit" on Render switches Auto-Deploy off ("Auto-Deploy has been disabled to prevent accidental deploys"); seen on 23 October 2026 with the backend live on `d13d983`. After any manual Render deploy, set Settings, Build & Deploy, Auto-Deploy back to "On Commit".
 - **Netlify is no longer used.** Its free credits ran out on 23 October 2026 and the user deleted the site the same day. Pull-request previews are checked on Vercel with the bypass key (UX plan, method step 4).
