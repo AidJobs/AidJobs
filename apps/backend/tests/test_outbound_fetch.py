@@ -16,6 +16,9 @@ from crawler_v2.api_crawler import SimpleAPICrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
 from crawler_v2.simple_crawler import SimpleCrawler
 
+# One TLS context for every fake pool; without it httpcore loads its certificate bundle per pool.
+TEST_SSL_CONTEXT = httpcore.default_ssl_context()
+
 
 def _response(
     status: int,
@@ -107,6 +110,7 @@ def _world(responses, addresses=None):
 
     def pool_factory(backend):
         pool = httpcore.AsyncConnectionPool(
+            ssl_context=TEST_SSL_CONTEXT,
             network_backend=backend,
             max_connections=1,
             max_keepalive_connections=0,
@@ -537,6 +541,7 @@ def test_timeout_and_exception_close_the_pool():
 
     def pool_factory(backend):
         pool = httpcore.AsyncConnectionPool(
+            ssl_context=TEST_SSL_CONTEXT,
             network_backend=backend,
             max_connections=1,
             max_keepalive_connections=0,
@@ -617,6 +622,7 @@ def test_read_timeout_during_body_fails_closed(monkeypatch):
 
     def pool_factory(backend):
         pool = httpcore.AsyncConnectionPool(
+            ssl_context=TEST_SSL_CONTEXT,
             network_backend=backend,
             max_connections=1,
             max_keepalive_connections=0,

@@ -988,7 +988,12 @@ Evidence, 2 November 2026 (local, Python 3.11.9 with the locked test requirement
 - **The existing suite passes unchanged:** 716 passed and 4 skipped locally, and 921 passed with the new file's first 205 tests. Local runs count 5 more passing tests and 5 fewer skips than CI, because git-ignored saved pages exist only here.
 - **Ruff:** no new finding (`sources.py` 16, `link_validator.py` 4, `contracts/` 0); the new test file is clean.
 - **Crawl path:** every current URL is `https` without a port; the headers sent after a redirect are the same for every current caller; ICRC's 33 job pages took about 3 seconds each on 27 October 2026, far below the 60-second limit.
-- **Local test speed:** each hop through the test fakes takes about 2 seconds on this Windows machine, on `main` as on the branch (for example 41 seconds for the 20-redirect test on both), while the real backend's limits fire on time (1.0, 1.0 and 0.5 seconds); CI runs the whole suite in about 40 seconds.
+- **Local test speed:** each `https` hop through the test fakes took about 2 seconds on this Windows machine, on `main` as on the branch (41 seconds for the 20-redirect test on both). That made the first independent review, with its mutation runs, take well over an hour.
+  - The cause: httpcore loads its certificate bundle again for every connection pool that is not given one (`httpcore.default_ssl_context()`, 0.9 seconds here), and the policy opens a pool per hop.
+  - The test fakes now share one context (test files only). The three policy test files then run 297 tests in 24 seconds.
+  - The real backend's limits fire on time (1.0, 1.0 and 0.5 seconds).
+
+Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, would remove it; that is a separate decision.
 
 Accepted, not changed:
 - A lookup that hangs inside the operating system's resolver keeps its thread until the resolver gives up. At most 8 do so at once, and further lookups wait in the queue and time out after 5 seconds. As with Python's default pool, the process waits for such a thread when it exits; Render's 30-second stop still applies.

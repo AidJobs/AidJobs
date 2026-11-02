@@ -17,6 +17,7 @@ from contracts import outbound
 from contracts.fetch import address_permitted, hostname_permitted, pin_address
 from contracts.outbound import FetchError, PinnedBackend, fetch_url
 from tests.test_outbound_fetch import (
+    TEST_SSL_CONTEXT,
     TrackingPool,
     _header_names,
     _redirect,
@@ -406,6 +407,7 @@ def _timed_world(make_stream=None, connect_delay=0.0, backend_class=_Backend):
 
     def pool_factory(network_backend):
         return TrackingPool(httpcore.AsyncConnectionPool(
+            ssl_context=TEST_SSL_CONTEXT,
             network_backend=network_backend, max_connections=1, max_keepalive_connections=0,
             keepalive_expiry=0.0, retries=0, http2=False), events)
 
