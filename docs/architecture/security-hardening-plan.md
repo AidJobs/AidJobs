@@ -962,7 +962,7 @@ What changes:
 
   Python's own checks still apply, so a later Python can only refuse more.
 - **Only ports 80 and 443.** Another port, or one that cannot be read, gets "destination port is not permitted". This is checked on every hop and on every redirect destination before DNS.
-- **DNS lookups** run on their own pool of 8 threads and get 5 seconds; then "DNS resolution timed out". A resolver that reports its own timeout gets "DNS resolution failed".
+- **DNS lookups** run on their own pool of 8 threads and get 10 seconds; then "DNS resolution timed out". A resolver that reports its own timeout gets "DNS resolution failed". The plan said 5 seconds; the review showed that equals one try of the usual Linux resolver's 5-second timeout, so one lost packet would fail a lookup that works today. 10 seconds allows two tries; the value is part of the merge approval.
 - **A total time limit per fetch** (`total_timeout`) covers DNS, every hop and the whole body; then "time limit".
   - Crawl fetches keep the default, 60 seconds: HTML listing and job pages, RSS and API. The admin extraction simulation uses the crawler's fetch, so it gets 60 seconds too.
   - The admin source test's HEAD and each link-validation check get 20 seconds.
@@ -993,14 +993,21 @@ Evidence, 2 November 2026 (local, Python 3.11.9 with the locked test requirement
   - The test fakes now share one context (test files only). The three policy test files then run 297 tests in 24 seconds.
   - The real backend's limits fire on time (1.0, 1.0 and 0.5 seconds).
 
-Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, would remove it; that is a separate decision.
+Found, not changed: production pays the same per-hop cost, one certificate-bundle load for every hop of every crawl fetch, link check and source test. A process-wide context, with the same verification, removes it. Approved by the user on 3 November 2026 as its own small pull request after this one; built and waiting.
 
 Accepted, not changed:
-- A lookup that hangs inside the operating system's resolver keeps its thread until the resolver gives up. At most 8 do so at once, and further lookups wait in the queue and time out after 5 seconds. As with Python's default pool, the process waits for such a thread when it exits; Render's 30-second stop still applies.
-- 6to4 and NAT64 addresses are refused even when they carry a public IPv4 address, and so are `192.0.0.9` and `192.0.0.10`, which are global anycast addresses. No source uses any of them.
+- A lookup that hangs inside the operating system's resolver keeps its thread until the resolver gives up. At most 8 do so at once, and further lookups wait in the queue; time spent waiting counts against their 10 seconds. As with Python's default pool, the process waits for such a thread when it exits; Render's 30-second stop still applies.
+- Some addresses IANA marks as globally reachable are refused: 6to4 and NAT64 addresses carrying a public IPv4 address; `192.0.0.9` and `192.0.0.10` (global anycast); and parts of `2001::/23` such as `2001:3::/32` and `2001:20::/28`, which Python 3.14 permits. No source uses any of them. "Python can only refuse more" describes the combined policy: the tables decide first, and Python's checks can add refusals but not remove any.
 - The redirect limits are unchanged: 20 for crawls and 10 for link validation.
 
-Still to do: an independent code review; the user's merge approval; then a read-only live check (health, database status, search, the admin pages under the guard) and the next scheduled crawl, Oxfam GB on 4 November 2026 at 19:30 UTC, watched in Render's log.
+- **Independent code review** (separate read-only agent, isolated clone, Python 3.11.9, no network, about 24 minutes, at `0753d17`): "approve with changes", no blocking issue.
+  - Probed and holding: IPv4-mapped, IPv4-translated, IPv4-compatible, Teredo, NAT64, 6to4 and scoped literals (`fe80::1%25eth0`); odd numeric hosts (`2130706433`, `0177.0.0.1`, `0x7f.1`), which pass the pre-DNS check but resolve to `127.0.0.1` and are refused when pinned; odd ports (`+443`, full-width digits, `u:p@host:80@evil:8080`); a caller's deadline against the total limit, both ways; and the header origin rules (case, trailing dot, default port, IDNA).
+  - 23 of 25 mutations caught. The two that survive are expected: the redirect destination's port check is repeated by the next hop's own check before DNS, and the test-only TLS context only changes speed.
+  - Taken: the two dripping-body tests and the slow-lookup test hung for hours without the limit they test; they now run inside a 15-second outer bound and fail at once (checked by removing the total limit: both fail in about 15 seconds). The DNS limit was raised to 10 seconds (above). The two document points: the refused global addresses and the combined-policy wording (above).
+  - Not verified: production runs uvloop, which the tests do not (Windows has none); the live check after merge covers it.
+  - Found, outside this change: `app/sources.py` line 753 calls `fetch_api` with a JSON string as its headers and a keyword it does not accept (an older bug in the API source test). Recorded for later.
+
+Still to do: the user's merge approval; then a read-only live check (health, database status, search, the admin pages under the guard) and the next scheduled crawl, Oxfam GB on 4 November 2026 at 19:30 UTC, watched in Render's log.
 
 ### Stage 3A. Dependency security
 

@@ -46,6 +46,12 @@ def _connects(events):
     return [item for item in events if item[0] == "connect"]
 
 
+async def _bounded(coro, seconds=15.0):
+    """A missing limit fails the test with a plain TimeoutError instead of running for hours."""
+    async with asyncio.timeout(seconds):
+        return await coro
+
+
 # Address ranges ---------------------------------------------------------------------------
 
 REFUSED = [
@@ -275,8 +281,9 @@ def test_a_slow_lookup_times_out_and_never_connects():
     events, resolver, backend_factory, pool_factory = _resolving_world(stalls)
     started = time.monotonic()
     with pytest.raises(FetchError, match="^DNS resolution timed out$"):
-        asyncio.run(fetch_url("https://jobs.example/", dns_timeout=0.2, resolver=resolver,
-                              backend_factory=backend_factory, pool_factory=pool_factory))
+        asyncio.run(_bounded(fetch_url(
+            "https://jobs.example/", dns_timeout=0.2, resolver=resolver,
+            backend_factory=backend_factory, pool_factory=pool_factory)))
     assert time.monotonic() - started < 20
     assert _connects(events) == []
 
@@ -419,7 +426,8 @@ def test_a_body_sent_a_byte_at_a_time_stops_at_the_total_limit():
     events, world = _timed_world(_Dripping)
     started = time.monotonic()
     with pytest.raises(FetchError, match="^time limit$"):
-        asyncio.run(fetch_url("https://jobs.example/", timeout=10.0, total_timeout=1.0, **world))
+        asyncio.run(_bounded(
+            fetch_url("https://jobs.example/", timeout=10.0, total_timeout=1.0, **world)))
     assert time.monotonic() - started < 20
     assert events.count(("stream-close",)) == 1
     assert events.count(("pool-close",)) == 1
@@ -556,7 +564,7 @@ def test_the_real_backend_stops_a_dripping_body_at_the_total_limit():
 
     started = time.monotonic()
     with pytest.raises(FetchError, match="^time limit$"):
-        asyncio.run(_with_server(_drip, fetch))
+        asyncio.run(_bounded(_with_server(_drip, fetch)))
     assert time.monotonic() - started < 20
 
 
@@ -670,7 +678,7 @@ def test_headers_dropped_once_stay_dropped_on_a_later_hop_home():
 
 def test_the_approved_values():
     assert outbound.TOTAL_TIMEOUT_SECONDS == 60.0
-    assert outbound.DNS_TIMEOUT_SECONDS == 5.0
+    assert outbound.DNS_TIMEOUT_SECONDS == 10.0
     assert outbound.DNS_WORKERS == 8
     assert policy._PERMITTED_PORTS == {80, 443}
 

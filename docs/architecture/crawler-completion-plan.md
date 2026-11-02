@@ -85,7 +85,7 @@ Preflight before any edit. Do not change admission, persistence, extraction, ide
 
 Exit: the three live fetchers call the policy, a blocked address never connects, a redirect to a blocked address fails, oversized and timed-out responses fail closed, and tests cover those cases.
 
-Tightened on 2 November 2026, with the user's approval, in the security plan's "Shared fetch policy gaps" pull request: the refused ranges are listed in `contracts/fetch.py` rather than taken from Python's own lists, which differ between patch releases; only ports 80 and 443; DNS lookups limited to 5 seconds on their own threads; a total time limit per fetch; and only known request headers kept after a redirect to another origin. Its record is in `security-hardening-plan.md`.
+Tightened on 2 November 2026, with the user's approval, in the security plan's "Shared fetch policy gaps" pull request: the refused ranges are listed in `contracts/fetch.py` rather than taken from Python's own lists, which differ between patch releases; only ports 80 and 443; DNS lookups limited to 10 seconds on their own threads; a total time limit per fetch; and only known request headers kept after a redirect to another origin. Its record is in `security-hardening-plan.md`.
 
 #### B1 verification record
 

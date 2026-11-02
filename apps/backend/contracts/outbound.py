@@ -26,7 +26,8 @@ from contracts.fetch import hostname_permitted, pin_address, port_permitted, sch
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 20
 TOTAL_TIMEOUT_SECONDS = 60.0
-DNS_TIMEOUT_SECONDS = 5.0
+# Two tries of glibc's default 5-second resolver timeout, so one lost packet still resolves
+DNS_TIMEOUT_SECONDS = 10.0
 DNS_WORKERS = 8
 _REDIRECTS = {301, 302, 303, 307, 308}
 # Sent again after a redirect to another origin; any other header (a key, a token) is dropped.
