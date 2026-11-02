@@ -34,7 +34,7 @@ On 26 October 2026, during the UX-31 follow-up, three things showed that point f
 | 0 | Supabase log review for the exposure window | Done, 26 October 2026: no unexplained activity found, with limits (below) |
 | 1 | Close the public surface | Done, 26 October 2026: [PR #51](https://github.com/AidJobs/AidJobs/pull/51), merged as `c207066`, verified in production (below) |
 | 2 | Crawl-lock recovery | Done, 28 October 2026: PR A ([PR #55](https://github.com/AidJobs/AidJobs/pull/55)) and PR B ([PR #60](https://github.com/AidJobs/AidJobs/pull/60), merged as `f4059f0`), deployed and live-checked (live record below) |
-| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PRs 2 to 5 and phase 3 each need their own approval |
+| 3 | Backend error handling and logging | Design approved 28 October 2026 (below). Phase 1 done: [PR #63](https://github.com/AidJobs/AidJobs/pull/63), merged as `2de9d53`, deployed and live-checked (live record below). Phase 2 plan approved 29 October 2026. Its PR 1 (sources and presets) is done: [PR #65](https://github.com/AidJobs/AidJobs/pull/65), merged as `f8bedf9`, deployed and live-checked. PR 2 (`crawler_admin.py`, link validation on the fetch policy, `data_quality.validate_job`) is built after an independent plan review and code review: [PR #86](https://github.com/AidJobs/AidJobs/pull/86), not merged (implementation record below). PRs 3 to 5 and phase 3 each need their own approval |
 | 3A | Dependency security | Added 30 October 2026 and approved by the user the same day; runs before stage 3, phase 2, PR 2 (section below). Part 1 (backend pins) done: [PR #69](https://github.com/AidJobs/AidJobs/pull/69), merged as `6b657c4`, deployed and live-checked, with three manual crawls on the new version (live record below). Part 1b (test tools) done: [PR #71](https://github.com/AidJobs/AidJobs/pull/71), merged as `720fa4c`, deployed and live-checked, and Render's build cache cleared (live record below). FastAPI upgrade done: [PR #73](https://github.com/AidJobs/AidJobs/pull/73), reviewed head `7377e10`, merged as `385c5f8`, deployed, every production check passed, Render's `setuptools` version Not verified (records below). Part 2 (Next.js 16 and React 19) done: [PR #75](https://github.com/AidJobs/AidJobs/pull/75), merged as `f9b635f`, live-checked; Dependabot closed its 60 runtime alerts (records below). Part 3 (continuous checks), split on 1 November 2026 into three steps: step 1, the audit gate, done: [PR #80](https://github.com/AidJobs/AidJobs/pull/80), merged as `4d404ae`, live-checked (records below); step 2, the development tools, done: [PR #81](https://github.com/AidJobs/AidJobs/pull/81), merged as `c046bce`, live-checked; Dependabot closed 36 alerts; the three remaining advisories formally accepted and their alerts dismissed (records below); step 3, a backend lockfile and Render's build tools: pull request A done ([PR #83](https://github.com/AidJobs/AidJobs/pull/83), merged as `9ed0561`, live-checked), Render's Build Command changed by the user and verified, pull request B done ([PR #84](https://github.com/AidJobs/AidJobs/pull/84), merged as `6fee7e0`, live-checked with a production crawl) (records below) |
 | 4 | Frontend proxy error handling | After stage 3 |
 | 5 | Tooling guard against printing secrets | Proposal first |
@@ -837,6 +837,76 @@ Merge approved by the user on 29 October 2026, at the reviewed head `1f8df7f`. E
   - The page listed the 3 sources. Its `GET /api/admin/sources?page=1&size=20&status=active` returned 200. Render's log has that request at 16:46:35 UTC under `3f066fa7…`, on two lines: the access line, and the connection-parameters line, which now carries host, port and user only. Neither line has a credential pattern.
   - The guard blocked only the test POST and Vercel's page-view ping. The tab was reloaded afterwards to remove it.
 - **The database name is out of the start-up line, confirmed:** the old instance woke at 16:42:52 UTC and still logged `…:5432/postgres`. The new instance logs `…:5432`.
+
+#### Stage 3, phase 2, PR 2: implementation record
+
+Scope approved by the user on 1 November 2026: `app/crawler_admin.py`, including link validation, and `data_quality.validate_job`. The user chose to rebuild link validation on the shared fetch policy rather than switch it off. The plan was reviewed by a separate read-only agent (verdict: approve with changes). Its four blocking points were folded in, and the user approved the three result changes it listed and a redirect limit of 10. Built on the branch `security/stage3-phase2-crawler-admin` from `main` at `97ea44d`.
+
+Findings of the read-only investigation that shaped the plan:
+- **19 functions in `crawler_admin.py` put the exception text into an HTTP 500,** and the quality-score backfill also returned it per job. Seven routes re-wrapped `get_db_url()`'s own 500 ("Failed to get coverage stats: 500: No PostgreSQL …"). Five converted functions opened their connection before their `try`.
+- **Link validation bypassed contract §9.** `core/link_validator.py` sent HEAD requests with plain `httpx`: no blocked ranges, no DNS pinning, no redirect-destination check. `/api/admin/link-validation/validate` accepts any admin-supplied URL and also checks `apply_url`s taken from crawled pages. In a local demo, `main`'s validator tried to connect to `10.0.0.5:80` and `169.254.169.254:80`, and the branch refused both before any connection. The demo first blocked only Python's socket functions, so those two attempts were really made from the development machine and failed (last item of the evidence below).
+- **No page calls the link-validation routes;** only the proxy files exist. The production cache table `link_validations` had 0 rows (read-only check, 1 November 2026), so no stale result or raw message can be served after the change.
+- **`data_quality.validate_job`'s raw parse text** reaches no production route: only the uncalled `DataQualityValidator.validate_batch` uses it. It is fixed and unit-tested anyway.
+
+What changes:
+- **Unexpected failures (500)** in the 19 functions raise `InternalError`: `{"detail": "Failed to get analytics (ref 3f9a12bc)", "request_id": "<id>"}`. The fixed message is the old prefix without the exception text, and the status stays 500. The cause is logged once, redacted, with its traceback, under the request ID. The hand-written `traceback.format_exc()` lines are gone.
+- **Expected answers are unchanged.** Every converted function lets an `HTTPException` through, so `get_db_url()`'s 500, the 400 "Meilisearch not configured", the 404s and the 410 keep their wording. The seven routes that re-wrapped it no longer do.
+- **The five functions that opened their connection first now open it inside the `try`.** A connection failure gets the function's fixed message instead of the middleware's generic 500 body. That is one of the three result changes the user approved.
+- **Routes about one source or job** (`/data-quality/source/{id}`, `/analytics/source/{id}`, `/link-validation/validate-job/{id}`) log the ID with `%r` under the request ID, as PR 1 does.
+- **The backfill's per-job list** says "Job <id>: could not be scored". The cause is logged on one line per job, redacted, without a traceback, so a failed batch cannot flood the log.
+- **`data_quality.validate_job`** says "URL parsing error".
+- **Link validation goes through `contracts.outbound.fetch_url`** (HEAD, 10-second timeout, at most 10 redirects). Every hop is resolved, checked, pinned and has its redirect destination checked.
+  - `FetchResult` gains `redirects: int = 0`, so `redirect_count` keeps its meaning. It is a defaulted last field: nothing else constructs, unpacks or serialises `FetchResult`.
+  - The dead HEAD-to-GET fallback and the unused `follow_redirects` parameter are removed. Behaviour stays HEAD-only.
+  - Its messages are chosen by type: "URL is empty", "Invalid URL format", "Invalid status code: <n>", "Validation error: <the policy's fixed message>" (for example "destination address is not permitted", "redirect limit", "redirect destination is missing"), "connection failed", "TLS error", "timeout" (including a plain `TimeoutError`), "invalid response" (any HTTP protocol error from the server), "invalid URL", and "unexpected error (ref <id>)". Only the last is logged with its cause.
+  - Two of the three approved result changes are here: more than 10 redirects is invalid ("redirect limit"), and a redirect without `Location` is invalid. `main` reported both as valid.
+  - Its cache helpers treat an unreachable database as a cache miss or a skipped write. On `main`, a database failure silently dropped URLs from `/validate`'s results.
+  - Requests are limited to 100 `urls` and 100 `job_ids`, each URL at most 2,048 characters and each job ID at most 64 (job IDs are 36-character UUIDs). `/link-validation/stats` takes at most 100 comma-separated job IDs of at most 64 characters. Anything larger answers 422 before any work.
+- **`fetch_message` and its list move to `contracts/outbound.py`,** next to the messages they list. `app/sources.py` imports them from there, and `fetch_message` now also requires a `FetchError`.
+- **The static guard** loses the 20 entries and gains four things:
+  - a rule for a dict literal holding exception text (the link validator's shape, missed before);
+  - a rule for exception text in the message of `InternalError`, `_item_error` or `_source_error` (their cause argument goes only to the log and is allowed);
+  - a scan of `core/link_validator.py`;
+  - a describer check that names each describer's home and accepts an import only from there, under its own name. It counts every other way a module can bind the name: definitions and classes, assignment and unpacking, `for`, `with`, walrus, parameters and lambda arguments, `except` and `match` names, star imports, relative and aliased imports, attribute and `globals()` assignment, and `setattr`. Each form has its own test. Dynamic forms (`exec`, `locals().update`, a module's `__dict__`) are not seen.
+
+  Its count on `main`'s link validator is 2, and on the branch 0. A re-raise rule (`raise Exception(f"…{e}")`) was not added: such text reaches a response only through a later `except`, which the dict and return rules cover.
+
+Evidence, 1 November 2026 (local, Python 3.11.9 with the locked test requirements, `uvloop` excepted on Windows):
+- **New tests:**
+  - `test_admin_crawler_errors.py`: a fresh-process walk of all 28 `crawler_admin` routes, with a failing fake driver, coverage monitor, extraction logger and Meilisearch client. Real sockets and DNS, and the event loop's connect functions, are refused and recorded. A probe test shows the guard records attempts. The file also covers references leading to the logged cause, IDs logged for one-item routes, the backfill's per-job message, and `validate_job`.
+  - `test_admin_crawler_contract.py`: 401 without a session on all 28 routes; the 400, 404, 410 and the unwrapped 500; the link-validation response shape; the 422 limits.
+  - `test_link_validator_policy.py`: the real policy over fake DNS and a scripted transport. Prohibited addresses and names are refused before any connection, including after a redirect. The 10-redirect limit is tested, as are the categories, a redacted unexpected cause, and the cache failing.
+  - Plus `redirects` asserted in the outbound tests, and the fetch-message list checked against what `outbound.py` raises.
+- **On `main`'s code:** 19 of the new security tests fail on the behaviour they target. The walk fails on "responses quoting the fake database password", the observability routes on the re-wrapped 500, the limits on the missing 422, and the guard on its findings. The link-validator file cannot import its new functions. The 401, 404, 400, 410 and shape tests pass on both.
+- **On the branch, in CI** (first head `2e9c5ec`): 662 passed and 9 skipped; `main` (`97ea44d`) has 544 passed and the same 9 skipped. The PostgreSQL ownership tests passed (47), and gitleaks found no leaks. Local runs on the development machine count 5 more passing tests and 5 fewer skips, because git-ignored saved pages exist only there. Ruff is clean on CI's list. No changed module has a new Ruff finding: `crawler_admin.py` 32 to 31, `link_validator.py` 8 to 4, `data_quality.py` and `sources.py` unchanged.
+- **Independent code review** (separate read-only agent, isolated clone, fake values, no network): "approve with changes", no code defect. 35 of its 40 mutations were caught. All its suggestions were taken, with the user's approval:
+  - the record's test counts and the demo's wording above;
+  - a probe proving the link-validator tests' own network block, aimed at loopback (port 9), like the walk's probe;
+  - the guard's `InternalError` rule and the wider describer check;
+  - the plain `TimeoutError` and base protocol-error categories;
+  - the job ID caps;
+  - a route test through the real validator;
+  - a test of a failed rollback.
+
+- **Re-review of those follow-ups** (`57a0ed9`; CI 701 passed, 9 skipped): "approve", nothing blocking. 21 of 24 mutations caught. The three it found uncaught are now each caught by a test, with the user's approval:
+  - the overall `/stats` length limit, tested with a query made mostly of commas;
+  - exception text in an `InternalError` keyword argument other than `cause`;
+  - a categorised failure, a base protocol error included, logged with a traceback.
+
+  Before this, the base protocol error was not caught in the expected-failures list (it was caught only as a category). Noted, not changed: `/stats`'s own 422 refusals carry a string `detail`, while FastAPI's carry a list; no page calls `/stats`.
+- **Crawl path:** the only change is the defaulted `FetchResult.redirects` field. CI's crawl-path tests pass unchanged (gates, outbound, the UNICEF saved excerpts, the site-reader fallback). PR 1's offline comparison over 12 saved sources was not repeated: its saved pages are not available in this environment.
+- **A local evidence demo made two connection attempts from the development machine.** The demo first blocked only Python's socket functions, and Windows' event loop connects without them. So `main`'s validator tried `10.0.0.5:80` and `169.254.169.254:80` from the development machine, and both failed at once. Nothing reached production. The demo and both new test files now also block the event loop's connect functions.
+
+Recorded for later, outside this pull request:
+- **The shared fetch policy's gaps** (found by the reviews): `100.64.0.0/10`, including `100.100.100.200`, and `fec0::/10` are permitted. Private-range results depend on the Python patch release. There is no port restriction, no DNS timeout, and no total time limit per URL: the 10-second timeout applies to each network step of each of up to 11 hops, as on `main`. The user placed this investigation right after this pull request, as its own pull request.
+- **The link validator:**
+  - errors are cached for 24 hours, although 1 hour was intended (`ttl_hours` is ignored);
+  - there is no GET fallback for servers that refuse HEAD;
+  - whether the feature gets a page or is removed.
+- **The backfill:** after one failed `UPDATE`, the transaction is aborted and every later job in the batch fails too.
+- **`get_db_url()`** answers 500 "No PostgreSQL database URL configured", where `sources.py` uses 503.
+- **Dead code:** the Meilisearch sync route for the removed service.
+- **`delete_jobs_by_org`** matches by `ILIKE` substring, a destructive-control safeguard like W-49.
 
 ### Stage 3A. Dependency security
 

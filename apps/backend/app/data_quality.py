@@ -87,8 +87,8 @@ class DataQualityValidator:
                 parsed = urlparse(apply_url)
                 if not parsed.scheme or not parsed.netloc:
                     errors.append(f"Invalid URL format: {apply_url[:80]}")
-            except Exception as e:
-                errors.append(f"URL parsing error: {str(e)}")
+            except Exception:
+                errors.append("URL parsing error")
             
             if is_listing_url(apply_url):
                 errors.append(f"URL appears to be listing page: {apply_url[:80]}")

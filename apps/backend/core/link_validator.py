@@ -2,17 +2,23 @@
 Link validation service for verifying apply URLs.
 
 Validates that job apply URLs are accessible and working.
-Uses HTTP HEAD requests to minimize bandwidth, follows redirects,
-and caches results in database for 24 hours.
+Uses HTTP HEAD requests through the shared outbound policy (contracts.outbound),
+follows redirects, and caches results in database for 24 hours.
 """
 
 import logging
 import asyncio
+import contextlib
+import ssl
 from typing import Dict, Optional, Tuple, Any, List
-from datetime import datetime, timedelta
-from urllib.parse import urlparse
+from datetime import datetime
+from urllib.parse import urlsplit
+import httpcore
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from app.errors import log_failure
+from app.log_safety import current_request_id, redact_exception
+from contracts.outbound import FetchError, fetch_message, fetch_url
 from core.net import HTTPClient
 
 logger = logging.getLogger(__name__)
@@ -23,8 +29,57 @@ VALIDATION_CACHE_TTL_HOURS = 24
 # Valid status codes
 VALID_STATUS_CODES = {200, 201, 202, 301, 302, 303, 307, 308}
 
-# Maximum redirect hops to follow
-MAX_REDIRECT_HOPS = 3
+# Maximum redirect hops to follow; one more is reported as "redirect limit"
+MAX_REDIRECT_HOPS = 10
+
+CHECK_TIMEOUT_SECONDS = 10.0
+
+# Failures with a category of their own; anything else is unexpected and logged with its cause
+_EXPECTED_FAILURES = (FetchError, httpcore.TimeoutException, httpcore.NetworkError,
+                      httpcore.ProtocolError, OSError, ValueError)
+
+
+def _caused_by_tls(error: BaseException) -> bool:
+    seen = 0
+    current: Optional[BaseException] = error
+    while current is not None and seen < 5:
+        if isinstance(current, ssl.SSLError):
+            return True
+        current = current.__cause__ or current.__context__
+        seen += 1
+    return False
+
+
+def describe_link_failure(error: BaseException) -> str:
+    """Why a link check failed, in our own words, chosen by the exception's type.
+
+    Never the exception's text: it can quote the URL, its query string or the server's reply.
+    """
+    if isinstance(error, FetchError):
+        return f"Validation error: {fetch_message(error) or 'fetch failed'}"
+    if isinstance(error, (httpcore.TimeoutException, TimeoutError)):
+        return "Validation error: timeout"
+    if isinstance(error, (httpcore.NetworkError, OSError)):
+        if _caused_by_tls(error):
+            return "Validation error: TLS error"
+        return "Validation error: connection failed"
+    if isinstance(error, (httpcore.LocalProtocolError, ValueError)):
+        return "Validation error: invalid URL"
+    if isinstance(error, httpcore.ProtocolError):
+        return "Validation error: invalid response"
+    return f"Validation error: unexpected error (ref {current_request_id()[:8] or 'unavailable'})"
+
+
+def _well_formed(url: str) -> bool:
+    """A scheme, a host that encodes, and a readable port."""
+    try:
+        parts = urlsplit(url)
+        if not parts.scheme or not parts.hostname:
+            return False
+        parts.hostname.encode("idna")
+        return parts.port is None or parts.port >= 0
+    except ValueError:
+        return False
 
 
 class LinkValidator:
@@ -32,8 +87,8 @@ class LinkValidator:
     Service for validating job apply URLs.
     
     Features:
-    - HTTP HEAD requests (lightweight)
-    - Redirect following (up to 3 hops)
+    - HTTP HEAD requests (lightweight), through the shared outbound policy
+    - Redirect following (up to 10 hops), each destination checked
     - Status code validation
     - Database caching (24h TTL)
     - Batch validation support
@@ -50,8 +105,7 @@ class LinkValidator:
     async def validate_url(
         self,
         url: str,
-        use_cache: bool = True,
-        follow_redirects: bool = True
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
         Validate a single URL.
@@ -59,7 +113,6 @@ class LinkValidator:
         Args:
             url: URL to validate
             use_cache: Whether to use cached results (default: True)
-            follow_redirects: Whether to follow redirects (default: True)
         
         Returns:
             Dictionary with:
@@ -94,27 +147,13 @@ class LinkValidator:
                 return cached_result
         
         # Validate URL format
-        try:
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                result = {
-                    'valid': False,
-                    'status_code': None,
-                    'final_url': url,
-                    'redirect_count': 0,
-                    'error': 'Invalid URL format',
-                    'cached': False,
-                    'validated_at': datetime.utcnow()
-                }
-                self._cache_validation(url, result)
-                return result
-        except Exception as e:
+        if not _well_formed(url):
             result = {
                 'valid': False,
                 'status_code': None,
                 'final_url': url,
                 'redirect_count': 0,
-                'error': f'URL parsing error: {str(e)}',
+                'error': 'Invalid URL format',
                 'cached': False,
                 'validated_at': datetime.utcnow()
             }
@@ -123,10 +162,7 @@ class LinkValidator:
         
         # Perform HTTP HEAD request
         try:
-            status_code, final_url, redirect_count = await self._check_url(
-                url,
-                follow_redirects=follow_redirects
-            )
+            status_code, final_url, redirect_count = await self._check_url(url)
             
             is_valid = status_code in VALID_STATUS_CODES
             
@@ -151,13 +187,14 @@ class LinkValidator:
             return result
             
         except Exception as e:
-            error_msg = str(e)
+            if not isinstance(e, _EXPECTED_FAILURES):
+                log_failure(logger, f"[link_validator] Unexpected failure checking {url!r}", e)
             result = {
                 'valid': False,
                 'status_code': None,
                 'final_url': url,
                 'redirect_count': 0,
-                'error': f'Validation error: {error_msg}',
+                'error': describe_link_failure(e),
                 'cached': False,
                 'validated_at': datetime.utcnow()
             }
@@ -165,96 +202,34 @@ class LinkValidator:
             # Cache error result (shorter TTL for errors)
             self._cache_validation(url, result, ttl_hours=1)
             
-            logger.error(f"[link_validator] Error validating {url}: {error_msg}")
+            logger.warning("[link_validator] Error validating %r: %s", url, result['error'])
             return result
     
-    async def _check_url(
-        self,
-        url: str,
-        follow_redirects: bool = True
-    ) -> Tuple[int, Optional[str], int]:
+    async def _check_url(self, url: str) -> Tuple[int, str, int]:
         """
-        Check URL using HTTP HEAD request.
+        HEAD the URL through the shared outbound policy (contract section 9): every hop's
+        destination is resolved, checked and pinned before it is connected to.
         
         Returns:
             (status_code, final_url_after_redirects, redirect_count)
         """
-        redirect_count = 0
-        current_url = url
-        max_hops = MAX_REDIRECT_HOPS if follow_redirects else 0
-        
-        # Use httpx directly for more control over redirects
-        import httpx
-        
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0),  # 10 second timeout for validation
-            follow_redirects=False  # Manual redirect handling for counting
-        ) as client:
-            for hop in range(max_hops + 1):
-                try:
-                    # Try HEAD first (lightweight)
-                    response = await client.head(
-                        current_url,
-                        headers={
-                            'User-Agent': self.http_client.user_agent,
-                            'Accept': '*/*'
-                        }
-                    )
-                    
-                    status_code = response.status_code
-                    
-                    # Check if redirect
-                    if status_code in {301, 302, 303, 307, 308} and follow_redirects:
-                        location = response.headers.get('Location') or response.headers.get('location')
-                        if location and hop < max_hops:
-                            # Resolve relative URLs
-                            if location.startswith('/'):
-                                from urllib.parse import urljoin
-                                location = urljoin(current_url, location)
-                            elif not location.startswith('http'):
-                                from urllib.parse import urljoin
-                                location = urljoin(current_url, location)
-                            
-                            redirect_count += 1
-                            current_url = location
-                            logger.debug(f"[link_validator] Redirect {redirect_count}: {current_url}")
-                            continue
-                    
-                    # Final status (or non-redirect status)
-                    return status_code, current_url, redirect_count
-                    
-                except httpx.HTTPStatusError as e:
-                    # Some servers return errors for HEAD, try GET
-                    if hop == 0:
-                        try:
-                            # Try GET with minimal data (just headers)
-                            response = await client.get(
-                                current_url,
-                                headers={
-                                    'User-Agent': self.http_client.user_agent,
-                                    'Accept': '*/*'
-                                },
-                                follow_redirects=follow_redirects
-                            )
-                            return response.status_code, str(response.url), redirect_count
-                        except Exception as get_error:
-                            # Both HEAD and GET failed
-                            raise e
-                    else:
-                        raise e
-                except httpx.RequestError as e:
-                    # Network error, connection error, etc.
-                    raise Exception(f"Request failed: {str(e)}")
-                except Exception as e:
-                    raise Exception(f"Unexpected error: {str(e)}")
-            
-            # If we get here, we hit max redirects
-            raise Exception(f"Too many redirects (>{max_hops})")
+        result = await fetch_url(
+            url,
+            method="HEAD",
+            headers={
+                'User-Agent': self.http_client.user_agent,
+                'Accept': '*/*'
+            },
+            timeout=CHECK_TIMEOUT_SECONDS,
+            max_redirects=MAX_REDIRECT_HOPS,
+        )
+        return result.status_code, result.url, result.redirects
     
     def _get_cached_validation(self, url: str) -> Optional[Dict]:
-        """Get cached validation result if still valid"""
-        conn = self._get_db_conn()
+        """Get cached validation result if still valid. An unreachable cache is a miss."""
+        conn = None
         try:
+            conn = self._get_db_conn()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT 
@@ -283,16 +258,18 @@ class LinkValidator:
                         'validated_at': row['validated_at']
                     }
         except Exception as e:
-            logger.warning(f"[link_validator] Error reading cache: {e}")
+            logger.warning("[link_validator] Error reading cache: %s", redact_exception(e))
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
         
         return None
     
     def _cache_validation(self, url: str, result: Dict, ttl_hours: int = VALIDATION_CACHE_TTL_HOURS):
-        """Cache validation result in database"""
-        conn = self._get_db_conn()
+        """Cache validation result in database. An unreachable cache skips the write."""
+        conn = None
         try:
+            conn = self._get_db_conn()
             with conn.cursor() as cur:
                 # Upsert validation result
                 cur.execute("""
@@ -320,10 +297,13 @@ class LinkValidator:
                 ))
                 conn.commit()
         except Exception as e:
-            logger.warning(f"[link_validator] Error caching validation: {e}")
-            conn.rollback()
+            logger.warning("[link_validator] Error caching validation: %s", redact_exception(e))
+            if conn is not None:
+                with contextlib.suppress(psycopg2.Error):
+                    conn.rollback()
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
     
     async def validate_batch(
         self,

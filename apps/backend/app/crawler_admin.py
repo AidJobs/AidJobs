@@ -1,17 +1,20 @@
 """
 Admin API routes for crawler management
 """
+import contextlib
 import os
 import logging
 import json
-from typing import Optional, List
+from typing import Annotated, Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
-from pydantic import BaseModel  # type: ignore
+from pydantic import BaseModel, Field, StringConstraints  # type: ignore
 import psycopg2  # type: ignore
 from psycopg2.extras import RealDictCursor  # type: ignore
 from psycopg2 import errors as psycopg2_errors  # type: ignore
 
+from app.errors import InternalError
+from app.log_safety import redact_exception
 from security.admin_auth import admin_required
 from orchestrator import get_orchestrator
 
@@ -39,6 +42,12 @@ def get_db_url():
 def get_db_conn():
     """Get database connection"""
     return psycopg2.connect(get_db_url())
+
+
+def _item_error(message: str, kind: str, item_id: str, cause: BaseException) -> InternalError:
+    """InternalError for a route about one source or job: the ID goes to the log, not the response."""
+    logger.error("[crawler_admin] %s: %s %r", message, kind, item_id)
+    return InternalError(message, cause=cause)
 
 
 # Models
@@ -207,10 +216,7 @@ async def get_status(admin=Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in get_status: {e}", exc_info=True)
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to get crawler status: {str(e)}")
+        raise InternalError("Failed to get crawler status", cause=e)
     finally:
         if 'conn' in locals() and conn:
             conn.close()
@@ -221,8 +227,9 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
     """Diagnostic endpoint to test UNESCO extraction and verify job extraction"""
     from crawler_v2.simple_crawler import SimpleCrawler
     
-    conn = get_db_conn()
+    conn = None
     try:
+        conn = get_db_conn()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Find UNESCO source
             cur.execute("""
@@ -339,18 +346,21 @@ async def unesco_diagnostics(admin=Depends(admin_required)):
                 ]
             }
             
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in unesco_diagnostics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get UNESCO diagnostics: {str(e)}")
+        raise InternalError("Failed to get UNESCO diagnostics", cause=e)
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 @router.get("/diagnostics/undp")
 async def undp_diagnostics(admin=Depends(admin_required)):
     """Diagnostic endpoint to check UNDP crawl status and verify unique apply_urls"""
-    conn = get_db_conn()
+    conn = None
     try:
+        conn = get_db_conn()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Find UNDP source
             cur.execute("""
@@ -461,11 +471,13 @@ async def undp_diagnostics(admin=Depends(admin_required)):
             
             return response
             
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in undp_diagnostics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get UNDP diagnostics: {str(e)}")
+        raise InternalError("Failed to get UNDP diagnostics", cause=e)
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 @router.get("/logs")
@@ -663,7 +675,6 @@ async def upsert_policy(host: str, policy: DomainPolicyUpdate, admin=Depends(adm
 async def get_source_quality(source_id: str, admin=Depends(admin_required)):
     """Get data quality report for a specific source"""
     from app.data_quality import DataQualityValidator
-    import traceback
     
     db_url = get_db_url()
     validator = DataQualityValidator(db_url)
@@ -690,9 +701,7 @@ async def get_source_quality(source_id: str, admin=Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in get_source_quality: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to get quality report: {str(e)}")
+        raise _item_error("Failed to get quality report", "source", source_id, e)
 
 
 @router.post("/delete-jobs-by-org")
@@ -704,10 +713,9 @@ async def delete_jobs_by_org(
     Delete all jobs from sources matching an organization name pattern.
     Useful for cleaning up jobs when source no longer exists.
     """
-    import traceback
-    
-    conn = get_db_conn()
+    conn = None
     try:
+        conn = get_db_conn()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Find all sources matching the org name pattern
             cur.execute("""
@@ -776,14 +784,15 @@ async def delete_jobs_by_org(
                     "message": f"Soft-deleted {total_jobs_deleted} jobs from {len(matching_sources)} source(s) matching '{org_name}'"
                 }
             }
+    except HTTPException:
+        raise
     except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error deleting jobs by org: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to delete jobs: {str(e)}")
+        if conn is not None:
+            with contextlib.suppress(psycopg2.Error):
+                conn.rollback()
+        raise InternalError("Failed to delete jobs", cause=e)
     finally:
-        if conn:
+        if conn is not None:
             conn.close()
 
 
@@ -804,10 +813,7 @@ async def get_global_quality(admin=Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in get_global_quality: {e}", exc_info=True)
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to get global quality report: {str(e)}")
+        raise InternalError("Failed to get global quality report", cause=e)
 
 
 # Crawl analytics endpoints
@@ -815,8 +821,9 @@ async def get_global_quality(admin=Depends(admin_required)):
 @router.get("/analytics/overview")
 async def get_crawl_analytics_overview(admin=Depends(admin_required)):
     """Get overview of crawl analytics"""
-    conn = get_db_conn()
+    conn = None
     try:
+        conn = get_db_conn()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Overall statistics
             cur.execute("""
@@ -935,21 +942,21 @@ async def get_crawl_analytics_overview(admin=Depends(admin_required)):
                     ]
                 }
             }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in get_crawl_analytics_overview: {e}", exc_info=True)
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+        raise InternalError("Failed to get analytics", cause=e)
     finally:
-        if conn:
+        if conn is not None:
             conn.close()
 
 
 @router.get("/analytics/source/{source_id}")
 async def get_source_analytics(source_id: str, admin=Depends(admin_required)):
     """Get analytics for a specific source"""
-    conn = get_db_conn()
+    conn = None
     try:
+        conn = get_db_conn()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Get source info
             cur.execute("""
@@ -1032,10 +1039,10 @@ async def get_source_analytics(source_id: str, admin=Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in get_source_analytics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get source analytics: {str(e)}")
+        raise _item_error("Failed to get source analytics", "source", source_id, e)
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 @router.post("/run-migration")
@@ -1050,9 +1057,18 @@ async def run_deletion_migration(admin: str = Depends(admin_required)):
 
 # Link validation endpoints
 
+MAX_LINKS_PER_REQUEST = 100
+MAX_LINK_LENGTH = 2048
+MAX_JOB_ID_LENGTH = 64  # job IDs are 36-character UUIDs
+
+JobId = Annotated[str, StringConstraints(max_length=MAX_JOB_ID_LENGTH)]
+
+
 class ValidateLinksRequest(BaseModel):
-    job_ids: Optional[List[str]] = None
-    urls: Optional[List[str]] = None
+    job_ids: Optional[List[JobId]] = Field(None, max_length=MAX_LINKS_PER_REQUEST)
+    urls: Optional[List[Annotated[str, StringConstraints(max_length=MAX_LINK_LENGTH)]]] = Field(
+        None, max_length=MAX_LINKS_PER_REQUEST
+    )
     use_cache: bool = True
 
 
@@ -1127,14 +1143,18 @@ async def validate_links(request: ValidateLinksRequest, admin=Depends(admin_requ
             "results": results
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error validating links: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Link validation failed: {str(e)}")
+        raise InternalError("Link validation failed", cause=e)
 
 
 @link_validation_router.get("/stats")
 async def get_validation_stats(
-    job_ids: Optional[str] = Query(None, description="Comma-separated job IDs"),
+    job_ids: Optional[str] = Query(
+        None, description="Comma-separated job IDs",
+        max_length=MAX_LINKS_PER_REQUEST * (MAX_JOB_ID_LENGTH + 1),
+    ),
     admin=Depends(admin_required)
 ):
     """
@@ -1146,15 +1166,21 @@ async def get_validation_stats(
     Returns:
         Validation statistics
     """
+    job_id_list = None
+    if job_ids:
+        job_id_list = [jid.strip() for jid in job_ids.split(',') if jid.strip()]
+        if len(job_id_list) > MAX_LINKS_PER_REQUEST:
+            raise HTTPException(status_code=422,
+                                detail=f"At most {MAX_LINKS_PER_REQUEST} job IDs")
+        if any(len(jid) > MAX_JOB_ID_LENGTH for jid in job_id_list):
+            raise HTTPException(status_code=422,
+                                detail=f"Each job ID is at most {MAX_JOB_ID_LENGTH} characters")
+
     db_url = get_db_url()
     
     try:
         from core.link_validator import get_link_validator
         link_validator = get_link_validator(db_url)
-        
-        job_id_list = None
-        if job_ids:
-            job_id_list = [jid.strip() for jid in job_ids.split(',') if jid.strip()]
         
         stats = link_validator.get_validation_stats(job_id_list)
         
@@ -1163,9 +1189,10 @@ async def get_validation_stats(
             "data": stats
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting validation stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        raise InternalError("Failed to get stats", cause=e)
 
 
 @link_validation_router.post("/validate-job/{job_id}")
@@ -1225,8 +1252,7 @@ async def validate_job_link(job_id: str, admin=Depends(admin_required)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error validating job link: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Link validation failed: {str(e)}")
+        raise _item_error("Link validation failed", "job", job_id, e)
 
 
 @meilisearch_router.post("/sync")
@@ -1328,8 +1354,7 @@ async def sync_meilisearch(execute: bool = False, admin=Depends(admin_required))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error syncing Meilisearch: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Meilisearch sync failed: {str(e)}")
+        raise InternalError("Meilisearch sync failed", cause=e)
 
 
 # Observability endpoints (Phase 2)
@@ -1347,9 +1372,10 @@ async def get_coverage_stats(
         monitor = CoverageMonitor(db_url)
         stats = monitor.get_coverage_stats(source_id=source_id, hours=hours)
         return {"status": "ok", "data": stats}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting coverage stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get coverage stats: {str(e)}")
+        raise InternalError("Failed to get coverage stats", cause=e)
 
 
 @observability_router.get("/coverage/sources")
@@ -1364,9 +1390,10 @@ async def get_source_coverage(
         monitor = CoverageMonitor(db_url)
         sources = monitor.get_source_coverage(limit=limit)
         return {"status": "ok", "data": sources}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting source coverage: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get source coverage: {str(e)}")
+        raise InternalError("Failed to get source coverage", cause=e)
 
 
 @observability_router.get("/coverage/issues")
@@ -1381,9 +1408,10 @@ async def get_coverage_issues(
         monitor = CoverageMonitor(db_url)
         flagged = monitor.flag_sources_with_issues(mismatch_threshold=threshold)
         return {"status": "ok", "data": flagged, "count": len(flagged)}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting coverage issues: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get coverage issues: {str(e)}")
+        raise InternalError("Failed to get coverage issues", cause=e)
 
 
 @observability_router.get("/extraction/stats")
@@ -1399,9 +1427,10 @@ async def get_extraction_stats(
         logger_instance = ExtractionLogger(db_url)
         stats = logger_instance.get_extraction_stats(source_id=source_id, hours=hours)
         return {"status": "ok", "data": stats}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting extraction stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get extraction stats: {str(e)}")
+        raise InternalError("Failed to get extraction stats", cause=e)
 
 
 @router.post("/backfill-quality-scores")
@@ -1506,8 +1535,9 @@ async def backfill_quality_scores(
                     updated += 1
                 
             except Exception as e:
-                errors.append(f"Job {job.get('id')}: {str(e)}")
-                logger.error(f"Error processing job {job.get('id')}: {e}")
+                logger.error("[crawler_admin] Could not score job %r: %s",
+                             job.get('id'), redact_exception(e))
+                errors.append(f"Job {job.get('id')}: could not be scored")
                 continue
         
         if not dry_run:
@@ -1527,12 +1557,12 @@ async def backfill_quality_scores(
             "errors": errors[:10] if errors else []  # Return first 10 errors
         }
         
+    except HTTPException:
+        raise
     except psycopg2.Error as e:
-        logger.error(f"Database error backfilling quality scores: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise InternalError("Database error", cause=e)
     except Exception as e:
-        logger.error(f"Error backfilling quality scores: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to backfill quality scores: {str(e)}")
+        raise InternalError("Failed to backfill quality scores", cause=e)
     finally:
         if 'cur' in locals():
             cur.close()
@@ -1564,9 +1594,10 @@ async def get_failed_inserts(
             failed = [f for f in failed if f.get('operation') == operation]
         
         return {"status": "ok", "data": failed, "count": len(failed)}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting failed inserts: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get failed inserts: {str(e)}")
+        raise InternalError("Failed to get failed inserts", cause=e)
 
 
 @observability_router.get("/test")
@@ -1601,6 +1632,7 @@ async def get_validation_errors(
             "count": len(failed),
             "message": f"Found {len(failed)} validation errors"
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting validation errors: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get validation errors: {str(e)}")
+        raise InternalError("Failed to get validation errors", cause=e)

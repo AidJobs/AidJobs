@@ -24,6 +24,7 @@ import json
 from app.db_config import db_config
 from app.errors import InternalError, log_failure
 from app.log_safety import current_request_id
+from contracts.outbound import fetch_message
 from security.admin_auth import admin_required
 
 logger = logging.getLogger(__name__)
@@ -31,22 +32,6 @@ router = APIRouter()
 
 DB_NOT_CONFIGURED = "Database not configured"
 DB_SETTINGS_UNREADABLE = "Database settings could not be read"
-
-# contracts.outbound.FetchError's messages: fixed text we wrote. Anything else is not repeated.
-_FETCH_MESSAGES = frozenset({
-    "unix sockets are not used",
-    "DNS resolution failed",
-    "URL scheme or host is not permitted",
-    "destination host is not permitted",
-    "destination address is not permitted",
-    "response exceeds size limit",
-    "content encoding failed",
-    "content encoding is not permitted",
-    "timeout",
-    "redirect limit",
-    "redirect destination is missing",
-    "redirect destination is not permitted",
-})
 
 
 def _connection_params() -> dict:
@@ -63,12 +48,6 @@ def _source_error(message: str, source_id: str, cause: BaseException) -> Interna
     """InternalError for a route about one source: the ID goes to the log, not the response."""
     logger.error("[sources] %s: source %r", message, source_id)
     return InternalError(message, cause=cause)
-
-
-def fetch_message(error: BaseException) -> str | None:
-    """A FetchError's message when it is one of the fixed messages above; otherwise None."""
-    reason = str(error)
-    return reason if reason in _FETCH_MESSAGES else None
 
 
 def describe_failure(error: BaseException) -> str:
