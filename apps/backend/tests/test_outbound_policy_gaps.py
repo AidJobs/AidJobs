@@ -674,6 +674,36 @@ def test_headers_dropped_once_stay_dropped_on_a_later_hop_home():
     assert all(b"key-token" not in write for write in writes[1:])
 
 
+# TLS context ----------------------------------------------------------------------------------
+
+def test_the_certificate_bundle_is_loaded_once_for_every_pool(monkeypatch):
+    built = []
+
+    def build():
+        built.append(TEST_SSL_CONTEXT)
+        return TEST_SSL_CONTEXT
+
+    outbound._tls_context.cache_clear()
+    monkeypatch.setattr(outbound.httpcore, "default_ssl_context", build)
+    try:
+        pools = [outbound._default_pool_factory(httpcore.AnyIOBackend()) for _ in range(3)]
+        assert len(built) == 1
+        assert all(pool._ssl_context is TEST_SSL_CONTEXT for pool in pools)
+    finally:
+        outbound._tls_context.cache_clear()
+
+
+def test_the_shared_context_still_verifies_certificates_and_names():
+    import ssl
+
+    outbound._tls_context.cache_clear()
+    context = outbound._tls_context()
+    assert context is outbound._tls_context()
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    assert context.cert_store_stats()["x509_ca"] > 0
+
+
 # Callers and values -------------------------------------------------------------------------
 
 def test_the_approved_values():
