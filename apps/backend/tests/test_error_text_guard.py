@@ -23,13 +23,6 @@ import pytest
 BACKEND = Path(__file__).resolve().parents[1]
 
 ALLOWED = {
-    # Admin routes (session required); phase 2.
-    "app/search.py::get_search_settings": 1,
-    "app/search.py::reindex_jobs": 1,
-    "main.py::admin_search_init": 1,
-    # Internal-key routes; phase 2.
-    "app/pipeline_api.py::get_extracted_job": 1,
-    "app/pipeline_api.py::list_extracted_jobs": 1,
     # Not reachable in production today (router not mounted, or no caller); phase 3.
     "app/data_quality_logs.py::get_data_quality_logs": 1,
     "app/data_quality_logs.py::get_data_quality_stats": 1,

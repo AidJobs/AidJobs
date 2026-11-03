@@ -14,6 +14,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from app.db_config import db_config
+from app.errors import InternalError
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +165,10 @@ async def list_extracted_jobs(
             }
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error listing extracted jobs: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to list extracted jobs", cause=e)
     finally:
         if conn:
             conn.close()
@@ -264,8 +266,7 @@ async def get_extracted_job(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting extracted job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalError("Failed to get extracted job", cause=e)
     finally:
         if conn:
             conn.close()
