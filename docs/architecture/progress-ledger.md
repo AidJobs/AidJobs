@@ -214,6 +214,7 @@ Rule, agreed 19 October 2026: do not edit a source's URL to work around one site
 | Working method made more efficient (the user's seven changes, and parallel work); PR #91 live record | PR #92, `517f234` | 3 Nov 2026 | Merged, CI green (docs and CI trigger only; Render did not deploy) |
 | Security stage 3, extra pull request: the admin gate before body reading, a 1 MB admin body limit, the constant-time internal key comparison, `app/shortlist.py` removed | PR #93, `f982a8c` | 3 Nov 2026 | Merged, CI green, deployed, live-checked (two reviews) |
 | Security stage 4, PR 1: the shared proxy helper and the four public proxy routes; PR #93 live record | PR #94 | 3 Nov 2026 | Not merged |
+| Security stage 3, phase 3, PR 1: crawl outcomes stored masked, one log line per message, the crawl modules guarded, dormant entries cleared, the offline comparison script | PR #97 | 3 Nov 2026 | Not merged |
 
 PR #7 introduced a regression: from 15 October, every UNICEF job was rejected as `thin_vacancy`, and three crawls (15, 17, 18 October) saved nothing. PR #11 fixed it. The C3 analysis had not been checked against the live UNICEF source.
 

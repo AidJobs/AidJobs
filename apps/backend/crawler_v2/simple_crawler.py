@@ -22,6 +22,7 @@ from contracts.detail_reader import apply_detail_reading, read_detail_page
 from contracts.outbound import FetchError, fetch_url
 from contracts.persist import persist_candidate
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
+from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
 import httpx
 from bs4 import BeautifulSoup
@@ -1597,7 +1598,7 @@ class SimpleCrawler:
                             del recorded[recorded_mark:]
                         else:
                             attempted += 1
-                        error_msg = f"Unexpected error processing job: {str(e)}"
+                        error_msg = f"Unexpected error processing job: {stored_text(e)}"
                         logger.error(f"Error processing job: {error_msg}")
                         failed += 1
                         failed_inserts.append({
@@ -1612,7 +1613,7 @@ class SimpleCrawler:
                 logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {skipped} skipped, {failed} failed")
         
         except Exception as e:
-            logger.error(f"Error saving jobs (batch): {e}", exc_info=True)
+            logger.error(f"Error saving jobs (batch): {redact_exception(e)}", exc_info=True)
             if conn:
                 conn.rollback()
             # Re-raise to see the actual error
@@ -1984,7 +1985,7 @@ class SimpleCrawler:
         try:
             conn = self._get_db_conn()
         except Exception as e:
-            logger.warning(f"Error saving raw_page record: {e}")
+            logger.warning(f"Error saving raw_page record: {redact_exception(e)}")
             return None
         try:
             with conn.cursor() as cur:
@@ -1999,7 +2000,7 @@ class SimpleCrawler:
             conn.commit()
             return raw_page_id
         except Exception as e:
-            logger.warning(f"Error saving raw_page record: {e}")
+            logger.warning(f"Error saving raw_page record: {redact_exception(e)}")
             conn.rollback()
             return None
         finally:
@@ -2296,10 +2297,10 @@ class SimpleCrawler:
                 }
         
         except Exception as e:
-            logger.error(f"Error crawling {org_name}: {e}", exc_info=True)
+            logger.error(f"Error crawling {org_name}: {redact_exception(e)}", exc_info=True)
             return {
                 'status': 'failed',
-                'message': str(e)[:200],
+                'message': stored_text(e, 200),
                 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
             }
 

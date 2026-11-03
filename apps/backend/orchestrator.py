@@ -12,7 +12,7 @@ import psycopg2
 import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
-from app.log_safety import REQUEST_ID
+from app.log_safety import REQUEST_ID, redact_exception, stored_text
 from crawler_v2.run_handle import RunHandle
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
@@ -77,6 +77,11 @@ def _row_id(row):
     if isinstance(row, dict):
         return row.get("id")
     return row[0]
+
+
+def _ipv6_unreachable(error: BaseException) -> bool:
+    text = str(error)
+    return "Network is unreachable" in text or "2406:" in text or "::" in text
 
 
 def overdue_hours(next_run_at, *, now=None):
@@ -159,13 +164,14 @@ class CrawlerOrchestrator:
                     connection_urls.append(ipv4_url)
                     logger.info(f"[orchestrator] Resolved {hostname} to IPv4: {ipv4_addr}")
             except (socket.gaierror, ValueError, OSError) as e:
-                logger.warning(f"[orchestrator] Could not resolve {hostname} to IPv4: {e}")
+                logger.warning(f"[orchestrator] Could not resolve {hostname} to IPv4: {redact_exception(e)}")
             
             # Always try original URL as fallback
             connection_urls.append(self.db_url)
         
-        # Try each connection URL with retries
-        last_error = None
+        # Try each connection URL with retries. The last exception is kept to be raised, never
+        # stored or shown as text.
+        failure = None
         for url in connection_urls:
             for attempt in range(retries):
                 try:
@@ -178,41 +184,40 @@ class CrawlerOrchestrator:
                     logger.debug(f"[orchestrator] Successfully connected to database (attempt {attempt + 1})")
                     return conn
                 except psycopg2.OperationalError as e:
-                    last_error = e
-                    error_msg = str(e)
+                    failure = e
                     
                     # Check if it's an IPv6/unreachable error
-                    if "Network is unreachable" in error_msg or "2406:" in error_msg or "::" in error_msg:
+                    if _ipv6_unreachable(e):
                         if url == connection_urls[-1] and attempt == retries - 1:
                             # Last URL and last attempt - this is the final failure
                             logger.error(f"[orchestrator] Database connection failed (IPv6 unreachable). Tried {len(connection_urls)} URL(s) with {retries} attempt(s) each.")
-                            logger.error(f"[orchestrator] Error: {e}")
+                            logger.error(f"[orchestrator] Error: {redact_exception(e)}")
                             logger.error(f"[orchestrator] Suggestion: Use Supabase connection pooler URL or ensure IPv4 connectivity.")
                         elif attempt < retries - 1:
                             wait_time = (attempt + 1) * 2
-                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed (IPv6 issue): {e}. Retrying in {wait_time}s...")
+                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed (IPv6 issue): {redact_exception(e)}. Retrying in {wait_time}s...")
                             time.sleep(wait_time)
                         continue
                     else:
                         # Different error, log and continue
                         if attempt < retries - 1:
                             wait_time = (attempt + 1) * 2
-                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed: {e}. Retrying in {wait_time}s...")
+                            logger.warning(f"[orchestrator] Connection attempt {attempt + 1}/{retries} failed: {redact_exception(e)}. Retrying in {wait_time}s...")
                             time.sleep(wait_time)
                         else:
-                            logger.error(f"[orchestrator] Database connection failed after {retries} attempts: {e}")
+                            logger.error(f"[orchestrator] Database connection failed after {retries} attempts: {redact_exception(e)}")
                 except Exception as e:
-                    last_error = e
-                    logger.error(f"[orchestrator] Unexpected database connection error: {e}")
+                    failure = e
+                    logger.error(f"[orchestrator] Unexpected database connection error: {redact_exception(e)}")
                     break
             
             # If we successfully connected, break out of URL loop
-            if last_error and "Network is unreachable" not in str(last_error):
+            if failure and "Network is unreachable" not in str(failure):
                 continue
         
         # If we get here, all connection attempts failed
-        if last_error:
-            raise last_error
+        if failure:
+            raise failure
         else:
             raise Exception("Database connection failed: Unknown error")
     
@@ -442,10 +447,10 @@ class CrawlerOrchestrator:
             result['duration_ms'] = int((time.time() - start_time) * 1000)
             return result
         except Exception as e:
-            logger.error(f"[orchestrator] Error crawling {url}: {e}")
+            logger.error(f"[orchestrator] Error crawling {url}: {redact_exception(e)}")
             return {
                 'status': 'fail',
-                'message': str(e)[:500],
+                'message': stored_text(e, 500),
                 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
                 'duration_ms': int((time.time() - start_time) * 1000),
             }
@@ -815,10 +820,10 @@ class CrawlerOrchestrator:
             raise
         except Exception as exc:
             logger.error(
-                "[orchestrator] Crawl failed for %s: %s", source.get("org_name"), exc,
-                exc_info=True,
+                "[orchestrator] Crawl failed for %s: %s", source.get("org_name"),
+                redact_exception(exc), exc_info=True,
             )
-            result = _failed_result(str(exc)[:500])
+            result = _failed_result(stored_text(exc, 500))
         finally:
             if not result.get("duration_ms"):
                 result["duration_ms"] = int((loop.time() - started) * 1000)
@@ -1058,7 +1063,7 @@ class CrawlerOrchestrator:
             try:
                 await self.recover_once()
             except Exception as e:
-                logger.error(f"[orchestrator] Recovery error: {e}", exc_info=True)
+                logger.error(f"[orchestrator] Recovery error: {redact_exception(e)}", exc_info=True)
             await asyncio.sleep(RECOVERY_INTERVAL_SECONDS)
 
     async def scheduler_loop(self):
@@ -1076,7 +1081,7 @@ class CrawlerOrchestrator:
                 consecutive_errors += 1
                 logger.error(
                     f"[orchestrator] Database error (attempt {consecutive_errors}"
-                    f"/{max_consecutive_errors}): {e}"
+                    f"/{max_consecutive_errors}): {redact_exception(e)}"
                 )
                 if consecutive_errors >= max_consecutive_errors:
                     consecutive_errors = 0
@@ -1084,7 +1089,7 @@ class CrawlerOrchestrator:
                     continue
             except Exception as e:
                 consecutive_errors += 1
-                logger.error(f"[orchestrator] Scheduler error: {e}", exc_info=True)
+                logger.error(f"[orchestrator] Scheduler error: {redact_exception(e)}", exc_info=True)
                 if consecutive_errors >= max_consecutive_errors:
                     consecutive_errors = 0
                     await asyncio.sleep(SCHEDULER_INTERVAL_SECONDS * 2)

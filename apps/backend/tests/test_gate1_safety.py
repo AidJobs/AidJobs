@@ -1,22 +1,11 @@
 """Gate 1: destructive and unauthenticated behaviours stay disabled."""
 import asyncio
 import inspect
-import sys
-import types
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-# data_quality_logs imports app.db, which is not in this repository.
-# The stub lets this test load the module and check its auth dependency.
-if "app.db" not in sys.modules:
-    _db_stub = types.ModuleType("app.db")
-    _db_stub.get_db_conn = lambda: None
-    sys.modules["app.db"] = _db_stub
-
-import app.data_quality_logs as data_quality_logs
-import security.admin_auth as admin_auth
 from app.crawler_admin import get_status, run_deletion_migration
 from main import app
 from orchestrator import CrawlerOrchestrator
@@ -86,8 +75,10 @@ def test_configured_password_still_matches(monkeypatch):
     assert get_current_admin(_request({"X-Dev-Bypass": "1"})) is None
 
 
-def test_data_quality_uses_canonical_admin_dependency():
-    assert data_quality_logs.admin_required is admin_auth.admin_required
+def test_unmounted_data_quality_logs_module_is_gone():
+    """It needed a missing app.db, so it never mounted; it is deleted, not left half-wired."""
+    assert not (BACKEND_ROOT / "app" / "data_quality_logs.py").exists()
+    assert "data_quality_logs" not in (BACKEND_ROOT / "main.py").read_text(encoding="utf-8")
 
 
 def test_find_earn_submit_route_is_gone():

@@ -5,10 +5,16 @@ This module is the safety net under it: every handler's formatter is wrapped so 
 text of each line, tracebacks included, is redacted before it is written. The record itself
 is never changed, because uvicorn's access formatter reads `record.args` as a tuple.
 
+A message is written as one line: its line breaks are escaped, so text from a scraped page or a
+caller cannot start a line that looks like our own. Traceback lines stay separate, each prefixed.
+The wrapped formatter produces the first line; the traceback is appended after it, so a formatter
+that builds the whole record itself (one JSON object, say) would see it outside that object.
+
 Imports nothing from the app, so main.py can install it before importing anything else.
 """
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import re
@@ -114,23 +120,50 @@ def redact_exception(error: BaseException) -> str:
     return f"{type(error).__name__}: {redact_text(text)}"
 
 
+def stored_text(error: BaseException, limit: int | None = None) -> str:
+    """An exception's text for a stored crawl message: secrets masked first, then cut to limit."""
+    text = redact_text(str(error))
+    return text if limit is None else text[:limit]
+
+
 def current_request_id() -> str:
     return REQUEST_ID.get()
 
 
+# Every character str.splitlines() breaks at; a log viewer may start a new line at any of them.
+_LINE_BREAKS = str.maketrans(
+    {c: repr(c)[1:-1] for c in "\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"}
+)
+TRACE_PREFIX = "  | "
+
+
 class RedactingFormatter(logging.Formatter):
-    """Wraps a handler's own formatter and redacts the finished line."""
+    """Wraps a handler's own formatter; redacts the finished line and keeps it one line."""
 
     def __init__(self, inner: logging.Formatter | None):
         super().__init__()
         self.inner = inner or logging.Formatter()
 
     def format(self, record: logging.LogRecord) -> str:
-        text = self.inner.format(record)
+        details = []
+        if record.exc_info or record.exc_text or record.stack_info:
+            plain = copy.copy(record)
+            plain.exc_info = plain.exc_text = plain.stack_info = None
+            head = self.inner.format(plain)
+            if record.exc_info or record.exc_text:
+                details.append(record.exc_text or self.inner.formatException(record.exc_info))
+            if record.stack_info:
+                details.append(self.inner.formatStack(record.stack_info))
+        else:
+            head = self.inner.format(record)
         request_id = REQUEST_ID.get()
         if request_id:
-            text = f"[{request_id}] {text}"
-        return redact_text(text)
+            head = f"[{request_id}] {head}"
+        lines = [redact_text(head).translate(_LINE_BREAKS)]
+        for block in details:
+            lines.extend(TRACE_PREFIX + line.translate(_LINE_BREAKS)
+                         for line in redact_text(block).split("\n"))
+        return "\n".join(lines)
 
 
 def _wrap(handler: logging.Handler) -> None:
