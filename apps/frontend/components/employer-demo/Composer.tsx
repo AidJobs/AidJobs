@@ -16,6 +16,8 @@ export default function Composer({
   placeholder,
   label,
   autoFocus,
+  compact,
+  large,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -24,6 +26,8 @@ export default function Composer({
   placeholder: string;
   label: string;
   autoFocus?: boolean;
+  compact?: boolean;
+  large?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const hintId = useId();
@@ -34,7 +38,7 @@ export default function Composer({
   };
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="ej-composer">
+      <div className="ej-composer" data-size={compact ? 'compact' : large ? 'large' : undefined}>
         {showGhost && (
           <div className="ej-ghost" aria-hidden>
             {value}
@@ -48,7 +52,7 @@ export default function Composer({
           aria-label={label}
           aria-describedby={suggestion ? hintId : undefined}
           placeholder={value ? '' : suggestion ? `${suggestion.trim()}…` : placeholder}
-          rows={3}
+          rows={compact ? 1 : 3}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
             const el = e.currentTarget;

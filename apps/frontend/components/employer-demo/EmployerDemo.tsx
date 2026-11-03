@@ -1,15 +1,16 @@
 'use client';
 
-import { Briefcase, Building2, Eye, Globe2, Home as HomeIcon, Menu, Palette, RotateCcw, Star, Users } from 'lucide-react';
+import { Briefcase, Building2, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Star, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
+import Create from './Create';
 import Home from './Home';
 import Jobs from './Jobs';
 import Public from './Public';
 import Publish from './Publish';
 import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
 import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
-import Studio, { setReviewer } from './Studio';
+import { setReviewer } from './Review';
 import { DemoMark, Dialog, NoticeBar } from './ui';
 
 function ViewAs() {
@@ -29,7 +30,7 @@ function ViewAs() {
           if (id) {
             const name = s.team.find((p) => p.id === id)?.name;
             const target = s.jobs.find((j) => j.review.state !== 'none' && j.review.reviewers.some((r) => r.name === name));
-            if (target) go('studio', target.id);
+            if (target) go('create', target.id);
           }
         }}
         aria-label="View as"
@@ -69,11 +70,12 @@ export default function EmployerDemo() {
     label,
     icon,
     count,
-    active: route.screen === key || (key === 'home' && (route.screen === 'studio' || route.screen === 'publish')),
+    active: route.screen === key || (key === 'create' && route.screen === 'publish'),
     onSelect: () => go(key),
   });
   const primary: MenuEntry[] = [
-    entry('home', 'Home', <HomeIcon size={15} strokeWidth={1.8} />),
+    entry('create', 'Create a job', <Plus size={15} strokeWidth={2} />),
+    entry('home', 'Overview', <LayoutDashboard size={15} strokeWidth={1.8} />),
     entry('jobs', 'Jobs', <Briefcase size={15} strokeWidth={1.8} />, liveCount),
     entry('styles', 'Styles', <Palette size={15} strokeWidth={1.8} />),
     entry('team', 'Team', <Users size={15} strokeWidth={1.8} />, s.team.length),
@@ -81,11 +83,12 @@ export default function EmployerDemo() {
     entry('public', 'On AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
   ];
 
-  const full = route.screen === 'studio';
+  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
+    case 'create':
     case 'studio':
-      screen = <Studio id={route.id} />;
+      screen = <Create key={route.id ?? 'new'} id={route.id} />;
       break;
     case 'publish':
       screen = <Publish key={route.id} id={route.id} />;
@@ -105,8 +108,11 @@ export default function EmployerDemo() {
     case 'public':
       screen = <Public key={route.id ?? 'list'} id={route.id} />;
       break;
-    default:
+    case 'home':
       screen = <Home />;
+      break;
+    default:
+      screen = <Create />;
   }
 
   return (
@@ -131,6 +137,7 @@ export default function EmployerDemo() {
         drawerOpen={drawer}
         onCloseDrawer={() => setDrawer(false)}
         homeHref="/employer-demo"
+        width={216}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6" style={{ background: 'var(--surface)' }}>
@@ -179,7 +186,7 @@ export default function EmployerDemo() {
                   resetDemo();
                   setResetting(false);
                   update((st) => ({ ...st, signedIn: true }));
-                  go('home');
+                  go('create');
                 }}
               >
                 Reset

@@ -1,129 +1,256 @@
 /**
  * The demo's stand-in for the job-description generator: fixed rules and a written content library, no AI and no
- * network. It shows how the chat, the tags, the fact strip, and the quality checks behave; the production generator
- * is decided later (employer-side plan, E7).
+ * network. Formats, groups, commitments, and checks follow the research recorded in the employer-side plan
+ * (section 14); the production generator is decided later (decision E7).
  */
-import type { Facts, Org, Section, Style, Tag, Tone } from './types';
+import type { Arrangement, Commitment, Engagement, Facts, Format, GroupKey, Org, Period, Section, SectionDef, Tone } from './types';
 
 const DAY = 86_400_000;
 
-export const TAGS: Tag[] = [
-  { key: 'about', label: 'About us', group: 'Core', hint: 'Who the organisation is, from its profile' },
-  { key: 'role', label: 'The role', group: 'Core', hint: 'A short summary of the job and its purpose' },
-  { key: 'responsibilities', label: 'Responsibilities', group: 'Core', hint: 'What the person will do' },
-  { key: 'qualifications', label: 'Qualifications', group: 'Core', hint: 'Education and experience required' },
-  { key: 'competencies', label: 'Competencies', group: 'Core', hint: 'Skills and behaviours' },
-  { key: 'languages', label: 'Languages', group: 'Core', hint: 'Required and desirable languages' },
-  { key: 'offer', label: 'What we offer', group: 'Core', hint: 'Salary, benefits, and leave' },
-  { key: 'apply', label: 'How to apply', group: 'Core', hint: 'Where and by when to apply' },
-  { key: 'setting', label: 'Organisational setting', group: 'UN style', hint: 'Where the post sits and who it reports to' },
-  { key: 'assessment', label: 'Assessment', group: 'UN style', hint: 'How candidates are assessed' },
-  { key: 'safeguarding', label: 'Safeguarding', group: 'Sector', hint: 'Commitment to protecting children and adults at risk' },
-  { key: 'security', label: 'Security context', group: 'Sector', hint: 'Duty-station security and rest and recuperation' },
-  { key: 'donor', label: 'Donor compliance', group: 'Sector', hint: 'Funding source and compliance duties' },
-  { key: 'deliverables', label: 'Deliverables', group: 'Sector', hint: 'For consultancies: outputs and timeline' },
-  { key: 'payment', label: 'Payment schedule', group: 'Sector', hint: 'For consultancies: instalments by deliverable' },
-  { key: 'learning', label: 'Learning goals', group: 'Sector', hint: 'For internships: what the intern will learn' },
-  { key: 'deployment', label: 'Deployment', group: 'Sector', hint: 'For emergency roles: notice and duration' },
-  { key: 'equal', label: 'Equal opportunity', group: 'Standard text', hint: "The organisation's fixed text" },
-  { key: 'psea', label: 'PSEA', group: 'Standard text', hint: 'Protection from sexual exploitation and abuse' },
-  { key: 'dataprot', label: 'Data protection', group: 'Standard text', hint: "How candidates' data is handled" },
-  { key: 'nofee', label: 'No-fee notice', group: 'Standard text', hint: 'The organisation never charges candidates' },
+export const GROUPS: Array<{ key: GroupKey; label: string; hint: string }> = [
+  { key: 'employer', label: 'About the employer', hint: 'Who you are and where the post sits' },
+  { key: 'job', label: 'The job', hint: 'What the person will do' },
+  { key: 'person', label: 'The person', hint: 'What they need, essential and desirable' },
+  { key: 'offer', label: 'The offer and conditions', hint: 'Pay, benefits, and the conditions of the post' },
+  { key: 'apply', label: 'Applying', hint: 'How, by when, and what happens next' },
 ];
 
-export const TAG_BY_KEY: Record<string, Tag> = Object.fromEntries(TAGS.map((t) => [t.key, t]));
-
-/** The order sections appear in a job description, whatever order the tags were chosen in. */
-const ORDER = [
-  'about',
-  'setting',
-  'role',
-  'deliverables',
-  'responsibilities',
-  'learning',
-  'deployment',
-  'qualifications',
-  'competencies',
-  'languages',
-  'security',
-  'donor',
-  'payment',
-  'offer',
-  'assessment',
-  'apply',
-  'safeguarding',
-  'equal',
-  'psea',
-  'dataprot',
-  'nofee',
+export const SECTIONS: SectionDef[] = [
+  { key: 'about', label: 'About us', group: 'employer', hint: 'Who the organisation is, from its profile' },
+  { key: 'team', label: 'Team purpose', group: 'employer', hint: 'What the team is there to do' },
+  { key: 'background', label: 'Background', group: 'employer', hint: 'The programme or project the post belongs to' },
+  { key: 'setting', label: 'Organisational setting', group: 'employer', hint: 'Where the post sits and who it reports to' },
+  { key: 'purpose', label: 'Role purpose', group: 'job', hint: 'The job in two or three sentences' },
+  { key: 'responsibilities', label: 'Responsibilities', group: 'job', hint: 'What the person will do, grouped' },
+  { key: 'deliverables', label: 'Deliverables', group: 'job', hint: 'Outputs and timeline (consultancies)' },
+  { key: 'relationships', label: 'Key working relationships', group: 'job', hint: 'Reports to, direct reports, who they work with' },
+  { key: 'learning', label: 'Learning goals', group: 'job', hint: 'What an intern or fellow will learn' },
+  { key: 'deployment', label: 'Deployment', group: 'job', hint: 'Availability and notice (rosters, surge)' },
+  { key: 'firstweeks', label: 'Your first weeks', group: 'job', hint: 'What starting looks like' },
+  { key: 'requirements', label: 'Qualifications and experience', group: 'person', hint: 'Essential and desirable' },
+  { key: 'competencies', label: 'Competencies', group: 'person', hint: 'Skills and behaviours' },
+  { key: 'languages', label: 'Languages', group: 'person', hint: 'Required and desirable' },
+  { key: 'practical', label: 'Practical requirements', group: 'person', hint: 'Local language, licence, residence, travel' },
+  { key: 'offer', label: 'What we offer', group: 'offer', hint: 'Pay, benefits, and leave' },
+  { key: 'conditions', label: 'Conditions', group: 'offer', hint: 'Duty-station status, security, rest and recuperation' },
+  { key: 'funding', label: 'Funding and contract conditions', group: 'offer', hint: 'Subject to funding, or contingent on an award' },
+  { key: 'apply', label: 'How to apply', group: 'apply', hint: 'Method, documents, and process' },
+  { key: 'assessment', label: 'Assessment', group: 'apply', hint: 'Tests and interviews' },
 ];
 
-export const STYLES: Style[] = [
+export const SECTION_BY_KEY: Record<string, SectionDef> = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
+
+export const COMMITMENTS: Array<{ key: string; label: string; hint: string }> = [
+  { key: 'safeguarding', label: 'Safeguarding', hint: 'Keeping children and adults at risk safe' },
+  { key: 'psea', label: 'PSEA', hint: 'Protection from sexual exploitation, abuse and harassment (IASC Six Core Principles)' },
+  { key: 'mds', label: 'Misconduct Disclosure Scheme', hint: 'For members of the inter-agency scheme (SCHR, CHS Alliance)' },
+  { key: 'checks', label: 'Background checks', hint: 'References and checks for the country of work' },
+  { key: 'ct', label: 'Counter-terrorism checks', hint: 'Sanctions screening some donors require' },
+  { key: 'fraud', label: 'No fee, fraud warning', hint: 'Candidates are never charged' },
+  { key: 'equal', label: 'Equal opportunity', hint: 'Who you welcome' },
+  { key: 'encourage', label: 'Apply even if…', hint: '"You don\'t need to meet every requirement"' },
+  { key: 'adjustments', label: 'Adjustments', hint: 'Reasonable adjustments in the process' },
+  { key: 'dataprot', label: 'Data protection', hint: "How applicants' data is handled" },
+  { key: 'righttowork', label: 'Right to work', hint: 'Work authorisation for the country' },
+  { key: 'unconsiderations', label: 'UN considerations', hint: 'For UN entities' },
+];
+
+const DOC_ORDER = SECTIONS.map((s) => s.key);
+
+/** Ten real formats, named by format (decision of 3 November 2026), with the headings their users write. */
+export const FORMATS: Format[] = [
   {
-    key: 'un',
-    label: 'UN style',
-    by: 'AidJobs',
-    tags: ['setting', 'responsibilities', 'competencies', 'qualifications', 'languages', 'assessment', 'nofee', 'equal'],
+    key: 'un-secretariat',
+    label: 'UN Secretariat format',
+    family: 'UN and multilateral',
+    usedBy: 'UN Secretariat entities (UN Careers, Inspira)',
     tone: 'formal',
-    note: 'The structure UN agencies use: organisational setting, competencies, assessment, no-fee notice',
+    order: [
+      { key: 'setting', heading: 'Org. setting and reporting' },
+      { key: 'responsibilities', heading: 'Responsibilities' },
+      { key: 'competencies', heading: 'Competencies' },
+      { key: 'requirements', heading: 'Education and work experience' },
+      { key: 'languages', heading: 'Languages' },
+      { key: 'assessment', heading: 'Assessment' },
+    ],
+    commitments: ['unconsiderations', 'fraud'],
   },
   {
-    key: 'ngo',
-    label: 'NGO standard',
-    by: 'AidJobs',
-    tags: ['about', 'role', 'responsibilities', 'qualifications', 'offer', 'safeguarding', 'apply', 'equal'],
-    tone: 'warm',
-    note: 'A clear NGO advert with safeguarding and what you offer',
-  },
-  {
-    key: 'tor',
-    label: 'Consultancy terms of reference',
-    by: 'AidJobs',
-    tags: ['about', 'role', 'deliverables', 'payment', 'qualifications', 'apply'],
+    key: 'un-agency',
+    label: 'UN agency format',
+    family: 'UN and multilateral',
+    usedBy: 'e.g. UNDP and other UN funds and programmes',
     tone: 'formal',
-    note: 'Background, deliverables, payment by instalment',
+    order: [
+      { key: 'background', heading: 'Background' },
+      { key: 'responsibilities', heading: 'Duties and responsibilities' },
+      { key: 'relationships', heading: 'Institutional arrangement' },
+      { key: 'competencies', heading: 'Competencies' },
+      { key: 'requirements', heading: 'Required skills and experience' },
+      { key: 'languages', heading: 'Languages' },
+    ],
+    commitments: ['fraud', 'equal'],
   },
   {
-    key: 'intern',
-    label: 'Internship',
-    by: 'AidJobs',
-    tags: ['about', 'role', 'learning', 'qualifications', 'offer', 'apply'],
+    key: 'ingo-role-profile',
+    label: 'INGO role profile',
+    family: 'INGO and humanitarian',
+    usedBy: 'e.g. Save the Children, World Vision',
+    tone: 'formal',
+    order: [
+      { key: 'purpose', heading: 'Role purpose' },
+      { key: 'relationships', heading: 'Scope of role' },
+      { key: 'responsibilities', heading: 'Key areas of accountability' },
+      { key: 'competencies', heading: 'Behaviours' },
+      { key: 'requirements', heading: 'Qualifications and experience' },
+    ],
+    commitments: ['safeguarding', 'checks', 'equal', 'fraud'],
+  },
+  {
+    key: 'ingo-purpose',
+    label: 'INGO purpose-led',
+    family: 'INGO and humanitarian',
+    usedBy: 'e.g. Oxfam',
     tone: 'warm',
-    note: 'Learning goals first, then eligibility',
+    order: [
+      { key: 'team', heading: 'Team purpose' },
+      { key: 'purpose', heading: 'Job purpose' },
+      { key: 'responsibilities', heading: 'Key responsibilities' },
+      { key: 'requirements', heading: 'What we are looking for' },
+      { key: 'offer', heading: 'We offer' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['safeguarding', 'mds', 'ct', 'equal'],
   },
   {
-    key: 'surge',
-    label: 'Emergency or surge',
-    by: 'AidJobs',
-    tags: ['role', 'deployment', 'responsibilities', 'qualifications', 'security', 'safeguarding', 'apply'],
+    key: 'about-you',
+    label: '"About you" narrative',
+    family: 'INGO and humanitarian',
+    usedBy: 'e.g. Plan International, CARE International UK, Christian Aid',
+    tone: 'warm',
+    order: [
+      { key: 'about', heading: 'The organisation' },
+      { key: 'purpose', heading: 'The opportunity' },
+      { key: 'responsibilities', heading: 'Key responsibilities' },
+      { key: 'requirements', heading: 'About you' },
+      { key: 'offer', heading: 'What we offer' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['safeguarding', 'mds', 'equal', 'fraud'],
+  },
+  {
+    key: 'field-profile',
+    label: 'Humanitarian field profile',
+    family: 'INGO and humanitarian',
+    usedBy: 'e.g. MSF, IRC, NRC',
     tone: 'plain',
-    note: 'Deployment notice, security context, short and direct',
+    order: [
+      { key: 'purpose', heading: 'Main purpose' },
+      { key: 'responsibilities', heading: 'Accountabilities' },
+      { key: 'relationships', heading: 'Key working relationships' },
+      { key: 'requirements', heading: 'Requirements' },
+      { key: 'conditions', heading: 'Conditions' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['safeguarding', 'psea', 'fraud', 'equal'],
+  },
+  {
+    key: 'donor',
+    label: 'Government donor',
+    family: 'Donors, foundations and contractors',
+    usedBy: 'e.g. GIZ; FCDO uses essential and desirable criteria and behaviours',
+    tone: 'formal',
+    order: [
+      { key: 'background', heading: 'About the programme' },
+      { key: 'responsibilities', heading: 'Your tasks' },
+      { key: 'requirements', heading: 'Your profile' },
+      { key: 'offer', heading: 'What we offer' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['equal', 'righttowork', 'checks'],
+  },
+  {
+    key: 'contractor',
+    label: 'Development contractor',
+    family: 'Donors, foundations and contractors',
+    usedBy: 'e.g. DAI, Palladium, Chemonics',
+    tone: 'formal',
+    order: [
+      { key: 'purpose', heading: 'Position overview' },
+      { key: 'responsibilities', heading: 'Responsibilities' },
+      { key: 'deliverables', heading: 'Deliverables' },
+      { key: 'requirements', heading: 'Qualifications' },
+      { key: 'funding', heading: 'Funding and contract conditions' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['equal', 'fraud', 'safeguarding'],
+  },
+  {
+    key: 'local-concise',
+    label: 'Local NGO concise',
+    family: 'National NGOs and charities',
+    usedBy: 'e.g. BRAC, Amref, Kenya Red Cross',
+    tone: 'plain',
+    order: [
+      { key: 'background', heading: 'Project brief' },
+      { key: 'purpose', heading: 'Job purpose' },
+      { key: 'responsibilities', heading: 'Key responsibilities' },
+      { key: 'requirements', heading: 'Qualifications and experience' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['fraud', 'safeguarding', 'equal'],
+  },
+  {
+    key: 'charity',
+    label: 'Domestic charity',
+    family: 'National NGOs and charities',
+    usedBy: 'UK, US, and Australian charities and nonprofits',
+    tone: 'warm',
+    order: [
+      { key: 'purpose', heading: 'About the role' },
+      { key: 'responsibilities', heading: "What you'll do" },
+      { key: 'requirements', heading: 'About you' },
+      { key: 'offer', heading: 'Why join us' },
+      { key: 'apply', heading: 'How to apply' },
+    ],
+    commitments: ['equal', 'encourage', 'adjustments', 'checks'],
   },
 ];
 
-type Family = {
+export const FAMILIES_ORDER: Array<Format['family']> = ['Your organisation', 'UN and multilateral', 'INGO and humanitarian', 'Donors, foundations and contractors', 'National NGOs and charities'];
+
+/** The closest real format for an organisation type, when none has been learned. */
+export const FORMAT_FOR_TYPE: Record<Org['orgType'], string> = {
+  un: 'un-agency',
+  ingo: 'about-you',
+  ngo: 'local-concise',
+  charity: 'charity',
+  donor: 'donor',
+  contractor: 'contractor',
+};
+
+type RoleFamily = {
   key: string;
   title: string;
   words: string[];
   sector: string;
   sdg: number;
-  extraTags: string[];
   resp: string[];
   more: string[];
-  qual: string[];
+  essential: string[];
+  desirable: string[];
   comp: string[];
   deliverables: string[];
   learning: string[];
 };
 
-export const FAMILIES: Family[] = [
+export const ROLE_FAMILIES: RoleFamily[] = [
   {
     key: 'wash',
     title: 'WASH Programme Manager',
     words: ['wash', 'water', 'sanitation', 'hygiene'],
     sector: 'Water, sanitation and hygiene',
     sdg: 6,
-    extraTags: ['donor'],
     resp: [
       'Lead the design, delivery, and quality of the water, sanitation, and hygiene programme across project sites',
       'Manage the WASH team and partners, including work plans, coaching, and performance reviews',
@@ -132,17 +259,9 @@ export const FAMILIES: Family[] = [
       'Represent the organisation in the WASH cluster and with local water authorities',
       'Prepare donor reports and proposals with the grants and MEAL teams',
     ],
-    more: [
-      'Plan hygiene promotion with communities, including women and people with disabilities',
-      'Lead water-quality monitoring and act on the results',
-      'Prepare the WASH response for cholera or flooding, with pre-positioned stock',
-    ],
-    qual: [
-      "Master's degree in civil or environmental engineering, public health, or a related field",
-      'Experience managing WASH programmes in humanitarian or development settings',
-      'Experience managing budgets above USD 1 million and leading teams',
-      'Knowledge of Sphere standards and the WASH cluster',
-    ],
+    more: ['Plan hygiene promotion with communities, including women and people with disabilities', 'Lead water-quality monitoring and act on the results', 'Prepare the WASH response for cholera or flooding, with pre-positioned stock'],
+    essential: ["Degree in civil or environmental engineering, public health, or a related field", 'Experience managing WASH programmes in humanitarian or development settings', 'Experience managing budgets and leading teams'],
+    desirable: ['Knowledge of Sphere standards and the WASH cluster', 'Experience with cholera preparedness'],
     comp: ['Leads teams through change and pressure', 'Builds trust with communities and authorities', 'Plans and solves problems in the field'],
     deliverables: ['Inception report with method and work plan', 'Assessment of water points and sanitation facilities', 'Draft report with recommendations', 'Final report and validation workshop'],
     learning: ['How a WASH programme is planned and monitored', 'Water-quality testing in the field', 'Writing for donors'],
@@ -150,19 +269,13 @@ export const FAMILIES: Family[] = [
   {
     key: 'health',
     title: 'Health Programme Officer',
-    words: ['health', 'medical', 'clinic', 'epidemiolog', 'nurse', 'doctor', 'malaria', 'vaccin'],
+    words: ['health', 'medical', 'clinic', 'epidemiolog', 'nurse', 'doctor', 'malaria', 'vaccin', 'nutrition'],
     sector: 'Health',
     sdg: 3,
-    extraTags: ['safeguarding'],
-    resp: [
-      'Support the delivery of primary health care activities with health facilities and community health workers',
-      'Monitor health indicators and the quality of services',
-      'Coordinate with the Ministry of Health and the health cluster',
-      'Manage medical supplies with the logistics team',
-      'Train health staff and volunteers',
-    ],
+    resp: ['Support primary health care activities with health facilities and community health workers', 'Monitor health indicators and the quality of services', 'Coordinate with the Ministry of Health and the health cluster', 'Manage medical supplies with the logistics team', 'Train health staff and volunteers'],
     more: ['Support outbreak preparedness and response', 'Make sure services reach women, children, and people with disabilities'],
-    qual: ['Degree in medicine, nursing, public health, or a related field', 'Experience in health programmes in low-resource settings', 'Knowledge of national health policies'],
+    essential: ['Degree in medicine, nursing, public health, or a related field', 'Experience in health programmes in low-resource settings'],
+    desirable: ['Knowledge of national health policies'],
     comp: ['Works well with government counterparts', 'Accurate with data', 'Calm under pressure'],
     deliverables: ['Inception report', 'Health facility assessment', 'Draft and final report'],
     learning: ['How health programmes are monitored', 'Working with health authorities'],
@@ -170,19 +283,13 @@ export const FAMILIES: Family[] = [
   {
     key: 'protection',
     title: 'Child Protection Specialist',
-    words: ['protection', 'child', 'gbv', 'gender-based', 'safeguard'],
+    words: ['protection', 'child', 'gbv', 'gender-based', 'safeguard', 'caseworker', 'case worker'],
     sector: 'Child protection',
     sdg: 16,
-    extraTags: ['safeguarding'],
-    resp: [
-      'Lead case management for children at risk, with clear referral pathways',
-      'Train staff and partners on child protection and safeguarding',
-      'Coordinate with the child protection area of responsibility and local authorities',
-      'Monitor the quality of services and the wellbeing of children',
-      'Support community-based protection groups',
-    ],
+    resp: ['Lead case management for children at risk, with clear referral pathways', 'Train staff and partners on child protection and safeguarding', 'Coordinate with the child protection area of responsibility and local authorities', 'Monitor the quality of services and the wellbeing of children', 'Support community-based protection groups'],
     more: ['Run child-friendly spaces with partners', 'Advise programmes on safe and inclusive design'],
-    qual: ['Degree in social work, law, psychology, or a related field', 'Experience in child protection case management', 'Knowledge of the Minimum Standards for Child Protection in Humanitarian Action'],
+    essential: ['Degree in social work, law, psychology, or a related field', 'Experience in child protection case management'],
+    desirable: ['Knowledge of the Minimum Standards for Child Protection in Humanitarian Action'],
     comp: ['Puts the child first', 'Discreet with sensitive information', 'Builds strong partnerships'],
     deliverables: ['Inception report', 'Mapping of services and referral pathways', 'Final report'],
     learning: ['How case management works', 'Safeguarding in practice'],
@@ -193,10 +300,10 @@ export const FAMILIES: Family[] = [
     words: ['education', 'teacher', 'school', 'learning centre'],
     sector: 'Education',
     sdg: 4,
-    extraTags: ['safeguarding'],
     resp: ['Support schools and learning centres to deliver quality education', 'Train teachers in child-centred methods', 'Monitor attendance and learning outcomes', 'Work with parents and education authorities'],
     more: ['Support education in emergencies preparedness', 'Promote inclusive education for children with disabilities'],
-    qual: ['Degree in education or a related field', 'Experience in education programmes', 'Knowledge of INEE Minimum Standards'],
+    essential: ['Degree in education or a related field', 'Experience in education programmes'],
+    desirable: ['Knowledge of INEE Minimum Standards'],
     comp: ['Communicates clearly with communities', 'Organised and reliable'],
     deliverables: ['Inception report', 'Learning assessment', 'Final report'],
     learning: ['How education programmes are run', 'Monitoring learning outcomes'],
@@ -207,10 +314,10 @@ export const FAMILIES: Family[] = [
     words: ['meal', 'm&e', 'monitoring', 'evaluation', 'accountability'],
     sector: 'Monitoring and evaluation',
     sdg: 17,
-    extraTags: ['donor'],
-    resp: ['Lead monitoring, evaluation, accountability, and learning across the country programme', 'Design indicators, tools, and data systems', 'Run the feedback and complaints mechanism', 'Lead evaluations and learning reviews', 'Train staff on data quality'],
+    resp: ['Lead monitoring, evaluation, accountability, and learning (MEAL) across the country programme', 'Design indicators, tools, and data systems', 'Run the feedback and complaints mechanism', 'Lead evaluations and learning reviews', 'Train staff on data quality'],
     more: ['Produce dashboards for management', 'Support proposal writing with results frameworks'],
-    qual: ['Degree in statistics, social sciences, or a related field', 'Experience leading MEAL systems', 'Skills in Kobo, Excel, and a statistics package'],
+    essential: ['Degree in statistics, social sciences, or a related field', 'Experience leading MEAL systems'],
+    desirable: ['Skills in Kobo and a statistics package'],
     comp: ['Analytical', 'Turns data into decisions', 'Coaches others'],
     deliverables: ['Evaluation design', 'Data collection and analysis', 'Evaluation report'],
     learning: ['How MEAL systems work', 'Data collection tools'],
@@ -221,10 +328,10 @@ export const FAMILIES: Family[] = [
     words: ['finance', 'accountant', 'accounting', 'budget', 'grants'],
     sector: 'Finance',
     sdg: 17,
-    extraTags: ['donor'],
     resp: ['Process payments and keep accurate accounting records', 'Prepare monthly financial reports and reconciliations', 'Support budget monitoring with programme teams', 'Make sure spending follows donor rules and internal policies', 'Support audits'],
     more: ['Train staff on finance procedures', 'Manage petty cash and bank transfers'],
-    qual: ['Degree in accounting, finance, or a related field', 'Experience in NGO finance', 'Skills in accounting software and Excel'],
+    essential: ['Degree in accounting, finance, or a related field', 'Experience in NGO finance'],
+    desirable: ['A professional accounting qualification (ACCA, CPA)'],
     comp: ['Accurate', 'Honest and transparent', 'Meets deadlines'],
     deliverables: ['Financial review', 'Recommendations report'],
     learning: ['NGO finance procedures', 'Donor reporting'],
@@ -235,10 +342,10 @@ export const FAMILIES: Family[] = [
     words: ['logistics', 'supply', 'procurement', 'fleet', 'warehouse'],
     sector: 'Logistics',
     sdg: 9,
-    extraTags: [],
     resp: ['Manage procurement in line with policy and donor rules', 'Run warehouses and stock control', 'Manage the vehicle fleet and movements', 'Support distributions with programme teams'],
     more: ['Pre-position emergency stock', 'Assess suppliers and markets'],
-    qual: ['Degree or diploma in logistics or supply chain', 'Experience in humanitarian logistics', 'Knowledge of procurement rules'],
+    essential: ['Degree or diploma in logistics or supply chain', 'Experience in humanitarian logistics'],
+    desirable: ['Knowledge of donor procurement rules'],
     comp: ['Organised', 'Solves problems quickly', 'Works well across teams'],
     deliverables: ['Supply chain assessment', 'Recommendations report'],
     learning: ['Humanitarian supply chains', 'Procurement procedures'],
@@ -249,10 +356,10 @@ export const FAMILIES: Family[] = [
     words: ['communications', 'comms', 'advocacy', 'media', 'content'],
     sector: 'Communications',
     sdg: 17,
-    extraTags: [],
     resp: ['Produce stories, photos, and videos from programmes', 'Manage social media and the website', 'Support advocacy and media relations', 'Follow consent and safeguarding rules for content'],
     more: ['Prepare donor visibility materials', 'Train staff on storytelling'],
-    qual: ['Degree in communications, journalism, or a related field', 'Experience in NGO communications', 'Strong writing in English'],
+    essential: ['Degree in communications, journalism, or a related field', 'Experience in NGO communications'],
+    desirable: ['Photography or video skills'],
     comp: ['Creative', 'Respects dignity in storytelling', 'Works to deadlines'],
     deliverables: ['Content plan', 'Stories and media package'],
     learning: ['NGO communications', 'Ethical storytelling'],
@@ -263,10 +370,10 @@ export const FAMILIES: Family[] = [
     words: ['climate', 'environment', 'resilience', 'adaptation'],
     sector: 'Climate and environment',
     sdg: 13,
-    extraTags: ['donor'],
     resp: ['Advise programmes on climate risk and adaptation', 'Design community resilience projects', 'Support climate finance proposals', 'Represent the organisation in climate networks'],
     more: ['Develop early warning and anticipatory action plans', 'Measure environmental impact of programmes'],
-    qual: ["Master's degree in environmental science, climate policy, or a related field", 'Experience in climate adaptation programmes', 'Knowledge of climate finance'],
+    essential: ['Degree in environmental science, climate policy, or a related field', 'Experience in climate adaptation programmes'],
+    desirable: ['Knowledge of climate finance'],
     comp: ['Thinks across sectors', 'Influences decision-makers'],
     deliverables: ['Climate risk assessment', 'Adaptation plan'],
     learning: ['Climate adaptation in practice', 'Climate finance basics'],
@@ -277,10 +384,10 @@ export const FAMILIES: Family[] = [
     words: ['livelihood', 'food security', 'cash', 'economic', 'agricultur'],
     sector: 'Livelihoods and food security',
     sdg: 2,
-    extraTags: [],
     resp: ['Deliver cash and livelihoods activities with communities', 'Run market assessments', 'Support farmer and business groups', 'Monitor household food security'],
     more: ['Link groups to markets and financial services', 'Support cash transfer systems'],
-    qual: ['Degree in agriculture, economics, or a related field', 'Experience in livelihoods or cash programmes'],
+    essential: ['Degree in agriculture, economics, or a related field', 'Experience in livelihoods or cash programmes'],
+    desirable: ['Experience with digital cash transfers'],
     comp: ['Works closely with communities', 'Practical and organised'],
     deliverables: ['Market assessment', 'Final report'],
     learning: ['Cash programming', 'Market assessments'],
@@ -291,10 +398,10 @@ export const FAMILIES: Family[] = [
     words: ['hr ', 'human resources', 'people and culture', 'recruitment'],
     sector: 'Human resources',
     sdg: 8,
-    extraTags: [],
     resp: ['Run recruitment from advert to contract', 'Maintain staff records and HR systems', 'Support performance management and learning', 'Advise managers on HR policy and labour law'],
     more: ['Support staff wellbeing initiatives', 'Prepare payroll inputs'],
-    qual: ['Degree in human resources or a related field', 'Experience in HR in an NGO'],
+    essential: ['Degree in human resources or a related field', 'Experience in HR in an NGO'],
+    desirable: ['A professional HR qualification'],
     comp: ['Discreet', 'Fair and consistent'],
     deliverables: ['HR policy review', 'Recommendations'],
     learning: ['Recruitment in an NGO', 'HR systems'],
@@ -305,106 +412,151 @@ export const FAMILIES: Family[] = [
     words: ['programme', 'program', 'project manager', 'project'],
     sector: 'Programme management',
     sdg: 17,
-    extraTags: ['donor'],
     resp: ['Lead the delivery of the programme on time and on budget', 'Manage the programme team and partners', 'Monitor results with the MEAL team', 'Report to donors and senior management', 'Represent the organisation with partners and authorities'],
     more: ['Develop new proposals', 'Manage risks and compliance'],
-    qual: ['Degree in development studies or a related field', 'Experience managing development or humanitarian programmes', 'Experience managing budgets and teams'],
+    essential: ['Degree in development studies or a related field', 'Experience managing development or humanitarian programmes'],
+    desirable: ['Experience with institutional donors'],
     comp: ['Leads and motivates', 'Plans and delivers', 'Builds partnerships'],
     deliverables: ['Inception report', 'Draft and final reports'],
     learning: ['Programme management', 'Donor reporting'],
   },
 ];
 
-const FAMILY_BY_KEY: Record<string, Family> = Object.fromEntries(FAMILIES.map((f) => [f.key, f]));
+const ROLE_BY_KEY: Record<string, RoleFamily> = Object.fromEntries(ROLE_FAMILIES.map((f) => [f.key, f]));
 
-export type Modifier = 'consultancy' | 'internship' | 'surge' | null;
-
-export type Place = { city: string; country: string; iso: string; risky?: boolean };
+export type Place = { city: string; country: string; iso: string; risky?: boolean; tz: string; currency: string; payLaw?: string };
 
 export const PLACES: Place[] = [
-  { city: 'Nairobi', country: 'Kenya', iso: 'KE' },
-  { city: 'Kampala', country: 'Uganda', iso: 'UG' },
-  { city: 'Addis Ababa', country: 'Ethiopia', iso: 'ET' },
-  { city: 'Juba', country: 'South Sudan', iso: 'SS', risky: true },
-  { city: 'Goma', country: 'DR Congo', iso: 'CD', risky: true },
-  { city: 'Kinshasa', country: 'DR Congo', iso: 'CD' },
-  { city: 'Mogadishu', country: 'Somalia', iso: 'SO', risky: true },
-  { city: 'Maiduguri', country: 'Nigeria', iso: 'NG', risky: true },
-  { city: 'Abuja', country: 'Nigeria', iso: 'NG' },
-  { city: 'Dakar', country: 'Senegal', iso: 'SN' },
-  { city: 'Amman', country: 'Jordan', iso: 'JO' },
-  { city: 'Beirut', country: 'Lebanon', iso: 'LB' },
-  { city: "Cox's Bazar", country: 'Bangladesh', iso: 'BD', risky: true },
-  { city: 'Dhaka', country: 'Bangladesh', iso: 'BD' },
-  { city: 'Kabul', country: 'Afghanistan', iso: 'AF', risky: true },
-  { city: 'Kathmandu', country: 'Nepal', iso: 'NP' },
-  { city: 'New Delhi', country: 'India', iso: 'IN' },
-  { city: 'Manila', country: 'Philippines', iso: 'PH' },
-  { city: 'Port-au-Prince', country: 'Haiti', iso: 'HT', risky: true },
-  { city: 'Bogotá', country: 'Colombia', iso: 'CO' },
-  { city: 'Geneva', country: 'Switzerland', iso: 'CH' },
-  { city: 'London', country: 'United Kingdom', iso: 'GB' },
-  { city: 'New York', country: 'United States', iso: 'US' },
-  { city: 'Lilongwe', country: 'Malawi', iso: 'MW' },
-  { city: 'Maputo', country: 'Mozambique', iso: 'MZ' },
+  { city: 'Nairobi', country: 'Kenya', iso: 'KE', tz: 'EAT', currency: 'KES' },
+  { city: 'Kampala', country: 'Uganda', iso: 'UG', tz: 'EAT', currency: 'UGX' },
+  { city: 'Addis Ababa', country: 'Ethiopia', iso: 'ET', tz: 'EAT', currency: 'ETB' },
+  { city: 'Juba', country: 'South Sudan', iso: 'SS', risky: true, tz: 'CAT', currency: 'USD' },
+  { city: 'Goma', country: 'DR Congo', iso: 'CD', risky: true, tz: 'CAT', currency: 'USD' },
+  { city: 'Mogadishu', country: 'Somalia', iso: 'SO', risky: true, tz: 'EAT', currency: 'USD' },
+  { city: 'Maiduguri', country: 'Nigeria', iso: 'NG', risky: true, tz: 'WAT', currency: 'NGN' },
+  { city: 'Abuja', country: 'Nigeria', iso: 'NG', tz: 'WAT', currency: 'NGN' },
+  { city: 'Dakar', country: 'Senegal', iso: 'SN', tz: 'GMT', currency: 'XOF' },
+  { city: 'Amman', country: 'Jordan', iso: 'JO', tz: 'AST', currency: 'JOD' },
+  { city: "Cox's Bazar", country: 'Bangladesh', iso: 'BD', risky: true, tz: 'BST', currency: 'BDT' },
+  { city: 'Dhaka', country: 'Bangladesh', iso: 'BD', tz: 'BST', currency: 'BDT' },
+  { city: 'Kabul', country: 'Afghanistan', iso: 'AF', risky: true, tz: 'AFT', currency: 'USD' },
+  { city: 'Kathmandu', country: 'Nepal', iso: 'NP', tz: 'NPT', currency: 'NPR' },
+  { city: 'New Delhi', country: 'India', iso: 'IN', tz: 'IST', currency: 'INR' },
+  { city: 'Manila', country: 'Philippines', iso: 'PH', tz: 'PHT', currency: 'PHP' },
+  { city: 'Port-au-Prince', country: 'Haiti', iso: 'HT', risky: true, tz: 'EST', currency: 'USD' },
+  { city: 'Bogotá', country: 'Colombia', iso: 'CO', tz: 'COT', currency: 'COP' },
+  { city: 'Geneva', country: 'Switzerland', iso: 'CH', tz: 'CET', currency: 'CHF' },
+  { city: 'London', country: 'United Kingdom', iso: 'GB', tz: 'GMT', currency: 'GBP' },
+  { city: 'New York', country: 'United States', iso: 'US', tz: 'EST', currency: 'USD', payLaw: 'New York' },
+  { city: 'Denver', country: 'United States', iso: 'US', tz: 'MST', currency: 'USD', payLaw: 'Colorado' },
+  { city: 'Melbourne', country: 'Australia', iso: 'AU', tz: 'AEDT', currency: 'AUD' },
+  { city: 'Lilongwe', country: 'Malawi', iso: 'MW', tz: 'CAT', currency: 'MWK' },
+  { city: 'Maputo', country: 'Mozambique', iso: 'MZ', tz: 'CAT', currency: 'MZN' },
 ];
 
-const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali'];
-
+const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali', 'Hausa', 'Hindi', 'Bengali'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-
-/** Public holidays by country (month-day), for the deadline warning. Kenya in full for the sample; others the common ones. */
-const HOLIDAYS: Record<string, string[]> = {
-  KE: ['01-01', '05-01', '06-01', '10-10', '10-20', '12-12', '12-25', '12-26'],
-  default: ['01-01', '12-25'],
-};
+const HOLIDAYS: Record<string, string[]> = { KE: ['01-01', '05-01', '06-01', '10-10', '10-20', '12-12', '12-25', '12-26'], default: ['01-01', '12-25'] };
 
 export function isoDay(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-
 export function startOfDay(ms: number): number {
   const d = new Date(ms);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
-
 export function addDays(ms: number, n: number): string {
   return isoDay(ms + n * DAY);
 }
-
 export function parseIso(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).getTime();
 }
-
 export function daysUntil(today: number, iso: string): number {
   return Math.round((parseIso(iso) - startOfDay(today)) / DAY);
 }
-
 export function longDate(iso: string): string {
-  if (!iso) return '';
-  return new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  return iso ? new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
-
 export function shortDate(iso: string): string {
-  if (!iso) return '';
-  return new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return iso ? new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+}
+export function weekend(iso: string): boolean {
+  const d = new Date(parseIso(iso)).getDay();
+  return d === 0 || d === 6;
+}
+export function holiday(iso: string, countryIso: string): boolean {
+  return (HOLIDAYS[countryIso] ?? HOLIDAYS.default).includes(iso.slice(5));
+}
+export function placeOf(location: string): Place | undefined {
+  return PLACES.find((p) => location.startsWith(p.city));
 }
 
 export function emptyFacts(): Facts {
-  return { title: '', location: '', country: '', iso: '', grade: '', contract: '', duration: '', deadline: '', salary: '', languages: [], remote: false };
+  return {
+    title: '',
+    location: '',
+    country: '',
+    iso: '',
+    arrangement: 'onsite',
+    engagement: 'job',
+    contract: '',
+    hours: 'full',
+    recruitment: 'vacancy',
+    subjectToFunding: false,
+    grade: '',
+    duration: '',
+    deadline: '',
+    closingTime: '23:59',
+    timezone: '',
+    salaryMode: 'hidden',
+    salaryMin: '',
+    salaryMax: '',
+    currency: '',
+    period: 'month',
+    languages: [],
+    eligibility: 'anyone',
+    safeguarding: '',
+    directReports: '',
+    startDate: '',
+    positions: '1',
+    donor: '',
+    availability: '',
+    client: '',
+    keyPersonnel: false,
+  };
 }
 
-export function detectFamily(text: string): { family: Family | null; modifier: Modifier } {
+export const ENGAGEMENTS: Array<{ key: Engagement; label: string; hint: string; google: string }> = [
+  { key: 'job', label: 'Job', hint: 'A paid position, permanent or temporary', google: 'FULL_TIME' },
+  { key: 'consultancy', label: 'Consultancy', hint: 'A specialised task or advice for a limited period', google: 'CONTRACTOR' },
+  { key: 'internship', label: 'Internship or fellowship', hint: 'Practical experience for students, graduates, or fellows', google: 'INTERN' },
+  { key: 'volunteer', label: 'Volunteer', hint: 'Unpaid or with an allowance', google: 'VOLUNTEER' },
+];
+
+export const CONTRACTS: Record<Engagement, string[]> = {
+  job: ['Fixed-term', 'Temporary (under a year)', 'Open-ended', 'Continuing'],
+  consultancy: ['Consultant', 'Individual contractor'],
+  internship: ['Internship', 'Fellowship'],
+  volunteer: ['Volunteer', 'UN Volunteer'],
+};
+
+export function googleType(f: Facts): string[] {
+  const t = [ENGAGEMENTS.find((e) => e.key === f.engagement)?.google ?? 'OTHER'];
+  if (f.engagement === 'job') t[0] = f.hours === 'part' ? 'PART_TIME' : f.contract.startsWith('Temporary') ? 'TEMPORARY' : 'FULL_TIME';
+  return t;
+}
+
+export function detectRole(text: string): { role: RoleFamily | null; engagement: Engagement | null } {
   const t = ` ${text.toLowerCase()} `;
-  let modifier: Modifier = null;
-  if (/\bconsult(ant|ancy)\b|terms of reference|\btor\b/.test(t)) modifier = 'consultancy';
-  else if (/\bintern(ship)?\b|\bfellow(ship)?\b/.test(t)) modifier = 'internship';
-  else if (/\bsurge\b|\bemergency\b|\broster\b|rapid response|deployment/.test(t)) modifier = 'surge';
-  const family = FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => t.includes(w))) ?? FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => t.includes(w))) ?? null;
-  return { family, modifier };
+  let engagement: Engagement | null = null;
+  if (/\bconsult(ant|ancy)\b|terms of reference|\btor\b/.test(t)) engagement = 'consultancy';
+  else if (/\bintern(ship)?\b|\bfellow(ship)?\b/.test(t)) engagement = 'internship';
+  else if (/\bvolunteer\b/.test(t)) engagement = 'volunteer';
+  const role = ROLE_FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => t.includes(w))) ?? ROLE_FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => t.includes(w))) ?? null;
+  return { role, engagement };
 }
 
 function titleCase(s: string): string {
@@ -415,24 +567,23 @@ function titleCase(s: string): string {
       if (/^[A-Z0-9&]{2,}$/.test(w)) return w;
       const lw = w.toLowerCase();
       if (i > 0 && small.has(lw)) return lw;
-      if (lw === 'wash' || lw === 'meal' || lw === 'hr' || lw === 'gbv') return lw.toUpperCase();
+      if (['wash', 'meal', 'hr', 'gbv'].includes(lw)) return lw.toUpperCase();
       return lw.charAt(0).toUpperCase() + lw.slice(1);
     })
     .join(' ');
 }
 
-function titleFrom(text: string, family: Family | null, modifier: Modifier): string {
+function titleFrom(text: string, role: RoleFamily | null, engagement: Engagement | null): string {
   const m = text.match(/\b(?:hiring|recruiting|looking for|need|seeking)\s+(?:an?\s+|the\s+)?([a-z&][a-z&\s/–-]{2,60}?)(?=\s+(?:in|for|based|at|to|on|with|who)\b|[,.;:(]|\s+[–-]\s|$)/i);
   if (m) {
     const raw = m[1].trim().replace(/\s+/g, ' ');
     if (raw.split(' ').length <= 7) return titleCase(raw);
   }
-  if (!family) return '';
-  const sector = family.key === 'programme' ? 'Programme' : family.title.split(' ').slice(0, -1).join(' ') || family.title;
-  if (modifier === 'consultancy') return `${sector} Consultant`;
-  if (modifier === 'internship') return `${sector} Intern`;
-  if (modifier === 'surge') return `Emergency ${sector} Coordinator`;
-  return family.title;
+  if (!role) return '';
+  const sector = role.key === 'programme' ? 'Programme' : role.title.split(' ').slice(0, -1).join(' ') || role.title;
+  if (engagement === 'consultancy') return `${sector} Consultant`;
+  if (engagement === 'internship') return `${sector} Intern`;
+  return role.title;
 }
 
 function nextDate(today: number, day: number, monthIdx: number, year?: number): string {
@@ -446,36 +597,40 @@ function nextDate(today: number, day: number, monthIdx: number, year?: number): 
   return isoDay(d.getTime());
 }
 
-export function extractFacts(text: string, today: number, base: Facts = emptyFacts()): { facts: Facts; family: Family | null; modifier: Modifier } {
-  const { family, modifier } = detectFamily(text);
+export function extractFacts(text: string, today: number, base: Facts = emptyFacts()): { facts: Facts; role: RoleFamily | null; engagement: Engagement | null } {
+  const { role, engagement } = detectRole(text);
   const f: Facts = { ...base, languages: [...base.languages] };
   const t = text;
-  const title = titleFrom(t, family, modifier);
+  const title = titleFrom(t, role, engagement);
   if (title && !base.title) f.title = title;
-
+  if (engagement) {
+    f.engagement = engagement;
+    if (!f.contract || !CONTRACTS[engagement].includes(f.contract)) f.contract = CONTRACTS[engagement][0];
+  }
   const place = PLACES.find((p) => new RegExp(`\\b${p.city.replace(/[.*+?^${}()|[\]\\']/g, '.')}\\b`, 'i').test(t));
   if (place) {
     f.location = `${place.city}, ${place.country}`;
     f.country = place.country;
     f.iso = place.iso;
+    f.timezone = place.tz;
+    if (!f.currency) f.currency = place.currency;
   }
-  if (/\bremote\b|home[- ]based|work from home/i.test(t)) f.remote = true;
-
+  if (/\bremote\b|home[- ]based|work from home/i.test(t)) f.arrangement = 'remote';
+  else if (/\bhybrid\b/i.test(t)) f.arrangement = 'hybrid';
   const grade = t.match(/\b(P-?[1-5]|D-?[12]|G-?[1-7]|NO-?[A-D])\b/i);
   if (grade) f.grade = grade[1].toUpperCase().replace('-', '');
-
   const months = t.match(/\b(\d{1,2})[- ]?(?:month|months|mo)\b/i);
-  const years = t.match(/\b(\d)[- ]?(?:year|years)\b/i);
+  const years = t.match(/\b(\d)[- ]?(?:year|years)\b(?!\s+(?:of\s+)?experience)/i);
   if (months) f.duration = `${Number(months[1])} months`;
   else if (years) f.duration = `${Number(years[1])} ${Number(years[1]) === 1 ? 'year' : 'years'}`;
-
-  if (modifier === 'consultancy') f.contract = 'Consultancy';
-  else if (modifier === 'internship') f.contract = 'Internship';
-  else if (/fixed[- ]term/i.test(t)) f.contract = 'Fixed-term';
-  else if (/\btemporary\b/i.test(t)) f.contract = 'Temporary';
+  if (/fixed[- ]term/i.test(t)) f.contract = 'Fixed-term';
+  else if (/\btemporary\b/i.test(t)) f.contract = 'Temporary (under a year)';
   else if (/permanent|open[- ]ended/i.test(t)) f.contract = 'Open-ended';
   else if (f.duration && !f.contract) f.contract = 'Fixed-term';
-
+  if (/\bpart[- ]time\b/i.test(t)) f.hours = 'part';
+  if (/\broster\b|talent pool|\bpool\b/i.test(t)) f.recruitment = 'roster';
+  else if (/contingent|proposal stage|key personnel/i.test(t)) f.recruitment = 'proposal';
+  if (/subject to (?:continued )?funding/i.test(t)) f.subjectToFunding = true;
   const iso = t.match(/\b(20\d\d)-(\d\d)-(\d\d)\b/);
   const dm = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+(20\d\d))?/i);
   const md = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d\d))?/i);
@@ -484,62 +639,83 @@ export function extractFacts(text: string, today: number, base: Facts = emptyFac
   else if (dm) f.deadline = nextDate(today, Number(dm[1]), MONTHS.indexOf(dm[2].toLowerCase()), dm[3] ? Number(dm[3]) : undefined);
   else if (md) f.deadline = nextDate(today, Number(md[2]), MONTHS.indexOf(md[1].toLowerCase()), md[3] ? Number(md[3]) : undefined);
   else if (weeks) f.deadline = addDays(today, Number(weeks[1]) * 7);
-
-  const sal = t.match(/\b(USD|US\$|EUR|GBP|KES|\$|€|£)\s?(\d[\d,.]*k?)(?:\s?(?:-|–|to)\s?(\d[\d,.]*k?))?(?:\s?(?:a|per|\/)\s?(month|year|annum|day))?/i);
+  const sal = t.match(/\b(USD|US\$|EUR|GBP|KES|AUD|INR|\$|€|£)\s?(\d[\d,.]*k?)(?:\s?(?:-|–|to)\s?(\d[\d,.]*k?))?(?:\s?(?:a|per|\/)\s?(hour|day|month|year|annum))?/i);
   if (sal) {
-    const cur = sal[1].toUpperCase() === '$' || sal[1].toUpperCase() === 'US$' ? 'USD' : sal[1] === '€' ? 'EUR' : sal[1] === '£' ? 'GBP' : sal[1].toUpperCase();
-    f.salary = `${cur} ${sal[2]}${sal[3] ? ` to ${sal[3]}` : ''}${sal[4] ? ` a ${sal[4].toLowerCase() === 'annum' ? 'year' : sal[4].toLowerCase()}` : ''}`;
-  }
-
-  for (const lang of LANGUAGES) {
-    if (new RegExp(`\\b${lang}\\b`, 'i').test(t) && !f.languages.includes(lang)) f.languages.push(lang);
-  }
-  return { facts: f, family, modifier };
+    const c = sal[1].toUpperCase();
+    f.currency = c === '$' || c === 'US$' ? 'USD' : sal[1] === '€' ? 'EUR' : sal[1] === '£' ? 'GBP' : c;
+    f.salaryMin = sal[2];
+    f.salaryMax = sal[3] ?? '';
+    f.salaryMode = sal[3] ? 'range' : 'exact';
+    if (sal[4]) f.period = (sal[4].toLowerCase() === 'annum' ? 'year' : sal[4].toLowerCase()) as Period;
+  } else if (/as per (?:our )?(?:salary )?scale/i.test(t)) f.salaryMode = 'scale';
+  for (const lang of LANGUAGES) if (new RegExp(`\\b${lang}\\b`, 'i').test(t) && !f.languages.includes(lang)) f.languages.push(lang);
+  return { facts: f, role, engagement };
 }
 
-export function familyByKey(key: string): Family | undefined {
-  return FAMILY_BY_KEY[key];
+export function roleByKey(key: string): RoleFamily {
+  return ROLE_BY_KEY[key] ?? ROLE_BY_KEY.programme;
 }
 
-/** Tags the role needs: the core four, then what the role family, contract, and place call for. */
-export function recommendTags(family: Family | null, modifier: Modifier, facts: Facts): string[] {
-  const tags = new Set(['role', 'responsibilities', 'qualifications', 'apply']);
-  if (modifier === 'consultancy') {
-    tags.delete('responsibilities');
-    tags.add('deliverables');
-    tags.add('payment');
+export function salaryText(f: Facts): string {
+  const per = { hour: 'an hour', day: 'a day', month: 'a month', year: 'a year' }[f.period];
+  switch (f.salaryMode) {
+    case 'range':
+      return f.salaryMin && f.salaryMax ? `${f.currency} ${f.salaryMin} to ${f.salaryMax} ${per}` : '';
+    case 'exact':
+      return f.salaryMin ? `${f.currency} ${f.salaryMin} ${per}` : '';
+    case 'daily':
+      return f.salaryMin ? `${f.currency} ${f.salaryMin} a day` : 'Daily rate: please state yours';
+    case 'scale':
+      return 'As per our salary scale';
+    case 'grade':
+      return f.grade ? `Grade ${f.grade}` : 'By grade';
+    case 'competitive':
+      return 'Competitive';
+    default:
+      return '';
   }
-  if (modifier === 'internship') tags.add('learning');
-  if (modifier === 'surge') {
-    tags.add('deployment');
-    tags.add('security');
+}
+
+/** Sections a job needs: the format's own, then what the engagement, recruitment, and place call for. */
+export function recommendSections(format: Format, f: Facts): string[] {
+  const keys = format.order.map((o) => o.key);
+  const add = (k: string) => {
+    if (!keys.includes(k)) keys.push(k);
+  };
+  if (f.engagement === 'consultancy') {
+    add('deliverables');
+    add('apply');
   }
-  if (/^[PD]\d/.test(facts.grade)) {
-    tags.add('competencies');
-    tags.add('setting');
-  }
-  for (const t of family?.extraTags ?? []) tags.add(t);
-  if (PLACES.some((p) => p.risky && facts.location.startsWith(p.city))) tags.add('security');
-  if (facts.languages.length > 1) tags.add('languages');
-  return ORDER.filter((k) => tags.has(k));
+  if (f.engagement === 'internship') add('learning');
+  if (f.recruitment === 'roster') add('deployment');
+  if (f.recruitment === 'proposal' || f.subjectToFunding) add('funding');
+  if (placeOf(f.location)?.risky) add('conditions');
+  if (f.languages.length > 1) add('languages');
+  if (!keys.includes('apply')) add('apply');
+  return keys;
+}
+
+export function orderSections(keys: string[], format: Format): string[] {
+  const own = format.order.map((o) => o.key);
+  return [...own.filter((k) => keys.includes(k)), ...DOC_ORDER.filter((k) => keys.includes(k) && !own.includes(k))];
+}
+
+export function headingFor(key: string, format: Format): string {
+  return format.order.find((o) => o.key === key)?.heading ?? SECTION_BY_KEY[key]?.label ?? key;
 }
 
 const NEXT_HINTS: Array<{ need: (f: Facts, hasRole: boolean) => boolean; text: (today: number) => string }> = [
   { need: (_f, hasRole) => !hasRole, text: () => "We're hiring a WASH Programme Manager" },
-  { need: (f) => !f.location && !f.remote, text: () => ' in Nairobi, Kenya' },
+  { need: (f) => !f.location && f.arrangement !== 'remote', text: () => ' in Nairobi, Kenya' },
   { need: (f) => !f.duration && !f.contract, text: () => ', 12-month fixed-term contract' },
-  { need: (f) => !f.grade, text: () => ' at P4 level' },
   { need: (f) => !f.deadline, text: (today) => `, closing ${longDate(addDays(today, 27))}` },
-  { need: (f) => !f.salary, text: () => ', salary USD 4,800 to 5,600 a month' },
-  { need: (f) => f.languages.length === 0, text: () => '. English required, French an advantage' },
 ];
 
-/** Ghost text: the next missing fact, as a completion of what the person has typed. Empty when nothing is missing. */
+/** Ghost text: the next missing fact, as a completion of what the person has typed. */
 export function suggestNext(text: string, today: number): string {
   const trimmed = text.replace(/\s+$/, '');
-  const { facts, family } = extractFacts(trimmed, today);
-  const hasRole = Boolean(family) || Boolean(facts.title);
-  const hint = NEXT_HINTS.find((h) => h.need(facts, hasRole));
+  const { facts, role } = extractFacts(trimmed, today);
+  const hint = NEXT_HINTS.find((h) => h.need(facts, Boolean(role) || Boolean(facts.title)));
   if (!hint) return '';
   let s = hint.text(today);
   if (!trimmed) return s;
@@ -548,248 +724,336 @@ export function suggestNext(text: string, today: number): string {
   return s;
 }
 
-export type BuildContext = { facts: Facts; familyKey: string; org: Org; tone: Tone; modifier: Modifier };
+export type BuildContext = { facts: Facts; roleKey: string; org: Org; tone: Tone; format: Format; commitments: string[]; applyLines: string[] };
 
-function yearsFor(grade: string, modifier: Modifier): string {
-  if (modifier === 'internship') return 'Currently enrolled in, or graduated within the last year from, a relevant degree';
+function yearsFor(grade: string, engagement: Engagement): string {
+  if (engagement === 'internship') return 'Currently enrolled in, or recently completed, a relevant degree, or equivalent experience';
   const years: Record<string, number> = { P1: 1, P2: 2, P3: 5, P4: 7, P5: 10, D1: 15, D2: 15, NOA: 1, NOB: 2, NOC: 5, NOD: 7 };
-  const n = years[grade] ?? (modifier === 'consultancy' ? 5 : /^G/.test(grade) ? 3 : 5);
-  return `At least ${n} years of relevant, progressively responsible experience`;
+  const n = years[grade];
+  return n ? `At least ${n} years of relevant, progressively responsible experience` : 'Relevant experience in a similar role, or equivalent experience';
 }
 
 function lead(tone: Tone, formal: string, warm: string, plain: string): string {
   return tone === 'formal' ? formal : tone === 'warm' ? warm : plain;
 }
 
+export function starterCommitment(key: string, org: Org, f: Facts): string {
+  const name = org.name;
+  switch (key) {
+    case 'safeguarding':
+      return `${name} is committed to keeping children and adults at risk safe. Every member of staff follows our safeguarding policy and code of conduct${f.safeguarding === 'high' ? '; this role has frequent contact with children, so enhanced checks apply' : ''}.`;
+    case 'psea':
+      return `${name} has zero tolerance for sexual exploitation, abuse and harassment, in line with the IASC Six Core Principles. Every member of staff must report any concern.`;
+    case 'mds':
+      return `${name} takes part in the Inter-Agency Misconduct Disclosure Scheme: we will ask previous employers about any findings of sexual exploitation, abuse, or harassment. By applying, you confirm you understand this.`;
+    case 'checks':
+      return 'Any offer depends on satisfactory references and the background checks that apply in the country of work.';
+    case 'ct':
+      return 'Any offer depends on counter-terrorism and sanctions screening, as some of our donors require.';
+    case 'fraud':
+      return `${name} never charges a fee at any stage of recruitment and never asks for bank details. Genuine messages come only from @${org.domain}.`;
+    case 'equal':
+      return `${name} is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.`;
+    case 'encourage':
+      return "You don't need to meet every requirement to apply. If you meet most of the essentials and the work excites you, we'd like to hear from you.";
+    case 'adjustments':
+      return 'If you need any adjustment at any stage of the process, tell us and we will make it.';
+    case 'dataprot':
+      return 'We use your application only to assess it for this role and delete it when it is no longer needed.';
+    case 'righttowork':
+      return `Applicants must have the right to work in ${f.country || 'the country of the post'}.`;
+    case 'unconsiderations':
+      return 'Applications are considered without restriction on the eligibility of women and men to take part in any capacity and under conditions of equality.';
+    default:
+      return '';
+  }
+}
+
+export function commitmentText(key: string, org: Org, f: Facts): { text: string; locked: boolean; own: boolean } {
+  const own = org.standard.find((c: Commitment) => c.key === key);
+  return own ? { text: own.text, locked: own.locked, own: true } : { text: starterCommitment(key, org, f), locked: false, own: false };
+}
+
 export function buildSection(key: string, ctx: BuildContext): Section {
-  const { facts: f, org, tone, modifier } = ctx;
-  const fam = FAMILY_BY_KEY[ctx.familyKey] ?? FAMILY_BY_KEY.programme;
-  const title = f.title || fam.title;
-  const where = f.remote ? 'remotely' : f.location ? `in ${f.location}` : 'at the duty station';
-  const label = TAG_BY_KEY[key]?.label ?? key;
-  const std = org.standard.find((s) => s.key === key);
-  if (std) return { key, title: label, lines: [std.text] };
-  const terms = [f.contract, f.duration, f.grade && `grade ${f.grade}`].filter(Boolean).join(', ');
+  const { facts: f, org, tone, format } = ctx;
+  const role = roleByKey(ctx.roleKey);
+  const title = f.title || role.title;
+  const where = f.arrangement === 'remote' ? 'remotely' : f.location ? `in ${f.location}` : 'at the duty station';
+  const heading = headingFor(key, format);
+  const terms = [f.contract, f.duration, f.grade && `grade ${f.grade}`, f.hours === 'part' ? 'part-time' : ''].filter(Boolean).join(', ');
+  const place = placeOf(f.location);
   switch (key) {
     case 'about':
-      return { key, title: label, lines: [org.about] };
-    case 'role':
+      return { key, title: heading, lines: [org.about] };
+    case 'team':
+      return { key, title: heading, lines: [`The ${role.sector.toLowerCase()} team ${lead(tone, 'delivers', 'works with communities to deliver', 'delivers')} ${org.short}'s ${role.sector.toLowerCase()} programmes${f.country ? ` in ${f.country}` : ''}, directly and with local partners.`] };
+    case 'background':
+      return { key, title: heading, lines: [`${org.short}'s ${role.sector.toLowerCase()} programme${f.country ? ` in ${f.country}` : ''} ${f.donor ? `is funded by ${f.donor} and ` : ''}works with communities and local authorities to improve services and resilience.`] };
+    case 'setting':
+      return { key, title: heading, lines: [`This position is located in the ${org.short} ${f.location ? `${f.location.split(',')[0]} office` : 'country office'} and reports to the Head of Programmes.`] };
+    case 'purpose':
       return {
         key,
-        title: label,
+        title: heading,
         lines: [
           lead(
             tone,
-            `${org.name} seeks a ${title} to be based ${where}. The incumbent will lead ${fam.sector.toLowerCase()} work and contribute to the organisation's country strategy.`,
-            `We're looking for a ${title} to join our team ${where}. You'll lead our ${fam.sector.toLowerCase()} work and make a real difference for the communities we serve.`,
-            `This ${title} role is based ${where} and leads ${fam.sector.toLowerCase()} work.`,
+            `The ${title} leads ${role.sector.toLowerCase()} work ${where} and contributes to ${org.short}'s country strategy.`,
+            `We're looking for a ${title} to join our team ${where}. You'll lead our ${role.sector.toLowerCase()} work and make a real difference for the communities we serve.`,
+            `This ${title} role is based ${where} and leads ${role.sector.toLowerCase()} work.`,
           ),
           ...(terms ? [`Contract: ${terms}.`] : []),
         ],
       };
-    case 'setting':
-      return {
-        key,
-        title: label,
-        lines: [`This position is located in the ${org.short} ${f.location ? `${f.location.split(',')[0]} office` : 'country office'} and reports to the Head of Programmes. The incumbent works closely with the operations, MEAL, and partnerships teams.`],
-      };
     case 'responsibilities':
-      return { key, title: label, lines: [lead(tone, 'Key responsibilities include:', "What you'll do:", 'Responsibilities:'), ...fam.resp.map((r) => `- ${r}`)] };
-    case 'qualifications':
+      return { key, title: heading, lines: role.resp.map((r) => `- ${r}`) };
+    case 'deliverables':
+      return { key, title: heading, lines: [...role.deliverables.map((d) => `- ${d}`), `Duration: ${f.duration || '40 working days over 3 months'}.`] };
+    case 'relationships':
+      return { key, title: heading, lines: [`Reports to: Head of Programmes.`, `Direct reports: ${f.directReports || 'none'}.`, 'Works closely with the operations, MEAL, and partnerships teams, and with local partners.'] };
+    case 'learning':
+      return { key, title: heading, lines: role.learning.map((l) => `- ${l}`) };
+    case 'deployment':
+      return { key, title: heading, lines: [`Availability: ${f.availability || 'at least 6 months'}, with deployment at short notice.`, 'Being on the roster is unpaid; you are paid when you are deployed.'] };
+    case 'firstweeks':
+      return { key, title: heading, lines: ['- Meet the team and partners, and visit project sites', '- Agree your work plan and priorities with your manager', '- Complete induction, including safeguarding and security briefings'] };
+    case 'requirements':
       return {
         key,
-        title: label,
-        lines: [lead(tone, 'Education and experience:', "What you'll bring:", 'Requirements:'), ...fam.qual.map((q) => `- ${q}`), `- ${yearsFor(f.grade, modifier)}`],
+        title: heading,
+        lines: ['Essential:', ...role.essential.map((q) => `- ${q}`), `- ${yearsFor(f.grade, f.engagement)}`, 'Desirable:', ...role.desirable.map((q) => `- ${q}`)],
       };
     case 'competencies':
-      return { key, title: label, lines: [...(tone === 'formal' ? ['- Professionalism, teamwork, and accountability'] : []), ...fam.comp.map((c) => `- ${c}`)] };
+      return { key, title: heading, lines: role.comp.map((c) => `- ${c}`) };
     case 'languages': {
       const [first, ...rest] = f.languages.length ? f.languages : ['English'];
-      return { key, title: label, lines: [`Fluency in ${first} is required.${rest.length ? ` Knowledge of ${rest.join(' or ')} is an advantage.` : ''}`] };
+      return { key, title: heading, lines: [`Fluency in ${first} is required.${rest.length ? ` Knowledge of ${rest.join(' or ')} is desirable.` : ''}`] };
     }
+    case 'practical':
+      return { key, title: heading, lines: [`- Willingness to travel to project sites${place ? ` in ${place.country}` : ''}`, ...(f.eligibility === 'nationals' ? [`- Open to nationals of ${f.country || 'the country of the post'} only`] : [])] };
     case 'offer': {
-      const risky = PLACES.some((p) => p.risky && f.location.startsWith(p.city));
+      const pay = salaryText(f);
       return {
         key,
-        title: label,
+        title: heading,
         lines: [
-          f.salary ? `Salary: ${f.salary}.` : `Salary: in line with ${org.short}'s salary scale.`,
-          '- 25 days of annual leave, medical insurance, and a learning budget',
-          ...(risky ? ['- Rest and recuperation cycle in line with the duty station'] : []),
-          ...(modifier === 'internship' ? ['- A monthly stipend and a mentor for the whole internship'] : []),
+          ...(pay ? [`Salary: ${pay}.`] : []),
+          '- Annual leave, medical insurance, and a learning budget',
+          ...(place?.risky ? ['- Rest and recuperation in line with the duty station'] : []),
+          ...(f.engagement === 'internship' ? ['- A monthly stipend and a mentor for the whole internship'] : []),
+          ...(f.subjectToFunding ? ['This post is subject to continued funding.'] : []),
         ],
       };
     }
+    case 'conditions':
+      return { key, title: heading, lines: [place?.risky ? `${place.city} is a non-family duty station with security restrictions; rest and recuperation applies.` : 'Standard working conditions for the duty station.'] };
+    case 'funding':
+      return {
+        key,
+        title: heading,
+        lines: [
+          f.recruitment === 'proposal'
+            ? `This position is contingent upon contract award${f.client ? ` by ${f.client}` : ''} and client approval${f.keyPersonnel ? ' of key personnel' : ''}.`
+            : 'This post is subject to continued funding.',
+        ],
+      };
     case 'apply':
-      return {
-        key,
-        title: label,
-        lines: [`Apply on ${org.short}'s careers site${f.deadline ? ` by ${longDate(f.deadline)}` : ''}. Applications are reviewed on a rolling basis; only shortlisted candidates will be contacted.`],
-      };
+      return { key, title: heading, lines: ctx.applyLines };
     case 'assessment':
-      return { key, title: label, lines: ['Evaluation of qualified candidates may include a written assessment, followed by a competency-based interview.'] };
-    case 'safeguarding':
-      return {
-        key,
-        title: label,
-        lines: [`${org.short} is committed to keeping children and adults at risk safe. All offers depend on satisfactory references and background checks, and every staff member follows our code of conduct.`],
-      };
-    case 'security':
-      return {
-        key,
-        title: label,
-        lines: [`${f.location ? f.location.split(',')[0] : 'The duty station'} has security restrictions. The post holder follows the security plan and movement rules at all times; rest and recuperation applies.`],
-      };
-    case 'donor':
-      return { key, title: label, lines: ['This position is funded by an institutional donor. The post holder makes sure activities follow donor rules and reporting deadlines.'] };
-    case 'deliverables':
-      return { key, title: label, lines: [lead(tone, 'The consultant will deliver:', "You'll deliver:", 'Deliverables:'), ...fam.deliverables.map((d) => `- ${d}`), `Duration: ${f.duration || '40 working days over 3 months'}.`] };
-    case 'payment':
-      return { key, title: label, lines: ['Payment in instalments on approval of each deliverable: 20% on the inception report, 40% on the draft, and 40% on the final report.'] };
-    case 'learning':
-      return { key, title: label, lines: [lead(tone, 'The intern will gain experience in:', "What you'll learn:", 'Learning goals:'), ...fam.learning.map((l) => `- ${l}`)] };
-    case 'deployment':
-      return {
-        key,
-        title: label,
-        lines: [`Deployment within 72 hours of an offer, for ${f.duration || 'up to 3 months'}. Candidates need a valid passport and medical clearance.`],
-      };
+      return { key, title: heading, lines: ['Shortlisted candidates may take a written assessment, followed by a competency-based interview.'] };
     default:
-      return { key, title: label, lines: [`${label}: to be written.`] };
+      return { key, title: heading, lines: [`${heading}: to be written.`] };
   }
 }
 
-export function buildSections(tags: string[], ctx: BuildContext): Section[] {
-  return ORDER.filter((k) => tags.includes(k)).map((k) => buildSection(k, ctx));
+export function buildSections(keys: string[], ctx: BuildContext): Section[] {
+  return keys.map((k) => buildSection(k, ctx));
 }
 
-export type QualityItem = { key: string; level: 'ok' | 'warn' | 'issue'; text: string; section?: string };
+export type QualityItem = { key: string; level: 'ok' | 'info' | 'warn' | 'issue'; text: string; section?: string };
 
-const EXCLUDING = [
-  { re: /\bhe\b|\bhis\b|\bhim\b/i, say: '"he" or "his": use "they" or "the post holder"' },
-  { re: /\bshe\b|\bher\b/i, say: '"she" or "her": use "they" or "the post holder"' },
-  { re: /\bmanpower\b/i, say: '"manpower": use "staff" or "workforce"' },
-  { re: /\bchairman\b/i, say: '"chairman": use "chair"' },
-  { re: /\bnative speaker\b/i, say: '"native speaker": use "fluent"' },
-  { re: /\byoung\b|\benergetic\b/i, say: 'wording that suggests age' },
-  { re: /\bninja\b|\brockstar\b/i, say: 'jargon that puts some people off' },
-];
-
-export function weekend(iso: string): boolean {
-  const d = new Date(parseIso(iso)).getDay();
-  return d === 0 || d === 6;
-}
-
-export function holiday(iso: string, countryIso: string): boolean {
-  const md = iso.slice(5);
-  return (HOLIDAYS[countryIso] ?? HOLIDAYS.default).includes(md);
-}
-
-/** Inline checks shown on the document. They never block publishing except a missing deadline or title. */
-export function quality(sections: Section[], facts: Facts, today: number, otherLiveTitles: string[]): QualityItem[] {
+/** Checks shown on the document. They never block publishing; only a missing title, place, or closing date is an issue. */
+export function quality(sections: Section[], f: Facts, today: number, otherLiveTitles: string[]): QualityItem[] {
   const items: QualityItem[] = [];
-  if (!facts.title) items.push({ key: 'title', level: 'issue', text: 'Add a job title' });
-  if (!facts.deadline) items.push({ key: 'deadline', level: 'issue', text: 'Add a closing date: candidates and Google need one' });
+  if (!f.title) items.push({ key: 'title', level: 'issue', text: 'Add a job title' });
+  if (!f.location && f.arrangement !== 'remote') items.push({ key: 'location', level: 'issue', text: 'Add a duty station, or mark the job remote' });
+  if (!f.deadline) items.push({ key: 'deadline', level: 'issue', text: 'Add a closing date' });
   else {
-    const left = daysUntil(today, facts.deadline);
+    const left = daysUntil(today, f.deadline);
     if (left < 0) items.push({ key: 'deadline-past', level: 'issue', text: 'The closing date has passed' });
-    else if (left < 14 && /^[PD]\d/.test(facts.grade)) items.push({ key: 'deadline-short', level: 'warn', text: `Only ${left} days to apply: international roles usually allow at least 2 weeks` });
-    if (weekend(facts.deadline)) items.push({ key: 'deadline-weekend', level: 'warn', text: `${longDate(facts.deadline)} is a weekend` });
-    if (holiday(facts.deadline, facts.iso)) items.push({ key: 'deadline-holiday', level: 'warn', text: `${longDate(facts.deadline)} is a public holiday${facts.country ? ` in ${facts.country}` : ''}` });
+    if (weekend(f.deadline)) items.push({ key: 'deadline-weekend', level: 'info', text: `${longDate(f.deadline)} is a weekend` });
+    if (holiday(f.deadline, f.iso)) items.push({ key: 'deadline-holiday', level: 'info', text: `${longDate(f.deadline)} is a public holiday${f.country ? ` in ${f.country}` : ''}` });
   }
-  if (!facts.location && !facts.remote) items.push({ key: 'location', level: 'issue', text: 'Add a duty station, or mark the job remote' });
-  if (!facts.salary) items.push({ key: 'salary', level: 'warn', text: 'No salary stated: many candidates filter by pay' });
   for (const s of sections) {
-    const text = s.lines.join(' ');
-    for (const e of EXCLUDING) if (e.re.test(text)) items.push({ key: `words-${s.key}-${e.say}`, level: 'warn', text: `${s.title}: ${e.say}`, section: s.key });
+    const text = s.lines.join('\n');
+    if (/\{[^}]{0,40}\}/.test(text)) items.push({ key: `placeholder-${s.key}`, level: 'warn', text: `${s.title}: a template placeholder is left in the text`, section: s.key });
+    const bullets = s.lines.filter((l) => l.startsWith('- '));
+    if (new Set(bullets).size < bullets.length) items.push({ key: `dupe-${s.key}`, level: 'warn', text: `${s.title}: a bullet appears twice`, section: s.key });
+    if (s.key === 'responsibilities' && bullets.length < 2) items.push({ key: 'duties-empty', level: 'warn', text: 'Responsibilities: list at least a few duties', section: s.key });
+    const otherDate = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d\d)\b/i);
+    if (otherDate && f.deadline && longDate(f.deadline).toLowerCase() !== `${Number(otherDate[1])} ${otherDate[2].toLowerCase()} ${otherDate[3]}` && /clos|deadline|apply/i.test(text)) {
+      items.push({ key: `date-${s.key}`, level: 'warn', text: `${s.title}: mentions ${otherDate[0]}, but the closing date is ${longDate(f.deadline)}`, section: s.key });
+    }
   }
-  const words = sections.reduce((n, s) => n + s.lines.join(' ').split(/\s+/).filter(Boolean).length, 0);
-  if (words > 900) items.push({ key: 'length', level: 'warn', text: `${words} words: adverts over about 900 words are often skimmed` });
-  if (facts.title && otherLiveTitles.some((t) => t.toLowerCase() === facts.title.toLowerCase())) {
-    items.push({ key: 'duplicate', level: 'warn', text: 'A job with this title is already live' });
-  }
-  const googleReady = Boolean(facts.title && facts.deadline && (facts.location || facts.remote) && sections.length >= 3);
-  items.push({ key: 'google', level: googleReady ? 'ok' : 'warn', text: googleReady ? "Ready for Google's job listings" : "Not yet ready for Google's job listings: needs title, place, closing date, and 3 sections" });
+  if (f.title && otherLiveTitles.some((t) => t.toLowerCase() === f.title.toLowerCase())) items.push({ key: 'duplicate', level: 'info', text: 'A job with this title is already live' });
+  const ready = Boolean(f.title && f.deadline && (f.location || f.arrangement === 'remote') && sections.length >= 3);
+  items.push({ key: 'google', level: ready ? 'ok' : 'info', text: ready ? "Ready for Google's job listings" : "For Google's job listings: title, place, closing date, and 3 sections" });
   return items;
 }
 
+/** Inclusive-language rules. Highlight only, with a reason and a possible alternative; the user decides (3 November 2026). */
+export type InclusiveRule = { id: string; re: RegExp; why: string; alt: string; source: string; skipFormats?: string[] };
+
+export const INCLUSIVE: InclusiveRule[] = [
+  { id: 'masculine', re: /\b(aggressive|dominant|competitive|fearless|headstrong|ninja|rock ?star)\b/gi, why: 'Strongly masculine-coded word. In experiments, wording like this lowered women\u2019s sense of belonging and the job\u2019s appeal, without changing how they rated their own skills.', alt: 'For example: "motivated", "confident", "committed"', source: 'Gaucher, Friesen and Kay, 2011' },
+  { id: 'pronoun', re: /\b(he|him|his|she|her)\b/gi, why: 'A gendered pronoun suggests who is expected in the role.', alt: '"they", "the post holder", or "you"', source: 'Common inclusive-writing guidance' },
+  { id: 'title', re: /\b(chairman|salesman|foreman|manpower|waitress)\b/gi, why: 'A gendered job word.', alt: '"chair", "sales assistant", "supervisor", "staff", "server"', source: 'UK job-advert guidance (reed.co.uk)' },
+  { id: 'age', re: /\b(young|youthful|energetic|mature|recent graduates?|digital native)\b/gi, why: 'Age-coded wording can put off people of other ages; UK and US guidance warn against it.', alt: 'Describe the level ("entry-level") or the skill needed', source: 'UK statutory code (via University of Exeter guidance); US EEOC' },
+  { id: 'years', re: /\b(at least|minimum of|a minimum of)\s+\d+\+?\s+years\b|\b\d+\+\s+years\b/gi, why: 'A fixed minimum of years can exclude capable people; UK guidance says it needs a reason.', alt: 'Add "or equivalent experience", or describe the skills', source: 'UK statutory code (via University of Exeter guidance)', skipFormats: ['un-secretariat', 'un-agency'] },
+  { id: 'native', re: /\b(native speaker|native english|mother tongue)\b/gi, why: '"Native" points to origin, not ability.', alt: '"fluent in…" or "native-level proficiency"', source: 'University of Exeter and reed.co.uk guidance' },
+  { id: 'physical', re: /\b(physically fit|able-bodied|good eyesight|must be able to stand|valid driving licen[cs]e)\b/gi, why: 'A physical requirement can exclude disabled people; worth keeping only if the job truly needs it.', alt: 'Describe the task, for example "regular travel to project sites", and offer adjustments', source: 'Disability guidance in UK and US employment law' },
+  { id: 'acronym', re: /\b(IPA|HAC|CLA|SADD|PDM|HRP|NFI|CCCM|AAP)\b/g, why: 'An acronym that people outside the agency, or reading English as a second language, may not know.', alt: 'Spell it out the first time', source: 'Plain-language practice' },
+];
+
+export type InclusiveHit = { rule: InclusiveRule; match: string; index: number };
+
+export function findInclusive(text: string, formatKey: string): InclusiveHit[] {
+  const hits: InclusiveHit[] = [];
+  for (const rule of INCLUSIVE) {
+    if (rule.skipFormats?.includes(formatKey)) continue;
+    rule.re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = rule.re.exec(text))) hits.push({ rule, match: m[0], index: m.index });
+  }
+  return hits.sort((a, b) => a.index - b.index).filter((h, i, all) => i === 0 || h.index >= all[i - 1].index + all[i - 1].match.length);
+}
+
+/** Salary suggestion with its basis (plan, section 14). Returns null when there is no basis rather than a guess. */
+export type SalaryHint = { min: number; max: number; currency: string; period: Period; basis: string; sample: boolean };
+
+export function salarySuggestion(f: Facts, org: Org): SalaryHint | null {
+  const own = org.scale.find((r) => r.grade === f.grade);
+  if (own) return { min: own.min, max: own.max, currency: own.currency, period: own.period, basis: `Your ${org.short} salary scale, grade ${own.grade}`, sample: true };
+  if (/^P[1-5]$|^D[12]$/.test(f.grade) && f.location) return { min: 6500, max: 8200, currency: 'USD', period: 'month', basis: `Indicative UN net pay for ${f.grade} at ${f.location.split(',')[0]} from the ICSC salary scale and post adjustment (sample figures in the demo)`, sample: true };
+  const place = placeOf(f.location);
+  if (place?.iso === 'GB') return { min: 2350, max: 2900, currency: 'GBP', period: 'month', basis: 'Middle range of 14 similar UK charity jobs on AidJobs that show pay (sample figures in the demo); the Real Living Wage is £14.10 an hour, £15.45 in London', sample: true };
+  if (place?.iso === 'KE') return { min: 180000, max: 260000, currency: 'KES', period: 'month', basis: 'Middle range of 9 similar jobs in Kenya on AidJobs that show pay (sample figures in the demo)', sample: true };
+  return null;
+}
+
+export const SALARY_FACTS = [
+  { text: 'Jobs that show an employer-provided salary get 3.8 times more applications.', source: 'Indeed Hiring Lab, US job postings' },
+  { text: '70% of organisations that list pay ranges say it brought more applicants, and 66% say better-qualified ones.', source: 'SHRM, 2023' },
+  { text: '73% of workers trust organisations more when they show pay ranges.', source: 'SHRM, 2023' },
+];
+
 export type ChatResult = { sections: Section[]; tags: string[]; tone: Tone; facts: Facts; reply: string; quick?: string[] };
 
-function sectionFrom(text: string, tags: string[]): string | null {
+function sectionFrom(text: string, keys: string[], format: Format): string | null {
   const t = text.toLowerCase();
-  const match = TAGS.find((tag) => tags.includes(tag.key) && (t.includes(tag.label.toLowerCase()) || t.includes(tag.key)));
-  return match?.key ?? null;
+  const hit = keys.find((k) => t.includes(headingFor(k, format).toLowerCase()) || t.includes((SECTION_BY_KEY[k]?.label ?? k).toLowerCase()) || t.includes(k));
+  return hit ?? null;
 }
 
 /** Edits asked for in the chat after the first draft. */
-export function applyEdit(text: string, tags: string[], sections: Section[], ctx: BuildContext, today: number): ChatResult {
+export function applyEdit(text: string, keys: string[], sections: Section[], ctx: BuildContext, today: number): ChatResult {
   const t = text.toLowerCase();
-  const target = sectionFrom(text, tags);
+  const target = sectionFrom(text, keys, ctx.format);
+  const role = roleByKey(ctx.roleKey);
+  const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited ? buildSection(s.key, c) : s));
   let tone = ctx.tone;
-  let nextTags = tags;
   let facts = ctx.facts;
-  const fam = FAMILY_BY_KEY[ctx.familyKey] ?? FAMILY_BY_KEY.programme;
-  const rebuild = (keys: string[], c: BuildContext) => sections.map((s) => (keys.includes(s.key) && !s.edited ? buildSection(s.key, c) : s));
-
   if (/\b(shorter|shorten|concise|cut)\b/.test(t)) {
-    const keys = target ? [target] : sections.map((s) => s.key);
+    const ks = target ? [target] : sections.map((s) => s.key);
     const next = sections.map((s) => {
-      if (!keys.includes(s.key)) return s;
+      if (!ks.includes(s.key)) return s;
       const bullets = s.lines.filter((l) => l.startsWith('- '));
       const other = s.lines.filter((l) => !l.startsWith('- '));
-      return { ...s, lines: [...other.slice(0, 1), ...bullets.slice(0, 3)] };
+      return bullets.length > 3 ? { ...s, lines: [...other.slice(0, 1), ...bullets.slice(0, 3)], edited: true } : s;
     });
-    return { sections: next, tags, tone, facts, reply: target ? `Shortened ${TAG_BY_KEY[target].label}.` : 'Shortened every section to its essentials.', quick: ['Undo that', 'More formal'] };
+    return { sections: next, tags: keys, tone, facts, reply: target ? `Shortened ${headingFor(target, ctx.format)}.` : 'Shortened the longer sections to their essentials.', quick: ['Undo that', 'More formal'] };
   }
   if (/\b(longer|expand|more detail|add more)\b/.test(t)) {
-    const key = target ?? 'responsibilities';
-    const next = sections.map((s) => (s.key === key ? { ...s, lines: [...s.lines, ...fam.more.filter((m) => !s.lines.includes(`- ${m}`)).map((m) => `- ${m}`)] } : s));
-    return { sections: next, tags, tone, facts, reply: `Added more detail to ${TAG_BY_KEY[key]?.label ?? key}.` };
+    const k = target ?? 'responsibilities';
+    const next = sections.map((s) => (s.key === k ? { ...s, lines: [...s.lines, ...role.more.filter((m) => !s.lines.includes(`- ${m}`)).map((m) => `- ${m}`)], edited: true } : s));
+    return { sections: next, tags: keys, tone, facts, reply: `Added more detail to ${headingFor(k, ctx.format)}.` };
   }
   if (/\b(formal|un tone)\b/.test(t)) tone = 'formal';
   else if (/\b(warm|friendly|human)\b/.test(t)) tone = 'warm';
   else if (/\b(plain|simple|direct)\b/.test(t)) tone = 'plain';
-  if (tone !== ctx.tone) {
-    const c = { ...ctx, tone };
-    return { sections: rebuild(sections.map((s) => s.key), c), tags, tone, facts, reply: `Rewritten in a ${tone} tone. Sections you edited by hand are unchanged.` };
-  }
-  const add = t.match(/\badd\s+(?:a\s+|an\s+|the\s+)?(.+)/);
-  const remove = t.match(/\b(?:remove|drop|delete)\s+(?:the\s+)?(.+)/);
+  if (tone !== ctx.tone) return { sections: rebuild(sections.map((s) => s.key), { ...ctx, tone }), tags: keys, tone, facts, reply: `Rewritten in a ${tone} tone. Sections you edited by hand are unchanged.` };
   const lang = LANGUAGES.find((l) => t.includes(l.toLowerCase()));
   if (lang && !facts.languages.includes(lang)) {
     facts = { ...facts, languages: facts.languages.length ? [...facts.languages, lang] : ['English', lang] };
-    nextTags = tags.includes('languages') ? tags : [...tags, 'languages'];
+    const nextKeys = keys.includes('languages') ? keys : [...keys, 'languages'];
     const c = { ...ctx, facts };
-    const sec = buildSections(nextTags, c);
-    const merged = sec.map((s) => sections.find((o) => o.key === s.key && o.key !== 'languages') ?? s);
-    return { sections: merged, tags: nextTags, tone, facts, reply: `Added ${lang} as ${facts.languages.length > 1 ? 'an advantage' : 'required'}.` };
+    const merged = nextKeys.map((k) => (k === 'languages' ? buildSection(k, c) : (sections.find((s) => s.key === k) ?? buildSection(k, c))));
+    return { sections: merged, tags: nextKeys, tone, facts, reply: `Added ${lang} as desirable.` };
   }
+  const add = t.match(/\badd\s+(?:a\s+|an\s+|the\s+)?(.+)/);
   if (add) {
-    const tag = TAGS.find((x) => add[1].includes(x.label.toLowerCase()) || add[1].includes(x.key));
-    if (tag && !tags.includes(tag.key)) {
-      nextTags = ORDER.filter((k) => k === tag.key || tags.includes(k));
-      const next = ORDER.filter((k) => nextTags.includes(k)).map((k) => sections.find((s) => s.key === k) ?? buildSection(k, ctx));
-      return { sections: next, tags: nextTags, tone, facts, reply: `Added ${tag.label}.` };
+    const def = SECTIONS.find((x) => add[1].includes(x.label.toLowerCase()) || add[1].includes(x.key));
+    if (def && !keys.includes(def.key)) {
+      const nextKeys = [...keys, def.key];
+      return { sections: [...sections, buildSection(def.key, ctx)], tags: nextKeys, tone, facts, reply: `Added ${headingFor(def.key, ctx.format)}.` };
     }
   }
+  const remove = t.match(/\b(?:remove|drop|delete)\s+(?:the\s+)?(.+)/);
   if (remove) {
-    const tag = TAGS.find((x) => tags.includes(x.key) && (remove[1].includes(x.label.toLowerCase()) || remove[1].includes(x.key)));
-    if (tag) {
-      nextTags = tags.filter((k) => k !== tag.key);
-      return { sections: sections.filter((s) => s.key !== tag.key), tags: nextTags, tone, facts, reply: `Removed ${tag.label}.` };
-    }
+    const k = keys.find((x) => remove[1].includes(headingFor(x, ctx.format).toLowerCase()) || remove[1].includes((SECTION_BY_KEY[x]?.label ?? x).toLowerCase()));
+    if (k) return { sections: sections.filter((s) => s.key !== k), tags: keys.filter((x) => x !== k), tone, facts, reply: `Removed ${headingFor(k, ctx.format)}.` };
   }
   const { facts: f2 } = extractFacts(text, today, facts);
-  const changed = (Object.keys(f2) as Array<keyof typeof f2>).filter((k) => JSON.stringify(f2[k]) !== JSON.stringify(facts[k]));
+  const changed = (Object.keys(f2) as Array<keyof Facts>).filter((k) => JSON.stringify(f2[k]) !== JSON.stringify(facts[k]));
   if (changed.length) {
     facts = f2;
-    const c = { ...ctx, facts };
-    return { sections: rebuild(['role', 'apply', 'offer', 'languages', 'setting', 'security', 'deployment', 'deliverables'], c), tags, tone, facts, reply: `Updated ${changed.join(', ')} and the sections that mention it.` };
+    return { sections: rebuild(['purpose', 'apply', 'offer', 'languages', 'setting', 'conditions', 'deployment', 'deliverables', 'funding'], { ...ctx, facts }), tags: keys, tone, facts, reply: 'Updated the facts and the sections that mention them.' };
   }
-  const key = target ?? 'role';
+  const k = target ?? (keys.includes('purpose') ? 'purpose' : keys[0]);
   const sentence = text.trim().replace(/^./, (c) => c.toUpperCase()).replace(/([^.!?])$/, '$1.');
-  const next = sections.map((s) => (s.key === key ? { ...s, lines: [...s.lines, sentence] } : s));
-  return { sections: next, tags, tone, facts, reply: `Added that to ${TAG_BY_KEY[key]?.label ?? 'The role'}.` };
+  return { sections: sections.map((s) => (s.key === k ? { ...s, lines: [...s.lines, sentence], edited: true } : s)), tags: keys, tone, facts, reply: `Added that to ${headingFor(k, ctx.format)}.` };
+}
+
+/** Reads pasted text into sections: headings are short lines, upper-case lines, or lines ending in a colon. */
+export function readPasted(text: string): Array<{ heading: string; key: string; lines: string[] }> {
+  const rows = text.split(/\r?\n/).map((l) => l.trim());
+  const out: Array<{ heading: string; key: string; lines: string[] }> = [];
+  const keyFor = (h: string): string => {
+    const l = h.toLowerCase();
+    if (/about (us|the organi[sz]ation)|who we are|the organi[sz]ation|company description/.test(l)) return 'about';
+    if (/team purpose|about the team/.test(l)) return 'team';
+    if (/background|project brief|about the programme|context/.test(l)) return 'background';
+    if (/setting|reporting/.test(l)) return 'setting';
+    if (/purpose|summary|overview|the role|about the role|the opportunity/.test(l)) return 'purpose';
+    if (/responsibilit|accountabilit|duties|tasks|what you.?ll do/.test(l)) return 'responsibilities';
+    if (/deliverable/.test(l)) return 'deliverables';
+    if (/relationship|scope of role|institutional/.test(l)) return 'relationships';
+    if (/qualification|requirement|experience|about you|profile|looking for|person specification|skills/.test(l)) return 'requirements';
+    if (/competenc|behaviour|values/.test(l)) return 'competencies';
+    if (/language/.test(l)) return 'languages';
+    if (/offer|benefit|salary|remuneration|why join/.test(l)) return 'offer';
+    if (/condition|working environment/.test(l)) return 'conditions';
+    if (/apply|application/.test(l)) return 'apply';
+    if (/assessment|selection/.test(l)) return 'assessment';
+    return 'purpose';
+  };
+  let current: { heading: string; key: string; lines: string[] } | null = null;
+  for (const r of rows) {
+    if (!r) continue;
+    const isHeading = (r.length < 60 && (/:$/.test(r) || (/^[A-Z0-9 &/'()-]+$/.test(r) && /[A-Z]{3}/.test(r)))) || (r.length < 40 && !/[.!?]$/.test(r) && rows.length > 3 && /^[A-Z]/.test(r) && r.split(' ').length <= 5);
+    if (isHeading) {
+      const heading = r.replace(/:$/, '').replace(/\b\w/g, (c) => c).trim();
+      current = { heading: heading.charAt(0) + heading.slice(1).toLowerCase(), key: keyFor(heading), lines: [] };
+      out.push(current);
+    } else {
+      if (!current) {
+        current = { heading: 'The role', key: 'purpose', lines: [] };
+        out.push(current);
+      }
+      current.lines.push(/^[•*\-–]\s*/.test(r) ? `- ${r.replace(/^[•*\-–]\s*/, '')}` : r);
+    }
+  }
+  return out.filter((s) => s.lines.length);
 }
 
 export function slug(title: string): string {
@@ -799,4 +1063,8 @@ export function slug(title: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 60);
+}
+
+export function arrangementLabel(a: Arrangement): string {
+  return a === 'onsite' ? 'On-site' : a === 'hybrid' ? 'Hybrid' : 'Remote';
 }

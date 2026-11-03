@@ -1,5 +1,6 @@
-import { addDays, buildSections, emptyFacts, STYLES } from './engine';
-import type { DemoJob, Facts, InboxItem, Org, Person, Review, State } from './types';
+import { applyLines, defaultApply } from './apply';
+import { addDays, buildSections, emptyFacts, FORMATS, orderSections } from './engine';
+import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } from './types';
 
 const DAY = 86_400_000;
 
@@ -8,6 +9,7 @@ export const SAMPLE_ORG: Org = {
   name: 'Riverstone Aid',
   short: 'Riverstone',
   type: 'International NGO',
+  orgType: 'ingo',
   hq: 'Nairobi, Kenya',
   website: 'https://riverstone.example.org',
   careersUrl: 'https://riverstone.example.org/careers',
@@ -19,15 +21,42 @@ export const SAMPLE_ORG: Org = {
   countries: ['Kenya', 'Uganda', 'Ethiopia', 'South Sudan'],
   voice: ['Warm', 'Plain English', 'Speaks as "we"', 'Rights-based'],
   standard: [
-    { key: 'equal', label: 'Equal opportunity', text: 'Riverstone Aid is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.', locked: true },
-    { key: 'psea', label: 'PSEA', text: 'Riverstone Aid has zero tolerance for sexual exploitation and abuse. All staff sign our code of conduct and complete PSEA training.', locked: true },
-    { key: 'dataprot', label: 'Data protection', text: 'We use your application only to assess it for this role and delete it 12 months after the recruitment closes.', locked: false },
-    { key: 'nofee', label: 'No-fee notice', text: 'Riverstone Aid never charges a fee at any stage of recruitment. Report any request for payment to safeguarding@riverstone.example.org.', locked: true },
+    { key: 'safeguarding', label: 'Safeguarding', text: 'Riverstone Aid is committed to keeping children and adults at risk safe. Our selection process includes checks that reflect this commitment, and every member of staff follows our code of conduct.', locked: true },
+    { key: 'psea', label: 'PSEA', text: 'Riverstone Aid has zero tolerance for sexual exploitation, abuse and harassment. All staff complete PSEA training and must report any concern.', locked: true },
+    { key: 'mds', label: 'Misconduct Disclosure Scheme', text: 'Riverstone Aid takes part in the Inter-Agency Misconduct Disclosure Scheme. We will ask your previous employers about any findings of sexual exploitation, abuse or harassment.', locked: true },
+    { key: 'fraud', label: 'No fee, fraud warning', text: 'Riverstone Aid never charges a fee at any stage of recruitment. Report any request for payment to safeguarding@riverstone.example.org.', locked: true },
+    { key: 'equal', label: 'Equal opportunity', text: 'Riverstone Aid is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.', locked: false },
   ],
+  mdsMember: true,
+  scale: [
+    { grade: 'B2', min: 145000, max: 190000, currency: 'KES', period: 'month' },
+    { grade: 'C1', min: 230000, max: 300000, currency: 'KES', period: 'month' },
+    { grade: 'D1', min: 4200, max: 5100, currency: 'USD', period: 'month' },
+    { grade: 'D2', min: 5200, max: 6300, currency: 'USD', period: 'month' },
+  ],
+  learned: { source: 'careers', adverts: 4, confirmed: false },
   approval: 'senior',
   approvalRule: 'any',
   verified: true,
   setupDone: true,
+};
+
+/** Riverstone's own format, as AidJobs learned it from four adverts on its careers site (simulated). */
+export const HOUSE_FORMAT: Format = {
+  key: 'house',
+  label: 'Riverstone format',
+  family: 'Your organisation',
+  usedBy: 'Learned from 4 of your adverts on riverstone.example.org/careers (simulated)',
+  tone: 'warm',
+  order: [
+    { key: 'about', heading: 'About us' },
+    { key: 'purpose', heading: 'The role' },
+    { key: 'responsibilities', heading: 'What you will do' },
+    { key: 'requirements', heading: 'What you will bring' },
+    { key: 'offer', heading: 'What we offer' },
+    { key: 'apply', heading: 'How to apply' },
+  ],
+  commitments: ['safeguarding', 'psea', 'mds', 'fraud', 'equal'],
 };
 
 export const SAMPLE_ME: Person = { id: 'me', name: 'Sam Otieno', email: 'sam@riverstone.example.org', role: 'owner' };
@@ -43,27 +72,28 @@ function noReview(): Review {
   return { state: 'none', reviewers: [], due: '', round: 0, rule: 'any', remarks: [] };
 }
 
-function job(
-  today: number,
-  id: string,
-  family: string,
-  styleKey: string,
-  facts: Partial<Facts>,
-  extra: Partial<DemoJob>,
-): DemoJob {
+export function allFormats(): Format[] {
+  return [HOUSE_FORMAT, ...FORMATS];
+}
+
+function job(today: number, id: string, roleKey: string, formatKey: string, facts: Partial<Facts>, extra: Partial<DemoJob>): DemoJob {
   const f: Facts = { ...emptyFacts(), languages: ['English'], ...facts };
-  const style = STYLES.find((s) => s.key === styleKey) ?? STYLES[1];
-  const tags = style.tags;
-  const sections = buildSections(tags, { facts: f, familyKey: family, org: SAMPLE_ORG, tone: style.tone, modifier: null });
+  const format = allFormats().find((x) => x.key === formatKey) ?? HOUSE_FORMAT;
+  const apply = defaultApply(SAMPLE_ORG.orgType, SAMPLE_ORG.careersUrl);
+  const tags = orderSections(format.order.map((o) => o.key), format);
+  const sections = buildSections(tags, { facts: f, roleKey, org: SAMPLE_ORG, tone: format.tone, format, commitments: format.commitments, applyLines: applyLines(apply, f, SAMPLE_ORG) });
   return {
     id,
     status: 'draft',
     plan: null,
     facts: f,
-    family,
+    family: roleKey,
     tags,
-    style: style.key,
-    tone: style.tone,
+    format: format.key,
+    tone: format.tone,
+    commitments: format.commitments,
+    apply,
+    genuine: {},
     sections,
     versions: [{ n: 1, at: today - 3 * DAY, note: 'First draft', sections }],
     review: noReview(),
@@ -78,88 +108,62 @@ function job(
 
 export function sampleJobs(today: number): DemoJob[] {
   return [
-    job(
-      today,
-      'job-cps',
-      'protection',
-      'ngo',
-      { title: 'Child Protection Specialist', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 2), salary: 'USD 3,900 to 4,400 a month' },
-      {
-        status: 'live',
-        plan: 'premium',
-        publishedAt: today - 26 * DAY,
-        reach: {
-          candidates: [{ email: 'candidate1@example.org', status: 'sent' }, { email: 'candidate2@example.org', status: 'sent' }],
-          team: ['amina', 'daniel', 'grace'].map((n) => ({ email: `${n}@riverstone.example.org`, status: 'sent' as const })),
-          community: true,
-          intro: '',
-        },
-        audit: [
-          { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
-          { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Published as Premium' },
-        ],
+    job(today, 'job-cps', 'protection', 'house', { title: 'Child Protection Specialist', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', timezone: 'EAT', contract: 'Fixed-term', duration: '12 months', grade: 'C1', deadline: addDays(today, 2), salaryMode: 'range', salaryMin: '3,900', salaryMax: '4,400', currency: 'USD', safeguarding: 'high' }, {
+      status: 'live',
+      plan: 'premium',
+      publishedAt: today - 26 * DAY,
+      reach: {
+        candidates: [{ email: 'candidate1@example.org', status: 'sent' }, { email: 'candidate2@example.org', status: 'sent' }],
+        team: ['amina', 'daniel', 'grace'].map((n) => ({ email: `${n}@riverstone.example.org`, status: 'sent' as const })),
+        community: true,
+        intro: '',
       },
-    ),
-    job(
-      today,
-      'job-meal',
-      'meal',
-      'ngo',
-      { title: 'MEAL Coordinator', location: 'Addis Ababa, Ethiopia', country: 'Ethiopia', iso: 'ET', contract: 'Fixed-term', duration: '24 months', deadline: addDays(today, 9) },
-      { status: 'live', plan: 'standard', publishedAt: today - 12 * DAY, audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published as Standard' }] },
-    ),
-    job(
-      today,
-      'job-fin',
-      'finance',
-      'un',
-      { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', grade: 'P3', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) },
-      {
-        status: 'review',
-        review: {
-          state: 'open',
-          reviewers: [
-            { name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false, decision: 'approved', note: 'Looks good to me.' },
-            { name: 'Daniel Mwangi', email: 'daniel@riverstone.example.org', outside: false },
-          ],
-          due: addDays(today, 3),
-          round: 1,
-          rule: 'any',
-          remarks: [
-            { id: 'r1', section: 'qualifications', author: 'Amina Yusuf', kind: 'suggestion', text: 'Make the accounting qualification an advantage, not a requirement.', suggestion: '- A professional accounting qualification (ACCA, CPA) is an advantage', state: 'open' },
-          ],
-        },
-        audit: [
-          { at: today - 6 * DAY, who: SAMPLE_ME.name, what: 'Created' },
-          { at: today - 2 * DAY, who: SAMPLE_ME.name, what: 'Sent for review to Amina Yusuf and Daniel Mwangi' },
-          { at: today - DAY, who: 'Amina Yusuf', what: 'Approved version 1' },
+      audit: [
+        { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
+        { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Published as Premium' },
+      ],
+    }),
+    job(today, 'job-meal', 'meal', 'house', { title: 'MEAL Coordinator', location: 'Addis Ababa, Ethiopia', country: 'Ethiopia', iso: 'ET', timezone: 'EAT', contract: 'Fixed-term', duration: '24 months', deadline: addDays(today, 9), salaryMode: 'scale' }, {
+      status: 'live',
+      plan: 'standard',
+      publishedAt: today - 12 * DAY,
+      audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published as Standard' }],
+    }),
+    job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
+      status: 'review',
+      review: {
+        state: 'open',
+        reviewers: [
+          { name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false, decision: 'approved', note: 'Looks good to me.' },
+          { name: 'Daniel Mwangi', email: 'daniel@riverstone.example.org', outside: false },
         ],
+        due: addDays(today, 3),
+        round: 1,
+        rule: 'any',
+        remarks: [{ id: 'r1', section: 'requirements', author: 'Amina Yusuf', kind: 'suggestion', text: 'Add the field-experience point we discussed.', suggestion: '- Experience working in a field office', state: 'open' }],
       },
-    ),
-    job(
-      today,
-      'job-comms',
-      'comms',
-      'intern',
-      { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', contract: 'Internship', duration: '6 months' },
-      { status: 'draft', countsAsFreeDraft: true },
-    ),
-    job(
-      today,
-      'job-log',
-      'logistics',
-      'ngo',
-      { title: 'Logistics Assistant', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', contract: 'Fixed-term', duration: '6 months', deadline: addDays(today, -25) },
-      { status: 'closed', plan: 'standard', publishedAt: today - 55 * DAY, closedAt: today - 25 * DAY, closeReason: 'deadline' },
-    ),
-    job(
-      today,
-      'job-wash-2026',
-      'wash',
-      'ngo',
-      { title: 'WASH Programme Manager', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', grade: 'P4', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, -230), salary: 'USD 4,800 to 5,600 a month' },
-      { status: 'closed', plan: 'premium', publishedAt: today - 262 * DAY, closedAt: today - 230 * DAY, closeReason: 'filled', createdAt: today - 270 * DAY },
-    ),
+      audit: [
+        { at: today - 6 * DAY, who: SAMPLE_ME.name, what: 'Created' },
+        { at: today - 2 * DAY, who: SAMPLE_ME.name, what: 'Sent for review to Amina Yusuf and Daniel Mwangi' },
+        { at: today - DAY, who: 'Amina Yusuf', what: 'Approved version 1' },
+      ],
+    }),
+    job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months' }, { status: 'draft', countsAsFreeDraft: true }),
+    job(today, 'job-log', 'logistics', 'house', { title: 'Logistics Assistant', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', contract: 'Fixed-term', duration: '6 months', deadline: addDays(today, -25) }, {
+      status: 'closed',
+      plan: 'standard',
+      publishedAt: today - 55 * DAY,
+      closedAt: today - 25 * DAY,
+      closeReason: 'deadline',
+    }),
+    job(today, 'job-wash-2026', 'wash', 'house', { title: 'WASH Programme Manager', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', grade: 'D2', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, -230), salaryMode: 'range', salaryMin: '5,200', salaryMax: '6,300', currency: 'USD' }, {
+      status: 'closed',
+      plan: 'premium',
+      publishedAt: today - 262 * DAY,
+      closedAt: today - 230 * DAY,
+      closeReason: 'filled',
+      createdAt: today - 270 * DAY,
+    }),
   ];
 }
 
@@ -173,17 +177,14 @@ export function sampleInbox(today: number): InboxItem[] {
 
 export function initialState(today: number): State {
   return {
-    v: 1,
+    v: 2,
     today,
     signedIn: false,
     me: SAMPLE_ME,
     org: SAMPLE_ORG,
     team: SAMPLE_TEAM,
     jobs: sampleJobs(today),
-    styles: [
-      ...STYLES,
-      { key: 'house', label: 'Riverstone house style', by: 'Organisation', tags: ['about', 'role', 'responsibilities', 'qualifications', 'offer', 'safeguarding', 'apply', 'equal', 'psea', 'nofee'], tone: 'warm', note: 'From your careers page: warm, plain English, "we"' },
-    ],
+    formats: allFormats(),
     inbox: sampleInbox(today),
     draftsUsed: 1,
     credits: 0,
@@ -203,3 +204,6 @@ export const PUBLIC_SAMPLES = [
   { id: 'p5', org: 'Open Hands Foundation', title: 'Grants Manager', place: 'London, United Kingdom', iso: 'GB', days: 19, premium: false },
   { id: 'p6', org: 'Harbour Health Alliance', title: 'Community Health Supervisor', place: 'Maputo, Mozambique', iso: 'MZ', days: 8, premium: false },
 ];
+
+/** Sample market context for the first screen; replaced by real AidJobs figures once there are enough jobs. */
+export const MARKET_SAMPLE = { similar: 34, grade: 'P4 or equivalent', showPay: 62, daysOpen: 21 };

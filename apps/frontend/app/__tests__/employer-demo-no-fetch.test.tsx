@@ -99,8 +99,9 @@ describe('employer demo: never calls the network', () => {
     shows('Publish once. Reach further.');
     click(/Email me a sign-in link/);
     click('Open the link (demo)');
-    shows('Hello, Sam');
-    shows('Decision inbox');
+    shows('What role are you hiring for?');
+    shows('Start from what you have');
+    shows('What strong adverts include');
 
     for (const p of [false, true]) {
       phone = p;
@@ -112,11 +113,15 @@ describe('employer demo: never calls the network', () => {
       shows('History');
       route('#jobs/job-log');
       shows('Hire again');
-      route('#studio/job-fin');
-      shows('Finance Officer');
+      route('#create/job-fin');
+      shows('Job description');
       shows('In review');
+      shows('Key areas of accountability');
+      route('#create/job-cps');
+      expect(container.textContent?.toLowerCase()).toContain('our commitments');
       route('#styles');
-      shows('UN style');
+      shows('UN Secretariat format');
+      shows('Local NGO concise');
       route('#team');
       shows('Approval before publishing');
       route('#org');
@@ -127,6 +132,9 @@ describe('employer demo: never calls the network', () => {
       shows('Riverstone Aid');
       route('#home');
       shows('Hello, Sam');
+      shows('Decision inbox');
+      route('#create');
+      shows('What role are you hiring for?');
     }
 
     phone = false;
@@ -136,9 +144,17 @@ describe('employer demo: never calls the network', () => {
       id = startJob("We're hiring a WASH Programme Manager in Nairobi, 12-month fixed-term contract, closing 30 November 2026");
       writeDraft(id);
     });
-    route(`#studio/${id}`);
-    shows('Responsibilities');
-    shows('What I understood');
+    route(`#create/${id}`);
+    shows('Job description');
+    shows('What you will do');
+    shows('Structure');
+    for (const pill of [/Nairobi/, /^Job/, /^Grade$/, /^Closes/, /As per our salary scale|Not shown/, /^More$/]) {
+      click(pill);
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      });
+    }
     route(`#publish/${id}`);
     shows('How it will look');
     click('Continue');
@@ -164,7 +180,7 @@ describe('employer demo: never calls the network', () => {
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":1');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":2');
     for (const k of Object.keys(localStorage)) expect(k.startsWith('aidjobs.')).toBe(true);
   });
 });

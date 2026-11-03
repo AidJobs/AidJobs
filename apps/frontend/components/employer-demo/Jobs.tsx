@@ -125,7 +125,7 @@ function VariantDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: (
             onClick={() => {
               const id = hireAgain(job.id, place.trim());
               onClose();
-              if (id) go('studio', id);
+              if (id) go('create', id);
             }}
           >
             Create the copy
@@ -180,7 +180,7 @@ function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: '
         <button type="button" className="aj-pill" onClick={() => closeJob(job.id, 'early')}>
           <XCircle size={14} strokeWidth={1.8} /> Close now
         </button>
-        <button type="button" className="aj-pill" onClick={() => go('studio', job.id)}>
+        <button type="button" className="aj-pill" onClick={() => go('create', job.id)}>
           <Pencil size={14} strokeWidth={1.8} /> Edit
         </button>
         <button type="button" className="aj-pill" onClick={() => onDialog('reshare')}>
@@ -202,7 +202,7 @@ function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: '
           className="aj-ink-btn"
           onClick={() => {
             const id = hireAgain(job.id);
-            if (id) go('studio', id);
+            if (id) go('create', id);
           }}
         >
           <Repeat2 size={14} strokeWidth={1.8} /> Hire again
@@ -217,7 +217,7 @@ function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: '
     );
   return (
     <div className="flex flex-wrap gap-1.5">
-      <button type="button" className="aj-ink-btn" onClick={() => go('studio', job.id)}>
+      <button type="button" className="aj-ink-btn" onClick={() => go('create', job.id)}>
         Continue
       </button>
       {job.status === 'draft' && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CheckCircle2, Clock, Download, FileText, Inbox, MessageSquareWarning, Receipt, RotateCcw, Send, Sparkles, Wand2 } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Download, FileText, Inbox, MessageSquareWarning, Receipt, RotateCcw, Send, Sparkles } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import DayStrip, { type DayGroup } from '@/components/site/DayStrip';
 import Flag from '@/components/site/Flag';
@@ -20,7 +20,7 @@ import {
   type Intent,
 } from './actions';
 import Composer from './Composer';
-import { addDays, daysUntil, longDate, shortDate, suggestNext } from './engine';
+import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { go, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
 import { Lifeline, PlanBadge, Section, stageOf } from './ui';
@@ -63,7 +63,7 @@ export function needsYou(s: State, j: DemoJob): boolean {
 
 export function openJob(j: DemoJob) {
   if (j.status === 'live' || j.status === 'closed' || j.status === 'scheduled') go('jobs', j.id);
-  else go('studio', j.id);
+  else go('create', j.id);
 }
 
 function briefing(s: State): Brief[] {
@@ -79,11 +79,11 @@ function briefing(s: State): Brief[] {
         body: approvalRequired(s, j) ? 'Approval was required, and it is in. Publish now?' : 'Publish now?',
         actions: [
           { label: 'Publish', run: () => go('publish', j.id), primary: true },
-          { label: 'Open', run: () => go('studio', j.id) },
+          { label: 'Open', run: () => go('create', j.id) },
         ],
       });
     } else if (j.review.state === 'changes') {
-      out.push({ id: `chg-${j.id}`, icon: <MessageSquareWarning size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />, title: `Changes requested on ${j.facts.title}`, body: 'See the comments on the sections.', actions: [{ label: 'Open', run: () => go('studio', j.id), primary: true }] });
+      out.push({ id: `chg-${j.id}`, icon: <MessageSquareWarning size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />, title: `Changes requested on ${j.facts.title}`, body: 'See the comments on the sections.', actions: [{ label: 'Open', run: () => go('create', j.id), primary: true }] });
     }
     if (j.status === 'live' && left !== null && left <= 3 && !s.inbox.some((i) => i.jobId === j.id && i.kind === 'deadline' && i.done)) {
       out.push({
@@ -112,7 +112,7 @@ function briefing(s: State): Brief[] {
               label: 'Hire again',
               run: () => {
                 const id = hireAgain(j.id);
-                if (id) go('studio', id);
+                if (id) go('create', id);
               },
             },
           ],
@@ -121,7 +121,7 @@ function briefing(s: State): Brief[] {
     }
   }
   const unwritten = s.jobs.find((j) => j.status === 'draft');
-  if (unwritten) out.push({ id: `dr-${unwritten.id}`, icon: <FileText size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />, title: `${unwritten.facts.title || 'A draft'} is waiting`, body: unwritten.sections.length ? 'Pick up where you left off.' : 'Not written yet.', actions: [{ label: 'Continue', run: () => go('studio', unwritten.id), primary: true }] });
+  if (unwritten) out.push({ id: `dr-${unwritten.id}`, icon: <FileText size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />, title: `${unwritten.facts.title || 'A draft'} is waiting`, body: unwritten.sections.length ? 'Pick up where you left off.' : 'Not written yet.', actions: [{ label: 'Continue', run: () => go('create', unwritten.id), primary: true }] });
   return out;
 }
 
@@ -178,7 +178,6 @@ export function DecisionInbox() {
 export default function Home() {
   const s = useDemo();
   const [text, setText] = useState('');
-  const [style, setStyle] = useState<string | null>(null);
   const [intent, setIntent] = useState<Intent>(null);
   const [noMatch, setNoMatch] = useState(false);
   const [day, setDay] = useState<string | null>(null);
@@ -203,17 +202,17 @@ export default function Home() {
       else setNoMatch(true);
       return;
     }
-    const st = s.styles.find((x) => x.key === style);
-    const id = startJob(v, st);
+    const id = startJob(v);
     setText('');
-    go('studio', id);
+    go('create', id);
   };
 
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-4 py-5 lg:flex-row lg:px-8 lg:py-8">
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <div>
-          <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+          <span className="ej-panel-label">Overview</span>
+          <h1 className="aj-display aj-h1" style={{ margin: '2px 0 0' }}>
             Hello, {s.me.name.split(' ')[0]}
           </h1>
           <p className="aj-muted" style={{ margin: '4px 0 0' }}>
@@ -250,28 +249,18 @@ export default function Home() {
           </ul>
         )}
 
-        <Section title="What are you hiring for?" action={<span className="aj-faint">{left} of {FREE_DRAFTS} free drafts left this month</span>}>
+        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_DRAFTS} free drafts left this month</span>}>
           <Composer
             value={text}
             onChange={setText}
             onSend={send}
-            suggestion={suggestNext(text, s.today)}
-            placeholder="Describe the role in a few lines"
-            label="Describe the role, or ask me to do something"
+            suggestion=""
+            placeholder='For example: "extend all Nairobi jobs by a week", or describe a new role'
+            label="Ask AidJobs to do something, or describe a role"
+            compact
           />
-          <div className="aj-no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-            <span className="aj-faint shrink-0" style={{ fontSize: 11.5 }}>
-              <Wand2 size={12} strokeWidth={2} className="mr-1 inline" />
-              Start with a style:
-            </span>
-            {s.styles.map((st) => (
-              <button key={st.key} type="button" className="ej-tag" data-on={style === st.key} onClick={() => setStyle(style === st.key ? null : st.key)} aria-pressed={style === st.key}>
-                {st.label}
-              </button>
-            ))}
-          </div>
           <p className="aj-faint" style={{ margin: 0, fontSize: 11.5 }}>
-            You can also ask, for example, &ldquo;extend all Nairobi jobs by a week&rdquo;. {left === 0 ? 'Free drafts are used up this month; a Premium job does not use one.' : 'A Premium job does not use a free draft.'}
+            Every change is confirmed first and can be undone. {left === 0 ? 'Free drafts are used up this month; a Premium job does not use one.' : 'A Premium job does not use a free draft.'}
           </p>
           {noMatch && (
             <div className="aj-card p-3 aj-muted" role="status">
@@ -297,7 +286,7 @@ export default function Home() {
                     const id = runIntent(intent);
                     setIntent(null);
                     setText('');
-                    if (id) go('studio', id);
+                    if (id) go('create', id);
                   }}
                 >
                   Confirm
@@ -337,7 +326,7 @@ export default function Home() {
                     </div>
                     <div className="aj-muted flex w-full items-center gap-2">
                       {j.facts.iso && <Flag iso={j.facts.iso} title={j.facts.country} />}
-                      <span className="min-w-0 flex-1 truncate">{j.facts.location || (j.facts.remote ? 'Remote' : 'No place yet')}</span>
+                      <span className="min-w-0 flex-1 truncate">{j.facts.location || (j.facts.arrangement === 'remote' ? 'Remote' : 'No place yet')}</span>
                       <span className="shrink-0">{statusLine(s, j)}</span>
                     </div>
                     <Lifeline stage={stageOf(j, leftDays)} attention={attention} />

@@ -1,21 +1,25 @@
 'use client';
 
+import { applyLines, defaultApply } from './apply';
 import {
   addDays,
   applyEdit,
+  buildSection,
   buildSections,
   daysUntil,
-  detectFamily,
   emptyFacts,
   extractFacts,
+  FORMAT_FOR_TYPE,
+  headingFor,
   longDate,
+  orderSections,
   parseIso,
-  recommendTags,
-  TAG_BY_KEY,
+  readPasted,
+  recommendSections,
   type BuildContext,
 } from './engine';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
-import type { ChatMsg, DemoJob, Facts, Person, ReachRecord, Review, State, Style } from './types';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, ReachRecord, Review, State } from './types';
 
 export const FREE_DRAFTS = 3;
 export const FREE_LIVE = 2;
@@ -30,8 +34,23 @@ function who(s: State): string {
   return s.reviewerAs ? (s.team.find((p) => p.id === s.reviewerAs)?.name ?? 'Reviewer') : s.me.name;
 }
 
+export function formatOf(s: State, key: string): Format {
+  return s.formats.find((f) => f.key === key) ?? s.formats[0];
+}
+
+export function defaultFormatKey(s: State): string {
+  return s.org.learned && s.formats.some((f) => f.key === 'house') ? 'house' : FORMAT_FOR_TYPE[s.org.orgType];
+}
+
 export function ctxFor(s: State, j: DemoJob): BuildContext {
-  return { facts: j.facts, familyKey: j.family, org: s.org, tone: j.tone, modifier: detectFamily(`${j.facts.title} ${j.facts.contract}`).modifier };
+  return { facts: j.facts, roleKey: j.family, org: s.org, tone: j.tone, format: formatOf(s, j.format), commitments: j.commitments, applyLines: applyLines(j.apply, j.facts, s.org) };
+}
+
+/** Rebuilds every section not edited by hand, keeping the user's order and headings from the job's format. */
+function rebuilt(s: State, j: DemoJob): DemoJob {
+  if (!j.sections.length) return j;
+  const ctx = ctxFor(s, j);
+  return { ...j, sections: j.tags.map((k) => j.sections.find((x) => x.key === k && x.edited) ?? buildSection(k, ctx)) };
 }
 
 export function freeDraftsLeft(s: State): number {
@@ -52,12 +71,11 @@ export function isApproved(j: DemoJob): boolean {
   return j.review.state === 'approved' || (j.review.rule === 'any' ? j.review.reviewers.some((r) => r.decision === 'approved') : j.review.reviewers.length > 0 && j.review.reviewers.every((r) => r.decision === 'approved'));
 }
 
-function missingFacts(f: Facts): Array<{ key: keyof Facts; ask: string; quick: string[] }> {
+function missingFacts(f: Facts): Array<{ ask: string; quick: string[] }> {
   const today = getState().today;
-  const out: Array<{ key: keyof Facts; ask: string; quick: string[] }> = [];
-  if (!f.location && !f.remote) out.push({ key: 'location', ask: 'Where is the job based?', quick: ['Nairobi', 'Kampala', 'Addis Ababa', 'Remote'] });
-  if (!f.deadline) out.push({ key: 'deadline', ask: 'When do applications close?', quick: [`In 2 weeks`, `In 4 weeks`, longDate(addDays(today, 27))] });
-  if (!f.contract) out.push({ key: 'contract', ask: 'What kind of contract is it?', quick: ['Fixed-term, 12 months', 'Consultancy', 'Internship', 'Open-ended'] });
+  const out: Array<{ ask: string; quick: string[] }> = [];
+  if (!f.location && f.arrangement !== 'remote') out.push({ ask: 'Where is the job based?', quick: ['Nairobi', 'Kampala', 'Addis Ababa', 'Remote'] });
+  if (!f.deadline) out.push({ ask: 'When do applications close?', quick: ['In 2 weeks', 'In 4 weeks', longDate(addDays(today, 27))] });
   return out;
 }
 
@@ -66,31 +84,39 @@ function memoryHint(s: State, title: string): string | null {
   return past ? `You hired a ${past.facts.title} before (${past.facts.location}). Say "start from last time" to reuse it.` : null;
 }
 
-/** Starts a job conversation from the first message. Returns the new job's id. */
-export function startJob(text: string, style?: Style): string {
-  const s = getState();
-  const id = nextId('job');
-  const { facts, family, modifier } = extractFacts(text, s.today);
-  const tags = style ? style.tags : recommendTags(family, modifier, facts);
-  const job: DemoJob = {
+function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: string): DemoJob {
+  const format = formatOf(s, formatKey);
+  return {
     id,
     status: 'draft',
     plan: null,
     facts,
-    family: family?.key ?? 'programme',
-    tags,
-    style: style?.key ?? null,
-    tone: style?.tone ?? (s.styles.find((x) => x.key === 'house')?.tone ?? 'warm'),
+    family: roleKey,
+    tags: orderSections(recommendSections(format, facts), format),
+    format: format.key,
+    tone: format.tone,
+    commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember),
+    apply: defaultApply(s.org.orgType, s.org.careersUrl),
+    genuine: {},
     sections: [],
     versions: [],
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [msg('user', text)],
+    chat: [],
     createdAt: Date.now(),
     countsAsFreeDraft: false,
     audit: [{ at: Date.now(), who: s.me.name, what: 'Started in the chat' }],
   };
-  job.chat.push(...replyAfterFacts(s, job, true));
+}
+
+/** Starts a job conversation from the first message. Returns the new job's id. */
+export function startJob(text: string, formatKey?: string): string {
+  const s = getState();
+  const id = nextId('job');
+  const { facts, role } = extractFacts(text, s.today);
+  if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
+  const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
+  job.chat = [msg('user', text), ...replyAfterFacts(s, job, true)];
   update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
   return id;
 }
@@ -100,7 +126,7 @@ function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
   const mem = first ? memoryHint(s, j.facts.title) : null;
   if (first) {
     const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'this role';
-    out.push(msg('ai', `Got it: ${what}. I've suggested the sections it needs; tap a tag to add or remove one (at least 3).`));
+    out.push(msg('ai', `Got it: ${what}, in ${formatOf(s, j.format).label}. The outline on the right shows the sections; add, remove, or reorder any of them.`));
     if (mem) out.push(msg('ai', mem));
   }
   const reuse = mem ? ['Start from last time'] : [];
@@ -108,26 +134,6 @@ function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
   if (missing.length) out.push(msg('ai', missing[0].ask, [...missing[0].quick, ...reuse]));
   else if (!j.sections.length) out.push(msg('ai', 'I have what I need. Ready to write it?', ['Write the description', ...reuse]));
   return out;
-}
-
-export function toggleTag(id: string, key: string) {
-  updateJob(id, (j) => {
-    const has = j.tags.includes(key);
-    const tags = has ? j.tags.filter((t) => t !== key) : [...j.tags, key];
-    if (!j.sections.length) return { ...j, tags, style: null };
-    const s = getState();
-    const sections = has ? j.sections.filter((x) => x.key !== key) : buildSections(tags, ctxFor(s, { ...j, tags })).map((x) => j.sections.find((o) => o.key === x.key) ?? x);
-    return { ...j, tags, sections, style: null };
-  });
-}
-
-export function applyStyle(id: string, style: Style) {
-  updateJob(id, (j) => {
-    const s = getState();
-    const next = { ...j, tags: style.tags, tone: style.tone, style: style.key };
-    const sections = j.sections.length ? buildSections(style.tags, ctxFor(s, next)).map((x) => j.sections.find((o) => o.key === x.key && o.edited) ?? x) : [];
-    return { ...next, sections, chat: [...j.chat, msg('ai', `Applied ${style.label}: ${style.tags.length} sections, ${style.tone} tone.`)] };
-  });
 }
 
 export function canWrite(j: DemoJob): { ok: boolean; why?: string } {
@@ -153,14 +159,20 @@ export function writeDraft(id: string) {
             sections,
             countsAsFreeDraft: x.countsAsFreeDraft || counts,
             versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'First draft', sections }],
-            chat: [
-              ...x.chat,
-              msg('ai', `Here's a first draft with ${sections.length} sections. Ask me to change anything, or edit the text directly.`, ['Shorter', 'More formal', 'Add French', 'Add a salary']),
-            ],
+            chat: [...x.chat, msg('ai', `Here's a first draft with ${sections.length} sections. Ask me to change anything, or edit the text directly.`, ['Shorter', 'More formal', 'Add French'])],
           }
         : x,
     ),
   }));
+}
+
+/** Quick replies are short; this turns them into text the fact reader understands. */
+function answerToText(text: string, j: DemoJob): string {
+  const t = text.trim();
+  if (/^remote$/i.test(t)) return 'remote';
+  if (/^in \d weeks?$/i.test(t)) return `closing ${t.toLowerCase()}`;
+  if (!j.facts.location && j.facts.arrangement !== 'remote' && /^[A-Z][a-zA-Z' -]+$/.test(t)) return `based in ${t}`;
+  return t;
 }
 
 export function sendChat(id: string, text: string) {
@@ -169,7 +181,6 @@ export function sendChat(id: string, text: string) {
   if (!j || !text.trim()) return;
   const userMsg = msg('user', text);
   const lower = text.toLowerCase();
-
   if (lower === 'write the description') {
     updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg] }));
     if (canWrite(j).ok) writeDraft(id);
@@ -180,13 +191,9 @@ export function sendChat(id: string, text: string) {
     const past = s.jobs.find((x) => x.status === 'closed' && x.facts.title.toLowerCase() === j.facts.title.toLowerCase());
     if (past) {
       const facts: Facts = { ...past.facts, deadline: j.facts.deadline || addDays(s.today, 27), location: j.facts.location || past.facts.location, country: j.facts.country || past.facts.country, iso: j.facts.iso || past.facts.iso };
-      updateJob(id, (x) => ({ ...x, facts, tags: past.tags, tone: past.tone, family: past.family, chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title} of ${longDate(past.facts.deadline)}, with a new closing date. Ready to write it?`, ['Write the description'])] }));
+      updateJob(id, (x) => ({ ...x, facts, tags: past.tags, format: past.format, tone: past.tone, family: past.family, chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title}, with a new closing date. Ready to write it?`, ['Write the description'])] }));
       return;
     }
-  }
-  if (lower === 'add a salary') {
-    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', 'What is the salary range?', ['USD 4,800 to 5,600 a month', 'USD 3,000 to 3,600 a month', 'In line with our scale'])] }));
-    return;
   }
   if (lower === 'undo that') {
     updateJob(id, (x) => {
@@ -195,17 +202,14 @@ export function sendChat(id: string, text: string) {
     });
     return;
   }
-
   if (!j.sections.length) {
-    const { facts, family, modifier } = extractFacts(answerToText(text, j), s.today, j.facts);
-    const famKey = j.family === 'programme' && family ? family.key : j.family;
-    const tags = j.style ? j.tags : Array.from(new Set([...j.tags, ...recommendTags(family, modifier, facts)]));
-    const next = { ...j, facts, family: famKey, tags, chat: [...j.chat, userMsg] };
+    const { facts, role } = extractFacts(answerToText(text, j), s.today, j.facts);
+    const next = { ...j, facts, family: j.family === 'programme' && role ? role.key : j.family, chat: [...j.chat, userMsg] };
+    next.tags = orderSections(Array.from(new Set([...j.tags, ...recommendSections(formatOf(s, j.format), facts)])), formatOf(s, j.format));
     next.chat.push(...replyAfterFacts(s, next, false));
     updateJob(id, () => next);
     return;
   }
-
   const result = applyEdit(answerToText(text, j), j.tags, j.sections, ctxFor(s, j), s.today);
   updateJob(id, (x) => ({
     ...x,
@@ -220,38 +224,66 @@ export function sendChat(id: string, text: string) {
   }));
 }
 
-/** Quick replies are short; this turns them into text the fact reader understands. */
-function answerToText(text: string, j: DemoJob): string {
-  const t = text.trim();
-  if (/^remote$/i.test(t)) return 'remote';
-  if (/^in \d weeks?$/i.test(t)) return `closing ${t.toLowerCase()}`;
-  if (/^in line with our scale$/i.test(t)) return 'salary in line with scale';
-  if (!j.facts.location && !j.facts.remote && /^[A-Z][a-zA-Z' -]+$/.test(t)) return `based in ${t}`;
-  return t;
+export function setFacts(id: string, patch: Partial<Facts>) {
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, { ...j, facts: { ...j.facts, ...patch }, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish }) : j)) }));
 }
 
-export function setFact(id: string, key: keyof Facts, value: string) {
+export function setApply(id: string, patch: Partial<ApplySettings>) {
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, { ...j, apply: { ...j.apply, ...patch } }) : j)) }));
+}
+
+export function toggleSection(id: string, key: string) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const has = j.tags.includes(key);
+      const tags = has ? j.tags.filter((t) => t !== key) : [...j.tags, key];
+      const next = { ...j, tags };
+      if (!j.sections.length) return next;
+      return { ...next, sections: has ? j.sections.filter((x) => x.key !== key) : [...j.sections, buildSection(key, ctxFor(s, next))] };
+    }),
+  }));
+}
+
+export function moveSection(id: string, key: string, dir: -1 | 1) {
   updateJob(id, (j) => {
-    const s = getState();
-    const facts: Facts = { ...j.facts };
-    if (key === 'languages') facts.languages = value.split(',').map((x) => x.trim()).filter(Boolean);
-    else if (key === 'remote') facts.remote = value === 'true';
-    else if (key === 'location') {
-      const { facts: f } = extractFacts(value, s.today, emptyFacts());
-      facts.location = f.location || value;
-      facts.country = f.country;
-      facts.iso = f.iso;
-    } else (facts as Record<string, unknown>)[key] = value;
-    const next = { ...j, facts };
-    const sections = j.sections.map((x) => (x.edited ? x : ['role', 'apply', 'offer', 'languages', 'setting', 'security'].includes(x.key) ? buildSections([x.key], ctxFor(s, next))[0] : x));
-    return { ...next, sections, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
+    const i = j.tags.indexOf(key);
+    const k = i + dir;
+    if (i < 0 || k < 0 || k >= j.tags.length) return j;
+    const tags = [...j.tags];
+    [tags[i], tags[k]] = [tags[k], tags[i]];
+    const sections = tags.map((t) => j.sections.find((x) => x.key === t)).filter(Boolean) as DemoJob['sections'];
+    return { ...j, tags, sections: j.sections.length ? sections : j.sections };
   });
+}
+
+export function applyFormat(id: string, formatKey: string) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const format = formatOf(s, formatKey);
+      const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && x.edited)));
+      const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
+      const next = { ...j, format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
+    }),
+  }));
+}
+
+export function toggleCommitment(id: string, key: string) {
+  updateJob(id, (j) => ({ ...j, commitments: j.commitments.includes(key) ? j.commitments.filter((c) => c !== key) : [...j.commitments, key] }));
+}
+
+export function markGenuine(id: string, hitKey: string, reason: string) {
+  updateJob(id, (j) => ({ ...j, genuine: { ...j.genuine, [hitKey]: reason }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `Kept highlighted wording as a genuine requirement: "${reason}"` }] }));
 }
 
 export function editSection(id: string, key: string, text: string) {
   updateJob(id, (j) => {
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines: text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim()), edited: true } : x));
-    return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${TAG_BY_KEY[key]?.label ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
+    return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
   });
 }
 
@@ -263,6 +295,46 @@ export function restoreVersion(id: string, n: number) {
   notify(`Restored version ${n}`);
 }
 
+/** A pasted advert becomes a job in its own format; its headings can then be saved as the organisation's format. */
+export function importPasted(text: string): string | null {
+  const s = getState();
+  const parsed = readPasted(text);
+  if (!parsed.length) return null;
+  const merged: Array<{ heading: string; key: string; lines: string[] }> = [];
+  for (const p of parsed) {
+    const same = merged.find((m) => m.key === p.key);
+    if (same) same.lines.push(...p.lines);
+    else merged.push({ ...p });
+  }
+  const { facts, role } = extractFacts(text, s.today);
+  const fkey = `pasted-${s.seq + 1}`;
+  const format: Format = { key: fkey, label: 'Format of your pasted advert', family: 'Your organisation', usedBy: `Read from ${merged.length} headings you pasted`, tone: 'warm', order: merged.map((m) => ({ key: m.key, heading: m.heading })), commitments: [] };
+  const id = nextId('job');
+  update((st) => ({ ...st, formats: [...st.formats, format] }));
+  const st2 = getState();
+  const job = newJob(st2, id, facts, role?.key ?? 'programme', fkey);
+  job.tags = merged.map((m) => m.key);
+  job.sections = merged.map((m) => ({ key: m.key, title: m.heading, lines: m.lines, edited: true }));
+  job.versions = [{ n: 1, at: Date.now(), note: 'Imported from pasted text', sections: job.sections }];
+  job.chat = [msg('ai', `I read ${merged.length} sections from your text and kept your wording and headings. Check the facts in the top row, then ask for any changes. You can save these headings as your organisation's format.`, ['Save as our format', 'Shorter'])];
+  job.audit = [{ at: Date.now(), who: st2.me.name, what: 'Imported from a pasted advert' }];
+  update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
+  return id;
+}
+
+export function saveAsOurFormat(id: string) {
+  update((s) => {
+    const j = s.jobs.find((x) => x.id === id);
+    if (!j) return s;
+    const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: 'Saved from your own advert', tone: j.tone, order: j.sections.map((x) => ({ key: x.key, heading: x.title })), commitments: j.commitments };
+    return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'upload', adverts: 1, confirmed: true } }, jobs: s.jobs.map((x) => (x.id === id ? { ...x, format: 'house' } : x)), notice: { text: `Saved as the ${s.org.short} format. New jobs start from it.` } };
+  });
+}
+
+export function confirmLearned() {
+  update((s) => ({ ...s, org: { ...s.org, learned: s.org.learned ? { ...s.org.learned, confirmed: true } : s.org.learned }, notice: { text: 'Your format is confirmed. New jobs start from it.' } }));
+}
+
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
   update((s) => {
     const j = s.jobs.find((x) => x.id === id);
@@ -270,21 +342,14 @@ export function sendForReview(id: string, reviewers: Array<{ name: string; email
     const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined };
     return {
       ...s,
-      jobs: s.jobs.map((x) =>
-        x.id === id
-          ? { ...x, status: 'review', review, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Sent for review to ${reviewers.map((r) => r.name).join(', ')}${note ? `: "${note}"` : ''}` }] }
-          : x,
-      ),
+      jobs: s.jobs.map((x) => (x.id === id ? { ...x, status: 'review', review, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Sent for review to ${reviewers.map((r) => r.name).join(', ')}${note ? `: "${note}"` : ''}` }] } : x)),
       notice: { text: `Sent to ${reviewers.length} ${reviewers.length === 1 ? 'reviewer' : 'reviewers'} (simulated). Outside reviewers get a private link that expires in 7 days.` },
     };
   });
 }
 
 export function addRemark(id: string, section: string, kind: 'comment' | 'suggestion', text: string, suggestion?: string) {
-  update((s) => ({
-    ...s,
-    jobs: s.jobs.map((j) => (j.id === id ? { ...j, review: { ...j.review, remarks: [...j.review.remarks, { id: `r${Math.random().toString(36).slice(2, 8)}`, section, author: who(s), kind, text, suggestion, state: 'open' }] } } : j)),
-  }));
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, review: { ...j.review, remarks: [...j.review.remarks, { id: `r${Math.random().toString(36).slice(2, 8)}`, section, author: who(s), kind, text, suggestion, state: 'open' }] } } : j)) }));
 }
 
 export function reviewerDecision(id: string, decision: 'approved' | 'changes', note: string) {
@@ -302,10 +367,7 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
     return {
       ...s,
       jobs: s.jobs.map((x) => (x.id === id ? next : x)),
-      inbox: [
-        { id: `i${Date.now()}`, kind: decision === 'approved' ? 'approved' : 'changes', jobId: id, title: `${name.split(' ')[0]} ${decision === 'approved' ? 'approved' : 'requested changes on'} ${j.facts.title}`, body: note || (decision === 'approved' ? 'Ready to publish.' : 'See the comments on the sections.'), at: Date.now() },
-        ...s.inbox,
-      ],
+      inbox: [{ id: `i${Date.now()}`, kind: decision === 'approved' ? 'approved' : 'changes', jobId: id, title: `${name.split(' ')[0]} ${decision === 'approved' ? 'approved' : 'requested changes on'} ${j.facts.title}`, body: note || (decision === 'approved' ? 'Ready to publish.' : 'See the comments on the sections.'), at: Date.now() }, ...s.inbox],
       notice: { text: decision === 'approved' ? 'Approval sent (simulated)' : 'Changes requested (simulated)' },
     };
   });
@@ -315,10 +377,7 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
   updateJob(id, (j) => {
     const r = j.review.remarks.find((x) => x.id === remarkId);
     if (!r) return j;
-    let sections = j.sections;
-    if (outcome === 'accepted' && r.suggestion) {
-      sections = j.sections.map((sec) => (sec.key === r.section ? { ...sec, lines: [...sec.lines, r.suggestion as string], edited: true } : sec));
-    }
+    const sections = outcome === 'accepted' && r.suggestion ? j.sections.map((sec) => (sec.key === r.section ? { ...sec, lines: [...sec.lines, r.suggestion as string], edited: true } : sec)) : j.sections;
     return {
       ...j,
       sections,
@@ -329,10 +388,7 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
 }
 
 export function overrideApproval(id: string, reason: string) {
-  update((s) => ({
-    ...s,
-    jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'approved', review: { ...j.review, state: 'approved' }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Approval overridden by the owner: "${reason}"` }] } : j)),
-  }));
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'approved', review: { ...j.review, state: 'approved' }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Approval overridden by the owner: "${reason}"` }] } : j)) }));
 }
 
 export function buyCredits(n: number, mode: 'paddle-sandbox' | 'simulated') {
@@ -360,10 +416,7 @@ export function publish(id: string, o: PublishOptions) {
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
     const refund = o.plan === 'premium' && j.countsAsFreeDraft;
-    const status = o.schedule ? 'scheduled' : 'live';
-    const reach: ReachRecord | null = o.reach
-      ? { ...o.reach, candidates: o.reach.candidates.map((r) => ({ ...r, status: 'queued' })), team: o.reach.team.map((r) => ({ ...r, status: 'queued' })) }
-      : null;
+    const reach: ReachRecord | null = o.reach ? { ...o.reach, candidates: o.reach.candidates.map((r) => ({ ...r, status: 'queued' })), team: o.reach.team.map((r) => ({ ...r, status: 'queued' })) } : null;
     return {
       ...s,
       credits: o.useCredit ? s.credits - 1 : s.credits,
@@ -372,7 +425,7 @@ export function publish(id: string, o: PublishOptions) {
         x.id === id
           ? {
               ...x,
-              status,
+              status: o.schedule ? 'scheduled' : 'live',
               plan: o.plan,
               scheduledFor: o.schedule ?? undefined,
               publishedAt: o.schedule ? undefined : Date.now(),
@@ -395,39 +448,31 @@ export function publish(id: string, o: PublishOptions) {
 function simulateDelivery(id: string) {
   const step = (status: 'sending' | 'sent', delay: number) =>
     setTimeout(() => {
-      updateJob(id, (j) =>
-        j.reach
-          ? {
-              ...j,
-              reach: {
-                ...j.reach,
-                candidates: j.reach.candidates.map((r) => ({ ...r, status: status === 'sent' && r.email.startsWith('bounce') ? 'failed' : status })),
-                team: j.reach.team.map((r) => ({ ...r, status })),
-              },
-            }
-          : j,
-      );
+      updateJob(id, (j) => (j.reach ? { ...j, reach: { ...j.reach, candidates: j.reach.candidates.map((r) => ({ ...r, status })), team: j.reach.team.map((r) => ({ ...r, status })) } } : j));
     }, delay);
   step('sending', 1200);
   step('sent', 3200);
+}
+
+function movedDeadline(today: number, current: string, days: number): string {
+  const base = current && daysUntil(today, current) >= 0 ? current : addDays(today, 0);
+  return addDays(parseIso(base) + 12 * 3_600_000, days);
 }
 
 export function extend(id: string, days: number) {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j) return;
-  const base = j.facts.deadline && daysUntil(s.today, j.facts.deadline) >= 0 ? j.facts.deadline : addDays(s.today, 0);
-  const deadline = addDays(parseIso(base) + 12 * 3_600_000, days);
+  const deadline = movedDeadline(s.today, j.facts.deadline, days);
   changeWithUndo(`${j.facts.title}: closing date moved to ${longDate(deadline)}`, (st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? { ...x, facts: { ...x.facts, deadline }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)}` }] } : x)),
+    jobs: st.jobs.map((x) => (x.id === id ? rebuilt(st, { ...x, facts: { ...x.facts, deadline }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)}` }] }) : x)),
     inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)),
   }));
 }
 
 export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', tellReach = false) {
-  const s = getState();
-  const j = s.jobs.find((x) => x.id === id);
+  const j = getState().jobs.find((x) => x.id === id);
   if (!j) return;
   const label = reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early';
   changeWithUndo(`${j.facts.title}: ${label.toLowerCase()}${tellReach ? '; the people it was shared with are told (simulated)' : ''}`, (st) => ({
@@ -446,7 +491,7 @@ export function deleteDraft(id: string) {
   changeWithUndo(`Draft deleted: ${j?.facts.title || 'untitled'}`, (s) => ({ ...s, jobs: s.jobs.filter((x) => x.id !== id) }));
 }
 
-/** A new draft from an earlier job: same text, fresh dates. */
+/** A new draft from an earlier job: same text, fresh dates; optionally for another duty station. */
 export function hireAgain(id: string, place?: string): string | null {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
@@ -455,24 +500,16 @@ export function hireAgain(id: string, place?: string): string | null {
   let facts: Facts = { ...j.facts, deadline: addDays(s.today, 27) };
   if (place) {
     const { facts: f } = extractFacts(place, s.today, emptyFacts());
-    facts = { ...facts, location: f.location || place, country: f.country, iso: f.iso };
+    facts = { ...facts, location: f.location || place, country: f.country, iso: f.iso, timezone: f.timezone || facts.timezone };
   }
-  const ctx = { ...ctxFor(s, j), facts };
-  const sections = buildSections(j.tags, ctx).map((x) => {
-    const old = j.sections.find((o) => o.key === x.key);
-    return old?.edited ? old : x;
-  });
+  const base: DemoJob = { ...j, id: nid, facts };
   const copy: DemoJob = {
-    ...j,
-    id: nid,
+    ...rebuilt(s, base),
     status: 'draft',
     plan: null,
-    facts,
-    sections,
-    versions: [{ n: 1, at: Date.now(), note: place ? `Variant of ${j.facts.title} for ${facts.location}` : `Reopened from ${longDate(j.facts.deadline)}`, sections }],
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [msg('ai', place ? `A copy of ${j.facts.title} for ${facts.location}. Check the duty-station details, then publish.` : `Reopened ${j.facts.title} with a new closing date, ${longDate(facts.deadline)}. Review it and publish when ready.`)],
+    chat: [msg('ai', place ? `A copy of ${j.facts.title} for ${facts.location}. Check the duty-station details, then publish.` : `Reopened ${j.facts.title} with a new closing date, ${longDate(facts.deadline)}.`)],
     createdAt: Date.now(),
     publishedAt: undefined,
     closedAt: undefined,
@@ -481,14 +518,14 @@ export function hireAgain(id: string, place?: string): string | null {
     countsAsFreeDraft: false,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };
+  copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Reopened', sections: copy.sections }];
   update((st) => ({ ...st, jobs: [copy, ...st.jobs] }));
   return nid;
 }
 
 export function downloadCopy(j: DemoJob, orgName: string) {
-  const text = [`${j.facts.title}`, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const href = URL.createObjectURL(blob);
+  const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
+  const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = href;
   a.download = `${j.facts.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
@@ -564,9 +601,8 @@ export function runIntent(intent: NonNullable<Intent>): string | null {
       ...st,
       jobs: st.jobs.map((j) => {
         if (!intent.jobIds.includes(j.id)) return j;
-        const base = j.facts.deadline && daysUntil(s.today, j.facts.deadline) >= 0 ? j.facts.deadline : addDays(s.today, 0);
-        const deadline = addDays(parseIso(base) + 12 * 3_600_000, intent.days ?? 7);
-        return { ...j, facts: { ...j.facts, deadline }, audit: [...j.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)} from the chat` }] };
+        const deadline = movedDeadline(s.today, j.facts.deadline, intent.days ?? 7);
+        return rebuilt(st, { ...j, facts: { ...j.facts, deadline }, audit: [...j.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)} from the chat` }] });
       }),
     }));
     return null;

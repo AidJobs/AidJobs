@@ -37,6 +37,8 @@ type Props = {
   drawerOpen: boolean;
   onCloseDrawer: () => void;
   homeHref: string;
+  /** Expanded width in pixels; the public site uses the default. */
+  width?: number;
 };
 
 function Entry({ entry, collapsed, onAfterSelect }: { entry: MenuEntry; collapsed: boolean; onAfterSelect: () => void }) {
@@ -281,7 +283,7 @@ export default function SideMenu(props: Props) {
     <>
       <aside
         className="aj-menu hidden h-full shrink-0 border-r lg:block aj-hair"
-        style={{ width: props.collapsed ? 64 : 248, background: 'var(--surface)', transition: 'width 160ms ease' }}
+        style={{ width: props.collapsed ? 64 : (props.width ?? 248), background: 'var(--surface)', transition: 'width 160ms ease' }}
       >
         <MenuBody props={props} collapsed={props.collapsed} />
       </aside>

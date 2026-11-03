@@ -6,7 +6,7 @@ import { initialState } from './sample';
 import type { DemoJob, State } from './types';
 
 /** Everything the demo keeps lives in this browser only, under its own keys, apart from the public site's. */
-export const STORAGE_KEY = 'aidjobs.employerDemo.v1';
+export const STORAGE_KEY = 'aidjobs.employerDemo.v2';
 
 const listeners = new Set<() => void>();
 let current: State | null = null;
@@ -36,10 +36,11 @@ function normalise(s: State): State {
 function load(): State {
   const today = startOfDay(Date.now());
   try {
+    localStorage.removeItem('aidjobs.employerDemo.v1');
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as State;
-      if (parsed && parsed.v === 1 && Array.isArray(parsed.jobs)) return normalise({ ...parsed, today });
+      if (parsed && parsed.v === 2 && Array.isArray(parsed.jobs)) return normalise({ ...parsed, today });
     }
   } catch {
     /* unreadable: start again */
@@ -134,7 +135,7 @@ export function useRoute(): Route {
     () => '',
   );
   const [screen, id] = hash.replace(/^#\/?/, '').split('/');
-  return { screen: screen || 'home', id: id || undefined };
+  return { screen: screen || 'create', id: id || undefined };
 }
 
 export function go(screen: string, id?: string) {

@@ -1,15 +1,23 @@
 'use client';
 
-import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, ShieldCheck, Sparkles, Star, Trash2, Unlock } from 'lucide-react';
+import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, Sparkles, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { invite, removeMember, setRole } from './actions';
-import { TAGS } from './engine';
+import { FAMILIES_ORDER, SECTIONS } from './engine';
 import { nextId, update, useDemo } from './store';
-import type { ApprovalSetting, Org, Person, Style, Tone } from './types';
+import type { ApprovalSetting, Format, Org, OrgType, Person, Tone } from './types';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
 
 const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response'];
 const VOICES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
+const ORG_TYPES: Array<{ key: OrgType; label: string }> = [
+  { key: 'ingo', label: 'International NGO' },
+  { key: 'ngo', label: 'National or local NGO' },
+  { key: 'charity', label: 'Domestic charity or nonprofit' },
+  { key: 'un', label: 'UN agency or multilateral' },
+  { key: 'donor', label: 'Donor, fund, or foundation' },
+  { key: 'contractor', label: 'Development contractor' },
+];
 
 function setOrg(patch: Partial<Org>) {
   update((s) => ({ ...s, org: { ...s.org, ...patch } }));
@@ -260,10 +268,19 @@ function Basics({ org }: { org: Org }) {
       <Field label="Short name">
         <input style={inputStyle} value={org.short} onChange={(e) => setOrg({ short: e.target.value })} />
       </Field>
-      <Field label="Type">
-        <select style={inputStyle} value={org.type} onChange={(e) => setOrg({ type: e.target.value })}>
-          {['International NGO', 'National NGO', 'UN agency', 'Foundation', 'Charity', 'Research institute', 'Social enterprise'].map((t) => (
-            <option key={t}>{t}</option>
+      <Field label="Type" hint="Sets the closest real format, the salary default, and how people apply">
+        <select
+          style={inputStyle}
+          value={org.orgType}
+          onChange={(e) => {
+            const t = ORG_TYPES.find((x) => x.key === e.target.value);
+            if (t) setOrg({ orgType: t.key, type: t.label });
+          }}
+        >
+          {ORG_TYPES.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
           ))}
         </select>
       </Field>
@@ -434,36 +451,48 @@ export function Team() {
   );
 }
 
-function StyleEditor({ style, onClose }: { style: Style; onClose: () => void }) {
-  const editable = style.by === 'Organisation';
-  const save = (patch: Partial<Style>) => update((s) => ({ ...s, styles: s.styles.map((x) => (x.key === style.key ? { ...x, ...patch } : x)) }));
+function FormatEditor({ format, onClose }: { format: Format; onClose: () => void }) {
+  const editable = format.family === 'Your organisation';
+  const save = (patch: Partial<Format>) => update((s) => ({ ...s, formats: s.formats.map((x) => (x.key === format.key ? { ...x, ...patch } : x)) }));
+  const has = (k: string) => format.order.some((o) => o.key === k);
   return (
     <div className="aj-card flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
-        {editable ? (
-          <input style={{ ...inputStyle, fontWeight: 650 }} value={style.label} onChange={(e) => save({ label: e.target.value })} aria-label="Style name" />
-        ) : (
-          <span style={{ fontWeight: 700 }}>{style.label}</span>
-        )}
+        {editable ? <input style={{ ...inputStyle, fontWeight: 650 }} value={format.label} onChange={(e) => save({ label: e.target.value })} aria-label="Format name" /> : <span style={{ fontWeight: 700 }}>{format.label}</span>}
         <button type="button" className="aj-pill ml-auto" onClick={onClose}>
           Done
         </button>
       </div>
-      {!editable && <span className="aj-faint">AidJobs styles are fixed. Duplicate one to make your own.</span>}
+      {!editable && <span className="aj-faint">Real formats are kept as their users write them. Duplicate one to make your own.</span>}
+      <Field label="Headings, in order">
+        <ol className="flex flex-col gap-1" style={{ margin: 0, paddingLeft: 20 }}>
+          {format.order.map((o, i) => (
+            <li key={o.key}>
+              {editable ? (
+                <input style={{ ...inputStyle, minHeight: 32 }} value={o.heading} onChange={(e) => save({ order: format.order.map((x, k) => (k === i ? { ...x, heading: e.target.value } : x)) })} aria-label={`Heading ${i + 1}`} />
+              ) : (
+                o.heading
+              )}
+            </li>
+          ))}
+        </ol>
+      </Field>
+      {editable && (
+        <Field label="Add or remove sections">
+          <div className="flex flex-wrap gap-1.5">
+            {SECTIONS.map((d) => (
+              <button key={d.key} type="button" className="ej-tag" data-on={has(d.key)} onClick={() => save({ order: has(d.key) ? format.order.filter((o) => o.key !== d.key) : [...format.order, { key: d.key, heading: d.label }] })} aria-pressed={has(d.key)}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
       <Field label="Tone">
         <div className="flex gap-1.5">
           {(['formal', 'warm', 'plain'] as Tone[]).map((t) => (
-            <button key={t} type="button" className="aj-pill" data-active={style.tone === t} disabled={!editable} onClick={() => save({ tone: t })}>
+            <button key={t} type="button" className="aj-pill" data-active={format.tone === t} disabled={!editable} onClick={() => save({ tone: t })}>
               {t}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label={`Sections · ${style.tags.length}`}>
-        <div className="flex flex-wrap gap-1.5">
-          {TAGS.map((t) => (
-            <button key={t.key} type="button" className="ej-tag" data-on={style.tags.includes(t.key)} disabled={!editable} onClick={() => save({ tags: style.tags.includes(t.key) ? style.tags.filter((x) => x !== t.key) : [...style.tags, t.key] })} aria-pressed={style.tags.includes(t.key)}>
-              {t.label}
             </button>
           ))}
         </div>
@@ -475,67 +504,69 @@ function StyleEditor({ style, onClose }: { style: Style; onClose: () => void }) 
 export function Styles() {
   const s = useDemo();
   const [editing, setEditing] = useState<string | null>(null);
-  const duplicate = (st: Style) => {
-    const key = nextId('style');
-    update((x) => ({ ...x, styles: [...x.styles, { ...st, key, by: 'Organisation', label: `${st.label} (${x.org.short})`, note: `Based on ${st.label}` }] }));
+  const duplicate = (f: Format) => {
+    const key = nextId('format');
+    update((x) => ({ ...x, formats: [...x.formats, { ...f, key, family: 'Your organisation', label: `${f.label} (${x.org.short})`, usedBy: `Based on ${f.label}` }] }));
     setEditing(key);
   };
+  const shown = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
+    <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-8">
       <div>
         <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
           Styles
         </h1>
         <p className="aj-muted" style={{ margin: '4px 0 0' }}>
-          A style is a set of sections and a tone. Tap one in the chat and the job is written that way.
+          Real advert formats, named by format, with the headings their users write. Yours comes first. Any section can be added to any job.
         </p>
       </div>
-      <ul className="grid gap-3 md:grid-cols-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {s.styles.map((st) =>
-          editing === st.key ? (
-            <li key={st.key} className="md:col-span-2">
-              <StyleEditor style={st} onClose={() => setEditing(null)} />
-            </li>
-          ) : (
-            <li key={st.key} className="aj-card flex flex-col gap-2 p-4">
-              <div className="flex items-center gap-2">
-                <span style={{ fontWeight: 700 }}>{st.label}</span>
-                <span className="aj-chip" data-tone={st.by === 'Organisation' ? 'sage' : undefined}>
-                  {st.by === 'Organisation' ? 'Yours' : 'AidJobs'}
-                </span>
-                {st.key === 'un' && <ShieldCheck size={13} strokeWidth={2} className="aj-faint" />}
-              </div>
-              <span className="aj-muted">{st.note}</span>
-              <div className="flex flex-wrap gap-1">
-                {st.tags.map((t) => (
-                  <span key={t} className="aj-chip">
-                    {TAGS.find((x) => x.key === t)?.label ?? t}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-1 flex gap-1.5">
-                <button type="button" className="aj-pill" onClick={() => setEditing(st.key)}>
-                  {st.by === 'Organisation' ? (
-                    'Edit'
-                  ) : (
-                    <>
-                      <Unlock size={12} strokeWidth={2} /> View
-                    </>
-                  )}
-                </button>
-                <button type="button" className="aj-pill" onClick={() => duplicate(st)}>
-                  Duplicate
-                </button>
-                {st.by === 'Organisation' && (
-                  <button type="button" className="aj-icon-btn" onClick={() => update((x) => ({ ...x, styles: x.styles.filter((y) => y.key !== st.key) }))} aria-label={`Delete ${st.label}`}>
-                    <Trash2 size={14} strokeWidth={1.8} />
-                  </button>
-                )}
-              </div>
-            </li>
-          ),
-        )}
-      </ul>
+      {FAMILIES_ORDER.map((fam) => {
+        const list = shown.filter((f) => f.family === fam);
+        if (!list.length) return null;
+        return (
+          <Section key={fam} title={fam}>
+            <ul className="grid gap-3 md:grid-cols-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {list.map((f) =>
+                editing === f.key ? (
+                  <li key={f.key} className="md:col-span-2">
+                    <FormatEditor format={f} onClose={() => setEditing(null)} />
+                  </li>
+                ) : (
+                  <li key={f.key} className="aj-card flex flex-col gap-2 p-4">
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontWeight: 700 }}>{f.label}</span>
+                      <span className="aj-chip" data-tone={f.family === 'Your organisation' ? 'sage' : undefined}>
+                        {f.family === 'Your organisation' ? 'Yours' : f.tone}
+                      </span>
+                    </div>
+                    <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                      {f.usedBy}
+                    </span>
+                    <ol className="aj-muted" style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                      {f.order.map((o) => (
+                        <li key={o.key}>{o.heading}</li>
+                      ))}
+                    </ol>
+                    <div className="mt-1 flex gap-1.5">
+                      <button type="button" className="aj-pill" onClick={() => setEditing(f.key)}>
+                        {f.family === 'Your organisation' ? 'Edit' : 'View'}
+                      </button>
+                      <button type="button" className="aj-pill" onClick={() => duplicate(f)}>
+                        Duplicate
+                      </button>
+                      {f.family === 'Your organisation' && f.key !== 'house' && (
+                        <button type="button" className="aj-icon-btn" onClick={() => update((x) => ({ ...x, formats: x.formats.filter((y) => y.key !== f.key) }))} aria-label={`Delete ${f.label}`}>
+                          <Trash2 size={14} strokeWidth={1.8} />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ),
+              )}
+            </ul>
+          </Section>
+        );
+      })}
     </div>
   );
 }

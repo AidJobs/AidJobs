@@ -2,15 +2,33 @@ export type Role = 'owner' | 'member' | 'reviewer';
 
 export type Person = { id: string; name: string; email: string; role: Role };
 
-export type TagGroup = 'Core' | 'UN style' | 'Sector' | 'Standard text';
+/** The five groups of a job description (employer-side plan, section 14). */
+export type GroupKey = 'employer' | 'job' | 'person' | 'offer' | 'apply';
 
-export type Tag = { key: string; label: string; group: TagGroup; hint: string };
+export type SectionDef = { key: string; label: string; group: GroupKey; hint: string };
 
 export type Tone = 'formal' | 'warm' | 'plain';
 
-export type Style = { key: string; label: string; by: 'AidJobs' | 'Organisation'; tags: string[]; tone: Tone; note: string };
+export type Family = 'UN and multilateral' | 'INGO and humanitarian' | 'Donors, foundations and contractors' | 'National NGOs and charities';
 
-export type StandardText = { key: string; label: string; text: string; locked: boolean };
+/** A real advert format: its headings, in order, as organisations that use it write them. */
+export type Format = {
+  key: string;
+  label: string;
+  family: Family | 'Your organisation';
+  usedBy: string;
+  tone: Tone;
+  order: Array<{ key: string; heading: string }>;
+  commitments: string[];
+};
+
+export type OrgType = 'ingo' | 'ngo' | 'un' | 'charity' | 'donor' | 'contractor';
+
+export type Commitment = { key: string; label: string; text: string; locked: boolean };
+
+export type ScaleRow = { grade: string; min: number; max: number; currency: string; period: 'month' | 'year' };
+
+export type LearnedFormat = { source: 'careers' | 'link' | 'upload' | 'reliefweb' | 'type'; adverts: number; confirmed: boolean };
 
 export type ApprovalSetting = 'off' | 'all' | 'senior';
 
@@ -18,6 +36,7 @@ export type Org = {
   name: string;
   short: string;
   type: string;
+  orgType: OrgType;
   hq: string;
   website: string;
   careersUrl: string;
@@ -27,25 +46,53 @@ export type Org = {
   sdgs: number[];
   countries: string[];
   voice: string[];
-  standard: StandardText[];
+  standard: Commitment[];
+  mdsMember: boolean;
+  scale: ScaleRow[];
+  learned: LearnedFormat | null;
   approval: ApprovalSetting;
   approvalRule: 'any' | 'all';
   verified: boolean;
   setupDone: boolean;
 };
 
+export type Engagement = 'job' | 'consultancy' | 'internship' | 'volunteer';
+export type Recruitment = 'vacancy' | 'roster' | 'proposal';
+export type Arrangement = 'onsite' | 'hybrid' | 'remote';
+export type SalaryMode = 'range' | 'exact' | 'scale' | 'grade' | 'competitive' | 'daily' | 'hidden';
+export type Period = 'hour' | 'day' | 'month' | 'year';
+
 export type Facts = {
   title: string;
   location: string;
   country: string;
   iso: string;
-  grade: string;
+  arrangement: Arrangement;
+  engagement: Engagement;
   contract: string;
+  hours: 'full' | 'part';
+  recruitment: Recruitment;
+  subjectToFunding: boolean;
+  grade: string;
   duration: string;
   deadline: string;
-  salary: string;
+  closingTime: string;
+  timezone: string;
+  salaryMode: SalaryMode;
+  salaryMin: string;
+  salaryMax: string;
+  currency: string;
+  period: Period;
   languages: string[];
-  remote: boolean;
+  eligibility: 'anyone' | 'nationals' | 'internal' | 'righttowork';
+  safeguarding: '' | 'low' | 'medium' | 'high';
+  directReports: string;
+  startDate: string;
+  positions: string;
+  donor: string;
+  availability: string;
+  client: string;
+  keyPersonnel: boolean;
 };
 
 export type Section = { key: string; title: string; lines: string[]; edited?: boolean };
@@ -80,11 +127,25 @@ export type Delivery = 'queued' | 'sending' | 'sent' | 'failed';
 
 export type Recipient = { email: string; status: Delivery };
 
-export type ReachRecord = {
-  candidates: Recipient[];
-  team: Recipient[];
-  community: boolean;
-  intro: string;
+export type ReachRecord = { candidates: Recipient[]; team: Recipient[]; community: boolean; intro: string };
+
+export type ApplySettings = {
+  method: 'system' | 'email' | 'form' | 'formOnly';
+  address: string;
+  documents: string[];
+  cvPages: string;
+  statementWords: string;
+  references: string;
+  subjectLine: boolean;
+  onePdf: boolean;
+  maxMb: string;
+  language: string;
+  rolling: boolean;
+  earlyClose: boolean;
+  shortlistedOnly: boolean;
+  interviewDates: string;
+  replyWeeks: string;
+  anonymised: boolean;
 };
 
 export type JobStatus = 'draft' | 'review' | 'approved' | 'scheduled' | 'live' | 'closed';
@@ -98,8 +159,11 @@ export type DemoJob = {
   facts: Facts;
   family: string;
   tags: string[];
-  style: string | null;
+  format: string;
   tone: Tone;
+  commitments: string[];
+  apply: ApplySettings;
+  genuine: Record<string, string>;
   sections: Section[];
   versions: Version[];
   review: Review;
@@ -123,17 +187,15 @@ export type Receipt = { id: string; at: number; item: string; amount: string; mo
 
 export type Notice = { text: string; undo?: DemoJob[] } | null;
 
-export type Screen = 'home' | 'studio' | 'publish' | 'jobs' | 'styles' | 'team' | 'org' | 'public';
-
 export type State = {
-  v: 1;
+  v: 2;
   today: number;
   signedIn: boolean;
   me: Person;
   org: Org;
   team: Person[];
   jobs: DemoJob[];
-  styles: Style[];
+  formats: Format[];
   inbox: InboxItem[];
   draftsUsed: number;
   credits: number;

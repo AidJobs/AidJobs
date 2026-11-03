@@ -16,7 +16,7 @@ import {
   PRICE_LABEL,
   publish,
 } from './actions';
-import { addDays, daysUntil, longDate, slug } from './engine';
+import { addDays, arrangementLabel, commitmentText, COMMITMENTS, daysUntil, longDate, salaryText, slug } from './engine';
 import { openSandboxCheckout, paddleConfigured, PRICE_PACK, PRICE_PREMIUM } from './paddle';
 import { go, notify, updateJob, useDemo } from './store';
 import type { DemoJob, Org, ReachRecord, State } from './types';
@@ -86,7 +86,7 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
         <div className="flex items-center gap-2">
           <MapPin size={14} strokeWidth={1.8} className="aj-faint" />
           <Flag iso={job.facts.iso || null} title={job.facts.country} />
-          <span>{job.facts.location || (job.facts.remote ? 'Remote' : '')}</span>
+          <span>{job.facts.location || (job.facts.arrangement === 'remote' ? 'Remote' : '')}</span>
         </div>
         {job.facts.deadline && (
           <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
         )}
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {[job.facts.contract, job.facts.duration, job.facts.grade, ...(job.facts.salary ? [job.facts.salary] : [])].filter(Boolean).map((x) => (
+        {[job.facts.contract, job.facts.duration, job.facts.grade, arrangementLabel(job.facts.arrangement), job.facts.recruitment === 'roster' ? 'Roster' : job.facts.recruitment === 'proposal' ? 'Proposal stage' : '', salaryText(job.facts)].filter(Boolean).map((x) => (
           <span key={x} className="aj-chip">
             {x}
           </span>
@@ -123,6 +123,16 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
           <Lines lines={sec.lines} />
         </section>
       ))}
+      {job.commitments.length > 0 && (
+        <section>
+          <h3>Our commitments</h3>
+          {job.commitments.map((k) => (
+            <p key={k} className="ej-commitment">
+              <strong>{COMMITMENTS.find((c) => c.key === k)?.label}.</strong> {commitmentText(k, s.org, job.facts).text}
+            </p>
+          ))}
+        </section>
+      )}
       <div className="aj-faint flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 aj-hair" style={{ fontSize: 11.5 }}>
         <span>Published by {s.org.name}</span>
         <span>{job.publishedAt ? `Posted ${new Date(job.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Not published yet'}</span>
@@ -150,7 +160,7 @@ function GooglePreview({ job, s }: { job: DemoJob; s: State }) {
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <span className="aj-chip">{job.facts.contract || 'Contract not stated'}</span>
-        <span className="aj-chip">{job.facts.salary || 'Salary not stated'}</span>
+        <span className="aj-chip">{salaryText(job.facts) || 'Salary not shown'}</span>
         <span className="aj-chip" data-tone="sage">
           Job listing data: title, place, dates, employer
         </span>
@@ -248,7 +258,7 @@ export function EmailPreview({ job, s, intro, initial, to, onClose }: { job: Dem
         <div className="ej-email">
           <div className="ej-email-head">
             <div>
-              <strong>From:</strong> {s.org.name} via AidJobs &lt;jobs@aidjobs.app&gt;
+              <strong>From:</strong> {s.org.name} via AidJobs &lt;jobs@aidjobs.example.org&gt;
             </div>
             <div>
               <strong>Reply-to:</strong> {s.me.email}
@@ -575,7 +585,7 @@ export default function Publish({ id }: { id?: string }) {
     <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex items-center gap-2">
         {step < 3 && (
-          <button type="button" className="aj-icon-btn" onClick={() => (step === 0 ? go('studio', job.id) : setStep((step - 1) as 0 | 1 | 2))} aria-label="Back">
+          <button type="button" className="aj-icon-btn" onClick={() => (step === 0 ? go('create', job.id) : setStep((step - 1) as 0 | 1 | 2))} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
           </button>
         )}
@@ -600,7 +610,7 @@ export default function Publish({ id }: { id?: string }) {
               <div style={{ fontWeight: 650 }}>Approval is required for this job</div>
               <span className="aj-muted">Your organisation asks for approval on senior roles (P4 and above). {job.review.state === 'none' ? 'Send it for review first.' : 'Waiting for your reviewers.'}</span>
               <div className="flex flex-wrap items-center gap-1.5">
-                <button type="button" className="aj-pill" onClick={() => go('studio', job.id)}>
+                <button type="button" className="aj-pill" onClick={() => go('create', job.id)}>
                   Back to the job
                 </button>
                 {s.me.role === 'owner' && (

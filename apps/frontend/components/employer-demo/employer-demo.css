@@ -86,7 +86,7 @@
   color: var(--text-3);
 }
 
-.ej-tag {
+.aj-root .ej-tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -102,14 +102,14 @@
   cursor: pointer;
 }
 
-.ej-tag[data-on='true'] {
+.aj-root .ej-tag[data-on='true'] {
   border-style: solid;
   border-color: var(--sage-3);
   background: var(--sage-2);
   color: var(--sage-8);
 }
 
-.ej-tag[data-recommended='true']:not([data-on='true']) {
+.aj-root .ej-tag[data-recommended='true']:not([data-on='true']) {
   border-color: var(--sage-5);
   color: var(--sage-8);
 }
@@ -140,7 +140,7 @@
   background: linear-gradient(135deg, var(--sage-1), var(--surface) 60%);
 }
 
-.ej-fact {
+.aj-root .ej-fact {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -154,7 +154,7 @@
   cursor: pointer;
 }
 
-.ej-fact[data-missing='true'] {
+.aj-root .ej-fact[data-missing='true'] {
   border-color: var(--amber);
   color: var(--amber);
   background: var(--amber-bg);
@@ -206,4 +206,190 @@
   color: #ffffff;
   font-weight: 650;
   text-decoration: none;
+}
+
+/* Round 2: the Create a job page (employer-side plan, section 14). */
+
+.ej-composer[data-size='large'] {
+  border-radius: 22px;
+  box-shadow: 0 1px 3px rgba(18, 21, 18, 0.06);
+}
+
+.ej-composer[data-size='large'] textarea {
+  min-height: 110px;
+  font-size: 15px;
+}
+
+.ej-composer[data-size='compact'] textarea {
+  min-height: 44px;
+}
+
+/* Labels the user must be able to read at a glance: full-strength text, not the faint tone. */
+.ej-panel-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.ej-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--hair);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.aj-root .ej-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ej-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.ej-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+
+.ej-row-tools {
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0.55;
+}
+
+.ej-outline-row:hover .ej-row-tools,
+.ej-outline-row:focus-within .ej-row-tools {
+  opacity: 1;
+}
+
+.aj-root .ej-row-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.aj-root .ej-row-tools button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.aj-root .ej-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--hair);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.aj-root .ej-add[data-recommended='true'] {
+  border-color: var(--sage-5);
+  color: var(--sage-8);
+}
+
+.aj-root .ej-add:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.aj-root .ej-mark {
+  display: inline;
+  padding: 0 1px;
+  border: none;
+  border-radius: 3px;
+  background: var(--amber-bg);
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted var(--amber);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.ej-doc .ej-sub {
+  margin: 6px 0 2px;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.ej-doc .ej-commitment {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.ej-title-input {
+  min-width: 120px;
+  max-width: 260px;
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ej-title-input:hover,
+.ej-title-input:focus {
+  border-color: var(--hair);
+  background: var(--surface);
+  outline: none;
+}
+
+.ej-dock .ej-bubble {
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .ej-title-input {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+  }
 }
