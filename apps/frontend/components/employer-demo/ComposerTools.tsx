@@ -113,6 +113,8 @@ export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: 
         </>
       }
     >
+      <MenuItem title="Create your own format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
+      <div className="ej-menu-sep" />
       {FAMILIES_ORDER.map((fam) => {
         const list = formats.filter((f) => f.family === fam);
         if (!list.length) return null;
@@ -125,8 +127,6 @@ export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: 
           </div>
         );
       })}
-      <div className="ej-menu-sep" />
-      <MenuItem title="Create your own format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
     </ClickMenu>
   );
 }

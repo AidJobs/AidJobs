@@ -486,6 +486,47 @@
   text-transform: uppercase;
 }
 
+.ej-drag-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 10px;
+}
+
+.ej-drag-row[data-sliding='true'] {
+  transition: transform 150ms ease;
+}
+
+.ej-drag-row[data-dragging='true'] {
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(20, 30, 20, 0.16);
+}
+
+.aj-root .ej-drag-handle {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: grab;
+  touch-action: none;
+}
+
+.aj-root .ej-drag-handle:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.ej-drag-row[data-dragging='true'] .ej-drag-handle {
+  cursor: grabbing;
+}
+
 .ej-menu-sep {
   margin: 4px 6px;
   border-top: 1px solid var(--hair);

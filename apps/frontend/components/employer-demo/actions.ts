@@ -259,6 +259,16 @@ export function moveSection(id: string, key: string, dir: -1 | 1) {
   });
 }
 
+/** Puts some of a job's sections in a new order, keeping the places the others hold. */
+export function reorderSections(id: string, keys: string[]) {
+  updateJob(id, (j) => {
+    const queue = [...keys];
+    const tags = j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t));
+    const sections = tags.map((t) => j.sections.find((x) => x.key === t)).filter(Boolean) as DemoJob['sections'];
+    return { ...j, tags, sections: j.sections.length ? sections : j.sections };
+  });
+}
+
 export function applyFormat(id: string, formatKey: string) {
   update((s) => ({
     ...s,

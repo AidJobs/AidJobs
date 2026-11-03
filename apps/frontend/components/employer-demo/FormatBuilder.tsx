@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowDown, ArrowUp, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { createFormat } from './actions';
+import DragList, { moveItem } from './DragList';
 import { FAMILIES_ORDER, GROUPS, SECTION_BY_KEY, SECTIONS } from './engine';
 import { useDemo } from './store';
 import type { Format, Tone } from './types';
@@ -25,13 +26,6 @@ export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () =
   const [tone, setTone] = useState<Tone>('warm');
   const has = (k: string) => order.some((o) => o.key === k);
   const toggle = (k: string) => setOrder(has(k) ? order.filter((o) => o.key !== k) : [...order, { key: k, heading: SECTION_BY_KEY[k].label }]);
-  const move = (i: number, by: number) => {
-    const j = i + by;
-    if (j < 0 || j >= order.length) return;
-    const next = [...order];
-    [next[i], next[j]] = [next[j], next[i]];
-    setOrder(next);
-  };
   const startFrom = (key: string) => {
     setFrom(key);
     const f = formats.find((x) => x.key === key);
@@ -112,25 +106,20 @@ export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () =
           <div className="flex flex-col gap-1.5">
             <span className="ej-panel-label">Headings, in order</span>
             {order.length === 0 && <span className="aj-faint">Choose sections on the left, or start from a format.</span>}
-            <ol className="flex flex-col gap-1" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-              {order.map((o, i) => (
-                <li key={o.key} className="flex items-center gap-1">
-                  <span className="aj-faint w-5 shrink-0 text-right" style={{ fontSize: 12 }}>
-                    {i + 1}
-                  </span>
-                  <input style={{ ...inputStyle, minHeight: 32, padding: '4px 10px' }} value={o.heading} onChange={(e) => setOrder(order.map((x, k) => (k === i ? { ...x, heading: e.target.value } : x)))} aria-label={`Heading ${i + 1}`} />
-                  <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${o.heading} up`}>
-                    <ArrowUp size={13} strokeWidth={2} />
-                  </button>
-                  <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => move(i, 1)} disabled={i === order.length - 1} aria-label={`Move ${o.heading} down`}>
-                    <ArrowDown size={13} strokeWidth={2} />
-                  </button>
-                  <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => toggle(o.key)} aria-label={`Remove ${o.heading}`}>
-                    <X size={13} strokeWidth={2} />
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <DragList ids={order.map((o) => o.key)} label={(k) => order.find((o) => o.key === k)?.heading ?? k} onMove={(from, to) => setOrder(moveItem(order, from, to))}>
+              {(k) => {
+                const i = order.findIndex((o) => o.key === k);
+                const o = order[i];
+                return (
+                  <>
+                    <input style={{ ...inputStyle, minHeight: 32, padding: '4px 10px' }} value={o.heading} onChange={(e) => setOrder(order.map((x, n) => (n === i ? { ...x, heading: e.target.value } : x)))} aria-label={`Heading ${i + 1}`} />
+                    <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => toggle(o.key)} aria-label={`Remove ${o.heading}`}>
+                      <X size={13} strokeWidth={2} />
+                    </button>
+                  </>
+                );
+              }}
+            </DragList>
           </div>
         </div>
 

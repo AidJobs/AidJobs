@@ -202,6 +202,15 @@ describe('employer demo: never calls the network', () => {
     route(window.location.hash);
     shows('1 of 1 sent');
 
+    route('#create/job-fin');
+    const tagsOf = () => getState().jobs.find((j) => j.id === 'job-fin')?.tags ?? [];
+    const before = tagsOf();
+    const list = Array.from(container.querySelectorAll('[aria-label="Structure"] ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
+    const handle = list?.querySelector('.ej-drag-handle') as HTMLElement;
+    act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(tagsOf()).not.toEqual(before);
+    expect([...tagsOf()].sort()).toEqual([...before].sort());
+
     act(() => {
       expect(learnFormat('WHO WE ARE\nRiverstone works in East Africa.\n\nTHE JOB\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.')).toBe(true);
     });

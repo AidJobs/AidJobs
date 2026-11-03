@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronRight, Lock, PanelRightClose, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Lock, PanelRightClose, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
-import { applyFormat, confirmLearned, formatOf, moveSection, toggleCommitment, toggleSection } from './actions';
+import { applyFormat, confirmLearned, formatOf, reorderSections, toggleCommitment, toggleSection } from './actions';
+import DragList, { moveItem } from './DragList';
 import { COMMITMENTS, commitmentText, FAMILIES_ORDER, GROUPS, headingFor, recommendSections, SECTIONS } from './engine';
 import CreateFormatDialog from './FormatBuilder';
 import type { DemoJob, State } from './types';
@@ -43,10 +44,18 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
       </div>
       <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4">
         <div className="flex flex-col gap-1.5">
-          <label className="ej-panel-label" htmlFor="ej-style">
-            Style
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="ej-panel-label" htmlFor="ej-style">
+              Style
+            </label>
+            <Tip label="Name it, choose its sections and headings, and save it for reuse.">
+              <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setCreating(true)}>
+                Create your own format
+              </button>
+            </Tip>
+          </div>
           <select id="ej-style" className="ej-select" value={job.format} onChange={(e) => (e.target.value === CREATE ? setCreating(true) : applyFormat(job.id, e.target.value))}>
+            <option value={CREATE}>Create your own format…</option>
             {FAMILIES_ORDER.map((fam) => {
               const list = formats.filter((f) => f.family === fam);
               return list.length ? (
@@ -59,7 +68,6 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                 </optgroup>
               ) : null;
             })}
-            <option value={CREATE}>Create your own format…</option>
           </select>
           {creating && <CreateFormatDialog onClose={() => setCreating(false)} onSaved={(key) => applyFormat(job.id, key)} />}
           <span className="aj-faint" style={{ fontSize: 11 }}>
@@ -99,26 +107,20 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                 </button>
                 {!isClosed && (
                   <>
-                    <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                      {chosen.map((k) => (
-                        <li key={k} className="ej-outline-row">
+                    <DragList ids={chosen} label={(k) => headingFor(k, format)} onMove={(from, to) => reorderSections(job.id, moveItem(chosen, from, to))}>
+                      {(k) => (
+                        <div className="ej-outline-row min-w-0 flex-1">
                           <button type="button" className="min-w-0 flex-1 truncate text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }} onClick={() => scrollToSection(k)} title={SECTIONS.find((d) => d.key === k)?.hint}>
                             {headingFor(k, format)}
                           </button>
                           <span className="ej-row-tools">
-                            <button type="button" onClick={() => moveSection(job.id, k, -1)} aria-label={`Move ${headingFor(k, format)} up`}>
-                              <ArrowUp size={12} strokeWidth={2} />
-                            </button>
-                            <button type="button" onClick={() => moveSection(job.id, k, 1)} aria-label={`Move ${headingFor(k, format)} down`}>
-                              <ArrowDown size={12} strokeWidth={2} />
-                            </button>
                             <button type="button" onClick={() => toggleSection(job.id, k)} aria-label={`Remove ${headingFor(k, format)}`}>
                               <X size={12} strokeWidth={2} />
                             </button>
                           </span>
-                        </li>
-                      ))}
-                    </ul>
+                        </div>
+                      )}
+                    </DragList>
                     {unchosen.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {unchosen.map((d) => (
