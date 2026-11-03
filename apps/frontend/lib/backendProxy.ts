@@ -114,8 +114,17 @@ function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
   }
 }
 
+/** A `.` or `..` segment, which URL parsing would resolve into a different backend path. */
+function hasDotSegment(path: string): boolean {
+  return path.split(/[?#]/, 1)[0].split('/').some((segment) => segment === '.' || segment === '..');
+}
+
 export async function proxyToBackend(call: ProxyCall): Promise<NextResponse> {
   const admin = call.session !== undefined;
+  if (hasDotSegment(call.path)) {
+    logFailure(call.route, 'refused, a dot segment in the path', null);
+    return answer(call.errorBody(MESSAGES.invalidRequest, 'invalid-request', null), 400, null, admin);
+  }
   const init: RequestInit = { method: call.method ?? 'GET' };
   if (call.body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' };

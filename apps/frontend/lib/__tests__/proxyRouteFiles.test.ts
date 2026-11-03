@@ -42,6 +42,7 @@ describe('proxy route files', () => {
       expect(text).toContain("from '@/lib/backendProxy'");
       expect(text).toMatch(/\bproxyToBackend\s*\(/);
       expect(text).not.toMatch(/\bconsole\./);
+      expect(text).not.toMatch(/\bprocess\./);
       expect(text).not.toMatch(/\.message\b/);
       expect(text).not.toMatch(/\bfetch\s*\(/);
       expect(text).not.toMatch(/\badminBackendFetch\s*\(/);

@@ -259,6 +259,14 @@ describe.each(CASES.filter((c) => c.params))('$method $module with an id that is
     expect(url).toBe(`${BACKEND}${c.backendPath.replace(original, encodeURIComponent(odd))}`);
     expect(new URL(url).search).toBe('');
   });
+
+  it.each(['..', '.'])('refuses the id %j with 400, without calling the backend', async (odd) => {
+    const [key] = Object.entries(c.params as Record<string, string>)[0];
+    const response = await call(c, { params: { [key]: odd } });
+    expect(response.status).toBe(400);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('query handling kept from the old routes', () => {
@@ -288,8 +296,10 @@ describe('query handling kept from the old routes', () => {
     expect([...new URL(url).searchParams.entries()]).toEqual([['org_name', name]]);
   });
 
-  it('crawl/delete-jobs-by-org answers 400 without an organisation name, without calling the backend', async () => {
-    const response = await call(find('crawl/delete-jobs-by-org', 'POST'), { query: '' });
+  it.each(['', '?org_name=', '?org_name=%20%20', '?org_name=%09'])(
+    'crawl/delete-jobs-by-org answers 400 without an organisation name (%j), without calling the backend',
+    async (query) => {
+    const response = await call(find('crawl/delete-jobs-by-org', 'POST'), { query });
     expect(response.status).toBe(400);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(await response.json()).toEqual({
