@@ -1324,7 +1324,7 @@ class SearchService:
         if not self.meili_enabled:
             return {
                 "enabled": False,
-                "error": self.meili_error if self.meili_error else "Meilisearch not configured"
+                "error": MEILI_UNAVAILABLE if self.meili_error else "Meilisearch not configured"
             }
         
         if not self.meili_client:
@@ -1354,10 +1354,10 @@ class SearchService:
                 }
             }
         except Exception as e:
-            logger.error(f"Failed to get Meilisearch settings: {e}")
+            logger.error("Failed to get Meilisearch settings: %s", _redacted(e))
             return {
                 "enabled": False,
-                "error": str(e)
+                "error": MEILI_UNAVAILABLE
             }
     
     async def _eligible_ids(self, hit_ids):
@@ -1702,12 +1702,12 @@ class SearchService:
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"Failed to reindex jobs: {e}")
+            logger.error("Failed to reindex jobs: %s", _redacted(e))
             return {
                 "indexed": 0,
                 "skipped": 0,
                 "duration_ms": duration_ms,
-                "error": str(e)
+                "error": f"Reindex failed (ref {current_request_id()[:8] or 'unavailable'})",
             }
         finally:
             if cursor:
