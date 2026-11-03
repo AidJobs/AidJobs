@@ -1,50 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { proxyToBackend, statusErrorBody } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-export async function GET(req: NextRequest) {
-  try {
-    // Ensure BACKEND_URL doesn't have trailing /api
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/api/db/status`;
-    console.log(`[proxy] GET ${url}`);
-    
-    const res = await fetch(url, {
-      headers: {
-        'Cookie': req.headers.get('cookie') || '',
-      },
-      credentials: 'include',
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error');
-      console.error('DB status error:', res.status, errorText);
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText || `HTTP ${res.status}` };
-      }
-      return NextResponse.json(
-        { status: 'error', ...errorData },
-        { status: res.status }
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('DB status proxy error:', error);
-    return NextResponse.json(
-      { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Failed to fetch database status' 
-      },
-      { status: 500 }
-    );
-  }
+export async function GET() {
+  return proxyToBackend({ route: 'GET /api/db/status', path: '/api/db/status', errorBody: statusErrorBody });
 }
-
