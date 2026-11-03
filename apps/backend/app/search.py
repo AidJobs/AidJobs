@@ -227,13 +227,13 @@ class SearchService:
                 logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' configured successfully")
             except Exception as e:
                 logger.warning(f"[aidjobs] Failed to configure Meilisearch index: {e}")
-                self.meili_error = str(e)
+                self.meili_error = MEILI_UNAVAILABLE
                 
         except Exception as e:
             logger.error(f"[aidjobs] Failed to initialize Meilisearch client: {e}")
             self.meili_enabled = False
             self.meili_client = None
-            self.meili_error = str(e)
+            self.meili_error = MEILI_UNAVAILABLE
 
     def _compute_reasons(
         self,
@@ -1707,7 +1707,7 @@ class SearchService:
                 "indexed": 0,
                 "skipped": 0,
                 "duration_ms": duration_ms,
-                "error": f"Reindex failed (ref {current_request_id()[:8] or 'unavailable'})",
+                "error": f"Unexpected error (ref {current_request_id()[:8] or 'unavailable'})",
             }
         finally:
             if cursor:

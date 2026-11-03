@@ -1104,21 +1104,27 @@ Findings of the investigation:
 - **The internal pipeline routes** (`/_internal/jobs` and `/_internal/jobs/{id}`, behind the internal API key, no page) put the exception's text into a 500; the list route also re-wrapped "Database not configured".
 
 What changes:
-- **Initialize and Reindex keep their status and shape.** On failure they say "Index initialization failed (ref …)" and "Reindex failed (ref …)"; the cause is logged, redacted, under the request ID.
-- **The settings route** says "Meilisearch unavailable" for both failures, as the status route does.
+- **Initialize and Reindex keep their status and shape.** On failure each says "Unexpected error (ref …)", which the dashboard's toasts show as "Initialization failed: Unexpected error (ref …)" and "Reindex failed: Unexpected error (ref …)"; the cause is logged, redacted, under the request ID. (First built as "Index initialization failed (ref …)" and "Reindex failed (ref …)", which the toasts would have repeated; changed after the review.)
+- **The settings route** says "Meilisearch unavailable" for both failures, as the status route does. Meilisearch's start-up now stores that fixed marker instead of the exception's text, so no later reader can return it; the cause is still logged at start-up.
 - **The internal routes raise `InternalError`:** "Failed to list extracted jobs" and "Failed to get extracted job", with a reference, the cause logged; "Database not configured" passes through.
 - **The static guard** loses its 5 entries in these three files. Phase 2's acceptance criterion holds: the allowlist has no admin route left. What remains is phase 3 (8 entries in code no production route reaches today) and the 3 reviewed entries that are not leaks (`main.py::healthz`, `ai_service.py::_call_openrouter`, `search.py::_search_meilisearch`).
 
 Evidence, 3 November 2026 (local, Python 3.11.9 with the locked test requirements):
-- **New tests,** in `test_admin_search_pipeline_errors.py` (9): a fresh-process walk (`test_admin_crawler_errors.py`'s), with Meilisearch made to look configured and fail, the start-up failing, and the database driver failing, each with fake connection-string text. It covers the fixed messages and shapes, the stored-error case, nothing quoting the fake password in responses or logs, each reference leading to the logged cause, and no network attempt. In process: the search routes still refuse a caller without a session, the internal routes a wrong or missing key, and "Database not configured" passes through.
-- **On `main`'s code:** 6 of the 9 fail; the 3 that pass check what was already right (no network, the 401s).
-- **CI's lists, locally:** 967 passed and 4 skipped; Ruff clean on CI's list; no new Ruff finding in `main.py` (29), `search.py` (38) or `pipeline_api.py` (6).
+- **New tests,** in `test_admin_search_pipeline_errors.py` (9 at first, 10 after the review): a fresh-process walk (`test_admin_crawler_errors.py`'s), with Meilisearch made to look configured and fail, the start-up failing, and the database driver failing, each with fake connection-string text. It covers the fixed messages and shapes, the stored-error case, nothing quoting the fake password in responses or logs, each reference leading to the logged cause, and no network attempt. In process: the search routes still refuse a caller without a session, the internal routes a wrong or missing key, and "Database not configured" passes through.
+- **On `main`'s code:** 7 of the 10 fail (6 of the first 9); the 3 that pass check what was already right (no network, the 401s).
+- **CI's lists, locally:** 967 passed and 4 skipped; Ruff clean on CI's list; no new Ruff finding in `main.py` (29), `search.py` (38) or `pipeline_api.py` (6). The review's clone, without the git-ignored saved pages, ran the same 971 tests as 962 passed and 9 skipped.
+- **Independent code review** (separate read-only agent, isolated clone, Python 3.11.9, no network, about 27 minutes, at `36172b6`): approve, nothing blocking.
+  - It found no remaining path in the five places, nor through the stored error, for exception text, connection details or SQL to reach a response; the public status routes already used fixed text. It confirmed the dashboard still reads the same fields, and that the `InternalError` handler covers the internal router.
+  - 14 of 15 mutations caught. The survivor, the settings route logging its cause without redaction (still masked by the global log filter), is now caught: the walk requires that route's cause line under its reference.
+  - Taken: that test; the repeated toast wording (above); the stored marker instead of the start-up text (above), with a test, and each change shown to fail its test when reverted.
+  - Confirmed in the code: the dashboard hides Initialize when the status says "Meilisearch not configured", and shows Reindex only when search is enabled or an index exists.
+  - Left for later, as it suggested: the f-string log lines in `search.py` (phase 3), and the constant-time key comparison in `verify_internal_api_key` (the extra pull request).
 
 Recorded for later, outside this pull request:
 - "Initialize Index" reports success even when Meilisearch is not configured: `_init_meilisearch` never raises; it stores the error instead.
 - Removing the leftover Meilisearch code, routes and dashboard controls, a product decision (ledger).
 
-Still to do: the independent code review; the user's merge approval; then the live check and the admin dashboard under the guard, with the user signed in.
+Still to do: the user's merge approval; then the live check and the admin dashboard under the guard, with the user signed in.
 
 ### Stage 3A. Dependency security
 

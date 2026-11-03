@@ -78,15 +78,17 @@ def test_no_response_or_log_line_quotes_the_fake_password(walk):
 
 
 def test_initialize_and_reindex_keep_their_shape_with_a_fixed_message(walk):
+    """The dashboard's toasts already say what failed ("Initialization failed: …"), so the
+    message only adds the reference."""
     calls, _logs = walk
     init = calls["POST /api/admin/search/init"]
     assert init["status"] == 200
     assert _body(calls, "POST /api/admin/search/init") == {
-        "success": False, "error": f"Index initialization failed (ref {init['request_id'][:8]})"}
+        "success": False, "error": f"Unexpected error (ref {init['request_id'][:8]})"}
     reindex = calls["POST /api/admin/search/reindex"]
     body = _body(calls, "POST /api/admin/search/reindex")
     assert reindex["status"] == 200
-    assert body["error"] == f"Reindex failed (ref {reindex['request_id'][:8]})"
+    assert body["error"] == f"Unexpected error (ref {reindex['request_id'][:8]})"
     assert (body["indexed"], body["skipped"]) == (0, 0) and isinstance(body["duration_ms"], int)
 
 
@@ -114,12 +116,26 @@ def test_each_reference_leads_to_the_logged_cause(walk):
     calls, logs = walk
     causes = [line for line in logs.splitlines()
               if "RuntimeError" in line or "OperationalError" in line]
-    for route in LOGGED + ["POST /api/admin/search/reindex"]:
+    for route in LOGGED + ["POST /api/admin/search/reindex", "GET /api/admin/search/settings"]:
         c = calls[route]
         assert any(line.startswith(f"[{c['request_id']}]") for line in causes), route
 
 
 # In process ---------------------------------------------------------------------------------
+
+def test_a_failed_start_up_stores_a_marker_not_the_text(monkeypatch):
+    from app import search
+
+    def broken(*args, **kwargs):
+        raise RuntimeError(DSN_ERROR)
+
+    monkeypatch.setenv("MEILISEARCH_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("MEILISEARCH_KEY", "probe-" + "value")
+    monkeypatch.setattr(search.meilisearch, "Client", broken)
+    service = search.SearchService()
+    assert service.meili_enabled is False
+    assert service.meili_error == search.MEILI_UNAVAILABLE
+
 
 def test_the_admin_search_routes_refuse_a_caller_without_a_session():
     from fastapi.testclient import TestClient

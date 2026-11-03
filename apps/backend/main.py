@@ -465,7 +465,7 @@ async def admin_search_init(admin: str = Depends(admin_required)):
     except Exception as e:
         log_failure(logger, "Index initialization failed", e)
         reference = log_safety.current_request_id()[:8] or "unavailable"
-        return {"success": False, "error": f"Index initialization failed (ref {reference})"}
+        return {"success": False, "error": f"Unexpected error (ref {reference})"}
 
 
 @app.post("/api/admin/search/reindex")
