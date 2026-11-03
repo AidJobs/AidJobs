@@ -80,7 +80,8 @@ describe('proxy routes', () => {
 
   it('label every body they send to the backend as JSON', () => {
     const withBody = calls.filter((c) => c.options && /\bbody\s*(:|,|\})/.test(c.options));
-    expect(withBody.length).toBeGreaterThanOrEqual(12);
+    // Routes that call lib/backendProxy send no body here; the helper labels it (its own tests).
+    expect(withBody.length).toBeGreaterThanOrEqual(11);
     const unlabelled = withBody.filter(
       (c) => !/['"]content-type['"]\s*:\s*['"]application\/json['"]/i.test(c.options ?? '')
     );
