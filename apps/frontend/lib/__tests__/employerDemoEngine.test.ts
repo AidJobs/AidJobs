@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { applyLines, defaultApply } from '../../components/employer-demo/apply';
 import {
+  addSuggestions,
   applyEdit,
   buildSection,
   detectRole,
@@ -124,6 +125,18 @@ describe('quality checks', () => {
     expect(keys.some((k) => k.startsWith('salary'))).toBe(false);
     expect(weekend('2026-11-28')).toBe(true);
     expect(holiday('2026-12-12', 'KE')).toBe(true);
+  });
+});
+
+describe('one-click additions', () => {
+  it('offers up to five high-value sections the format and the facts leave out', () => {
+    const f = { ...emptyFacts(), location: 'Juba, South Sudan' };
+    const offered = addSuggestions(fmt('house'), f);
+    expect(offered).toHaveLength(5);
+    expect(offered[0]).toBe('assessment');
+    expect(offered).not.toContain('offer');
+    expect(offered).not.toContain('conditions');
+    expect(addSuggestions(fmt('un-secretariat'), f)).toContain('offer');
   });
 });
 

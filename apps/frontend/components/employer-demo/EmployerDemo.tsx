@@ -116,7 +116,7 @@ export default function EmployerDemo() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="ej-app flex h-full">
       <SideMenu
         primary={primary}
         sections={[

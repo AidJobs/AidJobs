@@ -110,12 +110,13 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
 }
 
 /** Starts a job conversation from the first message. Returns the new job's id. */
-export function startJob(text: string, formatKey?: string): string {
+export function startJob(text: string, formatKey?: string, extra: string[] = []): string {
   const s = getState();
   const id = nextId('job');
   const { facts, role } = extractFacts(text, s.today);
   if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
+  if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   job.chat = [msg('user', text), ...replyAfterFacts(s, job, true)];
   update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
   return id;
@@ -296,7 +297,8 @@ export function restoreVersion(id: string, n: number) {
 }
 
 /** A pasted advert becomes a job in its own format; its headings can then be saved as the organisation's format. */
-export function importPasted(text: string): string | null {
+/** Reads an advert from pasted text. `fromHost` marks text that stands in for a web page (the demo never fetches). */
+export function importPasted(text: string, fromHost?: string): string | null {
   const s = getState();
   const parsed = readPasted(text);
   if (!parsed.length) return null;
@@ -308,16 +310,25 @@ export function importPasted(text: string): string | null {
   }
   const { facts, role } = extractFacts(text, s.today);
   const fkey = `pasted-${s.seq + 1}`;
-  const format: Format = { key: fkey, label: 'Format of your pasted advert', family: 'Your organisation', usedBy: `Read from ${merged.length} headings you pasted`, tone: 'warm', order: merged.map((m) => ({ key: m.key, heading: m.heading })), commitments: [] };
+  const format: Format = {
+    key: fkey,
+    label: fromHost ? 'Format of the linked advert' : 'Format of your pasted advert',
+    family: 'Your organisation',
+    usedBy: fromHost ? `Read from ${merged.length} headings on ${fromHost}` : `Read from ${merged.length} headings you pasted`,
+    tone: 'warm',
+    order: merged.map((m) => ({ key: m.key, heading: m.heading })),
+    commitments: [],
+  };
   const id = nextId('job');
   update((st) => ({ ...st, formats: [...st.formats, format] }));
   const st2 = getState();
   const job = newJob(st2, id, facts, role?.key ?? 'programme', fkey);
   job.tags = merged.map((m) => m.key);
   job.sections = merged.map((m) => ({ key: m.key, title: m.heading, lines: m.lines, edited: true }));
-  job.versions = [{ n: 1, at: Date.now(), note: 'Imported from pasted text', sections: job.sections }];
-  job.chat = [msg('ai', `I read ${merged.length} sections from your text and kept your wording and headings. Check the facts in the top row, then ask for any changes. You can save these headings as your organisation's format.`, ['Save as our format', 'Shorter'])];
-  job.audit = [{ at: Date.now(), who: st2.me.name, what: 'Imported from a pasted advert' }];
+  job.versions = [{ n: 1, at: Date.now(), note: fromHost ? `Imported from ${fromHost}` : 'Imported from pasted text', sections: job.sections }];
+  const read = fromHost ? `I read ${merged.length} sections from the page on ${fromHost} (simulated in the demo: a sample advert stands in for the page)` : `I read ${merged.length} sections from your text`;
+  job.chat = [msg('ai', `${read} and kept the wording and headings. Check the facts in the top row, then ask for any changes. You can save these headings as your organisation's format.`, ['Save as our format', 'Shorter'])];
+  job.audit = [{ at: Date.now(), who: st2.me.name, what: fromHost ? `Imported from a link on ${fromHost}` : 'Imported from a pasted advert' }];
   update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
   return id;
 }

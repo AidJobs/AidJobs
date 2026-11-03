@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowUp, CornerDownRight } from 'lucide-react';
-import { useId, useRef } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 
 /**
  * The chat box. Ghost text after the cursor suggests what to write next; the → key at the end of the text, or the
@@ -18,6 +18,7 @@ export default function Composer({
   autoFocus,
   compact,
   large,
+  tools,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -28,6 +29,7 @@ export default function Composer({
   autoFocus?: boolean;
   compact?: boolean;
   large?: boolean;
+  tools?: ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const hintId = useId();
@@ -65,11 +67,18 @@ export default function Composer({
             }
           }}
         />
-        <div className="flex items-center gap-2 px-2 pb-2">
+        <div className="flex min-w-0 items-center gap-1.5 px-2 pb-2">
+          {tools}
           {suggestion && (
-            <button type="button" className="aj-text-btn inline-flex items-center gap-1" style={{ height: 30, fontSize: 12 }} onClick={value ? accept : () => onChange(suggestion.replace(/^[,.\s]+/, ''))}>
+            <button
+              type="button"
+              className="aj-text-btn inline-flex shrink-0 items-center gap-1"
+              style={{ height: 30, fontSize: 12 }}
+              onClick={value ? accept : () => onChange(suggestion.replace(/^[,.\s]+/, ''))}
+              aria-label="Use suggestion"
+            >
               <CornerDownRight size={13} strokeWidth={2} />
-              Use suggestion
+              <span className={tools ? 'hidden sm:inline' : undefined}>Use suggestion</span>
             </button>
           )}
           <button

@@ -695,6 +695,15 @@ export function recommendSections(format: Format, f: Facts): string[] {
   return keys;
 }
 
+/** Sections candidates value most that a format often leaves out: pay and benefits, what happens after applying, the first weeks, the team. */
+const ADD_RANK = ['offer', 'assessment', 'firstweeks', 'team', 'relationships', 'practical', 'competencies', 'languages', 'background', 'setting'];
+
+/** Up to five high-value sections to offer as one-click additions, beyond what the format and the facts already include. */
+export function addSuggestions(format: Format, f: Facts): string[] {
+  const have = recommendSections(format, f);
+  return ADD_RANK.filter((k) => !have.includes(k)).slice(0, 5);
+}
+
 export function orderSections(keys: string[], format: Format): string[] {
   const own = format.order.map((o) => o.key);
   return [...own.filter((k) => keys.includes(k)), ...DOC_ORDER.filter((k) => keys.includes(k) && !own.includes(k))];

@@ -100,8 +100,20 @@ describe('employer demo: never calls the network', () => {
     click(/Email me a sign-in link/);
     click('Open the link (demo)');
     shows('What role are you hiring for?');
-    shows('Start from what you have');
-    shows('What strong adverts include');
+    shows('Add:');
+    for (const [tool, inside] of [
+      ['Start from what you have', 'Use a job description from a link'],
+      [/^Format: /, 'UN Secretariat format'],
+      [/^Continue a draft/, 'Finance Officer'],
+    ] as const) {
+      const el = Array.from(container.querySelectorAll('button')).find((b) => (typeof tool === 'string' ? b.getAttribute('aria-label') === tool : tool.test(b.getAttribute('aria-label') ?? '')));
+      act(() => el?.click());
+      shows(inside);
+      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    }
+    const pill = container.querySelector('[aria-label="Add sections"] button');
+    act(() => (pill as HTMLElement).click());
+    expect(pill?.getAttribute('aria-pressed')).toBe('true');
 
     for (const p of [false, true]) {
       phone = p;

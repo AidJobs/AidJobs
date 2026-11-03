@@ -207,3 +207,20 @@ export const PUBLIC_SAMPLES = [
 
 /** Sample market context for the first screen; replaced by real AidJobs figures once there are enough jobs. */
 export const MARKET_SAMPLE = { similar: 34, grade: 'P4 or equivalent', showPay: 62, daysOpen: 21 };
+
+/** Stands in for the page behind a pasted link: the demo never fetches. */
+export const LINKED_SAMPLE = `ABOUT THE ROLE
+The Protection Officer leads community-based protection activities in Amman, working with refugee families and local partners.
+
+KEY RESPONSIBILITIES
+• Run protection monitoring visits and referrals
+• Train partner staff on safe referral pathways
+• Report monthly to the Protection Coordinator
+
+ABOUT YOU
+• Degree in law, social work, or a related field
+• Three years of protection work in humanitarian settings
+• Fluent Arabic and English
+
+HOW TO APPLY
+Send your CV and a cover letter to jobs@example.org by 30 November 2026.`;
