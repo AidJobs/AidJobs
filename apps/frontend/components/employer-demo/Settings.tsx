@@ -1,0 +1,541 @@
+'use client';
+
+import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, ShieldCheck, Sparkles, Star, Trash2, Unlock } from 'lucide-react';
+import { useState } from 'react';
+import { invite, removeMember, setRole } from './actions';
+import { TAGS } from './engine';
+import { nextId, update, useDemo } from './store';
+import type { ApprovalSetting, Org, Person, Style, Tone } from './types';
+import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
+
+const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response'];
+const VOICES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
+
+function setOrg(patch: Partial<Org>) {
+  update((s) => ({ ...s, org: { ...s.org, ...patch } }));
+}
+
+export function SignIn() {
+  const [email, setEmail] = useState('sam@riverstone.example.org');
+  const [sent, setSent] = useState(false);
+  return (
+    <div className="flex min-h-full items-center justify-center p-4">
+      <div className="aj-card flex w-full max-w-[420px] flex-col gap-4 p-6">
+        <div className="flex items-center gap-2">
+          <Star size={18} strokeWidth={2} style={{ color: 'var(--sage-7)' }} />
+          <span style={{ fontSize: 16, fontWeight: 700 }}>aidjobs</span>
+          <span className="aj-faint">for employers</span>
+          <span className="ml-auto">
+            <DemoMark label="Demo" />
+          </span>
+        </div>
+        <div>
+          <h1 className="aj-display" style={{ margin: 0, fontSize: 24 }}>
+            Publish once. Reach further.
+          </h1>
+          <p className="aj-muted" style={{ margin: '6px 0 0' }}>
+            Write a job description with AidJobs, publish it, and get it in front of the right people.
+          </p>
+        </div>
+        {!sent ? (
+          <>
+            <Field label="Work email" hint="We send a sign-in link. No password.">
+              <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            </Field>
+            <button type="button" className="aj-ink-btn justify-center" disabled={!isEmail(email)} onClick={() => setSent(true)}>
+              <Mail size={14} strokeWidth={2} /> Email me a sign-in link
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl p-3" style={{ background: 'var(--sage-1)' }}>
+              A sign-in link would now go to <strong>{email}</strong>. In this demo nothing is sent and no account is created.
+            </div>
+            <button type="button" className="aj-ink-btn justify-center" onClick={() => update((s) => ({ ...s, signedIn: true }))}>
+              Open the link (demo)
+            </button>
+            <button type="button" className="aj-text-btn" onClick={() => setSent(false)}>
+              Use another email
+            </button>
+          </div>
+        )}
+        <p className="aj-faint" style={{ margin: 0, fontSize: 11 }}>
+          The organisation, people, and jobs here are fictional sample data, kept only in this browser.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BrandStyle({ org }: { org: Org }) {
+  const [mode, setMode] = useState<'link' | 'paste'>('link');
+  const [url, setUrl] = useState(org.careersUrl);
+  const [sample, setSample] = useState('');
+  const [reading, setReading] = useState(false);
+  const read = () => {
+    setReading(true);
+    setTimeout(() => {
+      let voice = ['Warm', 'Plain English', 'Speaks as "we"', 'Rights-based'];
+      if (mode === 'paste' && sample.trim()) {
+        const t = ` ${sample.toLowerCase()} `;
+        const sentences = sample.split(/[.!?]+/).filter((x) => x.trim());
+        const avg = sentences.length ? sample.split(/\s+/).length / sentences.length : 20;
+        voice = [
+          ...(/\bwe\b|\bour\b/.test(t) ? ['Speaks as "we"'] : []),
+          ...(/\byou\b|\byour\b/.test(t) ? ['Uses "you"'] : []),
+          ...(avg < 18 ? ['Short sentences', 'Plain English'] : ['Formal']),
+          ...(/rights|dignity|inclusion|equit/.test(t) ? ['Rights-based'] : []),
+        ];
+      }
+      setOrg({ voice: Array.from(new Set(voice)), careersUrl: mode === 'link' ? url : org.careersUrl });
+      setReading(false);
+    }, 900);
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="aj-switch self-start" role="radiogroup" aria-label="How to learn your style">
+        <button type="button" role="radio" aria-checked={mode === 'link'} data-active={mode === 'link'} onClick={() => setMode('link')}>
+          Careers page link
+        </button>
+        <button type="button" role="radio" aria-checked={mode === 'paste'} data-active={mode === 'paste'} onClick={() => setMode('paste')}>
+          Paste a sample
+        </button>
+      </div>
+      {mode === 'link' ? (
+        <Field label="Your careers page" hint="AidJobs reads this one page, once, and nothing else on your site (simulated here).">
+          <input style={inputStyle} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" />
+        </Field>
+      ) : (
+        <Field label="A job advert or page you like" hint="Paste a few paragraphs. They are used to learn your style and are not published.">
+          <textarea style={{ ...inputStyle, minHeight: 110 }} value={sample} onChange={(e) => setSample(e.target.value)} />
+        </Field>
+      )}
+      <button type="button" className="aj-pill self-start" onClick={read} disabled={reading}>
+        <Sparkles size={13} strokeWidth={1.8} /> {reading ? 'Reading… (simulated)' : 'Learn my style'}
+      </button>
+      <Field label="Your style · tap to adjust">
+        <div className="flex flex-wrap gap-1.5">
+          {VOICES.map((v) => (
+            <button key={v} type="button" className="ej-tag" data-on={org.voice.includes(v)} onClick={() => setOrg({ voice: org.voice.includes(v) ? org.voice.filter((x) => x !== v) : [...org.voice, v] })} aria-pressed={org.voice.includes(v)}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+function Sectors({ org }: { org: Org }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Sectors">
+        <div className="flex flex-wrap gap-1.5">
+          {SECTORS.map((x) => (
+            <button key={x} type="button" className="ej-tag" data-on={org.sectors.includes(x)} onClick={() => setOrg({ sectors: org.sectors.includes(x) ? org.sectors.filter((y) => y !== x) : [...org.sectors, x] })} aria-pressed={org.sectors.includes(x)}>
+              {x}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Sustainable Development Goals">
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from({ length: 17 }, (_, i) => i + 1).map((g) => (
+            <button key={g} type="button" className="ej-tag" data-on={org.sdgs.includes(g)} onClick={() => setOrg({ sdgs: org.sdgs.includes(g) ? org.sdgs.filter((y) => y !== g) : [...org.sdgs, g].sort((a, b) => a - b) })} aria-pressed={org.sdgs.includes(g)}>
+              SDG {g}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+function StandardTexts({ org }: { org: Org }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {org.standard.map((t) => (
+        <div key={t.key} className="aj-card flex flex-col gap-2 p-3">
+          <div className="flex items-center gap-2">
+            <span style={{ fontWeight: 650 }}>{t.label}</span>
+            <button
+              type="button"
+              className="aj-pill ml-auto"
+              style={{ height: 28 }}
+              onClick={() => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, locked: !x.locked } : x)) })}
+              aria-pressed={t.locked}
+              title={t.locked ? 'Locked: recruiters cannot change or remove it in a job' : 'Unlocked: recruiters can edit it in a job'}
+            >
+              {t.locked ? <Lock size={12} strokeWidth={2} /> : <LockOpen size={12} strokeWidth={2} />}
+              {t.locked ? 'Locked' : 'Editable'}
+            </button>
+          </div>
+          <textarea style={{ ...inputStyle, minHeight: 64 }} value={t.text} onChange={(e) => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, text: e.target.value } : x)) })} aria-label={t.label} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ApprovalSettingView({ org }: { org: Org }) {
+  const opts: Array<{ key: ApprovalSetting; label: string; hint: string }> = [
+    { key: 'off', label: 'Off', hint: 'Anyone who can publish publishes directly; review stays available' },
+    { key: 'senior', label: 'Senior roles', hint: 'Required for P4 and above, and D grades' },
+    { key: 'all', label: 'Every job', hint: 'Nothing is published without approval' },
+  ];
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Approval before publishing">
+        {opts.map((o) => (
+          <button key={o.key} type="button" className="aj-option" data-active={org.approval === o.key} onClick={() => setOrg({ approval: o.key })} role="radio" aria-checked={org.approval === o.key}>
+            <span className="flex h-4 w-4 items-center justify-center">{org.approval === o.key && <Check size={14} strokeWidth={2.4} />}</span>
+            <span className="flex flex-col">
+              <span style={{ fontWeight: 650 }}>{o.label}</span>
+              <span className="aj-faint">{o.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="aj-muted">An approval needs</span>
+        <button type="button" className="aj-pill" data-active={org.approvalRule === 'any'} onClick={() => setOrg({ approvalRule: 'any' })}>
+          any one reviewer
+        </button>
+        <button type="button" className="aj-pill" data-active={org.approvalRule === 'all'} onClick={() => setOrg({ approvalRule: 'all' })}>
+          every reviewer
+        </button>
+      </div>
+      <span className="aj-faint">An owner can publish without approval in an emergency; the reason is kept in the job&apos;s history.</span>
+    </div>
+  );
+}
+
+function Verification({ org }: { org: Org }) {
+  const [method, setMethod] = useState<'domain' | 'charity' | 'iati'>('domain');
+  const [value, setValue] = useState('');
+  return (
+    <div className="flex flex-col gap-3">
+      {org.verified ? (
+        <div className="flex items-center gap-2 rounded-xl p-3" style={{ background: 'var(--sage-1)' }}>
+          <BadgeCheck size={16} strokeWidth={2} style={{ color: 'var(--sage-7)' }} />
+          Verified by email on @{org.domain}. Your jobs carry the verified badge.
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ['domain', 'Work email domain'],
+                ['charity', 'Charity register number'],
+                ['iati', 'IATI organisation ID'],
+              ] as const
+            ).map(([k, l]) => (
+              <button key={k} type="button" className="aj-pill" data-active={method === k} onClick={() => setMethod(k)}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <input style={inputStyle} value={value} onChange={(e) => setValue(e.target.value)} placeholder={method === 'domain' ? `you@${org.domain}` : method === 'charity' ? 'For example 1234567' : 'For example XM-DAC-00000'} />
+          <button type="button" className="aj-ink-btn self-start" disabled={!value.trim()} onClick={() => setOrg({ verified: true })}>
+            Verify (simulated)
+          </button>
+        </>
+      )}
+      <span className="aj-faint">Verification protects candidates: fake vacancies that ask for fees are a known problem in this sector. Premium and Reach emails need a verified organisation.</span>
+      {org.verified && (
+        <button type="button" className="aj-text-btn self-start" onClick={() => setOrg({ verified: false })}>
+          Show the unverified state
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Basics({ org }: { org: Org }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label="Name">
+        <input style={inputStyle} value={org.name} onChange={(e) => setOrg({ name: e.target.value })} />
+      </Field>
+      <Field label="Short name">
+        <input style={inputStyle} value={org.short} onChange={(e) => setOrg({ short: e.target.value })} />
+      </Field>
+      <Field label="Type">
+        <select style={inputStyle} value={org.type} onChange={(e) => setOrg({ type: e.target.value })}>
+          {['International NGO', 'National NGO', 'UN agency', 'Foundation', 'Charity', 'Research institute', 'Social enterprise'].map((t) => (
+            <option key={t}>{t}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Headquarters">
+        <input style={inputStyle} value={org.hq} onChange={(e) => setOrg({ hq: e.target.value })} />
+      </Field>
+      <div className="sm:col-span-2">
+        <Field label="About" hint="Used in the About us section of every job">
+          <textarea style={{ ...inputStyle, minHeight: 80 }} value={org.about} onChange={(e) => setOrg({ about: e.target.value })} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+const STEPS = [
+  { key: 'basics', label: 'Basics', View: Basics },
+  { key: 'brand', label: 'Brand style', View: BrandStyle },
+  { key: 'sectors', label: 'Sectors and SDGs', View: Sectors },
+  { key: 'standard', label: 'Standard text', View: StandardTexts },
+  { key: 'approval', label: 'Approval', View: ApprovalSettingView },
+  { key: 'verify', label: 'Verification', View: Verification },
+] as const;
+
+export function Onboarding() {
+  const s = useDemo();
+  const [i, setI] = useState(0);
+  const Step = STEPS[i].View;
+  return (
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 px-4 py-6">
+      <div className="flex items-center gap-2">
+        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+          Set up your organisation
+        </h1>
+        <span className="aj-faint ml-auto">
+          {i + 1} of {STEPS.length}
+        </span>
+      </div>
+      <div className="aj-no-scrollbar flex gap-1.5 overflow-x-auto">
+        {STEPS.map((st, k) => (
+          <button key={st.key} type="button" className="aj-pill shrink-0" data-active={k === i} onClick={() => setI(k)}>
+            {k < i ? <Check size={12} strokeWidth={2.4} /> : null} {st.label}
+          </button>
+        ))}
+      </div>
+      <div className="aj-card p-4">
+        <Step org={s.org} />
+      </div>
+      <div className="flex justify-between gap-2">
+        <button type="button" className="aj-text-btn" onClick={() => setOrg({ setupDone: true })}>
+          Skip: use the sample organisation
+        </button>
+        <div className="flex gap-2">
+          {i > 0 && (
+            <button type="button" className="aj-pill" onClick={() => setI(i - 1)}>
+              Back
+            </button>
+          )}
+          <button type="button" className="aj-ink-btn" onClick={() => (i < STEPS.length - 1 ? setI(i + 1) : setOrg({ setupDone: true }))}>
+            {i < STEPS.length - 1 ? 'Next' : 'Finish'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function OrgSettings() {
+  const s = useDemo();
+  return (
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 py-5 lg:px-8 lg:py-8">
+      <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+        Organisation
+      </h1>
+      {STEPS.map((st) => (
+        <Section key={st.key} title={st.label}>
+          <div className="aj-card p-4">
+            <st.View org={s.org} />
+          </div>
+        </Section>
+      ))}
+      <button type="button" className="aj-text-btn self-start" onClick={() => setOrg({ setupDone: false })}>
+        <Globe size={13} strokeWidth={2} className="mr-1 inline" /> Run the set-up again
+      </button>
+    </div>
+  );
+}
+
+const ROLE_HINT: Record<Person['role'], string> = {
+  owner: 'Everything, including settings, payment, and overriding an approval',
+  member: 'Creates, edits, and publishes jobs',
+  reviewer: 'Comments, suggests, and approves',
+};
+
+export function Team() {
+  const s = useDemo();
+  const [email, setEmail] = useState('');
+  const [role, setRoleState] = useState<Person['role']>('member');
+  return (
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6 px-4 py-5 lg:px-8 lg:py-8">
+      <div>
+        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+          Team
+        </h1>
+        <p className="aj-muted" style={{ margin: '4px 0 0' }}>
+          Optional. On your own, you can do everything. Invite people when you want help or approval.
+        </p>
+      </div>
+      <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {s.team.map((p) => (
+          <li key={p.id} className="aj-card flex flex-wrap items-center gap-2 p-3">
+            <div className="min-w-0 flex-1">
+              <div style={{ fontWeight: 650 }}>
+                {p.name}
+                {p.id === s.me.id ? ' (you)' : ''}
+              </div>
+              <div className="aj-faint truncate">{p.email}</div>
+            </div>
+            <select style={{ ...inputStyle, width: 130, minHeight: 34 }} value={p.role} disabled={p.id === s.me.id} onChange={(e) => setRole(p.id, e.target.value as Person['role'])} aria-label={`Role for ${p.name}`} title={ROLE_HINT[p.role]}>
+              <option value="owner">Owner</option>
+              <option value="member">Member</option>
+              <option value="reviewer">Reviewer</option>
+            </select>
+            {p.id !== s.me.id && (
+              <button type="button" className="aj-icon-btn" onClick={() => removeMember(p.id)} aria-label={`Remove ${p.name}`}>
+                <Trash2 size={14} strokeWidth={1.8} />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <Section title="Invite">
+        <div className="aj-card flex flex-col gap-3 p-4">
+          <div className="flex flex-wrap gap-2">
+            <input style={{ ...inputStyle, flex: 1, minWidth: 200 }} value={email} onChange={(e) => setEmail(e.target.value)} placeholder={`name@${s.org.domain}`} type="email" aria-label="Email" />
+            <select style={{ ...inputStyle, width: 130 }} value={role} onChange={(e) => setRoleState(e.target.value as Person['role'])} aria-label="Role">
+              <option value="member">Member</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="owner">Owner</option>
+            </select>
+            <button
+              type="button"
+              className="aj-ink-btn"
+              disabled={!isEmail(email) || s.team.some((p) => p.email === email.toLowerCase())}
+              onClick={() => {
+                invite(email.trim().toLowerCase(), role);
+                setEmail('');
+              }}
+            >
+              <Plus size={14} strokeWidth={2} /> Invite
+            </button>
+          </div>
+          <ul className="aj-faint flex flex-col gap-0.5" style={{ margin: 0, paddingLeft: 18 }}>
+            {(Object.keys(ROLE_HINT) as Person['role'][]).map((r) => (
+              <li key={r}>
+                <strong style={{ textTransform: 'capitalize' }}>{r}</strong>: {ROLE_HINT[r]}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Section>
+      <Section title="Approval before publishing">
+        <div className="aj-card p-4">
+          <ApprovalSettingView org={s.org} />
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function StyleEditor({ style, onClose }: { style: Style; onClose: () => void }) {
+  const editable = style.by === 'Organisation';
+  const save = (patch: Partial<Style>) => update((s) => ({ ...s, styles: s.styles.map((x) => (x.key === style.key ? { ...x, ...patch } : x)) }));
+  return (
+    <div className="aj-card flex flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        {editable ? (
+          <input style={{ ...inputStyle, fontWeight: 650 }} value={style.label} onChange={(e) => save({ label: e.target.value })} aria-label="Style name" />
+        ) : (
+          <span style={{ fontWeight: 700 }}>{style.label}</span>
+        )}
+        <button type="button" className="aj-pill ml-auto" onClick={onClose}>
+          Done
+        </button>
+      </div>
+      {!editable && <span className="aj-faint">AidJobs styles are fixed. Duplicate one to make your own.</span>}
+      <Field label="Tone">
+        <div className="flex gap-1.5">
+          {(['formal', 'warm', 'plain'] as Tone[]).map((t) => (
+            <button key={t} type="button" className="aj-pill" data-active={style.tone === t} disabled={!editable} onClick={() => save({ tone: t })}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={`Sections · ${style.tags.length}`}>
+        <div className="flex flex-wrap gap-1.5">
+          {TAGS.map((t) => (
+            <button key={t.key} type="button" className="ej-tag" data-on={style.tags.includes(t.key)} disabled={!editable} onClick={() => save({ tags: style.tags.includes(t.key) ? style.tags.filter((x) => x !== t.key) : [...style.tags, t.key] })} aria-pressed={style.tags.includes(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+export function Styles() {
+  const s = useDemo();
+  const [editing, setEditing] = useState<string | null>(null);
+  const duplicate = (st: Style) => {
+    const key = nextId('style');
+    update((x) => ({ ...x, styles: [...x.styles, { ...st, key, by: 'Organisation', label: `${st.label} (${x.org.short})`, note: `Based on ${st.label}` }] }));
+    setEditing(key);
+  };
+  return (
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
+      <div>
+        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+          Styles
+        </h1>
+        <p className="aj-muted" style={{ margin: '4px 0 0' }}>
+          A style is a set of sections and a tone. Tap one in the chat and the job is written that way.
+        </p>
+      </div>
+      <ul className="grid gap-3 md:grid-cols-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {s.styles.map((st) =>
+          editing === st.key ? (
+            <li key={st.key} className="md:col-span-2">
+              <StyleEditor style={st} onClose={() => setEditing(null)} />
+            </li>
+          ) : (
+            <li key={st.key} className="aj-card flex flex-col gap-2 p-4">
+              <div className="flex items-center gap-2">
+                <span style={{ fontWeight: 700 }}>{st.label}</span>
+                <span className="aj-chip" data-tone={st.by === 'Organisation' ? 'sage' : undefined}>
+                  {st.by === 'Organisation' ? 'Yours' : 'AidJobs'}
+                </span>
+                {st.key === 'un' && <ShieldCheck size={13} strokeWidth={2} className="aj-faint" />}
+              </div>
+              <span className="aj-muted">{st.note}</span>
+              <div className="flex flex-wrap gap-1">
+                {st.tags.map((t) => (
+                  <span key={t} className="aj-chip">
+                    {TAGS.find((x) => x.key === t)?.label ?? t}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-1 flex gap-1.5">
+                <button type="button" className="aj-pill" onClick={() => setEditing(st.key)}>
+                  {st.by === 'Organisation' ? (
+                    'Edit'
+                  ) : (
+                    <>
+                      <Unlock size={12} strokeWidth={2} /> View
+                    </>
+                  )}
+                </button>
+                <button type="button" className="aj-pill" onClick={() => duplicate(st)}>
+                  Duplicate
+                </button>
+                {st.by === 'Organisation' && (
+                  <button type="button" className="aj-icon-btn" onClick={() => update((x) => ({ ...x, styles: x.styles.filter((y) => y.key !== st.key) }))} aria-label={`Delete ${st.label}`}>
+                    <Trash2 size={14} strokeWidth={1.8} />
+                  </button>
+                )}
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+    </div>
+  );
+}
