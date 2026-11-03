@@ -176,9 +176,12 @@ def test_missing_deletion_columns_keep_their_message_and_roll_back(monkeypatch, 
 
 @pytest.mark.parametrize("error", [
     psycopg2.errors.SyntaxError("syntax error at or near " + FRAGMENT),
+    psycopg2.errors.SyntaxError('column "deleted_at" does not exist ' + FRAGMENT),
     RuntimeError("password=" + FRAGMENT),
 ])
 def test_any_other_delete_failure_is_a_fixed_message_and_rolls_back(monkeypatch, client, error):
+    """Missing columns are recognised by the error's type: the same words in another error are
+    an ordinary failure."""
     log = _database(monkeypatch, fail_on="UPDATE jobs", error=error)
     response = client.post("/api/admin/jobs/delete-bulk", json={"job_ids": ["job-1"]})
     request_id = response.headers["X-Request-ID"]
@@ -220,18 +223,34 @@ def test_a_failed_check_is_named_by_type_and_code_only(error, expected):
     assert describe_check_failure(error) == expected
 
 
-def test_one_failed_check_no_longer_fails_every_later_one(monkeypatch, client):
-    bad_uuid = _coded("InvalidTextRepresentation", "22P02")("invalid uuid " + FRAGMENT)
-    _database(monkeypatch, fail_on="WHERE id::uuid = %s", error=bad_uuid, abort=True)
+CHECKS = [  # (check, a fragment of its query, in the route's order)
+    ("uuid_direct", "WHERE id::uuid = %s"),
+    ("text_direct", "SELECT id, id::text FROM jobs WHERE id::text = %s LIMIT 1"),
+    ("text_array", "ANY(ARRAY[%s]::text[]) LIMIT 1"),
+    ("text_ilike", "ILIKE %s LIMIT 1"),
+    ("sample_ids", "pg_typeof(id)"),
+    ("total_jobs", "SELECT COUNT(*) as total FROM jobs"),
+    ("similar_ids", "id::text LIKE %s LIMIT 10"),
+    ("including_deleted", "SELECT id::text, deleted_at, title FROM jobs WHERE id::text = %s"),
+    ("search_endpoint_ids", "WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10"),
+    ("all_db_ids_sample", "ORDER BY created_at DESC LIMIT 100"),
+]
+
+
+@pytest.mark.parametrize("failing", range(len(CHECKS)), ids=[name for name, _q in CHECKS])
+def test_one_failed_check_no_longer_fails_every_later_one(monkeypatch, client, failing):
+    name, query = CHECKS[failing]
+    bad = _coded("InvalidTextRepresentation", "22P02")("invalid input " + FRAGMENT)
+    log = _database(monkeypatch, fail_on=query, error=bad, abort=True)
     response = client.get("/api/admin/jobs/diagnose/not-a-uuid")
     body = response.json()
     assert response.status_code == 200 and body["status"] == "ok"
     tests = body["data"]["tests"]
-    assert tests["uuid_direct"] == {"success": False, "error": "InvalidTextRepresentation (22P02)",
-                                    "query": "WHERE id::uuid = %s"}
-    for name in ("text_direct", "text_array", "text_ilike", "sample_ids", "total_jobs",
-                 "similar_ids", "including_deleted", "search_endpoint_ids", "all_db_ids_sample"):
-        assert tests[name]["success"] is True, (name, tests[name])
+    assert tests[name]["success"] is False
+    assert tests[name]["error"] == "InvalidTextRepresentation (22P02)"
+    for later, _q in CHECKS[failing + 1:]:
+        assert tests[later]["success"] is True, (later, tests[later])
+    assert ["ROLLBACK", []] in log
     assert FRAGMENT not in response.text
 
 

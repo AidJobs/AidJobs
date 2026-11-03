@@ -1062,18 +1062,25 @@ What changes:
 - **The static guard** loses its 7 `job_management.py` entries (18 places) and gains the describer.
 
 Evidence, 3 November 2026 (local, Python 3.11.9 with the locked test requirements, `uvloop` excepted on Windows):
-- **New tests,** in `test_admin_jobs_errors.py` (22):
+- **New tests,** in `test_admin_jobs_errors.py` (22 at first, 32 after the review's two additions):
   - a fresh-process walk of the 7 routes (`test_admin_crawler_errors.py`'s), with real sockets and DNS refused and a database driver failing with fake connection-string text: the fixed messages and references, nothing quoting the fake password in responses or logs, each reference leading to the logged cause, no network attempt;
   - each job route registered once; all 7 refuse a caller without a session; "Database not configured" passed through; bulk delete's 400s unchanged, and a hard delete without a reason deleting nothing;
   - the missing-columns message with a rollback; any other delete failure, and a failed restore, rolled back with the fixed message; a failed rollback not hiding it;
   - the describer, and one failed check no longer failing the later ones;
-  - **the statement record:** 16 cases (search with and without filters, the impact check by IDs, organisation, and source with dates, bulk delete soft, hard, dry run, by organisation with export and by source with dates, restore, export as JSON and CSV, and both diagnose routes) recorded from `main`'s code at `130be19` into `tests/fixtures/job_routes/statements.json`: 90 statements, with each commit and each result. The branch sends exactly the same, so what is deleted, restored or exported does not change.
-- **On `main`'s code:** 15 of the 22 fail. The 7 that pass check what was already right: no network, the 401s, the 400s, and the statement record, which `main` matches by construction.
+  - **the statement record:** 16 cases (search with and without filters, the impact check by IDs, organisation, and source with dates, bulk delete soft, hard, dry run, by organisation with export and by source with dates, restore, export as JSON and CSV, and both diagnose routes) recorded from `main`'s code at `130be19` into `tests/fixtures/job_routes/statements.json`: 90 recorded steps (53 SQL statements with their parameters, 5 commits, and the cursor and connection closes), and each result. The branch sends exactly the same, so what is deleted, restored or exported does not change. The fake database always counts 2 rows, so bulk delete's zero-match branches and its Meilisearch block are not in the record; this change does not touch them.
+- **On `main`'s code:** 25 of the 32 fail (15 of the first 22). The 7 that pass check what was already right: no network, the 401s, the 400s, and the statement record, which `main` matches by construction.
 - **CI's lists, locally:** 948 passed and 4 skipped; Ruff clean on CI's list; no new Ruff finding in `job_management.py` (59) or `main.py` (29).
 
 Recorded for later, outside this pull request: W-49 (bulk-delete safeguards); the raw text in this file's log lines (phase 3); the bulk-delete Meilisearch block for the removed service; restore with an empty list (a database syntax error, now a fixed 500).
 
-Still to do: the independent code review; the user's merge approval; a read-only check of the Jobs page on the pull request's preview under the guard, with the user signed in and no delete; then the live check and the production Jobs page under the guard.
+- **Independent code review** (separate read-only agent, isolated clone, Python 3.11.9, no network, about 25 minutes, at `5534baf`; a first attempt was stopped before it reported, and the user chose a fresh one): "approve with changes", nothing blocking.
+  - It regenerated the statement record from `130be19` and got the fixture exactly, and confirmed from the diff that no SQL, parameter, deletion condition, commit or success-path order changed.
+  - 18 of 20 mutations caught, including every change to a WHERE clause, to restore's `deleted_at IS NOT NULL`, and every dropped commit (by the statement record). The two survivors were test gaps, both closed: a `SyntaxError` whose text reads "column … does not exist" must now get the ordinary fixed message, so the missing-columns message cannot go back to matching text; and each of the ten diagnose checks is now made to fail in turn, with every later check required to succeed. Both mutations now fail their tests.
+  - Taken: the "90 statements" wording (above).
+  - Accepted, not changed: a failed diagnose check's database text is not logged; the check returns its type and code, and the route has no page.
+- **The planned preview check is dropped.** Vercel's preview builds only the frontend and calls the production backend, so for this backend-only change it would have tested `main`'s code. The production Jobs page under the guard, after the merge, is the check that tests it.
+
+Still to do: the user's merge approval; then the live check and the production Jobs page under the guard, with the user signed in and no control used.
 
 ### Stage 3A. Dependency security
 
