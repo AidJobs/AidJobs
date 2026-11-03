@@ -18,7 +18,9 @@ def _scope(method, path, headers=()):
     return {
         "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method,
         "scheme": "http", "path": path, "raw_path": path.encode(), "query_string": b"",
-        "root_path": "", "headers": [(k.lower().encode(), v.encode()) for k, v in headers],
+        "root_path": "",
+        "headers": [(k.lower().encode(), v if isinstance(v, bytes) else v.encode())
+                    for k, v in headers],
         "client": ("127.0.0.1", 50000), "server": ("testserver", 80),
     }
 
@@ -276,7 +278,38 @@ def test_the_server_root_path_does_not_hide_an_admin_route(app):
     assert (start["status"], reads) == (401, [])
 
 
-@pytest.mark.parametrize("declared", ["²", "1" * 5000, "-1", " 12", "0x10"])
+def test_a_root_path_ending_inside_a_segment_is_not_removed(app):
+    """With root path /ap, /api/admin/... is still an admin path, as the router sees it."""
+    scope = {**_scope("POST", "/api/admin/jobs/delete-bulk",
+                      [JSON, ("Content-Length", "9")]), "root_path": "/ap"}
+    reads = []
+    sent = []
+
+    async def receive():
+        reads.append(1)
+        return {"type": "http.request", "body": b"{not json", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    asyncio.run(app(scope, receive, send))
+    start = next(m for m in sent if m["type"] == "http.response.start")
+    assert (start["status"], reads) == (401, [])
+
+
+def test_scopes_other_than_http_pass_through_untouched():
+    seen = []
+
+    async def inner(scope, receive, send):
+        seen.append(scope)
+
+    lifespan = {"type": "lifespan", "asgi": {"version": "3.0"}}
+    asyncio.run(AdminGateMiddleware(inner)(lifespan, None, None))
+    assert seen == [lifespan]
+
+
+# "²" is sent as the single Latin-1 byte 0xB2, as a client would; str.isdigit() accepts it.
+@pytest.mark.parametrize("declared", [b"\xb2", "1" * 5000, "-1", " 12", "0x10"])
 def test_an_odd_declared_length_is_left_to_the_streamed_count(app, monkeypatch, declared):
     monkeypatch.setenv("COOKIE_SECRET", "gate-test-secret")
     monkeypatch.setenv("ADMIN_PASSWORD", "gate-test-password")
