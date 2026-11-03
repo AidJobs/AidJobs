@@ -1,54 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend, readJsonBody } from '@/lib/backendProxy';
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    // Ensure BACKEND_URL doesn't have trailing /api
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/api/admin/crawl/run`;
-    console.log(`[proxy] POST ${url}`);
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: adminAuthHeaders(req, {
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(body),
-    });
-
-    // Handle 401 - redirect to login
-    if (res.status === 401) {
-      return NextResponse.json(
-        { status: 'error', error: 'Authentication required', authenticated: false },
-        { status: 401 }
-      );
-    }
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error');
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { detail: errorText };
-      }
-      return NextResponse.json(
-        { status: 'error', error: errorData.error || errorData.detail || `HTTP ${res.status}: ${errorText}` },
-        { status: res.status }
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (error) {
-    console.error('Crawl run proxy error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Network error';
-    return NextResponse.json(
-      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
-      { status: 500 }
-    );
-  }
+  const body = await readJsonBody(req, adminErrorBody, true);
+  if (!body.ok) return body.response;
+  return proxyToBackend({
+    route: 'POST /api/admin/crawl/run',
+    path: '/api/admin/crawl/run',
+    method: 'POST',
+    body: body.value,
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }

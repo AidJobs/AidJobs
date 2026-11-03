@@ -1,40 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
-    
-    // Remove cache busting parameter before forwarding
-    const cleanParams = new URLSearchParams(searchParams);
-    cleanParams.delete('_t');
-    
-    const response = await fetch(`${backendUrl}/api/admin/jobs/search?${cleanParams.toString()}`, {
-      headers: adminAuthHeaders(request, {
-        'Cache-Control': 'no-cache',
-      }),
-      cache: 'no-store',  // Prevent caching
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      return NextResponse.json(
-        { status: 'error', ...errorData },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error searching jobs:', error);
-    return NextResponse.json(
-      { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+export async function GET(req: NextRequest) {
+  const params = new URLSearchParams(req.nextUrl.searchParams);
+  params.delete('_t');
+  const query = params.toString();
+  return proxyToBackend({
+    route: 'GET /api/admin/jobs/search',
+    path: `/api/admin/jobs/search${query ? `?${query}` : ''}`,
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-
