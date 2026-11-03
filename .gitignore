@@ -11,6 +11,7 @@ next-env.d.ts
 
 # Python
 .venv/
+.venv311/
 __pycache__/
 
 # Env & local config
