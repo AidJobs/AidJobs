@@ -97,6 +97,19 @@ describe('statuses the browser cannot be given', () => {
     expect(logged).toEqual(['[proxy] GET /api/test: backend 304 status not passed on (ref 01234567)']);
   });
 
+  it.each([301, 307, 308])('keeps a %i as an error with fixed text and without the backend\'s address', async (status) => {
+    backend(`<a href="http://${PLANTED}.internal/">moved</a>`, status, {
+      location: `http://${PLANTED}.internal/api/test/`,
+    });
+    const response = await proxyToBackend(PUBLIC);
+    expect(response.status).toBe(status);
+    expect(response.headers.get('location')).toBeNull();
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ status: 'error', error: `The service failed (HTTP ${status}). Try again.` });
+    expect(text).not.toContain(PLANTED);
+    expect(logged.join('\n')).not.toContain(PLANTED);
+  });
+
   it.each([0, 199, 600, 999])('answers 502 with fixed text for status %i', async (status) => {
     fetchMock.mockResolvedValue({
       status,
