@@ -15,7 +15,7 @@ Every recommendation below was approved by the user on 21 October 2026, except w
 | 1 | Direction | Approve `public-ux-direction.md` with the demo section |
 | 2 | Contract | Approve the five amendments in item 2 |
 | 3 | Logo | **Decided:** placeholder now, logo at the end with the domain |
-| 4 | Launch date | Set when the domain is settled and Stage B is half done. **Changed 30 October 2026:** launch after the crawler foundation, with thousands of jobs (`growth-and-seo-plan.md`, decision 6) |
+| 4 | Launch date | Set when the domain is settled and Stage B is half done. **Changed 30 October 2026:** launch after the crawler foundation, with thousands of jobs (`growth-and-seo-plan.md`, decision 6). **Changed 3 November 2026:** with about 2,000 open jobs, then growing |
 | 5 | Slow first load | **Decided:** cached server-rendered page. Paid instance deferred (budget); keep-alive skipped until after launch. **Updated 30 October 2026:** code built for an always-on instance; paid plan when a recorded signal appears |
 | 6 | AI crawlers | **Decided:** allow search, user-triggered, and training crawlers; block only `Bytespider` |
 | 7 | Server rendering | Cached page with every open job, refreshed every 10 minutes |
@@ -62,6 +62,7 @@ The launch needs the domain (item 9), Stage B, the switch (UX-29), and W-06 if i
 - **Recommendation:** set the date when the domain is settled and Stage B is about half done, when the remaining work can be counted in pull requests.
 - **Decision:** 21 October 2026, the user approved the recommendation: the date is set when the domain is settled and Stage B is about half done.
 - **Changed 30 October 2026:** the launch comes after the crawler foundation, the admin's add-source flow, and gradual source growth, with thousands of jobs (`growth-and-seo-plan.md`, decision 6 and section 7).
+- **Changed 3 November 2026** (the user): the launch comes at about 2,000 open jobs, and sources keep being added after it (`growth-and-seo-plan.md`, decision 6).
 
 ## 5. Slow first load
 
@@ -157,7 +158,7 @@ Established 21 October 2026:
 
 - **Recommendation:** in the browser for launch. Move to the server when open jobs pass about 1,500 or the job data passes about 200 KB compressed, measured at each launch check. UX-11 narrows to what the server-rendered page needs. The public list then reads PostgreSQL through the existing database path; the Meilisearch decision (W-18) is not needed for launch.
 - **Decision:** 21 October 2026, the user approved the recommendation: filtering in the browser for launch; move to the server at about 1,500 open jobs or 200 KB compressed, measured at each launch check.
-- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 6 and section 4.5): the launch now comes with thousands of jobs, past that threshold, so UX-11 includes server-side search and paging before launch. Because server-side search waits on the backend, it needs the always-on instance at launch.
+- **Updated 30 October 2026** (`growth-and-seo-plan.md`, decision 6 and section 4.5): the launch now comes with thousands of jobs, past that threshold, so UX-11 includes server-side search and paging before launch. Because server-side search waits on the backend, it needs the always-on instance at launch. Unchanged by the launch at about 2,000 open jobs (3 November 2026): that is still above the threshold.
 
 ## 11. Where title facts are read
 
