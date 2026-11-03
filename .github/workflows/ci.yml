@@ -1,7 +1,9 @@
 name: CI
 
+# Branch work is checked through its pull request; pushes run only on main, after a merge.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:

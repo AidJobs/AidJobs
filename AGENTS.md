@@ -8,7 +8,8 @@ The rules are in `docs/architecture/aidjobs-migration-contract.md` and `docs/arc
 
 Key conventions, detailed in the ledger:
 
-- Every step needs the user's explicit approval: investigate, plan, implement, merge.
+- Every step needs the user's explicit approval: to investigate, the plan (which covers building it, the review and its fixes), and the merge (which names the head commit and covers deleting the merged branch). Details in the ledger.
+- Start each stage in a new chat; the ledger is the handover.
 - Work on a branch through a pull request. Do not push `main`. Merging to `main` publishes the frontend on Vercel and deploys the backend on Render.
 - Do not crawl production, write to the jobs database, or reindex search unless the user asks for that step.
 - On admin pages, use the read-only browser guard described in the UX plan; never trigger a destructive control during verification.
