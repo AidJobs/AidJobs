@@ -59,6 +59,11 @@ export type ProxyCall = {
   errorBody: ErrorBody;
 };
 
+/** A status the browser can be given with a JSON body or none; others would make Next throw. */
+function passable(status: number): boolean {
+  return status >= 200 && status <= 599 && status !== 304;
+}
+
 function requestIdOf(response: Response): string | null {
   const value = response.headers.get('x-request-id');
   return value && REQUEST_ID.test(value) ? value : null;
@@ -141,8 +146,15 @@ export async function proxyToBackend(call: ProxyCall): Promise<NextResponse> {
     return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, admin);
   }
 
+  if (!passable(response.status)) {
+    logFailure(call.route, `backend ${response.status} status not passed on`, requestId);
+    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, admin);
+  }
+
   if (response.ok) {
-    if (response.status === 204 || text === '') return answer(null, response.status, requestId, admin);
+    if (response.status === 204 || response.status === 205 || text === '') {
+      return answer(null, response.status, requestId, admin);
+    }
     const parsed = parseJson(text);
     if (parsed.ok && parsed.value !== null && typeof parsed.value === 'object') {
       return answer(parsed.value, response.status, requestId, admin);

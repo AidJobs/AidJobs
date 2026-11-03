@@ -71,9 +71,44 @@ describe('answers that pass through', () => {
     expect(await response.text()).toBe('');
   });
 
-  it('forwards only a reference in the backend\'s own format', async () => {
-    backend('{}', 200, { 'x-request-id': `${RID}\r\nSet-Cookie: x=1`.replace(/[\r\n]/g, ' ') });
-    expect((await proxyToBackend(PUBLIC)).headers.get('x-request-id')).toBeNull();
+  it.each([`${RID} Set-Cookie: x=1`, RID.toUpperCase(), `${RID}0`])(
+    'forwards only a reference in the backend\'s own format (%s)',
+    async (value) => {
+      backend('{}', 200, { 'x-request-id': value });
+      expect((await proxyToBackend(PUBLIC)).headers.get('x-request-id')).toBeNull();
+    }
+  );
+
+  it('passes a 205 through without a body', async () => {
+    fetchMock.mockResolvedValue({ status: 205, ok: true, headers: new Headers(), text: async () => '{"ok":true}' });
+    const response = await proxyToBackend(PUBLIC);
+    expect(response.status).toBe(205);
+    expect(await response.text()).toBe('');
+  });
+});
+
+describe('statuses the browser cannot be given', () => {
+  it('answers 502 with fixed text for a 304', async () => {
+    backend(null, 304, { 'x-request-id': RID });
+    const response = await proxyToBackend(PUBLIC);
+    expect(response.status).toBe(502);
+    expect(await json(response)).toEqual({ status: 'error', error: MESSAGES.unreadable });
+    expect(response.headers.get('x-request-id')).toBe(RID);
+    expect(logged).toEqual(['[proxy] GET /api/test: backend 304 status not passed on (ref 01234567)']);
+  });
+
+  it.each([0, 199, 600, 999])('answers 502 with fixed text for status %i', async (status) => {
+    fetchMock.mockResolvedValue({
+      status,
+      ok: false,
+      headers: new Headers(),
+      text: async () => `<html>${PLANTED}</html>`,
+    });
+    const response = await proxyToBackend(PUBLIC);
+    expect(response.status).toBe(502);
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ status: 'error', error: MESSAGES.unreadable });
+    expect(text).not.toContain(PLANTED);
   });
 });
 
@@ -169,6 +204,17 @@ describe('an unreachable backend', () => {
     }));
     await proxyToBackend(PUBLIC);
     expect(logged).toEqual(['[proxy] GET /api/test: backend unreachable, ECONNREFUSED']);
+  });
+
+  it.each([
+    ['a code', { cause: { code: `ECONNREFUSED ${PLANTED}` }, name: 'TypeError' }, 'TypeError'],
+    ['a lowercase code', { cause: { code: 'econnrefused' }, name: 'TypeError' }, 'TypeError'],
+    ['a name', { name: `Abort ${PLANTED}` }, 'Error'],
+    ['a long name', { name: 'A'.repeat(41) }, 'Error'],
+  ])('logs a generic name when %s carries text', async (_case, fields, expected) => {
+    fetchMock.mockRejectedValue(Object.assign(new Error('x'), fields));
+    await proxyToBackend(PUBLIC);
+    expect(logged).toEqual([`[proxy] GET /api/test: backend unreachable, ${expected}`]);
   });
 });
 

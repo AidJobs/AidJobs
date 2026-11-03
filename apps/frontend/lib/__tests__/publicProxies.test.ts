@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import { NextRequest } from 'next/server';
+import { ADMIN_SESSION_HEADER } from '@/lib/adminSession';
 
 // Security plan, stage 4, pull request 1: the four public proxy routes call the backend only
 // through lib/backendProxy, so neither Node's error text nor raw backend text reaches a visitor.
@@ -77,8 +78,11 @@ describe.each(ROUTES)('$method $module', (route) => {
     expect(response.headers.get('x-request-id')).toBe(RID);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`http://backend.test${route.backendPath}`);
-    expect(new Headers(init.headers).get('cookie')).toBeNull();
-    expect(JSON.stringify(init.headers ?? {})).not.toContain(PLANTED);
+    const sent = new Headers(init.headers);
+    expect(sent.get('cookie')).toBeNull();
+    expect(sent.get(ADMIN_SESSION_HEADER)).toBeNull();
+    sent.forEach((value) => expect(value).not.toContain(PLANTED));
+    expect(response.headers.get('cache-control')).not.toBe('private, no-store');
   });
 
   it('answers 503 with fixed text when the backend cannot be reached', async () => {
@@ -130,6 +134,13 @@ describe('POST search/parse', () => {
     expect(new Headers(init.headers).get('content-type')).toBe('application/json');
   });
 
+  it.each([[{ a: 1 }], [['x']], [42], [null]])('sends an empty query when the query is not text (%j)', async (query) => {
+    fetchMock.mockResolvedValue(new Response('{"status":"ok","data":{}}', { status: 200 }));
+    await call({ ...parse, body: JSON.stringify({ query }) });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(JSON.stringify({ query: '' }));
+  });
+
   it('answers 400 with fixed text for a body that is not JSON, without calling the backend', async () => {
     const response = await call({ ...parse, body: `{not json ${PLANTED}` });
     expect(response.status).toBe(400);
@@ -137,6 +148,18 @@ describe('POST search/parse', () => {
     expect(JSON.parse(text)).toEqual({ status: 'error', data: null, error: 'The request body is not valid JSON.' });
     expect(text).not.toContain(PLANTED);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET search/autocomplete', () => {
+  it('encodes the query, so it cannot add or cut backend parameters', async () => {
+    fetchMock.mockResolvedValue(new Response('{"status":"ok","data":[]}', { status: 200 }));
+    const q = 'a&size=999#/../admin?%';
+    await call({ ...ROUTES[3], url: `/api/search/autocomplete?q=${encodeURIComponent(q)}` });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(`http://backend.test/api/search/autocomplete?q=${encodeURIComponent(q)}`);
+    expect(new URL(url).searchParams.get('q')).toBe(q);
+    expect([...new URL(url).searchParams.keys()]).toEqual(['q']);
   });
 });
 
