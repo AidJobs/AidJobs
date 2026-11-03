@@ -31,6 +31,7 @@ from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from security.admin_auth import admin_required
+from security.admin_gate import AdminGateMiddleware
 import psycopg2
 from app.db_config import db_config
 from app.query_parser import parse_query
@@ -136,6 +137,9 @@ def _cors_origins() -> list[str]:
     return origins
 
 
+# Added before CORS, so it sits inside it: preflight requests are answered first, and its 401 and
+# 413 answers carry the CORS headers.
+app.add_middleware(AdminGateMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -151,7 +155,6 @@ app.add_exception_handler(InternalError, internal_error_handler)
 app.include_router(admin_auth_router)
 app.include_router(sources_router)
 app.include_router(presets_router)
-# app/shortlist.py stays unmounted: it takes user_id from the request, not from a session.
 
 # Add new crawler admin routes
 try:

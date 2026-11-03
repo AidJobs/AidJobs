@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.signed_in import SIGN_IN_IN_PROCESS
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FRAGMENT = "FAKEPW7Q"
 # A password with an unencoded "/": urllib cannot read the port, and its message quotes it.
@@ -46,6 +48,7 @@ calls = [
 ADMIN_CALLS = """
 from app import sources
 app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
+""" + SIGN_IN_IN_PROCESS + """
 calls = [
     call("GET", "/api/admin/sources"),
     call("GET", "/api/admin/organisations"),

@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from main import app
+from tests.signed_in import session_headers
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent.parent
@@ -49,14 +50,16 @@ def test_shadow_catalogue_cannot_be_written():
     assert "/api/admin/crawl-v2" not in mounted
 
 
-def test_removed_admin_routes_are_absent():
+def test_removed_admin_routes_are_absent(monkeypatch):
     client = TestClient(app)
     submit = client.post("/api/find-earn/submit", json={"url": "https://example.org"})
     assert submit.status_code == 404
     assert client.post("/admin/database/migrate").status_code == 404
     assert client.post("/admin/jobs/enrich", json={"job_id": "1"}).status_code == 404
     assert client.post("/admin/normalize/reindex").status_code == 404
-    assert client.post("/api/admin/crawl-v2/run", json={"source_id": "1"}).status_code == 404
+    signed_in = session_headers(monkeypatch)
+    assert client.post("/api/admin/crawl-v2/run", json={"source_id": "1"},
+                       headers=signed_in).status_code == 404
     assert "/api/admin/setup/status" in [getattr(route, "path", "") for route in app.routes]
 
 

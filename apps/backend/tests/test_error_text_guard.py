@@ -30,8 +30,6 @@ ALLOWED = {
     "app/enrichment.py::batch_enrich_jobs": 1,
     "app/enrichment_consistency.py::check_consistency": 1,
     "app/enrichment_ground_truth.py::validate_enrichment_accuracy": 1,
-    "app/shortlist.py::get_shortlist": 1,
-    "app/shortlist.py::toggle_shortlist": 1,
     # Reviewed, not a leak: the except branch cannot run.
     "main.py::healthz": 1,
     # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;

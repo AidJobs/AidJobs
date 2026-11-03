@@ -4,6 +4,7 @@ Read-only API endpoints for extracted jobs from pipeline.
 Protected by INTERNAL_API_KEY header token.
 """
 
+import hmac
 import os
 import logging
 from typing import Optional, List, Dict, Any
@@ -32,7 +33,9 @@ def verify_internal_api_key(x_internal_api_key: Optional[str] = Header(None)):
             detail="Internal API not configured (INTERNAL_API_KEY not set)"
         )
     
-    if not x_internal_api_key or x_internal_api_key != INTERNAL_API_KEY:
+    if not x_internal_api_key or not hmac.compare_digest(
+        x_internal_api_key.encode("utf-8"), INTERNAL_API_KEY.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing internal API key"
