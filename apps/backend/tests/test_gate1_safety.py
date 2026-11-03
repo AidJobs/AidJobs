@@ -114,6 +114,11 @@ def test_removed_and_disabled_routes(monkeypatch):
 
     client = TestClient(app)
 
+    # Before signing in, the admin gate answers 401 for any /api/admin/ path, removed ones included.
+    assert client.get("/api/admin/config-check").status_code == 401
+    login = client.post("/api/admin/login", json={"password": "gate1-test-password"})
+    assert login.status_code == 200
+
     env_response = client.get("/admin/config/env")
     config_response = client.get("/api/admin/config-check")
     assert env_response.status_code == 404
@@ -127,7 +132,5 @@ def test_removed_and_disabled_routes(monkeypatch):
     reindex = client.get("/admin/search/reindex")
     assert reindex.status_code == 404
 
-    login = client.post("/api/admin/login", json={"password": "gate1-test-password"})
-    assert login.status_code == 200
     migration = client.post("/api/admin/crawl/run-migration")
     assert migration.status_code == 410

@@ -16,6 +16,7 @@ import psycopg2
 import psycopg2.errors
 import pytest
 
+from tests.signed_in import session_headers
 from tests.test_admin_crawler_errors import DSN_ERROR, FRAGMENT, _calls_source, _run
 
 SID = "00000000-0000-0000-0000-000000000000"
@@ -108,7 +109,7 @@ def test_each_job_route_is_registered_once():
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     from fastapi.testclient import TestClient
 
     from app import job_management
@@ -116,7 +117,7 @@ def client():
 
     app.dependency_overrides[job_management.admin_required] = lambda: "test-admin"
     try:
-        yield TestClient(app, raise_server_exceptions=False)
+        yield TestClient(app, raise_server_exceptions=False, headers=session_headers(monkeypatch))
     finally:
         app.dependency_overrides.pop(job_management.admin_required, None)
 

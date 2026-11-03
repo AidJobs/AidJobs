@@ -1,4 +1,4 @@
-﻿"""Security stage 3, phase 2, PR 2: the crawler admin routes return no exception text.
+"""Security stage 3, phase 2, PR 2: the crawler admin routes return no exception text.
 
 The route walk runs in a fresh process built as production builds it (the method of
 test_admin_sources_errors.py), signed in through a dependency override. The database driver, the
@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from tests.signed_in import SIGN_IN_IN_PROCESS
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FRAGMENT = "FAKEPW3k"
@@ -60,6 +62,7 @@ from main import app
 from app import crawler_admin
 app.dependency_overrides[crawler_admin.admin_required] = lambda: "test-admin"
 client = TestClient(app, raise_server_exceptions=False)
+""" + SIGN_IN_IN_PROCESS + """
 def call(method, path, **kwargs):
     r = client.request(method, path, **kwargs)
     return {"route": method + " " + path, "status": r.status_code, "body": r.text,

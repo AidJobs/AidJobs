@@ -19,6 +19,7 @@ import pytest
 
 from app.log_safety import REQUEST_ID
 from contracts.outbound import FetchError
+from tests.signed_in import SIGN_IN_IN_PROCESS
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FRAGMENT = "FAKEPW3k"
@@ -37,6 +38,7 @@ from main import app
 from app import sources
 app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
 client = TestClient(app, raise_server_exceptions=False)
+""" + SIGN_IN_IN_PROCESS + """
 def call(method, path, **kwargs):
     r = client.request(method, path, **kwargs)
     return {"route": method + " " + path, "status": r.status_code, "body": r.text,
