@@ -193,13 +193,6 @@ try:
 except ImportError:
     logger.warning("Data quality logs router not available")
 
-# Add job management routes
-try:
-    from app.job_management import router as job_management_router
-    app.include_router(job_management_router)
-except ImportError as e:
-    logger.warning(f"[main] Could not import job_management routes: {e}")
-
 # Add pipeline API routes (read-only, internal)
 try:
     from app.pipeline_api import router as pipeline_api_router

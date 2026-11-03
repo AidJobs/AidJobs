@@ -24,13 +24,6 @@ BACKEND = Path(__file__).resolve().parents[1]
 
 ALLOWED = {
     # Admin routes (session required); phase 2.
-    "app/job_management.py::bulk_delete_jobs": 2,
-    "app/job_management.py::diagnose_job_id": 11,
-    "app/job_management.py::diagnose_search_vs_db": 1,
-    "app/job_management.py::export_jobs": 1,
-    "app/job_management.py::get_deletion_impact": 1,
-    "app/job_management.py::restore_jobs": 1,
-    "app/job_management.py::search_jobs": 1,
     "app/search.py::get_search_settings": 1,
     "app/search.py::reindex_jobs": 1,
     "main.py::admin_search_init": 1,
@@ -56,6 +49,7 @@ ALLOWED = {
 
 
 DESCRIBERS = {
+    "describe_check_failure": "app/job_management.py",
     "describe_failure": "app/sources.py",
     "describe_link_failure": "core/link_validator.py",
     "fetch_message": "contracts/outbound.py",

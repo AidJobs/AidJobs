@@ -4,19 +4,22 @@ Enterprise-Grade Job Management API
 Provides comprehensive job search, filtering, bulk operations, and deletion capabilities.
 Works even when sources are deleted.
 """
+import contextlib
 import os
 import logging
 import json
-import traceback
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
 from pydantic import BaseModel  # type: ignore
 import psycopg2  # type: ignore
+from psycopg2 import errors as psycopg2_errors  # type: ignore
 from psycopg2.extras import RealDictCursor  # type: ignore
 
 from security.admin_auth import admin_required
 from app.db_config import db_config
+from app.errors import InternalError, log_failure
+from app.log_safety import current_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,26 @@ def get_db_conn():
     if not conn_params:
         raise HTTPException(status_code=500, detail="Database not configured")
     return psycopg2.connect(**conn_params, connect_timeout=5)
+
+
+def _rollback(conn) -> None:
+    if conn is not None:
+        with contextlib.suppress(psycopg2.Error):
+            conn.rollback()
+
+
+def describe_check_failure(error: BaseException) -> str:
+    """A failed diagnostic check, named by its type and database error code, never its text."""
+    code = getattr(error, "pgcode", None)
+    return f"{type(error).__name__} ({code})" if code else type(error).__name__
+
+
+def _diagnosis_failed(message: str) -> dict:
+    """The diagnose routes' failure answer, in their usual shape; the caller logs the cause."""
+    return {
+        "status": "error",
+        "error": f"{message} (ref {current_request_id()[:8] or 'unavailable'})",
+    }
 
 
 # Request Models
@@ -239,10 +262,10 @@ async def search_jobs(
                 "pages": (total + size - 1) // size
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error searching jobs: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to search jobs: {str(e)}")
+        raise InternalError("Failed to search jobs", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -334,10 +357,10 @@ async def get_deletion_impact(
                 "risk_level": "high" if total_jobs > 1000 or shortlists_count > 100 else "medium" if total_jobs > 100 else "low"
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error analyzing deletion impact: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to analyze impact: {str(e)}")
+        raise InternalError("Failed to analyze impact", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -354,8 +377,6 @@ async def bulk_delete_jobs(
     Bulk delete jobs with comprehensive options.
     Works even when sources are deleted.
     """
-    import traceback
-    
     logger.info(f"[bulk_delete] Received deletion request: type={request.deletion_type}, job_ids={len(request.job_ids) if request.job_ids else 0}, org_name={request.org_name}, source_id={request.source_id}, admin={admin}")
     
     conn = None
@@ -635,25 +656,17 @@ async def bulk_delete_jobs(
     except HTTPException:
         raise
     except psycopg2.Error as e:
-        if conn:
-            conn.rollback()
-        error_msg = f"Database error: {str(e)}"
-        logger.error(f"[bulk_delete] {error_msg}")
-        logger.error(traceback.format_exc())
-        # Check if it's a column missing error
-        if "column" in str(e).lower() and "does not exist" in str(e).lower():
+        _rollback(conn)
+        if isinstance(e, psycopg2_errors.UndefinedColumn):
+            log_failure(logger, "[bulk_delete] Missing deletion columns", e)
             raise HTTPException(
                 status_code=500,
                 detail="Database schema error: Missing deletion columns. Please run migration to add deleted_at, deleted_by, deletion_reason columns."
             )
-        raise HTTPException(status_code=500, detail=error_msg)
+        raise InternalError("Failed to delete jobs", cause=e)
     except Exception as e:
-        if conn:
-            conn.rollback()
-        error_msg = f"Unexpected error: {str(e)}"
-        logger.error(f"[bulk_delete] {error_msg}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=error_msg)
+        _rollback(conn)
+        raise InternalError("Failed to delete jobs", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -699,12 +712,11 @@ async def restore_jobs(
                 "message": f"Successfully restored {restored_count} jobs"
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Error restoring jobs: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to restore jobs: {str(e)}")
+        _rollback(conn)
+        raise InternalError("Failed to restore jobs", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -793,10 +805,10 @@ async def export_jobs(
                     "count": len(jobs)
                 }
             }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error exporting jobs: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to export jobs: {str(e)}")
+        raise InternalError("Failed to export jobs", cause=e)
     finally:
         if cursor:
             cursor.close()
@@ -859,13 +871,11 @@ async def diagnose_search_vs_db(
                 "note": "These are the job IDs that the search endpoint returns (what UI sees). Compare these with the IDs you're trying to delete."
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"[diagnose_search_vs_db] Error: {e}")
-        logger.error(traceback.format_exc())
-        return {
-            "status": "error",
-            "error": str(e),
-        }
+        log_failure(logger, "Diagnosis failed", e)
+        return _diagnosis_failed("Diagnosis failed")
     finally:
         if cursor:
             cursor.close()
@@ -896,6 +906,7 @@ async def diagnose_job_id(
             "tests": {}
         }
         
+        # A failed check is rolled back, or every later check fails on the aborted transaction.
         # Test 1: Direct UUID comparison
         try:
             cursor.execute("SELECT id, id::text, id::uuid::text FROM jobs WHERE id::uuid = %s LIMIT 1", (job_id,))
@@ -906,9 +917,10 @@ async def diagnose_job_id(
                 "query": "WHERE id::uuid = %s"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["uuid_direct"] = {
                 "success": False,
-                "error": str(e),
+                "error": describe_check_failure(e),
                 "query": "WHERE id::uuid = %s"
             }
         
@@ -922,9 +934,10 @@ async def diagnose_job_id(
                 "query": "WHERE id::text = %s"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["text_direct"] = {
                 "success": False,
-                "error": str(e),
+                "error": describe_check_failure(e),
                 "query": "WHERE id::text = %s"
             }
         
@@ -938,9 +951,10 @@ async def diagnose_job_id(
                 "query": "WHERE id::text = ANY(ARRAY[%s]::text[])"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["text_array"] = {
                 "success": False,
-                "error": str(e),
+                "error": describe_check_failure(e),
                 "query": "WHERE id::text = ANY(ARRAY[%s]::text[])"
             }
         
@@ -954,9 +968,10 @@ async def diagnose_job_id(
                 "query": "WHERE id::text ILIKE %s"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["text_ilike"] = {
                 "success": False,
-                "error": str(e),
+                "error": describe_check_failure(e),
                 "query": "WHERE id::text ILIKE %s"
             }
         
@@ -970,9 +985,10 @@ async def diagnose_job_id(
                 "query": "SELECT id, id::text, pg_typeof(id) FROM jobs LIMIT 5"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["sample_ids"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 6: Count total jobs
@@ -984,9 +1000,10 @@ async def diagnose_job_id(
                 "total": total
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["total_jobs"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 7: Try to find similar IDs (first 8 chars match)
@@ -1001,9 +1018,10 @@ async def diagnose_job_id(
                 "count": len(similar)
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["similar_ids"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 8: Check if ID exists with any method
@@ -1032,9 +1050,10 @@ async def diagnose_job_id(
                     "query": "WHERE id::text = %s (no deleted_at filter)"
                 }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["including_deleted"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 10: Get first 10 job IDs from search endpoint (what UI sees)
@@ -1054,9 +1073,10 @@ async def diagnose_job_id(
                 "query": "SELECT id::text FROM jobs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["search_endpoint_ids"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 11: Check if requested ID is in search results
@@ -1074,9 +1094,10 @@ async def diagnose_job_id(
                 "query": "SELECT id::text FROM jobs ORDER BY created_at DESC LIMIT 100"
             }
         except Exception as e:
+            _rollback(conn)
             diagnostics["tests"]["all_db_ids_sample"] = {
                 "success": False,
-                "error": str(e)
+                "error": describe_check_failure(e)
             }
         
         # Test 13: Check if any of the search result IDs match the requested ID format
@@ -1093,13 +1114,11 @@ async def diagnose_job_id(
             "data": diagnostics
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"[diagnose] Error: {e}")
-        logger.error(traceback.format_exc())
-        return {
-            "status": "error",
-            "error": str(e),
-        }
+        log_failure(logger, "Diagnosis failed", e)
+        return _diagnosis_failed("Diagnosis failed")
     finally:
         if cursor:
             cursor.close()
