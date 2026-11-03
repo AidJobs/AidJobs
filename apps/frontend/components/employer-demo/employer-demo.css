@@ -486,6 +486,11 @@
   text-transform: uppercase;
 }
 
+.ej-menu-sep {
+  margin: 4px 6px;
+  border-top: 1px solid var(--hair);
+}
+
 .ej-menu .aj-tip {
   display: flex;
 }

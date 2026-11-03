@@ -19,7 +19,7 @@ import {
   type BuildContext,
 } from './engine';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, ReachRecord, Review, State } from './types';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, ReachRecord, Review, State, Tone } from './types';
 
 export const FREE_DRAFTS = 3;
 export const FREE_LIVE = 2;
@@ -340,6 +340,17 @@ export function saveAsOurFormat(id: string) {
     const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: 'Saved from your own advert', tone: j.tone, order: j.sections.map((x) => ({ key: x.key, heading: x.title })), commitments: j.commitments };
     return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'upload', adverts: 1, confirmed: true } }, jobs: s.jobs.map((x) => (x.id === id ? { ...x, format: 'house' } : x)), notice: { text: `Saved as the ${s.org.short} format. New jobs start from it.` } };
   });
+}
+
+/** Saves a format the organisation built itself, for reuse. Returns its key. */
+export function createFormat(label: string, order: Format['order'], tone: Tone): string {
+  const key = nextId('format');
+  update((s) => ({
+    ...s,
+    formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments }],
+    notice: { text: `Saved ${label}. It is under Your organisation in Select a format.` },
+  }));
+  return key;
 }
 
 /** Learns the organisation's format from one of its past adverts: its headings and their order. */

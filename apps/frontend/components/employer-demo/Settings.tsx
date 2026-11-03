@@ -6,6 +6,7 @@ import { invite, removeMember, setRole } from './actions';
 import { FAMILIES_ORDER, SECTIONS } from './engine';
 import { nextId, update, useDemo } from './store';
 import type { ApprovalSetting, Format, Org, OrgType, Person, Tone } from './types';
+import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
 
 const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response'];
@@ -504,6 +505,7 @@ function FormatEditor({ format, onClose }: { format: Format; onClose: () => void
 export function Styles() {
   const s = useDemo();
   const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const duplicate = (f: Format) => {
     const key = nextId('format');
     update((x) => ({ ...x, formats: [...x.formats, { ...f, key, family: 'Your organisation', label: `${f.label} (${x.org.short})`, usedBy: `Based on ${f.label}` }] }));
@@ -512,14 +514,20 @@ export function Styles() {
   const shown = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   return (
     <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-8">
-      <div>
-        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-          Styles
-        </h1>
-        <p className="aj-muted" style={{ margin: '4px 0 0' }}>
-          Real advert formats, named by format, with the headings their users write. Yours comes first. Any section can be added to any job.
-        </p>
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+            Styles
+          </h1>
+          <p className="aj-muted" style={{ margin: '4px 0 0' }}>
+            Real advert formats, named by format, with the headings their users write. Yours comes first. Any section can be added to any job.
+          </p>
+        </div>
+        <button type="button" className="aj-ink-btn" onClick={() => setCreating(true)}>
+          Create your own format
+        </button>
       </div>
+      {creating && <CreateFormatDialog onClose={() => setCreating(false)} />}
       {FAMILIES_ORDER.map((fam) => {
         const list = shown.filter((f) => f.family === fam);
         if (!list.length) return null;

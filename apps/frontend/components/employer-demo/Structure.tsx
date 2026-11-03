@@ -5,8 +5,11 @@ import { useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { applyFormat, confirmLearned, formatOf, moveSection, toggleCommitment, toggleSection } from './actions';
 import { COMMITMENTS, commitmentText, FAMILIES_ORDER, GROUPS, headingFor, recommendSections, SECTIONS } from './engine';
+import CreateFormatDialog from './FormatBuilder';
 import type { DemoJob, State } from './types';
 import { Dialog } from './ui';
+
+const CREATE = '__create';
 
 function scrollToSection(key: string) {
   document.getElementById(`ej-sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -17,6 +20,7 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
   const rec = new Set(recommendSections(format, job.facts));
   const [closed, setClosed] = useState<Record<string, boolean>>({ commitments: true });
   const [headingsOpen, setHeadingsOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-') || f.key === job.format);
   const toggleGroup = (k: string) => setClosed({ ...closed, [k]: !closed[k] });
 
@@ -42,7 +46,7 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
           <label className="ej-panel-label" htmlFor="ej-style">
             Style
           </label>
-          <select id="ej-style" className="ej-select" value={job.format} onChange={(e) => applyFormat(job.id, e.target.value)}>
+          <select id="ej-style" className="ej-select" value={job.format} onChange={(e) => (e.target.value === CREATE ? setCreating(true) : applyFormat(job.id, e.target.value))}>
             {FAMILIES_ORDER.map((fam) => {
               const list = formats.filter((f) => f.family === fam);
               return list.length ? (
@@ -55,7 +59,9 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                 </optgroup>
               ) : null;
             })}
+            <option value={CREATE}>Create your own format…</option>
           </select>
+          {creating && <CreateFormatDialog onClose={() => setCreating(false)} onSaved={(key) => applyFormat(job.id, key)} />}
           <span className="aj-faint" style={{ fontSize: 11 }}>
             {format.usedBy}
           </span>

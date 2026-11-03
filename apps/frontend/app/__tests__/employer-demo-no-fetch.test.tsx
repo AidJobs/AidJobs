@@ -111,6 +111,19 @@ describe('employer demo: never calls the network', () => {
       shows(inside);
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     }
+    act(() => (Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Select a format') as HTMLElement).click());
+    click('Create your own format');
+    const nameInput = document.querySelector('input[placeholder^="For example"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(nameInput, 'Riverstone field roles');
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    for (const sec of ['About us', 'Responsibilities', 'How to apply']) click(sec);
+    click('Save format');
+    const made = getState().formats.find((f) => f.label === 'Riverstone field roles');
+    expect(made?.family).toBe('Your organisation');
+    expect(made?.order.map((o) => o.key)).toEqual(['about', 'responsibilities', 'apply']);
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.getAttribute('aria-label') === 'Format: Riverstone field roles')).toBe(true);
     const pill = container.querySelector('[aria-label="Add sections"] button');
     act(() => (pill as HTMLElement).click());
     expect(pill?.getAttribute('aria-pressed')).toBe('true');

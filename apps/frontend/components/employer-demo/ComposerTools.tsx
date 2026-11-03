@@ -100,7 +100,7 @@ export function PlusMenu({ s, onFormat, onPaste, onLink }: { s: State; onFormat:
 }
 
 /** The format the new job is written in; choosing one applies its headings, order, and tone. */
-export function FormatMenu({ s, value, onChange }: { s: State; value: string | null; onChange: (key: string) => void }) {
+export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: string | null; onChange: (key: string) => void; onCreate: () => void }) {
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const current = formats.find((f) => f.key === value);
   return (
@@ -125,6 +125,8 @@ export function FormatMenu({ s, value, onChange }: { s: State; value: string | n
           </div>
         );
       })}
+      <div className="ej-menu-sep" />
+      <MenuItem title="Create your own format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
     </ClickMenu>
   );
 }

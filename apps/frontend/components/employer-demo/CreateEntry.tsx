@@ -6,6 +6,7 @@ import Tip from '@/components/site/Tip';
 import { defaultFormatKey, formatOf, importPasted, learnFormat, startJob } from './actions';
 import Composer from './Composer';
 import { DraftsMenu, FormatMenu, PlusMenu } from './ComposerTools';
+import CreateFormatDialog from './FormatBuilder';
 import { addSuggestions, detectRole, extractFacts, FORMAT_FOR_TYPE, headingFor, SECTION_BY_KEY, suggestNext } from './engine';
 import { LINKED_SAMPLE, MARKET_SAMPLE } from './sample';
 import { go, update, useDemo } from './store';
@@ -202,7 +203,7 @@ export default function CreateEntry() {
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
   const [extra, setExtra] = useState<string[]>([]);
-  const [dialog, setDialog] = useState<'paste' | 'link' | 'format' | null>(null);
+  const [dialog, setDialog] = useState<'paste' | 'link' | 'format' | 'create' | null>(null);
   const fkey = picked ?? defaultFormatKey(s);
   const format = formatOf(s, fkey);
   const { facts } = extractFacts(text, s.today);
@@ -240,7 +241,7 @@ export default function CreateEntry() {
             tools={
               <>
                 <PlusMenu s={s} onFormat={() => setDialog('format')} onPaste={() => setDialog('paste')} onLink={() => setDialog('link')} />
-                <FormatMenu s={s} value={picked} onChange={setPicked} />
+                <FormatMenu s={s} value={picked} onChange={setPicked} onCreate={() => setDialog('create')} />
                 <DraftsMenu s={s} />
               </>
             }
@@ -270,6 +271,7 @@ export default function CreateEntry() {
       {dialog === 'paste' && <PasteDialog onClose={() => setDialog(null)} />}
       {dialog === 'link' && <LinkDialog onClose={() => setDialog(null)} />}
       {dialog === 'format' && <UploadFormatDialog onClose={() => setDialog(null)} />}
+      {dialog === 'create' && <CreateFormatDialog onClose={() => setDialog(null)} onSaved={setPicked} />}
     </div>
   );
 }
