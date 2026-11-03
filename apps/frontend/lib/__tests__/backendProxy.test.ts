@@ -231,6 +231,27 @@ describe('an unreachable backend', () => {
   });
 });
 
+describe('paths URL parsing would rewrite', () => {
+  it.each(['/api/a/../b', '/api/a/./b', '/api/a/..', '/api/a/.?x=1', '/api/a/..#y'])(
+    'refuses %s with 400 and fixed text, without calling the backend',
+    async (path) => {
+      const response = await proxyToBackend({ ...PUBLIC, path });
+      expect(response.status).toBe(400);
+      expect(await json(response)).toEqual({ status: 'error', error: MESSAGES.invalidRequest });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(logged).toEqual(['[proxy] GET /api/test: refused, a dot segment in the path']);
+    }
+  );
+
+  it.each(['/api/a/..%2Fb', '/api/a/.b', '/api/a/b.', '/api/a?x=..', '/api/a?x=/../'])(
+    'passes %s, which has no dot segment',
+    async (path) => {
+      backend('{}', 200);
+      expect((await proxyToBackend({ ...PUBLIC, path })).status).toBe(200);
+    }
+  );
+});
+
 describe('what goes to the backend', () => {
   it('sends a body as JSON, labelled JSON', async () => {
     backend('{}', 200);

@@ -1,25 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export async function POST(req: NextRequest) {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/admin/search/reindex`, {
-      method: 'POST',
-      headers: adminAuthHeaders(req),
-    });
-
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
-  } catch (error) {
-    console.error('Search reindex proxy error:', error);
-    return NextResponse.json(
-      { error: 'Failed to reindex search' },
-      { status: 500 }
-    );
-  }
+  return proxyToBackend({
+    route: 'POST /api/admin/search/reindex',
+    path: '/api/admin/search/reindex',
+    method: 'POST',
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-
