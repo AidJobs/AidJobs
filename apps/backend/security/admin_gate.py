@@ -7,6 +7,8 @@ alone let a caller without a session have any body read and parsed (malformed JS
 """
 from __future__ import annotations
 
+import re
+
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -20,14 +22,25 @@ MAX_ADMIN_BODY_BYTES = 1024 * 1024
 
 NOT_SIGNED_IN = {"detail": "Authentication required"}
 TOO_LARGE = {"detail": "Request too large"}
+# A declared length the gate trusts; anything else is left to the streamed count below.
+_LENGTH = re.compile(r"[0-9]{1,15}")
+
+
+def _route_path(scope) -> str:
+    """The path the router matches: Starlette's own rule for removing the server's root path."""
+    path = scope["path"]
+    root = scope.get("root_path", "")
+    if root and path.startswith(root) and (path == root or path[len(root)] == "/"):
+        return path[len(root):]
+    return path
 
 
 class AdminGateMiddleware:
     """Pure ASGI, inside the CORS middleware, so preflight requests are answered before it.
 
-    A permitted body is read here, at most one byte past the limit, and handed to the route
-    unchanged; an error raised from inside a route's body reading would reach FastAPI as
-    "400 There was an error parsing the body" instead of the 413.
+    A permitted body is read here, stopping at the first piece that passes the limit, and handed
+    to the route unchanged; an error raised from inside a route's body reading would reach
+    FastAPI as "400 There was an error parsing the body" instead of the 413.
     """
 
     def __init__(self, app, max_body_bytes: int = MAX_ADMIN_BODY_BYTES):
@@ -35,15 +48,17 @@ class AdminGateMiddleware:
         self.max_body_bytes = max_body_bytes
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(ADMIN_PREFIX):
+        path = _route_path(scope) if scope["type"] == "http" else ""
+        if not path.startswith(ADMIN_PREFIX):
             await self.app(scope, receive, send)
             return
         request = Request(scope)
-        if scope["path"] not in OPEN_PATHS and get_current_admin(request) is None:
+        if path not in OPEN_PATHS and get_current_admin(request) is None:
             await JSONResponse(NOT_SIGNED_IN, status_code=401)(scope, receive, send)
             return
         declared = request.headers.get("content-length")
-        if declared is not None and declared.isdigit() and int(declared) > self.max_body_bytes:
+        if (declared is not None and _LENGTH.fullmatch(declared)
+                and int(declared) > self.max_body_bytes):
             await JSONResponse(TOO_LARGE, status_code=413)(scope, receive, send)
             return
 

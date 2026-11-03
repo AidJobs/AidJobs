@@ -209,6 +209,83 @@ def test_the_limit_is_exact_for_declared_and_streamed_bodies(monkeypatch, size, 
         assert declared[1] == streamed[1] == {"read": size}
 
 
+def test_only_the_session_check_sign_in_and_sign_out_are_open():
+    assert admin_gate.OPEN_PATHS == {"/api/admin/session", "/api/admin/login", "/api/admin/logout"}
+
+
+def _recording_gate(messages_from_client, monkeypatch):
+    """The gate around an app that records every message it receives, until a disconnect."""
+    seen = []
+
+    async def app(scope, receive, send):
+        while True:
+            message = await receive()
+            seen.append(message)
+            if message["type"] == "http.disconnect" or message.get("type") == "sentinel":
+                break
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    pending = list(messages_from_client)
+
+    async def receive():
+        return pending.pop(0)
+
+    async def send(message):
+        pass
+
+    signed = [(k.lower().encode(), v.encode()) for k, v in session_headers(monkeypatch).items()]
+    scope = {**_scope("POST", "/api/admin/x"), "headers": signed}
+    asyncio.run(AdminGateMiddleware(app, max_body_bytes=100)(scope, receive, send))
+    return seen
+
+
+def test_after_the_body_the_route_hears_the_client_itself(monkeypatch):
+    seen = _recording_gate([
+        {"type": "http.request", "body": b"ab", "more_body": True},
+        {"type": "http.request", "body": b"cd", "more_body": False},
+        {"type": "sentinel"},
+    ], monkeypatch)
+    assert seen == [{"type": "http.request", "body": b"abcd", "more_body": False},
+                    {"type": "sentinel"}]
+
+
+def test_a_client_that_leaves_mid_body_is_passed_on_as_gone(monkeypatch):
+    seen = _recording_gate([
+        {"type": "http.request", "body": b"ab", "more_body": True},
+        {"type": "http.disconnect"},
+    ], monkeypatch)
+    assert seen == [{"type": "http.disconnect"}]
+
+
+def test_the_server_root_path_does_not_hide_an_admin_route(app):
+    scope = {**_scope("POST", "/p/api/admin/jobs/delete-bulk",
+                      [JSON, ("Content-Length", "9")]), "root_path": "/p"}
+    reads = []
+    sent = []
+
+    async def receive():
+        reads.append(1)
+        return {"type": "http.request", "body": b"{not json", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    asyncio.run(app(scope, receive, send))
+    start = next(m for m in sent if m["type"] == "http.response.start")
+    assert (start["status"], reads) == (401, [])
+
+
+@pytest.mark.parametrize("declared", ["²", "1" * 5000, "-1", " 12", "0x10"])
+def test_an_odd_declared_length_is_left_to_the_streamed_count(app, monkeypatch, declared):
+    monkeypatch.setenv("COOKIE_SECRET", "gate-test-secret")
+    monkeypatch.setenv("ADMIN_PASSWORD", "gate-test-password")
+    body = b'{"password": "x"}'
+    status, answer, _headers, _reads = _call(
+        app, "POST", "/api/admin/login", [JSON, ("Content-Length", declared)], [body])
+    assert (status, answer) == (401, {"detail": "Invalid credentials"})
+
+
 def test_the_gate_reuses_the_session_check_of_admin_required():
     from security import admin_auth
 
