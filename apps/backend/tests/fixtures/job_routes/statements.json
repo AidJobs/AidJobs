@@ -1,0 +1,980 @@
+{
+ "delete, ids, dry run": {
+  "outcome": {
+   "data": {
+    "dry_run": true,
+    "jobs_to_delete": 2,
+    "message": "Dry run: Would delete 2 jobs"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, deleted_at, status FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[])",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[])",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "delete, ids, hard": {
+  "outcome": {
+   "data": {
+    "deleted_count": 1,
+    "deleted_ids": [
+     "job-1"
+    ],
+    "deletion_type": "hard",
+    "exported_data": null,
+    "message": "Successfully hard-deleted 1 jobs"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, deleted_at, status FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[])",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[])",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[])",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "DELETE FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[]) RETURNING id::text",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "COMMIT",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "delete, ids, soft": {
+  "outcome": {
+   "data": {
+    "deleted_count": 2,
+    "deleted_ids": [
+     "job-1",
+     "job-2"
+    ],
+    "deletion_type": "soft",
+    "exported_data": null,
+    "message": "Successfully soft-deleted 2 jobs"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, deleted_at, status FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[])",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[])",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "UPDATE jobs SET deleted_at = NOW(), deleted_by = 'admin', deletion_reason = %s WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL RETURNING id::text",
+    [
+     "Bulk deletion via admin",
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "COMMIT",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "delete, organisation, export": {
+  "outcome": {
+   "data": {
+    "deleted_count": 2,
+    "deleted_ids": [
+     "job-1",
+     "job-2"
+    ],
+    "deletion_type": "soft",
+    "exported_data": [
+     {
+      "deleted_at": null,
+      "id": "job-1",
+      "org_name": "Org",
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-1"
+     },
+     {
+      "deleted_at": null,
+      "id": "job-2",
+      "org_name": "Org",
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-2"
+     }
+    ],
+    "message": "Successfully soft-deleted 2 jobs"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "SELECT id::text, title, org_name, apply_url, location_raw, deadline, created_at, fetched_at, source_id::text as source_id FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL LIMIT 10000",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "UPDATE jobs SET deleted_at = NOW(), deleted_by = 'admin', deletion_reason = %s WHERE org_name ILIKE %s AND deleted_at IS NULL RETURNING id::text",
+    [
+     "cleanup",
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "COMMIT",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "delete, source and dates": {
+  "outcome": {
+   "data": {
+    "deleted_count": 2,
+    "deleted_ids": [
+     "job-1",
+     "job-2"
+    ],
+    "deletion_type": "soft",
+    "exported_data": null,
+    "message": "Successfully soft-deleted 2 jobs"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE source_id::text = %s AND created_at >= %s AND created_at <= %s AND deleted_at IS NULL",
+    [
+     "source-1",
+     "2026-01-01",
+     "2026-06-30"
+    ]
+   ],
+   [
+    "UPDATE jobs SET deleted_at = NOW(), deleted_by = 'admin', deletion_reason = %s WHERE source_id::text = %s AND created_at >= %s AND created_at <= %s AND deleted_at IS NULL RETURNING id::text",
+    [
+     "Bulk deletion via admin",
+     "source-1",
+     "2026-01-01",
+     "2026-06-30"
+    ]
+   ],
+   [
+    "COMMIT",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "diagnose, one id": {
+  "outcome": {
+   "data": {
+    "found_by_any_method": true,
+    "id_length": 5,
+    "id_repr": "'job-1'",
+    "id_type": "str",
+    "requested_id": "job-1",
+    "requested_id_in_search_results": true,
+    "search_ids_format_check": {
+     "format_match": true,
+     "length_match": true,
+     "requested_id_format": "job-1",
+     "search_ids_sample": [
+      "job-1",
+      "job-2"
+     ]
+    },
+    "tests": {
+     "all_db_ids_sample": {
+      "count": 2,
+      "ids": [
+       "job-1",
+       "job-2"
+      ],
+      "query": "SELECT id::text FROM jobs ORDER BY created_at DESC LIMIT 100",
+      "success": true
+     },
+     "including_deleted": {
+      "is_deleted": false,
+      "query": "WHERE id::text = %s (no deleted_at filter)",
+      "result": {
+       "count": 2,
+       "total": 2
+      },
+      "success": true
+     },
+     "sample_ids": {
+      "query": "SELECT id, id::text, pg_typeof(id) FROM jobs LIMIT 5",
+      "samples": [
+       {
+        "deleted_at": null,
+        "id": "job-1",
+        "org_name": "Org",
+        "source_id": "source-1",
+        "status": "active",
+        "title": "Title job-1"
+       },
+       {
+        "deleted_at": null,
+        "id": "job-2",
+        "org_name": "Org",
+        "source_id": "source-1",
+        "status": "active",
+        "title": "Title job-2"
+       }
+      ],
+      "success": true
+     },
+     "search_endpoint_ids": {
+      "count": 2,
+      "ids": [
+       {
+        "deleted_at": null,
+        "id": "job-1",
+        "title": "Title job-1"
+       },
+       {
+        "deleted_at": null,
+        "id": "job-2",
+        "title": "Title job-2"
+       }
+      ],
+      "query": "SELECT id::text FROM jobs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10",
+      "success": true
+     },
+     "similar_ids": {
+      "count": 1,
+      "matches": [
+       {
+        "id": "job-1%",
+        "title": "Title job-1%"
+       }
+      ],
+      "prefix": "job-1",
+      "success": true
+     },
+     "text_array": {
+      "query": "WHERE id::text = ANY(ARRAY[%s]::text[])",
+      "result": {
+       "count": 2,
+       "total": 2
+      },
+      "success": true
+     },
+     "text_direct": {
+      "query": "WHERE id::text = %s",
+      "result": {
+       "count": 2,
+       "total": 2
+      },
+      "success": true
+     },
+     "text_ilike": {
+      "query": "WHERE id::text ILIKE %s",
+      "result": {
+       "count": 2,
+       "total": 2
+      },
+      "success": true
+     },
+     "total_jobs": {
+      "success": true,
+      "total": 2
+     },
+     "uuid_direct": {
+      "query": "WHERE id::uuid = %s",
+      "result": {
+       "count": 2,
+       "total": 2
+      },
+      "success": true
+     }
+    }
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id, id::text, id::uuid::text FROM jobs WHERE id::uuid = %s LIMIT 1",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT id, id::text FROM jobs WHERE id::text = %s LIMIT 1",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT id, id::text FROM jobs WHERE id::text = ANY(ARRAY[%s]::text[]) LIMIT 1",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT id, id::text FROM jobs WHERE id::text ILIKE %s LIMIT 1",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT id, id::text, pg_typeof(id) as id_type FROM jobs LIMIT 5",
+    []
+   ],
+   [
+    "SELECT COUNT(*) as total FROM jobs",
+    []
+   ],
+   [
+    "SELECT id::text, title FROM jobs WHERE id::text LIKE %s LIMIT 10",
+    [
+     "job-1%"
+    ]
+   ],
+   [
+    "SELECT id::text, deleted_at, title FROM jobs WHERE id::text = %s LIMIT 1",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "SELECT id::text, title, deleted_at FROM jobs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10",
+    []
+   ],
+   [
+    "SELECT id::text FROM jobs ORDER BY created_at DESC LIMIT 100",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "diagnose, search against database": {
+  "outcome": {
+   "data": {
+    "database_stats": {
+     "active_jobs": 2,
+     "deleted_jobs": 0,
+     "total_jobs": 2
+    },
+    "note": "These are the job IDs that the search endpoint returns (what UI sees). Compare these with the IDs you're trying to delete.",
+    "search_endpoint_results": {
+     "count": 2,
+     "ids": [
+      "job-1",
+      "job-2"
+     ],
+     "sample_jobs": [
+      {
+       "created_at": "",
+       "id": "job-1",
+       "title": "Title job-1"
+      },
+      {
+       "created_at": "",
+       "id": "job-2",
+       "title": "Title job-2"
+      }
+     ]
+    }
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, deleted_at, created_at FROM jobs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 50",
+    []
+   ],
+   [
+    "SELECT COUNT(*) as total FROM jobs WHERE deleted_at IS NULL",
+    []
+   ],
+   [
+    "SELECT COUNT(*) as total FROM jobs",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "export, ids, json": {
+  "outcome": {
+   "data": {
+    "count": 1,
+    "format": "json",
+    "jobs": [
+     {
+      "deleted_at": null,
+      "id": "job-1",
+      "org_name": "Org",
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-1"
+     }
+    ]
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, org_name, location_raw, country_iso, level_norm, deadline, apply_url, description_snippet, status, source_id::text as source_id, created_at, fetched_at FROM jobs WHERE id::text IN (%s) ORDER BY created_at DESC LIMIT 10000",
+    [
+     "job-1"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "export, organisation, csv": {
+  "outcome": {
+   "data": {
+    "content": "id,title,deleted_at,status,source_id,org_name\r\njob-1,Title job-1,,active,source-1,Org\r\njob-2,Title job-2,,active,source-1,Org\r\n",
+    "count": 2,
+    "format": "csv"
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT id::text, title, org_name, location_raw, country_iso, level_norm, deadline, apply_url, description_snippet, status, source_id::text as source_id, created_at, fetched_at FROM jobs WHERE org_name ILIKE %s ORDER BY created_at DESC LIMIT 10000",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "impact, ids": {
+  "outcome": {
+   "data": {
+    "active_jobs": 2,
+    "deleted_jobs": 0,
+    "enrichment_history_count": 0,
+    "ground_truth_count": 0,
+    "risk_level": "low",
+    "shortlists_count": 2,
+    "total_jobs": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text = ANY(ARRAY[%s,%s]::text[]) AND deleted_at IS NULL AND status = 'active'",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM shortlists WHERE job_id::text = ANY(ARRAY[%s,%s]::text[])",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "impact, organisation": {
+  "outcome": {
+   "data": {
+    "active_jobs": 2,
+    "deleted_jobs": 0,
+    "enrichment_history_count": 0,
+    "ground_truth_count": 0,
+    "risk_level": "low",
+    "shortlists_count": 2,
+    "total_jobs": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL AND status = 'active'",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "SELECT id::text FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL LIMIT 1000",
+    [
+     "%Oxfam%"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM shortlists WHERE job_id::text IN (%s,%s)",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "impact, source and dates": {
+  "outcome": {
+   "data": {
+    "active_jobs": 2,
+    "deleted_jobs": 0,
+    "enrichment_history_count": 0,
+    "ground_truth_count": 0,
+    "risk_level": "low",
+    "shortlists_count": 2,
+    "total_jobs": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE source_id::text = %s AND created_at >= %s AND created_at <= %s AND deleted_at IS NULL",
+    [
+     "source-1",
+     "2026-01-01",
+     "2026-06-30"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE source_id::text = %s AND created_at >= %s AND created_at <= %s AND deleted_at IS NULL AND status = 'active'",
+    [
+     "source-1",
+     "2026-01-01",
+     "2026-06-30"
+    ]
+   ],
+   [
+    "SELECT id::text FROM jobs WHERE source_id::text = %s AND created_at >= %s AND created_at <= %s AND deleted_at IS NULL LIMIT 1000",
+    [
+     "source-1",
+     "2026-01-01",
+     "2026-06-30"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM shortlists WHERE job_id::text IN (%s,%s)",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "restore": {
+  "outcome": {
+   "data": {
+    "message": "Successfully restored 2 jobs",
+    "restored_count": 2,
+    "restored_ids": [
+     "job-1",
+     "job-2"
+    ]
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "UPDATE jobs SET deleted_at = NULL, deleted_by = NULL, deletion_reason = NULL WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL RETURNING id::text",
+    [
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "COMMIT",
+    []
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "search, defaults": {
+  "outcome": {
+   "data": {
+    "items": [
+     {
+      "deleted_at": null,
+      "id": "job-1",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-1"
+     },
+     {
+      "deleted_at": null,
+      "id": "job-2",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-2"
+     }
+    ],
+    "page": 1,
+    "pages": 1,
+    "size": 50,
+    "total": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE (deleted_at IS NULL)",
+    []
+   ],
+   [
+    "SELECT id::text, title, org_name, location_raw, country_iso, level_norm, deadline, apply_url, status, source_id::text as source_id, created_at, fetched_at, deleted_at, deleted_by, deletion_reason, data_quality_score, data_quality_issues, quality_score, quality_grade, quality_issues, needs_review, latitude, longitude, is_remote, geocoding_source FROM jobs WHERE (deleted_at IS NULL) ORDER BY created_at DESC LIMIT %s OFFSET %s",
+    [
+     "50",
+     "0"
+    ]
+   ],
+   [
+    "SELECT id::text, org_name, careers_url, status FROM sources WHERE id::text IN (%s)",
+    [
+     "source-1"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "search, deleted": {
+  "outcome": {
+   "data": {
+    "items": [
+     {
+      "deleted_at": null,
+      "id": "job-1",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-1"
+     },
+     {
+      "deleted_at": null,
+      "id": "job-2",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-2"
+     }
+    ],
+    "page": 1,
+    "pages": 1,
+    "size": 50,
+    "total": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE (deleted_at IS NOT NULL)",
+    []
+   ],
+   [
+    "SELECT id::text, title, org_name, location_raw, country_iso, level_norm, deadline, apply_url, status, source_id::text as source_id, created_at, fetched_at, deleted_at, deleted_by, deletion_reason, data_quality_score, data_quality_issues, quality_score, quality_grade, quality_issues, needs_review, latitude, longitude, is_remote, geocoding_source FROM jobs WHERE (deleted_at IS NOT NULL) ORDER BY created_at DESC LIMIT %s OFFSET %s",
+    [
+     "50",
+     "0"
+    ]
+   ],
+   [
+    "SELECT id::text, org_name, careers_url, status FROM sources WHERE id::text IN (%s)",
+    [
+     "source-1"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ },
+ "search, every filter": {
+  "outcome": {
+   "data": {
+    "items": [
+     {
+      "deleted_at": null,
+      "id": "job-1",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-1"
+     },
+     {
+      "deleted_at": null,
+      "id": "job-2",
+      "org_name": "Org",
+      "source": {
+       "careers_url": "https://org.example/",
+       "id": "source-1",
+       "org_name": "Org",
+       "status": "active"
+      },
+      "source_id": "source-1",
+      "status": "active",
+      "title": "Title job-2"
+     }
+    ],
+    "page": 2,
+    "pages": 1,
+    "size": 20,
+    "total": 2
+   },
+   "status": "ok"
+  },
+  "statements": [
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE status = 'active' AND (deleted_at IS NULL) AND (title ILIKE %s OR org_name ILIKE %s OR description_snippet ILIKE %s) AND org_name ILIKE %s AND source_id::text = %s AND created_at >= %s AND created_at <= %s AND data_quality_score >= %s",
+    [
+     "%engineer%",
+     "%engineer%",
+     "%engineer%",
+     "%Ox%",
+     "source-1",
+     "2026-01-01",
+     "2026-12-31",
+     "50"
+    ]
+   ],
+   [
+    "SELECT id::text, title, org_name, location_raw, country_iso, level_norm, deadline, apply_url, status, source_id::text as source_id, created_at, fetched_at, deleted_at, deleted_by, deletion_reason, data_quality_score, data_quality_issues, quality_score, quality_grade, quality_issues, needs_review, latitude, longitude, is_remote, geocoding_source FROM jobs WHERE status = 'active' AND (deleted_at IS NULL) AND (title ILIKE %s OR org_name ILIKE %s OR description_snippet ILIKE %s) AND org_name ILIKE %s AND source_id::text = %s AND created_at >= %s AND created_at <= %s AND data_quality_score >= %s ORDER BY title ASC LIMIT %s OFFSET %s",
+    [
+     "%engineer%",
+     "%engineer%",
+     "%engineer%",
+     "%Ox%",
+     "source-1",
+     "2026-01-01",
+     "2026-12-31",
+     "50",
+     "20",
+     "20"
+    ]
+   ],
+   [
+    "SELECT id::text, org_name, careers_url, status FROM sources WHERE id::text IN (%s)",
+    [
+     "source-1"
+    ]
+   ],
+   [
+    "CURSOR CLOSE",
+    []
+   ],
+   [
+    "CLOSE",
+    []
+   ]
+  ]
+ }
+}
