@@ -733,6 +733,6 @@ def batch_enrich_jobs(
         return {
             "success_count": success_count,
             "error_count": error_count + len(job_ids) - success_count,
-            "errors": [str(e)],
+            "errors": ["Batch enrichment failed"],
         }
 

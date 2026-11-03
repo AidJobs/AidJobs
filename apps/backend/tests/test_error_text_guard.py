@@ -1,18 +1,21 @@
-"""Security stage 3: no new place may put exception text into an API response.
+"""Security stage 3: no new place may put exception text into an API response or a stored message.
 
-A static tripwire over app/, main.py and the link validator. Inside every `except ... as NAME:`
-block, in any function, it finds where NAME (or traceback.format_exc()) reaches a
-`raise HTTPException(...)`, a `return`, a `JSONResponse(...)`, a dict entry or dict literal, an
-error/message variable, or an append/update. The last four are counted in every function, not only
+A static tripwire over app/, main.py, the link validator and the crawl modules. Inside every
+`except ... as NAME:` block, in any function, it finds where NAME (or traceback.format_exc())
+reaches a `raise HTTPException(...)`, a `return`, a `JSONResponse(...)`, a dict entry or dict
+literal, an error/message variable, an append/update, or a call that stores a crawl outcome
+(STORING_CALLS). The dict, variable and append rules are counted in every function, not only
 routes, because the facets leak was a helper's `base["error"] = str(e)` returned by a public route,
 and the link validator's was a result dict returned later. It does not follow values through
 other variables; it is not a proof of absence, and the runtime leak tests remain the proof.
 
-ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
-convert them and shrink this list to nothing. A converted function must be removed from it.
+ALLOWED listed what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
+converted them all, and it is empty (3 November 2026); a test keeps it empty.
 
 DESCRIBERS are reviewed functions that turn an exception into our own words by its type and never
-repeat its text; a direct call DESCRIBER(NAME) is not a finding.
+repeat its text; a direct call DESCRIBER(NAME) is not a finding. MASKERS are reviewed functions
+that keep an exception's text with its secrets masked, for stored crawl messages only; a direct
+call MASKER(NAME) or MASKER(NAME, <whole number>) is not a finding.
 """
 import ast
 from collections import Counter
@@ -22,21 +25,7 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 
-ALLOWED = {
-    # Not reachable in production today (router not mounted, or no caller); phase 3.
-    "app/data_quality_logs.py::get_data_quality_logs": 1,
-    "app/data_quality_logs.py::get_data_quality_stats": 1,
-    "app/data_quality_logs.py::get_rejected_jobs": 1,
-    "app/enrichment.py::batch_enrich_jobs": 1,
-    "app/enrichment_consistency.py::check_consistency": 1,
-    "app/enrichment_ground_truth.py::validate_enrichment_accuracy": 1,
-    # Reviewed, not a leak: the except branch cannot run.
-    "main.py::healthz": 1,
-    # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;
-    # _search_meilisearch uses the text only for keyword matching).
-    "app/ai_service.py::_call_openrouter": 6,
-    "app/search.py::_search_meilisearch": 2,
-}
+ALLOWED: dict[str, int] = {}
 
 
 DESCRIBERS = {
@@ -46,13 +35,31 @@ DESCRIBERS = {
     "fetch_message": "contracts/outbound.py",
 }
 
+MASKERS = {
+    "stored_text": "app/log_safety.py",
+}
+
+TRUSTED = {**DESCRIBERS, **MASKERS}
+
 # Outside app/: modules that build admin responses from exception handling.
 EXTRA_SCANNED = ["core/link_validator.py"]
+
+# Modules that store crawl outcomes the Crawls and Sources pages show (crawl_logs.message,
+# sources.last_crawl_message, failed_inserts.error). The only place a masker may be used.
+CRAWL_SCANNED = ["orchestrator.py", "core/extraction_logger.py"]
+
+# Calls whose arguments are stored as a crawl outcome.
+STORING_CALLS = {"_failed_result", "log_failed_insert"}
+
+
+def _crawl_files():
+    return ([BACKEND / rel for rel in CRAWL_SCANNED]
+            + sorted((BACKEND / "crawler_v2").glob("*.py")))
 
 
 def _scanned_files():
     return ([BACKEND / "main.py"] + sorted((BACKEND / "app").glob("*.py"))
-            + [BACKEND / rel for rel in EXTRA_SCANNED])
+            + [BACKEND / rel for rel in EXTRA_SCANNED] + _crawl_files())
 
 
 def _module(rel):
@@ -65,10 +72,16 @@ def _call_name(call):
 
 
 def _describes(node, name):
-    """A direct call DESCRIBER(NAME): the exception goes in, only our own words come out."""
-    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-            and node.func.id in DESCRIBERS and not node.keywords
-            and [type(a) for a in node.args] == [ast.Name] and node.args[0].id == name)
+    """DESCRIBER(NAME), or MASKER(NAME) with at most a whole-number limit: nothing else goes in."""
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in TRUSTED and not node.keywords and node.args
+            and isinstance(node.args[0], ast.Name) and node.args[0].id == name):
+        return False
+    rest = node.args[1:]
+    if node.func.id in MASKERS:
+        return len(rest) <= 1 and all(
+            isinstance(a, ast.Constant) and type(a.value) is int for a in rest)
+    return not rest
 
 
 def _refs(node, name):
@@ -115,7 +128,7 @@ def _reaches_response(node, name):
         return _call_name(node.exc) == "HTTPException" and _refs(node.exc, name)
     if isinstance(node, ast.Return):
         return node.value is not None and _refs(node.value, name)
-    if isinstance(node, ast.Call) and _call_name(node) == "JSONResponse":
+    if isinstance(node, ast.Call) and _call_name(node) in {"JSONResponse", *STORING_CALLS}:
         return _refs(node, name)
     # In any function, not only routes: the facets leak was a helper's dict entry
     # (base["error"] = str(e)) returned by a public route.
@@ -170,9 +183,9 @@ def _import_bindings(node):
         return
     for alias in node.names:
         if alias.name == "*":
-            yield from DESCRIBERS  # the names it binds are unknown, so it binds every describer
+            yield from TRUSTED  # the names it binds are unknown, so it binds every trusted name
             continue
-        home = DESCRIBERS.get(alias.name)
+        home = TRUSTED.get(alias.name)
         if alias.asname or home is None or node.level or node.module != _module(home):
             yield alias.asname or alias.name
 
@@ -205,18 +218,18 @@ def _bindings(tree):
 
 
 def _describer_bindings(source):
-    return Counter(name for name in _bindings(ast.parse(source)) if name in DESCRIBERS)
+    return Counter(name for name in _bindings(ast.parse(source)) if name in TRUSTED)
 
 
 def test_each_describer_is_the_reviewed_one():
     """Each trusted name is defined once, where it was reviewed, and bound nowhere else."""
     defined = Counter()
-    homes = [BACKEND / rel for rel in sorted(set(DESCRIBERS.values()))]
+    homes = [BACKEND / rel for rel in sorted(set(TRUSTED.values()))]
     for path in sorted(set(_scanned_files()) | set(homes)):
         rel = path.relative_to(BACKEND).as_posix()
         for name, count in _describer_bindings(path.read_text(encoding="utf-8")).items():
             defined[(name, rel)] += count
-    assert defined == Counter({(name, where): 1 for name, where in DESCRIBERS.items()})
+    assert defined == Counter({(name, where): 1 for name, where in TRUSTED.items()})
 
 
 @pytest.mark.parametrize("source", [
@@ -321,6 +334,72 @@ def test_a_dict_inside_a_finding_is_counted_once():
 def test_the_link_validator_is_scanned():
     assert BACKEND / "core/link_validator.py" in _scanned_files()
     assert not {k for k in findings() if k.startswith("core/link_validator.py::")}
+
+
+def test_the_crawl_modules_are_scanned():
+    scanned = set(_scanned_files())
+    crawl = set(_crawl_files())
+    assert BACKEND / "orchestrator.py" in crawl and BACKEND / "core/extraction_logger.py" in crawl
+    assert {BACKEND / "crawler_v2" / f"{n}.py" for n in ("simple_crawler", "rss_crawler",
+                                                       "api_crawler")} <= crawl
+    assert crawl <= scanned
+    rels = {p.relative_to(BACKEND).as_posix() for p in crawl}
+    assert not {k for k in findings() if k.split("::")[0] in rels}
+
+
+def _masker_calls(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return [node.lineno for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and _call_name(node) in MASKERS]
+
+
+def _backend_modules():
+    skipped = {"tests", "scripts", "__pycache__"}
+    return [path for path in sorted(BACKEND.rglob("*.py"))
+            if not skipped & set(path.relative_to(BACKEND).parts)
+            and not any(part.startswith((".", "venv")) for part in path.relative_to(BACKEND).parts)]
+
+
+def test_a_masker_is_used_only_where_crawl_outcomes_are_stored():
+    """Responses get fixed text (InternalError); only stored crawl outcomes keep masked text."""
+    crawl = set(_crawl_files())
+    assert BACKEND / "contracts" / "outbound.py" in _backend_modules()
+    outside = {path.relative_to(BACKEND).as_posix(): _masker_calls(path)
+               for path in _backend_modules() if path not in crawl}
+    assert not {rel: lines for rel, lines in outside.items() if lines}
+    assert sum(len(_masker_calls(path)) for path in crawl) == 6
+
+
+@pytest.mark.parametrize("stored, found", [
+    ("result = _failed_result(str(exc)[:500])", 1),
+    ("result = _failed_result(stored_text(exc, 500))", 0),
+    ("result = _failed_result(f'Failed: {stored_text(exc)}')", 0),
+    ("result = _failed_result(stored_text(exc, len(str(exc))))", 1),
+    ("result = _failed_result(stored_text(exc, limit=500))", 1),
+    ("result = _failed_result(stored_text(exc, 500, exc))", 1),
+    ("result = _failed_result(stored_text(str(exc), 500))", 1),
+    ("result = _failed_result(describe_failure(exc, 500))", 1),
+    ("logger.log_failed_insert(source_url=url, error=str(exc))", 1),
+    ("return {'status': 'failed', 'message': str(exc)[:200]}", 1),
+    ("return {'status': 'failed', 'message': stored_text(exc, 200)}", 0),
+    ("error_msg = f'Unexpected error processing job: {str(exc)}'", 1),
+    ("error_msg = f'Unexpected error processing job: {stored_text(exc)}'", 0),
+])
+def test_stored_crawl_outcomes_are_found_unless_masked(stored, found):
+    source = (
+        "def crawl(source):\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception as exc:\n"
+        f"        {stored}\n"
+    )
+    assert sum(_findings_in(source, "orchestrator.py").values()) == found
+
+
+def test_the_allowlist_is_empty():
+    """Stage 3 is done: no function may put exception text into a response or stored message."""
+    assert ALLOWED == {}
+    assert not findings()
 
 
 def test_converted_functions_leave_the_allowlist():

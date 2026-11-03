@@ -1,35 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest, props: { params: Promise<{ job_id: string }> }) {
-  const params = await props.params;
-  try {
-    const { job_id } = params;
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
-
-    const response = await fetch(`${backendUrl}/api/admin/link-validation/validate-job/${job_id}`, {
-      method: 'POST',
-      headers: adminAuthHeaders(request),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      return NextResponse.json(
-        { status: 'error', ...errorData },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error validating job link:', error);
-    return NextResponse.json(
-      { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+export async function POST(req: NextRequest, props: { params: Promise<{ job_id: string }> }) {
+  const { job_id: jobId } = await props.params;
+  return proxyToBackend({
+    route: 'POST /api/admin/link-validation/validate-job/[job_id]',
+    path: `/api/admin/link-validation/validate-job/${encodeURIComponent(jobId)}`,
+    method: 'POST',
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-

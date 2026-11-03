@@ -253,10 +253,6 @@ def test_prevention_keeps_secrets_out_of_the_message_itself(monkeypatch, caplog)
 
 def test_the_global_error_handler_logs_without_the_secret(caplog):
     """main.py's middleware must log through log_failure, not with the raw exception text."""
-    import sys
-    import types
-
-    sys.modules.setdefault("app.db", types.ModuleType("app.db")).get_db_conn = lambda: None
     import main
 
     def explode():

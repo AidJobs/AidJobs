@@ -1,53 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-export async function POST(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const execute = searchParams.get('execute') === 'true';
-    
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/api/admin/meilisearch/sync?execute=${execute}`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: adminAuthHeaders(request),
-    });
-
-    if (response.status === 401) {
-      return NextResponse.json(
-        { status: 'error', error: 'Authentication required', authenticated: false },
-        { status: 401 }
-      );
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { detail: errorText };
-      }
-      return NextResponse.json(
-        { status: 'error', error: errorData.detail || errorData.error || `HTTP ${response.status}: ${errorText}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Meilisearch sync proxy error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Network error';
-    return NextResponse.json(
-      { status: 'error', error: `Failed to connect to backend: ${errorMessage}` },
-      { status: 500 }
-    );
-  }
+export async function POST(req: NextRequest) {
+  const execute = req.nextUrl.searchParams.get('execute') === 'true';
+  return proxyToBackend({
+    route: 'POST /api/admin/meilisearch/sync',
+    path: `/api/admin/meilisearch/sync?execute=${execute}`,
+    method: 'POST',
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-

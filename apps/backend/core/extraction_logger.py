@@ -9,6 +9,8 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 
+from app.log_safety import redact_exception
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,7 +95,7 @@ class ExtractionLogger:
                 return str(log_id)
         
         except Exception as e:
-            logger.error(f"Error logging extraction: {e}")
+            logger.error(f"Error logging extraction: {redact_exception(e)}")
             if conn:
                 conn.rollback()
             return None
@@ -164,7 +166,7 @@ class ExtractionLogger:
                 return str(log_id)
         
         except Exception as e:
-            logger.error(f"Error logging failed insert: {e}")
+            logger.error(f"Error logging failed insert: {redact_exception(e)}")
             if conn:
                 conn.rollback()
             return None
@@ -231,7 +233,7 @@ class ExtractionLogger:
                 return stats
         
         except Exception as e:
-            logger.error(f"Error getting extraction stats: {e}")
+            logger.error(f"Error getting extraction stats: {redact_exception(e)}")
             return {'ok': 0, 'partial': 0, 'empty': 0, 'db_fail': 0, 'total': 0}
         finally:
             if conn:
@@ -300,7 +302,7 @@ class ExtractionLogger:
                 return results
         
         except Exception as e:
-            logger.error(f"Error getting failed inserts: {e}")
+            logger.error(f"Error getting failed inserts: {redact_exception(e)}")
             return []
         finally:
             if conn:

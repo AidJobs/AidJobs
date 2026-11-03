@@ -1,55 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { proxyToBackend, type ErrorBody } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const errorBody: ErrorBody = (message, _kind, requestId) => ({
+  ok: false,
+  status: 'error',
+  error: message,
+  detail: message,
+  ...(requestId ? { request_id: requestId } : {}),
+});
 
-export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  try {
-    // Ensure BACKEND_URL doesn't have trailing /api
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    console.log(`[proxy] POST ${backendUrl}/api/admin/sources/${params.id}/simulate_extract`);
-    
-    const response = await fetch(`${backendUrl}/api/admin/sources/${params.id}/simulate_extract`, {
-      method: 'POST',
-      headers: adminAuthHeaders(request),
-    });
-
-    // Handle 401 - redirect to login
-    if (response.status === 401) {
-      return NextResponse.json(
-        { ok: false, error: 'Authentication required', authenticated: false },
-        { status: 401 }
-      );
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText };
-      }
-      return NextResponse.json(
-        { ok: false, error: errorData.error || errorData.detail || `HTTP ${response.status}: ${errorText}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    
-    return NextResponse.json(data, { 
-      status: response.status,
-    });
-  } catch (error) {
-    console.error('API proxy error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Network error';
-    return NextResponse.json(
-      { ok: false, error: `Failed to connect to backend: ${errorMessage}` },
-      { status: 500 }
-    );
-  }
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const { id } = await props.params;
+  return proxyToBackend({
+    route: 'POST /api/admin/sources/[id]/simulate_extract',
+    path: `/api/admin/sources/${encodeURIComponent(id)}/simulate_extract`,
+    method: 'POST',
+    session: req,
+    errorBody,
+  });
 }

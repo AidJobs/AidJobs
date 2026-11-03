@@ -17,6 +17,7 @@ from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
+from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
 
 logger = logging.getLogger(__name__)
@@ -251,7 +252,7 @@ class SimpleRSSCrawler:
                         cur.execute("ROLLBACK TO SAVEPOINT job_save")
                         del recorded[recorded_mark:]
                         failed += 1
-                        logger.error("RSS job failed to save: %s", exc)
+                        logger.error("RSS job failed to save: %s", redact_exception(exc))
                         continue
                     if outcome == "created":
                         inserted += 1
@@ -265,7 +266,7 @@ class SimpleRSSCrawler:
                 commit_and_schedule(conn, recorded, loop=loop)
         
         except Exception as e:
-            logger.error(f"Error saving jobs: {e}")
+            logger.error(f"Error saving jobs: {redact_exception(e)}")
             conn.rollback()
             raise
         finally:
@@ -329,10 +330,10 @@ class SimpleRSSCrawler:
             }
         
         except Exception as e:
-            logger.error(f"Error crawling RSS {org_name}: {e}", exc_info=True)
+            logger.error(f"Error crawling RSS {org_name}: {redact_exception(e)}", exc_info=True)
             return {
                 'status': 'failed',
-                'message': str(e)[:200],
+                'message': stored_text(e, 200),
                 'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
             }
 
