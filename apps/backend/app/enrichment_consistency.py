@@ -204,7 +204,7 @@ def check_consistency(
         
     except Exception as e:
         logger.error(f"[enrichment_consistency] Failed to check consistency: {e}", exc_info=True)
-        return {"error": str(e)}
+        return {"error": "Failed to check consistency"}
 
 
 def get_consistency_report(limit: int = 50) -> Dict[str, Any]:

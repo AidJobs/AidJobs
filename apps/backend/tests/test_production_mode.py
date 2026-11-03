@@ -1,17 +1,9 @@
 """W-22: callers never receive tracebacks or raw stored data, whatever AIDJOBS_ENV says."""
 import asyncio
 import inspect
-import sys
-import types
 
 import pytest
 from fastapi.testclient import TestClient
-
-# data_quality_logs (imported by main) needs app.db, which is not in this repository.
-if "app.db" not in sys.modules:
-    _db_stub = types.ModuleType("app.db")
-    _db_stub.get_db_conn = lambda: None
-    sys.modules["app.db"] = _db_stub
 
 import app.job_management as job_management
 import app.search as search

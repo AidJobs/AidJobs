@@ -24,7 +24,6 @@ PREAMBLE = """
 import json, sys, types
 import dotenv
 dotenv.load_dotenv = lambda *args, **kwargs: False
-sys.modules.setdefault("app.db", types.ModuleType("app.db")).get_db_conn = lambda: None
 from fastapi.testclient import TestClient
 from main import app
 client = TestClient(app, raise_server_exceptions=False)
