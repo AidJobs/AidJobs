@@ -11,6 +11,8 @@ from typing import Any, Optional, Dict, List
 from collections import deque
 import httpx
 
+from app.log_safety import redact_exception
+
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -145,7 +147,6 @@ class AIService:
             payload["max_tokens"] = max_tokens
         
         # Retry with exponential backoff
-        last_error = None
         for attempt in range(MAX_RETRIES):
             try:
                 # Calculate delay for this attempt (exponential backoff)
@@ -174,8 +175,7 @@ class AIService:
                                 self.circuit_breaker.record_success()
                                 return {"content": parsed, "raw": data}
                             except json.JSONDecodeError as e:
-                                logger.error(f"[ai_service] Failed to parse JSON response: {e}, content: {content[:200]}")
-                                last_error = e
+                                logger.error(f"[ai_service] Failed to parse JSON response: {redact_exception(e)} ({len(content)} characters)")
                                 self.circuit_breaker.record_call(True)
                                 continue  # Retry
                         # Record success
@@ -183,8 +183,7 @@ class AIService:
                         self.circuit_breaker.record_success()
                         return {"content": content, "raw": data}
                     
-                    logger.error(f"[ai_service] Unexpected response format: {data}")
-                    last_error = ValueError("Unexpected response format")
+                    logger.error(f"[ai_service] Unexpected response format, keys: {sorted(data)[:10] if isinstance(data, dict) else type(data).__name__}")
                     self.circuit_breaker.record_call(True)
                     continue  # Retry
                     
@@ -193,42 +192,37 @@ class AIService:
                 status_code = e.response.status_code
                 if status_code >= 500:
                     # Server errors - retry
-                    logger.warning(f"[ai_service] HTTP {status_code} error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
-                    last_error = e
+                    logger.warning(f"[ai_service] HTTP {status_code} error (attempt {attempt + 1}/{MAX_RETRIES}): {redact_exception(e)}")
                     self.circuit_breaker.record_call(True)
                     continue
                 else:
                     # Client errors (4xx) - don't retry
-                    logger.error(f"[ai_service] HTTP {status_code} client error: {e}")
+                    logger.error(f"[ai_service] HTTP {status_code} client error: {redact_exception(e)}")
                     self.circuit_breaker.record_call(True)
                     return None
                     
             except httpx.TimeoutException as e:
-                logger.warning(f"[ai_service] Timeout error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
-                last_error = e
+                logger.warning(f"[ai_service] Timeout error (attempt {attempt + 1}/{MAX_RETRIES}): {redact_exception(e)}")
                 self.circuit_breaker.record_call(True)
                 continue  # Retry on timeout
                 
             except httpx.NetworkError as e:
-                logger.warning(f"[ai_service] Network error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
-                last_error = e
+                logger.warning(f"[ai_service] Network error (attempt {attempt + 1}/{MAX_RETRIES}): {redact_exception(e)}")
                 self.circuit_breaker.record_call(True)
                 continue  # Retry on network errors
                 
             except json.JSONDecodeError as e:
-                logger.error(f"[ai_service] JSON decode error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
-                last_error = e
+                logger.error(f"[ai_service] JSON decode error (attempt {attempt + 1}/{MAX_RETRIES}): {redact_exception(e)}")
                 self.circuit_breaker.record_call(True)
                 continue  # Retry
                 
             except Exception as e:
-                logger.error(f"[ai_service] Unexpected error (attempt {attempt + 1}/{MAX_RETRIES}): {e}", exc_info=True)
-                last_error = e
+                logger.error(f"[ai_service] Unexpected error (attempt {attempt + 1}/{MAX_RETRIES}): {redact_exception(e)}", exc_info=True)
                 self.circuit_breaker.record_call(True)
                 continue  # Retry
         
         # All retries failed
-        logger.error(f"[ai_service] All {MAX_RETRIES} retry attempts failed. Last error: {last_error}")
+        logger.error(f"[ai_service] All {MAX_RETRIES} retry attempts failed (each is logged above)")
         return None
     
     def enrich_job(
@@ -393,7 +387,7 @@ Return only valid JSON, no markdown formatting."""
             try:
                 return json.loads(content) if isinstance(content, str) else content
             except (json.JSONDecodeError, TypeError) as e:
-                logger.error(f"[ai_service] Failed to parse enrichment JSON: {e}, content type: {type(content)}")
+                logger.error(f"[ai_service] Failed to parse enrichment JSON: {redact_exception(e)}, content type: {type(content)}")
                 return None
         
         logger.warning(f"[ai_service] No content in result: {result}")
@@ -519,7 +513,7 @@ Return only valid JSON, no markdown formatting."""
             try:
                 return json.loads(content) if isinstance(content, str) else content
             except (json.JSONDecodeError, TypeError) as e:
-                logger.error(f"[ai_service] Failed to parse query JSON: {e}, content type: {type(content)}")
+                logger.error(f"[ai_service] Failed to parse query JSON: {redact_exception(e)}, content type: {type(content)}")
                 return None
         
         logger.warning(f"[ai_service] No content in result: {result}")
@@ -607,7 +601,7 @@ Return only valid JSON array, no markdown formatting."""
                     return data
                 return None
             except (json.JSONDecodeError, TypeError) as e:
-                logger.error(f"[ai_service] Failed to parse autocomplete JSON: {e}, content type: {type(content)}")
+                logger.error(f"[ai_service] Failed to parse autocomplete JSON: {redact_exception(e)}, content type: {type(content)}")
                 return None
         
         logger.warning(f"[ai_service] No content in result: {result}")
