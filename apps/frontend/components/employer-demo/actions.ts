@@ -342,6 +342,19 @@ export function saveAsOurFormat(id: string) {
   });
 }
 
+/** Learns the organisation's format from one of its past adverts: its headings and their order. */
+export function learnFormat(text: string): boolean {
+  const parsed = readPasted(text);
+  if (!parsed.length) return false;
+  const order: Format['order'] = [];
+  for (const p of parsed) if (!order.some((o) => o.key === p.key)) order.push({ key: p.key, heading: p.heading });
+  update((s) => {
+    const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: `Learned from your advert: ${order.map((o) => o.heading).join(', ')}`, tone: 'warm', order, commitments: formatOf(s, 'house').commitments };
+    return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'upload', adverts: 1, confirmed: true } }, notice: { text: `Learned the ${s.org.short} format from your advert. New jobs start from it.` } };
+  });
+  return true;
+}
+
 export function confirmLearned() {
   update((s) => ({ ...s, org: { ...s.org, learned: s.org.learned ? { ...s.org.learned, confirmed: true } : s.org.learned }, notice: { text: 'Your format is confirmed. New jobs start from it.' } }));
 }

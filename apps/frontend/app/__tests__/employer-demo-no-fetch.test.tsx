@@ -15,7 +15,7 @@ jest.mock('next/link', () => ({
 }));
 
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
-import { publish, readIntent, startJob, writeDraft } from '@/components/employer-demo/actions';
+import { learnFormat, publish, readIntent, startJob, writeDraft } from '@/components/employer-demo/actions';
 import { getState, go, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -103,7 +103,7 @@ describe('employer demo: never calls the network', () => {
     shows('Add:');
     for (const [tool, inside] of [
       ['Start from what you have', 'Use a job description from a link'],
-      [/^Format: /, 'UN Secretariat format'],
+      ['Select a format', 'UN Secretariat format'],
       [/^Continue a draft/, 'Finance Officer'],
     ] as const) {
       const el = Array.from(container.querySelectorAll('button')).find((b) => (typeof tool === 'string' ? b.getAttribute('aria-label') === tool : tool.test(b.getAttribute('aria-label') ?? '')));
@@ -114,7 +114,6 @@ describe('employer demo: never calls the network', () => {
     const pill = container.querySelector('[aria-label="Add sections"] button');
     act(() => (pill as HTMLElement).click());
     expect(pill?.getAttribute('aria-pressed')).toBe('true');
-
     for (const p of [false, true]) {
       phone = p;
       render();
@@ -189,6 +188,11 @@ describe('employer demo: never calls the network', () => {
     });
     route(window.location.hash);
     shows('1 of 1 sent');
+
+    act(() => {
+      expect(learnFormat('WHO WE ARE\nRiverstone works in East Africa.\n\nTHE JOB\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.')).toBe(true);
+    });
+    expect(getState().formats.find((f) => f.key === 'house')?.order.map((o) => o.heading)).toEqual(['Who we are', 'The job', 'How to apply']);
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
