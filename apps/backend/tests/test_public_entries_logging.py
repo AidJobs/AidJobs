@@ -113,6 +113,76 @@ def test_a_failing_ai_call_logs_no_secret_and_returns_none(error, monkeypatch, c
     _clean(messages)
 
 
+@pytest.mark.parametrize("error, posts", [
+    (httpx.ConnectError(LEAK, request=_request()), 3),
+    (_status_error(503), 3),
+    (_status_error(401), 1),
+    (RuntimeError(LEAK), 3),
+], ids=["network", "server-error", "client-error", "unexpected"])
+def test_each_failure_is_tried_as_often_as_before(error, posts, monkeypatch):
+    """A 4xx is not retried; every other failure is tried three times."""
+    calls = []
+
+    class Client(_raise(error)):
+        def post(self, *args, **kwargs):
+            calls.append(1)
+            raise error
+
+    service = ai_module.AIService()
+    service.enabled = True
+    service.api_key = FAKE_KEY
+    monkeypatch.setattr(ai_module.httpx, "Client", Client)
+    monkeypatch.setattr(ai_module.time, "sleep", lambda seconds: None)
+    assert service._call_openrouter([{"role": "user", "content": "nurse"}]) is None
+    assert len(calls) == posts
+
+
+LOGGER_METHODS = {"debug", "info", "warning", "error", "critical", "exception"}
+
+
+def _raw_exception_logs(path):
+    """Log calls inside `except ... as NAME:` that put NAME itself into the message."""
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    found = []
+    for handler in ast.walk(tree):
+        if not isinstance(handler, ast.ExceptHandler) or not handler.name:
+            continue
+        for node in ast.walk(handler):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in LOGGER_METHODS
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "logger"):
+                continue
+            for arg in node.args:
+                parts = ([v.value for v in arg.values if isinstance(v, ast.FormattedValue)]
+                         if isinstance(arg, ast.JoinedStr) else [arg])
+                if any(isinstance(p, ast.Name) and p.id == handler.name for p in parts):
+                    found.append(node.lineno)
+    return found
+
+
+@pytest.mark.parametrize("module", ["app/ai_service.py", "app/search.py"])
+def test_no_log_line_in_these_modules_writes_an_exception_raw(module):
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / module
+    assert _raw_exception_logs(path) == []
+
+
+def test_the_raw_exception_check_finds_one():
+    import tempfile
+    from pathlib import Path
+
+    source = ("def f():\n    try:\n        g()\n    except Exception as e:\n"
+              "        logger.warning(f'failed: {e}')\n        logger.error('x %s', e)\n"
+              "        logger.error('y %s', redact_exception(e))\n")
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "probe.py"
+        path.write_text(source, encoding="utf-8")
+        assert _raw_exception_logs(path) == [5, 6]
+
+
 def _search_service(index_error, reconnects):
     service = search_module.SearchService.__new__(search_module.SearchService)
 
