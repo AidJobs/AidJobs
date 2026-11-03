@@ -41,6 +41,14 @@ FACETS_UNAVAILABLE = "Facets unavailable"
 # PR #50's helper now lives in app.log_safety, with the same markers.
 _redacted = redact_exception
 
+_CONNECTION_WORDS = ("connection", "timeout", "unreachable", "refused")
+
+
+def _connection_failure(error: BaseException) -> bool:
+    """Whether a Meilisearch failure looks like a lost connection, which a reconnect may fix."""
+    text = str(error).lower()
+    return any(word in text for word in _CONNECTION_WORDS)
+
 
 class SearchService:
     def __init__(self):
@@ -102,7 +110,7 @@ class SearchService:
             return False
         except Exception as e:
             # JSON parsing errors, connection errors, etc. - all mean unhealthy
-            logger.debug(f"[aidjobs] Meilisearch health check failed: {e}")
+            logger.debug(f"[aidjobs] Meilisearch health check failed: {redact_exception(e)}")
             return False
     
     def _init_meilisearch(self, retry: bool = False) -> None:
@@ -135,12 +143,12 @@ class SearchService:
                         logger.info(f"[aidjobs] Meilisearch connection verified: {health_status}")
                 except Exception as health_check_error:
                     # Health check failed - this is OK during initialization if Meili is starting up
-                    logger.debug(f"[aidjobs] Meilisearch health check not available yet: {health_check_error}")
+                    logger.debug(f"[aidjobs] Meilisearch health check not available yet: {redact_exception(health_check_error)}")
                     if not retry:
                         # Only raise if this is the first attempt and we're not in retry mode
                         pass  # Don't fail initialization if health check fails
             except Exception as health_error:
-                logger.warning(f"[aidjobs] Meilisearch health check failed: {health_error}")
+                logger.warning(f"[aidjobs] Meilisearch health check failed: {redact_exception(health_error)}")
                 if not retry:
                     # Don't raise - allow initialization to continue and try index operations
                     pass
@@ -175,7 +183,7 @@ class SearchService:
                         index = self.meili_client.get_index(self.meili_index_name)
                         logger.info(f"[aidjobs] Index '{self.meili_index_name}' created successfully")
                     except Exception as create_error:
-                        logger.error(f"[aidjobs] Failed to create index: {create_error}")
+                        logger.error(f"[aidjobs] Failed to create index: {redact_exception(create_error)}")
                         raise
                 
                 index.update_searchable_attributes([
@@ -226,11 +234,11 @@ class SearchService:
                 
                 logger.info(f"[aidjobs] Meilisearch index '{self.meili_index_name}' configured successfully")
             except Exception as e:
-                logger.warning(f"[aidjobs] Failed to configure Meilisearch index: {e}")
+                logger.warning(f"[aidjobs] Failed to configure Meilisearch index: {redact_exception(e)}")
                 self.meili_error = MEILI_UNAVAILABLE
                 
         except Exception as e:
-            logger.error(f"[aidjobs] Failed to initialize Meilisearch client: {e}")
+            logger.error(f"[aidjobs] Failed to initialize Meilisearch client: {redact_exception(e)}")
             self.meili_enabled = False
             self.meili_client = None
             self.meili_error = MEILI_UNAVAILABLE
@@ -554,7 +562,7 @@ class SearchService:
                         logger.error("[aidjobs] Meilisearch reconnection failed, falling back to database")
                         return None
                 except Exception as reconnect_error:
-                    logger.error(f"[aidjobs] Failed to reconnect to Meilisearch: {reconnect_error}")
+                    logger.error(f"[aidjobs] Failed to reconnect to Meilisearch: {redact_exception(reconnect_error)}")
                     return None
         
         if not self.meili_client:
@@ -565,7 +573,7 @@ class SearchService:
                     self._init_meilisearch(retry=True)
                     self._connection_retry_count += 1
                 except Exception as e:
-                    logger.warning(f"[aidjobs] Reconnection attempt failed: {e}")
+                    logger.warning(f"[aidjobs] Reconnection attempt failed: {redact_exception(e)}")
                     return None
             else:
                 logger.warning("[aidjobs] Meilisearch client not available after retries")
@@ -573,7 +581,6 @@ class SearchService:
         
         # Retry logic for search operations
         max_retries = 2
-        last_error = None
         
         for attempt in range(max_retries + 1):
             try:
@@ -704,23 +711,21 @@ class SearchService:
                 }
                 
             except Exception as e:
-                last_error = e
-                logger.warning(f"[aidjobs] Meilisearch search attempt {attempt + 1}/{max_retries + 1} failed: {e}")
+                logger.warning(f"[aidjobs] Meilisearch search attempt {attempt + 1}/{max_retries + 1} failed: {redact_exception(e)}")
                 
                 # If it's a connection error, try to reconnect
                 if attempt < max_retries:
-                    error_str = str(e).lower()
-                    if any(keyword in error_str for keyword in ['connection', 'timeout', 'unreachable', 'refused']):
+                    if _connection_failure(e):
                         logger.info(f"[aidjobs] Connection error detected, attempting reconnection...")
                         try:
                             self._init_meilisearch(retry=True)
                             # Wait a bit before retry
                             await asyncio.sleep(0.5)
                         except Exception as reconnect_error:
-                            logger.warning(f"[aidjobs] Reconnection failed: {reconnect_error}")
+                            logger.warning(f"[aidjobs] Reconnection failed: {redact_exception(reconnect_error)}")
                 
-        # All retries failed
-        logger.error(f"[aidjobs] Meilisearch search failed after {max_retries + 1} attempts: {last_error}, falling back to database")
+        # All retries failed; each attempt's error is logged above.
+        logger.error(f"[aidjobs] Meilisearch search failed after {max_retries + 1} attempts, falling back to database")
         return None
 
     async def _search_database(
@@ -911,7 +916,7 @@ class SearchService:
 
         except Exception as e:
             # Log error but don't crash - return empty results
-            logger.error(f"Database search error: {e}")
+            logger.error(f"Database search error: {redact_exception(e)}")
             return {
                 "items": [],
                 "total": 0,
@@ -1063,7 +1068,7 @@ class SearchService:
                 
                 return base
             except Exception as e:
-                logger.error(f"Meilisearch facets error: {e}, falling back to database")
+                logger.error(f"Meilisearch facets error: {redact_exception(e)}, falling back to database")
         
         if self.db_enabled:
             try:
@@ -1131,7 +1136,7 @@ class SearchService:
                         # Return None if not found (will be handled as 404)
                         return None
                 except Exception as e:
-                    logger.error(f"Database job lookup error: {e}")
+                    logger.error(f"Database job lookup error: {redact_exception(e)}")
         
         # Fallback to Meilisearch if database fails
         if self.meili_enabled and self.meili_client:
@@ -1148,7 +1153,7 @@ class SearchService:
                         "source": "meili",
                     }
             except Exception as e:
-                logger.warning(f"Failed to get job from Meilisearch: {e}")
+                logger.warning(f"Failed to get job from Meilisearch: {redact_exception(e)}")
         
         # Return None if not found anywhere
         return None
@@ -1288,7 +1293,7 @@ class SearchService:
                 return result
                 
             except Exception as index_error:
-                logger.error(f"[search_status] Failed to get index stats: {index_error}", exc_info=True)
+                logger.error(f"[search_status] Failed to get index stats: {redact_exception(index_error)}", exc_info=True)
                 # Try to reconnect or reinitialize
                 try:
                     self._init_meilisearch()
@@ -1306,14 +1311,14 @@ class SearchService:
                         }
                     }
                 except Exception as retry_error:
-                    logger.error(f"[search_status] Retry also failed: {retry_error}")
+                    logger.error(f"[search_status] Retry also failed: {redact_exception(retry_error)}")
                     return {
                         "enabled": False,
                         "error": MEILI_UNAVAILABLE
                     }
                     
         except Exception as e:
-            logger.error(f"[search_status] Unexpected error in get_search_status: {e}", exc_info=True)
+            logger.error(f"[search_status] Unexpected error in get_search_status: {redact_exception(e)}", exc_info=True)
             return {
                 "enabled": False,
                 "error": MEILI_UNAVAILABLE
@@ -1386,7 +1391,7 @@ class SearchService:
             )
             return {row[0] for row in cursor.fetchall()}
         except Exception as exc:
-            logger.warning("eligibility check failed: %s", exc)
+            logger.warning("eligibility check failed: %s", redact_exception(exc))
             return None
         finally:
             if cursor:

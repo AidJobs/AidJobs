@@ -9,8 +9,8 @@ routes, because the facets leak was a helper's `base["error"] = str(e)` returned
 and the link validator's was a result dict returned later. It does not follow values through
 other variables; it is not a proof of absence, and the runtime leak tests remain the proof.
 
-ALLOWED lists what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
-convert them and shrink this list to nothing. A converted function must be removed from it.
+ALLOWED listed what the stage 3 inventory found on 28 October 2026, per function. Phases 2 and 3
+converted them all, and it is empty (3 November 2026); a test keeps it empty.
 
 DESCRIBERS are reviewed functions that turn an exception into our own words by its type and never
 repeat its text; a direct call DESCRIBER(NAME) is not a finding. MASKERS are reviewed functions
@@ -25,14 +25,7 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 
-ALLOWED = {
-    # Reviewed, not a leak: the except branch cannot run.
-    "main.py::healthz": 1,
-    # Reviewed, internal: kept for logs or retries, never returned (ai_service returns None;
-    # _search_meilisearch uses the text only for keyword matching).
-    "app/ai_service.py::_call_openrouter": 6,
-    "app/search.py::_search_meilisearch": 2,
-}
+ALLOWED: dict[str, int] = {}
 
 
 DESCRIBERS = {
@@ -401,6 +394,12 @@ def test_stored_crawl_outcomes_are_found_unless_masked(stored, found):
         f"        {stored}\n"
     )
     assert sum(_findings_in(source, "orchestrator.py").values()) == found
+
+
+def test_the_allowlist_is_empty():
+    """Stage 3 is done: no function may put exception text into a response or stored message."""
+    assert ALLOWED == {}
+    assert not findings()
 
 
 def test_converted_functions_leave_the_allowlist():
