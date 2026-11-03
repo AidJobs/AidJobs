@@ -240,6 +240,10 @@
 
 .ej-composer[data-size='large'] textarea {
   min-height: 110px;
+}
+
+.ej-composer[data-size='large'] textarea,
+.ej-composer[data-size='large'] .ej-ghost {
   font-size: 15px;
 }
 
