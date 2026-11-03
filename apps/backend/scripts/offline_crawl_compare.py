@@ -19,9 +19,10 @@ secrets, at the places that store a crawl outcome or log a database failure:
   python scripts/offline_crawl_compare.py compare before-normal.json after-normal.json
 
 compare prints every difference in sources, crawl_logs, jobs and failed_inserts, after leaving
-out ids and timestamps. A difference is "masked" when the first file's value holds a fake secret
-and the second's holds none and has the redaction mark; any other difference fails. It also
-counts the captured log messages and final log lines that hold a fake secret.
+out ids and timestamps. A difference is "masked" only when the second file's value is the first's
+with each fake secret replaced by the redaction mark (cut at a stored limit at most); any other
+difference fails. It also counts the captured log messages and final log lines that hold a fake
+secret. Python sockets are closed to anything but loopback; name lookups are not blocked.
 """
 from __future__ import annotations
 
@@ -111,6 +112,12 @@ def _pages(root: Path) -> dict[str, tuple[int, bytes]]:
 
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _failed_insert_order(row):
+    """Fields both sides share; the error text is what may differ."""
+    return (row.get("source_url") or "", row.get("operation") or "",
+            json.dumps(row.get("payload"), sort_keys=True))
 
 
 def _volatile(key, value):
@@ -284,7 +291,7 @@ def run(args) -> None:
         "jobs": sorted(rows("SELECT row_to_json(j) FROM jobs j"),
                        key=lambda r: (r.get("apply_url") or "", r.get("title") or "")),
         "failed_inserts": sorted(rows("SELECT row_to_json(f) FROM failed_inserts f"),
-                                 key=lambda r: (r.get("source_url") or "", r.get("error") or "")),
+                                 key=_failed_insert_order),
         "locks": sql("SELECT count(*) FROM crawl_locks")[0][0],
         "log_messages_with_a_secret": [m for m in messages if any(f in m for f in FAKES)],
         "log_lines_with_a_secret": [line for line in lines if any(f in line for f in FAKES)],
@@ -307,15 +314,24 @@ def _diff(path, a, b, out):
         for i, (x, y) in enumerate(zip(a, b)):
             _diff(f"{path}[{i}]", x, y, out)
     elif a != b:
-        masked = (isinstance(a, str) and isinstance(b, str) and any(f in a for f in FAKES)
-                  and not any(f in b for f in FAKES) and VALUE_MARK in b)
-        out.append(("masked" if masked else "DIFFERENT", path, a, b))
+        out.append(("masked" if _only_masked(a, b) else "DIFFERENT", path, a, b))
+
+
+def _only_masked(a, b) -> bool:
+    """b is a with each fake secret masked as redaction masks it, cut at a stored limit at most."""
+    if not (isinstance(a, str) and isinstance(b, str) and any(f in a for f in FAKES)):
+        return False
+    expected = (a.replace(f"probe:{FAKE_PASSWORD}@", f"{VALUE_MARK}@")
+                .replace(FAKE_PASSWORD, VALUE_MARK).replace(FAKE_KEY, VALUE_MARK))
+    return b in {expected, expected[:200], expected[:500]}
 
 
 def compare(args) -> int:
     before = json.loads(Path(args.before).read_text(encoding="utf-8"))
     after = json.loads(Path(args.after).read_text(encoding="utf-8"))
     found: list = []
+    for side in (before, after):
+        side["failed_inserts"].sort(key=_failed_insert_order)
     for key in ("sources", "crawl_logs", "jobs", "failed_inserts", "locks"):
         _diff(key, before[key], after[key], found)
     for kind, path, a, b in found:

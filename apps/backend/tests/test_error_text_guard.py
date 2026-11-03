@@ -360,11 +360,19 @@ def _masker_calls(path):
             if isinstance(node, ast.Call) and _call_name(node) in MASKERS]
 
 
+def _backend_modules():
+    skipped = {"tests", "scripts", "__pycache__"}
+    return [path for path in sorted(BACKEND.rglob("*.py"))
+            if not skipped & set(path.relative_to(BACKEND).parts)
+            and not any(part.startswith((".", "venv")) for part in path.relative_to(BACKEND).parts)]
+
+
 def test_a_masker_is_used_only_where_crawl_outcomes_are_stored():
     """Responses get fixed text (InternalError); only stored crawl outcomes keep masked text."""
     crawl = set(_crawl_files())
+    assert BACKEND / "contracts" / "outbound.py" in _backend_modules()
     outside = {path.relative_to(BACKEND).as_posix(): _masker_calls(path)
-               for path in _scanned_files() if path not in crawl}
+               for path in _backend_modules() if path not in crawl}
     assert not {rel: lines for rel, lines in outside.items() if lines}
     assert sum(len(_masker_calls(path)) for path in crawl) == 6
 

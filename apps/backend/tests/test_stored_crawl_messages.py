@@ -310,15 +310,31 @@ def test_a_line_break_in_a_message_cannot_start_a_new_line(brk):
 def test_a_traceback_stays_on_its_own_prefixed_lines():
     logger, stream = _logger()
     try:
-        raise ValueError(f"bad title\nERROR [orchestrator] forged {FAKE_KEY}")
+        raise ValueError(f"bad title\nERROR [orchestrator] forged {FAKE_KEY}"
+                         "\rINFO second\u2028INFO third")
     except ValueError:
         logger.exception("Crawl failed for %s", "Example\nINFO forged too")
     lines = stream.getvalue().splitlines()
     assert lines[0] == "ERROR Crawl failed for Example\\nINFO forged too"
     assert len(lines) > 3 and all(line.startswith(TRACE_PREFIX) for line in lines[1:])
     assert lines[1] == TRACE_PREFIX + "Traceback (most recent call last):"
-    assert TRACE_PREFIX + "ERROR [orchestrator] forged " + VALUE_MARK in lines
+    assert (TRACE_PREFIX + "ERROR [orchestrator] forged " + VALUE_MARK
+            + "\\rINFO second\\u2028INFO third") in lines
     _clean(stream.getvalue())
+
+
+def test_a_secret_holding_a_line_break_is_masked_before_escaping(fake_secrets):
+    """A key kept in the environment with line breaks (a PEM key, say) must still match."""
+    pem = "-----BEGIN FAKE KEY-----\n" + "MIIfake" + "Q29tcGFyZQ" + "\n-----END FAKE KEY-----"
+    refresh_secrets({"FAKE_SIGNING_KEY": pem})
+    logger, stream = _logger()
+    try:
+        raise RuntimeError(f"signing with {pem} failed")
+    except RuntimeError:
+        logger.exception("Using %s", pem)
+    output = stream.getvalue()
+    assert "MIIfake" not in output
+    assert output.splitlines()[0] == "ERROR Using " + VALUE_MARK
 
 
 def test_stack_information_is_prefixed_too():

@@ -7,6 +7,8 @@ is never changed, because uvicorn's access formatter reads `record.args` as a tu
 
 A message is written as one line: its line breaks are escaped, so text from a scraped page or a
 caller cannot start a line that looks like our own. Traceback lines stay separate, each prefixed.
+The wrapped formatter produces the first line; the traceback is appended after it, so a formatter
+that builds the whole record itself (one JSON object, say) would see it outside that object.
 
 Imports nothing from the app, so main.py can install it before importing anything else.
 """
