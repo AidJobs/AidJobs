@@ -216,7 +216,7 @@ def validate_enrichment_accuracy(
         
     except Exception as e:
         logger.error(f"[enrichment_ground_truth] Failed to validate accuracy: {e}", exc_info=True)
-        return {"error": str(e)}
+        return {"error": "Failed to validate accuracy"}
 
 
 def get_ground_truth_stats() -> Dict[str, Any]:

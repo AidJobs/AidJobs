@@ -189,13 +189,6 @@ try:
 except ImportError:
     logger.warning("Job management router not available")
 
-# Add data quality logs routes
-try:
-    from app.data_quality_logs import router as data_quality_logs_router
-    app.include_router(data_quality_logs_router, prefix="/api/admin/data-quality", tags=["data_quality_logs"])
-except ImportError:
-    logger.warning("Data quality logs router not available")
-
 # Add pipeline API routes (read-only, internal)
 try:
     from app.pipeline_api import router as pipeline_api_router
@@ -213,19 +206,10 @@ async def healthz():
     Lightweight health check for Render.
     Returns immediately without blocking on database checks.
     """
-    try:
-        # Quick check - don't block on database connection
-        # Just verify the app is running
-        return {
-            "status": "ok",
-            "message": "Service is running"
-        }
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+    return {
+        "status": "ok",
+        "message": "Service is running"
+    }
 
 
 @app.get("/api/capabilities")

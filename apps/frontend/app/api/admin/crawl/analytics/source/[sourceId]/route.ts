@@ -1,32 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest, props: { params: Promise<{ sourceId: string }> }) {
-  const params = await props.params;
-  try {
-    const { sourceId } = params;
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/api$/, '');
-    const response = await fetch(`${backendUrl}/api/admin/crawl/analytics/source/${sourceId}`, {
-      headers: adminAuthHeaders(request),
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { status: 'error', error: `Backend returned ${response.status}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error fetching source analytics:', error);
-    return NextResponse.json(
-      { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+export async function GET(req: NextRequest, props: { params: Promise<{ sourceId: string }> }) {
+  const { sourceId } = await props.params;
+  return proxyToBackend({
+    route: 'GET /api/admin/crawl/analytics/source/[sourceId]',
+    path: `/api/admin/crawl/analytics/source/${encodeURIComponent(sourceId)}`,
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-

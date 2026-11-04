@@ -1,58 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { adminAuthHeaders } from '@/lib/adminBackend';
+import { NextRequest } from 'next/server';
+import { adminErrorBody, proxyToBackend, readJsonBody } from '@/lib/backendProxy';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const backendUrl = BACKEND_URL.replace(/\/api$/, '');
-    const url = `${backendUrl}/admin/jobs/enrich/batch`;
-    console.log(`[proxy] POST ${url}`);
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: adminAuthHeaders(req, {
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(body),
-    });
-
-    if (res.status === 401) {
-      return NextResponse.json(
-        { status: 'error', error: 'Authentication required', authenticated: false },
-        { status: 401 }
-      );
-    }
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error');
-      console.error('Batch enrich error:', res.status, errorText);
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: errorText || `HTTP ${res.status}` };
-      }
-      return NextResponse.json(
-        { status: 'error', ...errorData },
-        { status: res.status }
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Batch enrich proxy error:', error);
-    return NextResponse.json(
-      { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Failed to enrich jobs' 
-      },
-      { status: 500 }
-    );
-  }
+  const body = await readJsonBody(req, adminErrorBody, true);
+  if (!body.ok) return body.response;
+  return proxyToBackend({
+    route: 'POST /api/admin/jobs/enrich/batch',
+    path: '/admin/jobs/enrich/batch',
+    method: 'POST',
+    body: body.value,
+    session: req,
+    errorBody: adminErrorBody,
+  });
 }
-

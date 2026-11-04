@@ -86,13 +86,13 @@ An independent agent reviewed the plan against the repository, the contract, and
 | 3 | Hosting | Render free and Supabase free now; the code built for one always-on Render instance; paid plans when a signal in section 8 appears | User, 30 October 2026 |
 | 4 | Market | International aid and development, plus domestic nonprofit and charity jobs in the US, UK, Australia, Canada, and Europe | User, 30 October 2026 |
 | 5 | Descriptions | Full text stored and shown, with attribution, a display setting per source, and an employer opt-out | Delegated to the agent |
-| 6 | Launch | After the crawler foundation, with thousands of jobs | User, 30 October 2026 |
+| 6 | Launch | After the crawler foundation, with about 2,000 open jobs, then growing to thousands (changed 3 November 2026) | User, 30 October and 3 November 2026 |
 | 7 | Demo differences | Job pages, landing pages above a minimum job count, the job sheet using the job page's address, the heading widened | Delegated to the agent |
 | 8 | Order | Section 7, chosen on technical grounds | Delegated to the agent |
 | 9 | Posting date | Three dates, rules in section 4.4 | Delegated to the agent |
 | 10 | Known jobs and expiry | The observation rule and expiry rule in section 4.3 | Delegated to the agent |
 | 11 | ReliefWeb | API v2 for discovery, and as the feed only for organisations not crawled directly | User asked for the best way; agent's choice |
-| 12 | Features | No ads; employer submissions first after launch, then alerts | User, 30 October 2026 |
+| 12 | Features | No display advertising; employer submissions first after launch, then alerts; paid, labelled sponsored listings allowed for jobs employers publish (clarified 3 November 2026) | User, 30 October and 3 November 2026 |
 | 13 | Crawl frequency | Twice a day for large employers, daily for the rest, within the politeness rules | Delegated to the agent |
 | 14 | Title facts (UX-08 item 11) | Worked out when read, on the server, in one shared module | Delegated to the agent |
 
@@ -117,6 +117,8 @@ AidJobs adds what neither UNjobs nor the employer shows: a facts summary at the 
 
 **6. Launch.** After the crawler foundation (section 7, step 4), the admin's add-source flow (step 5), and gradual source growth (step 6), so the site launches with thousands of jobs.
 
+Changed by the user on 3 November 2026: "we will launch with around 2000 and then gradually add more." Thousands of jobs is the vision; the launch comes at about 2,000 open jobs, and sources keep being added after it. Server-side search and paging (UX-11) still come before launch, because about 2,000 is above the 1,500-job threshold of UX-08 item 10, and so does the always-on Render instance (section 8).
+
 **7. Demo differences** (delegated to the agent; approved with this record; added to the UX plan's revision of 30 October 2026):
 - a permanent, server-rendered page per job at `/jobs/{readable-title}-{id}`, where the id is the job's database id (`jobs.id`, a UUID, or a short unique form of it fixed in UX-24's plan), never the identity key. Tidying how a title is displayed never changes the address. A job whose identity changes (a title change at the employer, or W-24's cleaning at save time) is a new row with a new address; redirecting the old address uses `jobs.duplicate_of` and is its own database-write decision;
 - opening a job from the list still opens the sheet without a page load, but the address becomes the job page's address, so every shared link is the indexable page;
@@ -130,6 +132,8 @@ AidJobs adds what neither UNjobs nor the employer shows: a facts summary at the 
 **11. ReliefWeb.** The user's words: "relief web is reliable, what do you say or is there a better way out, no hot fixes though". The agent's choice, a lasting design rather than a quick feed: API v2 (the user requests the `appname`) for discovery (which organisations post jobs, how many) and as the job feed only for organisations AidJobs does not crawl directly, often small NGOs that post only there. One primary source per organisation avoids guessing which jobs are duplicates; a duplicate report covers the remaining overlap, and nothing is merged automatically. Links go to the original advert; ReliefWeb's terms are checked in the survey. UN Talent (`untalent.org/open`) is a benchmark only. The UN careers site is read through its official RSS feed.
 
 **12. Features.** No ads. After launch, employer submissions come first (moderated, for organisations without a recruitment system), then alerts; each changes contract §2 (it says "Users do not submit career sources" and rules out user accounts) and needs its own scope decision then.
+
+Clarified by the user on 3 November 2026: "no ads" meant display advertising. Paid sponsored listings ("Premium") for jobs that employers publish are allowed, always labelled, in a section of their own, so the Recommended order stays the same for every visitor. They arrive with the employer side (`employer-side-plan.md`, decisions E2 and E6), which needs its own §2 scope decision; the contract's "no advertising" wording (§2 amendment of 30 October 2026) and the Vercel note in section 8 are updated with that decision, and Vercel Pro comes before any live payment.
 
 **13. Crawl frequency.** Twice a day for UN agencies and large NGOs, daily for the rest; the adaptive scheduler slows sources that rarely change (every 2 or 3 days) and speeds up busy ones. The aim is to keep crawling without being blocked (section 4.2). Full frequency depends on the always-on instance. The new targets replace today's defaults (UN 1 day, INGO 2, NGO 3) as part of W-39.
 
@@ -268,7 +272,7 @@ W-06, which UX-08 item 12 (21 October 2026) moved ahead of the other crawler ite
    10. W-39: completeness for every source, the daily crawl-health message, and the crawl-frequency targets (decision 13);
    11. W-42: the title-facts module on the server.
 5. **Admin before launch** (W-40): the add-source flow (paste a careers address, the system is detected, one approved fetch, a report of which fields are filled, then admit) and crawl review (parts of UX-19 and UX-20).
-6. **Sources, added gradually,** in survey order, with more readers (Workday, Oracle, SuccessFactors, iCIMS, Jobvite, W-41 ReliefWeb and the UN careers RSS feed), until there are thousands of jobs. The paid Render plan when a signal in section 8 appears.
+6. **Sources, added gradually,** in survey order, with more readers (Workday, Oracle, SuccessFactors, iCIMS, Jobvite, W-41 ReliefWeb and the UN careers RSS feed), until there are about 2,000 open jobs for the launch (decision 6, changed 3 November 2026), and more after it. The paid Render plan when a signal in section 8 appears.
 7. **The public site and launch:** server-side search and paging (UX-11, W-18); the rest of Stage B (UX-12 to UX-17, UX-26 to UX-28); job pages (UX-24) and the first landing pages (UX-25); About, Privacy, and the opt-out route (UX-27); the switch (UX-29); the launch check with `aidjobs.app`, Search Console, and Bing (UX-18).
 8. **After launch:** employer submissions, then alerts (each a §2 decision); the rest of Stage C (UX-19 to UX-21); more landing pages and guides; non-English Europe; feeds and partner widgets; the hiring report.
 
@@ -301,7 +305,7 @@ A keep-alive monitor every 5 minutes (UX-08 item 5) was skipped by the user unti
 - W-33: direction updated on 30 October 2026 (ledger W-33): fixed together with the reader interface (W-35), with no separate "plain public JSON" step.
 - Workday's POST search under §9.
 - Stage 6 implementation timing.
-- Employer submissions, alerts, and accounts (§2), after launch.
+- Employer submissions, alerts, and accounts (§2), after launch. The employer side is designed first as a demo that is never merged (W-51, `employer-side-plan.md`, 3 November 2026).
 - Landing-page thresholds, closed-page timings, and the exact heading words, in their steps' plans.
 - Languages after English, and their order.
 - How the daily crawl-health message is delivered (email needs a provider and a secret), in W-39's plan.

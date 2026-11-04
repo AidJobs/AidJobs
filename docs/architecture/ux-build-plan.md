@@ -81,7 +81,7 @@ UX-31, the repository tidy-up, can run at any point with the user's approval of 
 From `growth-and-seo-plan.md`, which holds the reasons. The launch timing is the user's decision (decision 6); the order and the demo differences were delegated by the user to the agent (decisions 7 and 8). All of it takes effect when the user explicitly approves merging that record. Where this revision and the revision of 21 October 2026 disagree, this one applies.
 
 **Order.** The growth plan's section 7 sets the order of all work. For UX steps:
-- UX-11 to UX-17, UX-26 to UX-28, UX-29, and UX-18 come in its step 7, after the security stages, the employer survey, the crawler foundation, the admin's add-source flow and crawl review, and gradual source growth. The site launches with thousands of jobs (decision 6).
+- UX-11 to UX-17, UX-26 to UX-28, UX-29, and UX-18 come in its step 7, after the security stages, the employer survey, the crawler foundation, the admin's add-source flow and crawl review, and gradual source growth. The site launches with thousands of jobs (decision 6); changed 3 November 2026 to about 2,000 open jobs, then growing, which still needs server-side search before launch.
 - UX-11 includes server-side search and paging: open jobs will pass the 1,500-job threshold of UX-08 item 10 before launch.
 - UX-24 (job pages) and the first part of UX-25 (landing pages per organisation, per country, and the hubs) move before the switch (UX-29).
 - From Stage C, the add-source flow and crawl review (parts of UX-19 and UX-20, ledger W-40) come before launch; the rest of Stage C (UX-19 to UX-21) after launch.
