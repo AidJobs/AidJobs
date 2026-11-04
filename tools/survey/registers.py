@@ -84,12 +84,29 @@ IATI_TYPES = {
 IATI_KEEP = {"10", "15", "21", "22", "23", "24", "30", "40", "60"}
 IATI_REVIEW = {"70", "71", "72", "73"}
 
-# NTEE major group Q: international, foreign affairs and national security.
-IRS_NTEE = re.compile(r"^Q")
+# NTEE major group Q: international, foreign affairs and national security; without domestic
+# national security (Q43) and exchange programmes (Q21 cultural, Q22 student, Q23 country).
+IRS_NTEE = re.compile(r"^Q(?!43|21|22|23)")
 UK_OVERSEAS_CODE = "106"  # "What" classification: Overseas Aid/famine Relief
+# OSCR's geographical spread "UK and overseas" covers many charities working mainly at home;
+# those are kept only when what they say they do reads as aid work abroad.
+OSCR_AID_TEXT = re.compile(
+    r"overseas|abroad|international (aid|development|relief)|developing (countr|world|nation)"
+    r"|humanitarian|famine|refugee|disaster relief|africa|asia|latin america|caribbean"
+    r"|third world|global south|throughout the world|world-?wide|any part of the world"
+    r"|other countries|low[- ]income countries|global poverty", re.IGNORECASE)
 EU_CATEGORY = re.compile(r"non-governmental organisations", re.IGNORECASE)
 EU_INTERESTS = re.compile(r"development|humanitarian aid", re.IGNORECASE)
-EXCLUDED_NAME = re.compile(r"\b(hospitals?|universit(y|ies)|colleges?|schools?)\b", re.IGNORECASE)
+EXCLUDED_NAME = re.compile(
+    r"\b(hospitals?|h[oô]pital|universit(?:y|ies|é|e|à|ät|eit|at)|universidad(?:es)?"
+    r"|colleges?|coll[eè]ge"
+    r"|colegio|hochschule|[ée]cole|polytechnique|schools?|health sciences|health system)\b",
+    re.IGNORECASE)
+# Aid organisations whose names contain one of those words; each checked by hand.
+KEPT_DESPITE_NAME = re.compile(
+    r"world university service|united world schools|hospital appeal"
+    r"|promoting equality in african schools|baylor college of medicine children",
+    re.IGNORECASE)
 
 FIELDS = ["source", "source_id", "name", "country", "kind", "website_domain", "income",
           "currency", "income_year", "in_recommended_cutoff", "note"]
@@ -117,6 +134,8 @@ def _fetch(session, url: str, target: Path) -> dict:
     partial = target.with_suffix(target.suffix + ".part")
     with session.get(url, stream=True, timeout=120) as response:
         response.raise_for_status()
+        if not response.url.startswith("https://"):
+            raise ValueError("the download did not end on an HTTPS address")
         with partial.open("wb") as handle:
             for block in response.iter_content(1 << 20):
                 handle.write(block)
@@ -145,19 +164,27 @@ def download(_args) -> None:
         except Exception as error:  # noqa: BLE001  recorded, the other sources go on
             failed[name] = f"{type(error).__name__}"
             print(f"{name}: FAILED ({type(error).__name__})")
+        manifest_path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         time.sleep(1)
     manifest["failed"] = failed
     organisations, url = [], IATI_API + "?page_size=500"
     if (RAW / "iati_reporting_orgs.json").exists() and "iati_reporting_orgs.json" in manifest:
         url = None
         print("iati_reporting_orgs.json: already downloaded")
-    while url:
-        page = session.get(url, timeout=120)
-        page.raise_for_status()
-        data = page.json()
-        organisations.extend(data["results"])
-        url = data.get("next")
-        time.sleep(1)
+    try:
+        while url:
+            page = session.get(url, timeout=120)
+            page.raise_for_status()
+            data = page.json()
+            organisations.extend(data["results"])
+            url = data.get("next")
+            if url and not url.startswith(IATI_API):
+                raise ValueError("IATI's next page is not on its API")
+            time.sleep(1)
+    except Exception as error:  # noqa: BLE001  recorded; the files above are kept
+        failed["iati_reporting_orgs.json"] = type(error).__name__
+        organisations = []
+        print(f"iati_reporting_orgs.json: FAILED ({type(error).__name__})")
     if organisations:
         (RAW / "iati_reporting_orgs.json").write_text(json.dumps(organisations), encoding="utf-8")
         manifest["iati_reporting_orgs.json"] = {
@@ -284,13 +311,19 @@ def oscr(stats):
         if (record.get("Charity Status") or "").lower() not in ("", "active"):
             continue
         stats["oscr"]["all"] += 1
-        where = " ".join([record.get("Main Operating Location") or "",
-                          record.get("Geographical Spread") or ""])
-        if "overseas" not in where.lower():
+        spread = (record.get("Geographical Spread") or "").strip().lower()
+        if spread == "overseas only":
+            kind = "Operates overseas only"
+        elif spread == "uk and overseas" and OSCR_AID_TEXT.search(
+                " ".join([record.get("Objectives") or "",
+                          record.get("What the charity is set up to do and how it does this")
+                          or ""])):
+            kind = "UK and overseas, with aid work abroad"
+        else:
             continue
         stats["oscr"]["in sector"] += 1
         rows.append(_row("oscr", record.get("Charity Number"), record.get("Charity Name") or "",
-                         "GB-SCT", "Operates overseas", record.get("Website"),
+                         "GB-SCT", kind, record.get("Website"),
                          money(record.get("Most recent year income")),
                          (record.get("Year End") or "")[-4:]))
     return rows
@@ -309,13 +342,19 @@ def acnc(stats):
             operates_overseas.add(abn)
     rows = []
     for record in _csv_rows(RAW / "acnc_register.csv"):
-        stats["acnc"]["all"] += 1
         abn = (record.get("ABN") or "").strip()
+        name = (record.get("Charity_Legal_Name") or "").strip()
+        if not abn or not name:
+            continue  # continuation lines of a quoted field, not charities
+        stats["acnc"]["all"] += 1
         countries = {c.strip().upper() for c in (record.get("Operating_Countries") or "").split(",")}
         if not (countries - {"", "AUS"} or abn in operates_overseas):
             continue
         stats["acnc"]["in sector"] += 1
-        row = _row("acnc", abn, record.get("Charity_Legal_Name") or "", "AU",
+        other = (record.get("Other_Organisation_Names") or "").split(",")[0].strip()
+        if re.match(r"(?i)^ACN\s*\d", name) and other:
+            name = other  # registered under its company number, known by another name
+        row = _row("acnc", abn, name, "AU",
                    "Operates overseas", record.get("Charity_Website"), revenue.get(abn), "2023")
         if abn not in revenue and (record.get("Charity_Size") or "").lower() == "large":
             row["income_year"] = ""
@@ -325,14 +364,25 @@ def acnc(stats):
     return rows
 
 
+def _latest_return(path: Path) -> dict:
+    """One row per charity: some filed two returns in the year; keep the later period end."""
+    latest = {}
+    for record in _csv_rows(path):
+        bn = record.get("BN")
+        if bn and (bn not in latest or (record.get("FPE") or "") > (latest[bn].get("FPE") or "")):
+            latest[bn] = record
+    return latest
+
+
 def cra(stats):
     # Countries where programmes were carried out (schedule 2), or T3010 line 2100: activities
     # outside Canada, which also covers agencies that work through partners (World Vision,
     # Plan International, CARE).
     abroad = {r["BN"] for r in _csv_rows(RAW / "cra_countries.csv") if r.get("BN")}
-    abroad |= {r["BN"] for r in _csv_rows(RAW / "cra_general.csv")
+    abroad |= {bn for bn, r in _latest_return(RAW / "cra_general.csv").items()
                if (r.get("2100") or "").strip().upper() == "Y"}
-    revenue = {r["BN"]: money(r.get("4700")) for r in _csv_rows(RAW / "cra_financial.csv")}
+    revenue = {bn: money(r.get("4700"))
+               for bn, r in _latest_return(RAW / "cra_financial.csv").items()}
     web = {}
     for record in _csv_rows(RAW / "cra_web.csv"):
         web.setdefault(record.get("BN/NE"), record.get("Contact URL"))
@@ -398,7 +448,7 @@ def build(_args) -> None:
     rows = []
     for name, reader in sources.items():
         for row in reader(stats):
-            if EXCLUDED_NAME.search(row["name"]):
+            if EXCLUDED_NAME.search(row["name"]) and not KEPT_DESPITE_NAME.search(row["name"]):
                 stats[name]["excluded by name"] += 1
                 continue
             rows.append(row)

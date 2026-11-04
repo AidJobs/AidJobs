@@ -37,13 +37,41 @@ def test_a_row_records_whether_income_meets_the_recommended_cutoff():
         == "GIZ Non BMZ"
 
 
-def test_the_name_filter_drops_hospitals_universities_and_schools_only():
+def _dropped(name):
+    return bool(registers.EXCLUDED_NAME.search(name)) and not registers.KEPT_DESPITE_NAME.search(name)
+
+
+def test_the_name_filter_drops_hospitals_universities_and_schools_in_several_languages():
     for name in ("American Hospital of Paris", "University of Alberta", "Holland College",
-                 "Sofia American Schools Inc"):
-        assert registers.EXCLUDED_NAME.search(name)
+                 "Sofia American Schools Inc", "Université de Montréal", "Collège Jean-de-Brébeuf",
+                 "Universidad del Valle de Guatemala", "Polytechnique Montréal",
+                 "Hamilton Health Sciences Corporation", "Sinai Health System",
+                 "HEC Montréal (École des hautes études commerciales)", "Hochschule Bremen"):
+        assert _dropped(name), name
+
+
+def test_aid_organisations_are_kept_whatever_their_names():
     for name in ("Church World Service", "World Vision", "Catholic Relief Services",
-                 "Médecins Sans Frontières"):
-        assert not registers.EXCLUDED_NAME.search(name)
+                 "Médecins Sans Frontières", "Doctors with Africa CUAMM",
+                 "World University Service of Canada", "United World Schools",
+                 "Haiti Hospital Appeal", "Promoting Equality in African Schools",
+                 "Baylor College of Medicine Children's Foundation Malawi"):
+        assert not _dropped(name), name
+
+
+def test_the_us_filter_keeps_international_aid_and_drops_security_and_exchanges():
+    for code in ("Q30", "Q33", "Q70", "Q20", "Q40", "Q50", "Q"):
+        assert registers.IRS_NTEE.match(code), code
+    for code in ("Q43", "Q21", "Q22", "Q23", "E70", "X20", "P60", ""):
+        assert not registers.IRS_NTEE.match(code), code
+
+
+def test_scottish_aid_text_reads_aid_abroad_and_not_domestic_work():
+    assert registers.OSCR_AID_TEXT.search("to relieve poverty in developing countries")
+    assert registers.OSCR_AID_TEXT.search("humanitarian relief for refugees")
+    assert registers.OSCR_AID_TEXT.search("the relief of poverty throughout the world")
+    assert not registers.OSCR_AID_TEXT.search("lifeboat rescue around the coasts of the UK")
+    assert not registers.OSCR_AID_TEXT.search("research into cancer")
 
 
 def test_iati_keeps_aid_publishers_and_drops_academic_and_other():
