@@ -1,0 +1,615 @@
+action,a,b,reason
+merge,unjobs-nonun:27,irs:470972683,ACLED is the Armed Conflict Location and Event Data Project
+merge,unjobs-nonun:17,eu:475897351582-51,ACTED is the Agency for Technical Cooperation and Development
+merge,unjobs-nonun:9,irs:132535763,"the UNjobs entry is this organisation's headquarters (Accion, US)"
+merge,seed:14,eu:85103504511-82,ActionAid International's secretariat (Johannesburg)
+merge,unjobs-nonun:29,eu:594787238502-76,the UNjobs entry is this organisation's headquarters (London)
+merge,eu:594787238502-76,iati:GB-CHC-327421,"the same organisation in two registers (Article 19, same website)"
+merge,unjobs-nonun:30,irs:510255908,"the UNjobs entry is this organisation's headquarters (Ashoka, US)"
+merge,unjobs-nonun:73,acnc:60131554106,"the UNjobs entry is this organisation's headquarters (Catalpa International, Australia)"
+merge,iati:IT-CF-95008730160,eu:870642496811-94,the same organisation in two registers (Cesvi)
+merge,unjobs-nonun:191,iati:IT-CF-95008730160,Fondazione CESVI is Cesvi
+merge,eu:0896037100217-18,iati:UA-EDR-38621206,"the same organisation in two registers (Right to Protection, Ukraine)"
+merge,unjobs-nonun:92,iati:US-EIN-52-2145827,Chemonics is Chemonics International
+merge,seed:15,eu:802660516125-83,Concern Worldwide's headquarters (Dublin)
+merge,unjobs-nonun:113,iati:US-EIN-52-1497470,Conservation International (its foundation is the organisation)
+merge,unjobs-nonun:211,irs:520846183,"the UNjobs entry is this organisation's headquarters (Global Communities, US)"
+merge,eu:796649447034-89,iati:GB-CHC-1107403,"the same organisation in two registers (GOAL, Dublin)"
+merge,unjobs-nonun:222,eu:796649447034-89,"the UNjobs entry is this organisation's headquarters (GOAL, Dublin)"
+merge,seed:21,irs:911914868,Habitat for Humanity International
+merge,unjobs-nonun:232,iati:US-EIN-30-0739799,"Heartland Alliance's international arm, which posts the aid jobs"
+merge,eu:6685547101951-74,irs:135562162,the same organisation in two registers (Helen Keller International)
+merge,unjobs-nonun:247,iati:XM-DAC-21016,"the UNjobs entry is this organisation's headquarters (ICRC, Geneva)"
+merge,unjobs-nonun:282,iati:CA-CRA_ACR-127202349,"the UNjobs entry is this organisation's headquarters (IISD, Winnipeg)"
+merge,unjobs-nonun:283,iati:XM-DAC-47062,"the UNjobs entry is this organisation's headquarters (IITA, Ibadan)"
+merge,unjobs-nonun:289,iati:GB-CHC-229476,"the UNjobs entry is this organisation's headquarters (IPPF, London)"
+merge,unjobs-nonun:290,iati:XM-DAC-47021,"the UNjobs entry is this organisation's headquarters (CIP, Lima)"
+merge,unjobs-nonun:254,iati:US-EIN-22-3087809,IREX International is IREX
+merge,unjobs-nonun:300,iati:GB-CHC-328158,Islamic Relief Worldwide (Birmingham)
+merge,seed:29,eu:14505908784-58,Johanniter International
+merge,unjobs-nonun:324,cra:817387277RR0001,"the UNjobs entry is this organisation's headquarters (Mastercard Foundation, Toronto)"
+merge,seed:23,iati:CH-FDJP-106064950,Medair's headquarters (Switzerland)
+merge,unjobs-nonun:341,eu:928308827208-10,MSF International (Geneva); national sections stay separate
+merge,unjobs-nonun:355,eu:594026247429-89,"Nonviolent Peaceforce (one organisation, one website)"
+merge,unjobs-nonun:367,iati:US-EIN-20-1173866,Omidyar Network
+merge,unjobs-nonun:398,iati:US-EIN-91-1148123,Prosper Global (US) carries Mercy Corps' EIN: the US organisation
+merge,unjobs-nonun:436,iati:GB-CHC-1076822,"Save the Children International, whose site carries the international adverts; national members stay separate"
+merge,unjobs-nonun:441,uk:1096479,"the UNjobs entry is this organisation's headquarters (ShelterBox, Cornwall)"
+merge,seed:17,uk:265464,Tearfund (UK)
+merge,unjobs-nonun:95,eu:471583199480-81,"the UNjobs entry is this organisation's headquarters (CIFF, London)"
+merge,eu:471583199480-81,uk:1091043,"the same organisation in two registers (CIFF, same website)"
+merge,unjobs-nonun:468,iati:47045,The Global Fund (Geneva)
+merge,unjobs-nonun:309,eu:601682417261-34,"the UNjobs entry is this organisation's headquarters (Kvinna till Kvinna, Stockholm)"
+merge,unjobs-nonun:476,eu:2612702100111-92,"the UNjobs entry is this organisation's headquarters (Trócaire, Maynooth)"
+merge,unjobs-nonun:517,eu:567538843366-43,"the UNjobs entry is this organisation's headquarters (World Economic Forum, Geneva)"
+merge,seed:13,iati:US-EIN-95-3202116,World Vision International; national offices stay separate
+merge,unjobs-nonun:195,iati:CH-FDJP-110.162.567,"FIND, the Foundation for Innovative New Diagnostics"
+merge,eu:158922541572-78,iati:CH-FDJP-110.162.567,the same organisation in two registers (FIND)
+merge,unjobs-nonun:352,iati:NL-KVK-27078545,FMO is the Netherlands Development Finance Company
+merge,unjobs-nonun:335,iati:GB-CHC-1083008,MAG is the Mines Advisory Group
+merge,eu:146891994293-90,iati:GB-CHC-1083008,the same organisation in two registers (MAG)
+merge,unjobs-un:55,iati:XM-DAC-47080,OECD
+merge,unjobs-nonun:381,eu:500204952402-39,"Panthera (its only record, panthera.org)"
+merge,unjobs-nonun:397,eu:388385425436-55,PATH (Program for Appropriate Technology in Health)
+merge,unjobs-nonun:495,eu:400419941751-82,WRAP is the Waste & Resources Action Programme
+merge,unjobs-nonun:121,cra:811116813RR0001,"the UNjobs entry is this organisation's headquarters (Cuso International, Ottawa)"
+merge,unjobs-nonun:180,iati:US-EIN-237413005,FHI 360 (legal name Family Health International)
+merge,unjobs-nonun:500,eu:806672050986-56,WeWorld Onlus is WeWorld-GVC
+merge,iati:GB-CHC-1077216,oscr:SC045059,the same organisation in two registers (Compassion UK)
+merge,iati:NL-KVK-41160054,iati:NL-KVK-56484038,ICCO merged into Cordaid; same website
+merge,eu:802309999524-74,iati:DK-CVR-13078513,"the same organisation in two registers (DUF, the Danish Youth Council)"
+merge,eu:541350347851-77,iati:NL-KVK-72849770,the Dutch Relief Alliance and its grant foundation
+merge,eu:434831615060-89,iati:FI-PRO-0998454-4,the same organisation in two registers (Finn Church Aid)
+merge,eu:878191546960-72,iati:CH-FDJP-CHE331930936,the same organisation in two registers (GARDP)
+merge,eu:304743246533-21,iati:CH-FDJP-CHE-105181636,the same organisation in two registers (HD Centre)
+merge,eu:632334250397-96,iati:NL-KVK-27290536,the same organisation in two registers (HiiL)
+merge,eu:022874548279-90,iati:NL-KVK-53521129,the same organisation in two registers (IDH)
+merge,eu:823360034524-28,iati:GB-COH-08828458,the same organisation in two registers (INPUD)
+merge,eu:74313108109-71,iati:AT-ZVR-315688676,the same organisation in two registers (Light for the World International)
+merge,eu:562583120901-18,iati:BE-BCE_KBO-0460162753,the same organisation in two registers (Médecins du Monde Belgique)
+merge,eu:573779650406-42,iati:SE-ON-802013-1333,the same organisation in two registers (Olof Palme International Center)
+merge,eu:6543108101823-47,iati:NL-KVK-41177385,the same organisation in two registers (Tearfund Netherlands)
+merge,iati:GB-CHC-1113101,oscr:SC053871,THET was renamed Global Health Partnerships
+merge,iati:XM-OCHA-CBPF,iati:XM-DAC-41127,the pooled funds are part of OCHA
+merge,iati:XI-IATI-OCHASDC,iati:XM-DAC-41127,OCHA's specially designated contributions are OCHA
+merge,eu:806672050986-56,iati:IT-RI-97241280151,the same organisation in two registers (WeWorld-GVC)
+merge,eu:299330237015-12,iati:SE-ON-802005-9823,the same organisation in two registers (WWF Sweden)
+separate,unjobs-nonun:309,iati:JO-CCD-200178924,Kvinna till Kvinna's Jordan office; the organisation is in Stockholm
+separate,unjobs-nonun:382,iati:MW-RG-11429,Partners In Health's Malawi office; the organisation is in Boston (not in the registers)
+separate,unjobs-nonun:435,iati:KH-TIN- K009-100090427,Samaritan's Purse's Cambodia office; the organisation is in the US (not in the registers)
+separate,unjobs-nonun:342,cra:888081049RR0001,Médecins du Monde Canada; the network is in Paris (not in the registers)
+exclude,unjobs-nonun:2,,a company outside aid
+exclude,unjobs-nonun:21,,a company outside aid
+exclude,unjobs-nonun:26,,a company outside aid
+exclude,unjobs-nonun:52,,a company outside aid
+exclude,unjobs-nonun:68,,a company outside aid
+exclude,unjobs-nonun:69,,a company outside aid
+exclude,unjobs-nonun:102,,a company outside aid
+exclude,unjobs-nonun:114,,a company outside aid
+exclude,unjobs-nonun:167,,a company outside aid
+exclude,unjobs-nonun:168,,a company outside aid
+exclude,unjobs-nonun:189,,a company outside aid
+exclude,unjobs-nonun:190,,a company outside aid
+exclude,unjobs-nonun:202,,a company outside aid
+exclude,unjobs-nonun:200,,a company outside aid
+exclude,unjobs-nonun:234,,a company outside aid
+exclude,unjobs-nonun:306,,a company outside aid
+exclude,unjobs-nonun:323,,a company outside aid
+exclude,unjobs-nonun:338,,a company outside aid
+exclude,unjobs-nonun:339,,a company outside aid
+exclude,unjobs-nonun:348,,a company outside aid
+exclude,unjobs-nonun:359,,a company outside aid
+exclude,unjobs-nonun:439,,a company outside aid
+exclude,unjobs-nonun:446,,a company outside aid
+exclude,unjobs-nonun:449,,a company outside aid
+exclude,unjobs-nonun:459,,a company outside aid
+exclude,unjobs-nonun:465,,a company outside aid
+exclude,unjobs-nonun:462,,a company outside aid
+exclude,unjobs-nonun:499,,a company outside aid
+exclude,unjobs-nonun:508,,a company outside aid
+exclude,unjobs-nonun:524,,a company outside aid
+exclude,unjobs-nonun:141,,a company outside aid
+exclude,unjobs-nonun:461,,a company outside aid
+exclude,unjobs-nonun:23,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:76,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:86,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:93,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:99,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:129,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:143,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:240,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:399,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:427,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:470,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:485,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:486,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:488,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:450,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:423,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:307,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:79,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:137,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:165,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:67,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:131,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:364,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:231,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:353,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:262,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:351,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:77,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:83,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:18,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:176,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:177,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:175,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:150,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:178,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:236,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:330,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:366,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:501,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:75,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:320,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:145,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:494,,"a science, space or technical body without aid work"
+exclude,unjobs-nonun:318,,"a university, college or school, or part of one (the user's rule)"
+exclude,unjobs-nonun:244,,"a university, college or school, or part of one (the user's rule)"
+exclude,acnc:61006067349,,"a university, college or school, or part of one (the user's rule)"
+exclude,acnc:49781030034,,"a university, college or school, or part of one (the user's rule)"
+exclude,unjobs-nonun:266,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:277,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:218,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:296,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:407,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:243,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:271,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:480,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:201,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:268,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:297,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:505,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:372,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:340,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:265,,"an industry, professional, standards or internet body, not aid"
+exclude,unjobs-nonun:90,,"an industry, professional, standards or internet body, not aid"
+exclude,oscr:SC040665,,"an industry, professional, standards or internet body, not aid"
+exclude,oscr:SC037903,,"an industry, professional, standards or internet body, not aid"
+exclude,oscr:SC045842,,"an industry, professional, standards or internet body, not aid"
+exclude,oscr:SC003545,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC015962,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC046866,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC008740,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC045860,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC041673,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC050703,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC009466,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC011353,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC011294,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC041285,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC046952,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC040748,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:214779,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:833394000RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:879943611RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:106735400RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:106983935RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:899226682RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:849969811RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:869198200RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:895530954RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118856301RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107396905RR0002,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:862397551RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:811037696RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118966332RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118989359RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:859818908RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119051944RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:807556071RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119113033RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107909939RR0076,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107910259RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:132202755RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119151330RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108061441RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119215143RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:130357197RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107724478RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107951618RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:129759940RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107856619RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107983579RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108102435RR0003,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:892249640RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,oscr:SC042906,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC037594,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC047797,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC039645,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC040432,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC038379,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,oscr:SC040578,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:107808990RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:129947537RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:108066663RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:106845969RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:119307031RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119246460RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119307080RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119215119RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119307098RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:118836337RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119204295RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119009181RR0002,,"domestic social, youth, sport or community services"
+exclude,cra:106960719RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:888561065RR0001,,"domestic social, youth, sport or community services"
+exclude,oscr:SC005117,,"domestic social, youth, sport or community services"
+exclude,oscr:SC044074,,"domestic social, youth, sport or community services"
+exclude,oscr:SC043054,,"domestic social, youth, sport or community services"
+exclude,cra:833062144RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:863736310RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:859928483RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:893879015RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:879358612RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:880163720RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:782300503RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:1164703,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:281942,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:816420228RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,cra:119129369RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,cra:107746174RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,cra:108099979RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,cra:896011459RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,eu:54970512687-47,,"domestic health, medical or scientific research, not aid"
+exclude,oscr:SC022918,,"domestic health, medical or scientific research, not aid"
+exclude,oscr:SC022515,,"domestic health, medical or scientific research, not aid"
+exclude,oscr:SC022353,,"domestic health, medical or scientific research, not aid"
+exclude,oscr:SC032510,,a hospital or health service (the user's rule: no hospitals)
+exclude,oscr:SC012632,,"a university, college or school, or part of one (the user's rule)"
+exclude,oscr:SC053144,,"animal welfare, not aid"
+exclude,oscr:SC038384,,"animal welfare, not aid"
+exclude,oscr:SC010702,,"arts, publishing, heritage or a zoo, not aid"
+exclude,oscr:SC009404,,"arts, publishing, heritage or a zoo, not aid"
+exclude,oscr:SC036819,,"arts, publishing, heritage or a zoo, not aid"
+exclude,cra:129355418RR0001,,"domestic environment work, not aid"
+exclude,cra:118834704RR0001,,"domestic environment work, not aid"
+exclude,cra:137708509RR0001,,"domestic environment work, not aid"
+exclude,cra:863530135RR0001,,a hospital or health service (the user's rule: no hospitals)
+exclude,cra:119132090RR0001,,a hospital or health service (the user's rule: no hospitals)
+exclude,eu:6877434102013-05,,a hospital or health service (the user's rule: no hospitals)
+exclude,acnc:21006566972,,"domestic health, medical or scientific research, not aid"
+exclude,cra:813563665RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,acnc:54141228346,,"domestic health, medical or scientific research, not aid"
+exclude,eu:897994636209-21,,"domestic health, medical or scientific research, not aid"
+exclude,iati:GB-COH-RC000346,,"domestic health, medical or scientific research, not aid"
+exclude,cra:106846942RR0001,,"domestic health, medical or scientific research, not aid"
+exclude,acnc:78961616230,,"domestic health, medical or scientific research, not aid"
+exclude,cra:107781205RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:107957540RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:142413798RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:138795232RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,irs:237417722,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:107855116RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:894110469RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:118974179RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:131659627,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:133156445,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:131790719,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:130434195,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:134593391RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:131760102,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:132946608,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:136400352,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:113527658,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:562676533,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:320081620,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:043106173,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:931269590,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:521503251,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:113427755,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:812616888,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:300566945,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:275126671,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:205916414,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:201914370,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:135866593,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,acnc:18614066527,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:892425166RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:857269971RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:1139904,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:582277856,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:521273585,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:1094130,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:132992985,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:278387,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:119125797RR0001,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,uk:1002059,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:131623886,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:119288918RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:251549,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:248887,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:234252,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107951618RR0601,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:234025,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1123975,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1045501,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1143450,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:133063859RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:91233584761,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:234331,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:139138861RR0002,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:278742,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:856901285RR0002,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1133936,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:251211,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108082835RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,irs:136159064,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1084767,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:140729153RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:893659920RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:138792379RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108082025RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,irs:135562218,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:36763133867,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:806421681RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:821292547RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:27036472702,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1056921,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:106791171RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:89277942075,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:221319,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:106926827RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:287868,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:802772277RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119272615RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119091031RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:888021847RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:85706989105,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107383721RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:79480989066,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:130650732RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,irs:200170689,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:266260,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:327357,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1107956,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118903467RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1138459,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108086810RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:872089305RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1082666,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107663890RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107570855RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:108114026RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:814906301RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107406316RR0011,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107706525RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1119304,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:119062438RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:46596589148,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118939347RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1032224,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:251262,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1132699,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:92375794144,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:28953930342,,"a church, religious order or religious body, not an aid agency"
+exclude,iati:SE-ON-875002-7271,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:37447253549,,"a church, religious order or religious body, not an aid agency"
+exclude,eu:286659698987-65,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:50614804581,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:53670972068,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:91111111272,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:39924299273,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:274605,,"a church, religious order or religious body, not an aid agency"
+exclude,uk:1102949,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118827849RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:108223371RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:118829647RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:108222084RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:1131655,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:130637051RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,acnc:65004281690,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:1037154,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:872606157RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:258421,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,irs:232222206,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,acnc:17686524625,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:118945088RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:897978912RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:118873652RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:269640,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:1099143,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:828454538RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:119142164RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:891905408RR0001,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,acnc:85214424729,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,acnc:41725839724,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,cra:803976075RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119235877RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:119307171RR0001,,"domestic social, youth, sport or community services"
+exclude,eu:386735920730-21,,"domestic social, youth, sport or community services"
+exclude,uk:1128267,,"domestic social, youth, sport or community services"
+exclude,irs:541282616,,"domestic social, youth, sport or community services"
+exclude,cra:105198873RR0001,,"domestic social, youth, sport or community services"
+exclude,iati:IN-PAN-AAETN9841L,,"domestic social, youth, sport or community services"
+exclude,eu:07410725016-32,,"domestic social, youth, sport or community services"
+exclude,eu:199308213329-62,,"domestic social, youth, sport or community services"
+exclude,acnc:83295983059,,"arts, publishing, heritage or a zoo, not aid"
+exclude,cra:119147882RR0001,,"arts, publishing, heritage or a zoo, not aid"
+exclude,cra:118958883RR0001,,"arts, publishing, heritage or a zoo, not aid"
+exclude,acnc:45001335182,,"arts, publishing, heritage or a zoo, not aid"
+exclude,cra:821197514RR0001,,"arts, publishing, heritage or a zoo, not aid"
+exclude,eu:435166212247-84,,"arts, publishing, heritage or a zoo, not aid"
+exclude,eu:2367972100126-84,,"arts, publishing, heritage or a zoo, not aid"
+exclude,eu:907559523669-88,,"arts, publishing, heritage or a zoo, not aid"
+exclude,eu:158270723530-82,,"an industry, professional, standards or internet body, not aid"
+exclude,eu:897362334010-17,,"an industry, professional, standards or internet body, not aid"
+exclude,eu:187726193787-89,,"an industry, professional, standards or internet body, not aid"
+exclude,eu:446858420375-53,,"an industry, professional, standards or internet body, not aid"
+exclude,eu:8279066104632-56,,"an industry, professional, standards or internet body, not aid"
+exclude,iati:GB-CHC-1188731,,"an industry, professional, standards or internet body, not aid"
+exclude,eu:76014811270-77,,"an industry, professional, standards or internet body, not aid"
+exclude,cra:118888957RR0001,,"domestic environment work, not aid"
+exclude,acnc:82090616443,,"domestic environment work, not aid"
+exclude,iati:GB-GOV-28,,a government body that reports aid spending but does not run aid work
+exclude,iati:GB-GOV-27,,a government body that reports aid spending but does not run aid work
+exclude,iati:GB-GOV-8,,a government body that reports aid spending but does not run aid work
+exclude,irs:421591205,,a government body that reports aid spending but does not run aid work
+exclude,irs:621049974,,a government body that reports aid spending but does not run aid work
+exclude,irs:530217164,,"political lobbying or media monitoring, not aid"
+exclude,irs:522068483,,"political lobbying or media monitoring, not aid"
+separate,eu:051753599653-33,eu:638136618275-48,different organisations
+separate,irs:980513530,eu:493858499963-76,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:450212791764-83,eu:800446498687-34,different organisations
+separate,iati:GB-COH-04589451,eu:6440079101269-68,different organisations
+separate,unjobs-nonun:61,eu:450195951100-88,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:62,eu:62193811660-44,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:992338248452-34,eu:8045259100146-43,different organisations
+separate,unjobs-nonun:230,eu:120004038547-60,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:135633307,eu:120004038547-60,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:NL-KVK-41151952,eu:336765244362-96,different organisations
+separate,iati:NL-KVK-41151952,unjobs-nonun:292,different organisations
+separate,iati:SV-NIT-9498-180400-101-7,eu:095367695927-10,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:408,eu:155730840543-53,different organisations
+separate,eu:827172316947-35,eu:031571311716-04,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:827172316947-35,unjobs-nonun:520,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:353327997718-23,eu:7512167100744-11,different organisations
+separate,eu:783127949178-77,eu:180591397409-49,different organisations
+separate,eu:632695640817-36,eu:975218830723-71,different organisations
+separate,eu:496658448374-80,unjobs-un:22,different organisations
+separate,eu:121848610166-52,eu:5833453104517-62,different organisations
+separate,eu:8478402101115-51,eu:613584898056-65,different organisations
+separate,eu:0531601101692-04,eu:9216901101118-49,different organisations
+separate,eu:082119050457-22,eu:264779625605-96,different organisations
+separate,eu:709051598241-62,unjobs-nonun:510,different organisations
+separate,cra:811116813RR0001,irs:300545486,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:273941186,uk:1122574,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:40538475090-82,iati:NL-KVK-41169658,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:121,irs:300545486,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,acnc:86164099736,acnc:77507629093,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,acnc:85214424729,acnc:41725839724,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,acnc:22095044465,acnc:86693237685,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:062334253126-35,eu:7794896102687-61,different organisations
+separate,eu:7794896102687-61,iati:CH-FDJP-CHE100871337,different organisations
+separate,eu:896045415778-75,eu:03518238467-61,different organisations
+separate,acnc:47915006050,acnc:62639931230,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1164703,uk:281942,different organisations
+separate,oscr:SC022515,oscr:SC022353,different organisations
+separate,iati:NL-KVK-30114598,iati:NL-KVK-72908114,different organisations
+separate,acnc:61006067349,acnc:49781030034,different organisations
+separate,iati:GB-COH-SC301345,iati:NL-KVK-06702132,different organisations
+separate,uk:274467,seed:14,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:NL-KVK-27264198,iati:NL-KVK-41217595,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:NL-KVK-27264198,seed:14,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-274467,seed:14,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,oscr:SC050047,unjobs-nonun:13,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:260397519,seed:24,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-04481639,unjobs-nonun:20,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:520851555,unjobs-nonun:25,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:908208124300-82,unjobs-nonun:278,different organisations
+separate,irs:271337098,unjobs-nonun:29,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:603232231321-29,unjobs-nonun:30,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:941191246,irs:133234632,different organisations
+separate,irs:133234632,unjobs-nonun:31,different organisations
+separate,iati:GB-CHC-1115482,unjobs-nonun:38,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:208456741,unjobs-nonun:38,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:54970512687-47,oscr:SC022918,different organisations
+separate,eu:90237823189-97,unjobs-nonun:61,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-292506,unjobs-nonun:61,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:292506,unjobs-nonun:61,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:540761510,irs:446005794,different organisations
+separate,oscr:SC038107,seed:15,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1092236,seed:15,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1092236,seed:15,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-11373728,unjobs-nonun:120,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:258864648057-10,iati:US-EIN-27-5026293,different organisations
+separate,eu:258864648057-10,irs:275026293,different organisations
+separate,eu:03960197927-62,unjobs-nonun:163,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:521654284,unjobs-nonun:163,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:237413005,irs:561719871,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:47937943241-80,unjobs-nonun:365,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:TZ-NNCB-INGO-R1-00149,unjobs-nonun:211,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,acnc:57102400993,unjobs-nonun:273,different organisations
+separate,irs:133492792,unjobs-nonun:222,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:522158152,unjobs-nonun:469,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:710699939,unjobs-nonun:233,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:071230647405-02,iati:GB-CHC-1128267-8,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-1762840,iati:GB-CHC-1128267-8,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1128267-8,uk:288180,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1128267-8,seed:22,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:874477821,irs:135633307,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:874477821,unjobs-nonun:230,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:232836648,irs:043129839,different organisations
+separate,eu:201585250780-07,unjobs-nonun:134,different organisations
+separate,irs:986001029,unjobs-nonun:247,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:980142199,unjobs-nonun:282,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:237185633,unjobs-nonun:283,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1093861,unjobs-nonun:287,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1093861,unjobs-nonun:287,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:773472399076-69,irs:382935397,different organisations
+separate,irs:131845455,unjobs-nonun:289,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:237396123,unjobs-nonun:290,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1065972,unjobs-nonun:292,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1065972,seed:1,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:953701819437-32,irs:823285688,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:541650477,irs:823285688,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:823285688,unjobs-nonun:297,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-SC-SCO45223,oscr:SC045223,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,oscr:SC022140,oscr:SC045223,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:3206326101138-11,seed:23,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1026588,unjobs-nonun:341,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:133433452,unjobs-nonun:341,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1058226,uk:1064598,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-EIN-20-0097189,unjobs-nonun:339,different organisations
+separate,iati:GB-CHC-1150993,unjobs-nonun:350,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-EIN-23-7069110,unjobs-nonun:374,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:237069110,unjobs-nonun:374,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-GOV-10,irs:264599860,different organisations
+separate,irs:510169168,irs:135661832,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-1364201,unjobs-nonun:390,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:276035,unjobs-nonun:390,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-IRS-13-5661832,irs:510169168,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-IRS-13-5661832,unjobs-nonun:390,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:135661832,unjobs-nonun:390,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-SC-SC030289,unjobs-nonun:398,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-SC-SC030289,unjobs-nonun:538,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:988324839304-12,unjobs-nonun:395,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:5064421103747-60,unjobs-nonun:404,different organisations
+separate,iati:GB-CHC-1138287,unjobs-nonun:411,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:133500609,unjobs-nonun:411,different organisations
+separate,iati:GB-CHC-1098106,unjobs-nonun:418,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1098106,unjobs-nonun:418,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1001349,unjobs-nonun:435,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1001349,unjobs-nonun:435,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:060726487,unjobs-nonun:436,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:060726487,seed:11,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1076822,iati:GB-COH-213890,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1076822,uk:213890,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1076822,uk:213890,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-213890,uk:1076822,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-213890,unjobs-nonun:436,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-213890,seed:11,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:162431991765-16,unjobs-nonun:438,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:521257425,unjobs-nonun:438,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:BE-BCE_KBO-0453975341,unjobs-nonun:438,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:1069204,seed:20,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:NL-KVK-41217595,seed:14,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:BE-BCE_KBO-0419872616,seed:17,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:US-EIN-941191246,irs:133234632,different organisations
+separate,uk:1043886,unjobs-nonun:183,different organisations
+separate,iati:GB-CHC-1140288,unjobs-nonun:196,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:980543843,unjobs-nonun:324,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:214779,uk:1000566,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:213890,unjobs-nonun:436,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:213890,seed:11,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,eu:074104299048-35,unjobs-nonun:473,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-1112842,unjobs-nonun:473,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-COH-NI21482,unjobs-nonun:476,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:582060131,unjobs-nonun:526,different organisations
+separate,unjobs-nonun:497,unjobs-nonun:526,different organisations
+separate,irs:300181674,unjobs-nonun:498,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,acnc:92607879345,unjobs-nonun:506,different organisations
+separate,eu:9414007100152-01,irs:980493088,different organisations
+separate,iati:US-EIN-203908371,unjobs-nonun:517,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,irs:980459408,unjobs-nonun:517,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,iati:GB-CHC-285908,seed:13,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,uk:285908,seed:13,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
