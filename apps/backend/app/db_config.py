@@ -67,10 +67,11 @@ class DBConfig:
                     masked_url = self.supabase_db_url.replace(parsed.password, '***')
                 else:
                     masked_url = self.supabase_db_url
-                # The path is not logged: in a malformed URL it can hold the password's tail.
+                # Neither the path (in a malformed URL it can hold the password's tail) nor the
+                # host or user is logged (security stage 7).
                 logger.info(
-                    "[db_config] SUPABASE_DB_URL configured: %s://%s:***@%s:%s",
-                    parsed.scheme, parsed.username, parsed.hostname, parsed.port or 5432,
+                    "[db_config] SUPABASE_DB_URL configured: %s, port %s",
+                    parsed.scheme, parsed.port or 5432,
                 )
             except Exception as e:
                 # The parser's message can quote part of the password.
@@ -149,15 +150,15 @@ class DBConfig:
                 )
                 if addr_info:
                     resolved_host = addr_info[0][4][0]  # Get IPv4 address
-                    logger.info(f"[db_config] Resolved {hostname} to IPv4: {resolved_host}")
+                    logger.debug("[db_config] Resolved the database host to IPv4")
             except (socket.gaierror, ValueError, OSError) as e:
-                logger.warning(
-                    "[db_config] Could not resolve %s to IPv4, using original hostname (%s)",
-                    hostname, type(e).__name__,
+                logger.debug(
+                    "[db_config] Could not resolve the database host to IPv4, using it as given (%s)",
+                    type(e).__name__,
                 )
                 # Continue with original hostname (pooler should work anyway)
         elif is_pooler:
-            logger.debug(f"[db_config] Using pooler hostname (IPv4 compatible): {hostname}")
+            logger.debug("[db_config] Using the pooler host as given (IPv4 compatible)")
         
         # Extract all parameters from the parsed URL
         params = {
@@ -171,9 +172,8 @@ class DBConfig:
         if parsed.password:
             params["password"] = unquote(parsed.password)
         
-        # Log the connection parameters (mask password)
-        logger.info("[db_config] Database connection params: host=%s, port=%s, user=%s",
-                    resolved_host, params['port'], params['user'])
+        # Called for every connection: no host or user here (security stage 7).
+        logger.debug("[db_config] Database connection params read: port=%s", params['port'])
         
         return params
     

@@ -47,6 +47,7 @@ const CASES: Case[] = [
   { module: 'presets/sources', method: 'GET', backendPath: '/api/admin/presets/sources' },
   { module: 'organisations', method: 'GET', backendPath: '/api/admin/organisations' },
   { module: 'setup/status', method: 'GET', backendPath: '/api/admin/setup/status' },
+  { module: 'db/status', method: 'GET', backendPath: '/api/admin/db/status' },
   { module: 'search/init', method: 'POST', backendPath: '/api/admin/search/init' },
   { module: 'search/reindex', method: 'POST', backendPath: '/api/admin/search/reindex' },
   { module: 'crawl/run', method: 'POST', body: { source_id: 'src-6', note: PLANTED }, backendPath: '/api/admin/crawl/run' },
@@ -150,8 +151,8 @@ describe('the table', () => {
       }
     }
     expect(found.sort()).toEqual(CASES.map((c) => `${c.method} ${c.module}`).sort());
-    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(37);
-    expect(found).toHaveLength(41);
+    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(38);
+    expect(found).toHaveLength(42);
   });
 });
 

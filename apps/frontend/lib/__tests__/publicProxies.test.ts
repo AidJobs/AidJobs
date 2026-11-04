@@ -123,6 +123,29 @@ describe.each(ROUTES)('$method $module', (route) => {
   });
 });
 
+describe('GET db/status', () => {
+  it('passes the backend\'s slim answer through unchanged (security plan, stage 7)', async () => {
+    fetchMock.mockResolvedValue(new Response('{"ok":true}', { status: 200, headers: { 'x-request-id': RID } }));
+    const response = await call(ROUTES[0]);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it('marks every answer as not to be stored', async () => {
+    fetchMock.mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    expect((await call(ROUTES[0])).headers.get('cache-control')).toBe('no-store');
+    fetchMock.mockResolvedValue(new Response('<html></html>', { status: 500 }));
+    expect((await call(ROUTES[0])).headers.get('cache-control')).toBe('no-store');
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+    expect((await call(ROUTES[0])).headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('leaves the other public routes as they were', async () => {
+    fetchMock.mockResolvedValue(new Response('{"status":"ok"}', { status: 200 }));
+    expect((await call(ROUTES[1])).headers.get('cache-control')).toBeNull();
+  });
+});
+
 describe('POST search/parse', () => {
   const parse = ROUTES[2];
 

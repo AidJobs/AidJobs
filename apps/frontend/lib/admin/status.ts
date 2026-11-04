@@ -35,6 +35,19 @@ export function databaseStatus(status: 'ok' | 'warn' | 'fail'): { text: string; 
   return { text: 'Cannot connect', tone: 'error' };
 }
 
+/** The message in an admin proxy's failure answer (`{status, error, detail}`), or null. */
+export function adminErrorMessage(text: string): string | null {
+  try {
+    const body = JSON.parse(text) as { error?: unknown; detail?: unknown } | null;
+    for (const candidate of [body?.error, body?.detail]) {
+      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    }
+  } catch {
+    // Not JSON: the caller shows its own text.
+  }
+  return null;
+}
+
 export type SearchStatus = { enabled: boolean; error?: string; index?: unknown };
 
 /** The backend's answer from `/api/search/status` when no Meilisearch settings are present. */
