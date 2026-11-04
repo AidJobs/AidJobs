@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Lock, PanelRightClose, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Lock, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { applyFormat, formatOf, reorderSections, toggleCommitment, toggleSection } from './actions';
@@ -16,7 +16,7 @@ function scrollToSection(key: string) {
   document.getElementById(`ej-sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function Structure({ job, s, onCollapse, bare }: { job: DemoJob; s: State; onCollapse?: () => void; bare?: boolean }) {
+export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: boolean }) {
   const format = formatOf(s, job.format);
   const rec = new Set(recommendSections(format, job.facts));
   const [closed, setClosed] = useState<Record<string, boolean>>({ commitments: true });
@@ -26,24 +26,7 @@ export default function Structure({ job, s, onCollapse, bare }: { job: DemoJob; 
 
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="JD outline">
-      {!bare && (
-      <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
-        <h2 className="aj-title" style={{ margin: 0, fontSize: 14 }}>
-          JD outline
-        </h2>
-        <span className="aj-faint" style={{ fontSize: 11 }}>
-          {job.tags.length} sections
-        </span>
-        {onCollapse && (
-          <Tip label="Hide the JD outline">
-            <button type="button" className="aj-icon-btn ml-auto" style={{ width: 28, height: 28 }} onClick={onCollapse} aria-label="Hide the JD outline">
-              <PanelRightClose size={14} strokeWidth={1.8} />
-            </button>
-          </Tip>
-        )}
-      </div>
-      )}
-      <div className={`aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 ${bare ? 'pt-3' : ''}`}>
+      <fieldset className="ej-fieldset aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-3" disabled={Boolean(s.reviewerAs)} aria-label={s.reviewerAs ? 'JD outline, read only for reviewers' : undefined}>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="ej-panel-label" htmlFor="ej-style">
@@ -163,7 +146,7 @@ export default function Structure({ job, s, onCollapse, bare }: { job: DemoJob; 
             )}
           </section>
         </div>
-      </div>
+      </fieldset>
     </div>
   );
 }

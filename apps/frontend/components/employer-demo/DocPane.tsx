@@ -1,14 +1,16 @@
 'use client';
 
 import { AlertCircle, Check, CheckCircle2, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
-import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, canWrite, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange, writeDraft } from './actions';
+import { addRemark, answerFact, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange } from './actions';
+import { contractPicks, deadlinePicks, placePatch, placePicks } from './answers';
 import { DOCUMENTS } from './apply';
-import Composer from './Composer';
-import { commitmentText, COMMITMENTS, findInclusive, longDate, quality, type QualityItem } from './engine';
+import Composer, { type ComposerHandle } from './Composer';
+import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
 import { ReviewerBar, ReviewSummary } from './Review';
-import type { ApplySettings, DemoJob, Section as Sec, State } from './types';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
+import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
 function rich(text: string): ReactNode {
@@ -39,6 +41,32 @@ function MarkedText({ text, job, section, onFlag }: { text: string; job: DemoJob
   return <>{out}</>;
 }
 
+const SLOTS: Record<string, 'place' | 'closes'> = { 'Duty station': 'place', 'Closing date': 'closes' };
+
+/** Text with clickable placeholders for missing facts ("[Closing date]"); each opens the fact's editor. */
+function SlotText({ text, job, section, onFlag }: { text: string; job: DemoJob; section: string; onFlag: (f: Flag) => void }) {
+  const parts = text.split(/\[(Duty station|Closing date)\]/);
+  if (parts.length === 1) return <MarkedText text={text} job={job} section={section} onFlag={onFlag} />;
+  const reviewing = Boolean(getState().reviewerAs);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 && reviewing ? (
+          <span key={i} className="ej-slot">{part}</span>
+        ) : i % 2 ? (
+          <Tip key={i} label={`Missing: ${part.toLowerCase()}. Click to add it.`}>
+            <button type="button" className="ej-slot" onClick={() => window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: SLOTS[part] }))}>
+              {part}
+            </button>
+          </Tip>
+        ) : (
+          <MarkedText key={i} text={part} job={job} section={section} onFlag={onFlag} />
+        ),
+      )}
+    </>
+  );
+}
+
 function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob; section: string; onFlag: (f: Flag) => void }) {
   const blocks: ReactNode[] = [];
   let list: string[] = [];
@@ -48,7 +76,7 @@ function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob;
         <ul key={`u${k}`}>
           {list.map((l, i) => (
             <li key={i}>
-              <MarkedText text={l} job={job} section={section} onFlag={onFlag} />
+              <SlotText text={l} job={job} section={section} onFlag={onFlag} />
             </li>
           ))}
         </ul>,
@@ -67,7 +95,7 @@ function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob;
           </p>
         ) : (
           <p key={i}>
-            <MarkedText text={l} job={job} section={section} onFlag={onFlag} />
+            <SlotText text={l} job={job} section={section} onFlag={onFlag} />
           </p>
         ),
       );
@@ -328,13 +356,16 @@ function FlagDialog({ job, flag, onClose }: { job: DemoJob; flag: Flag; onClose:
 /** The job title as the job description's heading: edited in place, full width, wrapping onto more lines when long. */
 export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [typing, setTyping] = useState(false);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [job.facts.title]);
+  const better = job.facts.title ? suggestTitle(job.facts.title) : null;
   return (
+    <>
     <textarea
       ref={ref}
       id="ej-title-edit"
@@ -343,10 +374,21 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
       value={job.facts.title}
       onChange={(e) => setFacts(job.id, { title: e.target.value.replace(/\n/g, ' ') })}
       onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+      onFocus={() => setTyping(true)}
+      onBlur={() => setTyping(false)}
       placeholder="Job title"
       aria-label="Job title"
       disabled={disabled}
     />
+    {better && !disabled && !typing && (
+      <div className="ej-spell" role="note">
+        Did you mean <strong>{better}</strong>?
+        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => setFacts(job.id, { title: better })}>
+          Use it
+        </button>
+      </div>
+    )}
+    </>
   );
 }
 export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; onSeeChat?: () => void }) {
@@ -395,113 +437,138 @@ export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; on
   );
 }
 
-export function ChecksBar({ job, s }: { job: DemoJob; s: State }) {
-  const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
-  const checks = quality(job.sections, job.facts, s.today, live).filter((c) => !c.section);
-  const flags = job.sections.reduce((n, sec) => n + sec.lines.reduce((m, l) => m + findInclusive(l, job.format).filter((h) => !job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]).length, 0), 0);
-  const tone = (l: QualityItem['level']) => (l === 'ok' ? 'var(--sage-7)' : l === 'issue' ? 'var(--red)' : l === 'warn' ? 'var(--amber)' : 'var(--text-3)');
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Checks">
-      {checks.map((i) => (
-        <span key={i.key} className="ej-check" style={{ color: tone(i.level) }}>
-          {i.level === 'ok' ? <CheckCircle2 size={13} strokeWidth={2} /> : i.level === 'info' ? <Info size={13} strokeWidth={2} /> : <AlertCircle size={13} strokeWidth={2} />}
-          <span style={{ color: 'var(--text-2)' }}>{i.text}</span>
-        </span>
-      ))}
-      <span className="ej-check shrink-0" style={{ color: flags ? 'var(--amber)' : 'var(--sage-7)' }}>
-        {flags ? <AlertCircle size={13} strokeWidth={2} /> : <CheckCircle2 size={13} strokeWidth={2} />}
-        <span style={{ color: 'var(--text-2)' }}>{flags ? `Inclusive language: ${flags} highlighted; hover to see why` : 'Inclusive language ✓'}</span>
-      </span>
-    </div>
-  );
-}
-
-/** The chat, docked under the document: the latest reply and the box, with the whole conversation one tap away. */
-/** The whole conversation, for the Chat tab beside the job description. */
-export function ChatHistory({ job }: { job: DemoJob }) {
-  if (!job.chat.length) return <p className="aj-faint m-0 px-4 py-3">The conversation about this job description appears here.</p>;
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3" aria-label="Conversation" aria-live="polite">
-      {job.chat.map((m) => (
-        <div key={m.id} className="ej-bubble" data-from={m.from}>
-          {rich(m.text)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * The slim chat line under the job description: AidJobs' current question in one line with quick answers, and a box
- * that grows only while typing. The whole conversation is in the Chat tab.
- */
-export function ChatLine({ job, s, onTyping }: { job: DemoJob; s: State; onTyping?: () => void }) {
-  const [text, setText] = useState('');
-  const [writing, setWriting] = useState(false);
-  const last = job.chat[job.chat.length - 1];
-  const asking = last?.from === 'ai' ? last : undefined;
-  const write = canWrite(job);
-  const start = () => {
-    setWriting(true);
-    setTimeout(() => {
-      writeDraft(job.id);
-      setWriting(false);
-    }, 900);
+/** Answers built into AidJobs' question: relevant picks, each with its reason, plus a search or a calendar. Free text in the box works too. */
+function AskAnswer({ job, s, kind, onAnswered }: { job: DemoJob; s: State; kind: NonNullable<ChatMsg['ask']>; onAnswered: () => void }) {
+  const [q, setQ] = useState('');
+  const [date, setDate] = useState('');
+  const min = addDays(s.today, 1);
+  const picks = kind === 'place' ? placePicks(s, job) : kind === 'deadline' ? deadlinePicks(s, job) : kind === 'contract' ? contractPicks(s, job) : [];
+  const answer = (patch: Partial<Facts>, said: string) => {
+    answerFact(job.id, patch, said);
+    onAnswered();
   };
-  if (s.reviewerAs) return null;
-  const quick = asking?.quick ?? [];
-  const showWrite = !job.sections.length && !quick.includes('Write the description');
+  const dateOk = /^20\d\d-\d\d-\d\d$/.test(date) && date >= min;
+  const matches = kind === 'place' && q.trim().length >= 2 ? PLACES.filter((p) => `${p.city} ${p.country}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 5) : [];
+  const choosePlace = (text: string) => {
+    const known = PLACES.find((p) => p.city.toLowerCase() === text.trim().toLowerCase());
+    if (known) return answer(placePatch(known.city), known.city);
+    const loose = looseLocation(`based in ${text}`);
+    answer({ location: loose?.location ?? text.trim(), country: loose?.country ?? '', arrangement: 'onsite' }, text.trim());
+  };
   return (
-    <div className="ej-dock flex shrink-0 flex-col gap-1.5">
-      {writing ? (
-        <div className="ej-ask">
-          <Sparkles size={13} strokeWidth={2} /> Writing the job description… (simulated)
+    <div className="ej-ask-answer">
+      {picks.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {picks.map((p) => (
+            <Tip key={p.label} label={p.why}>
+              <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => answer(p.patch, p.label)}>
+                {p.label}
+              </button>
+            </Tip>
+          ))}
         </div>
-      ) : (
-        asking && (
-          <div className="ej-ask" aria-live="polite">
-            <Sparkles size={13} strokeWidth={2} className="shrink-0" />
-            <span className="min-w-0 flex-1">{rich(asking.text)}</span>
-          </div>
-        )
       )}
-      {(quick.length > 0 || showWrite) && !writing && (
-        <div className="aj-no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-          {quick.map((q) =>
-            q === 'Write the description' ? (
-              <button key={q} type="button" className="aj-ink-btn shrink-0" style={{ height: 30 }} onClick={start} disabled={!write.ok}>
-                <Sparkles size={13} strokeWidth={2} /> Write the job description
-              </button>
-            ) : (
-              <button key={q} type="button" className="aj-pill shrink-0" style={{ height: 30 }} onClick={() => sendChat(job.id, q)}>
-                {q}
-              </button>
-            ),
-          )}
-          {showWrite && (
-            <button type="button" className="aj-ink-btn ml-auto shrink-0" style={{ height: 30 }} onClick={start} disabled={!write.ok}>
-              <Sparkles size={13} strokeWidth={2} /> {write.ok ? 'Write the job description' : write.why}
+      {kind === 'place' && (
+        <div className="flex flex-col gap-1">
+          <input
+            style={{ ...inputStyle, minHeight: 34 }}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && q.trim() && choosePlace(q)}
+            placeholder="Search a place, or type any town and country"
+            aria-label="Search a duty station"
+          />
+          {matches.map((m) => (
+            <button key={m.city} type="button" className="ej-menu-item" onClick={() => choosePlace(m.city)}>
+              {m.city}, {m.country}
+            </button>
+          ))}
+          {q.trim().length >= 2 && !matches.some((m) => m.city.toLowerCase() === q.trim().toLowerCase()) && (
+            <button type="button" className="ej-menu-item" onClick={() => choosePlace(q)}>
+              Use &ldquo;{q.trim()}&rdquo;
             </button>
           )}
         </div>
       )}
-      <Composer
-        value={text}
-        onChange={(v) => {
-          if (!text && v) onTyping?.();
-          setText(v);
-        }}
-        onSend={(v) => {
-          sendChat(job.id, v);
-          setText('');
-        }}
-        suggestion=""
-        placeholder={job.sections.length ? 'Ask for a change: "shorten the responsibilities", "add French"…' : 'Answer, or add details'}
-        label="Message AidJobs about this job description"
-        compact
-      />
+      {kind === 'deadline' && (
+        <div className="flex gap-1.5">
+          <input
+            type="date"
+            style={{ ...inputStyle, minHeight: 34, flex: 1 }}
+            min={min}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && dateOk && answer({ deadline: date }, longDate(date))}
+            aria-label="Pick a closing date"
+          />
+          <button type="button" className="aj-pill" style={{ height: 34 }} disabled={!dateOk} onClick={() => answer({ deadline: date }, longDate(date))}>
+            Set date
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+/** The whole conversation with AidJobs, in its own panel beside the job description, with the box to write in. */
+export function ChatPanel({ job, s, autoFocus }: { job: DemoJob; s: State; autoFocus?: boolean }) {
+  const [text, setText] = useState('');
+  const box = useRef<ComposerHandle>(null);
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end' });
+  }, [job.chat.length]);
+  if (s.reviewerAs) return null;
+  const last = job.chat[job.chat.length - 1];
+  const lastUser = job.chat.map((m) => m.from).lastIndexOf('user');
+  const own = [...s.jobs.map((j) => j.facts.title).filter(Boolean), ...s.org.countries.flatMap((c) => PLACES.filter((p) => p.country === c).map((p) => `${p.city}, ${p.country}`))];
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-2 px-4 py-3" aria-label="Conversation" aria-live="polite">
+        {job.chat.length === 0 && <p className="aj-faint m-0">Ask AidJobs for any change to the job description.</p>}
+        {job.chat.map((m, i) => (
+          <div key={m.id} className="ej-bubble" data-from={m.from}>
+            {rich(m.text)}
+            {m.from === 'ai' && i > lastUser && m.quick && m.quick.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {m.quick.map((q) => (
+                  <button key={q} type="button" className="aj-pill" style={{ height: 30 }} onClick={() => sendChat(job.id, q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+            {m.from === 'ai' && m === last && m.ask && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => box.current?.focus(), 0)} />}
+          </div>
+        ))}
+        <div ref={end} />
+      </div>
+      <div className="shrink-0 border-t px-3 py-2.5 aj-hair">
+        <Composer
+          ref={box}
+          value={text}
+          onChange={setText}
+          onSend={(v) => {
+            sendChat(job.id, v);
+            setText('');
+          }}
+          suggestion={completeText(text, own)}
+          placeholder={last?.ask ? 'Answer here, or pick above' : 'Ask for a change: "shorten the responsibilities", "add French"…'}
+          label="Message AidJobs about this job description"
+          compact
+          autoFocus={autoFocus}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The job's open checks, for the count on Publish: missing facts, template leftovers, and inclusive-language highlights still open. */
+export function openChecks(job: DemoJob, s: State): string[] {
+  const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
+  const items = quality(job.sections, job.facts, s.today, live).filter((c) => c.level !== 'ok' && c.level !== 'info').map((c) => c.text);
+  const flags = job.sections.reduce((n, sec) => n + sec.lines.reduce((m, l) => m + findInclusive(l, job.format).filter((h) => !job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]).length, 0), 0);
+  return flags ? [...items, `${flags} inclusive-language ${flags === 1 ? 'highlight' : 'highlights'} to look at`] : items;
 }
 export function ReviewArea({ job, s }: { job: DemoJob; s: State }) {
   return (

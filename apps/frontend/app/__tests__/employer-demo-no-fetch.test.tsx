@@ -15,7 +15,8 @@ jest.mock('next/link', () => ({
 }));
 
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
-import { importJobDescription, publish, readIntent, sendChat, startJob, writeDraft } from '@/components/employer-demo/actions';
+import { quality } from '@/components/employer-demo/engine';
+import { answerFact, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import { getState, go, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -165,7 +166,6 @@ describe('employer demo: never calls the network', () => {
     let id = '';
     act(() => {
       id = startJob("We're hiring a WASH Programme Manager in Nairobi, 12-month fixed-term contract, closing 30 November 2026");
-      writeDraft(id);
     });
     route(`#create/${id}`);
     expect(container.querySelector('#ej-title-edit')).not.toBeNull();
@@ -193,7 +193,6 @@ describe('employer demo: never calls the network', () => {
 
     act(() => {
       const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
-      writeDraft(id2);
       publish(id2, { plan: 'premium', useCredit: false, schedule: null, reach: { candidates: [{ email: 'a@example.org', status: 'queued' }], team: [], community: true, intro: '' } });
       jest.advanceTimersByTime(5000);
       go('jobs', id2);
@@ -240,6 +239,92 @@ describe('employer demo: never calls the network', () => {
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":2');
     for (const k of Object.keys(localStorage)) expect(k.startsWith('aidjobs.')).toBe(true);
+  });
+});
+
+describe('employer demo: the conversation', () => {
+  it('builds the job description at once, suggests a spelling, accepts any place, and asks each question only until it is answered', () => {
+    let id = '';
+    act(() => {
+      id = startJob('hiring education speclist');
+    });
+    const job = () => getState().jobs.find((j) => j.id === id)!;
+    expect(job().sections.length).toBeGreaterThan(2);
+    expect(job().chat.some((m) => m.text.includes('Did you mean **Education Specialist**?'))).toBe(true);
+    expect(job().chat.at(-1)?.ask).toBe('place');
+    act(() => sendChat(id, 'health professional with 10 years of experience in kashmir, india. field job'));
+    expect(job().facts.location).toBe('Kashmir, India');
+    expect(job().chat.at(-1)?.ask).toBe('deadline');
+    act(() => answerFact(id, { deadline: '2026-11-30' }, '30 November 2026'));
+    expect(job().chat.at(-1)?.ask).toBe('contract');
+    act(() => sendChat(id, 'Use "Education Specialist"'));
+    expect(job().facts.title).toBe('Education Specialist');
+    expect(job().chat.at(-1)?.ask).toBe('contract');
+    expect(JSON.stringify(job().sections)).not.toContain('[Closing date]');
+  });
+
+  it('asks again when it cannot read an answer, and never pastes the answer into the job description', () => {
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Lilongwe');
+    });
+    const job = () => getState().jobs.find((j) => j.id === id)!;
+    expect(job().chat.at(-1)?.ask).toBe('deadline');
+    const text = JSON.stringify(job().sections);
+    act(() => sendChat(id, 'sometime soon'));
+    expect(job().chat.at(-1)?.ask).toBe('deadline');
+    expect(job().chat.at(-1)?.text).toContain("couldn't read that");
+    expect(JSON.stringify(job().sections)).toBe(text);
+    act(() => sendChat(id, '30/11/2026'));
+    expect(job().facts.deadline).toBe('2026-11-30');
+    act(() => sendChat(id, 'staff'));
+    expect(job().facts.contract).toBe('Fixed-term');
+  });
+
+  it('asks for a missing title, and builds the job description once it is given', () => {
+    let id = '';
+    act(() => {
+      id = startJob('we need someone soon');
+    });
+    const job = () => getState().jobs.find((j) => j.id === id)!;
+    expect(job().sections).toHaveLength(0);
+    expect(job().chat.at(-1)?.ask).toBe('title');
+    act(() => sendChat(id, 'Cook'));
+    expect(job().facts.title).toBe('Cook');
+    expect(job().sections.length).toBeGreaterThan(2);
+    let other = '';
+    act(() => {
+      other = startJob('we need someone soon');
+      setFacts(other, { title: 'Driver' });
+    });
+    expect(getState().jobs.find((j) => j.id === other)?.sections.length).toBeGreaterThan(2);
+  });
+
+  it('undo after a change in the chat puts the facts back too, and placeholders count as open checks', () => {
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Finance Officer, closing 30 November 2026, fixed-term');
+    });
+    const job = () => getState().jobs.find((j) => j.id === id)!;
+    expect(quality(job().sections, job().facts, getState().today, []).some((q) => q.key.startsWith('missing-'))).toBe(true);
+    act(() => sendChat(id, 'it is based in Juba'));
+    act(() => sendChat(id, 'the closing date is 14 December 2026'));
+    expect(job().facts.deadline).toBe('2026-12-14');
+    expect(job().lastChange?.beforeFacts.deadline).toBe('2026-11-30');
+    act(() => undoLastChange(id));
+    expect(job().facts.deadline).toBe('2026-11-30');
+    expect(JSON.stringify(job().sections)).toContain('30 November 2026');
+  });
+
+  it('counts a free job description the first time it is used, not when it is written', () => {
+    const before = getState().draftsUsed;
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Logistics Officer in Goma, closing in 3 weeks');
+    });
+    expect(getState().draftsUsed).toBe(before);
+    act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
+    expect(getState().draftsUsed).toBe(before + 1);
   });
 });
 

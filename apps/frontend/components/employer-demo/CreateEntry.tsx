@@ -6,11 +6,14 @@ import Tip from '@/components/site/Tip';
 import { defaultFormatKey, formatOf, startJob } from './actions';
 import Composer from './Composer';
 import { FormatMenu, PlusMenu } from './ComposerTools';
-import { addSuggestions, detectRole, extractFacts, headingFor, SECTION_BY_KEY } from './engine';
+import { addSuggestions, completeText, detectRole, extractFacts, headingFor, PLACES, SECTION_BY_KEY } from './engine';
 import CreateFormatDialog from './FormatBuilder';
 import { MARKET_SAMPLE } from './sample';
 import { go, useDemo } from './store';
 import UploadDialog from './Upload';
+
+/** Set when a job starts from this screen, so its workspace opens once with the chat open and focused. */
+export const OPEN_CHAT_KEY = 'aidjobs.employerDemo.openChat';
 
 /** Short names so the "Add:" pills fit on one line; the full heading shows on hover. */
 const PILL_LABEL: Record<string, string> = {
@@ -38,7 +41,20 @@ export default function CreateEntry() {
   const offered = addSuggestions(format, facts);
   const pills = [...offered, ...extra.filter((k) => !offered.includes(k))];
   const toggle = (k: string) => setExtra(extra.includes(k) ? extra.filter((x) => x !== k) : [...extra, k]);
+  const own = [...s.jobs.map((j) => j.facts.title).filter(Boolean), ...s.org.countries.flatMap((c) => PLACES.filter((p) => p.country === c).map((p) => `${p.city}, ${p.country}`))];
+  const have = [
+    { ok: Boolean(role || facts.title), name: 'the role' },
+    { ok: Boolean(facts.location) || facts.arrangement === 'remote', name: 'the duty station' },
+    { ok: Boolean(facts.deadline), name: 'the closing date' },
+    { ok: Boolean(facts.contract || facts.duration), name: 'the contract' },
+  ];
+  const readiness = { done: have.filter((h) => h.ok).length, total: have.length, missing: have.filter((h) => !h.ok).map((h) => h.name) };
   const send = (v: string) => {
+    try {
+      localStorage.setItem(OPEN_CHAT_KEY, '1');
+    } catch {
+      /* storage unavailable */
+    }
     const id = startJob(v, fkey, extra);
     setText('');
     setExtra([]);
@@ -60,7 +76,8 @@ export default function CreateEntry() {
             value={text}
             onChange={setText}
             onSend={send}
-            suggestion=""
+            suggestion={completeText(text, own)}
+            readiness={text.trim() ? readiness : undefined}
             placeholder="Describe the role in a few lines"
             label="Describe the role"
             large

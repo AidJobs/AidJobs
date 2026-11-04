@@ -97,7 +97,7 @@ export type Facts = {
 
 export type Section = { key: string; title: string; lines: string[]; edited?: boolean };
 
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[] };
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract' };
 
 export type Remark = {
   id: string;
@@ -178,7 +178,7 @@ export type DemoJob = {
   countsAsFreeDraft: boolean;
   audit: AuditEntry[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
-  lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[] };
+  lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };
 
 export type InboxKind = 'approved' | 'changes' | 'comment' | 'deadline' | 'removal' | 'receipt' | 'reach' | 'review';

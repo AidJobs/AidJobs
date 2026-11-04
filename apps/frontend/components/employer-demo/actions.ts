@@ -16,6 +16,7 @@ import {
   parseIso,
   readPasted,
   recommendSections,
+  suggestTitle,
   type BuildContext,
 } from './engine';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
@@ -26,8 +27,8 @@ export const FREE_LIVE = 2;
 export const PREMIUM_EMAILS = 50;
 export const PRICE_LABEL = { premium: 'US$149', pack: 'US$599' };
 
-function msg(from: ChatMsg['from'], text: string, quick?: string[]): ChatMsg {
-  return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick };
+function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
+  return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
 }
 
 function who(s: State): string {
@@ -46,13 +47,21 @@ export function ctxFor(s: State, j: DemoJob): BuildContext {
   return { facts: j.facts, roleKey: j.family, org: s.org, tone: j.tone, format: formatOf(s, j.format), commitments: j.commitments, applyLines: applyLines(j.apply, j.facts, s.org) };
 }
 
-/** Rebuilds every section not edited by hand, keeping the user's order and headings from the job's format. */
+/** Rebuilds every section not edited by hand, keeping the user's order and headings from the job's format. Placeholders in edited sections are filled once the fact is known. */
 function rebuilt(s: State, j: DemoJob): DemoJob {
   if (!j.sections.length) return j;
   const ctx = ctxFor(s, j);
-  return { ...j, sections: j.tags.map((k) => j.sections.find((x) => x.key === k && x.edited) ?? buildSection(k, ctx)) };
+  const fill = (l: string) => l.replace('[Duty station]', j.facts.location || '[Duty station]').replace('[Closing date]', j.facts.deadline ? longDate(j.facts.deadline) : '[Closing date]');
+  return { ...j, sections: j.tags.map((k) => {
+    const own = j.sections.find((x) => x.key === k && x.edited);
+    return own ? { ...own, lines: own.lines.map(fill) } : buildSection(k, ctx);
+  }) };
 }
 
+/** A change to an approved job reopens its review. */
+function reopenApproval(j: DemoJob): DemoJob {
+  return j.review.state === 'approved' ? { ...j, review: { ...j.review, state: 'open', reviewers: j.review.reviewers.map((r) => ({ ...r, decision: undefined })) } } : j;
+}
 export function freeDraftsLeft(s: State): number {
   return Math.max(0, FREE_DRAFTS - s.draftsUsed);
 }
@@ -71,12 +80,47 @@ export function isApproved(j: DemoJob): boolean {
   return j.review.state === 'approved' || (j.review.rule === 'any' ? j.review.reviewers.some((r) => r.decision === 'approved') : j.review.reviewers.length > 0 && j.review.reviewers.every((r) => r.decision === 'approved'));
 }
 
-function missingFacts(f: Facts): Array<{ ask: string; quick: string[] }> {
-  const today = getState().today;
-  const out: Array<{ ask: string; quick: string[] }> = [];
-  if (!f.location && f.arrangement !== 'remote') out.push({ ask: 'Where is the job based?', quick: ['Nairobi', 'Kampala', 'Addis Ababa', 'Remote'] });
-  if (!f.deadline) out.push({ ask: 'When do applications close?', quick: ['In 2 weeks', 'In 4 weeks', longDate(addDays(today, 27))] });
+const ASK_TEXT: Record<NonNullable<ChatMsg['ask']>, string> = {
+  title: 'What is the job title?',
+  place: 'Where is the job based?',
+  deadline: 'When do applications close?',
+  contract: 'What kind of contract is it?',
+};
+
+function missingFacts(f: Facts): Array<NonNullable<ChatMsg['ask']>> {
+  const out: Array<NonNullable<ChatMsg['ask']>> = [];
+  if (!f.title) out.push('title');
+  if (!f.location && f.arrangement !== 'remote') out.push('place');
+  if (!f.deadline) out.push('deadline');
+  if (!f.contract && f.engagement === 'job') out.push('contract');
   return out;
+}
+
+/** The next question AidJobs needs answered, if any. */
+function nextAsk(f: Facts): ChatMsg[] {
+  const kind = missingFacts(f)[0];
+  return kind ? [msg('ai', ASK_TEXT[kind], undefined, kind)] : [];
+}
+
+/** Whether a fact asked about is now known. */
+function answered(kind: NonNullable<ChatMsg['ask']>, f: Facts): boolean {
+  return kind === 'title' ? Boolean(f.title) : kind === 'place' ? Boolean(f.location) || f.arrangement === 'remote' : kind === 'deadline' ? Boolean(f.deadline) : Boolean(f.contract);
+}
+
+/** Keeps a question open until it is answered: after any message, if a fact is still missing and no question is waiting, ask it. */
+function ensureAsk(id: string) {
+  updateJob(id, (x) => {
+    const last = x.chat[x.chat.length - 1];
+    if (last?.from === 'ai' && last.ask) return x;
+    const ask = nextAsk(x.facts);
+    return ask.length ? { ...x, chat: [...x.chat, ...ask] } : x;
+  });
+}
+/** The live draft: once the role is known, the job description is written straight away and fills in as facts arrive. */
+function withLiveDraft(s: State, j: DemoJob): DemoJob {
+  if (j.sections.length || !j.facts.title || j.tags.length < 3) return j;
+  const sections = buildSections(j.tags, ctxFor(s, j));
+  return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
 }
 
 function memoryHint(s: State, title: string): string | null {
@@ -117,8 +161,9 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [])
   if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
-  job.chat = [msg('user', text), ...replyAfterFacts(s, job, true)];
-  update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
+  const live = withLiveDraft(s, job);
+  live.chat = [msg('user', text), ...replyAfterFacts(s, live, true)];
+  update((st) => ({ ...st, jobs: [live, ...st.jobs] }));
   return id;
 }
 
@@ -126,75 +171,112 @@ function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
   const out: ChatMsg[] = [];
   const mem = first ? memoryHint(s, j.facts.title) : null;
   if (first) {
-    const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'this role';
-    out.push(msg('ai', `Got it: ${what}, in ${formatOf(s, j.format).label}. The outline on the right shows the sections; add, remove, or reorder any of them.`));
-    if (mem) out.push(msg('ai', mem));
+    const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : '';
+    if (what) out.push(msg('ai', `Got it: ${what}, in ${formatOf(s, j.format).label}. The job description is taking shape on the left, and fills in as you answer.`));
+    const better = j.facts.title ? suggestTitle(j.facts.title) : null;
+    if (better) out.push(msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`]));
+    if (mem) out.push(msg('ai', mem, ['Start from last time']));
   }
-  const reuse = mem ? ['Start from last time'] : [];
-  const missing = missingFacts(j.facts);
-  if (missing.length) out.push(msg('ai', missing[0].ask, [...missing[0].quick, ...reuse]));
-  else if (!j.sections.length) out.push(msg('ai', 'I have what I need. Ready to write it?', ['Write the description', ...reuse]));
+  const ask = nextAsk(j.facts);
+  out.push(...(ask.length ? ask : [msg('ai', "That's everything I need. Ask for any change, or edit the job description directly.")]));
   return out;
 }
-
-export function canWrite(j: DemoJob): { ok: boolean; why?: string } {
-  if (j.tags.length < 3) return { ok: false, why: 'Choose at least 3 sections' };
-  if (!j.facts.title) return { ok: false, why: 'Say what the role is' };
-  return { ok: true };
-}
-
-/** Writes the first draft. The first one in a conversation uses one free draft unless the job is Premium. */
-export function writeDraft(id: string) {
-  const s = getState();
-  const j = s.jobs.find((x) => x.id === id);
-  if (!j) return;
-  const counts = !j.countsAsFreeDraft && j.plan !== 'premium';
-  const sections = buildSections(j.tags, ctxFor(s, j));
-  update((st) => ({
-    ...st,
-    draftsUsed: counts ? st.draftsUsed + 1 : st.draftsUsed,
-    jobs: st.jobs.map((x) =>
-      x.id === id
-        ? {
-            ...x,
-            sections,
-            countsAsFreeDraft: x.countsAsFreeDraft || counts,
-            versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'First draft', sections }],
-            chat: [...x.chat, msg('ai', `Here's a first draft with ${sections.length} sections. Ask me to change anything, or edit the text directly.`, ['Shorter', 'More formal', 'Add French'])],
-          }
-        : x,
-    ),
-  }));
-}
-
-/** Quick replies are short; this turns them into text the fact reader understands. */
-function answerToText(text: string, j: DemoJob): string {
+/** Short answers become text the fact reader understands, using the question they answer. */
+function answerToText(text: string, ask: ChatMsg['ask']): string {
   const t = text.trim();
   if (/^remote$/i.test(t)) return 'remote';
   if (/^in \d weeks?$/i.test(t)) return `closing ${t.toLowerCase()}`;
-  if (!j.facts.location && j.facts.arrangement !== 'remote' && /^[A-Z][a-zA-Z' -]+$/.test(t)) return `based in ${t}`;
+  if (ask === 'place' && /^\p{L}[\p{L}' ,.-]*$/u.test(t) && t.split(/\s+/).length <= 5) return `based in ${t}`;
+  if (ask === 'deadline' && !/clos/i.test(t)) return `closing ${t}`;
+  if (ask === 'contract') {
+    if (/fixed|staff|\bfta\b/i.test(t)) return 'fixed-term';
+    if (/temp|short/i.test(t)) return 'temporary';
+    if (/permanent|open[- ]ended|indefinite/i.test(t)) return 'open-ended';
+  }
   return t;
 }
 
+/** Sets facts and keeps the job in step: the live draft, placeholders, and a reopened approval. */
+function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
+  const format = formatOf(s, j.format);
+  const tags = j.sections.length ? j.tags : orderSections(Array.from(new Set([...j.tags, ...recommendSections(format, facts)])), format);
+  return reopenApproval(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish })));
+}
+
+/** Answers a question with a fact picked in the chat (a place, a date, a contract) and asks the next one. */
+export function answerFact(id: string, patch: Partial<Facts>, said: string) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const next = withFacts(s, j, { ...j.facts, ...patch });
+      return { ...next, chat: [...j.chat, msg('user', said), ...replyAfterFacts(s, next, false)] };
+    }),
+  }));
+}
+
+const EDIT_WORDS = /\b(shorter|shorten|longer|expand|add|remove|drop|delete|formal|warm|plain|simple|make|change|rewrite|undo)\b/i;
+const ASK_HINT: Record<NonNullable<ChatMsg['ask']>, string> = {
+  title: 'a job title',
+  place: 'a duty station. Pick one above, search for it, or write it like "Kampala, Uganda"',
+  deadline: 'a closing date. Pick one above, choose it on the calendar, or write it like "30 November 2026"',
+  contract: 'a contract type. Pick one above, or write "fixed-term", "temporary", or "open-ended"',
+};
+
 export function sendChat(id: string, text: string) {
+  chatTurn(id, text);
+  ensureAsk(id);
+}
+
+function chatTurn(id: string, text: string) {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || !text.trim()) return;
   const userMsg = msg('user', text);
   const lower = text.toLowerCase();
-  if (lower === 'write the description') {
-    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg] }));
-    if (canWrite(j).ok) writeDraft(id);
-    else updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('ai', canWrite(j).why ?? '')] }));
+  const lastMsg = j.chat[j.chat.length - 1];
+  const pending = lastMsg?.from === 'ai' ? lastMsg.ask : undefined;
+  const use = text.match(/^use "(.+)"$/i);
+  if (use) {
+    update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...withFacts(st, x, { ...x.facts, title: use[1] }), chat: [...x.chat, userMsg, msg('ai', `The title is now **${use[1]}**.`)] } : x)) }));
     return;
   }
   if (lower === 'start from last time') {
     const past = s.jobs.find((x) => x.status === 'closed' && x.facts.title.toLowerCase() === j.facts.title.toLowerCase());
     if (past) {
       const facts: Facts = { ...past.facts, deadline: j.facts.deadline || addDays(s.today, 27), location: j.facts.location || past.facts.location, country: j.facts.country || past.facts.country, iso: j.facts.iso || past.facts.iso };
-      updateJob(id, (x) => ({ ...x, facts, tags: past.tags, format: past.format, tone: past.tone, family: past.family, chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title}, with a new closing date. Ready to write it?`, ['Write the description'])] }));
+      update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...withLiveDraft(st, { ...x, facts, tags: past.tags, format: past.format, tone: past.tone, family: past.family, sections: [] }), chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title}, with a new closing date. The job description is updated on the left.`)] } : x)) }));
       return;
     }
+  }
+  if (pending === 'title' && !EDIT_WORDS.test(text) && text.trim().split(/\s+/).length <= 8) {
+    const { facts, role } = extractFacts(`hiring a ${text.trim()}`, s.today, j.facts);
+    const title = facts.title || text.trim().replace(/\b\p{Ll}/gu, (ch) => ch.toUpperCase());
+    update((st) => ({
+      ...st,
+      jobs: st.jobs.map((x) => {
+        if (x.id !== id) return x;
+        const next = withFacts(st, { ...x, family: x.family === 'programme' && role ? role.key : x.family }, { ...facts, title });
+        return { ...next, chat: [...x.chat, userMsg, ...replyAfterFacts(st, next, true).filter((m) => m.from === 'ai')] };
+      }),
+    }));
+    return;
+  }
+  if (pending && pending !== 'title' && !EDIT_WORDS.test(text)) {
+    const { facts, role } = extractFacts(answerToText(text, pending), s.today, j.facts);
+    if (!answered(pending, facts)) {
+      updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', `I couldn't read that as ${ASK_HINT[pending]}.`, undefined, pending)] }));
+      return;
+    }
+    update((st) => ({
+      ...st,
+      jobs: st.jobs.map((x) => {
+        if (x.id !== id) return x;
+        const next = withFacts(st, { ...x, family: x.family === 'programme' && role ? role.key : x.family }, facts);
+        return { ...next, chat: [...x.chat, userMsg, ...replyAfterFacts(st, next, false)] };
+      }),
+    }));
+    return;
   }
   if (lower === 'undo that') {
     updateJob(id, (x) => {
@@ -204,28 +286,32 @@ export function sendChat(id: string, text: string) {
     return;
   }
   if (!j.sections.length) {
-    const { facts, role } = extractFacts(answerToText(text, j), s.today, j.facts);
-    const next = { ...j, facts, family: j.family === 'programme' && role ? role.key : j.family, chat: [...j.chat, userMsg] };
-    next.tags = orderSections(Array.from(new Set([...j.tags, ...recommendSections(formatOf(s, j.format), facts)])), formatOf(s, j.format));
-    next.chat.push(...replyAfterFacts(s, next, false));
-    updateJob(id, () => next);
+    const { facts, role } = extractFacts(text, s.today, j.facts);
+    update((st) => ({
+      ...st,
+      jobs: st.jobs.map((x) => {
+        if (x.id !== id) return x;
+        const next = withFacts(st, { ...x, family: x.family === 'programme' && role ? role.key : x.family }, facts);
+        return { ...next, chat: [...x.chat, userMsg, ...replyAfterFacts(st, next, false)] };
+      }),
+    }));
     return;
   }
-  const result = applyEdit(answerToText(text, j), j.tags, j.sections, ctxFor(s, j), s.today);
+  const edit = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today);
+  const factsChanged = JSON.stringify(edit.facts) !== JSON.stringify(j.facts);
+  const result = factsChanged ? { ...edit, sections: rebuilt(s, { ...j, sections: edit.sections, tags: edit.tags, tone: edit.tone, facts: edit.facts }).sections } : edit;
   updateJob(id, (x) => ({
-    ...x,
+    ...reopenApproval(x),
     sections: result.sections,
     tags: result.tags,
     tone: result.tone,
     facts: result.facts,
     updatedAfterPublish: x.status === 'live' ? true : x.updatedAfterPublish,
-    review: x.review.state === 'approved' ? { ...x.review, state: 'open', reviewers: x.review.reviewers.map((r) => ({ ...r, decision: undefined })) } : x.review,
     versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: text.slice(0, 60), sections: result.sections }],
     chat: [...x.chat, userMsg, msg('ai', result.reply + (x.review.state === 'approved' ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
-    lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags } : undefined,
+    lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags, beforeFacts: x.facts, beforeTone: x.tone } : undefined,
   }));
 }
-
 /** Sections whose text is new or different after a change. */
 function changedKeys(before: DemoJob['sections'], after: DemoJob['sections']): string[] {
   return after.filter((a) => JSON.stringify(before.find((b) => b.key === a.key)?.lines) !== JSON.stringify(a.lines)).map((a) => a.key);
@@ -233,7 +319,8 @@ function changedKeys(before: DemoJob['sections'], after: DemoJob['sections']): s
 
 /** Puts back the sections as they were before the last change asked for in the chat. */
 export function undoLastChange(id: string) {
-  updateJob(id, (x) => (x.lastChange ? { ...x, sections: x.lastChange.before, tags: x.lastChange.beforeTags, lastChange: undefined, chat: [...x.chat, msg('ai', 'Undone: the sections are back as they were.')] } : x));
+  updateJob(id, (x) => (x.lastChange ? { ...x, sections: x.lastChange.before, tags: x.lastChange.beforeTags, facts: x.lastChange.beforeFacts, tone: x.lastChange.beforeTone, lastChange: undefined, chat: [...x.chat, msg('ai', 'Undone: the job description is back as it was.')] } : x));
+  ensureAsk(id);
 }
 
 export function dismissChange(id: string) {
@@ -241,7 +328,7 @@ export function dismissChange(id: string) {
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
-  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, { ...j, facts: { ...j.facts, ...patch }, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish }) : j)) }));
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? withFacts(s, j, { ...j.facts, ...patch }) : j)) }));
 }
 
 export function setApply(id: string, patch: Partial<ApplySettings>) {
@@ -255,23 +342,11 @@ export function toggleSection(id: string, key: string) {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
       const tags = has ? j.tags.filter((t) => t !== key) : [...j.tags, key];
-      const next = { ...j, tags };
+      const next = reopenApproval({ ...j, tags });
       if (!j.sections.length) return next;
       return { ...next, sections: has ? j.sections.filter((x) => x.key !== key) : [...j.sections, buildSection(key, ctxFor(s, next))] };
     }),
   }));
-}
-
-export function moveSection(id: string, key: string, dir: -1 | 1) {
-  updateJob(id, (j) => {
-    const i = j.tags.indexOf(key);
-    const k = i + dir;
-    if (i < 0 || k < 0 || k >= j.tags.length) return j;
-    const tags = [...j.tags];
-    [tags[i], tags[k]] = [tags[k], tags[i]];
-    const sections = tags.map((t) => j.sections.find((x) => x.key === t)).filter(Boolean) as DemoJob['sections'];
-    return { ...j, tags, sections: j.sections.length ? sections : j.sections };
-  });
 }
 
 /** Puts some of a job's sections in a new order, keeping the places the others hold. */
@@ -379,8 +454,16 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   }));
   return key;
 }
+/** A free job description counts the first time it is used: published as Standard, sent for review, or downloaded. Exploring and editing are free. */
+function useFreeJob(s: State, id: string): State {
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || j.countsAsFreeDraft || j.plan === 'premium') return s;
+  return { ...s, draftsUsed: s.draftsUsed + 1, jobs: s.jobs.map((x) => (x.id === id ? { ...x, countsAsFreeDraft: true } : x)) };
+}
+
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
-  update((s) => {
+  update((s0) => {
+    const s = useFreeJob(s0, id);
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
     const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined };
@@ -456,7 +539,8 @@ export type PublishOptions = { plan: 'standard' | 'premium'; useCredit: boolean;
 
 /** Publishes, then queues the chosen Reach emails. Publishing never waits for, or depends on, the emails. */
 export function publish(id: string, o: PublishOptions) {
-  update((s) => {
+  update((s0) => {
+    const s = o.plan === 'standard' ? useFreeJob(s0, id) : s0;
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
     const refund = o.plan === 'premium' && j.countsAsFreeDraft;
@@ -562,6 +646,7 @@ export function hireAgain(id: string, place?: string): string | null {
     closeReason: undefined,
     updatedAfterPublish: false,
     countsAsFreeDraft: false,
+    lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };
   copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Reopened', sections: copy.sections }];
@@ -570,6 +655,7 @@ export function hireAgain(id: string, place?: string): string | null {
 }
 
 export function downloadCopy(j: DemoJob, orgName: string) {
+  update((s) => useFreeJob(s, j.id));
   const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
   const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');

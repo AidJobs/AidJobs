@@ -687,7 +687,7 @@ export default function Publish({ id }: { id?: string }) {
                 <li>On organisation, country, and hub pages</li>
                 <li>{PREMIUM_EMAILS} Reach emails to candidates and your team</li>
                 <li>Listed for 60 days</li>
-                <li>Unlimited generator use; no free draft used</li>
+                <li>Unlimited edits; does not use a free job description</li>
               </ul>
               <span className="aj-faint">Labelled &ldquo;Premium · Sponsored&rdquo; for job seekers. Price is a placeholder.</span>
             </button>

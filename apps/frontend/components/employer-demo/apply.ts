@@ -31,7 +31,7 @@ export function defaultApply(orgType: OrgType, careersUrl: string): ApplySetting
 }
 
 export function applyLines(a: ApplySettings, f: Facts, org: Org): string[] {
-  const by = f.deadline ? ` by ${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}${f.timezone ? ` ${f.timezone}` : ''}` : ''}` : '';
+  const by = f.deadline ? ` by ${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}${f.timezone ? ` ${f.timezone}` : ''}` : ''}` : ' by [Closing date]';
   const docs = a.documents.length ? a.documents.join(', ').replace(/, ([^,]*)$/, ' and $1') : 'your application';
   const lines: string[] = [];
   if (a.method === 'email') {
@@ -51,7 +51,7 @@ export function applyLines(a: ApplySettings, f: Facts, org: Org): string[] {
   if (a.anonymised) lines.push('Please remove your name, age, and photo from your CV; we shortlist anonymously.');
   const process = [
     a.rolling && 'We review applications as they arrive',
-    a.earlyClose && 'we may close the advert early',
+    a.earlyClose && 'we may close this vacancy early',
     a.shortlistedOnly && 'only shortlisted candidates will be contacted',
   ].filter(Boolean) as string[];
   if (process.length) lines.push(`${process.join(', and ').replace(/^./, (c) => c.toUpperCase())}.`);

@@ -3,6 +3,9 @@ import { applyLines, defaultApply } from '../../components/employer-demo/apply';
 import {
   addSuggestions,
   applyEdit,
+  completeText,
+  looseLocation,
+  suggestTitle,
   buildSection,
   detectRole,
   emptyFacts,
@@ -125,6 +128,31 @@ describe('quality checks', () => {
     expect(keys.some((k) => k.startsWith('salary'))).toBe(false);
     expect(weekend('2026-11-28')).toBe(true);
     expect(holiday('2026-12-12', 'KE')).toBe(true);
+  });
+});
+
+describe('places, spelling, and completion', () => {
+  it('accepts a duty station AidJobs does not know, but never guesses one from other words', () => {
+    expect(looseLocation('health professional with 10 years of experience in kashmir, india. field job')).toEqual({ location: 'Kashmir, India', country: 'India' });
+    expect(looseLocation('based in Tamale, Ghana')).toEqual({ location: 'Tamale, Ghana', country: 'Ghana' });
+    expect(looseLocation('a field role in India')).toEqual({ location: 'India', country: 'India' });
+    expect(looseLocation('experience in education and health')).toBeNull();
+    expect(extractFacts('Teacher trainer based in Herat', TODAY).facts.location).toBe('Herat');
+  });
+
+  it('suggests a spelling for a job title, and leaves a correct one alone', () => {
+    expect(suggestTitle('Education Speclist')).toBe('Education Specialist');
+    expect(suggestTitle('Educaton Officer')).toBe('Education Officer');
+    expect(suggestTitle('Finance Officer')).toBeNull();
+  });
+
+  it('completes the word or phrase being typed from titles, places, and contract terms, and never adds its own facts', () => {
+    expect(completeText('We need a WASH Progr')).toBe('amme Manager');
+    expect(completeText('based in Ju')).toBe('ba, South Sudan');
+    expect(completeText('on a fixed-te')).toBe('rm contract');
+    expect(completeText('Riverstone Fie', ['Riverstone Field Coordinator'])).toBe('ld Coordinator');
+    expect(completeText('hiring a ')).toBe('');
+    expect(completeText('in')).toBe('');
   });
 });
 

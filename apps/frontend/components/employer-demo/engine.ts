@@ -398,7 +398,7 @@ export const ROLE_FAMILIES: RoleFamily[] = [
     words: ['hr ', 'human resources', 'people and culture', 'recruitment'],
     sector: 'Human resources',
     sdg: 8,
-    resp: ['Run recruitment from advert to contract', 'Maintain staff records and HR systems', 'Support performance management and learning', 'Advise managers on HR policy and labour law'],
+    resp: ['Run recruitment from job posting to contract', 'Maintain staff records and HR systems', 'Support performance management and learning', 'Advise managers on HR policy and labour law'],
     more: ['Support staff wellbeing initiatives', 'Prepare payroll inputs'],
     essential: ['Degree in human resources or a related field', 'Experience in HR in an NGO'],
     desirable: ['A professional HR qualification'],
@@ -483,9 +483,12 @@ export function longDate(iso: string): string {
 export function shortDate(iso: string): string {
   return iso ? new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
 }
-export function weekend(iso: string): boolean {
+/** Countries whose working week runs Sunday to Thursday, so the weekend is Friday and Saturday. */
+const FRI_SAT = new Set(['AF', 'JO', 'IQ', 'YE', 'SA', 'EG', 'SY', 'LY', 'SD', 'OM', 'KW', 'BH', 'QA', 'AE', 'PS', 'DZ']);
+
+export function weekend(iso: string, countryIso = ''): boolean {
   const d = new Date(parseIso(iso)).getDay();
-  return d === 0 || d === 6;
+  return FRI_SAT.has(countryIso) ? d === 5 || d === 6 : d === 0 || d === 6;
 }
 export function holiday(iso: string, countryIso: string): boolean {
   return (HOLIDAYS[countryIso] ?? HOLIDAYS.default).includes(iso.slice(5));
@@ -577,7 +580,8 @@ function titleFrom(text: string, role: RoleFamily | null, engagement: Engagement
   const m = text.match(/\b(?:hiring|recruiting|looking for|need|seeking)\s+(?:an?\s+|the\s+)?([a-z&][a-z&\s/–-]{2,60}?)(?=\s+(?:in|for|based|at|to|on|with|who)\b|[,.;:(]|\s+[–-]\s|$)/i);
   if (m) {
     const raw = m[1].trim().replace(/\s+/g, ' ');
-    if (raw.split(' ').length <= 7) return titleCase(raw);
+    const vague = /^(?:someone|somebody|anyone|people|person|staff|help|support|candidates?|new (?:people|staff)|more (?:people|staff))\b/i.test(raw);
+    if (!vague && raw.split(' ').length <= 7) return titleCase(raw);
   }
   if (!role) return '';
   const sector = role.key === 'programme' ? 'Programme' : role.title.split(' ').slice(0, -1).join(' ') || role.title;
@@ -614,6 +618,12 @@ export function extractFacts(text: string, today: number, base: Facts = emptyFac
     f.iso = place.iso;
     f.timezone = place.tz;
     if (!f.currency) f.currency = place.currency;
+  } else if (!base.location) {
+    const loose = looseLocation(t);
+    if (loose) {
+      f.location = loose.location;
+      f.country = loose.country;
+    }
   }
   if (/\bremote\b|home[- ]based|work from home/i.test(t)) f.arrangement = 'remote';
   else if (/\bhybrid\b/i.test(t)) f.arrangement = 'hybrid';
@@ -635,10 +645,23 @@ export function extractFacts(text: string, today: number, base: Facts = emptyFac
   const dm = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+(20\d\d))?/i);
   const md = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d\d))?/i);
   const weeks = t.match(/\b(?:in|within)\s+(\d)\s+weeks?\b/i);
+  const slash = t.match(/\b(\d{1,2})[/.](\d{1,2})[/.](20\d\d)\b/);
+  const endOf = t.match(/\bend of (jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i);
+  const weekday = t.match(/\b(?:by |on |this |next )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
   if (iso) f.deadline = `${iso[1]}-${iso[2]}-${iso[3]}`;
   else if (dm) f.deadline = nextDate(today, Number(dm[1]), MONTHS.indexOf(dm[2].toLowerCase()), dm[3] ? Number(dm[3]) : undefined);
   else if (md) f.deadline = nextDate(today, Number(md[2]), MONTHS.indexOf(md[1].toLowerCase()), md[3] ? Number(md[3]) : undefined);
   else if (weeks) f.deadline = addDays(today, Number(weeks[1]) * 7);
+  else if (slash) f.deadline = `${slash[3]}-${slash[2].padStart(2, '0')}-${slash[1].padStart(2, '0')}`;
+  else if (endOf) {
+    const m = MONTHS.indexOf(endOf[1].toLowerCase());
+    const y = new Date(today).getUTCFullYear() + (m < new Date(today).getUTCMonth() ? 1 : 0);
+    f.deadline = isoDay(Date.UTC(y, m + 1, 0, 12));
+  } else if (weekday && /clos|deadline|by|until|^\s*(?:by |on |this |next )?\w+day\s*$/i.test(t)) {
+    const want = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(weekday[1].toLowerCase());
+    const now = new Date(today).getUTCDay();
+    f.deadline = addDays(today, ((want - now + 7) % 7) || 7);
+  }
   const sal = t.match(/\b(USD|US\$|EUR|GBP|KES|AUD|INR|\$|€|£)\s?(\d[\d,.]*k?)(?:\s?(?:-|–|to)\s?(\d[\d,.]*k?))?(?:\s?(?:a|per|\/)\s?(hour|day|month|year|annum))?/i);
   if (sal) {
     const c = sal[1].toUpperCase();
@@ -787,7 +810,7 @@ export function buildSection(key: string, ctx: BuildContext): Section {
   const { facts: f, org, tone, format } = ctx;
   const role = roleByKey(ctx.roleKey);
   const title = f.title || role.title;
-  const where = f.arrangement === 'remote' ? 'remotely' : f.location ? `in ${f.location}` : 'at the duty station';
+  const where = f.arrangement === 'remote' ? 'remotely' : f.location ? `in ${f.location}` : 'in [Duty station]';
   const heading = headingFor(key, format);
   const terms = [f.contract, f.duration, f.grade && `grade ${f.grade}`, f.hours === 'part' ? 'part-time' : ''].filter(Boolean).join(', ');
   const place = placeOf(f.location);
@@ -890,11 +913,12 @@ export function quality(sections: Section[], f: Facts, today: number, otherLiveT
   else {
     const left = daysUntil(today, f.deadline);
     if (left < 0) items.push({ key: 'deadline-past', level: 'issue', text: 'The closing date has passed' });
-    if (weekend(f.deadline)) items.push({ key: 'deadline-weekend', level: 'info', text: `${longDate(f.deadline)} is a weekend` });
+    if (weekend(f.deadline, f.iso)) items.push({ key: 'deadline-weekend', level: 'info', text: `${longDate(f.deadline)} is a weekend` });
     if (holiday(f.deadline, f.iso)) items.push({ key: 'deadline-holiday', level: 'info', text: `${longDate(f.deadline)} is a public holiday${f.country ? ` in ${f.country}` : ''}` });
   }
   for (const s of sections) {
     const text = s.lines.join('\n');
+    if (/\[(?:Duty station|Closing date)\]/.test(text)) items.push({ key: `missing-${s.key}`, level: 'issue', text: `${s.title}: a fact is still missing; click the highlighted space to add it`, section: s.key });
     if (/\{[^}]{0,40}\}/.test(text)) items.push({ key: `placeholder-${s.key}`, level: 'warn', text: `${s.title}: a template placeholder is left in the text`, section: s.key });
     const bullets = s.lines.filter((l) => l.startsWith('- '));
     if (new Set(bullets).size < bullets.length) items.push({ key: `dupe-${s.key}`, level: 'warn', text: `${s.title}: a bullet appears twice`, section: s.key });
@@ -1076,4 +1100,88 @@ export function slug(title: string): string {
 
 export function arrangementLabel(a: Arrangement): string {
   return a === 'onsite' ? 'On-site' : a === 'hybrid' ? 'Hybrid' : 'Remote';
+}
+
+/** Countries AidJobs recognises in free text, beyond the places it knows well. */
+const COUNTRY_NAMES = Array.from(
+  new Set([
+    ...PLACES.map((p) => p.country),
+    'India', 'Pakistan', 'Afghanistan', 'Bangladesh', 'Myanmar', 'Nepal', 'Sri Lanka', 'Syria', 'Lebanon', 'Jordan', 'Iraq', 'Yemen', 'Turkey', 'Ukraine', 'Sudan',
+    'Chad', 'Niger', 'Mali', 'Burkina Faso', 'Cameroon', 'Central African Republic', 'Somalia', 'Ethiopia', 'Kenya', 'Uganda', 'Tanzania', 'Rwanda', 'Burundi',
+    'Zambia', 'Zimbabwe', 'Mozambique', 'Malawi', 'Madagascar', 'South Africa', 'Nigeria', 'Ghana', 'Sierra Leone', 'Liberia', 'Senegal', 'Haiti', 'Colombia',
+    'Venezuela', 'Peru', 'Ecuador', 'Guatemala', 'Honduras', 'Philippines', 'Indonesia', 'Palestine', 'Egypt', 'Libya', 'Tunisia', 'Morocco',
+  ]),
+);
+
+/** A duty station AidJobs does not know, written as "based in …", "in Place, Country", or "in Country"; never guessed from other words. */
+export function looseLocation(t: string): { location: string; country: string } | null {
+  const stop = String.raw`(?=[.;!?,\n]|$|\s(?:and|with|for|from|on)\s)`;
+  const based = t.match(new RegExp(String.raw`\bbased in (\p{L}[\p{L}' .-]{1,40}?)(?:,\s*(\p{L}[\p{L}' .-]{1,30}?))?` + stop, 'iu'));
+  const pair = t.match(new RegExp(String.raw`\bin (\p{L}[\p{L}' .-]{1,30}?),\s*(\p{L}[\p{L}' .-]{1,30}?)` + stop, 'iu'));
+  const m = based ?? pair;
+  if (m) {
+    const named = (x?: string) => (x ? COUNTRY_NAMES.find((c) => c.toLowerCase() === x.trim().toLowerCase()) : undefined);
+    const country = named(m[2]) ?? named(m[1]);
+    if (based || country) {
+      const place = titleCase(m[1]);
+      return m[2] ? { location: `${place}, ${country ?? titleCase(m[2])}`, country: country ?? titleCase(m[2]) } : { location: place, country: country ?? '' };
+    }
+  }
+  const only = COUNTRY_NAMES.find((c) => new RegExp(String.raw`\bin ${c}\b`, 'i').test(t));
+  return only ? { location: only, country: only } : null;
+}
+
+/** Words that job titles in the sector commonly use, for gentle spelling suggestions. */
+const TITLE_WORDS = [
+  'Specialist', 'Officer', 'Manager', 'Coordinator', 'Assistant', 'Associate', 'Adviser', 'Advisor', 'Director', 'Consultant', 'Analyst', 'Engineer', 'Intern',
+  'Programme', 'Program', 'Project', 'Education', 'Protection', 'Nutrition', 'Health', 'Logistics', 'Finance', 'Communications', 'Monitoring', 'Evaluation',
+  'Accountability', 'Learning', 'Livelihoods', 'Shelter', 'Security', 'Procurement', 'Partnerships', 'Advocacy', 'Humanitarian', 'Emergency', 'Response',
+  'Safeguarding', 'Gender', 'Child', 'Senior', 'Junior', 'Country', 'Regional', 'Field', 'Technical', 'Resilience', 'Climate', 'Water', 'Sanitation', 'Hygiene',
+  'Educator', 'Evaluator', 'Programmer', 'Trainer', 'Facilitator', 'Mobiliser', 'Supervisor', 'Researcher', 'Driver', 'Nurse', 'Doctor', 'Midwife', 'Teacher',
+  'Accountant', 'Cashier', 'Translator', 'Interpreter', 'Planner', 'Designer', 'Developer', 'Writer', 'Editor', 'Lead', 'Head', 'Chief', 'Deputy',
+];
+
+function distance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/** A corrected job title when a word looks misspelt ("Speclist" → "Specialist"); null when it looks right. Never applied automatically. */
+export function suggestTitle(title: string): string | null {
+  let changed = false;
+  const words = title.split(/(\s+)/).map((w) => {
+    if (!/^[A-Za-z]{4,}$/.test(w) || TITLE_WORDS.some((x) => x.toLowerCase() === w.toLowerCase())) return w;
+    const best = TITLE_WORDS.map((x) => ({ x, d: distance(w.toLowerCase(), x.toLowerCase()) })).sort((p, q) => p.d - q.d)[0];
+    if (best && best.d > 0 && best.d <= (w.length > 6 ? 2 : 1)) {
+      changed = true;
+      return best.x;
+    }
+    return w;
+  });
+  return changed ? words.join('') : null;
+}
+
+const COMPLETION_TERMS = [
+  'fixed-term contract', 'temporary appointment', 'consultancy', 'internship', 'full-time', 'part-time', 'home-based', 'subject to funding', 'roster',
+  'closing', 'years of experience', 'national staff', 'international staff', 'P1', 'P2', 'P3', 'P4', 'P5', 'D1', 'D2', 'NOA', 'NOB', 'NOC', 'NOD',
+];
+
+/**
+ * Predictive completion: the rest of the word or phrase being typed, from the organisation's own titles and places first, then AidJobs titles,
+ * duty stations, grades, and contract terms. It completes what is typed and never adds a fact of its own.
+ */
+export function completeText(text: string, own: string[] = []): string {
+  if (!text || /\s$/.test(text)) return '';
+  const phrases = [...own, ...ROLE_FAMILIES.map((r) => r.title), ...PLACES.map((p) => `${p.city}, ${p.country}`), ...COMPLETION_TERMS];
+  const words = text.split(/\s+/);
+  for (let n = Math.min(4, words.length); n >= 1; n--) {
+    const tail = words.slice(-n).join(' ');
+    if (tail.length < (n === 1 ? (/^[A-Z]/.test(tail) ? 2 : 3) : 4)) continue;
+    const lower = tail.toLowerCase();
+    const hit = phrases.find((ph) => ph.toLowerCase().startsWith(lower) && ph.length > tail.length);
+    if (hit) return hit.slice(tail.length);
+  }
+  return '';
 }

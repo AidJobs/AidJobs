@@ -635,43 +635,152 @@
   font-size: 12px;
 }
 
-.ej-ask {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
-}
 
-.ej-ask svg {
-  margin-top: 3px;
-  color: var(--sage-7);
-}
 
-.ej-tabs {
+
+
+
+/* Workspace, chat redesign: the labelled rail, badges, the readiness ring, placeholders, and answers inside a question. */
+.ej-rail {
   display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
   gap: 4px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--hair);
+  width: 72px;
+  padding: 10px 6px;
+  border-left: 1px solid var(--hair);
+  background: var(--surface);
 }
 
-.aj-root .ej-tab {
-  height: 34px;
-  padding: 0 10px;
+.aj-root .ej-rail-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 2px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: 12px;
   background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
   cursor: pointer;
 }
 
-.aj-root .ej-tab[aria-selected='true'] {
-  border-bottom-color: var(--sage-7);
+.aj-root .ej-rail-btn:hover {
+  background: var(--surface-2);
+}
+
+.aj-root .ej-rail-btn[data-active='true'] {
+  background: var(--sage-1);
+  color: var(--sage-8);
+}
+
+.ej-rail-badge {
+  position: absolute;
+  top: -6px;
+  right: -9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--amber, #b45309);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.ej-count-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--amber, #b45309);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ej-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+
+.ej-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.ej-ring-track {
+  fill: none;
+  stroke: var(--hair);
+  stroke-width: 2.5;
+}
+
+.ej-ring-fill {
+  fill: none;
+  stroke: var(--sage-7);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 240ms ease;
+}
+
+.aj-root .ej-slot {
+  display: inline;
+  padding: 0 6px;
+  border: 1px dashed var(--amber, #b45309);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amber, #b45309) 10%, transparent);
   color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ej-spell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ej-ask-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ej-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+}
+
+.ej-fieldset:disabled button,
+.ej-fieldset:disabled select,
+.ej-fieldset:disabled input {
+  cursor: default;
+}
+
+.aj-root label.aj-pill:focus-within {
+  outline: 2px solid var(--ej-ring);
+  outline-offset: 2px;
+}
+
+.aj-root[data-theme='dark'] .ej-rail-badge,
+.aj-root[data-theme='dark'] .ej-count-badge {
+  color: #1d1306;
 }

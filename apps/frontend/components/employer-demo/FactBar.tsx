@@ -1,19 +1,20 @@
 'use client';
 
 import { Banknote, Briefcase, CalendarClock, Info, Layers, MapPin, MoreHorizontal, Sparkles } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
 import { setFacts } from './actions';
 import { arrangementLabel, CONTRACTS, ENGAGEMENTS, googleType, holiday, longDate, placeOf, PLACES, salarySuggestion, salaryText, SALARY_FACTS, shortDate, weekend } from './engine';
 import type { DemoJob, Facts, SalaryMode, State } from './types';
+import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
 type PillKey = 'place' | 'type' | 'grade' | 'closes' | 'salary' | 'more';
 
-function Pill({ icon, label, value, missing, onClick, extra }: { icon: ReactNode; label: string; value: string; missing?: boolean; onClick: () => void; extra?: ReactNode }) {
+function Pill({ icon, label, value, missing, onClick, extra, disabled }: { icon: ReactNode; label: string; value: string; missing?: boolean; onClick: () => void; extra?: ReactNode; disabled?: boolean }) {
   return (
     <span className="inline-flex shrink-0 items-center">
-      <button type="button" className="ej-fact" data-missing={missing} onClick={onClick} aria-label={`${label}: ${value || 'not set'}. Edit`}>
+      <button type="button" className="ej-fact" data-missing={missing} onClick={onClick} disabled={disabled} aria-label={disabled ? `${label}: ${value || 'not set'}` : `${label}: ${value || 'not set'}. Edit`}>
         {icon}
         <span style={{ fontWeight: 600 }}>{value || label}</span>
       </button>
@@ -249,7 +250,7 @@ function SalaryDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
             </li>
           ))}
         </ul>
-        {law && <span className="aj-faint" style={{ fontSize: 12 }}>For information: in {law}, job adverts must show a pay range by law.</span>}
+        {law && <span className="aj-faint" style={{ fontSize: 12 }}>For information: in {law}, job postings must show a pay range by law.</span>}
       </div>
     </Dialog>
   );
@@ -295,17 +296,24 @@ function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
 
 export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
   const [open, setOpen] = useState<PillKey | null>(null);
+  useEffect(() => {
+    const fromSlot = (e: Event) => {
+      if (!getState().reviewerAs) setOpen((e as CustomEvent<PillKey>).detail);
+    };
+    window.addEventListener('ej-open-fact', fromSlot);
+    return () => window.removeEventListener('ej-open-fact', fromSlot);
+  }, []);
   const f = job.facts;
   const type = [ENGAGEMENTS.find((e) => e.key === f.engagement)?.label.split(' ')[0], f.contract && f.contract !== 'Internship' ? f.contract.replace(' (under a year)', '') : '', f.recruitment === 'roster' ? 'Roster' : f.recruitment === 'proposal' ? 'Proposal' : ''].filter(Boolean).join(' · ');
   const salary = salaryText(f) || 'Not shown';
   return (
     <>
       <div className="aj-no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto" aria-label="Job facts">
-        <Pill icon={<MapPin size={13} strokeWidth={1.8} />} label="Place" value={f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : ''} missing={!f.location && f.arrangement !== 'remote'} onClick={() => setOpen('place')} />
-        <Pill icon={<Briefcase size={13} strokeWidth={1.8} />} label="Job type" value={type} onClick={() => setOpen('type')} />
-        <Pill icon={<Layers size={13} strokeWidth={1.8} />} label="Grade" value={f.grade} onClick={() => setOpen('grade')} />
-        <Pill icon={<CalendarClock size={13} strokeWidth={1.8} />} label="Closing date" value={f.deadline ? `Closes ${shortDate(f.deadline)}` : ''} missing={!f.deadline} onClick={() => setOpen('closes')} />
-        <Pill
+        <Pill disabled={Boolean(s.reviewerAs)} icon={<MapPin size={13} strokeWidth={1.8} />} label="Place" value={f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : ''} missing={!f.location && f.arrangement !== 'remote'} onClick={() => setOpen('place')} />
+        <Pill disabled={Boolean(s.reviewerAs)} icon={<Briefcase size={13} strokeWidth={1.8} />} label="Job type" value={type} onClick={() => setOpen('type')} />
+        <Pill disabled={Boolean(s.reviewerAs)} icon={<Layers size={13} strokeWidth={1.8} />} label="Grade" value={f.grade} onClick={() => setOpen('grade')} />
+        <Pill disabled={Boolean(s.reviewerAs)} icon={<CalendarClock size={13} strokeWidth={1.8} />} label="Closing date" value={f.deadline ? `Closes ${shortDate(f.deadline)}` : ''} missing={!f.deadline} onClick={() => setOpen('closes')} />
+        <Pill disabled={Boolean(s.reviewerAs)}
           icon={<Banknote size={13} strokeWidth={1.8} />}
           label="Salary"
           value={salary}
@@ -318,7 +326,7 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
             </Tip>
           }
         />
-        <Pill icon={<MoreHorizontal size={13} strokeWidth={1.8} />} label="More details" value="More details" onClick={() => setOpen('more')} />
+        <Pill disabled={Boolean(s.reviewerAs)} icon={<MoreHorizontal size={13} strokeWidth={1.8} />} label="More details" value="More details" onClick={() => setOpen('more')} />
       </div>
       {open === 'place' && <PlaceDialog job={job} s={s} onClose={() => setOpen(null)} />}
       {open === 'type' && <TypeDialog job={job} onClose={() => setOpen(null)} />}

@@ -11,7 +11,7 @@ import type { Format, Tone } from './types';
 import { Dialog, inputStyle } from './ui';
 
 const TONES: Array<{ key: Tone; label: string; tip: string }> = [
-  { key: 'formal', label: 'Formal', tip: 'Third person, as UN and donor adverts write: "The incumbent will…"' },
+  { key: 'formal', label: 'Formal', tip: 'Third person, as UN and donor job descriptions put it: "The incumbent will…"' },
   { key: 'warm', label: 'Warm', tip: 'Second person, as most NGOs write: "You will…"' },
   { key: 'plain', label: 'Plain', tip: 'Short sentences and everyday words' },
 ];

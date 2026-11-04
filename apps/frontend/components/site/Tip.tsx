@@ -42,7 +42,9 @@ export default function Tip({ label, side = 'top', className, children }: { labe
     const a = anchor.current.getBoundingClientRect();
     const b = bubble.current.getBoundingClientRect();
     const order: Side[] = [side, OPPOSITE[side], ...(['top', 'bottom', 'right', 'left'] as Side[]).filter((x) => x !== side && x !== OPPOSITE[side])];
-    const chosen = order.map((s) => place(s, a, b.width, b.height)).find((p) => p.fits) ?? place('bottom', a, b.width, b.height);
+    const room: Record<Side, number> = { top: a.top, bottom: window.innerHeight - a.bottom, left: a.left, right: window.innerWidth - a.right };
+    const roomiest = order.reduce((best, s) => (room[s] > room[best] ? s : best), order[0]);
+    const chosen = order.map((s) => place(s, a, b.width, b.height)).find((p) => p.fits) ?? place(roomiest, a, b.width, b.height);
     setPos({ left: chosen.left, top: Math.max(EDGE, Math.min(chosen.top, window.innerHeight - b.height - EDGE)) });
   }, [open, side, label]);
 

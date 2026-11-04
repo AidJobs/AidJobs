@@ -260,7 +260,7 @@ export default function Home() {
             compact
           />
           <p className="aj-faint" style={{ margin: 0, fontSize: 11.5 }}>
-            Every change is confirmed first and can be undone. {left === 0 ? 'Free drafts are used up this month; a Premium job does not use one.' : 'A Premium job does not use a free draft.'}
+            Every change is confirmed first and can be undone. {left === 0 ? 'The free job descriptions are used up this month; a Premium job does not use one.' : 'A Premium job does not use a free job description.'}
           </p>
           {noMatch && (
             <div className="aj-card p-3 aj-muted" role="status">
