@@ -159,3 +159,52 @@ Agreed in chat after research on about 50 organisations' real adverts (2026): UN
 - **How to apply builder:** method (system, email, form, form only), documents, email rules, and process (rolling, may close early, shortlisted only, interview dates, reply time, anonymised CVs).
 - **Checks:** leftover placeholders, empty duties, duplicated bullets, heading typos, conflicting deadlines. **Inclusive language** is highlighted with hover text saying why and a possible alternative; nothing is replaced automatically and the decision stays with the user. Context-aware: years of experience are not flagged in UN formats, where grades set them; genuine requirements (female-only posts in some contexts, nationals only, local language) are accepted with a one-line reason.
 - **Later, on the publishing page:** a short version for WhatsApp, LinkedIn, or flyers, and local-language versions.
+## 15. Round 3: decisions of 4 November 2026 (agreed with the user in chat)
+
+Agreed item by item with the user after their review of the round 2 preview; supersedes section 14 where they differ. Build in the phases at the end of this section and tick them off here as each lands on `demo/employer`, so this section is the handover if the chat is lost.
+
+### Item 1: help while typing in the chat box
+
+1. **"Use suggestion" is removed.** No sample facts are ever inserted (the old fixed hints "WASH Programme Manager", "Nairobi", "12-month", a date are gone, and with them the bug where the ghost text followed the user's own words: "hiring a We're hiring…").
+2. **Predictive completion** continues the word or phrase being typed: the organisation's own jobs first, then AidJobs titles, duty stations, grades, and contract terms; it never invents facts. Accepted with Tab (only while a completion shows) or the right arrow; tap on phones.
+3. **One "next most important fact" slot** in the box shows a single missing fact at a time ("+ Closing date") and opens a small picker (calendar, place search, contract list); it disappears when nothing important is missing.
+4. **Continue (job drafts) moves into the + menu.** The bottom row is: + · JD format · fact slot · Send.
+5. **Readiness ring on Send:** fills as role, place, closing date, and contract arrive; hover lists what is missing; sending is never blocked.
+6. **Recognised facts** in the text get a faint underline (place, date, grade, contract); hover shows how AidJobs read them with any useful note (high-risk duty station, weekend closing date); a click corrects them.
+7. **Drop a file on the box** to read a job description (no control until a drag).
+8. **Smart paste:** a long pasted job description prompts "Read this as a job description, keeping your wording".
+9. **Example placeholders** in the empty box rotate realistic examples from the organisation's own sectors and places.
+10. **Organisation memory:** the fact slot can offer one-click defaults from the organisation's past jobs, labelled as such ("Same as your last Juba job: 12-month fixed-term, P3").
+
+### Item 2: the job workspace
+
+- **A. Tooltips:** fixed once in the shared tooltip for the whole site: the preferred side, else the opposite side, else the others; never covering what it describes (a left side is added). Browser `title` tooltips move to the shared tooltip; every tooltip on the site is checked.
+- **B. Explicit terms**, one glossary checked across the demo and later the public site: **JD format** (the reusable template; "job description format" in full text), **JD outline** (a job's own sections), **job description** (never "the description"), **job drafts**, named labels in place of "More" ("More details"), and **Manage jobs** for the side-menu item, with full names on hover in the narrow side menu. The list of vague labels is shown to the user for approval before changing them.
+- **C. Long job titles:** edited in place as the job description's heading (full width, wrapping); the top row shows a shortened label with the full title on hover, and a click jumps to the heading. No new rows.
+- **D. Fewer header bars:** on the workspace the demo bar goes ("View as" and "Reset demo" move to the bottom of the side menu). The left column has one slim row (back, title label, fact pills); the right panel runs the full height: actions (Publish with a count of open checks, Send for review, Versions, a ⋯ menu), the status line ("Draft", "In review · 1 of 2 approved"), the tabs, then the JD format and the JD outline.
+- **E. Conversation:** results show on the changed section ("Shortened · Undo · See in chat") with a brief highlight; a slim chat line under the job description grows only while typing, with AidJobs' current question in one line above it and quick answers; the right panel has tabs "JD outline | Chat" and switches to Chat while the user types; on phones, JD outline and Chat open as half-height sheets so the job description stays visible. Reviewers see "Comments" in place of Chat.
+- **F. Live draft:** the job description builds as facts arrive, with clickable placeholders for missing facts ("[Closing date]"); no "Write the description" button; the empty-state card, the separate checks row (now a count on Publish plus highlights in the text), the "Conversation · N" toggle, and the Standard/Premium badge (now at the publish step) go.
+- **F. Free job descriptions:** shown as outcomes, "Free: 3 job descriptions a month, with unlimited edits to each"; one counts at its first use (published, sent for review, or downloaded); exploring and editing are free. Inside, a quiet fair-use token budget per job description caps cost if AI is used (a plain message, never a meter); at most about 10 open drafts; paid packs stay outcome-based or fold into the existing credit packs (one currency). Replaces "3 drafts a month" in section 4; settle together with the AI decision.
+- **G. Base JD format prompt:** "Your last 3 job descriptions share these headings. Use them as your base JD format?" with **Use it · Edit it · Not now**. Learned only from the organisation's own job descriptions in AidJobs (written, uploaded, or published) once two or three share most headings in the same order; never from links or careers pages, nothing read in the background. The base is the default start for new jobs; each job changes freely without changing it; "Update our base JD format from this job" is offered from ⋯, never automatic. "Not now" is respected (it returns only if the pattern grows); "Forget" on the Styles page. Organisations with no pattern (many local NGOs) never see it. Named formats sit beside the base. The demo shows it with sample history, labelled.
+- **H. Delete:** "Delete job draft" in the workspace ⋯ menu with Undo; drafts in review get "Withdraw from review and delete" (reviewers are told); it also stays on Manage jobs.
+
+### Item 3: uploading
+
+1. **One "Upload a job description" window**: paste text, a file (.txt, Word .docx, PDF), or a link sent with the arrow button (like the chat box); short text with details in an (i) tooltip; plain notes when a file cannot be read (old .doc, scanned PDF). In the demo, files are read in the browser and links are simulated; nothing leaves the browser.
+2. **"Save its headings as a JD format"**: a checkbox with a name field, unticked by default; several named formats per organisation.
+3. **Links are per job only**: no organisation-level careers-page learning; the sample "learned from 4 adverts" format goes; the old "Upload your format" and "Use a job description from a link" windows merge into this one.
+4. **The + menu**: Upload a job description · Hire again · Continue a job draft.
+5. **The workspace layout and journey** as in Item 2, to be adjusted after the user sees the live preview.
+
+### Already built on 3 and 4 November 2026 (kept)
+
+Click-only menus with names only and details on hover; "Create your own format" first in the menu and in the panel; drag to reorder (handle, mouse or touch, arrow keys); one-line "Add:" pills on the first screen only; light, rounded focus rings; the suggestion alignment fix (last code commit `d8be0a3`).
+
+### Build phases (tick when pushed)
+
+- [ ] **Phase 1, quick fixes:** the tooltip fix (A); the terms glossary (B), after the user approves the list of labels; "Delete job draft" in ⋯ (H); "Manage jobs" with hover labels; the + menu restructure and the one upload window with .docx and PDF (Item 3); "Use suggestion" removed (Item 1.1).
+- [ ] **Phase 2, workspace layout:** no demo bar; the full-height right panel with actions, status, and tabs; the title edited in the document; the slim chat line with change notes; phone sheets (C, D, E).
+- [ ] **Phase 3, live draft:** placeholders, the fact slot, the readiness ring, recognised facts, predictive completion, the checks count on Publish (F; Item 1.2 to 1.6).
+- [ ] **Phase 4, the rest:** the base JD format prompt from the organisation's history (G); smart paste; drop a file; example placeholders; organisation memory (Item 1.7 to 1.10).
+
+Open: the copy of this plan on `main` needs its own docs pull request when the user asks.
