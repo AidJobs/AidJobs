@@ -567,3 +567,111 @@
   color: var(--sage-8);
   font-weight: 650;
 }
+
+/* Workspace, round 3 phase 2: the title label and heading, change notes, the question line, and the panel tabs. */
+.aj-root .ej-title-label {
+  display: block;
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.aj-root .ej-title-edit {
+  display: block;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 2px 6px;
+  overflow: hidden;
+  resize: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.aj-root .ej-title-edit:hover {
+  border-color: var(--hair);
+}
+
+.aj-root .ej-title-edit:focus {
+  border-color: var(--sage-5);
+  background: var(--surface);
+}
+
+.ej-doc section[data-changed='true'] {
+  background: var(--sage-1);
+  animation: ej-flash 1.6s ease-out 1;
+}
+
+@keyframes ej-flash {
+  0% {
+    box-shadow: 0 0 0 3px var(--sage-3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.ej-change-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 6px;
+  color: var(--sage-8);
+  font-size: 12px;
+}
+
+.ej-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ej-ask svg {
+  margin-top: 3px;
+  color: var(--sage-7);
+}
+
+.ej-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.aj-root .ej-tab {
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aj-root .ej-tab[aria-selected='true'] {
+  border-bottom-color: var(--sage-7);
+  color: var(--text);
+}

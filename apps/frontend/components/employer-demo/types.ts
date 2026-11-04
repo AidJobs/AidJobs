@@ -177,6 +177,8 @@ export type DemoJob = {
   updatedAfterPublish?: boolean;
   countsAsFreeDraft: boolean;
   audit: AuditEntry[];
+  /** The last change asked for in the chat: shown on the changed sections, with Undo. */
+  lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[] };
 };
 
 export type InboxKind = 'approved' | 'changes' | 'comment' | 'deadline' | 'removal' | 'receipt' | 'reach' | 'review';

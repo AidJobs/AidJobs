@@ -33,7 +33,7 @@ export function OrgMark({ name, size = 22 }: { name: string; size?: number }) {
 }
 
 /** A dialog on wide screens and a bottom sheet on phones. */
-export function Dialog({ title, subtitle, onClose, footer, children, wide }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean }) {
+export function Dialog({ title, subtitle, onClose, footer, children, wide, half }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean; half?: boolean }) {
   const phone = useIsPhone();
   useEffect(() => {
     if (phone) return;
@@ -45,8 +45,10 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide }: { t
   }, [phone, onClose]);
   if (phone) {
     return (
-      <BottomSheet title={title} subtitle={subtitle} onClose={onClose} footer={footer} tall>
-        <div className="aj-scroll flex-1 px-1 pb-4">{children}</div>
+      <BottomSheet title={title} subtitle={subtitle} onClose={onClose} footer={footer} tall={!half}>
+        <div className="aj-scroll flex-1 px-1 pb-4" style={half ? { maxHeight: '46dvh' } : undefined}>
+          {children}
+        </div>
       </BottomSheet>
     );
   }

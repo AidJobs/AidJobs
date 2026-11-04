@@ -222,7 +222,22 @@ export function sendChat(id: string, text: string) {
     review: x.review.state === 'approved' ? { ...x.review, state: 'open', reviewers: x.review.reviewers.map((r) => ({ ...r, decision: undefined })) } : x.review,
     versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: text.slice(0, 60), sections: result.sections }],
     chat: [...x.chat, userMsg, msg('ai', result.reply + (x.review.state === 'approved' ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
+    lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags } : undefined,
   }));
+}
+
+/** Sections whose text is new or different after a change. */
+function changedKeys(before: DemoJob['sections'], after: DemoJob['sections']): string[] {
+  return after.filter((a) => JSON.stringify(before.find((b) => b.key === a.key)?.lines) !== JSON.stringify(a.lines)).map((a) => a.key);
+}
+
+/** Puts back the sections as they were before the last change asked for in the chat. */
+export function undoLastChange(id: string) {
+  updateJob(id, (x) => (x.lastChange ? { ...x, sections: x.lastChange.before, tags: x.lastChange.beforeTags, lastChange: undefined, chat: [...x.chat, msg('ai', 'Undone: the sections are back as they were.')] } : x));
+}
+
+export function dismissChange(id: string) {
+  updateJob(id, (x) => ({ ...x, lastChange: undefined }));
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {

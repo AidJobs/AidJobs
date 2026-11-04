@@ -16,7 +16,7 @@ function scrollToSection(key: string) {
   document.getElementById(`ej-sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: State; onCollapse?: () => void }) {
+export default function Structure({ job, s, onCollapse, bare }: { job: DemoJob; s: State; onCollapse?: () => void; bare?: boolean }) {
   const format = formatOf(s, job.format);
   const rec = new Set(recommendSections(format, job.facts));
   const [closed, setClosed] = useState<Record<string, boolean>>({ commitments: true });
@@ -26,6 +26,7 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
 
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="JD outline">
+      {!bare && (
       <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
         <h2 className="aj-title" style={{ margin: 0, fontSize: 14 }}>
           JD outline
@@ -41,7 +42,8 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
           </Tip>
         )}
       </div>
-      <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4">
+      )}
+      <div className={`aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 ${bare ? 'pt-3' : ''}`}>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="ej-panel-label" htmlFor="ej-style">

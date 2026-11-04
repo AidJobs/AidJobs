@@ -15,7 +15,7 @@ jest.mock('next/link', () => ({
 }));
 
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
-import { importJobDescription, publish, readIntent, startJob, writeDraft } from '@/components/employer-demo/actions';
+import { importJobDescription, publish, readIntent, sendChat, startJob, writeDraft } from '@/components/employer-demo/actions';
 import { getState, go, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -137,7 +137,7 @@ describe('employer demo: never calls the network', () => {
       route('#jobs/job-log');
       shows('Hire again');
       route('#create/job-fin');
-      shows('Job description');
+      expect(container.querySelector('#ej-title-edit')).not.toBeNull();
       shows('In review');
       shows('Key areas of accountability');
       route('#create/job-cps');
@@ -168,7 +168,7 @@ describe('employer demo: never calls the network', () => {
       writeDraft(id);
     });
     route(`#create/${id}`);
-    shows('Job description');
+    expect(container.querySelector('#ej-title-edit')).not.toBeNull();
     shows('What you will do');
     shows('JD outline');
     for (const pill of [/Nairobi/, /^Job/, /^Grade$/, /^Closes/, /As per our salary scale|Not shown/, /^More details$/]) {
@@ -210,6 +210,14 @@ describe('employer demo: never calls the network', () => {
     expect(tagsOf()).not.toEqual(before);
     expect([...tagsOf()].sort()).toEqual([...before].sort());
 
+    const linesOf = () => JSON.stringify(getState().jobs.find((j) => j.id === 'job-fin')?.sections);
+    const unchanged = linesOf();
+    act(() => sendChat('job-fin', 'make the responsibilities longer'));
+    expect(linesOf()).not.toBe(unchanged);
+    expect(container.querySelector('.ej-change-note')).not.toBeNull();
+    click('Undo');
+    expect(linesOf()).toBe(unchanged);
+    expect(container.querySelector('.ej-change-note')).toBeNull();
     let imported: string | null = null;
     act(() => {
       imported = importJobDescription('WHO WE ARE\nRiverstone works in East Africa.\n\nTHE JOB\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.', { saveAs: 'Riverstone HQ roles' });

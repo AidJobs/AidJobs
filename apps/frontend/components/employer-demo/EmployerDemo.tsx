@@ -12,41 +12,59 @@ import Publish from './Publish';
 import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
 import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
 import { setReviewer } from './Review';
+import MenuButton from './MenuButton';
 import { DemoMark, Dialog, NoticeBar } from './ui';
 
-function ViewAs() {
+/** "View as" and "Reset demo": demo-only controls, at the bottom of the side menu. */
+function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boolean; onReset: () => void; inHeader?: boolean }) {
   const s = useDemo();
   const reviewers = s.team.filter((p) => p.role === 'reviewer');
+  const pick = (id: string | null) => {
+    setReviewer(id);
+    if (!id) return;
+    const name = s.team.find((p) => p.id === id)?.name;
+    const target = s.jobs.find((j) => j.review.state !== 'none' && j.review.reviewers.some((r) => r.name === name));
+    if (target) go('create', target.id);
+  };
+  const reset = (
+    <Tip label="Reset the demo to its sample data" side={inHeader ? 'bottom' : collapsed ? 'right' : 'top'}>
+      <button type="button" className="aj-icon-btn" onClick={onReset} aria-label="Reset demo">
+        <RotateCcw size={14} strokeWidth={1.8} />
+      </button>
+    </Tip>
+  );
+  if (collapsed) {
+    return (
+      <>
+        <MenuButton
+          label="View the demo as"
+          trigger={<Eye size={15} strokeWidth={1.8} />}
+          align={inHeader ? 'right' : 'left'}
+          up={!inHeader}
+          actions={[{ label: `${s.me.name.split(' ')[0]} (you)`, current: !s.reviewerAs, run: () => pick(null) }, ...reviewers.map((p) => ({ label: `${p.name.split(' ')[0]} (reviewer)`, current: s.reviewerAs === p.id, run: () => pick(p.id) }))]}
+        />
+        {reset}
+      </>
+    );
+  }
   return (
-    <label className="flex items-center gap-1.5">
-      <Eye size={14} strokeWidth={1.8} className="aj-faint" />
-      <span className="aj-faint hidden sm:inline">View as</span>
-      <select
-        className="aj-pill"
-        style={{ height: 32, paddingRight: 6 }}
-        value={s.reviewerAs ?? ''}
-        onChange={(e) => {
-          const id = e.target.value || null;
-          setReviewer(id);
-          if (id) {
-            const name = s.team.find((p) => p.id === id)?.name;
-            const target = s.jobs.find((j) => j.review.state !== 'none' && j.review.reviewers.some((r) => r.name === name));
-            if (target) go('create', target.id);
-          }
-        }}
-        aria-label="View as"
-      >
-        <option value="">{s.me.name.split(' ')[0]} (you)</option>
-        {reviewers.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name.split(' ')[0]} (reviewer)
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <DemoMark />
+      <span className="flex w-full items-center gap-1.5">
+        <Eye size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
+        <select className="aj-pill min-w-0 flex-1" style={{ height: 32, paddingRight: 6 }} value={s.reviewerAs ?? ''} onChange={(e) => pick(e.target.value || null)} aria-label="View the demo as">
+          <option value="">{s.me.name.split(' ')[0]} (you)</option>
+          {reviewers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name.split(' ')[0]} (reviewer)
+            </option>
+          ))}
+        </select>
+        {reset}
+      </span>
+    </>
   );
 }
-
 export default function EmployerDemo() {
   const mounted = useMounted();
   const s = useDemo();
@@ -84,6 +102,7 @@ export default function EmployerDemo() {
     entry('public', 'Your page on AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
   ];
 
+  const workspace = (route.screen === 'create' || route.screen === 'studio') && Boolean(route.id);
   const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
@@ -128,7 +147,7 @@ export default function EmployerDemo() {
             ],
             footer: (
               <div className="aj-faint px-2.5 pb-2" style={{ fontSize: 11 }}>
-                {Math.max(0, 3 - s.draftsUsed)} of 3 free drafts left this month. Receipts: {s.receipts.length}.
+                {Math.max(0, 3 - s.draftsUsed)} of 3 free job descriptions left this month. Receipts: {s.receipts.length}.
               </div>
             ),
           },
@@ -139,9 +158,10 @@ export default function EmployerDemo() {
         onCloseDrawer={() => setDrawer(false)}
         homeHref="/employer-demo"
         width={216}
+        footer={(isCollapsed) => <DemoControls collapsed={isCollapsed} onReset={() => setResetting(true)} />}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6" style={{ background: 'var(--surface)' }}>
+        <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
           <span className="lg:hidden">
             <button type="button" className="aj-icon-btn" onClick={() => setDrawer(true)} aria-label="Open menu">
               <Menu size={16} strokeWidth={1.8} />
@@ -153,13 +173,8 @@ export default function EmployerDemo() {
           <span className="hidden sm:inline">
             <DemoMark />
           </span>
-          <span className="ml-auto flex items-center gap-2">
-            <ViewAs />
-            <Tip label="Reset the demo to its sample data" side="bottom">
-              <button type="button" className="aj-icon-btn" onClick={() => setResetting(true)} aria-label="Reset demo">
-                <RotateCcw size={14} strokeWidth={1.8} />
-              </button>
-            </Tip>
+          <span className="ml-auto flex items-center gap-2 lg:hidden">
+            <DemoControls collapsed inHeader onReset={() => setResetting(true)} />
           </span>
         </header>
         {s.reviewerAs && (

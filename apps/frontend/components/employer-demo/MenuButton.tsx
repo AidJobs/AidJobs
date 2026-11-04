@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-export type MenuAction = { label: string; danger?: boolean; run: () => void };
+export type MenuAction = { label: string; danger?: boolean; current?: boolean; run: () => void };
 
 /** A button that opens a short list of actions on click; Escape or a click outside closes it. */
-export default function MenuButton({ label, trigger, actions, align = 'right' }: { label: string; trigger: ReactNode; actions: MenuAction[]; align?: 'left' | 'right' }) {
+export default function MenuButton({ label, trigger, actions, align = 'right', up = false }: { label: string; trigger: ReactNode; actions: MenuAction[]; align?: 'left' | 'right'; up?: boolean }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -35,9 +35,9 @@ export default function MenuButton({ label, trigger, actions, align = 'right' }:
         {trigger}
       </button>
       {open && (
-        <div id={id} className="ej-menu" data-align={align} role="group" aria-label={label} onClick={() => setOpen(false)}>
+        <div id={id} className="ej-menu" data-align={align} data-up={up} role="group" aria-label={label} onClick={() => setOpen(false)}>
           {actions.map((a) => (
-            <button key={a.label} type="button" className="ej-menu-item" data-danger={a.danger ? 'true' : undefined} onClick={a.run}>
+            <button key={a.label} type="button" className="ej-menu-item" data-danger={a.danger ? 'true' : undefined} aria-current={a.current ? 'true' : undefined} onClick={a.run}>
               {a.label}
             </button>
           ))}

@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
-import { Fragment, useState, type ReactNode } from 'react';
+import { AlertCircle, Check, CheckCircle2, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, canWrite, editSection, markGenuine, sendChat, setApply, settleRemark, writeDraft } from './actions';
+import { addRemark, canWrite, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange, writeDraft } from './actions';
 import { DOCUMENTS } from './apply';
 import Composer from './Composer';
 import { commitmentText, COMMITMENTS, findInclusive, longDate, quality, type QualityItem } from './engine';
@@ -159,7 +159,7 @@ function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-function SectionView({ job, sec, s, notes, onFlag }: { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void }) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat }: { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [remark, setRemark] = useState<'comment' | 'suggestion' | null>(null);
@@ -168,8 +168,9 @@ function SectionView({ job, sec, s, notes, onFlag }: { job: DemoJob; sec: Sec; s
   const [applyOpen, setApplyOpen] = useState(false);
   const reviewing = Boolean(s.reviewerAs);
   const remarks = job.review.remarks.filter((r) => r.section === sec.key && r.state === 'open');
+  const changed = Boolean(job.lastChange?.keys.includes(sec.key));
   return (
-    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
+    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="flex items-center gap-2">
         <h3 style={{ flex: 1 }}>{sec.title}</h3>
         {sec.edited && <span className="aj-chip">Your text</span>}
@@ -198,6 +199,23 @@ function SectionView({ job, sec, s, notes, onFlag }: { job: DemoJob; sec: Sec; s
           </>
         )}
       </div>
+      {changed && job.lastChange && !reviewing && (
+        <div className="ej-change-note" role="status">
+          <Check size={12} strokeWidth={2.4} />
+          <span className="min-w-0 flex-1">{job.lastChange.text}</span>
+          <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoLastChange(job.id)}>
+            Undo
+          </button>
+          {onSeeChat && (
+            <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
+              See in chat
+            </button>
+          )}
+          <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
+            <X size={12} strokeWidth={2} />
+          </button>
+        </div>
+      )}
       {notes.map((n) => (
         <div key={n.key} className="ej-check mb-1" style={{ color: 'var(--amber)' }}>
           <AlertCircle size={12} strokeWidth={2} /> <span style={{ color: 'var(--text-2)' }}>{n.text.replace(`${sec.title}: `, '')}</span>
@@ -307,7 +325,31 @@ function FlagDialog({ job, flag, onClose }: { job: DemoJob; flag: Flag; onClose:
   );
 }
 
-export function DocumentView({ job, s }: { job: DemoJob; s: State }) {
+/** The job title as the job description's heading: edited in place, full width, wrapping onto more lines when long. */
+export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolean }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [job.facts.title]);
+  return (
+    <textarea
+      ref={ref}
+      id="ej-title-edit"
+      className="ej-title-edit"
+      rows={1}
+      value={job.facts.title}
+      onChange={(e) => setFacts(job.id, { title: e.target.value.replace(/\n/g, ' ') })}
+      onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+      placeholder="Job title"
+      aria-label="Job title"
+      disabled={disabled}
+    />
+  );
+}
+export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; onSeeChat?: () => void }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
   const checks = quality(job.sections, job.facts, s.today, live);
@@ -321,10 +363,10 @@ export function DocumentView({ job, s }: { job: DemoJob; s: State }) {
             {job.facts.deadline ? ` · closes ${longDate(job.facts.deadline)}` : ''}
             {job.facts.recruitment === 'roster' ? ' · Roster' : job.facts.recruitment === 'proposal' ? ' · Proposal stage' : ''}
           </div>
-          <h2 style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 700 }}>{job.facts.title || 'Untitled job'}</h2>
+          <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
         {job.sections.map((sec) => (
-          <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} />
+          <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} />
         ))}
         {job.commitments.length > 0 && (
           <section className="rounded-2xl px-3 py-2" aria-label="Commitments">
@@ -375,11 +417,29 @@ export function ChecksBar({ job, s }: { job: DemoJob; s: State }) {
 }
 
 /** The chat, docked under the document: the latest reply and the box, with the whole conversation one tap away. */
-export function ChatDock({ job, s }: { job: DemoJob; s: State }) {
+/** The whole conversation, for the Chat tab beside the job description. */
+export function ChatHistory({ job }: { job: DemoJob }) {
+  if (!job.chat.length) return <p className="aj-faint m-0 px-4 py-3">The conversation about this job description appears here.</p>;
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3" aria-label="Conversation" aria-live="polite">
+      {job.chat.map((m) => (
+        <div key={m.id} className="ej-bubble" data-from={m.from}>
+          {rich(m.text)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The slim chat line under the job description: AidJobs' current question in one line with quick answers, and a box
+ * that grows only while typing. The whole conversation is in the Chat tab.
+ */
+export function ChatLine({ job, s, onTyping }: { job: DemoJob; s: State; onTyping?: () => void }) {
   const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
   const [writing, setWriting] = useState(false);
   const last = job.chat[job.chat.length - 1];
+  const asking = last?.from === 'ai' ? last : undefined;
   const write = canWrite(job);
   const start = () => {
     setWriting(true);
@@ -388,73 +448,61 @@ export function ChatDock({ job, s }: { job: DemoJob; s: State }) {
       setWriting(false);
     }, 900);
   };
-  const quick = (q: string) => {
-    if (q === 'Write the description') start();
-    else sendChat(job.id, q);
-  };
   if (s.reviewerAs) return null;
+  const quick = asking?.quick ?? [];
+  const showWrite = !job.sections.length && !quick.includes('Write the description');
   return (
-    <div className="ej-dock flex shrink-0 flex-col gap-2">
-      {open && (
-        <div className="aj-scroll flex max-h-[45vh] flex-col gap-2 pr-1" aria-label="Conversation" aria-live="polite">
-          {job.chat.map((m) => (
-            <div key={m.id} className="ej-bubble" data-from={m.from}>
-              {rich(m.text)}
-            </div>
-          ))}
+    <div className="ej-dock flex shrink-0 flex-col gap-1.5">
+      {writing ? (
+        <div className="ej-ask">
+          <Sparkles size={13} strokeWidth={2} /> Writing the job description… (simulated)
         </div>
+      ) : (
+        asking && (
+          <div className="ej-ask" aria-live="polite">
+            <Sparkles size={13} strokeWidth={2} className="shrink-0" />
+            <span className="min-w-0 flex-1">{rich(asking.text)}</span>
+          </div>
+        )
       )}
-      {!open && last && (
-        <div className="ej-bubble" data-from={last.from} aria-live="polite">
-          {rich(last.text)}
-        </div>
-      )}
-      {writing && (
-        <div className="ej-bubble" data-from="ai">
-          <Sparkles size={13} strokeWidth={2} className="mr-1 inline" /> Writing… (simulated)
-        </div>
-      )}
-      {last?.from === 'ai' && last.quick && (
-        <div className="flex flex-wrap gap-1.5">
-          {last.quick.map((q) =>
+      {(quick.length > 0 || showWrite) && !writing && (
+        <div className="aj-no-scrollbar flex items-center gap-1.5 overflow-x-auto">
+          {quick.map((q) =>
             q === 'Write the description' ? (
-              <button key={q} type="button" className="aj-ink-btn" onClick={start} disabled={!write.ok || writing}>
-                <Sparkles size={13} strokeWidth={2} /> Write the description
+              <button key={q} type="button" className="aj-ink-btn shrink-0" style={{ height: 30 }} onClick={start} disabled={!write.ok}>
+                <Sparkles size={13} strokeWidth={2} /> Write the job description
               </button>
             ) : (
-              <button key={q} type="button" className="aj-pill" onClick={() => quick(q)}>
+              <button key={q} type="button" className="aj-pill shrink-0" style={{ height: 30 }} onClick={() => sendChat(job.id, q)}>
                 {q}
               </button>
             ),
           )}
+          {showWrite && (
+            <button type="button" className="aj-ink-btn ml-auto shrink-0" style={{ height: 30 }} onClick={start} disabled={!write.ok}>
+              <Sparkles size={13} strokeWidth={2} /> {write.ok ? 'Write the job description' : write.why}
+            </button>
+          )}
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <button type="button" className="aj-text-btn inline-flex items-center gap-1" style={{ height: 24 }} onClick={() => setOpen(!open)} aria-expanded={open}>
-          <ChevronUp size={13} strokeWidth={2} style={{ transform: open ? 'rotate(180deg)' : 'none' }} /> {open ? 'Hide conversation' : `Conversation · ${job.chat.length}`}
-        </button>
-        {!job.sections.length && !last?.quick?.includes('Write the description') && (
-          <button type="button" className="aj-ink-btn ml-auto" style={{ height: 30 }} onClick={start} disabled={!write.ok || writing}>
-            <Sparkles size={13} strokeWidth={2} /> {write.ok ? 'Write the description' : write.why}
-          </button>
-        )}
-      </div>
       <Composer
         value={text}
-        onChange={setText}
+        onChange={(v) => {
+          if (!text && v) onTyping?.();
+          setText(v);
+        }}
         onSend={(v) => {
           sendChat(job.id, v);
           setText('');
         }}
         suggestion=""
         placeholder={job.sections.length ? 'Ask for a change: "shorten the responsibilities", "add French"…' : 'Answer, or add details'}
-        label="Message the generator"
+        label="Message AidJobs about this job description"
         compact
       />
     </div>
   );
 }
-
 export function ReviewArea({ job, s }: { job: DemoJob; s: State }) {
   return (
     <>
