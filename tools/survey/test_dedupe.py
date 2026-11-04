@@ -138,20 +138,66 @@ def test_capitalised_register_names_are_made_readable():
     assert dedupe.tidy_case("INTERNATIONAL COMMITTEE OF THE RED CROSS") \
         == "International Committee of the Red Cross"
     assert dedupe.tidy_case("UNITED STATES FUND FOR UNICEF") == "United States Fund for UNICEF"
+    assert dedupe.tidy_case("SAVE THE CHILDREN'S FUND") == "Save the Children's Fund"
+    assert dedupe.tidy_case("OXFAM-QUEBEC INC") == "Oxfam-Quebec Inc"
     assert dedupe.tidy_case("Oxfam Novib") == "Oxfam Novib"
+
+
+def test_only_names_from_capitalised_registers_are_recased():
+    assert dedupe.shown_name(rec("irs:1", "HEIFER PROJECT INTERNATIONAL", "US")) == "Heifer Project International"
+    assert dedupe.shown_name(rec("unjobs-nonun:1", "FHI 360")) == "FHI 360"
+    assert dedupe.shown_name(rec("iati:X", "UNITAID", "CH")) == "UNITAID"
+
+
+def test_un_is_united_nations_and_bracketed_acronyms_are_read_from_every_register():
+    assert dedupe.strict_name("UN Office for Project Services") \
+        == dedupe.strict_name("United Nations Office for Project Services")
+    assert dedupe.split_acronym("United Nations World Food Programme (WFP)") \
+        == ("United Nations World Food Programme", "WFP")
+    assert dedupe.split_acronym("MEDECINS SANS FRONTIERES (UK)") == ("MEDECINS SANS FRONTIERES (UK)", "")
+
+
+def test_the_same_acronym_with_a_similar_name_joins_unless_the_countries_differ():
+    records = [rec("unjobs-un:102", "World Food Programme", acronym="WFP", jobs=105),
+               rec("iati:XM-DAC-41140", "United Nations World Food Programme", "IT", acronym="WFP"),
+               rec("eu:1", "World Fishing Platform", "NL", acronym="WFP")]
+    groups, _, _ = run(records)
+    assert together(groups, "unjobs-un:102", "iati:XM-DAC-41140")
+    assert not together(groups, "unjobs-un:102", "eu:1")
+
+
+def test_a_website_shared_by_unrelated_bodies_is_still_shown_when_it_is_the_only_one():
+    records = [rec("unjobs-un:103", "World Health Organization", jobs=79),
+               rec("iati:XM-DAC-928", "World Health Organization", "CH", "who.int")]
+    _, _, rows = run(records)
+    assert rows[0]["website_domain"] == "who.int"
+    assert dedupe.clean_domain("idrf.ca or idrf.com") == "idrf.ca"
+    assert dedupe.clean_domain("s") == "" and dedupe.clean_domain("shaw.ca") == ""
+
+
+def test_a_recorded_name_replaces_the_shown_one_and_un_offices_form_one_family():
+    records = [rec("iati:US-EIN-91-1148123", "Prosper Global (US)", "US", jobs=0),
+               rec("unjobs-un:1", "Office of the Special Adviser on Africa", jobs=3)]
+    records[1].kind = "un-secretariat (likely)"
+    decisions = Decisions(name={"iati:US-EIN-91-1148123": "Prosper Global (formerly Mercy Corps)"})
+    _, _, rows = run(records, decisions)
+    by_key = {r["org_id"]: r for r in rows}
+    assert by_key["iati:US-EIN-91-1148123"]["name"] == "Prosper Global (formerly Mercy Corps)"
+    assert by_key["unjobs-un:1"]["family"] == dedupe.UN_SECRETARIAT
 
 
 def test_a_family_is_named_after_the_words_its_members_share():
     assert dedupe.family_label(["Save the Children UK", "Save the Children International"]) \
         == "Save the Children"
     assert dedupe.family_label(["ActionAid Rwanda", "ACTIONAID INTERNATIONAL KENYA"]) == "ActionAid"
-    assert dedupe.family_label(["GOAL Uganda", "GOAL"]) == "GOAL"
+    assert dedupe.family_label(["DKT International", "DKT - (Pakistan)"]) == "DKT International"  # strongest first
+    assert dedupe.family_label(["Restless Development", "Restless Development- Zambia"]) == "Restless Development"
 
 
 def test_the_committed_decisions_name_only_records_that_exist():
     records, _, decisions = dedupe.load()
     keys = {r.key for r in records}
-    named = {*decisions.exclude, *decisions.family,
+    named = {*decisions.exclude, *decisions.family, *decisions.name,
              *(k for a, b, _ in decisions.merge for k in (a, b)),
              *(k for pair in decisions.separate for k in pair)}
     assert named <= keys

@@ -31,14 +31,20 @@ SURVEY = HERE.parents[1] / "docs" / "architecture" / "source-survey"
 # Federal Reserve G.5A, 2024 annual averages (US dollars per unit), used only for ordering.
 USD_PER = {"USD": 1.0, "GBP": 1.2781, "AUD": 0.6597, "CAD": 1 / 1.3699}
 
-# Hosts shared by unrelated organisations: never evidence of being the same one.
-SHARED_HOSTS = {
+# Platforms and email providers: never an organisation's website.
+PLATFORM_HOSTS = {
     "facebook.com", "linkedin.com", "twitter.com", "x.com", "instagram.com", "youtube.com",
     "sites.google.com", "google.com", "docs.google.com", "linktr.ee", "wordpress.com",
     "blogspot.com", "wixsite.com", "weebly.com", "squarespace.com", "github.io", "medium.com",
+    "justgiving.com", "charitycommission.gov.uk", "oscr.org.uk", "acnc.gov.au", "gmail.com",
+    "yahoo.com", "hotmail.com", "outlook.com", "shaw.ca", "telus.net", "rogers.com", "bell.net",
+    "sympatico.ca", "bigpond.com",
+}
+# Hosts shared by unrelated organisations: never evidence of being the same one, though they
+# can be an organisation's own website (who.int is WHO's).
+SHARED_HOSTS = PLATFORM_HOSTS | {
     "gov.uk", "gov.au", "gc.ca", "canada.ca", "gouv.fr", "europa.eu", "ec.europa.eu",
     "admin.ch", "government.nl", "rijksoverheid.nl", "bund.de", "un.org", "who.int",
-    "justgiving.com", "charitycommission.gov.uk", "oscr.org.uk", "acnc.gov.au",
 }
 
 # IATI identifier prefixes that carry another register's number.
@@ -91,7 +97,14 @@ BROAD = re.compile(
 def fold(text: str) -> str:
     text = unicodedata.normalize("NFKD", text or "")
     text = "".join(c for c in text if not unicodedata.combining(c)).lower()
+    text = re.sub(r"\bu\.?n\.?(?=\s|$)", "united nations", text)  # "UN Office" is "United Nations Office"
     return text.replace("&", " and ")
+
+
+def clean_domain(value: str) -> str:
+    """A register's website field, as a host: the first word that looks like one."""
+    host = next((w for w in (value or "").lower().split() if "." in w), "").strip(".,;/")
+    return "" if host in PLATFORM_HOSTS or "." not in host else host
 
 
 def _bracket(match: re.Match) -> str:
@@ -130,7 +143,8 @@ def split_acronym(shown: str) -> tuple[str, str]:
     if dash and not re.search(r"\s", dash.group(1)):
         return dash.group(2).strip(), dash.group(1).strip()
     paren = re.match(r"^(.+?)\s*\(([^()]{2,15})\)$", shown)
-    if paren and not re.search(r"\s", paren.group(2).strip()):
+    if paren and not re.search(r"\s", paren.group(2).strip()) \
+            and not COUNTRY_WORDS.match(fold(paren.group(2)).strip(" .")):
         return paren.group(1).strip(), paren.group(2).strip()
     return shown, ""
 
@@ -141,8 +155,11 @@ SMALL_WORDS = {"of", "the", "and", "for", "in", "to", "on", "at", "by", "de", "l
                "et", "y", "a"}
 
 
+CAPITALISED_SOURCES = {"irs", "cra", "uk"}
+
+
 def tidy_case(name: str) -> str:
-    """IRS and some CRA names are in capitals; others are kept as written."""
+    """Register names written in capitals made readable; acronyms and small words kept."""
     if not (name.isupper() and len(name) > 6):
         return name
     words = []
@@ -153,8 +170,12 @@ def tidy_case(name: str) -> str:
         elif index and bare.lower() in SMALL_WORDS:
             words.append(word.lower())
         else:
-            words.append(word.capitalize() if word.isalpha() else word.title())
+            words.append("-".join(part.capitalize() for part in word.split("-")))
     return " ".join(words)
+
+
+def shown_name(record) -> str:
+    return tidy_case(record.name) if record.source in CAPITALISED_SOURCES else record.name
 
 
 @dataclass
@@ -181,6 +202,7 @@ class Decisions:
     separate: set[frozenset] = field(default_factory=set)
     exclude: dict[str, str] = field(default_factory=dict)
     family: dict[str, str] = field(default_factory=dict)
+    name: dict[str, str] = field(default_factory=dict)
 
 
 # --- reading -----------------------------------------------------------------------------
@@ -193,16 +215,14 @@ def _rows(path: Path):
 def read_registers(path: Path) -> list[Record]:
     records = []
     for row in _rows(path):
-        name, acronym = row["name"], ""
-        if row["source"] == "eu":
-            name, acronym = split_acronym(name)
+        name, acronym = split_acronym(row["name"])
         income = float(row["income"]) if row["income"] else None
         country = EU_COUNTRIES.get(row["country"], row["country"]) if row["source"] == "eu" \
             else row["country"].split("-")[0]
         records.append(Record(
             key=f"{row['source']}:{row['source_id']}", source=row["source"], name=name,
             acronym=acronym, country=country, kind=row["kind"],
-            domain=row["website_domain"].lower(),
+            domain=clean_domain(row["website_domain"]),
             income_usd=None if income is None else income * USD_PER[row["currency"] or "USD"],
             income=row["income"], currency=row["currency"], income_year=row["income_year"],
             note=row["note"]))
@@ -248,6 +268,8 @@ def read_decisions(path: Path) -> Decisions:
             decisions.exclude[a] = reason
         elif action == "family":
             decisions.family[a] = b
+        elif action == "name":
+            decisions.name[a] = b
         else:
             raise ValueError(f"unknown action in decisions: {action}")
     return decisions
@@ -267,10 +289,12 @@ class Groups:
         return key
 
     def join(self, a, b, reason):
+        """Join two records' groups; only a join that merges two groups is recorded."""
         ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[rb] = ra
-            self.why[ra].extend(self.why.pop(rb, []))
+        if ra == rb:
+            return
+        self.parent[rb] = ra
+        self.why[ra].extend(self.why.pop(rb, []))
         self.why[ra].append(f"{a} = {b}: {reason}")
 
 
@@ -389,9 +413,41 @@ def match(records: list[Record], repeats, decisions: Decisions):
                 if frozenset((a.key, b.key)) not in decisions.separate:
                     groups.join(a.key, b.key, "same name")
 
+    # The same acronym and a similar name ("WFP - World Food Programme" and "United Nations
+    # World Food Programme (WFP)"), where the countries do not differ.
+    acronyms = defaultdict(list)
+    for r in records:
+        if len(r.acronym) >= 3:
+            acronyms[fold(r.acronym)].append(r)
+    for members in acronyms.values():
+        if len(members) > 6:
+            continue  # a common acronym ("IRC", "ICC"): left to the suggestions below
+        for i, a in enumerate(members):
+            for b in members[i + 1:]:
+                pair = frozenset((a.key, b.key))
+                if pair in decisions.separate or similar(a.name, b.name) < 0.5:
+                    continue
+                if not a.country or not b.country or a.country == b.country:
+                    groups.join(a.key, b.key, "same acronym, similar name")
+
     for a, b, reason in decisions.merge:
         if a in by_key and b in by_key:
             groups.join(a, b, f"decided: {reason}")
+
+    # A UNjobs entry or seed addition whose name is a register name without its country
+    # ("Médecins du Monde" and "Medecins du Monde France"): usually the head office.
+    country_names = {fold(n) for n in EU_COUNTRIES} | {"uk", "usa", "us"}
+    without_country = defaultdict(list)
+    for r in records:
+        words = strict_name(r.name).split()
+        if r.country and len(words) > 1 and (words[-1] in country_names
+                                             or COUNTRY_WORDS.match(words[-1])):
+            without_country[" ".join(words[:-1])].append(r)
+    tied = {groups.find(r.key) for r in records if r.country}
+    for r in records:
+        if not r.country and groups.find(r.key) not in tied and strict_name(r.name) in without_country:
+            for other in without_country[strict_name(r.name)]:
+                suggest(r.key, other.key, "name plus a country")
 
     # Suggestions: the same broad name, or an acronym that matches.
     by_broad = defaultdict(list)
@@ -436,19 +492,35 @@ REVIEW_FIELDS = ["rule", "a", "a_name", "a_country", "a_domain", "b", "b_name", 
 
 
 def _display(members: list[Record]) -> Record:
-    return min(members, key=lambda r: (NAME_ORDER.index(r.source), -len(r.name)))
+    """The best source's plainest name: the shortest that is more than an acronym."""
+    return min(members, key=lambda r: (NAME_ORDER.index(r.source), len(r.name) <= 6, len(r.name)))
+
+
+def _display_name(group: list[Record], decisions: Decisions) -> str:
+    chosen = next((decisions.name[r.key] for r in group if r.key in decisions.name), "")
+    return chosen or shown_name(_display(group))
+
+
+def _strength(group: list[Record]) -> tuple:
+    jobs = sum(r.unjobs_jobs for r in group)
+    income = max((r.income_usd for r in group if r.income_usd is not None), default=0)
+    return (-jobs, -income, -len(group))
 
 
 def family_label(names: list[str]) -> str:
-    """The words the members' names start with ("Save the Children"), else the shortest name."""
+    """The words the members' names start with ("Save the Children"), else the first name
+    (the caller lists the strongest member first)."""
     split = [re.sub(r"^the\s+", "", n, flags=re.IGNORECASE).split() for n in names]
     common = []
     for words in zip(*split):
-        if len({w.lower().strip(",.()") for w in words}) != 1:
+        if len({w.lower().strip(",.()-") for w in words}) != 1:
             break
-        common.append(words[0])
+        common.append(words[0].strip(",.()-"))
     label = " ".join(common).strip(" -,(")
-    return label if distinctive(label) else min(names, key=len)
+    return label if distinctive(label) else names[0]
+
+
+UN_SECRETARIAT = "UN Secretariat (careers.un.org)"
 
 
 def families_of(members: dict[str, list[Record]], families, groups: Groups,
@@ -462,9 +534,12 @@ def families_of(members: dict[str, list[Record]], families, groups: Groups,
     labels = {}
     for roots in clusters.values():
         if len(roots) > 1:
-            label = family_label([tidy_case(_display(members[r]).name) for r in roots])
+            roots.sort(key=lambda r: _strength(members[r]))
+            label = family_label([_display_name(members[r], decisions) for r in roots])
             labels.update({r: label for r in roots})
     for root, group in members.items():
+        if any("un-secretariat" in r.kind for r in group):
+            labels[root] = UN_SECRETARIAT  # departments and offices hiring through one site
         chosen = next((decisions.family[r.key] for r in group if r.key in decisions.family), "")
         if chosen:
             labels[root] = chosen
@@ -481,9 +556,9 @@ def organisations(records: list[Record], groups: Groups, decisions: Decisions,
     for root, group in members.items():
         if any(r.key in decisions.exclude for r in group):
             continue
-        shown = _display(group)
         anchor = min(group, key=lambda r: (NAME_ORDER.index(r.source), r.key))
-        domains = Counter(r.domain for r in group if r.domain and r.domain not in SHARED_HOSTS)
+        domains = Counter(r.domain for r in group if r.domain and r.domain not in SHARED_HOSTS) \
+            or Counter(r.domain for r in group if r.domain)  # who.int is WHO's own
         jobs = sum(r.unjobs_jobs for r in group)
         incomes = [r for r in group if r.income_usd is not None]
         richest = max(incomes, key=lambda r: r.income_usd) if incomes else None
@@ -495,7 +570,7 @@ def organisations(records: list[Record], groups: Groups, decisions: Decisions,
         acronym = next((r.acronym for r in sorted(group, key=lambda r: NAME_ORDER.index(r.source))
                         if r.acronym), "")
         rows.append({
-            "org_id": anchor.key, "name": tidy_case(shown.name), "acronym": acronym,
+            "org_id": anchor.key, "name": _display_name(group, decisions), "acronym": acronym,
             "family": family,
             "kind": "; ".join(sorted({r.kind for r in group if r.kind})),
             "country": countries.most_common(1)[0][0] if countries else "",
@@ -548,7 +623,7 @@ def load(survey: Path = SURVEY):
 
 def main() -> int:
     records, repeats, decisions = load()
-    unknown = [k for k in [*decisions.exclude, *decisions.family,
+    unknown = [k for k in [*decisions.exclude, *decisions.family, *decisions.name,
                            *(x for a, b, _ in decisions.merge for x in (a, b)),
                            *(x for pair in decisions.separate for x in pair)]
                if k not in {r.key for r in records}]

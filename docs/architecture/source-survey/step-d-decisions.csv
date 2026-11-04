@@ -77,7 +77,90 @@ merge,eu:299330237015-12,iati:SE-ON-802005-9823,the same organisation in two reg
 separate,unjobs-nonun:309,iati:JO-CCD-200178924,Kvinna till Kvinna's Jordan office; the organisation is in Stockholm
 separate,unjobs-nonun:382,iati:MW-RG-11429,Partners In Health's Malawi office; the organisation is in Boston (not in the registers)
 separate,unjobs-nonun:435,iati:KH-TIN- K009-100090427,Samaritan's Purse's Cambodia office; the organisation is in the US (not in the registers)
-separate,unjobs-nonun:342,cra:888081049RR0001,Médecins du Monde Canada; the network is in Paris (not in the registers)
+separate,unjobs-nonun:342,cra:888081049RR0001,Médecins du Monde Canada; the UNjobs entry is Médecins du Monde France (joined by decision)
+separate,seed:13,irs:951922279,"World Vision (US), a national office; the seed addition is World Vision International"
+merge,unjobs-un:102,iati:XM-DAC-41140,WFP
+merge,unjobs-un:93,iati:41AAA,UNOPS
+merge,unjobs-un:80,iati:XM-DAC-41121,UNHCR
+merge,unjobs-un:53,iati:XM-DAC-41127,OCHA
+merge,unjobs-un:77,iati:XM-DAC-41304,UNESCO
+merge,unjobs-un:107,iati:44000,the World Bank
+merge,iati:XI-IATI-WBTF,iati:44000,the World Bank's trust funds are the World Bank
+merge,unjobs-un:42,iati:XM-DAC-45001,ITC
+merge,unjobs-nonun:293,iati:XM-DAC-30011,IUCN
+merge,unjobs-nonun:3,eu:272646820681-30,"ACF, Action contre la Faim"
+merge,unjobs-nonun:242,iati:FR-RCS-519655997,Humanity & Inclusion is the Handicap International Federation
+merge,unjobs-nonun:342,iati:FR-INSEE-32101874900127,"Médecins du Monde France, the network's founder"
+merge,unjobs-nonun:233,irs:351019477,Heifer Project International
+merge,unjobs-nonun:478,irs:131760110,the US Fund for UNICEF
+merge,unjobs-nonun:509,irs:710603560,Winrock International
+merge,unjobs-nonun:285,irs:237181761,CIMMYT's US registration
+merge,unjobs-nonun:245,irs:980054968,ICARDA's US registration
+merge,seed:31,irs:237442567,ICRISAT's US registration
+merge,unjobs-nonun:153,irs:990161603,the East-West Center
+merge,unjobs-un:68,unjobs-nonun:468,"the Global Fund, listed on both UNjobs pages"
+merge,unjobs-nonun:528,iati:US-EIN-23-2220051,iDE
+merge,unjobs-nonun:183,iati:DE-AG-VR7795,Fairtrade International (Bonn)
+merge,unjobs-nonun:453,iati:SE-ON-802014-0763,the Stockholm Environment Institute
+merge,unjobs-nonun:44,eu:200781944024-83,the Berghof Foundation
+merge,unjobs-nonun:422,iati:US-EIN-20-3690821,the Rights and Resources Initiative
+merge,unjobs-nonun:45,eu:826985544179-84,Better Cotton
+merge,unjobs-nonun:71,irs:130552040,the Carnegie Endowment for International Peace
+merge,unjobs-nonun:248,iati:XM-DAC-301-2,IDRC
+merge,unjobs-nonun:467,iati:XI-IATI-CWSEC,the Commonwealth Secretariat
+merge,unjobs-nonun:334,acnc:24819440618,the Minderoo Foundation
+merge,unjobs-nonun:13,iati:ZA-CIP-2007-0308903-08,African Parks (Johannesburg)
+merge,unjobs-nonun:447,iati:NL-KVK-51756811,Solidaridad
+merge,irs:986001029,unjobs-nonun:247,the ICRC's US registration
+merge,irs:980543843,unjobs-nonun:324,the Mastercard Foundation's US registration
+merge,irs:237185633,unjobs-nonun:283,IITA's US registration
+merge,irs:237396123,unjobs-nonun:290,CIP's US registration
+merge,irs:980142199,unjobs-nonun:282,IISD's US registration
+merge,irs:980459408,unjobs-nonun:517,the World Economic Forum's US registration
+merge,seed:24,iati:FR-RCS-83162039800030,ALIMA is the Alliance for International Medical Action
+merge,seed:18,iati:GB-CHC-285776,CAFOD
+merge,eu:338162110726-87,iati:GB-CHC-313757,VSO is Voluntary Service Overseas
+separate,iati:SV-NIT-9498-180400-101-7,iati:NL-KVK-27189542,NIMD's Central America office; the institute is in The Hague (same family)
+separate,iati:US-EIN-95-3202116,irs:951922279,World Vision International and World Vision (US) are separate registrations (same family)
+name,iati:US-EIN-91-1148123,Prosper Global (formerly Mercy Corps),Mercy Corps operates as Prosper Global since 9 September 2026 (its announcement)
+exclude,eu:023332310378-35,,"a European political movement, not aid"
+exclude,eu:739474949490-38,,"a European political movement, not aid"
+exclude,irs:381557861,,"domestic social, youth, sport or community services"
+exclude,irs:411424988,,"domestic social, youth, sport or community services"
+exclude,irs:580598050,,"domestic social, youth, sport or community services"
+exclude,irs:980680056,,"a university, college or school, or part of one (the user's rule)"
+exclude,irs:526071299,,"a university, college or school, or part of one (the user's rule)"
+exclude,irs:042104172,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:107554735RR0002,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:108122540RR0001,,"a university, college or school, or part of one (the user's rule)"
+exclude,acnc:12451824370,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:119307122RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:130531114RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:108152349RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:118962851RR0001,,"domestic social, youth, sport or community services"
+exclude,cra:107678195RR0001,,"domestic social, youth, sport or community services"
+exclude,acnc:27360485381,,"domestic social, youth, sport or community services"
+exclude,acnc:52081388810,,"domestic social, youth, sport or community services"
+exclude,acnc:51007032760,,"domestic social, youth, sport or community services"
+exclude,cra:119214955RR0001,,"domestic social, youth, sport or community services"
+exclude,irs:465460594,,"domestic social, youth, sport or community services"
+exclude,acnc:12095165558,,"an industry, professional, standards or internet body, not aid"
+exclude,acnc:43006014106,,"an industry, professional, standards or internet body, not aid"
+exclude,cra:125594697RR0001,,"an industry, professional, standards or internet body, not aid"
+exclude,irs:751840827,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:1093913,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,uk:227931,,"a missionary, evangelism or church-support body, not an aid agency"
+exclude,irs:521623781,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:136110872,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:135645878,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,unjobs-un:44,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-nonun:269,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-un:15,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-un:19,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-un:5,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-un:21,,"a central bank, financial, food-safety or measurement body without aid work"
+exclude,unjobs-nonun:151,,"works mainly on domestic issues in one country, not aid"
+exclude,unjobs-nonun:28,,"works mainly on domestic issues in one country, not aid"
 exclude,unjobs-nonun:2,,a company outside aid
 exclude,unjobs-nonun:21,,a company outside aid
 exclude,unjobs-nonun:26,,a company outside aid
@@ -540,14 +623,10 @@ separate,irs:874477821,irs:135633307,"a separate national member, arm or fund of
 separate,irs:874477821,unjobs-nonun:230,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,irs:232836648,irs:043129839,different organisations
 separate,eu:201585250780-07,unjobs-nonun:134,different organisations
-separate,irs:986001029,unjobs-nonun:247,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
-separate,irs:980142199,unjobs-nonun:282,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
-separate,irs:237185633,unjobs-nonun:283,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,uk:1093861,unjobs-nonun:287,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,iati:GB-CHC-1093861,unjobs-nonun:287,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,eu:773472399076-69,irs:382935397,different organisations
 separate,irs:131845455,unjobs-nonun:289,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
-separate,irs:237396123,unjobs-nonun:290,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,iati:GB-CHC-1065972,unjobs-nonun:292,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,iati:GB-CHC-1065972,seed:1,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,eu:953701819437-32,irs:823285688,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
@@ -597,7 +676,6 @@ separate,iati:BE-BCE_KBO-0419872616,seed:17,"a separate national member, arm or 
 separate,iati:US-EIN-941191246,irs:133234632,different organisations
 separate,uk:1043886,unjobs-nonun:183,different organisations
 separate,iati:GB-CHC-1140288,unjobs-nonun:196,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
-separate,irs:980543843,unjobs-nonun:324,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,uk:214779,uk:1000566,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,uk:213890,unjobs-nonun:436,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,uk:213890,seed:11,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
@@ -610,6 +688,80 @@ separate,irs:300181674,unjobs-nonun:498,"a separate national member, arm or fund
 separate,acnc:92607879345,unjobs-nonun:506,different organisations
 separate,eu:9414007100152-01,irs:980493088,different organisations
 separate,iati:US-EIN-203908371,unjobs-nonun:517,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
-separate,irs:980459408,unjobs-nonun:517,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,iati:GB-CHC-285908,seed:13,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
 separate,uk:285908,seed:13,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:14,acnc:87001251930,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:14,iati:BD-NAB-0210,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:14,iati:DK-CVR-18243717,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:14,iati:GH-DSW-3064,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:25,acnc:64002806233,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:25,iati:NL-KVK-40530953,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:61,acnc:46003380890,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:61,cra:118838333RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:61,iati:BD-NAB-0004,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:61,iati:NL-KVK-41158230,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:19,acnc:90970605069,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:19,eu:345232651928-26,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:19,iati:DK-CVR-29439915,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:19,iati:FI-PRO-139407,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:62,acnc:23005326849,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:16,eu:798262594821-45,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:16,iati:IE-CHY-6998,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:110,iati:AU-ABN-94642321640,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:111,iati:AU-ABN-94642321640,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:113,eu:70299514465-38,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:123,iati:GB-COH-1858644,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:125,iati:GB-COH-02651349,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:162,eu:055599331897-93,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:222,iati:UG-NGO-INTP12912225NB,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:21,acnc:29131976004,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:21,iati:NL-KVK-41226182,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:282,eu:720485238568-09,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:287,eu:5432179104711-68,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:300,acnc:82147006639,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:331,eu:763605593361-56,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:8,eu:763605593361-56,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:342,eu:562583120901-18,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:341,acnc:74068758654,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:358,eu:750447615329-96,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:9,eu:750447615329-96,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:532,eu:750447615329-96,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:374,acnc:18055208636,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:374,cra:129716866RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:374,iati:AU-ACNC-18055208636,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:374,iati:IN-MCA-U74999DL2004NPL131340,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,acnc:49004875807,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,cra:118928993RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,iati:BE-BCE_KBO-0425420917,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,iati:FI-PRO-1498487-2,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,iati:NL-KVK-41198890,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:390,iati:SE-ON-802404-9150,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:398,iati:NL-KVK-70333564,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:538,iati:NL-KVK-70333564,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:418,iati:FR-RCS-42956525200054,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:421,eu:592780699777-45,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:435,cra:119138527RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:436,acnc:99008610035,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:436,eu:7577516100278-78,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:436,eu:697362735627-20,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:436,iati:DK-CVR-63407216,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:436,iati:NL-KVK-41201463,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:20,iati:KE-NGCB-149,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:20,iati:NL-KVK-41197577,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:20,iati:UA-EDR-34183275,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:17,cra:108222191RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:17,eu:6543108101823-47,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:25,iati:NL-KVK-41149287,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:473,iati:AU-ABN-23068075525,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:473,iati:BD-NAB-1301,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:473,iati:KE-RCO-84486,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:496,cra:872374426RR0001,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:496,iati:CA-CRA_ACR-872374426,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:496,iati:NL-KVK-41215393,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:498,acnc:99700687141,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:498,iati:SE-ON-802426-1268,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:506,iati:BE-BCE_KBO-0711.985.839,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:13,acnc:28004778081,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:13,iati:DE-CR-RA000209-VR1207,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,seed:13,iati:NL-KVK-41179943,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
+separate,unjobs-nonun:495,eu:134926817871-58,"a separate national member, arm or fund of the same network, with its own registration or careers site (same family)"
