@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeCheck, CalendarClock, Check, Clock, Copy, ExternalLink,
 import { useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
 import { useSiteSettings } from '@/components/site/SiteRoot';
+import Tip from '@/components/site/Tip';
 import {
   approvalRequired,
   buyCredits,
@@ -71,14 +72,18 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
         <OrgMark name={s.org.name} />
         <span className="aj-muted min-w-0 flex-1 truncate">{s.org.name}</span>
         {s.org.verified && (
-          <span className="aj-chip" data-tone="sage" title="Verified employer">
-            <BadgeCheck size={11} strokeWidth={2} /> Verified
-          </span>
+          <Tip label="Verified employer">
+            <span className="aj-chip" data-tone="sage">
+              <BadgeCheck size={11} strokeWidth={2} /> Verified
+            </span>
+          </Tip>
         )}
         {job.plan === 'premium' && (
-          <span className="aj-chip" style={{ background: 'var(--ink)', color: 'var(--on-ink)' }} title="Sponsored listing">
-            Premium · Sponsored
-          </span>
+          <Tip label="A sponsored listing, paid for by the employer">
+            <span className="aj-chip" style={{ background: 'var(--ink)', color: 'var(--on-ink)' }}>
+              Premium · Sponsored
+            </span>
+          </Tip>
         )}
       </div>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, lineHeight: 1.3 }}>{job.facts.title}</h2>

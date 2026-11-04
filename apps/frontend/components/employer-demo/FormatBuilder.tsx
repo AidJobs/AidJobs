@@ -43,8 +43,8 @@ export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () =
 
   return (
     <Dialog
-      title="Create your own format"
-      subtitle="Name it, choose its sections and headings, and reuse it for any job"
+      title="Create your own JD format"
+      subtitle="Name it, choose its sections and headings, and reuse it for any job description"
       onClose={onClose}
       wide
       footer={

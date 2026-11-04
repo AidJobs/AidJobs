@@ -9,10 +9,12 @@ import type { DemoJob, JobStatus } from './types';
 
 export function DemoMark({ label = 'Demo · sample data' }: { label?: string }) {
   return (
-    <span className="aj-chip" data-tone="amber" title="Everything here is simulated. Nothing is published, paid for, or sent.">
-      <Sparkles size={11} strokeWidth={2} />
-      {label}
-    </span>
+    <Tip label="Everything here is simulated. Nothing is published, paid for, or sent." side="bottom">
+      <span className="aj-chip" data-tone="amber" tabIndex={0}>
+        <Sparkles size={11} strokeWidth={2} />
+        {label}
+      </span>
+    </Tip>
   );
 }
 

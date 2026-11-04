@@ -202,7 +202,7 @@ Click-only menus with names only and details on hover; "Create your own format" 
 
 ### Build phases (tick when pushed)
 
-- [ ] **Phase 1, quick fixes:** the tooltip fix (A); the terms glossary (B), after the user approves the list of labels; "Delete job draft" in ⋯ (H); "Manage jobs" with hover labels; the + menu restructure and the one upload window with .docx and PDF (Item 3); "Use suggestion" removed (Item 1.1).
+- [x] **Phase 1, quick fixes** (done 4 November 2026; the user approved the label list; Word and PDF are read in the browser with `mammoth` 1.13.0 and `unpdf` 2.1.0, the runtime audit clean; the old "learned from the careers site" prompt is removed and the sample base JD format is recast as confirmed from the organisation's own job descriptions; the shared tooltip fix in `components/site/Tip.tsx` reaches the public site only through its own pull request on `main`, still to do): the tooltip fix (A); the terms glossary (B), after the user approves the list of labels; "Delete job draft" in ⋯ (H); "Manage jobs" with hover labels; the + menu restructure and the one upload window with .docx and PDF (Item 3); "Use suggestion" removed (Item 1.1).
 - [ ] **Phase 2, workspace layout:** no demo bar; the full-height right panel with actions, status, and tabs; the title edited in the document; the slim chat line with change notes; phone sheets (C, D, E).
 - [ ] **Phase 3, live draft:** placeholders, the fact slot, the readiness ring, recognised facts, predictive completion, the checks count on Publish (F; Item 1.2 to 1.6).
 - [ ] **Phase 4, the rest:** the base JD format prompt from the organisation's history (G); smart paste; drop a file; example placeholders; organisation memory (Item 1.7 to 1.10).

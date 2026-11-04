@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Create from './Create';
 import Home from './Home';
+import Tip from '@/components/site/Tip';
 import Jobs from './Jobs';
 import Public from './Public';
 import Publish from './Publish';
@@ -76,11 +77,11 @@ export default function EmployerDemo() {
   const primary: MenuEntry[] = [
     entry('create', 'Create a job', <Plus size={15} strokeWidth={2} />),
     entry('home', 'Overview', <LayoutDashboard size={15} strokeWidth={1.8} />),
-    entry('jobs', 'Jobs', <Briefcase size={15} strokeWidth={1.8} />, liveCount),
-    entry('styles', 'Styles', <Palette size={15} strokeWidth={1.8} />),
-    entry('team', 'Team', <Users size={15} strokeWidth={1.8} />, s.team.length),
-    entry('org', 'Organisation', <Building2 size={15} strokeWidth={1.8} />),
-    entry('public', 'On AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
+    entry('jobs', 'Manage jobs', <Briefcase size={15} strokeWidth={1.8} />, liveCount),
+    entry('styles', 'JD formats', <Palette size={15} strokeWidth={1.8} />),
+    entry('team', 'Team and roles', <Users size={15} strokeWidth={1.8} />, s.team.length),
+    entry('org', 'Organisation settings', <Building2 size={15} strokeWidth={1.8} />),
+    entry('public', 'Your page on AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
   ];
 
   const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home'].includes(route.screen);
@@ -154,9 +155,11 @@ export default function EmployerDemo() {
           </span>
           <span className="ml-auto flex items-center gap-2">
             <ViewAs />
-            <button type="button" className="aj-icon-btn" onClick={() => setResetting(true)} aria-label="Reset demo" title="Reset demo">
-              <RotateCcw size={14} strokeWidth={1.8} />
-            </button>
+            <Tip label="Reset the demo to its sample data" side="bottom">
+              <button type="button" className="aj-icon-btn" onClick={() => setResetting(true)} aria-label="Reset demo">
+                <RotateCcw size={14} strokeWidth={1.8} />
+              </button>
+            </Tip>
           </span>
         </header>
         {s.reviewerAs && (

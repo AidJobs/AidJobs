@@ -249,7 +249,7 @@ export default function Home() {
           </ul>
         )}
 
-        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_DRAFTS} free drafts left this month</span>}>
+        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_DRAFTS} free job descriptions left this month</span>}>
           <Composer
             value={text}
             onChange={setText}

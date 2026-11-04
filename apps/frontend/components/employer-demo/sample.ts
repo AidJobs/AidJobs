@@ -34,19 +34,19 @@ export const SAMPLE_ORG: Org = {
     { grade: 'D1', min: 4200, max: 5100, currency: 'USD', period: 'month' },
     { grade: 'D2', min: 5200, max: 6300, currency: 'USD', period: 'month' },
   ],
-  learned: { source: 'careers', adverts: 4, confirmed: false },
+  learned: { source: 'history', adverts: 3, confirmed: true },
   approval: 'senior',
   approvalRule: 'any',
   verified: true,
   setupDone: true,
 };
 
-/** Riverstone's own format, as AidJobs learned it from four adverts on its careers site (simulated). */
+/** Riverstone's base JD format: the headings its own job descriptions share, confirmed by the organisation (sample). */
 export const HOUSE_FORMAT: Format = {
   key: 'house',
   label: 'Riverstone format',
   family: 'Your organisation',
-  usedBy: 'Learned from 4 of your adverts on riverstone.example.org/careers (simulated)',
+  usedBy: 'Your base JD format, from 3 of your own job descriptions (sample)',
   tone: 'warm',
   order: [
     { key: 'about', heading: 'About us' },

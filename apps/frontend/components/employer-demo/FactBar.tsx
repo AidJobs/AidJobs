@@ -74,7 +74,7 @@ function PlaceDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () 
 function TypeDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   const f = job.facts;
   return (
-    <Dialog title="Type" subtitle={`Google job type: ${googleType(f).join(', ')}`} onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
+    <Dialog title="Job type" subtitle={`Google job type: ${googleType(f).join(', ')}`} onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <div className="flex flex-col gap-4">
         <Field label="1 · Engagement">
           <div className="grid gap-1.5 sm:grid-cols-2">
@@ -258,7 +258,7 @@ function SalaryDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
 function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   const f = job.facts;
   return (
-    <Dialog title="More facts" subtitle="Only what applies" onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
+    <Dialog title="More details" subtitle="Only what applies" onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Who can apply">
           <select style={inputStyle} value={f.eligibility} onChange={(e) => setFacts(job.id, { eligibility: e.target.value as Facts['eligibility'] })}>
@@ -302,7 +302,7 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
     <>
       <div className="aj-no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto" aria-label="Job facts">
         <Pill icon={<MapPin size={13} strokeWidth={1.8} />} label="Place" value={f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : ''} missing={!f.location && f.arrangement !== 'remote'} onClick={() => setOpen('place')} />
-        <Pill icon={<Briefcase size={13} strokeWidth={1.8} />} label="Type" value={type} onClick={() => setOpen('type')} />
+        <Pill icon={<Briefcase size={13} strokeWidth={1.8} />} label="Job type" value={type} onClick={() => setOpen('type')} />
         <Pill icon={<Layers size={13} strokeWidth={1.8} />} label="Grade" value={f.grade} onClick={() => setOpen('grade')} />
         <Pill icon={<CalendarClock size={13} strokeWidth={1.8} />} label="Closing date" value={f.deadline ? `Closes ${shortDate(f.deadline)}` : ''} missing={!f.deadline} onClick={() => setOpen('closes')} />
         <Pill
@@ -318,7 +318,7 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
             </Tip>
           }
         />
-        <Pill icon={<MoreHorizontal size={13} strokeWidth={1.8} />} label="More" value="More" onClick={() => setOpen('more')} />
+        <Pill icon={<MoreHorizontal size={13} strokeWidth={1.8} />} label="More details" value="More details" onClick={() => setOpen('more')} />
       </div>
       {open === 'place' && <PlaceDialog job={job} s={s} onClose={() => setOpen(null)} />}
       {open === 'type' && <TypeDialog job={job} onClose={() => setOpen(null)} />}

@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, canWrite, editSection, markGenuine, saveAsOurFormat, sendChat, setApply, settleRemark, writeDraft } from './actions';
+import { addRemark, canWrite, editSection, markGenuine, sendChat, setApply, settleRemark, writeDraft } from './actions';
 import { DOCUMENTS } from './apply';
 import Composer from './Composer';
 import { commitmentText, COMMITMENTS, findInclusive, longDate, quality, type QualityItem } from './engine';
@@ -334,8 +334,14 @@ export function DocumentView({ job, s }: { job: DemoJob; s: State }) {
             {job.commitments.map((k) => {
               const c = commitmentText(k, s.org, job.facts);
               return (
-                <p key={k} className="ej-commitment" title={c.locked ? 'Your locked text, inserted word for word' : undefined}>
-                  <strong>{COMMITMENTS.find((x) => x.key === k)?.label}.</strong> {c.text}
+                <p key={k} className="ej-commitment">
+                  <strong>{COMMITMENTS.find((x) => x.key === k)?.label}.</strong>{' '}
+                  {c.locked && (
+                    <Tip label="Your locked text, inserted word for word">
+                      <Lock size={11} strokeWidth={2} aria-label="Locked text" className="mr-1" />
+                    </Tip>
+                  )}
+                  {c.text}
                 </p>
               );
             })}
@@ -384,7 +390,6 @@ export function ChatDock({ job, s }: { job: DemoJob; s: State }) {
   };
   const quick = (q: string) => {
     if (q === 'Write the description') start();
-    else if (q === 'Save as our format') saveAsOurFormat(job.id);
     else sendChat(job.id, q);
   };
   if (s.reviewerAs) return null;
@@ -429,7 +434,7 @@ export function ChatDock({ job, s }: { job: DemoJob; s: State }) {
           <ChevronUp size={13} strokeWidth={2} style={{ transform: open ? 'rotate(180deg)' : 'none' }} /> {open ? 'Hide conversation' : `Conversation · ${job.chat.length}`}
         </button>
         {!job.sections.length && !last?.quick?.includes('Write the description') && (
-          <button type="button" className="aj-ink-btn ml-auto" style={{ height: 30 }} onClick={start} disabled={!write.ok || writing} title={write.why}>
+          <button type="button" className="aj-ink-btn ml-auto" style={{ height: 30 }} onClick={start} disabled={!write.ok || writing}>
             <Sparkles size={13} strokeWidth={2} /> {write.ok ? 'Write the description' : write.why}
           </button>
         )}

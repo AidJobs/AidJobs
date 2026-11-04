@@ -3,7 +3,7 @@
 import { ChevronRight, Lock, PanelRightClose, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
-import { applyFormat, confirmLearned, formatOf, reorderSections, toggleCommitment, toggleSection } from './actions';
+import { applyFormat, formatOf, reorderSections, toggleCommitment, toggleSection } from './actions';
 import DragList, { moveItem } from './DragList';
 import { COMMITMENTS, commitmentText, FAMILIES_ORDER, GROUPS, headingFor, recommendSections, SECTIONS } from './engine';
 import CreateFormatDialog from './FormatBuilder';
@@ -20,23 +20,22 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
   const format = formatOf(s, job.format);
   const rec = new Set(recommendSections(format, job.facts));
   const [closed, setClosed] = useState<Record<string, boolean>>({ commitments: true });
-  const [headingsOpen, setHeadingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-') || f.key === job.format);
   const toggleGroup = (k: string) => setClosed({ ...closed, [k]: !closed[k] });
 
   return (
-    <div className="flex h-full min-h-0 flex-col" aria-label="Structure">
+    <div className="flex h-full min-h-0 flex-col" aria-label="JD outline">
       <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
         <h2 className="aj-title" style={{ margin: 0, fontSize: 14 }}>
-          Structure
+          JD outline
         </h2>
         <span className="aj-faint" style={{ fontSize: 11 }}>
           {job.tags.length} sections
         </span>
         {onCollapse && (
-          <Tip label="Collapse the structure panel">
-            <button type="button" className="aj-icon-btn ml-auto" style={{ width: 28, height: 28 }} onClick={onCollapse} aria-label="Collapse the structure panel">
+          <Tip label="Hide the JD outline">
+            <button type="button" className="aj-icon-btn ml-auto" style={{ width: 28, height: 28 }} onClick={onCollapse} aria-label="Hide the JD outline">
               <PanelRightClose size={14} strokeWidth={1.8} />
             </button>
           </Tip>
@@ -46,16 +45,16 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="ej-panel-label" htmlFor="ej-style">
-              Style
+              JD format
             </label>
             <Tip label="Name it, choose its sections and headings, and save it for reuse.">
               <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setCreating(true)}>
-                Create your own format
+                Create your own JD format
               </button>
             </Tip>
           </div>
           <select id="ej-style" className="ej-select" value={job.format} onChange={(e) => (e.target.value === CREATE ? setCreating(true) : applyFormat(job.id, e.target.value))}>
-            <option value={CREATE}>Create your own format…</option>
+            <option value={CREATE}>Create your own JD format…</option>
             {FAMILIES_ORDER.map((fam) => {
               const list = formats.filter((f) => f.family === fam);
               return list.length ? (
@@ -73,21 +72,6 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
           <span className="aj-faint" style={{ fontSize: 11 }}>
             {format.usedBy}
           </span>
-          {format.key === 'house' && s.org.learned && !s.org.learned.confirmed && (
-            <div className="flex flex-col gap-1.5 rounded-xl p-2.5" style={{ background: 'var(--sage-1)' }}>
-              <span style={{ fontSize: 12 }}>
-                <strong>Is this your format?</strong> AidJobs found these headings in {s.org.learned.adverts} of your adverts.
-              </span>
-              <div className="flex gap-1.5">
-                <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => setHeadingsOpen(true)}>
-                  See headings
-                </button>
-                <button type="button" className="aj-ink-btn" style={{ height: 28 }} onClick={confirmLearned}>
-                  Yes, use it
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col gap-3" aria-label="Outline">
@@ -110,9 +94,11 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                     <DragList ids={chosen} label={(k) => headingFor(k, format)} onMove={(from, to) => reorderSections(job.id, moveItem(chosen, from, to))}>
                       {(k) => (
                         <div className="ej-outline-row min-w-0 flex-1">
-                          <button type="button" className="min-w-0 flex-1 truncate text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }} onClick={() => scrollToSection(k)} title={SECTIONS.find((d) => d.key === k)?.hint}>
-                            {headingFor(k, format)}
-                          </button>
+                          <Tip label={`${SECTIONS.find((d) => d.key === k)?.hint ?? ''}. Click to go to it.`} className="min-w-0 flex-1">
+                            <button type="button" className="min-w-0 flex-1 truncate text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }} onClick={() => scrollToSection(k)}>
+                              {headingFor(k, format)}
+                            </button>
+                          </Tip>
                           <span className="ej-row-tools">
                             <button type="button" onClick={() => toggleSection(job.id, k)} aria-label={`Remove ${headingFor(k, format)}`}>
                               <X size={12} strokeWidth={2} />
@@ -124,10 +110,12 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                     {unchosen.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {unchosen.map((d) => (
-                          <button key={d.key} type="button" className="ej-add" data-recommended={rec.has(d.key)} onClick={() => toggleSection(job.id, d.key)} title={`${d.hint}${rec.has(d.key) ? ' · recommended for this job' : ''}`}>
-                            {rec.has(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
-                            {d.label}
-                          </button>
+                          <Tip key={d.key} label={`${d.hint}${rec.has(d.key) ? ' · recommended for this job' : ''}`}>
+                            <button type="button" className="ej-add" data-recommended={rec.has(d.key)} onClick={() => toggleSection(job.id, d.key)}>
+                              {rec.has(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
+                              {d.label}
+                            </button>
+                          </Tip>
                         ))}
                       </div>
                     )}
@@ -151,7 +139,8 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                   const on = job.commitments.includes(c.key);
                   return (
                     <li key={c.key}>
-                      <label className="ej-outline-row" style={{ cursor: 'pointer' }} title={t.text}>
+                      <Tip label={t.text} className="w-full">
+                      <label className="ej-outline-row w-full" style={{ cursor: 'pointer' }}>
                         <input type="checkbox" checked={on} onChange={() => toggleCommitment(job.id, c.key)} />
                         <span className="min-w-0 flex-1 truncate" style={{ fontWeight: on ? 600 : 500, color: on ? 'var(--text)' : 'var(--text-2)' }}>
                           {c.label}
@@ -161,6 +150,7 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
                           {t.own ? 'yours' : 'starter'}
                         </span>
                       </label>
+                      </Tip>
                     </li>
                   );
                 })}
@@ -172,18 +162,6 @@ export default function Structure({ job, s, onCollapse }: { job: DemoJob; s: Sta
           </section>
         </div>
       </div>
-      {headingsOpen && (
-        <Dialog title="Headings found in your adverts" subtitle="Simulated" onClose={() => setHeadingsOpen(false)}>
-          <ol className="flex flex-col gap-1" style={{ margin: 0, paddingLeft: 20 }}>
-            {format.order.map((o) => (
-              <li key={o.key}>{o.heading}</li>
-            ))}
-          </ol>
-          <p className="aj-faint" style={{ margin: '10px 0 0' }}>
-            Found in 4 adverts on {s.org.careersUrl.replace('https://', '')}. If it isn&apos;t right, choose another style, edit the outline, and save it as your format.
-          </p>
-        </Dialog>
-      )}
     </div>
   );
 }

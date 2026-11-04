@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, Sparkles, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import Tip from '@/components/site/Tip';
 import { invite, removeMember, setRole } from './actions';
 import { FAMILIES_ORDER, SECTIONS } from './engine';
 import { nextId, update, useDemo } from './store';
@@ -115,7 +116,7 @@ function BrandStyle({ org }: { org: Org }) {
           <input style={inputStyle} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" />
         </Field>
       ) : (
-        <Field label="A job advert or page you like" hint="Paste a few paragraphs. They are used to learn your style and are not published.">
+        <Field label="A job description or page you like" hint="Paste a few paragraphs. They are used to learn your style and are not published.">
           <textarea style={{ ...inputStyle, minHeight: 110 }} value={sample} onChange={(e) => setSample(e.target.value)} />
         </Field>
       )}
@@ -167,17 +168,18 @@ function StandardTexts({ org }: { org: Org }) {
         <div key={t.key} className="aj-card flex flex-col gap-2 p-3">
           <div className="flex items-center gap-2">
             <span style={{ fontWeight: 650 }}>{t.label}</span>
-            <button
-              type="button"
-              className="aj-pill ml-auto"
-              style={{ height: 28 }}
-              onClick={() => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, locked: !x.locked } : x)) })}
-              aria-pressed={t.locked}
-              title={t.locked ? 'Locked: recruiters cannot change or remove it in a job' : 'Unlocked: recruiters can edit it in a job'}
-            >
-              {t.locked ? <Lock size={12} strokeWidth={2} /> : <LockOpen size={12} strokeWidth={2} />}
-              {t.locked ? 'Locked' : 'Editable'}
-            </button>
+            <Tip label={t.locked ? 'Locked: recruiters cannot change or remove it in a job' : 'Editable: recruiters can edit it in a job'} className="ml-auto">
+              <button
+                type="button"
+                className="aj-pill"
+                style={{ height: 28 }}
+                onClick={() => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, locked: !x.locked } : x)) })}
+                aria-pressed={t.locked}
+              >
+                {t.locked ? <Lock size={12} strokeWidth={2} /> : <LockOpen size={12} strokeWidth={2} />}
+                {t.locked ? 'Locked' : 'Editable'}
+              </button>
+            </Tip>
           </div>
           <textarea style={{ ...inputStyle, minHeight: 64 }} value={t.text} onChange={(e) => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, text: e.target.value } : x)) })} aria-label={t.label} />
         </div>
@@ -400,11 +402,13 @@ export function Team() {
               </div>
               <div className="aj-faint truncate">{p.email}</div>
             </div>
-            <select style={{ ...inputStyle, width: 130, minHeight: 34 }} value={p.role} disabled={p.id === s.me.id} onChange={(e) => setRole(p.id, e.target.value as Person['role'])} aria-label={`Role for ${p.name}`} title={ROLE_HINT[p.role]}>
+            <Tip label={ROLE_HINT[p.role]}>
+            <select style={{ ...inputStyle, width: 130, minHeight: 34 }} value={p.role} disabled={p.id === s.me.id} onChange={(e) => setRole(p.id, e.target.value as Person['role'])} aria-label={`Role for ${p.name}`}>
               <option value="owner">Owner</option>
               <option value="member">Member</option>
               <option value="reviewer">Reviewer</option>
             </select>
+            </Tip>
             {p.id !== s.me.id && (
               <button type="button" className="aj-icon-btn" onClick={() => removeMember(p.id)} aria-label={`Remove ${p.name}`}>
                 <Trash2 size={14} strokeWidth={1.8} />
@@ -517,14 +521,14 @@ export function Styles() {
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-            Styles
+            JD formats
           </h1>
           <p className="aj-muted" style={{ margin: '4px 0 0' }}>
-            Real advert formats, named by format, with the headings their users write. Yours comes first. Any section can be added to any job.
+            Real job description formats, named by format, with the headings their users write. Yours come first. Any section can be added to any job.
           </p>
         </div>
         <button type="button" className="aj-ink-btn" onClick={() => setCreating(true)}>
-          Create your own format
+          Create your own JD format
         </button>
       </div>
       {creating && <CreateFormatDialog onClose={() => setCreating(false)} />}

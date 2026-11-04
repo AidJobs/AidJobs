@@ -1,13 +1,14 @@
 'use client';
 
-import { ArrowLeft, FileText, History, ListTree, PanelRightOpen, UserCheck } from 'lucide-react';
+import { ArrowLeft, FileText, History, ListTree, MoreHorizontal, PanelRightOpen, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, isApproved, setFacts } from './actions';
+import { approvalRequired, deleteDraft, downloadCopy, isApproved, setFacts } from './actions';
 import CreateEntry from './CreateEntry';
 import { ChatDock, ChecksBar, DocumentView, ReviewArea } from './DocPane';
 import FactBar from './FactBar';
+import MenuButton from './MenuButton';
 import { statusLine } from './Home';
 import { ReviewDialog, VersionsDialog } from './Review';
 import { go, useDemo } from './store';
@@ -112,8 +113,8 @@ export default function Create({ id }: { id?: string }) {
         ) : (
           <div className="aj-card flex flex-col items-center gap-2 p-8 text-center aj-muted">
             <FileText size={22} strokeWidth={1.5} />
-            The description appears here once it is written.
-            <span className="aj-faint">Check the facts above and the outline in Structure, answer any question below, then write.</span>
+            Your job description appears here once it is written.
+            <span className="aj-faint">Check the facts above and the JD outline, answer any question below, then write the job description.</span>
           </div>
         )}
       </div>
@@ -140,13 +141,13 @@ export default function Create({ id }: { id?: string }) {
         <span className={phone ? 'ml-auto flex items-center gap-1.5' : 'flex shrink-0 items-center gap-1.5'}>
           {!phone && <PlanBadge plan={job.plan} />}
           {phone && (
-            <button type="button" className="aj-icon-btn" onClick={() => setSheet(true)} aria-label="Structure">
+            <button type="button" className="aj-icon-btn" onClick={() => setSheet(true)} aria-label="JD outline">
               <ListTree size={15} strokeWidth={1.8} />
             </button>
           )}
           {job.versions.length > 0 && (
-            <Tip label="Versions">
-              <button type="button" className="aj-icon-btn" onClick={() => setVersionsOpen(true)} aria-label="Versions">
+            <Tip label="Earlier versions">
+              <button type="button" className="aj-icon-btn" onClick={() => setVersionsOpen(true)} aria-label="Earlier versions">
                 <History size={15} strokeWidth={1.8} />
               </button>
             </Tip>
@@ -159,9 +160,28 @@ export default function Create({ id }: { id?: string }) {
             </Tip>
           )}
           {!reviewing && job.sections.length > 0 && job.status !== 'live' && (
-            <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)} title={blocked ? 'Approval is required before publishing' : undefined}>
-              {blocked ? 'Publish…' : 'Publish'}
-            </button>
+            <Tip label={blocked ? 'Approval is required before publishing' : 'Choose Standard or Premium, then publish'}>
+              <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
+                {blocked ? 'Publish…' : 'Publish'}
+              </button>
+            </Tip>
+          )}
+          {!reviewing && job.status !== 'live' && job.status !== 'closed' && (
+            <MenuButton
+              label="More actions for this job draft"
+              trigger={<MoreHorizontal size={15} strokeWidth={1.8} />}
+              actions={[
+                ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
+                {
+                  label: job.status === 'review' || job.status === 'approved' ? 'Withdraw from review and delete' : 'Delete job draft',
+                  danger: true,
+                  run: () => {
+                    deleteDraft(job.id);
+                    go('create');
+                  },
+                },
+              ]}
+            />
           )}
           {job.status === 'live' && (
             <button type="button" className="aj-ink-btn" onClick={() => go('jobs', job.id)}>
@@ -190,7 +210,7 @@ export default function Create({ id }: { id?: string }) {
                 data-dragging={dragging}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize the structure panel"
+                aria-label="Resize the JD outline"
                 aria-valuenow={Math.round(split)}
                 tabIndex={0}
                 onPointerDown={(e) => {
@@ -211,13 +231,13 @@ export default function Create({ id }: { id?: string }) {
             </>
           ) : (
             <div className="flex shrink-0 flex-col items-center border-l px-1 py-3 aj-hair" style={{ background: 'var(--surface)' }}>
-              <Tip label="Show the structure panel" side="right">
-                <button type="button" className="aj-icon-btn" onClick={() => togglePanel(true)} aria-label="Show the structure panel">
+              <Tip label="Show the JD outline" side="left">
+                <button type="button" className="aj-icon-btn" onClick={() => togglePanel(true)} aria-label="Show the JD outline">
                   <PanelRightOpen size={15} strokeWidth={1.8} />
                 </button>
               </Tip>
               <span className="mt-2 aj-faint" style={{ writingMode: 'vertical-rl', fontSize: 11, fontWeight: 600 }}>
-                Structure · {job.tags.length}
+                JD outline · {job.tags.length}
               </span>
             </div>
           )}
@@ -225,7 +245,7 @@ export default function Create({ id }: { id?: string }) {
       )}
 
       {sheet && (
-        <Dialog title="Structure" subtitle={`${job.tags.length} sections`} onClose={() => setSheet(false)}>
+        <Dialog title="JD outline" subtitle={`${job.tags.length} sections`} onClose={() => setSheet(false)}>
           <Structure job={job} s={s} />
         </Dialog>
       )}

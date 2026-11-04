@@ -28,7 +28,7 @@ export type Commitment = { key: string; label: string; text: string; locked: boo
 
 export type ScaleRow = { grade: string; min: number; max: number; currency: string; period: 'month' | 'year' };
 
-export type LearnedFormat = { source: 'careers' | 'link' | 'upload' | 'reliefweb' | 'type'; adverts: number; confirmed: boolean };
+export type LearnedFormat = { source: 'careers' | 'link' | 'upload' | 'reliefweb' | 'type' | 'history'; adverts: number; confirmed: boolean };
 
 export type ApprovalSetting = 'off' | 'all' | 'senior';
 

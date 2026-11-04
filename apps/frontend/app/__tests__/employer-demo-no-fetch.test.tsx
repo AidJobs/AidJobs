@@ -15,7 +15,7 @@ jest.mock('next/link', () => ({
 }));
 
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
-import { learnFormat, publish, readIntent, startJob, writeDraft } from '@/components/employer-demo/actions';
+import { importJobDescription, publish, readIntent, startJob, writeDraft } from '@/components/employer-demo/actions';
 import { getState, go, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -102,17 +102,16 @@ describe('employer demo: never calls the network', () => {
     shows('What role are you hiring for?');
     shows('Add:');
     for (const [tool, inside] of [
-      ['Start from what you have', 'Use a job description from a link'],
-      ['Select a format', 'UN Secretariat format'],
-      [/^Continue a draft/, 'Finance Officer'],
+      ['Upload a job description, hire again, or continue a job draft', 'Continue a job draft'],
+      ['Select a JD format', 'UN Secretariat format'],
     ] as const) {
       const el = Array.from(container.querySelectorAll('button')).find((b) => (typeof tool === 'string' ? b.getAttribute('aria-label') === tool : tool.test(b.getAttribute('aria-label') ?? '')));
       act(() => el?.click());
       shows(inside);
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     }
-    act(() => (Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Select a format') as HTMLElement).click());
-    click('Create your own format');
+    act(() => (Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Select a JD format') as HTMLElement).click());
+    click('Create your own JD format');
     const nameInput = document.querySelector('input[placeholder^="For example"]') as HTMLInputElement;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(nameInput, 'Riverstone field roles');
@@ -123,7 +122,7 @@ describe('employer demo: never calls the network', () => {
     const made = getState().formats.find((f) => f.label === 'Riverstone field roles');
     expect(made?.family).toBe('Your organisation');
     expect(made?.order.map((o) => o.key)).toEqual(['about', 'responsibilities', 'apply']);
-    expect(Array.from(container.querySelectorAll('button')).some((b) => b.getAttribute('aria-label') === 'Format: Riverstone field roles')).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.getAttribute('aria-label') === 'JD format: Riverstone field roles')).toBe(true);
     const pill = container.querySelector('[aria-label="Add sections"] button');
     act(() => (pill as HTMLElement).click());
     expect(pill?.getAttribute('aria-pressed')).toBe('true');
@@ -171,8 +170,8 @@ describe('employer demo: never calls the network', () => {
     route(`#create/${id}`);
     shows('Job description');
     shows('What you will do');
-    shows('Structure');
-    for (const pill of [/Nairobi/, /^Job/, /^Grade$/, /^Closes/, /As per our salary scale|Not shown/, /^More$/]) {
+    shows('JD outline');
+    for (const pill of [/Nairobi/, /^Job/, /^Grade$/, /^Closes/, /As per our salary scale|Not shown/, /^More details$/]) {
       click(pill);
       act(() => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -205,16 +204,29 @@ describe('employer demo: never calls the network', () => {
     route('#create/job-fin');
     const tagsOf = () => getState().jobs.find((j) => j.id === 'job-fin')?.tags ?? [];
     const before = tagsOf();
-    const list = Array.from(container.querySelectorAll('[aria-label="Structure"] ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
+    const list = Array.from(container.querySelectorAll('[aria-label="JD outline"] ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
     const handle = list?.querySelector('.ej-drag-handle') as HTMLElement;
     act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
     expect(tagsOf()).not.toEqual(before);
     expect([...tagsOf()].sort()).toEqual([...before].sort());
 
+    let imported: string | null = null;
     act(() => {
-      expect(learnFormat('WHO WE ARE\nRiverstone works in East Africa.\n\nTHE JOB\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.')).toBe(true);
+      imported = importJobDescription('WHO WE ARE\nRiverstone works in East Africa.\n\nTHE JOB\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.', { saveAs: 'Riverstone HQ roles' });
     });
-    expect(getState().formats.find((f) => f.key === 'house')?.order.map((o) => o.heading)).toEqual(['Who we are', 'The job', 'How to apply']);
+    const saved = getState().formats.find((f) => f.label === 'Riverstone HQ roles');
+    expect(saved?.order.map((o) => o.heading)).toEqual(['Who we are', 'The job', 'How to apply']);
+    expect(getState().jobs.find((j) => j.id === imported)?.format).toBe(saved?.key);
+    const ownFormats = () => getState().formats.filter((f) => f.family === 'Your organisation' && !f.key.startsWith('pasted-')).length;
+    const formatsBefore = ownFormats();
+    act(() => {
+      imported = importJobDescription('ABOUT THE ROLE\nThe officer leads the team.\n\nHOW TO APPLY\nApply online.');
+    });
+    expect(ownFormats()).toBe(formatsBefore);
+    route(`#create/${imported}`);
+    act(() => (container.querySelector('[aria-label="More actions for this job draft"]') as HTMLElement).click());
+    click('Delete job draft');
+    expect(getState().jobs.some((j) => j.id === imported)).toBe(false);
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();

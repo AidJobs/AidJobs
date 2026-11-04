@@ -76,44 +76,47 @@ function MenuItem({ title, tip, current, onClick }: { title: string; tip: string
 }
 
 /** "+": start from what the organisation already has. */
-export function PlusMenu({ s, onFormat, onPaste, onLink }: { s: State; onFormat: () => void; onPaste: () => void; onLink: () => void }) {
+export function PlusMenu({ s, onUpload }: { s: State; onUpload: () => void }) {
   const past = s.jobs.filter((j) => j.status === 'closed').slice(0, 3);
+  const drafts = s.jobs.filter((j) => j.status === 'draft' || j.status === 'review' || j.status === 'approved');
   return (
-    <ClickMenu label="Start from what you have" icon trigger={<Plus size={16} strokeWidth={2} />}>
-      <MenuItem title="Upload your format" tip={`Paste or upload one of your past adverts, or give your careers-page link. AidJobs learns your headings and their order, and new jobs start from them (now: ${s.formats.find((f) => f.key === 'house')?.label ?? 'none yet'}).`} onClick={onFormat} />
-      <MenuItem title="Upload or paste a job description" tip="A job description or terms of reference you already have. Your wording and headings are kept." onClick={onPaste} />
-      <MenuItem title="Use a job description from a link" tip="The web address of a job description online. AidJobs reads that one page and keeps its wording." onClick={onLink} />
+    <ClickMenu label="Upload a job description, hire again, or continue a job draft" icon trigger={<Plus size={16} strokeWidth={2} />}>
+      <MenuItem title="Upload a job description" tip="Paste text, choose a file (text, Word, or PDF), or give a link. Your wording and headings are kept." onClick={onUpload} />
       {past.length > 0 && <span className="ej-menu-label">Hire again</span>}
       {past.map((j) => (
         <MenuItem
           key={j.id}
           title={j.facts.title}
-          tip={`${j.facts.location ? `${j.facts.location}. ` : ''}Starts from last time's text, with new dates.`}
+          tip={`${j.facts.location ? `${j.facts.location}. ` : ''}Starts from last time's job description, with new dates.`}
           onClick={() => {
             const id = hireAgain(j.id);
             if (id) go('create', id);
           }}
         />
       ))}
+      {drafts.length > 0 && <span className="ej-menu-label">Continue a job draft</span>}
+      {drafts.slice(0, 5).map((j) => (
+        <MenuItem key={j.id} title={j.facts.title || 'Untitled job draft'} tip={statusLine(s, j)} onClick={() => go('create', j.id)} />
+      ))}
+      {drafts.length > 5 && <MenuItem title={`All ${drafts.length} job drafts`} tip="Opens Manage jobs, where every job draft is listed." onClick={() => go('jobs')} />}
     </ClickMenu>
   );
 }
-
 /** The format the new job is written in; choosing one applies its headings, order, and tone. */
 export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: string | null; onChange: (key: string) => void; onCreate: () => void }) {
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const current = formats.find((f) => f.key === value);
   return (
     <ClickMenu
-      label={current ? `Format: ${current.label}` : 'Select a format'}
+      label={current ? `JD format: ${current.label}` : 'Select a JD format'}
       trigger={
         <>
-          <span className="ej-tool-text max-w-[110px] sm:max-w-[200px]">{current ? current.label : 'Select a format'}</span>
+          <span className="ej-tool-text max-w-[110px] sm:max-w-[200px]">{current ? current.label : 'Select a JD format'}</span>
           <ChevronDown size={13} strokeWidth={2} className="shrink-0" />
         </>
       }
     >
-      <MenuItem title="Create your own format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
+      <MenuItem title="Create your own JD format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
       <div className="ej-menu-sep" />
       {FAMILIES_ORDER.map((fam) => {
         const list = formats.filter((f) => f.family === fam);
@@ -127,28 +130,6 @@ export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: 
           </div>
         );
       })}
-    </ClickMenu>
-  );
-}
-
-/** Drafts and jobs in review, to pick up where they were left. */
-export function DraftsMenu({ s }: { s: State }) {
-  const waiting = s.jobs.filter((j) => j.status === 'draft' || j.status === 'review' || j.status === 'approved');
-  if (!waiting.length) return null;
-  return (
-    <ClickMenu
-      label={`Continue a draft: ${waiting.length}`}
-      trigger={
-        <>
-          <span className="hidden sm:inline">Continue</span>
-          <span className="aj-faint">{waiting.length}</span>
-          <ChevronDown size={13} strokeWidth={2} className="shrink-0" />
-        </>
-      }
-    >
-      {waiting.map((j) => (
-        <MenuItem key={j.id} title={j.facts.title || 'Untitled draft'} tip={statusLine(s, j)} onClick={() => go('create', j.id)} />
-      ))}
     </ClickMenu>
   );
 }

@@ -471,6 +471,15 @@
   box-shadow: 0 14px 36px rgba(20, 30, 20, 0.14);
 }
 
+.ej-menu[data-align='right'] {
+  left: auto;
+  right: 0;
+}
+
+.aj-root .ej-menu-item[data-danger='true'] {
+  color: var(--red);
+}
+
 .ej-menu[data-up='true'] {
   top: auto;
   bottom: calc(100% + 6px);

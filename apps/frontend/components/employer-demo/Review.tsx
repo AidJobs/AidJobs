@@ -89,7 +89,7 @@ export function ReviewDialog({ job, s, onClose }: { job: DemoJob; s: State; onCl
 
 export function VersionsDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   return (
-    <Dialog title="Versions" subtitle={`${job.versions.length} saved`} onClose={onClose}>
+    <Dialog title="Earlier versions" subtitle={`${job.versions.length} saved`} onClose={onClose}>
       <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {[...job.versions].reverse().map((v, i) => (
           <li key={v.n} className="aj-card flex items-center gap-2 p-3">

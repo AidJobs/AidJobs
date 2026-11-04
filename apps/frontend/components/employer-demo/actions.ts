@@ -39,7 +39,7 @@ export function formatOf(s: State, key: string): Format {
 }
 
 export function defaultFormatKey(s: State): string {
-  return s.org.learned && s.formats.some((f) => f.key === 'house') ? 'house' : FORMAT_FOR_TYPE[s.org.orgType];
+  return s.formats.some((f) => f.key === 'house') ? 'house' : FORMAT_FOR_TYPE[s.org.orgType];
 }
 
 export function ctxFor(s: State, j: DemoJob): BuildContext {
@@ -306,8 +306,7 @@ export function restoreVersion(id: string, n: number) {
   notify(`Restored version ${n}`);
 }
 
-/** A pasted advert becomes a job in its own format; its headings can then be saved as the organisation's format. */
-/** Reads an advert from pasted text. `fromHost` marks text that stands in for a web page (the demo never fetches). */
+/** An uploaded job description becomes a job in its own JD format, keeping its wording and headings. `fromHost` marks text that stands in for a web page (the demo never fetches). */
 export function importPasted(text: string, fromHost?: string): string | null {
   const s = getState();
   const parsed = readPasted(text);
@@ -322,9 +321,9 @@ export function importPasted(text: string, fromHost?: string): string | null {
   const fkey = `pasted-${s.seq + 1}`;
   const format: Format = {
     key: fkey,
-    label: fromHost ? 'Format of the linked advert' : 'Format of your pasted advert',
+    label: fromHost ? 'JD format of the linked job description' : 'JD format of your uploaded job description',
     family: 'Your organisation',
-    usedBy: fromHost ? `Read from ${merged.length} headings on ${fromHost}` : `Read from ${merged.length} headings you pasted`,
+    usedBy: fromHost ? `Read from ${merged.length} headings on ${fromHost}` : `Read from ${merged.length} headings in your job description`,
     tone: 'warm',
     order: merged.map((m) => ({ key: m.key, heading: m.heading })),
     commitments: [],
@@ -335,21 +334,24 @@ export function importPasted(text: string, fromHost?: string): string | null {
   const job = newJob(st2, id, facts, role?.key ?? 'programme', fkey);
   job.tags = merged.map((m) => m.key);
   job.sections = merged.map((m) => ({ key: m.key, title: m.heading, lines: m.lines, edited: true }));
-  job.versions = [{ n: 1, at: Date.now(), note: fromHost ? `Imported from ${fromHost}` : 'Imported from pasted text', sections: job.sections }];
-  const read = fromHost ? `I read ${merged.length} sections from the page on ${fromHost} (simulated in the demo: a sample advert stands in for the page)` : `I read ${merged.length} sections from your text`;
-  job.chat = [msg('ai', `${read} and kept the wording and headings. Check the facts in the top row, then ask for any changes. You can save these headings as your organisation's format.`, ['Save as our format', 'Shorter'])];
-  job.audit = [{ at: Date.now(), who: st2.me.name, what: fromHost ? `Imported from a link on ${fromHost}` : 'Imported from a pasted advert' }];
+  job.versions = [{ n: 1, at: Date.now(), note: fromHost ? `Imported from ${fromHost}` : 'Imported from an uploaded job description', sections: job.sections }];
+  const read = fromHost ? `I read ${merged.length} sections from the page on ${fromHost} (simulated in the demo: a sample job description stands in for the page)` : `I read ${merged.length} sections from your job description`;
+  job.chat = [msg('ai', `${read} and kept the wording and headings. Check the facts in the top row, then ask for any changes.`, ['Shorter', 'More formal'])];
+  job.audit = [{ at: Date.now(), who: st2.me.name, what: fromHost ? `Imported from a link on ${fromHost}` : 'Imported from an uploaded job description' }];
   update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
   return id;
 }
 
-export function saveAsOurFormat(id: string) {
-  update((s) => {
-    const j = s.jobs.find((x) => x.id === id);
-    if (!j) return s;
-    const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: 'Saved from your own advert', tone: j.tone, order: j.sections.map((x) => ({ key: x.key, heading: x.title })), commitments: j.commitments };
-    return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'upload', adverts: 1, confirmed: true } }, jobs: s.jobs.map((x) => (x.id === id ? { ...x, format: 'house' } : x)), notice: { text: `Saved as the ${s.org.short} format. New jobs start from it.` } };
-  });
+/** Uploads a job description for a new job; with a name, its headings are also saved as a JD format for reuse. */
+export function importJobDescription(text: string, opts: { host?: string; saveAs?: string } = {}): string | null {
+  const id = importPasted(text, opts.host);
+  const name = opts.saveAs?.trim();
+  if (!id || !name) return id;
+  const j = getState().jobs.find((x) => x.id === id);
+  if (!j) return id;
+  const key = createFormat(name, j.sections.map((x) => ({ key: x.key, heading: x.title })), j.tone);
+  updateJob(id, (x) => ({ ...x, format: key }));
+  return id;
 }
 
 /** Saves a format the organisation built itself, for reuse. Returns its key. */
@@ -358,28 +360,10 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   update((s) => ({
     ...s,
     formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments }],
-    notice: { text: `Saved ${label}. It is under Your organisation in Select a format.` },
+    notice: { text: `Saved ${label}. It is under Your organisation in Select a JD format.` },
   }));
   return key;
 }
-
-/** Learns the organisation's format from one of its past adverts: its headings and their order. */
-export function learnFormat(text: string): boolean {
-  const parsed = readPasted(text);
-  if (!parsed.length) return false;
-  const order: Format['order'] = [];
-  for (const p of parsed) if (!order.some((o) => o.key === p.key)) order.push({ key: p.key, heading: p.heading });
-  update((s) => {
-    const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: `Learned from your advert: ${order.map((o) => o.heading).join(', ')}`, tone: 'warm', order, commitments: formatOf(s, 'house').commitments };
-    return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'upload', adverts: 1, confirmed: true } }, notice: { text: `Learned the ${s.org.short} format from your advert. New jobs start from it.` } };
-  });
-  return true;
-}
-
-export function confirmLearned() {
-  update((s) => ({ ...s, org: { ...s.org, learned: s.org.learned ? { ...s.org.learned, confirmed: true } : s.org.learned }, notice: { text: 'Your format is confirmed. New jobs start from it.' } }));
-}
-
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
   update((s) => {
     const j = s.jobs.find((x) => x.id === id);
@@ -533,7 +517,9 @@ export function letClose(id: string) {
 
 export function deleteDraft(id: string) {
   const j = getState().jobs.find((x) => x.id === id);
-  changeWithUndo(`Draft deleted: ${j?.facts.title || 'untitled'}`, (s) => ({ ...s, jobs: s.jobs.filter((x) => x.id !== id) }));
+  const inReview = j?.status === 'review' || j?.status === 'approved';
+  const what = inReview ? `Withdrawn from review and deleted: ${j?.facts.title || 'untitled'}. Reviewers were told (simulated)` : `Job draft deleted: ${j?.facts.title || 'untitled'}`;
+  changeWithUndo(what, (s) => ({ ...s, jobs: s.jobs.filter((x) => x.id !== id) }));
 }
 
 /** A new draft from an earlier job: same text, fresh dates; optionally for another duty station. */
