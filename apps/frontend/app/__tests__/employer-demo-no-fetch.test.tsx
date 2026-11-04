@@ -19,6 +19,7 @@ import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
+import DemoRecovery from '@/components/employer-demo/Recover';
 import { getState, go, resetDemo, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -364,6 +365,28 @@ describe('employer demo: phase 4 helpers', () => {
     act(() => forgetBase());
     const pattern = basePattern(getState());
     expect(getState().baseDismissed).toBe(pattern?.sig);
+  });
+});
+
+describe('employer demo: recovery', () => {
+  it('shows a way out instead of a blank page when something in the demo fails', () => {
+    const Broken = () => {
+      throw new Error('old saved data');
+    };
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    act(() => {
+      root.render(
+        <SiteRoot fontClasses="">
+          <DemoRecovery>
+            <Broken />
+          </DemoRecovery>
+        </SiteRoot>,
+      );
+    });
+    quiet.mockRestore();
+    expect(container.textContent).toContain('The demo needs a fresh start');
+    expect(container.textContent).toContain('Reset the demo data');
+    expect(container.textContent).toContain('old saved data');
   });
 });
 

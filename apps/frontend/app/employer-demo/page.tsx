@@ -1,5 +1,10 @@
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
+import DemoRecovery from '@/components/employer-demo/Recover';
 
 export default function EmployerDemoPage() {
-  return <EmployerDemo />;
+  return (
+    <DemoRecovery>
+      <EmployerDemo />
+    </DemoRecovery>
+  );
 }
