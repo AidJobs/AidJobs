@@ -932,3 +932,19 @@
 .ej-composer[data-size='compact'] > div:last-child {
   padding-bottom: 6px;
 }
+/* Fact pills: as many as fit are shown; the rest sit behind "+N". The hidden copy only measures their widths. */
+.ej-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 6px;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.ej-more-facts {
+  font-size: 12px;
+  font-weight: 700;
+}

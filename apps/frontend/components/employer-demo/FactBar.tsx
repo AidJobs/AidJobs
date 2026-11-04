@@ -1,11 +1,12 @@
 'use client';
 
 import { Banknote, Briefcase, CalendarClock, Info, Layers, MapPin, MoreHorizontal, Sparkles } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
 import { setFacts } from './actions';
 import { arrangementLabel, CONTRACTS, ENGAGEMENTS, googleType, holiday, longDate, placeOf, PLACES, salarySuggestion, salaryText, SALARY_FACTS, shortDate, weekend } from './engine';
 import type { DemoJob, Facts, SalaryMode, State } from './types';
+import MenuButton from './MenuButton';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
@@ -296,6 +297,27 @@ function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
 
 export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
   const [open, setOpen] = useState<PillKey | null>(null);
+  const [fit, setFit] = useState(6);
+  const row = useRef<HTMLDivElement>(null);
+  const measure = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = row.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const count = () => {
+      const widths = Array.from(measure.current?.children ?? []).map((x) => (x as HTMLElement).offsetWidth + 6);
+      const room = el.clientWidth;
+      const total = widths.reduce((a, w) => a + w, 0);
+      if (total <= room) return setFit(widths.length);
+      let used = 42;
+      let n = 0;
+      while (n < widths.length && used + widths[n] <= room) used += widths[n++];
+      setFit(Math.max(1, n));
+    };
+    const watch = new ResizeObserver(count);
+    watch.observe(el);
+    if (measure.current) watch.observe(measure.current);
+    return () => watch.disconnect();
+  }, []);
   useEffect(() => {
     const fromSlot = (e: Event) => {
       if (!getState().reviewerAs) setOpen((e as CustomEvent<PillKey>).detail);
@@ -306,29 +328,47 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
   const f = job.facts;
   const type = [ENGAGEMENTS.find((e) => e.key === f.engagement)?.label.split(' ')[0], f.contract && f.contract !== 'Internship' ? f.contract.replace(' (under a year)', '') : '', f.recruitment === 'roster' ? 'Roster' : f.recruitment === 'proposal' ? 'Proposal' : ''].filter(Boolean).join(' · ');
   const salary = salaryText(f) || 'Not shown';
+  const ro = Boolean(s.reviewerAs);
+  const pills: Array<{ key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [
+    { key: 'place', icon: <MapPin size={13} strokeWidth={1.8} />, label: 'Place', value: f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
+    { key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type },
+    { key: 'grade', icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade },
+    { key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline },
+    {
+      key: 'salary',
+      icon: <Banknote size={13} strokeWidth={1.8} />,
+      label: 'Salary',
+      value: salary,
+      extra: (
+        <Tip label={`${SALARY_FACTS[0].text} (${SALARY_FACTS[0].source})`}>
+          <span className="ml-0.5 inline-flex items-center aj-faint" tabIndex={0} aria-label={SALARY_FACTS[0].text}>
+            <Info size={12} strokeWidth={2} />
+          </span>
+        </Tip>
+      ),
+    },
+    { key: 'more', icon: <MoreHorizontal size={13} strokeWidth={1.8} />, label: 'More details', value: 'More details' },
+  ];
+  const hidden = pills.slice(fit);
   return (
     <>
-      <div className="aj-no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto" aria-label="Job facts">
-        <Pill disabled={Boolean(s.reviewerAs)} icon={<MapPin size={13} strokeWidth={1.8} />} label="Place" value={f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : ''} missing={!f.location && f.arrangement !== 'remote'} onClick={() => setOpen('place')} />
-        <Pill disabled={Boolean(s.reviewerAs)} icon={<Briefcase size={13} strokeWidth={1.8} />} label="Job type" value={type} onClick={() => setOpen('type')} />
-        <Pill disabled={Boolean(s.reviewerAs)} icon={<Layers size={13} strokeWidth={1.8} />} label="Grade" value={f.grade} onClick={() => setOpen('grade')} />
-        <Pill disabled={Boolean(s.reviewerAs)} icon={<CalendarClock size={13} strokeWidth={1.8} />} label="Closing date" value={f.deadline ? `Closes ${shortDate(f.deadline)}` : ''} missing={!f.deadline} onClick={() => setOpen('closes')} />
-        <Pill disabled={Boolean(s.reviewerAs)}
-          icon={<Banknote size={13} strokeWidth={1.8} />}
-          label="Salary"
-          value={salary}
-          onClick={() => setOpen('salary')}
-          extra={
-            <Tip label={`${SALARY_FACTS[0].text} (${SALARY_FACTS[0].source})`}>
-              <span className="ml-0.5 inline-flex items-center aj-faint" tabIndex={0} aria-label={SALARY_FACTS[0].text}>
-                <Info size={12} strokeWidth={2} />
-              </span>
-            </Tip>
-          }
-        />
-        <Pill disabled={Boolean(s.reviewerAs)} icon={<MoreHorizontal size={13} strokeWidth={1.8} />} label="More details" value="More details" onClick={() => setOpen('more')} />
-      </div>
-      {open === 'place' && <PlaceDialog job={job} s={s} onClose={() => setOpen(null)} />}
+      <div ref={row} className="relative flex min-w-0 items-center gap-1.5" aria-label="Job facts">
+        <div ref={measure} className="ej-measure" aria-hidden inert>
+          {pills.map((p) => (
+            <Pill key={p.key} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => undefined} />
+          ))}
+        </div>
+        {pills.slice(0, fit).map((p) => (
+          <Pill key={p.key} disabled={ro} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => setOpen(p.key)} />
+        ))}
+        {hidden.length > 0 && (
+          <MenuButton
+            label={`${hidden.length} more job ${hidden.length === 1 ? 'fact' : 'facts'}`}
+            trigger={<span className="ej-more-facts">+{hidden.length}</span>}
+            actions={hidden.map((p) => ({ label: `${p.label}: ${p.key === 'more' ? 'who can apply, start date, and more' : p.value || 'not set'}`, run: () => !ro && setOpen(p.key) }))}
+          />
+        )}
+      </div>      {open === 'place' && <PlaceDialog job={job} s={s} onClose={() => setOpen(null)} />}
       {open === 'type' && <TypeDialog job={job} onClose={() => setOpen(null)} />}
       {open === 'grade' && <GradeDialog job={job} s={s} onClose={() => setOpen(null)} />}
       {open === 'closes' && <ClosesDialog job={job} onClose={() => setOpen(null)} />}
