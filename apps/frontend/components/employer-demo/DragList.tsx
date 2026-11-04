@@ -14,7 +14,7 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
  * A list reordered by dragging its handle, with a mouse or a finger. Rows keep their place in the page while dragging
  * and only slide, so the pointer is never lost; the order changes on release. The handle also takes the arrow keys.
  */
-export default function DragList({ ids, label, onMove, children, gap = 4 }: { ids: string[]; label: (id: string) => string; onMove: (from: number, to: number) => void; children: (id: string) => ReactNode; gap?: number }) {
+export default function DragList({ ids, label, onMove, children, gap = 4, fixed }: { ids: string[]; label: (id: string) => string; onMove: (from: number, to: number) => void; children: (id: string) => ReactNode; gap?: number; fixed?: boolean }) {
   const [drag, setDrag] = useState<{ from: number; to: number; dy: number; h: number } | null>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
   const geo = useRef({ mids: [] as number[], startY: 0 });
@@ -71,18 +71,20 @@ export default function DragList({ ids, label, onMove, children, gap = 4 }: { id
           data-sliding={Boolean(drag) && drag?.from !== i}
           style={shift(i)}
         >
-          <button
-            type="button"
-            className="ej-drag-handle"
-            aria-label={`Drag to move ${label(id)}, or use the up and down arrow keys`}
-            onPointerDown={(e) => start(e, i)}
-            onPointerMove={move}
-            onPointerUp={end}
-            onPointerCancel={() => setDrag(null)}
-            onKeyDown={(e) => key(e, i)}
-          >
-            <GripVertical size={14} strokeWidth={1.8} />
-          </button>
+          {!fixed && (
+            <button
+              type="button"
+              className="ej-drag-handle"
+              aria-label={`Drag to move ${label(id)}, or use the up and down arrow keys`}
+              onPointerDown={(e) => start(e, i)}
+              onPointerMove={move}
+              onPointerUp={end}
+              onPointerCancel={() => setDrag(null)}
+              onKeyDown={(e) => key(e, i)}
+            >
+              <GripVertical size={14} strokeWidth={1.8} />
+            </button>
+          )}
           {children(id)}
         </li>
       ))}

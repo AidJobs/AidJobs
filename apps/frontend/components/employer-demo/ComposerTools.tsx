@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { inputStyle } from './ui';
 import Tip from '@/components/site/Tip';
 import { hireAgain } from './actions';
+import { refocus } from './MenuButton';
 import { contractPicks, deadlinePicks, memoryPick, pickPhrase, placePatch, placePicks } from './answers';
 import { addDays, FAMILIES_ORDER, longDate, PLACES } from './engine';
 import { statusLine } from './Home';
@@ -15,6 +16,11 @@ import type { Facts, State } from './types';
  * A tool in the chat box. A click opens its menu below the box, or above it when there is more room there, never
  * taller than the room, so the page itself never scrolls. Escape, a click outside, or choosing an option closes it.
  */
+/** Closes the click menu that holds this element, as choosing an option does. */
+function closeMenu(el: HTMLElement) {
+  el.dispatchEvent(new CustomEvent('ej-close-menu', { bubbles: true }));
+}
+
 function ClickMenu({ label, trigger, icon, children }: { label: string; trigger: ReactNode; icon?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [place, setPlace] = useState({ up: false, max: 360 });
@@ -44,11 +50,18 @@ function ClickMenu({ label, trigger, icon, children }: { label: string; trigger:
       setOpen(false);
       button.current?.focus();
     };
+    const chosen = () => {
+      setOpen(false);
+      refocus(wrap.current, button.current);
+    };
+    const el = wrap.current;
     document.addEventListener('pointerdown', down);
     document.addEventListener('keydown', key);
+    el?.addEventListener('ej-close-menu', chosen);
     return () => {
       document.removeEventListener('pointerdown', down);
       document.removeEventListener('keydown', key);
+      el?.removeEventListener('ej-close-menu', chosen);
     };
   }, [open]);
 
@@ -58,7 +71,19 @@ function ClickMenu({ label, trigger, icon, children }: { label: string; trigger:
         {trigger}
       </button>
       {open && (
-        <div id={menuId} className="ej-menu" data-up={place.up} style={{ maxHeight: place.max }} role="group" aria-label={label} onClick={(e) => (e.target as HTMLElement).closest('.ej-menu-item') && setOpen(false)}>
+        <div
+          id={menuId}
+          className="ej-menu"
+          data-up={place.up}
+          style={{ maxHeight: place.max }}
+          role="group"
+          aria-label={label}
+          onClick={(e) => {
+            if (!(e.target as HTMLElement).closest('.ej-menu-item')) return;
+            setOpen(false);
+            refocus(wrap.current, button.current);
+          }}
+        >
           {children}
         </div>
       )}
@@ -160,7 +185,19 @@ export function FactSlot({ s, facts, family, onAdd }: { s: State; facts: Facts; 
       {missing && picks.map((p) => <MenuItem key={p.label} title={p.label} tip={p.why} onClick={() => onAdd(pickPhrase(missing, p))} />)}
       {missing === 'place' && (
         <div className="flex flex-col gap-1 px-1 pt-1">
-          <input style={{ ...inputStyle, minHeight: 32 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a place, or type any town and country" aria-label="Search a duty station" />
+          <input
+            style={{ ...inputStyle, minHeight: 32 }}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || q.trim().length < 2) return;
+              e.preventDefault();
+              onAdd(matches[0] ? ` in ${placePatch(matches[0].city).location}` : `, based in ${q.trim()}`);
+              closeMenu(e.currentTarget);
+            }}
+            placeholder="Search a place, or type any town and country"
+            aria-label="Search a duty station"
+          />
           {matches.map((m) => (
             <MenuItem key={m.city} title={`${m.city}, ${m.country}`} tip="From AidJobs' list of duty stations" onClick={() => onAdd(` in ${placePatch(m.city).location}`)} />
           ))}

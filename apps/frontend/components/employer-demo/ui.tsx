@@ -1,7 +1,7 @@
 'use client';
 
 import { Sparkles, Undo2, X } from 'lucide-react';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { dismissNotice, undo, useDemo } from './store';
@@ -32,9 +32,12 @@ export function OrgMark({ name, size = 22 }: { name: string; size?: number }) {
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /** A dialog on wide screens and a bottom sheet on phones. */
 export function Dialog({ title, subtitle, onClose, footer, children, wide, half }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean; half?: boolean }) {
   const phone = useIsPhone();
+  const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (phone) return;
     const onKey = (e: KeyboardEvent) => {
@@ -43,6 +46,36 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [phone, onClose]);
+  // Focus moves into the dialog, stays there while it is open, and goes back to where it was when it closes.
+  useEffect(() => {
+    const box = card.current;
+    if (phone || !box) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const focusable = () => [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0);
+    if (!box.contains(document.activeElement)) {
+      const list = focusable();
+      (list.find((el) => el.matches('input, textarea, select')) ?? list.find((el) => el.getAttribute('aria-label') !== 'Close') ?? box).focus();
+    }
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const list = focusable();
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !box.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !box.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => {
+      document.removeEventListener('keydown', trap);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [phone]);
   if (phone) {
     return (
       <BottomSheet title={title} subtitle={subtitle} onClose={onClose} footer={footer} tall={!half}>
@@ -55,7 +88,7 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="aj-scrim absolute inset-0" onClick={onClose} aria-hidden />
-      <div className="aj-card relative flex max-h-[86vh] w-full flex-col" style={{ maxWidth: wide ? 820 : 560 }} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={card} tabIndex={-1} className="aj-card relative flex max-h-[86vh] w-full flex-col" style={{ maxWidth: wide ? 820 : 560, outline: 'none' }} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-center gap-2 px-5 pb-2 pt-4">
           <span className="aj-title" style={{ fontSize: 15 }}>
             {title}

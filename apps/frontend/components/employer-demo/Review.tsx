@@ -87,7 +87,7 @@ export function ReviewDialog({ job, s, onClose }: { job: DemoJob; s: State; onCl
   );
 }
 
-export function VersionsDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+export function VersionsDialog({ job, onClose, readOnly }: { job: DemoJob; onClose: () => void; readOnly?: boolean }) {
   return (
     <Dialog title="Earlier versions" subtitle={`${job.versions.length} saved`} onClose={onClose}>
       <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -101,7 +101,7 @@ export function VersionsDialog({ job, onClose }: { job: DemoJob; onClose: () => 
               </div>
               <div className="aj-muted truncate">{v.note}</div>
             </div>
-            {i > 0 && (
+            {i > 0 && !readOnly && (
               <button
                 type="button"
                 className="aj-pill"

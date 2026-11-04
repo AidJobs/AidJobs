@@ -24,23 +24,26 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
   const [creating, setCreating] = useState(false);
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-') || f.key === job.format);
   const toggleGroup = (k: string) => setClosed({ ...closed, [k]: !closed[k] });
+  const ro = Boolean(s.reviewerAs);
 
   return (
-    <div className="flex h-full min-h-0 flex-col" aria-label="JD outline">
-      <fieldset className="ej-fieldset aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-3" disabled={Boolean(s.reviewerAs)} aria-label={s.reviewerAs ? 'JD outline, read only for reviewers' : undefined}>
+    <div className="flex h-full min-h-0 flex-col" aria-label={ro ? 'JD outline, read only for reviewers' : 'JD outline'}>
+      <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-3">
         <BasePrompt s={s} />
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="ej-panel-label" htmlFor="ej-style">
               JD format
             </label>
-            <Tip label="Name it, choose its sections and headings, and save it for reuse.">
-              <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setCreating(true)}>
-                Create your own JD format
-              </button>
-            </Tip>
+            {!ro && (
+              <Tip label="Name it, choose its sections and headings, and save it for reuse.">
+                <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setCreating(true)}>
+                  Create your own JD format
+                </button>
+              </Tip>
+            )}
           </div>
-          <select id="ej-style" className="ej-select" value={job.format} onChange={(e) => (e.target.value === CREATE ? setCreating(true) : applyFormat(job.id, e.target.value))}>
+          <select id="ej-style" className="ej-select" value={job.format} disabled={ro} onChange={(e) => (e.target.value === CREATE ? setCreating(true) : applyFormat(job.id, e.target.value))}>
             <option value={CREATE}>Create your own JD format…</option>
             {FAMILIES_ORDER.map((fam) => {
               const list = formats.filter((f) => f.family === fam);
@@ -78,7 +81,7 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
                 </button>
                 {!isClosed && (
                   <>
-                    <DragList ids={chosen} label={(k) => headingFor(k, format)} onMove={(from, to) => reorderSections(job.id, moveItem(chosen, from, to))}>
+                    <DragList ids={chosen} fixed={ro} label={(k) => headingFor(k, format)} onMove={(from, to) => reorderSections(job.id, moveItem(chosen, from, to))}>
                       {(k) => (
                         <div className="ej-outline-row min-w-0 flex-1">
                           <Tip label={`${SECTIONS.find((d) => d.key === k)?.hint ?? ''}. Click to go to it.`} className="min-w-0 flex-1">
@@ -86,15 +89,17 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
                               {headingFor(k, format)}
                             </button>
                           </Tip>
-                          <span className="ej-row-tools">
-                            <button type="button" onClick={() => toggleSection(job.id, k)} aria-label={`Remove ${headingFor(k, format)}`}>
-                              <X size={12} strokeWidth={2} />
-                            </button>
-                          </span>
+                          {!ro && (
+                            <span className="ej-row-tools">
+                              <button type="button" onClick={() => toggleSection(job.id, k)} aria-label={`Remove ${headingFor(k, format)}`}>
+                                <X size={12} strokeWidth={2} />
+                              </button>
+                            </span>
+                          )}
                         </div>
                       )}
                     </DragList>
-                    {unchosen.length > 0 && (
+                    {!ro && unchosen.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {unchosen.map((d) => (
                           <Tip key={d.key} label={`${d.hint}${rec.has(d.key) ? ' · recommended for this job' : ''}`}>
@@ -127,8 +132,8 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
                   return (
                     <li key={c.key}>
                       <Tip label={t.text} className="w-full">
-                      <label className="ej-outline-row w-full" style={{ cursor: 'pointer' }}>
-                        <input type="checkbox" checked={on} onChange={() => toggleCommitment(job.id, c.key)} />
+                      <label className="ej-outline-row w-full" style={{ cursor: ro ? 'default' : 'pointer' }}>
+                        <input type="checkbox" checked={on} disabled={ro} onChange={() => toggleCommitment(job.id, c.key)} />
                         <span className="min-w-0 flex-1 truncate" style={{ fontWeight: on ? 600 : 500, color: on ? 'var(--text)' : 'var(--text-2)' }}>
                           {c.label}
                         </span>
@@ -148,7 +153,7 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
             )}
           </section>
         </div>
-      </fieldset>
+      </div>
     </div>
   );
 }

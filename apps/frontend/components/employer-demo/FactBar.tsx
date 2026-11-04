@@ -4,7 +4,7 @@ import { Banknote, Briefcase, CalendarClock, Info, Layers, MapPin, MoreHorizonta
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
 import { setFacts } from './actions';
-import { arrangementLabel, CONTRACTS, ENGAGEMENTS, googleType, holiday, longDate, placeOf, PLACES, salarySuggestion, salaryText, SALARY_FACTS, shortDate, weekend } from './engine';
+import { arrangementLabel, CONTRACTS, emptyFacts, ENGAGEMENTS, extractFacts, googleType, holiday, longDate, placeOf, PLACES, salarySuggestion, salaryText, SALARY_FACTS, shortDate, weekend } from './engine';
 import type { DemoJob, Facts, SalaryMode, State } from './types';
 import MenuButton from './MenuButton';
 import { getState } from './store';
@@ -52,11 +52,16 @@ function PlaceDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () 
     if (p) setFacts(job.id, { location: `${p.city}, ${p.country}`, country: p.country, iso: p.iso, timezone: p.tz, currency: f.currency || p.currency });
     setQ(p ? `${p.city}, ${p.country}` : city);
   };
+  /** A place not in the list: the country, time zone, and weekend come from what was typed, never from the previous place. */
+  const typed = (text: string) => {
+    const { facts: read } = extractFacts(`based in ${text}`, s.today, emptyFacts());
+    setFacts(job.id, { location: read.location || text, country: read.country, iso: read.iso, timezone: read.timezone });
+  };
   return (
     <Dialog title="Duty station and work arrangement" onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <div className="flex flex-col gap-3">
         <Field label="Duty station">
-          <input style={inputStyle} value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => q && !placeOf(q) && setFacts(job.id, { location: q })} placeholder="City, country" />
+          <input style={inputStyle} value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => q && q !== f.location && !placeOf(q) && typed(q)} placeholder="City, country" />
         </Field>
         <div className="flex flex-wrap gap-1.5">
           {options.slice(0, 8).map((p) => (

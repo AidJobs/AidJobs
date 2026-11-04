@@ -17,7 +17,7 @@ import {
   PRICE_LABEL,
   publish,
 } from './actions';
-import { addDays, arrangementLabel, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, longDate, salaryText, slug } from './engine';
+import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, longDate, salaryText, slug } from './engine';
 import { openSandboxCheckout, paddleConfigured, PRICE_PACK, PRICE_PREMIUM } from './paddle';
 import { go, notify, updateJob, useDemo } from './store';
 import type { DemoJob, Org, ReachRecord, State } from './types';
@@ -35,7 +35,7 @@ export function shareMessage(j: DemoJob, org: Org): string {
     '',
     "We're hiring!",
     '',
-    `${org.name} is looking for a ${j.facts.title}${j.facts.location ? ` in ${j.facts.location}` : ''}.`,
+    `${org.name} is looking for ${article(j.facts.title)} ${j.facts.title}${j.facts.location ? ` in ${j.facts.location}` : ''}.`,
     '',
     'If you or someone in your professional network has relevant experience, take a look at this opportunity.',
     '',
@@ -543,7 +543,7 @@ export default function Publish({ id }: { id?: string }) {
   const paid = job.plan === 'premium';
   const standardFull = liveStandard(s) >= FREE_LIVE;
   const required = approvalRequired(s, job);
-  const blocked = required && !(isApproved(job) || job.status === 'approved');
+  const blocked = required && !isApproved(job);
   const stepNames = ['Preview', 'Visibility', 'Reach', 'Live'];
   const shownJob = { ...job, plan: plan === 'premium' && (paid || useCredit) ? ('premium' as const) : job.plan === 'premium' ? job.plan : plan === 'standard' ? ('standard' as const) : job.plan };
 

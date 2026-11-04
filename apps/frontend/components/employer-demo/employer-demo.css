@@ -273,6 +273,11 @@
   font-weight: 600;
 }
 
+.ej-select:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .aj-root .ej-group {
   display: flex;
   align-items: center;
@@ -584,6 +589,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  min-height: 32px;
 }
 
 .aj-root .ej-title-edit {
@@ -761,18 +767,6 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
-}
-
-.ej-fieldset {
-  min-width: 0;
-  margin: 0;
-  border: 0;
-}
-
-.ej-fieldset:disabled button,
-.ej-fieldset:disabled select,
-.ej-fieldset:disabled input {
-  cursor: default;
 }
 
 .aj-root label.aj-pill:focus-within {

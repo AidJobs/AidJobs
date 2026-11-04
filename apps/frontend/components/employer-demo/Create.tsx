@@ -126,7 +126,7 @@ export default function Create({ id }: { id?: string }) {
 
   const reviewing = Boolean(s.reviewerAs);
   const shown: Panel = reviewing && panel === 'chat' ? 'outline' : panel;
-  const blocked = approvalRequired(s, job) && !(isApproved(job) || job.status === 'approved');
+  const blocked = approvalRequired(s, job) && !isApproved(job);
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
   const checks = job.sections.length ? openChecks(job, s) : [];
@@ -161,14 +161,18 @@ export default function Create({ id }: { id?: string }) {
             ...(phone && job.sections.length ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
             ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
-            {
-              label: job.status === 'review' || job.status === 'approved' ? 'Withdraw from review and delete' : 'Delete job draft',
-              danger: true,
-              run: () => {
-                deleteDraft(job.id);
-                go('create');
-              },
-            },
+            ...(job.status === 'draft' || job.status === 'review' || job.status === 'approved'
+              ? [
+                  {
+                    label: job.status === 'draft' ? 'Delete job draft' : 'Withdraw from review and delete',
+                    danger: true,
+                    run: () => {
+                      deleteDraft(job.id);
+                      go('create');
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       )}
@@ -277,7 +281,7 @@ export default function Create({ id }: { id?: string }) {
           </Dialog>
         )}
         {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
-        {versionsOpen && <VersionsDialog job={job} onClose={() => setVersionsOpen(false)} />}
+        {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
       </div>
     );
   }
@@ -348,7 +352,7 @@ export default function Create({ id }: { id?: string }) {
       </nav>
       )}
       {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
-      {versionsOpen && <VersionsDialog job={job} onClose={() => setVersionsOpen(false)} />}
+      {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
     </div>
   );
 }

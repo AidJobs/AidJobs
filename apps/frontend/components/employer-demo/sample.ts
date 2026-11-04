@@ -131,9 +131,10 @@ export function sampleJobs(today: number): DemoJob[] {
       audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published as Standard' }],
     }, ['assessment']),
     job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
-      status: 'review',
+      status: 'approved',
       review: {
-        state: 'open',
+        state: 'approved',
+        approvedVersion: 1,
         reviewers: [
           { name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false, decision: 'approved', note: 'Looks good to me.' },
           { name: 'Daniel Mwangi', email: 'daniel@riverstone.example.org', outside: false },

@@ -4,6 +4,12 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 export type MenuAction = { label: string; danger?: boolean; current?: boolean; run: () => void };
 
+/** After an option is chosen, focus goes back to the menu's button, unless the option moved it somewhere on purpose. */
+export function refocus(wrap: HTMLElement | null, button: HTMLElement | null) {
+  const at = document.activeElement;
+  if (!at || at === document.body || !at.isConnected || wrap?.contains(at)) button?.focus();
+}
+
 /** A button that opens a short list of actions on click; Escape or a click outside closes it. */
 export default function MenuButton({ label, trigger, actions, align = 'right', up = false }: { label: string; trigger: ReactNode; actions: MenuAction[]; align?: 'left' | 'right'; up?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -35,7 +41,10 @@ export default function MenuButton({ label, trigger, actions, align = 'right', u
         {trigger}
       </button>
       {open && (
-        <div id={id} className="ej-menu" data-align={align} data-up={up} role="group" aria-label={label} onClick={() => setOpen(false)}>
+        <div id={id} className="ej-menu" data-align={align} data-up={up} role="group" aria-label={label} onClick={() => {
+          setOpen(false);
+          refocus(wrap.current, button.current);
+        }}>
           {actions.map((a) => (
             <button key={a.label} type="button" className="ej-menu-item" data-danger={a.danger ? 'true' : undefined} aria-current={a.current ? 'true' : undefined} onClick={a.run}>
               {a.label}

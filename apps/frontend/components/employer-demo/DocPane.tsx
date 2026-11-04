@@ -23,6 +23,7 @@ type Flag = { key: string; why: string; alt: string; source: string; match: stri
 function MarkedText({ text, job, section, onFlag }: { text: string; job: DemoJob; section: string; onFlag: (f: Flag) => void }) {
   const hits = findInclusive(text, job.format).filter((h) => !job.genuine[`${h.rule.id}:${section}:${h.match.toLowerCase()}`]);
   if (!hits.length) return <>{text}</>;
+  const reviewing = Boolean(getState().reviewerAs);
   const out: ReactNode[] = [];
   let at = 0;
   hits.forEach((h, i) => {
@@ -30,9 +31,15 @@ function MarkedText({ text, job, section, onFlag }: { text: string; job: DemoJob
     const flag: Flag = { key: `${h.rule.id}:${section}:${h.match.toLowerCase()}`, why: h.rule.why, alt: h.rule.alt, source: h.rule.source, match: h.match, section };
     out.push(
       <Tip key={`m${i}`} label={`${h.rule.why} Possible alternative: ${h.rule.alt}. (${h.rule.source})`}>
-        <button type="button" className="ej-mark" onClick={() => onFlag(flag)} aria-label={`"${h.match}" highlighted: ${h.rule.why}`}>
-          {h.match}
-        </button>
+        {reviewing ? (
+          <span className="ej-mark" tabIndex={0} aria-label={`"${h.match}" highlighted: ${h.rule.why}`}>
+            {h.match}
+          </span>
+        ) : (
+          <button type="button" className="ej-mark" onClick={() => onFlag(flag)} aria-label={`"${h.match}" highlighted: ${h.rule.why}`}>
+            {h.match}
+          </button>
+        )}
       </Tip>,
     );
     at = h.index + h.match.length;

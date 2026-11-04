@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { basePattern, formatOf, notNowBase, setBaseFormat } from './actions';
+import { basePattern, formatOf, notNowBase, saveEditedBase, setBaseFormat } from './actions';
 import CreateFormatDialog from './FormatBuilder';
 import type { State } from './types';
 
@@ -37,7 +37,7 @@ export default function BasePrompt({ s }: { s: State }) {
         <CreateFormatDialog
           title="Edit your base JD format"
           initial={{ name: `${s.org.short} format`, order: pattern.order, tone: s.formats.some((f) => f.key === 'house') ? formatOf(s, 'house').tone : 'warm' }}
-          onSave={(_, order, tone) => setBaseFormat(order, from, tone, pattern.count)}
+          onSave={(_, order, tone) => saveEditedBase(pattern, order, tone)}
           onClose={() => setEditing(false)}
         />
       )}

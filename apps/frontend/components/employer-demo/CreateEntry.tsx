@@ -6,7 +6,7 @@ import Tip from '@/components/site/Tip';
 import { defaultFormatKey, formatOf, importJobDescription, startJob } from './actions';
 import Composer, { type ComposerHandle } from './Composer';
 import { FactSlot, FormatMenu, PlusMenu } from './ComposerTools';
-import { addSuggestions, completeText, detectRole, extractFacts, headingFor, PLACES, recognise, ROLE_FAMILIES, SECTION_BY_KEY } from './engine';
+import { addSuggestions, article, completeText, detectRole, extractFacts, headingFor, PLACES, recognise, ROLE_FAMILIES, SECTION_BY_KEY } from './engine';
 import CreateFormatDialog from './FormatBuilder';
 import { MARKET_SAMPLE } from './sample';
 import { go, useDemo } from './store';
@@ -35,7 +35,7 @@ const PILL_LABEL: Record<string, string> = {
 function examplesFor(s: State): string[] {
   const roles = ROLE_FAMILIES.filter((r) => s.org.sectors.includes(r.sector)).map((r) => r.title);
   const cities = s.org.countries.map((c) => PLACES.find((p) => p.country === c)?.city).filter(Boolean) as string[];
-  const out = roles.flatMap((title, i) => (cities.length ? [`We're hiring a ${title} in ${cities[i % cities.length]}, 12-month fixed-term…`] : [`We're hiring a ${title}…`]));
+  const out = roles.flatMap((title, i) => (cities.length ? [`We're hiring ${article(title)} ${title} in ${cities[i % cities.length]}, 12-month fixed-term…`] : [`We're hiring ${article(title)} ${title}…`]));
   return out.length ? out : ['Describe the role in a few lines'];
 }
 

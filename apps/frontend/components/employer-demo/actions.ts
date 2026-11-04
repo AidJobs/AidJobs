@@ -4,6 +4,7 @@ import { applyLines, defaultApply } from './apply';
 import {
   addDays,
   applyEdit,
+  article,
   buildSection,
   buildSections,
   daysUntil,
@@ -60,9 +61,29 @@ function rebuilt(s: State, j: DemoJob): DemoJob {
   }) };
 }
 
-/** A change to an approved job reopens its review. */
+/** Whether any approval stands on the job's current text: a full approval, an override, or one reviewer's under the "any" rule. */
+function hasApproval(j: DemoJob): boolean {
+  return j.status === 'approved' || j.review.state === 'approved' || j.review.reviewers.some((r) => r.decision === 'approved');
+}
+
+/** A change to the text of an approved job withdraws every approval given so far and sends it back to review. */
 function reopenApproval(j: DemoJob): DemoJob {
-  return j.review.state === 'approved' ? { ...j, review: { ...j.review, state: 'open', reviewers: j.review.reviewers.map((r) => ({ ...r, decision: undefined })) } } : j;
+  if (!hasApproval(j)) return j;
+  return {
+    ...j,
+    status: j.status === 'approved' ? 'review' : j.status,
+    review: { ...j.review, state: j.review.state === 'none' ? 'none' : 'open', approvedVersion: undefined, reviewers: j.review.reviewers.map((r) => (r.decision === 'approved' ? { ...r, decision: undefined } : r)) },
+  };
+}
+
+/** Any change to a job's content: reopens an approval, and the last chat change can no longer be undone on its own. */
+function touched(j: DemoJob): DemoJob {
+  return { ...reopenApproval(j), lastChange: undefined };
+}
+
+/** Reviewers comment and decide; only the job's owner changes it. */
+function ownerOnly(): boolean {
+  return !getState().reviewerAs;
 }
 export function freeDraftsLeft(s: State): number {
   return Math.max(0, FREE_DRAFTS - s.draftsUsed);
@@ -127,7 +148,7 @@ function withLiveDraft(s: State, j: DemoJob): DemoJob {
 
 function memoryHint(s: State, title: string): string | null {
   const past = s.jobs.find((j) => j.status === 'closed' && title && j.facts.title.toLowerCase() === title.toLowerCase());
-  return past ? `You hired a ${past.facts.title} before (${past.facts.location}). Say "start from last time" to reuse it.` : null;
+  return past ? `You hired ${article(past.facts.title)} ${past.facts.title} before (${past.facts.location}). Say "start from last time" to reuse it.` : null;
 }
 
 function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: string): DemoJob {
@@ -202,11 +223,12 @@ function answerToText(text: string, ask: ChatMsg['ask']): string {
 function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
   const format = formatOf(s, j.format);
   const tags = j.sections.length ? j.tags : orderSections(Array.from(new Set([...j.tags, ...recommendSections(format, facts)])), format);
-  return reopenApproval(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish })));
+  return touched(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish })));
 }
 
 /** Answers a question with a fact picked in the chat (a place, a date, a contract) and asks the next one. */
 export function answerFact(id: string, patch: Partial<Facts>, said: string) {
+  if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
@@ -226,6 +248,7 @@ const ASK_HINT: Record<NonNullable<ChatMsg['ask']>, string> = {
 };
 
 export function sendChat(id: string, text: string) {
+  if (!ownerOnly()) return;
   chatTurn(id, text);
   ensureAsk(id);
 }
@@ -247,7 +270,7 @@ function chatTurn(id: string, text: string) {
     const past = s.jobs.find((x) => x.status === 'closed' && x.facts.title.toLowerCase() === j.facts.title.toLowerCase());
     if (past) {
       const facts: Facts = { ...past.facts, deadline: j.facts.deadline || addDays(s.today, 27), location: j.facts.location || past.facts.location, country: j.facts.country || past.facts.country, iso: j.facts.iso || past.facts.iso };
-      update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...withLiveDraft(st, { ...x, facts, tags: past.tags, format: past.format, tone: past.tone, family: past.family, sections: [] }), chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title}, with a new closing date. The job description is updated on the left.`)] } : x)) }));
+      update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...touched(withLiveDraft(st, { ...x, facts, tags: past.tags, format: past.format, tone: past.tone, family: past.family, sections: [] })), chat: [...x.chat, userMsg, msg('ai', `Started from your ${past.facts.title}, with a new closing date. The job description is updated on the left.`)] } : x)) }));
       return;
     }
   }
@@ -282,8 +305,9 @@ function chatTurn(id: string, text: string) {
   }
   if (lower === 'undo that') {
     updateJob(id, (x) => {
+      if (x.lastChange) return { ...undone(x), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
       const prev = x.versions[x.versions.length - 2];
-      return prev ? { ...x, sections: prev.sections, chat: [...x.chat, userMsg, msg('ai', `Back to version ${prev.n}.`)] } : x;
+      return prev ? { ...atVersion(x, prev.sections, `Back to version ${prev.n}`), chat: [...x.chat, userMsg, msg('ai', `Back to version ${prev.n}.`)] } : { ...x, chat: [...x.chat, userMsg, msg('ai', 'There is no earlier version to go back to.')] };
     });
     return;
   }
@@ -310,7 +334,7 @@ function chatTurn(id: string, text: string) {
     facts: result.facts,
     updatedAfterPublish: x.status === 'live' ? true : x.updatedAfterPublish,
     versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: text.slice(0, 60), sections: result.sections }],
-    chat: [...x.chat, userMsg, msg('ai', result.reply + (x.review.state === 'approved' ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
+    chat: [...x.chat, userMsg, msg('ai', result.reply + (hasApproval(x) ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
     lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags, beforeFacts: x.facts, beforeTone: x.tone } : undefined,
   }));
 }
@@ -319,9 +343,23 @@ function changedKeys(before: DemoJob['sections'], after: DemoJob['sections']): s
   return after.filter((a) => JSON.stringify(before.find((b) => b.key === a.key)?.lines) !== JSON.stringify(a.lines)).map((a) => a.key);
 }
 
+/** The job as it was before the last change asked for in the chat: text, outline, facts, and tone. */
+function undone(x: DemoJob): DemoJob {
+  if (!x.lastChange) return x;
+  const { before, beforeTags, beforeFacts, beforeTone } = x.lastChange;
+  return { ...touched(x), sections: before, tags: beforeTags, facts: beforeFacts, tone: beforeTone, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'Undid the last change', sections: before }] };
+}
+
+/** The job with an earlier version's text; the outline follows the text, so the two never disagree. */
+function atVersion(x: DemoJob, sections: DemoJob['sections'], note: string): DemoJob {
+  const tags = outlineOrder(sections.map((sec) => sec.key));
+  return { ...touched(x), tags, sections: inOutlineOrder(sections, tags), versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note, sections }] };
+}
+
 /** Puts back the sections as they were before the last change asked for in the chat. */
 export function undoLastChange(id: string) {
-  updateJob(id, (x) => (x.lastChange ? { ...x, sections: x.lastChange.before, tags: x.lastChange.beforeTags, facts: x.lastChange.beforeFacts, tone: x.lastChange.beforeTone, lastChange: undefined, chat: [...x.chat, msg('ai', 'Undone: the job description is back as it was.')] } : x));
+  if (!ownerOnly()) return;
+  updateJob(id, (x) => (x.lastChange ? { ...undone(x), chat: [...x.chat, msg('ai', 'Undone: the job description is back as it was.')] } : x));
   ensureAsk(id);
 }
 
@@ -330,38 +368,46 @@ export function dismissChange(id: string) {
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
+  if (!ownerOnly()) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? withFacts(s, j, { ...j.facts, ...patch }) : j)) }));
 }
 
 export function setApply(id: string, patch: Partial<ApplySettings>) {
-  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, { ...j, apply: { ...j.apply, ...patch } }) : j)) }));
+  if (!ownerOnly()) return;
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, touched({ ...j, apply: { ...j.apply, ...patch } })) : j)) }));
 }
 
 export function toggleSection(id: string, key: string) {
+  if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
       const tags = has ? j.tags.filter((t) => t !== key) : outlineOrder([...j.tags, key]);
-      const next = reopenApproval({ ...j, tags });
+      const next = touched({ ...j, tags });
       if (!j.sections.length) return next;
-      return { ...next, sections: has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, buildSection(key, ctxFor(s, next))], tags) };
+      const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, buildSection(key, ctxFor(s, next))], tags);
+      const title = has ? j.sections.find((x) => x.key === key)?.title : sections.find((x) => x.key === key)?.title;
+      return { ...next, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${has ? 'Removed' : 'Added'} ${title ?? key}`, sections }] };
     }),
   }));
 }
 
 /** Puts some of a job's sections in a new order, keeping the places the others hold. */
 export function reorderSections(id: string, keys: string[]) {
+  if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const queue = [...keys];
     const tags = outlineOrder(j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t)));
+    if (tags.join() === j.tags.join()) return j;
     const sections = inOutlineOrder(j.sections, tags);
-    return { ...j, tags, sections: j.sections.length ? sections : j.sections };
+    return { ...touched(j), tags, sections: j.sections.length ? sections : j.sections };
   });
 }
 
 export function applyFormat(id: string, formatKey: string) {
+  if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
@@ -369,32 +415,35 @@ export function applyFormat(id: string, formatKey: string) {
       const format = formatOf(s, formatKey);
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && x.edited)));
       const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      const next = { ...j, format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      const next = { ...touched(j), format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));
 }
 
 export function toggleCommitment(id: string, key: string) {
-  updateJob(id, (j) => ({ ...j, commitments: j.commitments.includes(key) ? j.commitments.filter((c) => c !== key) : [...j.commitments, key] }));
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...touched(j), commitments: j.commitments.includes(key) ? j.commitments.filter((c) => c !== key) : [...j.commitments, key] }));
 }
 
 export function markGenuine(id: string, hitKey: string, reason: string) {
+  if (!ownerOnly()) return;
   updateJob(id, (j) => ({ ...j, genuine: { ...j.genuine, [hitKey]: reason }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `Kept highlighted wording as a genuine requirement: "${reason}"` }] }));
 }
 
 export function editSection(id: string, key: string, text: string) {
+  if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines: text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim()), edited: true } : x));
-    return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
+    return { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
   });
 }
 
 export function restoreVersion(id: string, n: number) {
-  updateJob(id, (j) => {
-    const v = j.versions.find((x) => x.n === n);
-    return v ? { ...j, sections: v.sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Restored version ${n}`, sections: v.sections }] } : j;
-  });
+  if (!ownerOnly()) return;
+  const v = getState().jobs.find((j) => j.id === id)?.versions.find((x) => x.n === n);
+  if (!v) return;
+  updateJob(id, (j) => atVersion(j, v.sections, `Restored version ${n}`));
   notify(`Restored version ${n}`);
 }
 
@@ -506,9 +555,10 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
   updateJob(id, (j) => {
     const r = j.review.remarks.find((x) => x.id === remarkId);
     if (!r) return j;
-    const sections = outcome === 'accepted' && r.suggestion ? j.sections.map((sec) => (sec.key === r.section ? { ...sec, lines: [...sec.lines, r.suggestion as string], edited: true } : sec)) : j.sections;
+    const accepted = outcome === 'accepted' && Boolean(r.suggestion);
+    const sections = accepted ? j.sections.map((sec) => (sec.key === r.section ? { ...sec, lines: [...sec.lines, r.suggestion as string], edited: true } : sec)) : j.sections;
     return {
-      ...j,
+      ...(accepted ? touched(j) : j),
       sections,
       versions: outcome === 'accepted' ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Accepted ${r.author.split(' ')[0]}'s suggestion`, sections }] : j.versions,
       review: { ...j.review, remarks: j.review.remarks.map((x) => (x.id === remarkId ? { ...x, state: outcome } : x)) },
@@ -617,6 +667,7 @@ export function letClose(id: string) {
 }
 
 export function deleteDraft(id: string) {
+  if (!ownerOnly()) return;
   const j = getState().jobs.find((x) => x.id === id);
   const inReview = j?.status === 'review' || j?.status === 'approved';
   const what = inReview ? `Withdrawn from review and deleted: ${j?.facts.title || 'untitled'}. Reviewers were told (simulated)` : `Job draft deleted: ${j?.facts.title || 'untitled'}`;
@@ -784,8 +835,15 @@ export function notNowBase(sig: string) {
   update((s) => ({ ...s, baseDismissed: sig }));
 }
 
+/** "Edit it": the edited headings become the base, and the offer they answered is not made again. */
+export function saveEditedBase(pattern: { count: number; sig: string }, order: Format['order'], tone: Tone) {
+  setBaseFormat(order, `from ${pattern.count} of your own job descriptions`, tone, pattern.count);
+  notNowBase(pattern.sig);
+}
+
 /** Makes a job's outline the organisation's base JD format; offered from the job's menu, never applied automatically. */
 export function updateBaseFromJob(id: string) {
+  if (!ownerOnly()) return;
   const j = getState().jobs.find((x) => x.id === id);
   if (j?.sections.length) setBaseFormat(inOutlineOrder(j.sections, j.tags).map((x) => ({ key: x.key, heading: x.title })), `from "${j.facts.title || 'a job description'}"`, j.tone);
 }

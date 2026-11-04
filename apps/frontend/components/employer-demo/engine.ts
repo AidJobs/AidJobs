@@ -477,6 +477,15 @@ export function parseIso(iso: string): number {
 export function daysUntil(today: number, iso: string): number {
   return Math.round((parseIso(iso) - startOfDay(today)) / DAY);
 }
+
+/** "a" or "an" before a word, by its sound: "an Education Specialist", "a UNICEF post", "an HR Officer". */
+export function article(word: string): 'a' | 'an' {
+  const w = word.trim();
+  if (/^(uni|use|usu|eu|one|once)/i.test(w) || /^U[A-Z]/.test(w)) return 'a';
+  if (/^(hour|honest|honou?r|heir)/i.test(w) || /^[FHLMNRSX][A-Z]/.test(w)) return 'an';
+  return /^[aeiou]/i.test(w) ? 'an' : 'a';
+}
+
 export function longDate(iso: string): string {
   return iso ? new Date(parseIso(iso)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
@@ -853,7 +862,7 @@ export function buildSection(key: string, ctx: BuildContext): Section {
           lead(
             tone,
             `The ${title} leads ${role.sector.toLowerCase()} work ${where} and contributes to ${org.short}'s country strategy.`,
-            `We're looking for a ${title} to join our team ${where}. You'll lead our ${role.sector.toLowerCase()} work and make a real difference for the communities we serve.`,
+            `We're looking for ${article(title)} ${title} to join our team ${where}. You'll lead our ${role.sector.toLowerCase()} work and make a real difference for the communities we serve.`,
             `This ${title} role is based ${where} and leads ${role.sector.toLowerCase()} work.`,
           ),
           ...(terms ? [`Contract: ${terms}.`] : []),

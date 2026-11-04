@@ -69,8 +69,14 @@ export function getState(): State {
   return snapshot();
 }
 
+const sameJobs = (a: DemoJob[], b: DemoJob[]) => a === b || (a.length === b.length && a.every((j, i) => j === b[i]));
+
 export function update(fn: (s: State) => State) {
-  current = fn(snapshot());
+  const prev = snapshot();
+  let next = fn(prev);
+  // An undo puts back a copy of the jobs, so it lasts only until the jobs change in any other way.
+  if (next.notice?.undo && next.notice === prev.notice && !sameJobs(next.jobs, prev.jobs)) next = { ...next, notice: null };
+  current = next;
   save(current);
   listeners.forEach((l) => l());
 }

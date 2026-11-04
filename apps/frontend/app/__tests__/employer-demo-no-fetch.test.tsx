@@ -143,7 +143,7 @@ describe('employer demo: never calls the network', () => {
       shows('Hire again');
       route('#create/job-fin');
       expect(container.querySelector('#ej-title-edit')).not.toBeNull();
-      shows('In review');
+      shows('Approved · ready to publish');
       shows('Key areas of accountability');
       route('#create/job-cps');
       expect(container.textContent?.toLowerCase()).toContain('our commitments');
