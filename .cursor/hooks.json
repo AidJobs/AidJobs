@@ -5,7 +5,7 @@
       { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10, "failClosed": true }
     ],
     "preToolUse": [
-      { "command": "node .cursor/hooks/secret-guard.mjs", "matcher": "Read|Grep", "timeout": 10, "failClosed": true }
+      { "command": "node .cursor/hooks/secret-guard.mjs", "matcher": "Read|Grep|MCP:", "timeout": 10, "failClosed": true }
     ],
     "beforeReadFile": [
       { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10, "failClosed": true }

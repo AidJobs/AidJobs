@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 export const ENV_FILES = [".env", ".env.local", "apps/backend/.env", "apps/frontend/.env.local"];
 
+// KEY=value lines; a quoted value may run over several lines (a private key, for example).
 export function parseEnvFile(path) {
   const values = {};
   let text;
@@ -22,12 +23,30 @@ export function parseEnvFile(path) {
   } catch {
     return values;
   }
-  for (const line of text.split(/\r?\n/)) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][\w]*)\s*=\s*(.*)\s*$/);
-    if (m) values[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(?:export\s+)?([A-Za-z_][\w]*)\s*=\s*(.*?)\s*$/);
+    if (!m) continue;
+    let value = m[2];
+    const quote = value[0];
+    if ((quote === '"' || quote === "'") && !(value.length > 1 && value.endsWith(quote))) {
+      const rest = [value.slice(1)];
+      while (i + 1 < lines.length) {
+        const next = lines[++i];
+        if (next.trimEnd().endsWith(quote)) { rest.push(next.trimEnd().slice(0, -1)); break; }
+        rest.push(next);
+      }
+      value = rest.join("\n");
+    } else {
+      value = value.replace(/^(['"])(.*)\1$/, "$2");
+    }
+    values[m[1]] = value;
   }
   return values;
 }
+
+// Setting names are capitals, digits and underscores; anything else could be part of a value.
+const SETTING_NAME = /^[A-Z_][A-Z0-9_]*$/;
 
 function sources(root, env) {
   const list = [["process environment", env]];
@@ -61,7 +80,7 @@ export function report(args, root = process.cwd(), env = process.env) {
   if (args[0] === "--names") {
     const filter = (args[1] || "").toLowerCase();
     for (const [where, values] of all) {
-      const names = Object.keys(values).filter((n) => n.toLowerCase().includes(filter)).sort();
+      const names = Object.keys(values).filter((n) => SETTING_NAME.test(n) && n.toLowerCase().includes(filter)).sort();
       if (where === "process environment" && !filter) {
         lines.push(`${where}: ${names.length} names (give a filter to list them)`);
       } else {

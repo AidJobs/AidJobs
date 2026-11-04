@@ -44,6 +44,16 @@ test("names can be listed, values never", () => {
   assert.match(joined(["--names"], { A: "1", B: "2" }), /process environment: 2 names \(give a filter/);
 });
 
+test("the lines of a multi-line value are never listed as names", () => {
+  const dir = mkdtempSync(join(tmpdir(), "envcheck-multi-"));
+  const tail = "fakeTail" + "Line0Zq9==";
+  writeFileSync(join(dir, ".env"), `PRIVATE_KEY="-----BEGIN FAKE-----\nAAAA\n${tail}\n-----END FAKE-----"\nNEXT_ONE=1\nUNQUOTED=x\n${tail}\n`);
+  const text = report(["--names"], dir, {}).join("\n");
+  rmSync(dir, { recursive: true, force: true });
+  assert.match(text, /\.env: NEXT_ONE, PRIVATE_KEY, UNQUOTED/);
+  assert.ok(!text.includes("fakeTail"));
+});
+
 test("describe gives the shape of an address only", () => {
   assert.equal(describe(undefined), "not set");
   assert.equal(describe(""), "empty");

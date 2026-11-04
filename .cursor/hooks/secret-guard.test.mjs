@@ -4,11 +4,13 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { checkShell, checkTool, checkUrl, handle, knownSecrets } from "./secret-guard.mjs";
+import { pathToFileURL } from "node:url";
+
+import { checkShell, checkTool, checkUrl, handle, knownSecrets, leakedNames, workspaceRoot } from "./secret-guard.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "secret-guard.mjs");
@@ -78,7 +80,8 @@ const BLOCKED = [
   ["python -c \"import os; [print(k, v) for k, v in os.environ.items()]\"", "code that prints the environment"],
   ["python -c \"import os; print(os.getenv('SUPABASE_DB_URL'))\"", "code that prints the environment"],
   ["python -c \"import os; print(os.environ['OPENROUTER_API_KEY'])\"", "code that prints the environment"],
-  ["python -c \"from dotenv import dotenv_values; print(dotenv_values('apps/backend/.env'))\"", "code that prints the environment"],
+  ["python -c \"from dotenv import dotenv_values; print(dotenv_values('apps/backend/.env'))\"", "reading an .env file"],
+  ["python -c \"from dotenv import dotenv_values; print(dotenv_values())\"", "code that prints the environment"],
   ["node -e \"console.log(process.env)\"", "code that prints the environment"],
   ["node -e \"console.log(process.env.VERCEL_TOKEN)\"", "code that prints the environment"],
   ["node -e \"console.log(JSON.stringify(process.env, null, 2))\"", "code that prints the environment"],
@@ -96,6 +99,37 @@ const BLOCKED = [
   // a remote connection string with a password
   [`psql "postgresql://user:${"hunter" + "2xyz"}@aws-1-ap.pooler.supabase.com:5432/postgres"`, "a connection string with a password for a remote host"],
   [`python check.py --db postgres://u:${"p4ss" + "w0rd"}@db.internal.company.net/x`, "a connection string with a password for a remote host"],
+  // from the code review of 4 November 2026
+  ["gci env: | Select-Object Name, Value", "dumping the environment"],
+  ["Get-ChildItem Env: | Select-Object Name,Value | Format-Table", "dumping the environment"],
+  ["(gci env:).Count; gci env:", "dumping the environment"],
+  ["cmd /c type .env", "reading an .env file"],
+  ["pwsh -c 'Get-Content .env'", "reading an .env file"],
+  ["powershell -NoProfile -Command \"Get-Content apps\\backend\\.env\"", "reading an .env file"],
+  ["bash -c 'echo $SUPABASE_DB_URL'", "printing a credential variable"],
+  ["echo (gc .env)", "reading an .env file"],
+  ["Write-Output (Get-Content .env)", "reading an .env file"],
+  ["$(Get-Content .env)", "reading an .env file"],
+  ["ConvertFrom-StringData (Get-Content .env -Raw)", "reading an .env file"],
+  ["python -c \"print(open('.env').read())\"", "reading an .env file"],
+  ["node -e \"console.log(require('fs').readFileSync('.env','utf8'))\"", "reading an .env file"],
+  ["node -p \"require('fs').readFileSync('apps/backend/.env','utf8')\"", "reading an .env file"],
+  ["node -p process.env", "code that prints the environment"],
+  ["node -p \"process.env.SUPABASE_DB_URL\"", "code that prints the environment"],
+  ["gci env:*KEY*", "dumping the environment"],
+  ["Get-ChildItem Env:\\SUPABASE_DB_URL", "printing a credential variable"],
+  ["dir Env:\\", "dumping the environment"],
+  ["Get-Item -Path Env:ADMIN_PASSWORD", "printing a credential variable"],
+  ["(gci env:).Value", "dumping the environment"],
+  ["[Environment]::GetEnvironmentVariable('SUPABASE_DB_URL')", "printing a credential variable"],
+  ["\"$env:SUPABASE_DB_URL\"", "printing a credential variable"],
+  ["echo ${env:OPENROUTER_API_KEY}", "printing a credential variable"],
+  ["cmd /c echo %SUPABASE_DB_URL%", "printing a credential variable"],
+  ["cmd /c set SUPA", "dumping the environment"],
+  ["cmd /c \"set\"", "dumping the environment"],
+  ["cat ~/.git-credentials", "reading a credentials file"],
+  ["Get-Content ~/.netrc", "reading a credentials file"],
+  ["type %APPDATA%\\postgresql\\.pgpass", "reading a credentials file"],
 ];
 
 const ALLOWED = [
@@ -150,6 +184,25 @@ const ALLOWED = [
   "Get-ChildItem Env: | Select-Object -ExpandProperty Name",
   "\"left: \" + ((Get-ChildItem Env: | Where-Object { $_.Name -in 'A_KEY','B_URL' }).Name -join ',')",
   "[Environment]::GetEnvironmentVariables('User').Keys | Sort-Object",
+  // from the code review of 4 November 2026: ordinary work that must not be refused
+  "git ls-files | findstr .env",
+  "git ls-files | Select-String -Pattern '\\.env'",
+  "Select-String -Path docs\\*.md -Pattern '\\.env'",
+  "Copy-Item .env.sample .env",
+  "cp .env.example .env.local",
+  "Get-Content apps\\frontend\\.env.local.example",
+  "Test-Path Env:SUPABASE_DB_URL",
+  "$x = [Environment]::GetEnvironmentVariable('SUPABASE_DB_URL'); python run.py",
+  "[bool][Environment]::GetEnvironmentVariable('SUPABASE_DB_URL')",
+  "python -c \"from dotenv import load_dotenv; load_dotenv('apps/backend/.env'); import os; print(bool(os.getenv('SUPABASE_DB_URL')))\"",
+  "node -p \"Object.keys(process.env).length\"",
+  "node -p \"process.env.NODE_ENV\"",
+  "cat ~/.ssh/id_rsa.pub",
+  "rg -n token_utils apps/backend",
+  "Get-Content apps\\backend\\app\\secret_scan.py",
+  "cmd /c npm run build",
+  "pwsh -c 'git status'",
+  "bash -c 'echo $HOME'",
 ];
 
 test("still blocked after the replay fixes", () => {
@@ -205,6 +258,79 @@ test("file tools: a content search of an outside folder holding an .env file is 
   assert.equal(checkTool("Grep", { pattern: "x", path: join(root, "apps", "backend") }, workspace), null);
 });
 
+test("the workspace root is read in the forms Cursor sends", () => {
+  assert.equal(workspaceRoot("/" + root.replace(/\\/g, "/")), resolve(root));
+  assert.equal(workspaceRoot(pathToFileURL(root).href), resolve(root));
+  assert.equal(workspaceRoot(root), resolve(root));
+  assert.equal(workspaceRoot(join(root, "no-such-folder")), process.cwd());
+  assert.equal(workspaceRoot(undefined), process.cwd());
+});
+
+test("file tools: relative and Cursor-style paths are judged from the workspace", () => {
+  const workspace = join(root, "ws");
+  const outside = join(root, "outside2");
+  mkdirSync(join(workspace, "apps"), { recursive: true });
+  mkdirSync(outside, { recursive: true });
+  writeFileSync(join(workspace, ".env"), "X=1\n");
+  writeFileSync(join(outside, ".env"), "X=1\n");
+  const refused = "searching a folder outside the workspace that may hold an .env file";
+  assert.equal(checkTool("Grep", { pattern: "x", path: "../outside2" }, workspace), refused);
+  assert.equal(checkTool("Grep", { pattern: "x", path: "/" + outside.replace(/\\/g, "/") }, workspace), refused);
+  assert.equal(checkTool("Grep", { pattern: "x", path: workspace }, workspace), null);
+  assert.equal(checkTool("Grep", { pattern: "x", path: "apps" }, workspace), null);
+  assert.equal(checkTool("Grep", { pattern: "x", path: outside, glob: "*.{py,env}" }, workspace), refused);
+});
+
+test("browser: the guard also answers preToolUse for browser tools", () => {
+  assert.equal(checkTool("MCP:browser_navigate", { url: "https://dashboard.render.com/env-groups/evg-1" }), "a dashboard page that shows secrets");
+  assert.equal(checkTool("MCP:browser_navigate", JSON.stringify({ url: "https://vercel.com/t/a/settings/environment-variables" })), "a dashboard page that shows secrets");
+  assert.equal(checkTool("MCP:browser_navigate", { url: "https://aid-jobs-frontend.vercel.app/v2" }), null);
+  assert.equal(checkTool("MCP:browser_snapshot", {}), null);
+});
+
+test("short and local passwords are not treated as known secrets", () => {
+  const secrets = knownSecrets(join(root, "no-such-folder"), {
+    TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/aidjobs_test",
+    SHORT_KEY: "abc12345",
+  });
+  assert.equal(leakedNames("image: postgres:16, start the postgres container, abc12345", secrets).size, 0);
+});
+
+test("a multi-line quoted value is one value, and its lines are not names", () => {
+  const dir = join(root, "multi");
+  mkdirSync(join(dir, "apps", "backend"), { recursive: true });
+  const tail = "fakeTail" + "Line0Zq9==";
+  writeFileSync(join(dir, "apps", "backend", ".env"), `PRIVATE_KEY="-----BEGIN FAKE-----\nAAAA${FAKE_KEY}\n${tail}\n-----END FAKE-----"\nNEXT_ONE=1\n`);
+  const secrets = knownSecrets(dir, {});
+  assert.equal(leakedNames(`line ${tail}`, secrets).size, 0);
+  assert.ok([...secrets.keys()].some((v) => v.includes(tail)));
+});
+
+test("long commands are checked quickly", () => {
+  for (const command of ["print(".repeat(40000), "console.log(".repeat(50000), "a".repeat(1000000), "gci env: | ".repeat(20000)]) {
+    const start = Date.now();
+    checkShell(command);
+    assert.ok(Date.now() - start < 2000, `${command.slice(0, 12)}… took ${Date.now() - start} ms`);
+  }
+});
+
+test("unexpected input types do not throw", () => {
+  for (const event of [
+    { hook_event_name: "beforeShellExecution", command: 5 },
+    { hook_event_name: "beforeShellExecution" },
+    { hook_event_name: "preToolUse", tool_name: "Grep", tool_input: null },
+    { hook_event_name: "preToolUse", tool_name: "Grep", tool_input: { path: 3 } },
+    { hook_event_name: "preToolUse", tool_name: "Read", tool_input: "not json" },
+    { hook_event_name: "beforeReadFile", file_path: 7, content: { a: 1 } },
+    { hook_event_name: "beforeMCPExecution", tool_input: "{" },
+    { hook_event_name: "postToolUse", tool_output: { stdout: 1 } },
+    { hook_event_name: "beforeSubmitPrompt", prompt: 7 },
+    null,
+  ]) {
+    assert.doesNotThrow(() => handle(event, root, ENV), JSON.stringify(event));
+  }
+});
+
 test("the repository ignores the env files, so workspace searches skip them", () => {
   const repo = join(HERE, "..", "..");
   const files = [".env", ".env.local", "apps/backend/.env", "apps/frontend/.env.local"];
@@ -236,6 +362,16 @@ function runHook(event) {
   const out = execFileSync(process.execPath, [SCRIPT], { input: JSON.stringify(event), cwd: root, env: ENV, encoding: "utf8" });
   return { text: out, json: JSON.parse(out) };
 }
+
+test("the script finds the env files from Cursor's workspace root, whatever its own folder", () => {
+  const event = {
+    hook_event_name: "postToolUse", tool_name: "Shell", workspace_roots: ["/" + root.replace(/\\/g, "/")],
+    tool_output: JSON.stringify({ stdout: `x ${FAKE_KEY} y` }),
+  };
+  const out = execFileSync(process.execPath, [SCRIPT], { input: JSON.stringify(event), cwd: tmpdir(), env: { SystemRoot: process.env.SystemRoot ?? "" }, encoding: "utf8" });
+  assert.match(JSON.parse(out).additional_context, /SERVICE_API_KEY/);
+  assert.ok(!out.includes(FAKE_KEY));
+});
 
 test("the script answers each event in its schema, and never repeats a secret", () => {
   const cases = [
@@ -283,7 +419,7 @@ test("hooks.json registers the guard on every event it handles, with existing pa
   for (const event of ["beforeShellExecution", "preToolUse", "beforeReadFile", "beforeMCPExecution"]) {
     assert.equal(config.hooks[event][0].failClosed, true, `${event} refuses when the guard cannot run`);
   }
-  assert.equal(config.hooks.preToolUse[0].matcher, "Read|Grep");
+  assert.equal(config.hooks.preToolUse[0].matcher, "Read|Grep|MCP:");
   assert.equal(config.hooks.postToolUse[0].matcher, "Shell|Read|Grep");
   assert.equal(handle({ hook_event_name: "somethingElse" }).permission, undefined);
 });
