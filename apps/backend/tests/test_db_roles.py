@@ -98,15 +98,29 @@ def _string_literals(source):
             literals.append(text)
             parts.clear()
 
-    for i, tok in enumerate(tokens):
+    fields = 0  # brace depth inside an f-string's replacement fields
+    for tok in tokens:
+        # Python 3.12 and later split an f-string into FSTRING_START, its text (FSTRING_MIDDLE),
+        # the tokens of each {field}, and FSTRING_END; keep the text and one {} per field, as
+        # Python 3.11's single STRING token reads once its prefix and quotes are removed.
         kind = tokenize.tok_name[tok.type]
-        if kind.startswith("FSTRING"):  # Python 3.12 and later split f-strings
-            depth += kind == "FSTRING_START"
-            depth -= kind == "FSTRING_END"
-            parts.append(tok.string)
+        if kind == "FSTRING_START":
+            depth += 1
+            continue
+        if kind == "FSTRING_END":
+            depth -= 1
+            continue
+        if kind == "FSTRING_MIDDLE":
+            if not fields:
+                parts.append(tok.string)
             continue
         if depth:
-            parts.append(tok.string)
+            if tok.type == tokenize.OP and tok.string == "{":
+                if not fields:
+                    parts.append("{}")
+                fields += 1
+            elif tok.type == tokenize.OP and tok.string == "}":
+                fields -= 1
             continue
         if tok.type == tokenize.STRING:
             parts.append(re.sub(r"^[A-Za-z]*('''|\"\"\"|'|\")|('''|\"\"\"|'|\")$", "", tok.string))
@@ -262,6 +276,45 @@ def test_a_table_name_from_a_value_cannot_slip_through(source):
 def test_imports_comments_and_prose_are_not_sql(source):
     assert not _source_needs(source)
     assert not _source_has_variable_table(source)
+
+
+@pytest.mark.parametrize("source, text", [
+    ('cur.execute(f"update {table} set x = 1")', "update {} set x = 1"),
+    ('q = rf"""\n    SELECT 1 FROM {t!r:>10} WHERE a = %s\n"""',
+     "\n    SELECT 1 FROM {} WHERE a = %s\n"),
+    ('q = (f"SELECT {cols} "\n     "FROM jobs")', "SELECT {} FROM jobs"),
+    ("q = F'DELETE FROM {name.lower()} WHERE x = 1'", "DELETE FROM {} WHERE x = 1"),
+])
+def test_f_strings_read_the_same_on_every_python(source, text):
+    # One STRING token on Python 3.11; FSTRING_START, _MIDDLE and _END on 3.12 and later.
+    [literal] = _string_literals(source)
+    assert re.sub(r"\{[^{}]*\}", "{}", literal) == text
+
+
+# MERGE and COPY name tables in ways the scan does not read; none are used today.
+_UNREAD_SQL = re.compile(
+    r"(?:^|;)\s*(?:MERGE\s+INTO\b|COPY\s+[\w.\"]+(?:\s*\([^)]*\))?\s+(?:FROM|TO)\b)", re.I)
+_COPY_CALL = re.compile(r"\.copy_(?:from|to|expert)\s*\(")
+
+
+@pytest.mark.parametrize("source", [
+    'cur.execute("MERGE INTO jobs j USING sources s ON j.source_id = s.id "\n'
+     '            "WHEN MATCHED THEN DELETE")',
+    'cur.execute("COPY jobs (id, title) FROM STDIN")',
+    'cur.execute("copy raw_pages to stdout")',
+    'cur.copy_expert("COPY jobs TO STDOUT", f)',
+    'cur.copy_from(f, "jobs")',
+])
+def test_merge_and_copy_are_recognised(source):
+    assert any(_UNREAD_SQL.search(t) for t in _string_literals(source)) or _COPY_CALL.search(source)
+
+
+def test_sql_that_the_scan_cannot_read_is_not_in_the_code():
+    for path in CODE:
+        source = path.read_text(encoding="utf-8")
+        assert not [t for t in _string_literals(source) if _UNREAD_SQL.search(t)], path
+        assert not _COPY_CALL.search(source), path
+    assert not any(_UNREAD_SQL.search(t) for t in _string_literals('x = "Copy the link to share"'))
 
 
 def test_a_row_lock_at_the_end_of_a_literal_is_not_a_variable_table():
