@@ -87,6 +87,10 @@ jobs:
           tests/signed_in.py
           tests/test_http_contract.py
           tests/test_db_status_check.py
+          tests/test_db_roles.py
+          tests/role_grants.py
+          scripts/db_readonly_check.py
+          scripts/db_role_password.py
           app/log_safety.py
           app/errors.py
           app/db_health.py
@@ -97,21 +101,51 @@ jobs:
           app/admin_auth_routes.py
 
       - name: Executed backend tests
-        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_reliability_persist.py tests/test_outbound_fetch.py tests/test_outbound_policy_gaps.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py tests/test_link_admission.py tests/test_detail_reader.py tests/test_site_reader_fallback.py tests/test_unicef_saved_excerpts.py tests/test_geocoder_backoff.py tests/test_production_mode.py tests/test_data_quality_listing.py tests/test_public_surface.py tests/test_deadline_parsing.py tests/test_log_safety.py tests/test_stored_crawl_messages.py tests/test_public_entries_logging.py tests/test_public_error_leaks.py tests/test_error_text_guard.py tests/test_admin_sources_errors.py tests/test_admin_sources_contract.py tests/test_admin_crawler_errors.py tests/test_admin_crawler_contract.py tests/test_admin_jobs_errors.py tests/test_admin_search_pipeline_errors.py tests/test_link_validator_policy.py tests/test_admin_session.py tests/test_admin_gate.py tests/test_http_contract.py tests/test_db_status_check.py -q
+        run: python -m pytest tests/test_gate1_safety.py tests/test_gate3_contracts.py tests/test_gate4_persist.py tests/test_gate5_crawl_run.py tests/test_reliability_persist.py tests/test_outbound_fetch.py tests/test_outbound_policy_gaps.py tests/test_gate6_lifecycle.py tests/test_gate7_search.py tests/test_gate8_organisations.py tests/test_gate9_admin.py tests/test_gate10_legacy.py tests/test_link_admission.py tests/test_detail_reader.py tests/test_site_reader_fallback.py tests/test_unicef_saved_excerpts.py tests/test_geocoder_backoff.py tests/test_production_mode.py tests/test_data_quality_listing.py tests/test_public_surface.py tests/test_deadline_parsing.py tests/test_log_safety.py tests/test_stored_crawl_messages.py tests/test_public_entries_logging.py tests/test_public_error_leaks.py tests/test_error_text_guard.py tests/test_admin_sources_errors.py tests/test_admin_sources_contract.py tests/test_admin_crawler_errors.py tests/test_admin_crawler_contract.py tests/test_admin_jobs_errors.py tests/test_admin_search_pipeline_errors.py tests/test_link_validator_policy.py tests/test_admin_session.py tests/test_admin_gate.py tests/test_http_contract.py tests/test_db_status_check.py tests/test_db_roles.py -q
 
       # Its own process, with no production database variable, against the service above.
+      # Security plan, stage 6: the role files run as they will in Supabase (01 and 02 twice,
+      # 02 on an empty copy of production's 38 tables, 03 read), then the crawl runs as
+      # aidjobs_app with only the grants in 02_grants.sql, so a missing grant fails here, and
+      # 04 removes the roles. CI's database trusts local connections, so no password is set or
+      # checked here; the SCRAM sign-in is rehearsed locally (security plan, stage 6 record).
       # A skipped test fails the step.
-      - name: Crawl ownership tests (PostgreSQL)
+      - name: Database roles and crawl ownership tests (PostgreSQL)
         shell: bash
         env:
-          TEST_DATABASE_URL: postgresql://postgres@localhost:5432/aidjobs_test
+          SERVER_URL: postgresql://postgres@localhost:5432
+          TEST_DATABASE_URL: postgresql://aidjobs_app@localhost:5432/aidjobs_test
+          TEST_ADMIN_DATABASE_URL: postgresql://postgres@localhost:5432/aidjobs_test
+          TEST_EXPECTED_ROLE: aidjobs_app
         run: |
           unset SUPABASE_DB_URL DATABASE_URL
+          run_sql() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
+          roles=../../infra/roles
+          run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/01_create_roles.sql"
+          run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/01_create_roles.sql"
+          run_sql "$TEST_ADMIN_DATABASE_URL" -c "CREATE DATABASE aidjobs_roles_test"
+          run_sql "$SERVER_URL/aidjobs_roles_test" -f tests/sql/role_stub_tables.sql
+          run_sql "$SERVER_URL/aidjobs_roles_test" -f "$roles/02_grants.sql"
+          run_sql "$SERVER_URL/aidjobs_roles_test" -f "$roles/02_grants.sql"
+          run_sql "$SERVER_URL/aidjobs_roles_test" -A -t -F '|' -f "$roles/03_verify.sql" | tee roles-verify.txt
+          for line in \
+            'table|jobs|aidjobs_app=rawd aidjobs_readonly=r' \
+            'table|crawl_locks|aidjobs_app=rawd aidjobs_readonly=r' \
+            'table|users|aidjobs_app=- aidjobs_readonly=-' \
+            'table|takedowns|aidjobs_app=- aidjobs_readonly=r' \
+            'schema|aidjobs_app|public usage=t create=f, database create=f temporary=t'; do
+            grep -qxF "$line" roles-verify.txt || { echo "03_verify.sql lacks: $line"; exit 1; }
+          done
+          test "$(grep -c '^table|' roles-verify.txt)" -eq 38
+          run_sql "$TEST_ADMIN_DATABASE_URL" -c "DROP DATABASE aidjobs_roles_test"
           python -m pytest tests/test_crawl_ownership.py -q -rs -p no:cacheprovider | tee ownership-tests.log
           if grep -qE "[0-9]+ skipped" ownership-tests.log; then
             echo "Crawl ownership tests must not be skipped"
             exit 1
           fi
+          run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/04_rollback.sql"
+          run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/04_rollback.sql"
+          test "$(psql -X -A -t "$TEST_ADMIN_DATABASE_URL" -c "SELECT count(*) FROM pg_roles WHERE rolname LIKE 'aidjobs\_%'")" -eq 0
 
       - name: Audit gate script tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

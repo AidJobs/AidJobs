@@ -13,6 +13,11 @@ hostaddr, service or second host); and Python sockets may connect only to loopba
 libpq's own sockets are not intercepted, which is why the connection check exists.
 Concurrent steps run on their own connections and threads; events and barriers force
 each interleaving.
+
+With TEST_ADMIN_DATABASE_URL as well (CI, security plan stage 6), the schema and the test's
+own rows go through that login, and the code under test connects through TEST_DATABASE_URL
+as aidjobs_app with only the grants in infra/roles/02_grants.sql, so a missing grant fails
+here. TEST_EXPECTED_ROLE names the role the code must be connected as.
 """
 import asyncio
 import os
@@ -59,9 +64,14 @@ for _name in _PRODUCTION_VARIABLES:
     if os.getenv(_name):
         raise RuntimeError(f"{_name} must be unset when the ownership tests run")
 _TARGET = check_test_url(TEST_URL)
+ADMIN_URL = os.getenv("TEST_ADMIN_DATABASE_URL", "") or TEST_URL
+if check_test_url(ADMIN_URL) != _TARGET:
+    raise RuntimeError("TEST_ADMIN_DATABASE_URL must name the same local test database")
+EXPECTED_ROLE = os.getenv("TEST_EXPECTED_ROLE", "")
 
 import dotenv  # noqa: E402
 import psycopg2  # noqa: E402
+import psycopg2.errors  # noqa: E402
 import psycopg2.extensions  # noqa: E402
 
 _real_connect = psycopg2.connect
@@ -127,6 +137,7 @@ from orchestrator import (  # noqa: E402
     CrawlerOrchestrator,
     crawl_time_settings,
 )
+from tests.role_grants import statements_for_tables  # noqa: E402
 
 SCHEMA = Path(__file__).parent / "sql" / "crawl_schema.sql"
 STEP_SECONDS = 20
@@ -137,8 +148,8 @@ STEP_SECONDS = 20
 # ---------------------------------------------------------------------------
 
 
-def _sql(query, params=None):
-    conn = psycopg2.connect(TEST_URL)
+def _sql(query, params=None, url=None):
+    conn = psycopg2.connect(url or ADMIN_URL)
     conn.autocommit = True
     try:
         with conn.cursor() as cur:
@@ -151,6 +162,14 @@ def _sql(query, params=None):
 @pytest.fixture(scope="module")
 def schema():
     _sql(SCHEMA.read_text(encoding="utf-8"))
+    if ADMIN_URL != TEST_URL:
+        # Production's grants, for the tables this database has; and, as in production since
+        # 24 October 2026, no EXECUTE on the search trigger's function for PUBLIC.
+        tables = _sql("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+        existing = {r[0] for r in tables}
+        for statement in statements_for_tables(existing):
+            _sql(statement)
+        _sql("REVOKE EXECUTE ON FUNCTION public.jobs_tsv_update() FROM PUBLIC")
     yield
 
 
@@ -366,6 +385,21 @@ def test_the_guard_refuses_anything_but_the_local_test_database(db):
         assert not os.getenv(name)
     assert "main" not in sys.modules
     assert _sql("SHOW server_version_num")[0][0] >= "170000"
+
+
+def test_the_crawl_runs_as_the_application_role_without_schema_changes(db):
+    if not EXPECTED_ROLE:
+        pytest.skip("TEST_EXPECTED_ROLE is not set")
+    assert _sql("SELECT current_user", url=TEST_URL)[0][0] == EXPECTED_ROLE
+    assert _sql("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user",
+                url=TEST_URL)[0] == (False, True)
+    for statement in ("CREATE TABLE public.not_allowed ()", "TRUNCATE jobs",
+                      "ALTER TABLE jobs ADD COLUMN not_allowed text",
+                      "DROP TRIGGER jobs_tsv_trigger ON jobs"):
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            _sql(statement, url=TEST_URL)
+    assert not _sql("SELECT has_function_privilege('public.jobs_tsv_update()', 'EXECUTE')",
+                    url=TEST_URL)[0][0]
 
 
 def test_the_schema_has_every_column_the_crawl_writes(db):
@@ -949,7 +983,7 @@ def test_a_save_deadlocked_with_an_admin_soft_delete_loses_only_that_job(db, mon
     }
     first_id, second_id = ids["Programme Officer 1"], ids["Programme Officer 2"]
 
-    admin = psycopg2.connect(TEST_URL)
+    admin = psycopg2.connect(ADMIN_URL)  # deadlock_timeout is a superuser's setting
     admin_cur = admin.cursor()
     # The save's deadlock check fires first, so the save is the transaction PostgreSQL ends.
     admin_cur.execute("SET deadlock_timeout = '10s'")
