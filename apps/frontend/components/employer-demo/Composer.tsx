@@ -11,21 +11,21 @@ export type Readiness = { done: number; total: number; missing: string[] };
 function SendButton({ disabled, onClick, readiness }: { disabled: boolean; onClick: () => void; readiness?: Readiness }) {
   const noteId = useId();
   const button = (
-    <button type="button" className="aj-ink-btn ej-send" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }} onClick={onClick} disabled={disabled} aria-label="Send" aria-describedby={readiness ? noteId : undefined}>
-      <ArrowUp size={16} strokeWidth={2.2} />
+    <button type="button" className="ej-send" onClick={onClick} disabled={disabled} aria-label="Send" aria-describedby={readiness ? noteId : undefined}>
+      <ArrowUp size={15} strokeWidth={2.2} />
     </button>
   );
   if (!readiness) return <span className="ml-auto">{button}</span>;
-  const r = 20;
+  const r = 16.5;
   const length = 2 * Math.PI * r;
   const part = readiness.total ? readiness.done / readiness.total : 0;
   const label = readiness.missing.length ? `Still useful to add: ${readiness.missing.join(', ')}. You can send at any time.` : 'Role, place, closing date, and contract are all in.';
   return (
     <Tip label={label} className="ml-auto">
       <span className="ej-ring">
-        <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden>
-          <circle cx="22" cy="22" r={r} className="ej-ring-track" />
-          <circle cx="22" cy="22" r={r} className="ej-ring-fill" strokeDasharray={length} strokeDashoffset={length * (1 - part)} transform="rotate(-90 22 22)" />
+        <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden>
+          <circle cx="19" cy="19" r={r} className="ej-ring-track" />
+          <circle cx="19" cy="19" r={r} className="ej-ring-fill" strokeDasharray={length} strokeDashoffset={length * (1 - part)} transform="rotate(-90 19 19)" />
         </svg>
         {button}
         <span id={noteId} className="sr-only">
@@ -75,6 +75,10 @@ const Composer = forwardRef<
   useLayoutEffect(() => {
     const ta = ref.current;
     if (!ta) return;
+    ta.style.height = 'auto';
+    const max = Math.round(window.innerHeight * (compact ? 0.4 : 0.5));
+    ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+    ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
     for (const el of [layer.current, ghost.current]) {
       if (!el) continue;
       el.style.height = `${ta.clientHeight}px`;

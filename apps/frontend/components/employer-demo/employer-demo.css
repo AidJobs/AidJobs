@@ -65,7 +65,6 @@
 
 .ej-composer:focus-within {
   border-color: var(--sage-5);
-  box-shadow: 0 0 0 3px var(--ej-ring-soft);
 }
 
 .aj-root .ej-composer textarea:focus-visible {
@@ -90,7 +89,6 @@
   display: block;
   width: 100%;
   min-height: 76px;
-  max-height: 220px;
   resize: none;
   border: none;
   outline: none;
@@ -647,9 +645,9 @@
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  gap: 4px;
-  width: 72px;
-  padding: 10px 6px;
+  gap: 6px;
+  width: 44px;
+  padding: 10px 4px;
   border-left: 1px solid var(--hair);
   background: var(--surface);
 }
@@ -658,9 +656,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  padding: 8px 2px;
+  padding: 8px 0;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -715,8 +713,8 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
 }
 
 .ej-ring svg {
@@ -788,9 +786,9 @@
 }
 
 /* Phase 4: recognised facts underlined over the text, the drop target, the fact slot, and the paste offer. */
-.ej-composer textarea,
-.ej-ghost,
-.ej-marks {
+.ej-composer[data-size='large'] textarea,
+.ej-composer[data-size='large'] .ej-ghost,
+.ej-composer[data-size='large'] .ej-marks {
   scrollbar-gutter: stable;
 }
 
@@ -830,4 +828,107 @@
   background: var(--sage-1);
   color: var(--text);
   font-size: 13px;
+}
+
+/* Rail labels run vertically so the closed rail stays narrow; the label stays at full strength. */
+.ej-rail-btn > span:last-child {
+  writing-mode: vertical-rl;
+}
+
+.ej-rail-badge.static {
+  position: static;
+  margin-left: 4px;
+}
+
+/* The panel's own switch between the JD outline and the chat, replacing the rail while a panel is open. */
+.ej-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+}
+
+.aj-root .ej-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.aj-root .ej-switch-btn[aria-pressed='true'] {
+  background: var(--sage-1);
+  color: var(--sage-8);
+}
+
+/* Light green instead of black for the main action and the selected menu item, which is easier on the eye. */
+.aj-root .ej-soft-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--sage-3);
+  border-radius: 999px;
+  background: var(--sage-1);
+  color: var(--sage-8);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.aj-root .ej-soft-btn:hover {
+  background: var(--sage-2);
+}
+
+.aj-root:has(.ej-app) .aj-nav[data-active='true'] {
+  background: var(--sage-1);
+  color: var(--sage-8);
+}
+
+.aj-root:has(.ej-app) .aj-nav[data-active='true'] .aj-count {
+  color: var(--sage-8);
+}
+
+/* A small, light send button that leaves the box to the text. */
+.aj-root .ej-send {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--sage-3);
+  border-radius: 999px;
+  background: var(--sage-1);
+  color: var(--sage-8);
+  cursor: pointer;
+}
+
+.aj-root .ej-send:hover:not(:disabled) {
+  background: var(--sage-2);
+}
+
+.aj-root .ej-send:disabled {
+  border-color: var(--hair);
+  background: transparent;
+  color: var(--text-3);
+  cursor: default;
+}
+
+.ej-composer[data-size='compact'] textarea {
+  min-height: 40px;
+  padding-bottom: 6px;
+}
+
+.ej-composer[data-size='compact'] > div:last-child {
+  padding-bottom: 6px;
 }

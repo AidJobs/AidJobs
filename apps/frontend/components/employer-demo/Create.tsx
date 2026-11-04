@@ -174,14 +174,14 @@ export default function Create({ id }: { id?: string }) {
       )}
       {!reviewing && job.sections.length > 0 && job.status !== 'live' && (
         <Tip label={blocked ? 'Approval is required before publishing' : checks.length ? `To look at before publishing: ${checks.join('; ')}.` : 'Nothing to check. Choose Standard or Premium, then publish.'} side="bottom">
-          <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
+          <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
             {blocked ? 'Publish…' : 'Publish'}
             {checks.length > 0 && <span className="ej-count-badge">{checks.length}</span>}
           </button>
         </Tip>
       )}
       {job.status === 'live' && (
-        <button type="button" className="aj-ink-btn" onClick={() => go('jobs', job.id)}>
+        <button type="button" className="ej-soft-btn" onClick={() => go('jobs', job.id)}>
           Done
         </button>
       )}
@@ -313,28 +313,40 @@ export default function Create({ id }: { id?: string }) {
             }}
           />
           <aside className="flex min-h-0 min-w-[300px] flex-1 flex-col border-l aj-hair" style={{ background: 'var(--surface)' }} aria-label={showChat ? 'Chat with AidJobs' : 'JD outline'}>
-            <div className="flex shrink-0 items-center justify-end gap-1.5 px-3 pt-2.5">{actions}</div>
-            <div className="aj-faint shrink-0 px-4 pt-1 text-right" style={{ fontSize: 11 }}>
-              {statusLine(s, job)}
-            </div>
-            <div className="flex shrink-0 items-center gap-2 border-b px-4 pb-2 pt-2 aj-hair">
-              <h2 className="aj-title" style={{ margin: 0, fontSize: 14 }}>
-                {showChat ? 'Chat with AidJobs' : `JD outline · ${job.tags.length}`}
-              </h2>
+            <div className="flex shrink-0 items-center gap-1.5 px-3 pt-2.5">
+              <div className="ej-switch" role="group" aria-label="Show">
+                <button type="button" className="ej-switch-btn" aria-pressed={shown === 'outline'} onClick={() => setPanel('outline')}>
+                  <ListTree size={14} strokeWidth={1.8} /> JD outline · {job.tags.length}
+                </button>
+                {!reviewing && (
+                  <button type="button" className="ej-switch-btn" aria-pressed={shown === 'chat'} onClick={() => setPanel('chat')}>
+                    <MessagesSquare size={14} strokeWidth={1.8} /> Chat
+                    {waiting && shown !== 'chat' ? <span className="ej-rail-badge static">1</span> : null}
+                  </button>
+                )}
+              </div>
               <Tip label="Close this panel" side="bottom" className="ml-auto">
-                <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setPanel(null)} aria-label="Close this panel">
+                <button type="button" className="aj-icon-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel(null)} aria-label="Close this panel">
                   <X size={14} strokeWidth={1.8} />
                 </button>
               </Tip>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 pb-2 pt-2 aj-hair">
+              <span className="aj-faint min-w-0 flex-1 truncate" style={{ fontSize: 11 }}>
+                {statusLine(s, job)}
+              </span>
+              {actions}
             </div>
             <div className="min-h-0 flex-1">{showChat ? <ChatPanel job={job} s={s} autoFocus /> : <Structure job={job} s={s} bare />}</div>
           </aside>
         </>
       )}
+      {!shown && (
       <nav className="ej-rail" aria-label="Panels">
         <RailButton icon={<ListTree size={17} strokeWidth={1.8} />} label="JD outline" active={shown === 'outline'} onClick={() => toggle('outline')} />
         {!reviewing && <RailButton icon={<MessagesSquare size={17} strokeWidth={1.8} />} label="Chat" active={shown === 'chat'} badge={waiting} onClick={() => toggle('chat')} />}
       </nav>
+      )}
       {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
       {versionsOpen && <VersionsDialog job={job} onClose={() => setVersionsOpen(false)} />}
     </div>
