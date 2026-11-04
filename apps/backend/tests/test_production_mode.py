@@ -154,7 +154,22 @@ def test_public_db_status_hides_driver_errors(monkeypatch, env, caplog):
             assert marker not in caplog.text
 
 
-def test_db_status_log_masks_connection_strings(monkeypatch, caplog):
+def test_admin_db_status_logs_only_the_failure_type_in_production(monkeypatch, caplog):
+    monkeypatch.setenv("AIDJOBS_ENV", "production")
+    monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
+    monkeypatch.setattr(search.psycopg2, "connect", _failing_connect(DRIVER_ERROR))
+
+    with caplog.at_level("ERROR", logger=search.logger.name):
+        result = asyncio.run(_db_service().get_db_status())
+
+    assert result == {"ok": False, "error": "Database unavailable"}
+    assert "Database status check failed: OperationalError" in caplog.text
+    for marker in LEAK_MARKERS:
+        assert marker not in caplog.text
+
+
+def test_db_status_log_masks_connection_strings_in_development(monkeypatch, caplog):
+    monkeypatch.setenv("AIDJOBS_ENV", "dev")
     fake_password = "fake" + "-test-value"
     address = "postgresql" + "://user:" + fake_password + "@db.example.internal:5432/postgres"
     monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})

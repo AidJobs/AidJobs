@@ -27,6 +27,8 @@ DRIVER_ERROR = (
 )
 LEAK_MARKERS = ["pooler.db.example.internal", "203.0.113.7", "5432", "FATAL", "ECIRCUITBREAKER"]
 BREAKDOWN = [{"source_id": "s-1", "org_name": "Org", "job_count": 4}]
+KEEPALIVES = {"keepalives": 1, "keepalives_idle": 5, "keepalives_interval": 2,
+              "keepalives_count": 2, "tcp_user_timeout": 5000}
 
 
 class _Row:
@@ -119,11 +121,15 @@ async def _healthz_while(path, headers, started, release):
         return health, health_after, await slow
 
 
-def _slow_connect(monkeypatch, started, release, values=None):
+def _slow_connect(monkeypatch, started, release, values=None, conns=None):
     def connect(**kwargs):
         started.set()
         release.wait(3)
-        return _Conn(values)
+        conn = _Conn(values)
+        conn.kwargs = kwargs
+        if conns is not None:
+            conns.append(conn)
+        return conn
 
     monkeypatch.setattr(psycopg2, "connect", connect)
 
@@ -138,6 +144,60 @@ def test_the_public_answer_is_exactly_ok(check, monkeypatch):
         assert word not in response.text
     assert conns[0].kwargs["connect_timeout"] == 3
     assert conns[0].sql == ["SET LOCAL statement_timeout = 2000", "SELECT 1"]
+    assert {k: conns[0].kwargs.get(k) for k in KEEPALIVES} == KEEPALIVES
+
+
+def test_the_keepalive_options_are_ones_libpq_accepts():
+    dsn = " ".join(f"{name}={value}" for name, value in db_health.KEEPALIVES.items())
+    assert psycopg2.extensions.parse_dsn(dsn) == {k: str(v) for k, v in KEEPALIVES.items()}
+
+
+def test_the_public_answer_is_never_stored(check, monkeypatch, clock):
+    _recording_connect(monkeypatch, [])
+    client = TestClient(app)
+    assert client.get("/api/db/status").headers["cache-control"] == "no-store"
+
+    def refuse(**kwargs):
+        raise psycopg2.OperationalError("refused")
+
+    monkeypatch.setattr(psycopg2, "connect", refuse)
+    clock.now += 31
+    failed = client.get("/api/db/status")
+    assert failed.json() == UNAVAILABLE
+    assert failed.headers["cache-control"] == "no-store"
+
+
+def test_a_hung_worker_is_not_joined_by_another(check, monkeypatch, clock, caplog):
+    """A check stuck past its limit keeps its thread; later checks fail fast, not pile up."""
+    monkeypatch.setattr(db_health, "OVERALL_TIMEOUT_SECONDS", 0.2)
+    release = threading.Event()
+    calls = []
+
+    def hang():
+        calls.append(1)
+        release.wait(5)
+        return {"ok": True}
+
+    monkeypatch.setattr(db_health, "_select_one", hang)
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            answers = [await client.get("/api/db/status")]
+            for _ in range(3):
+                clock.now += 31
+                answers.append(await client.get("/api/db/status"))
+            release.set()
+            return answers
+
+    try:
+        with caplog.at_level("ERROR"):
+            answers = asyncio.run(scenario())
+    finally:
+        release.set()
+    assert [a.json() for a in answers] == [UNAVAILABLE] * 4
+    assert len(calls) == 1
+    assert "still running" in caplog.text
 
 
 def test_healthz_answers_while_a_slow_database_check_runs(check, monkeypatch):
@@ -243,7 +303,8 @@ def _admin_service():
 def test_the_admin_detail_needs_a_session_and_does_not_stall_the_server(check, monkeypatch):
     monkeypatch.setattr(main_module, "search_service", _admin_service())
     started, release = threading.Event(), threading.Event()
-    _slow_connect(monkeypatch, started, release, values=[7, 4, 2])
+    conns = []
+    _slow_connect(monkeypatch, started, release, values=[7, 4, 2], conns=conns)
 
     refused = TestClient(app).get("/api/admin/db/status")
     assert refused.status_code == 401
@@ -260,3 +321,8 @@ def test_the_admin_detail_needs_a_session_and_does_not_stall_the_server(check, m
         "row_counts": {"jobs": 7, "active_jobs": 4, "sources": 2},
         "source_breakdown": BREAKDOWN,
     }
+    (conn,) = conns
+    assert conn.kwargs["connect_timeout"] == 5
+    assert {k: conn.kwargs.get(k) for k in KEEPALIVES} == KEEPALIVES
+    assert conn.sql[0] == "SET LOCAL statement_timeout = 10000"
+    assert len(conn.sql) == 5

@@ -89,6 +89,19 @@ psycopg2.connect = lambda *args, **kwargs: _Conn()
 calls = [call("GET", "/api/db/status")]
 """
 
+# A database host name that must never reach a log line, and a driver that names it, as libpq does.
+PLANTED_HOST = "planted-db-host-7q.invalid"
+PLANTED_USER = "planted-user-7q"
+PLANTED_HOST_URL = ("postgresql://" + PLANTED_USER + ":" + FRAGMENT + "dz9k" + "@" + PLANTED_HOST
+                    + ":6543/postgres")
+HOST_REFUSED = """
+import psycopg2
+def refuse(*args, **kwargs):
+    raise psycopg2.OperationalError(
+        'connection to server at "%s" (203.0.113.9), port 6543 failed: Connection refused')
+psycopg2.connect = refuse
+""" % PLANTED_HOST
+
 _ENV_KEPT = ("PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE",
              "PYTHONPATH")
 
@@ -185,6 +198,30 @@ def test_the_public_database_status_names_nothing():
     for word in ("SOURCE-ID-7Q", "ORG-NAME-7Q", "row_counts", "source_breakdown"):
         assert word not in db_status["body"]
     _assert_request_ids(calls)
+
+
+def _assert_host_not_logged(logs):
+    for word in (PLANTED_HOST, "203.0.113.9", PLANTED_USER):
+        assert word not in logs, [line for line in logs.splitlines() if word in line][:5]
+
+
+def test_the_public_database_check_logs_no_host():
+    """Stage 7 review: neither the connection settings nor the driver's text name the host."""
+    calls, logs = _run(PLANTED_HOST_URL, HOST_REFUSED + 'calls = [call("GET", "/api/db/status")]')
+    assert json.loads(calls[0]["body"]) == {"ok": False, "error": "Database unavailable"}
+    assert "Database check failed: OperationalError" in logs
+    _assert_host_not_logged(logs)
+    _assert_no_leak(calls, logs)
+
+
+def test_the_admin_database_status_logs_no_host():
+    body = HOST_REFUSED + SIGN_IN_IN_PROCESS + 'calls = [call("GET", "/api/admin/db/status")]'
+    calls, logs = _run(PLANTED_HOST_URL, body)
+    assert calls[0]["status"] == 200
+    assert json.loads(calls[0]["body"]) == {"ok": False, "error": "Database unavailable"}
+    assert "Database status check failed: OperationalError" in logs
+    _assert_host_not_logged(logs)
+    _assert_no_leak(calls, logs)
 
 
 def test_search_reuses_the_request_id():

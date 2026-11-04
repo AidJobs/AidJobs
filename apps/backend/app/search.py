@@ -8,6 +8,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from app.db_config import db_config
+from app.db_health import KEEPALIVES, log_cause
 from app.log_safety import current_request_id, redact_exception
 from app.normalizer import Normalizer
 from app.analytics import analytics_tracker
@@ -1186,7 +1187,7 @@ class SearchService:
         except asyncio.TimeoutError:
             logger.error("Database status check timed out after %s s", ADMIN_STATUS_TIMEOUT_SECONDS)
         except Exception as e:
-            logger.error("Database status check failed: %s", _redacted(e))
+            logger.error("Database status check failed: %s", log_cause(e))
         return {
             "ok": False,
             "error": DB_UNAVAILABLE
@@ -1206,7 +1207,8 @@ class SearchService:
                     "error": DB_UNAVAILABLE
                 }
             
-            conn = psycopg2.connect(**conn_params, connect_timeout=ADMIN_STATUS_CONNECT_TIMEOUT_SECONDS)
+            conn = psycopg2.connect(**conn_params, connect_timeout=ADMIN_STATUS_CONNECT_TIMEOUT_SECONDS,
+                                    **KEEPALIVES)
             
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             # LOCAL: the setting ends with this transaction, so it never reaches a pooled session.

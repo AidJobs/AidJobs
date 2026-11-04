@@ -233,8 +233,9 @@ async def search_status():
 
 
 @app.get("/api/db/status")
-async def db_status():
+async def db_status(response: Response):
     """Whether the database answers: {"ok": true} or a fixed failure (public; stage 7)."""
+    response.headers["Cache-Control"] = "no-store"
     try:
         return await db_check.status()
     except Exception as e:
