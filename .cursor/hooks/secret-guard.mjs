@@ -91,7 +91,6 @@ const PRESENCE_ONLY = [
   /\b(bool|len)\s*\(\s*os\.environ\s*\[[^\]]{0,200}\]\s*\)/g,
 ];
 const EXCLUDE_OPTION = /(\/xf|-exclude|--exclude(?:=|\s))\s*("[^"]*"|'[^']*'|[^\s;|]+(\s+[^\s/;|-][^\s;|]*)*)/gi;
-const PATTERN_OPTION = /-pattern\s+("[^"]*"|'[^']*'|\S+)/gi;
 // An environment listing that ends in a count or in names only (decided per statement).
 const NAMES_ONLY_LISTING = /(get-childitem|gci|dir|ls)\s+env:[^;\n]{0,2000}?(\)\s*\.(count|name|key)\b|measure-object|-expandproperty\s+(name|key)\b|select-object\s+(-property\s+)?(name|key)\b)/i;
 const SECRET_IN_TEXT = /(KEY|SECRET|PASSWORD|TOKEN|DB_URL|DATABASE_URL|DSN)/i;
@@ -122,21 +121,45 @@ function copySources(segment, word) {
   return " " + [...named, ...positional].join(" ");
 }
 
+const VALUE_OPTIONS = /^(-g|--glob|-t|--type|-T|--type-not|-A|-B|-C|-m|--max-count|-(literal)?path|-encoding|-context)$/i;
+
+// A search command without its search pattern, so that `rg ".env" docs` is not taken as a read.
+function withoutPattern(seg) {
+  const parts = tokens(seg);
+  const kept = [parts[0] ?? ""];
+  let dropped = false;
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    if (/^(-pattern|-e|--regexp)$/i.test(part)) { i++; dropped = true; continue; }
+    if (/^--regexp=/i.test(part)) { dropped = true; continue; }
+    if (VALUE_OPTIONS.test(part)) { kept.push(part, parts[++i] ?? ""); continue; }
+    if (!dropped && !/^[-/]/.test(part)) { dropped = true; continue; }
+    kept.push(part);
+  }
+  return " " + kept.join(" ");
+}
+
+// The parts of a command a shell runs: without quoted text, except "$(...)" inside double quotes.
+function codeOutsideQuotes(seg) {
+  return seg.replace(/'[^']*'/g, " ").replace(/"([^"]*)"/g, (_, inner) => ` ${(inner.match(/\$\([^)]*\)?/g) || []).join(" ")} `);
+}
+
 function readsFile(seg, ctx, mentionsFile) {
   const { word, piped } = ctx;
   if (COPIERS.has(word)) {
     if (mentionsFile(copySources(seg, word))) return true;
   } else if (FILTERS.has(word)) {
     const hasPath = /\s-(literal)?path\b/i.test(seg);
-    if ((!piped || hasPath) && mentionsFile(seg.replace(PATTERN_OPTION, " "))) return true;
+    if ((!piped || hasPath) && mentionsFile(withoutPattern(seg))) return true;
   } else if (READERS.has(word) && mentionsFile(seg)) {
     return true;
   }
-  for (const m of seg.matchAll(/(?:\$?\(|\{)\s*([\w-]+)/g)) {
+  for (const m of codeOutsideQuotes(seg).matchAll(/(?:\$?\(|\{)\s*([\w-]+)/g)) {
     if (READERS.has(m[1].toLowerCase()) && !COPIERS.has(m[1].toLowerCase()) && mentionsFile(seg)) return true;
   }
   if (/\[(system\.)?io\.file\]::(readall|open|copy)/i.test(seg) && mentionsFile(seg)) return true;
-  if (word === "git" && /\bgit\s+(show|diff|log|blame|cat-file|grep)\b/i.test(seg) && mentionsFile(seg)) return true;
+  const git = word === "git" && seg.match(/^git\s+(?:-\S+(?:\s+[^\s-]\S*)?\s+)*(show|diff|log|blame|cat-file|grep)\b(.*)$/i);
+  if (git && mentionsFile(git[1].toLowerCase() === "grep" ? withoutPattern(`grep${git[2]}`) : seg)) return true;
   // code that reads the file and prints
   const opens = /(\bopen\s*\(|readFileSync|readFile\s*\(|read_text\s*\(|dotenv_values\s*\((?![^)]{0,200}\)\s*\.\s*keys))/.test(seg);
   const prints = /(print\s*\((?!\s*(len|bool)\s*\()|console\.\w+\s*\((?!\s*Boolean\s*\()|process\.stdout|sys\.stdout|\bnode(\.exe)?\s+(-p|--print)\b)/.test(seg);
@@ -174,6 +197,9 @@ const SHELL_RULES = [
     if (item && isSecretName(item[4])) return true;
     if (!variableNames(seg).some(isSecretName)) return false;
     if (PRINTERS.has(word)) return true;
+    // a double-quoted string on its own is printed, its variables filled in
+    const quoted = seg.match(/^\s*\(?\s*"([^"]*)"\s*\)?\s*$/);
+    if (quoted && variableNames(quoted[1]).some(isSecretName)) return true;
     return /^["'(\s]*(\$\{?env:\w+\}?|\$\{?[A-Z_][A-Z0-9_]*\}?|%\w+%|\[(system\.)?environment\]::getenvironmentvariable\s*\([^)]{0,200}\))["')\s]*$/i.test(seg);
   }],
   ["code that prints the environment", (raw) => {
@@ -224,7 +250,8 @@ function nestedCommands(text) {
 export function checkShell(command, depth = 0, cmd = false) {
   const text = String(command ?? "");
   for (const statement of text.split(/\|\||&&|[;&\n]/)) {
-    const namesOnly = NAMES_ONLY_LISTING.test(statement) && !/\bvalue\b/i.test(statement);
+    const namesOnly = NAMES_ONLY_LISTING.test(statement) && !/\bvalue\b/i.test(statement)
+      && !/\b(tee-object|tee|out-host|out-file|out-string|format-\w+)\b/i.test(statement);
     const parts = statement.split("|");
     for (let i = 0; i < parts.length; i++) {
       const seg = parts[i].trim();
@@ -235,11 +262,11 @@ export function checkShell(command, depth = 0, cmd = false) {
       }
     }
   }
-  if (depth < 3) {
-    for (const inner of nestedCommands(text)) {
-      const rule = checkShell(inner.text, depth + 1, inner.cmd);
-      if (rule) return rule;
-    }
+  const nested = nestedCommands(text);
+  if (nested.length && depth >= 3) return "a shell nested too deeply to check";
+  for (const inner of nested) {
+    const rule = checkShell(inner.text, depth + 1, inner.cmd);
+    if (rule) return rule;
   }
   return null;
 }

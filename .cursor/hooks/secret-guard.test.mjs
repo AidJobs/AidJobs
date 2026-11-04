@@ -130,6 +130,17 @@ const BLOCKED = [
   ["cat ~/.git-credentials", "reading a credentials file"],
   ["Get-Content ~/.netrc", "reading a credentials file"],
   ["type %APPDATA%\\postgresql\\.pgpass", "reading a credentials file"],
+  // from the re-review of 4 November 2026
+  ["\"db: $env:SUPABASE_DB_URL\"", "printing a credential variable"],
+  ["(\"url=${env:DATABASE_URL}\")", "printing a credential variable"],
+  ["git commit -m \"x $(Get-Content .env)\"", "reading an .env file"],
+  [`${"cmd /c ".repeat(5)}type .env`, "a shell nested too deeply to check"],
+  ["gci env: | Tee-Object x.txt | Select-Object Name", "dumping the environment"],
+  ["gci env: | Out-Host | Select-Object Name", "dumping the environment"],
+  ["git -C apps/backend show HEAD:.env", "reading an .env file"],
+  ["git grep -n URL -- apps/backend/.env", "reading an .env file"],
+  ["rg -n URL apps/backend/.env", "reading an .env file"],
+  ["Select-String URL -Path apps\\backend\\.env", "reading an .env file"],
 ];
 
 const ALLOWED = [
@@ -203,6 +214,19 @@ const ALLOWED = [
   "cmd /c npm run build",
   "pwsh -c 'git status'",
   "bash -c 'echo $HOME'",
+  // from the re-review of 4 November 2026
+  "git commit -m \"docs (type of .env check)\"",
+  "git commit -m \"guard (code that reads .env)\"",
+  "gh pr create --title \"stage 5 (head of .env rules)\" --body-file body.md",
+  "git commit -m \"Refuses reads of .env {cat, type}\"",
+  "Write-Host \"(more) .env\"",
+  "'db: $env:SUPABASE_DB_URL'",
+  "\"RENDER_API_KEY present: $([bool]$env:RENDER_API_KEY)\"",
+  "rg -n \".env\" docs",
+  "grep -rn \".env\" docs/",
+  "git grep -n \".env\" -- docs",
+  "findstr /s /i \".env\" *.md",
+  "cmd /c cmd /c npm test",
 ];
 
 test("still blocked after the replay fixes", () => {
