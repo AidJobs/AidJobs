@@ -98,13 +98,14 @@ OSCR_AID_TEXT = re.compile(
 EU_CATEGORY = re.compile(r"non-governmental organisations", re.IGNORECASE)
 EU_INTERESTS = re.compile(r"development|humanitarian aid", re.IGNORECASE)
 EXCLUDED_NAME = re.compile(
-    r"\b(hospitals?|h[oô]pital|universit(?:y|ies|é|e|à|ät|eit|at)|universidad(?:es)?"
-    r"|colleges?|coll[eè]ge"
-    r"|colegio|hochschule|[ée]cole|polytechnique|schools?|health sciences|health system)\b",
+    r"\b(hospitals?|hospitales?|h[oô]pita(?:l|ux)|krankenh[aä]us(?:er)?|ospedal[ei]"
+    r"|ziekenhuis(?:en)?|universit(?:y|ies|[ée]s?|à|ät(?:en)?|eit(?:en)?|at)|universidad(?:es)?"
+    r"|coll[eè]ges?|colegios?|hochschulen?|[ée]coles?|polytechnique|schools?"
+    r"|health sciences|health system)\b",
     re.IGNORECASE)
 # Aid organisations whose names contain one of those words; each checked by hand.
 KEPT_DESPITE_NAME = re.compile(
-    r"world university service|united world schools|hospital appeal"
+    r"world university service|united world schools|haiti hospital appeal"
     r"|promoting equality in african schools|baylor college of medicine children",
     re.IGNORECASE)
 

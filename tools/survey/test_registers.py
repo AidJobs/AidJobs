@@ -46,8 +46,12 @@ def test_the_name_filter_drops_hospitals_universities_and_schools_in_several_lan
                  "Sofia American Schools Inc", "Université de Montréal", "Collège Jean-de-Brébeuf",
                  "Universidad del Valle de Guatemala", "Polytechnique Montréal",
                  "Hamilton Health Sciences Corporation", "Sinai Health System",
-                 "HEC Montréal (École des hautes études commerciales)", "Hochschule Bremen"):
+                 "HEC Montréal (École des hautes études commerciales)", "Hochschule Bremen",
+                 "Vereniging Universiteiten van Nederland", "Fédération des écoles",
+                 "Rectores de universidades", "Hôpitaux de Paris", "Krankenhaus Hamburg",
+                 "Ospedale San Raffaele", "Ziekenhuis Amsterdam", "Colegios Mayores"):
         assert _dropped(name), name
+    assert _dropped("Bansang Hospital Appeal")
 
 
 def test_aid_organisations_are_kept_whatever_their_names():
