@@ -5,7 +5,9 @@
 --
 -- Safe to run again: an existing role is brought back to these attributes and settings.
 -- Supabase's postgres is not a superuser, and PostgreSQL 16 and later refuse SUPERUSER or
--- NOSUPERUSER in ALTER ROLE from a non-superuser, so NOSUPERUSER appears only in CREATE ROLE.
+-- NOSUPERUSER in ALTER ROLE from a non-superuser, so NOSUPERUSER appears only in CREATE ROLE;
+-- NOREPLICATION too, since in ALTER ROLE it needs the REPLICATION attribute, which Supabase's
+-- postgres holds today but need not keep.
 --
 -- aidjobs_app: the backend's login. Reads and writes only the tables in 02_grants.sql; no
 -- schema changes. BYPASSRLS, as postgres has today: Row-Level Security here closes the Data
@@ -31,13 +33,11 @@ BEGIN
 END
 $$;
 
-ALTER ROLE aidjobs_app WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION BYPASSRLS
-  CONNECTION LIMIT 15;
+ALTER ROLE aidjobs_app WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT BYPASSRLS CONNECTION LIMIT 15;
 ALTER ROLE aidjobs_app SET statement_timeout = '60s';
 ALTER ROLE aidjobs_app SET idle_in_transaction_session_timeout = '5min';
 
-ALTER ROLE aidjobs_readonly WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION
-  BYPASSRLS CONNECTION LIMIT 2;
+ALTER ROLE aidjobs_readonly WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT BYPASSRLS CONNECTION LIMIT 2;
 ALTER ROLE aidjobs_readonly SET default_transaction_read_only = on;
 ALTER ROLE aidjobs_readonly SET statement_timeout = '15s';
 ALTER ROLE aidjobs_readonly SET idle_in_transaction_session_timeout = '30s';

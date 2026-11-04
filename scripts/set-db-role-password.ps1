@@ -13,7 +13,9 @@ the statement that sets it in Supabase. Prints nothing secret. Run it in your ow
    into Render's SUPABASE_DB_URL, then removed (Remove-Secret AIDJOBS_APP_DB_URL).
 4. Puts on the clipboard the ALTER ROLE statement with the password's SCRAM-SHA-256 verifier
    (apps/backend/scripts/db_role_password.py), for Supabase's SQL editor. The plain password
-   never goes there.
+   never goes there. After you press Enter, or if the script is stopped, the clipboard is
+   cleared. It refuses while Windows' clipboard history (Win+V) or cloud clipboard is on: a
+   verifier is not the password, but a kept copy could be tested against guesses.
 
 -UseStoredPassword makes the statement again from the password already in the vault, if the
 SQL editor step has to be repeated, without making a new one.
@@ -27,11 +29,17 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'clipboard-guard.ps1')
 $secretName = if ($Role -eq 'aidjobs_readonly') { 'AIDJOBS_READONLY_DB_URL' } else { 'AIDJOBS_APP_DB_URL' }
 $python = Join-Path $repo 'apps\backend\.venv311\Scripts\python.exe'
 if (-not (Test-Path $python)) { $python = 'python' }
 $helper = Join-Path $repo 'apps\backend\scripts\db_role_password.py'
 
+$reasons = @(Test-ClipboardKeepsCopies)
+if ($reasons.Count) {
+    Write-Host "refused: $($reasons -join '; and '). Turn it off, then run this again. Nothing was made or stored."
+    exit 2
+}
 if (-not (Get-Command Set-Secret -ErrorAction SilentlyContinue)) {
     Write-Host "Set-Secret is not available: install Microsoft.PowerShell.SecretManagement and Microsoft.PowerShell.SecretStore (README, 'Secrets on this machine')."
     exit 2
@@ -79,6 +87,13 @@ if ($code -ne 0 -or -not $statement) {
     Write-Host "The statement could not be made (exit $code)."
     exit 1
 }
-Set-Clipboard -Value $statement
-$statement = $null
-Write-Host "The ALTER ROLE statement for $Role is on the clipboard. Paste it into Supabase's SQL editor, run it, then copy something else to clear the clipboard."
+try {
+    Set-Clipboard -Value $statement
+    $statement = $null
+    Write-Host "The ALTER ROLE statement for $Role is on the clipboard. Paste it into Supabase's SQL editor, run it, then come back and press Enter."
+    $null = Read-Host 'Press Enter once it has run'
+} finally {
+    $statement = $null
+    Clear-SensitiveClipboard
+    Write-Host 'The clipboard is cleared.'
+}

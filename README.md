@@ -59,6 +59,7 @@ With `-Authentication None` the vault is encrypted for your Windows account and 
 - The read-only login: `& .\scripts\set-db-role-password.ps1 -Role aidjobs_readonly` (security plan, stage 6, step 3). It stores the connection string and puts the statement for Supabase's SQL editor on the clipboard; nothing secret is shown.
 - The preview key: `Set-Secret -Name VERCEL_AUTOMATION_BYPASS_SECRET` (it asks for the value without showing it), then remove it from your environment: `[Environment]::SetEnvironmentVariable('VERCEL_AUTOMATION_BYPASS_SECRET', $null, 'User')`.
 - To use them, from a PowerShell prompt: `& .\scripts\with-readonly-db.ps1 -- <command>` and `& .\scripts\with-secret.ps1 -Name VERCEL_AUTOMATION_BYPASS_SECRET -- <command>`. The read-only check: `& .\scripts\with-readonly-db.ps1 -- apps\backend\.venv311\Scripts\python.exe apps\backend\scripts\db_readonly_check.py`.
+- To move a stored value into a dashboard (stage 6, step 5: the application login into Render), never displaying it: `& .\scripts\copy-secret-to-clipboard.ps1 AIDJOBS_APP_DB_URL`. It refuses while Windows' clipboard history (Win+V) or cloud clipboard is on, waits for Enter after you paste, then clears the clipboard.
 - To see what is stored, by name only: `Get-SecretInfo | Select-Object Name`.
 
 ## Backend dependencies

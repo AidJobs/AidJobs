@@ -13,6 +13,7 @@ import hmac
 import importlib.util
 import io
 import re
+import tokenize
 from pathlib import Path
 
 import pytest
@@ -59,19 +60,88 @@ DYNAMIC_TABLES = {
 }
 ALLOWED_PRIVILEGES = {"SELECT", "INSERT", "UPDATE", "DELETE"}
 
-# SQL in this code base is written in capitals; Python's own "from" and "import" are not.
+# The scan reads only the code's string literals (Python's tokenizer, so imports and comments
+# never count), in any case, with adjacent literals joined as Python joins them.
+_TABLE = r"(?:public\.)?\"?([a-z_][a-z0-9_]*)\b"
 _STATEMENTS = {
-    "SELECT": re.compile(r"\b(?:FROM|JOIN)\s+(?:public\.)?([a-z_][a-z0-9_]*)\b"),
-    "INSERT": re.compile(r"\bINSERT\s+INTO\s+(?:public\.)?([a-z_][a-z0-9_]*)\b"),
+    "SELECT": re.compile(r"\b(?:FROM|JOIN)\s+" + _TABLE, re.I),
+    "INSERT": re.compile(r"\bINSERT\s+INTO\s+" + _TABLE, re.I),
     "UPDATE": re.compile(
-        r"\bUPDATE\s+(?:public\.)?([a-z_][a-z0-9_]*)\s+(?:(?:AS\s+)?[a-z_]\w*\s+)?SET\b"),
-    "DELETE": re.compile(r"\bDELETE\s+FROM\s+(?:public\.)?([a-z_][a-z0-9_]*)\b"),
-    "TRUNCATE": re.compile(r"\bTRUNCATE\s+(?:TABLE\s+)?(?:public\.)?([a-z_][a-z0-9_]*)\b"),
+        r"\bUPDATE\s+(?:ONLY\s+)?" + _TABLE + r"\"?\s+(?:(?:AS\s+)?[a-z_]\w*\s+)?SET\b", re.I),
+    "DELETE": re.compile(r"\bDELETE\s+FROM\s+(?:ONLY\s+)?" + _TABLE, re.I),
+    "TRUNCATE": re.compile(r"\bTRUNCATE\s+(?:TABLE\s+)?(?:ONLY\s+)?" + _TABLE, re.I),
 }
-_UPSERT_UPDATE = re.compile(r"ON\s+CONFLICT\b[^;]*?\bDO\s+UPDATE\b", re.S)
+_UPSERT = re.compile(r"\bINSERT\s+INTO\s+" + _TABLE + r".*?\bON\s+CONFLICT\b.*?\bDO\s+UPDATE\b",
+                     re.I | re.S)
 # Row locks need UPDATE on the table they lock (PostgreSQL, SELECT, "The Locking Clause").
-_ROW_LOCK = re.compile(r"\bFOR\s+(?:UPDATE|NO\s+KEY\s+UPDATE|SHARE|KEY\s+SHARE)\b")
-_DYNAMIC = re.compile(r"\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+\{")
+_ROW_LOCK = re.compile(r"\bFOR\s+(?:UPDATE|NO\s+KEY\s+UPDATE|SHARE|KEY\s+SHARE)\b", re.I)
+_SQL_START = re.compile(r"^\s*(?:SELECT|INSERT|UPDATE|DELETE|TRUNCATE|WITH)\b", re.I)
+# A table name that is not in the literal: a field ({...}, %s, %(name)s) or the literal's end,
+# when a value is joined on with + or %.
+_GAP = "\x00"
+_VARIABLE_TABLE = re.compile(
+    r"\b(?:FROM|JOIN|INTO|UPDATE|TRUNCATE(?:\s+TABLE)?)\s*(?:\{|%s|%\(|" + _GAP + r"|$)", re.I)
+
+
+def _string_literals(source):
+    """The source's string literals, adjacent ones joined; a literal followed by + or % ends
+    with _GAP, since what is joined on is not in the code as text."""
+    literals, parts, depth = [], [], 0
+    tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+
+    def flush(next_token):
+        if parts:
+            text = "".join(parts)
+            joined = next_token is not None and next_token.type == tokenize.OP
+            if joined and next_token.string in ("+", "%"):
+                text += _GAP
+            literals.append(text)
+            parts.clear()
+
+    for i, tok in enumerate(tokens):
+        kind = tokenize.tok_name[tok.type]
+        if kind.startswith("FSTRING"):  # Python 3.12 and later split f-strings
+            depth += kind == "FSTRING_START"
+            depth -= kind == "FSTRING_END"
+            parts.append(tok.string)
+            continue
+        if depth:
+            parts.append(tok.string)
+            continue
+        if tok.type == tokenize.STRING:
+            parts.append(re.sub(r"^[A-Za-z]*('''|\"\"\"|'|\")|('''|\"\"\"|'|\")$", "", tok.string))
+            continue
+        if tok.type in (tokenize.NL, tokenize.COMMENT):
+            continue
+        flush(tok)
+    flush(None)
+    return literals
+
+
+def _source_needs(source):
+    """{table: {privilege}} that the source's SQL literals use, for production tables."""
+    needs: dict[str, set[str]] = {}
+    for text in _string_literals(source):
+        found = [(privilege, m.group(1).lower())
+                 for privilege, pattern in _STATEMENTS.items() for m in pattern.finditer(text)]
+        found += [("UPDATE", m.group(1).lower()) for m in _UPSERT.finditer(text)]
+        if _ROW_LOCK.search(text) and re.search(r"\bSELECT\b", text, re.I):
+            found += [("UPDATE", m.group(1).lower()) for m in _STATEMENTS["SELECT"].finditer(text)]
+        for privilege, table in found:
+            if table in PRODUCTION_TABLES:
+                needs.setdefault(table, set()).add(privilege)
+    return needs
+
+
+def _source_has_variable_table(source):
+    """True when an SQL literal takes its table name from a value: an f-string or format field,
+    a %s, or a + or % right after FROM, JOIN, INTO, UPDATE or TRUNCATE."""
+    for text in _string_literals(source):
+        # "FOR UPDATE" and "DO UPDATE" name no table.
+        text = re.sub(r"\b(?:FOR\s+(?:NO\s+KEY\s+)?|DO\s+)UPDATE\b", " ", text, flags=re.I)
+        if _SQL_START.search(text) and _VARIABLE_TABLE.search(text):
+            return True
+    return False
 
 
 def _migration_files():
@@ -95,24 +165,8 @@ def _code_needs():
     """{table: {privilege}} from the code's SQL, for production tables."""
     needs: dict[str, set[str]] = {}
     for path in CODE:
-        text = path.read_text(encoding="utf-8")
-        for privilege, pattern in _STATEMENTS.items():
-            for m in pattern.finditer(text):
-                table = m.group(1)
-                if table not in PRODUCTION_TABLES:
-                    continue
-                needs.setdefault(table, set()).add(privilege)
-                if privilege == "INSERT":
-                    tail = text[m.end():m.end() + 1500]
-                    tail = re.split(r'"""|INSERT\s+INTO', tail, maxsplit=1)[0]
-                    if _UPSERT_UPDATE.search(tail):
-                        needs[table].add("UPDATE")
-        for m in _ROW_LOCK.finditer(text):
-            head = text[max(0, m.start() - 800):m.start()]
-            head = head[head.rfind("SELECT"):] if "SELECT" in head else ""
-            for t in _STATEMENTS["SELECT"].findall(head):
-                if t in PRODUCTION_TABLES:
-                    needs.setdefault(t, set()).add("UPDATE")
+        for table, privileges in _source_needs(path.read_text(encoding="utf-8")).items():
+            needs.setdefault(table, set()).update(privileges)
         relative = path.relative_to(BACKEND).as_posix()
         for table, privileges in DYNAMIC_TABLES.get(relative, {}).items():
             needs.setdefault(table, set()).update(privileges)
@@ -166,8 +220,55 @@ def test_the_application_role_holds_exactly_what_the_code_uses():
 
 def test_sql_with_a_variable_table_is_only_where_it_is_known():
     found = {p.relative_to(BACKEND).as_posix()
-             for p in CODE if _DYNAMIC.search(p.read_text(encoding="utf-8"))}
+             for p in CODE if _source_has_variable_table(p.read_text(encoding="utf-8"))}
     assert found == set(DYNAMIC_TABLES)
+
+
+# The review's three probes (5 November 2026), and their relatives.
+@pytest.mark.parametrize("source, table, privilege", [
+    ('cur.execute("select id from benefits")', "benefits", "SELECT"),
+    ('cur.execute("Update robots_cache set robots_txt = %s", (text,))', "robots_cache", "UPDATE"),
+    ('cur.execute("delete from raw_pages where id = %s", (i,))', "raw_pages", "DELETE"),
+    ('cur.execute("insert into tags (name) values (%s) "\n'
+     '            "on conflict (name) do update set name = excluded.name")',
+     "tags", "UPDATE"),
+    ('cur.execute("""\n    select 1 from crawl_locks\n    where source_id = %s for update\n""")',
+     "crawl_locks", "UPDATE"),
+    ('sql = ("SELECT id "\n       "FROM donors")', "donors", "SELECT"),
+])
+def test_the_scan_reads_sql_in_any_case_and_across_joined_literals(source, table, privilege):
+    assert privilege in _source_needs(source).get(table, set())
+
+
+@pytest.mark.parametrize("source", [
+    'cur.execute("DELETE FROM " + "raw_pages")',
+    'cur.execute("DELETE FROM " + table)',
+    'cur.execute("select * from %s" % table)',
+    'cur.execute("SELECT * FROM {} WHERE id = %s".format(table), (i,))',
+    'cur.execute(f"update {table} set x = 1")',
+    'cur.execute(f"TRUNCATE TABLE {table}")',
+    'cur.execute(f"SELECT id FROM jobs FOR UPDATE; DELETE FROM {table}")',
+])
+def test_a_table_name_from_a_value_cannot_slip_through(source):
+    assert _source_has_variable_table(source)
+
+
+@pytest.mark.parametrize("source", [
+    'from contracts.persist import LOAD_COLUMNS',
+    '# SELECT * FROM users',
+    'logger.info(f"Login attempt from {client_host}")',
+    'message = f"Soft-deleted {n} jobs from {count} source(s)"',
+])
+def test_imports_comments_and_prose_are_not_sql(source):
+    assert not _source_needs(source)
+    assert not _source_has_variable_table(source)
+
+
+def test_a_row_lock_at_the_end_of_a_literal_is_not_a_variable_table():
+    lock = 'cur.execute("SELECT 1 FROM crawl_logs WHERE id = %s FOR UPDATE")'
+    upsert = 'cur.execute("INSERT INTO tags (n) VALUES (%s) ON CONFLICT (n) DO UPDATE")'
+    assert not _source_has_variable_table(lock)
+    assert not _source_has_variable_table(upsert)
 
 
 def test_the_application_role_has_nothing_on_personal_or_unused_tables():
@@ -247,6 +348,7 @@ def test_the_roles_have_the_planned_attributes_and_settings():
         assert f"LIMIT {limit}" in " ".join(created)
         altered = re.search(rf"ALTER ROLE {role} WITH ([^;]+);", flat).group(1)
         assert "SUPERUSER" not in altered  # refused from a non-superuser on PostgreSQL 16 and later
+        assert "REPLICATION" not in altered  # needs postgres to hold REPLICATION itself
         assert f"CONNECTION LIMIT {limit}" in altered and "BYPASSRLS" in altered
     settings = dict(re.findall(r"ALTER ROLE (aidjobs_\w+ SET \w+) = ([^;]+);", flat))
     assert settings == {
@@ -271,6 +373,15 @@ def test_the_rollback_revokes_before_it_drops():
     sql = (ROLES_DIR / "04_rollback.sql").read_text(encoding="utf-8")
     assert sql.index("REVOKE ALL ON ALL TABLES") < sql.index("DROP ROLE")
     assert "IF EXISTS (SELECT 1 FROM pg_roles" in sql
+
+
+def test_the_rollback_refuses_while_a_role_has_sessions():
+    # PostgreSQL drops a role with open sessions; they then fail (the review, 5 November 2026).
+    code = re.sub(r"--[^\n]*", "", (ROLES_DIR / "04_rollback.sql").read_text(encoding="utf-8"))
+    check = code.index("FROM pg_stat_activity WHERE usename = name")
+    assert check < code.index("RAISE EXCEPTION") < code.index("DROP ROLE")
+    # The roles own nothing, and Supabase's postgres could not run these on them.
+    assert not re.search(r"REASSIGN\s+OWNED|DROP\s+OWNED", code)
 
 
 # ---------------------------------------------------------------------------

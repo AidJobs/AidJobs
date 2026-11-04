@@ -143,9 +143,28 @@ jobs:
             echo "Crawl ownership tests must not be skipped"
             exit 1
           fi
+          count() { psql -X -A -t "$TEST_ADMIN_DATABASE_URL" -c "SELECT count(*) FROM $1"; }
+          # 04 refuses while a role has a session, and changes nothing (the review of PR #106).
+          psql -X -q "postgresql://aidjobs_readonly@localhost:5432/aidjobs_test" -c "SELECT pg_sleep(10)" &
+          for _ in $(seq 50); do
+            test "$(count "pg_stat_activity WHERE usename = 'aidjobs_readonly'")" -ge 1 && break
+            sleep 0.2
+          done
+          if run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/04_rollback.sql" 2> rollback.err; then
+            echo "04_rollback.sql dropped a role with an open session"
+            exit 1
+          fi
+          grep -q "refused: aidjobs_readonly has 1 open session" rollback.err
+          test "$(count "pg_roles WHERE rolname LIKE 'aidjobs\_%'")" -eq 2
+          run_sql "$TEST_ADMIN_DATABASE_URL" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'aidjobs_readonly'" > /dev/null
+          wait || true
+          for _ in $(seq 50); do
+            test "$(count "pg_stat_activity WHERE usename = 'aidjobs_readonly'")" -eq 0 && break
+            sleep 0.2
+          done
           run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/04_rollback.sql"
           run_sql "$TEST_ADMIN_DATABASE_URL" -f "$roles/04_rollback.sql"
-          test "$(psql -X -A -t "$TEST_ADMIN_DATABASE_URL" -c "SELECT count(*) FROM pg_roles WHERE rolname LIKE 'aidjobs\_%'")" -eq 0
+          test "$(count "pg_roles WHERE rolname LIKE 'aidjobs\_%'")" -eq 0
 
       - name: Audit gate script tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
