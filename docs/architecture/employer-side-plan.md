@@ -200,6 +200,16 @@ Agreed item by item with the user after their review of the round 2 preview; sup
 
 Click-only menus with names only and details on hover; "Create your own format" first in the menu and in the panel; drag to reorder (handle, mouse or touch, arrow keys); one-line "Add:" pills on the first screen only; light, rounded focus rings; the suggestion alignment fix (last code commit `d8be0a3`).
 
+### Revision after the user's review of phase 2 (4 November 2026, afternoon)
+
+The chat is redesigned and built together with phase 3:
+
+- **The chat is its own panel.** A labelled rail on the far right, always visible, has two buttons with an icon and a full-strength label, **JD outline** and **Chat**; each opens its own resizable panel, one at a time; the Chat button shows a badge when AidJobs has a question waiting. The whole chat, including the input box, lives in the Chat panel; the job description column has no chat box. The actions (Publish, review, versions, ⋯) and the status line sit at the top of the open panel, or in the left top row when no panel is open.
+- **Pressing Enter on the first screen** opens the workspace with the Chat panel open and its input focused.
+- **Answers inside the question:** a place search for "Where is the job based?", a calendar for the closing date, contract choices for the contract. Quick picks must be relevant, each with its reason on hover, and none when nothing relevant exists: for the place, what was typed, the countries the organisation works in (its profile), its past jobs, and where similar roles are posted on AidJobs (sample figures in the demo), with "Remote" only for roles that can plausibly be remote; for the closing date, how long similar roles stay open, moved to a working day in the duty-station country, plus 2 and 4 weeks; for the contract, by organisation type and role. Free text always works; "in Kashmir, India" or "based in …" is accepted even when the place is not in AidJobs' list, so a question is never repeated.
+- **Spelling:** a gentle "Did you mean Education Specialist?" for job titles, in the chat and under the title; never changed automatically.
+- **Phase 3 lands with it:** the live draft (no "Write the job description" button; clickable placeholders "[Duty station]" and "[Closing date]"), predictive completion in the chat inputs, the readiness ring on Send, and the checks count on Publish. The first screen's fact slot and the underlined recognised facts move to phase 4.
+
 ### Build phases (tick when pushed)
 
 - [x] **Phase 1, quick fixes** (done 4 November 2026; the user approved the label list; Word and PDF are read in the browser with `mammoth` 1.13.0 and `unpdf` 2.1.0, the runtime audit clean; the old "learned from the careers site" prompt is removed and the sample base JD format is recast as confirmed from the organisation's own job descriptions; the shared tooltip fix in `components/site/Tip.tsx` reaches the public site only through its own pull request on `main`, still to do): the tooltip fix (A); the terms glossary (B), after the user approves the list of labels; "Delete job draft" in ⋯ (H); "Manage jobs" with hover labels; the + menu restructure and the one upload window with .docx and PDF (Item 3); "Use suggestion" removed (Item 1.1).
