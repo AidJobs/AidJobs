@@ -118,6 +118,17 @@ jobs:
           ruff check .github/scripts
           python -m pytest .github/scripts -q -p no:cacheprovider
 
+      # The employer survey's step D: its tests, and the committed organisation list must be exactly
+      # what the committed inputs and decisions produce.
+      - name: Survey step D
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: .
+        run: |
+          ruff check tools/survey/dedupe.py tools/survey/test_dedupe.py
+          python -m pytest tools/survey/test_dedupe.py -q -p no:cacheprovider
+          python tools/survey/dedupe.py
+          git diff --exit-code -- docs/architecture/source-survey/organisations.csv docs/architecture/source-survey/step-d-review.csv
+
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
