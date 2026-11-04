@@ -14,4 +14,5 @@ Key conventions, detailed in the ledger:
 - Do not crawl production, write to the jobs database, or reindex search unless the user asks for that step.
 - On admin pages, use the read-only browser guard described in the UX plan; never trigger a destructive control during verification.
 - Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`.
+- Never print a secret or the contents of an `.env` file. To check a setting, run `node scripts/env_check.mjs NAME` (it shows only whether it is set, its length, and a URL's shape). The project's secret guard (`.cursor/hooks.json`) refuses the usual ways of printing one; do not look for another way round it.
 - Update the ledger, and the UX plan for UX steps, when a step is finished.

@@ -185,6 +185,12 @@ jobs:
       - name: Frontend tests
         run: npm run test --workspace=@aidjobs/frontend
 
+      # Security plan, stage 5: the agent secret guard, its registration in .cursor/hooks.json,
+      # and the settings checker. An edit that unhooks or weakens the guard fails here.
+      - name: Secret guard tests
+        if: ${{ !cancelled() }}
+        run: node --test .cursor/hooks/secret-guard.test.mjs scripts/env_check.test.mjs
+
       # Security plan, stage 3A, part 3: each high or critical advisory in a runtime package fails,
       # unless .github/audit-exceptions.json accepts it. A missing or broken audit also fails.
       - name: Dependency audit gate
