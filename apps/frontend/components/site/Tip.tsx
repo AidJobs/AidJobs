@@ -3,16 +3,34 @@
 import { useLayoutEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-type Side = 'top' | 'right' | 'bottom';
+type Side = 'top' | 'right' | 'bottom' | 'left';
 
 const GAP = 8;
 const EDGE = 8;
+const OPPOSITE: Record<Side, Side> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
+type Box = { left: number; top: number; right: number; bottom: number; width: number; height: number };
+
+/** Where the bubble goes on one side of the anchor, kept inside the window along that side. */
+function place(side: Side, a: Box, w: number, h: number): { left: number; top: number; fits: boolean } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const clampX = (x: number) => Math.max(EDGE, Math.min(x, vw - w - EDGE));
+  const clampY = (y: number) => Math.max(EDGE, Math.min(y, vh - h - EDGE));
+  if (side === 'top' || side === 'bottom') {
+    const top = side === 'top' ? a.top - h - GAP : a.bottom + GAP;
+    return { left: clampX(a.left + a.width / 2 - w / 2), top, fits: top >= EDGE && top + h <= vh - EDGE };
+  }
+  const left = side === 'left' ? a.left - w - GAP : a.right + GAP;
+  return { left, top: clampY(a.top + a.height / 2 - h / 2), fits: left >= EDGE && left + w <= vw - EDGE };
+}
 
 /**
  * Label on hover, keyboard focus, or long-press. Drawn in a layer above the page,
  * so scrolling containers can neither clip it nor scroll sideways because of it.
+ * It takes the preferred side, else the opposite side, else the others, and never covers what it describes.
  */
-export default function Tip({ label, side = 'top', children }: { label: string; side?: Side; children: ReactNode }) {
+export default function Tip({ label, side = 'top', className, children }: { label: string; side?: Side; className?: string; children: ReactNode }) {
   const anchor = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -23,19 +41,11 @@ export default function Tip({ label, side = 'top', children }: { label: string; 
     if (!open || !anchor.current || !bubble.current) return;
     const a = anchor.current.getBoundingClientRect();
     const b = bubble.current.getBoundingClientRect();
-    let left: number;
-    let top: number;
-    if (side === 'right') {
-      left = a.right + GAP;
-      top = a.top + a.height / 2 - b.height / 2;
-    } else {
-      left = a.left + a.width / 2 - b.width / 2;
-      top = side === 'bottom' ? a.bottom + GAP : a.top - b.height - GAP;
-      if (top < EDGE) top = a.bottom + GAP;
-    }
-    left = Math.max(EDGE, Math.min(left, window.innerWidth - b.width - EDGE));
-    top = Math.max(EDGE, Math.min(top, window.innerHeight - b.height - EDGE));
-    setPos({ left, top });
+    const order: Side[] = [side, OPPOSITE[side], ...(['top', 'bottom', 'right', 'left'] as Side[]).filter((x) => x !== side && x !== OPPOSITE[side])];
+    const room: Record<Side, number> = { top: a.top, bottom: window.innerHeight - a.bottom, left: a.left, right: window.innerWidth - a.right };
+    const roomiest = order.reduce((best, s) => (room[s] > room[best] ? s : best), order[0]);
+    const chosen = order.map((s) => place(s, a, b.width, b.height)).find((p) => p.fits) ?? place(roomiest, a, b.width, b.height);
+    setPos({ left: chosen.left, top: Math.max(EDGE, Math.min(chosen.top, window.innerHeight - b.height - EDGE)) });
   }, [open, side, label]);
 
   const show = () => {
@@ -67,7 +77,7 @@ export default function Tip({ label, side = 'top', children }: { label: string; 
   return (
     <span
       ref={anchor}
-      className="aj-tip"
+      className={className ? `aj-tip ${className}` : 'aj-tip'}
       onPointerEnter={(e) => e.pointerType === 'mouse' && show()}
       onPointerLeave={(e) => e.pointerType === 'mouse' && hide()}
       onFocus={focusShow}
