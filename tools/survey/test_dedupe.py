@@ -186,6 +186,17 @@ def test_a_recorded_name_replaces_the_shown_one_and_un_offices_form_one_family()
     assert by_key["unjobs-un:1"]["family"] == dedupe.UN_SECRETARIAT
 
 
+def test_a_recorded_family_renames_or_removes_the_whole_family():
+    records = [rec("uk:1", "ACTIONAID", "GB", "actionaid.org"), rec("eu:1", "ActionAid", "ZA", "actionaid.org"),
+               rec("iati:A", "Ministry of Foreign Affairs", "GR"), rec("iati:B", "Ministry of Foreign Affairs", "NL")]
+    decisions = Decisions(family={"uk:1": "ActionAid network", "iati:A": "none"})
+    _, _, rows = run(records, decisions)
+    families = {r["org_id"]: r["family"] for r in rows}
+    assert families["uk:1"] == families["eu:1"] == "ActionAid network"
+    assert families["iati:A"] == families["iati:B"] == ""
+    assert dedupe.tidy_case("FONDATION L'ARCHE") == "Fondation L'Arche"
+
+
 def test_a_family_is_named_after_the_words_its_members_share():
     assert dedupe.family_label(["Save the Children UK", "Save the Children International"]) \
         == "Save the Children"

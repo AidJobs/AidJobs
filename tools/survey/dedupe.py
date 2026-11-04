@@ -155,7 +155,7 @@ SMALL_WORDS = {"of", "the", "and", "for", "in", "to", "on", "at", "by", "de", "l
                "et", "y", "a"}
 
 
-CAPITALISED_SOURCES = {"irs", "cra", "uk"}
+CAPITALISED_SOURCES = {"irs", "cra", "uk", "acnc", "oscr"}
 
 
 def tidy_case(name: str) -> str:
@@ -170,7 +170,8 @@ def tidy_case(name: str) -> str:
         elif index and bare.lower() in SMALL_WORDS:
             words.append(word.lower())
         else:
-            words.append("-".join(part.capitalize() for part in word.split("-")))
+            part_case = "-".join(part.capitalize() for part in word.split("-"))
+            words.append(re.sub(r"^([LDO]')([a-z])", lambda m: m.group(1) + m.group(2).upper(), part_case))
     return " ".join(words)
 
 
@@ -537,12 +538,18 @@ def families_of(members: dict[str, list[Record]], families, groups: Groups,
             roots.sort(key=lambda r: _strength(members[r]))
             label = family_label([_display_name(members[r], decisions) for r in roots])
             labels.update({r: label for r in roots})
-    for root, group in members.items():
-        if any("un-secretariat" in r.kind for r in group):
-            labels[root] = UN_SECRETARIAT  # departments and offices hiring through one site
-        chosen = next((decisions.family[r.key] for r in group if r.key in decisions.family), "")
+        for root in roots:
+            if any("un-secretariat" in r.kind for r in members[root]):
+                labels[root] = UN_SECRETARIAT  # departments and offices hiring through one site
+        # A recorded family names the whole cluster; "none" means it is not a family.
+        chosen = next((decisions.family[r.key] for root in roots for r in members[root]
+                       if r.key in decisions.family), "")
         if chosen:
-            labels[root] = chosen
+            for root in roots:
+                if chosen == "none":
+                    labels.pop(root, None)
+                else:
+                    labels[root] = chosen
     return labels
 
 

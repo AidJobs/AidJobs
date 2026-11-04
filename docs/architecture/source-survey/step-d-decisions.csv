@@ -122,6 +122,47 @@ merge,seed:18,iati:GB-CHC-285776,CAFOD
 merge,eu:338162110726-87,iati:GB-CHC-313757,VSO is Voluntary Service Overseas
 separate,iati:SV-NIT-9498-180400-101-7,iati:NL-KVK-27189542,NIMD's Central America office; the institute is in The Hague (same family)
 separate,iati:US-EIN-95-3202116,irs:951922279,World Vision International and World Vision (US) are separate registrations (same family)
+merge,eu:479045950408-91,iati:CZ-ICO-25755277,the same organisation in two registers (People in Need)
+merge,unjobs-nonun:279,iati:FR-RCS-92460256800025,the International Fund for Public Interest Media
+merge,unjobs-nonun:194,eu:0355818101725-40,the Fossil Fuel Treaty initiative
+merge,irs:980036091,unjobs-nonun:91,Chatham House's US registration (Royal Institute of International Affairs)
+name,iati:XM-DAC-40-3,Greece – Ministry of Foreign Affairs,"a donor government's ministry, named with its country"
+family,iati:XM-DAC-40-3,none,different governments' ministries are not one family
+name,iati:XM-DAC-7,Netherlands – Ministry of Foreign Affairs,"a donor government's ministry, named with its country"
+family,iati:XM-DAC-7,none,different governments' ministries are not one family
+name,iati:XM-DAC-61-2,Slovenia – Ministry of Foreign Affairs,"a donor government's ministry, named with its country"
+family,iati:XM-DAC-61-2,none,different governments' ministries are not one family
+family,uk:274467,ActionAid,the network's name
+family,iati:KE-NCB-218/051/9384/74,CARE,the network's name
+family,cra:119211282RR0001,Amref Health Africa,the network's name
+family,irs:951922279,World Vision,the network's name
+exclude,cra:118849470RR0004,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:107833295RR0374,,"a church, religious order or religious body, not an aid agency"
+exclude,cra:118978634RR0001,,"a church, religious order or religious body, not an aid agency"
+exclude,acnc:46002812259,,"a church, religious order or religious body, not an aid agency"
+family,acnc:28004778081,World Vision,the network's name
+family,cra:119304855RR0001,World Vision,the network's name
+family,iati:GB-CHC-285908,World Vision,the network's name
+family,iati:DE-CR-RA000209-VR1207,World Vision,the network's name
+family,iati:NL-KVK-41179943,World Vision,the network's name
+family,iati:US-EIN-95-3202116,World Vision,the network's name
+exclude,cra:119154516RR0001,,"arts, publishing, heritage or a zoo, not aid"
+exclude,acnc:48894537905,,"domestic social, youth, sport or community services"
+exclude,acnc:47140180169,,"domestic social, youth, sport or community services"
+exclude,uk:264166,,"domestic social, youth, sport or community services"
+exclude,irs:941167403,,"a university, college or school, or part of one (the user's rule)"
+exclude,irs:131624206,,"a university, college or school, or part of one (the user's rule)"
+exclude,uk:1153197,,"a university, college or school, or part of one (the user's rule)"
+exclude,cra:119219251RR0001,,"a science, space or technical body without aid work"
+exclude,irs:042535767,,"a science, space or technical body without aid work"
+exclude,irs:237185827,,"a science, space or technical body without aid work"
+exclude,irs:362167755,,"an industry, professional, standards or internet body, not aid"
+exclude,irs:134203820,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:230053483,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:010566033,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:813451968,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,irs:133014387,,"a donor fund, family or members' foundation that does not run aid work"
+exclude,cra:801966334RR0001,,"a donor fund, family or members' foundation that does not run aid work"
 name,iati:US-EIN-91-1148123,Prosper Global (formerly Mercy Corps),Mercy Corps operates as Prosper Global since 9 September 2026 (its announcement)
 exclude,eu:023332310378-35,,"a European political movement, not aid"
 exclude,eu:739474949490-38,,"a European political movement, not aid"
