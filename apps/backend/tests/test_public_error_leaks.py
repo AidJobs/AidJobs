@@ -65,6 +65,30 @@ def facets_query_fails():
 main.search_service._get_database_facets = facets_query_fails
 """ % (DSN_ERROR, DSN_ERROR)
 
+# A database that answers every query: row[0] and row["count"] are 1, and one source is listed.
+DATABASE_ANSWERS = """
+import psycopg2
+class _Row:
+    def __getitem__(self, key):
+        return 1
+class _Cursor:
+    def execute(self, sql, params=None):
+        pass
+    def fetchone(self):
+        return _Row()
+    def fetchall(self):
+        return [{"source_id": "SOURCE-ID-7Q", "org_name": "ORG-NAME-7Q", "job_count": 1}]
+    def close(self):
+        pass
+class _Conn:
+    def cursor(self, cursor_factory=None):
+        return _Cursor()
+    def close(self):
+        pass
+psycopg2.connect = lambda *args, **kwargs: _Conn()
+calls = [call("GET", "/api/db/status")]
+"""
+
 _ENV_KEPT = ("PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE",
              "PYTHONPATH")
 
@@ -150,6 +174,17 @@ def test_driver_errors_reach_no_response_or_log():
         "ok": False, "error": "Database unavailable",
     }
     assert "<redacted>" in logs
+
+
+def test_the_public_database_status_names_nothing():
+    """Security stage 7: a working database answers exactly {"ok": true}; the rest is admin-only."""
+    calls, _logs = _run(WELL_FORMED_DB_URL, DATABASE_ANSWERS)
+    (db_status,) = calls
+    assert db_status["status"] == 200
+    assert json.loads(db_status["body"]) == {"ok": True}
+    for word in ("SOURCE-ID-7Q", "ORG-NAME-7Q", "row_counts", "source_breakdown"):
+        assert word not in db_status["body"]
+    _assert_request_ids(calls)
 
 
 def test_search_reuses_the_request_id():

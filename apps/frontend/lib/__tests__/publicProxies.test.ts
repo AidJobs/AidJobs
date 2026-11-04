@@ -123,6 +123,15 @@ describe.each(ROUTES)('$method $module', (route) => {
   });
 });
 
+describe('GET db/status', () => {
+  it('passes the backend\'s slim answer through unchanged (security plan, stage 7)', async () => {
+    fetchMock.mockResolvedValue(new Response('{"ok":true}', { status: 200, headers: { 'x-request-id': RID } }));
+    const response = await call(ROUTES[0]);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+});
+
 describe('POST search/parse', () => {
   const parse = ROUTES[2];
 

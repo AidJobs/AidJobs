@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, CheckCircle, AlertCircle, Database as DatabaseIcon, Search as SearchIcon, Play, RotateCw, Activity, TrendingUp, Clock, Network } from 'lucide-react';
-import { COUNT_LABELS, healthScore as computeHealthScore, recentActivity, searchSummary, type RecentActivity } from '@/lib/admin/status';
+import { adminErrorMessage, COUNT_LABELS, healthScore as computeHealthScore, recentActivity, searchSummary, type RecentActivity } from '@/lib/admin/status';
 import { meiliControlsVisible } from '@/lib/admin/danger';
 import { adminDateTime } from '@/lib/dates';
 
@@ -88,7 +88,8 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const [dbRes, searchRes, crawlRes, logsBody] = await Promise.all([
-        fetch('/api/db/status'),
+        // The counts and the per-source list are admin-only; the public /api/db/status answers only {ok}.
+        fetch('/api/admin/db/status', { credentials: 'include', cache: 'no-store' }),
         fetch('/api/search/status').catch((err) => {
           console.error('Search status fetch failed:', err);
           return { ok: false, status: 0, text: async () => err.message } as Response;
@@ -102,8 +103,8 @@ export default function AdminPage() {
 
       if (!dbRes.ok) {
         const rawText = await dbRes.text().catch(() => '');
-        const safeMessage = sanitizeErrorText(dbRes.status, rawText);
-        console.error('DB status error:', dbRes.status, rawText || '(no body)');
+        const safeMessage = sanitizeErrorText(dbRes.status, adminErrorMessage(rawText) ?? rawText);
+        console.error('DB status error:', dbRes.status);
         setDbStatus({ ok: false, error: `HTTP ${dbRes.status}: ${safeMessage}` });
       } else {
         try {

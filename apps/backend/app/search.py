@@ -38,6 +38,11 @@ DB_UNAVAILABLE = "Database unavailable"
 MEILI_UNAVAILABLE = "Meilisearch unavailable"
 FACETS_UNAVAILABLE = "Facets unavailable"
 
+# The admin dashboard's database status (four counting queries).
+ADMIN_STATUS_CONNECT_TIMEOUT_SECONDS = 5
+ADMIN_STATUS_STATEMENT_TIMEOUT_MS = 10000
+ADMIN_STATUS_TIMEOUT_SECONDS = 20.0
+
 # PR #50's helper now lives in app.log_safety, with the same markers.
 _redacted = redact_exception
 
@@ -1159,7 +1164,10 @@ class SearchService:
         return None
     
     async def get_db_status(self) -> dict[str, Any]:
-        """Get database status with row counts"""
+        """Row counts and open jobs per source, for the admin dashboard only (stage 7).
+
+        The queries run on a worker thread, so the event loop keeps answering meanwhile.
+        """
         if not self.db_enabled:
             return {
                 "ok": False,
@@ -1172,6 +1180,20 @@ class SearchService:
                 "error": "psycopg2 not installed"
             }
         
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(self._read_db_status),
+                                          timeout=ADMIN_STATUS_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            logger.error("Database status check timed out after %s s", ADMIN_STATUS_TIMEOUT_SECONDS)
+        except Exception as e:
+            logger.error("Database status check failed: %s", _redacted(e))
+        return {
+            "ok": False,
+            "error": DB_UNAVAILABLE
+        }
+
+    def _read_db_status(self) -> dict[str, Any]:
+        """Blocking; runs on a worker thread."""
         conn = None
         cursor = None
         
@@ -1184,13 +1206,11 @@ class SearchService:
                     "error": DB_UNAVAILABLE
                 }
             
-            # Log connection attempt for debugging
-            logger.info(f"[search] Attempting database connection to {conn_params.get('host', 'unknown')}:{conn_params.get('port', 'unknown')}")
-            
-            # Connect with timeout (10 seconds)
-            conn = psycopg2.connect(**conn_params, connect_timeout=10)
+            conn = psycopg2.connect(**conn_params, connect_timeout=ADMIN_STATUS_CONNECT_TIMEOUT_SECONDS)
             
             cursor = conn.cursor(cursor_factory=RealDictCursor)
+            # LOCAL: the setting ends with this transaction, so it never reaches a pooled session.
+            cursor.execute(f"SET LOCAL statement_timeout = {int(ADMIN_STATUS_STATEMENT_TIMEOUT_MS)}")
             
             # Get row counts for jobs and sources tables
             cursor.execute("SELECT COUNT(*) as count FROM jobs")
@@ -1240,12 +1260,6 @@ class SearchService:
                     "sources": sources_count
                 },
                 "source_breakdown": source_breakdown
-            }
-        except Exception as e:
-            logger.error("Database status check failed: %s", _redacted(e))
-            return {
-                "ok": False,
-                "error": DB_UNAVAILABLE
             }
         finally:
             if cursor:
