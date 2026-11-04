@@ -2,12 +2,14 @@
 
 import { ChevronDown, Plus } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { inputStyle } from './ui';
 import Tip from '@/components/site/Tip';
 import { hireAgain } from './actions';
-import { FAMILIES_ORDER } from './engine';
+import { contractPicks, deadlinePicks, memoryPick, pickPhrase, placePatch, placePicks } from './answers';
+import { addDays, FAMILIES_ORDER, longDate, PLACES } from './engine';
 import { statusLine } from './Home';
 import { go } from './store';
-import type { State } from './types';
+import type { Facts, State } from './types';
 
 /**
  * A tool in the chat box. A click opens its menu below the box, or above it when there is more room there, never
@@ -56,7 +58,7 @@ function ClickMenu({ label, trigger, icon, children }: { label: string; trigger:
         {trigger}
       </button>
       {open && (
-        <div id={menuId} className="ej-menu" data-up={place.up} style={{ maxHeight: place.max }} role="group" aria-label={label} onClick={() => setOpen(false)}>
+        <div id={menuId} className="ej-menu" data-up={place.up} style={{ maxHeight: place.max }} role="group" aria-label={label} onClick={(e) => (e.target as HTMLElement).closest('.ej-menu-item') && setOpen(false)}>
           {children}
         </div>
       )}
@@ -130,6 +132,49 @@ export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: 
           </div>
         );
       })}
+    </ClickMenu>
+  );
+}
+
+const SLOT_NAME = { place: 'Duty station', deadline: 'Closing date', contract: 'Contract' } as const;
+
+/**
+ * The first screen's fact slot: the single most important fact still missing ("+ Closing date"), with relevant picks and their reasons, and
+ * reusing a similar past job's facts in one click when there is one. A choice is added to the text, so everything stays in the box.
+ */
+export function FactSlot({ s, facts, family, onAdd }: { s: State; facts: Facts; family: string; onAdd: (phrase: string) => void }) {
+  const [q, setQ] = useState('');
+  const [date, setDate] = useState('');
+  const missing = !facts.location && facts.arrangement !== 'remote' ? 'place' : !facts.deadline ? 'deadline' : !(facts.contract || facts.duration) ? 'contract' : null;
+  const subject = { id: '', family, facts };
+  const memory = memoryPick(s, subject);
+  if (!missing && !memory) return null;
+  const picks = missing === 'place' ? placePicks(s, subject) : missing === 'deadline' ? deadlinePicks(s, subject) : missing === 'contract' ? contractPicks(s, subject) : [];
+  const matches = missing === 'place' && q.trim().length >= 2 ? PLACES.filter((p) => `${p.city} ${p.country}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 4) : [];
+  const min = addDays(s.today, 1);
+  const dateOk = /^20\d\d-\d\d-\d\d$/.test(date) && date >= min;
+  return (
+    <ClickMenu label={missing ? `Add the ${SLOT_NAME[missing].toLowerCase()}` : "Reuse a past job's facts"} trigger={<span className="ej-tool-text">{missing ? `+ ${SLOT_NAME[missing]}` : "Reuse a past job's facts"}</span>}>
+      {memory && <MenuItem title={memory.label} tip={memory.why} onClick={() => onAdd(memory.text)} />}
+      {missing && <span className="ej-menu-label">{SLOT_NAME[missing]}</span>}
+      {missing && picks.map((p) => <MenuItem key={p.label} title={p.label} tip={p.why} onClick={() => onAdd(pickPhrase(missing, p))} />)}
+      {missing === 'place' && (
+        <div className="flex flex-col gap-1 px-1 pt-1">
+          <input style={{ ...inputStyle, minHeight: 32 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a place, or type any town and country" aria-label="Search a duty station" />
+          {matches.map((m) => (
+            <MenuItem key={m.city} title={`${m.city}, ${m.country}`} tip="From AidJobs' list of duty stations" onClick={() => onAdd(` in ${placePatch(m.city).location}`)} />
+          ))}
+          {q.trim().length >= 2 && !matches.some((m) => m.city.toLowerCase() === q.trim().toLowerCase()) && <MenuItem title={`Use "${q.trim()}"`} tip="Added as you typed it" onClick={() => onAdd(`, based in ${q.trim()}`)} />}
+        </div>
+      )}
+      {missing === 'deadline' && (
+        <div className="flex gap-1.5 px-1 pt-1">
+          <input type="date" style={{ ...inputStyle, minHeight: 32, flex: 1 }} min={min} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Pick a closing date" />
+          <button type="button" className="ej-menu-item" style={{ width: 'auto' }} disabled={!dateOk} onClick={() => onAdd(`, closing ${longDate(date)}`)}>
+            Set date
+          </button>
+        </div>
+      )}
     </ClickMenu>
   );
 }

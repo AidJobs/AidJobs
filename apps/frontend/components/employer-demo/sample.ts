@@ -76,11 +76,12 @@ export function allFormats(): Format[] {
   return [HOUSE_FORMAT, ...FORMATS];
 }
 
-function job(today: number, id: string, roleKey: string, formatKey: string, facts: Partial<Facts>, extra: Partial<DemoJob>): DemoJob {
+/** A sample job; `add` puts extra sections in, so that the recent jobs share a pattern the base JD format lacks (the base prompt, plan section 15). */
+function job(today: number, id: string, roleKey: string, formatKey: string, facts: Partial<Facts>, extra: Partial<DemoJob>, add: string[] = []): DemoJob {
   const f: Facts = { ...emptyFacts(), languages: ['English'], ...facts };
   const format = allFormats().find((x) => x.key === formatKey) ?? HOUSE_FORMAT;
   const apply = defaultApply(SAMPLE_ORG.orgType, SAMPLE_ORG.careersUrl);
-  const tags = orderSections(format.order.map((o) => o.key), format);
+  const tags = orderSections([...format.order.map((o) => o.key), ...add], format);
   const sections = buildSections(tags, { facts: f, roleKey, org: SAMPLE_ORG, tone: format.tone, format, commitments: format.commitments, applyLines: applyLines(apply, f, SAMPLE_ORG) });
   return {
     id,
@@ -122,13 +123,13 @@ export function sampleJobs(today: number): DemoJob[] {
         { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
         { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Published as Premium' },
       ],
-    }),
+    }, ['assessment']),
     job(today, 'job-meal', 'meal', 'house', { title: 'MEAL Coordinator', location: 'Addis Ababa, Ethiopia', country: 'Ethiopia', iso: 'ET', timezone: 'EAT', contract: 'Fixed-term', duration: '24 months', deadline: addDays(today, 9), salaryMode: 'scale' }, {
       status: 'live',
       plan: 'standard',
       publishedAt: today - 12 * DAY,
       audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published as Standard' }],
-    }),
+    }, ['assessment']),
     job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
       status: 'review',
       review: {
@@ -163,7 +164,7 @@ export function sampleJobs(today: number): DemoJob[] {
       closedAt: today - 230 * DAY,
       closeReason: 'filled',
       createdAt: today - 270 * DAY,
-    }),
+    }, ['assessment']),
   ];
 }
 

@@ -748,3 +748,60 @@ export function runIntent(intent: NonNullable<Intent>): string | null {
   }
   return hireAgain(intent.jobIds[0]);
 }
+
+/**
+ * The headings most of the organisation's own job descriptions share, when at least two share them in the same order and they differ from its
+ * base JD format. Only the organisation's own job descriptions in AidJobs are looked at; nothing is read from elsewhere.
+ */
+export function basePattern(s: State): { order: Format['order']; count: number; sig: string } | null {
+  const groups = new Map<string, { order: Format['order']; count: number }>();
+  for (const j of s.jobs) {
+    if (j.sections.length < 3) continue;
+    const order = j.sections.map((x) => ({ key: x.key, heading: x.title }));
+    const key = order.map((o) => o.heading.toLowerCase()).join('|');
+    const g = groups.get(key);
+    groups.set(key, { order, count: (g?.count ?? 0) + 1 });
+  }
+  const best = [...groups.entries()].sort((a, b) => b[1].count - a[1].count)[0];
+  if (!best || best[1].count < 2) return null;
+  const house = s.formats.find((f) => f.key === 'house');
+  if (house && house.order.map((o) => o.heading.toLowerCase()).join('|') === best[0]) return null;
+  return { order: best[1].order, count: best[1].count, sig: `${best[0]}#${best[1].count}` };
+}
+
+/** Makes headings the organisation's base JD format: the default start for new jobs. Each job can still change its own sections. */
+export function setBaseFormat(order: Format['order'], from: string, tone?: Tone, count = 1) {
+  update((s) => {
+    const old = s.formats.find((f) => f.key === 'house');
+    const house: Format = { key: 'house', label: `${s.org.short} format`, family: 'Your organisation', usedBy: `Your base JD format, ${from}`, tone: tone ?? old?.tone ?? 'warm', order, commitments: old?.commitments ?? formatOf(s, FORMAT_FOR_TYPE[s.org.orgType]).commitments };
+    return { ...s, formats: [house, ...s.formats.filter((f) => f.key !== 'house')], org: { ...s.org, learned: { source: 'history', adverts: count, confirmed: true } }, notice: { text: `Saved as your base JD format. New jobs start from it.` } };
+  });
+}
+
+export function notNowBase(sig: string) {
+  update((s) => ({ ...s, baseDismissed: sig }));
+}
+
+/** Makes a job's outline the organisation's base JD format; offered from the job's menu, never applied automatically. */
+export function updateBaseFromJob(id: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  if (j?.sections.length) setBaseFormat(j.sections.map((x) => ({ key: x.key, heading: x.title })), `from "${j.facts.title || 'a job description'}"`, j.tone);
+}
+
+/** Forgets the base JD format: it stays as an ordinary saved format, and new jobs start from the closest standard JD format again. */
+export function forgetBase() {
+  update((s) => {
+    const house = s.formats.find((f) => f.key === 'house');
+    if (!house) return s;
+    const key = `format-forgotten-${s.seq + 1}`;
+    const next: State = {
+      ...s,
+      seq: s.seq + 1,
+      formats: s.formats.map((f) => (f.key === 'house' ? { ...f, key, label: `${f.label} (no longer the base)`, usedBy: 'A saved JD format; no longer the base' } : f)),
+      jobs: s.jobs.map((j) => (j.format === 'house' ? { ...j, format: key } : j)),
+      org: { ...s.org, learned: null },
+      notice: { text: 'Forgotten. New jobs start from the closest standard JD format again.' },
+    };
+    return { ...next, baseDismissed: basePattern(next)?.sig };
+  });
+}

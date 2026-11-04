@@ -8,6 +8,9 @@ import type { DemoJob, Facts, State } from './types';
 
 export type Pick = { label: string; why: string; patch: Partial<Facts> };
 
+/** What the picks need to know about a job, so they also work before the job exists (on the first screen). */
+type Subject = { id: string; family: string; facts: Facts };
+
 /** Roles that are often home-based, so "Remote" is a sensible pick for them. */
 const REMOTE_OK = new Set(['finance', 'comms', 'meal', 'hr', 'climate']);
 
@@ -26,7 +29,7 @@ export function placePatch(city: string): Partial<Facts> {
   return { location: `${p.city}, ${p.country}`, country: p.country, iso: p.iso, timezone: p.tz, currency: p.currency, arrangement: 'onsite' };
 }
 
-export function placePicks(s: State, j: DemoJob): Pick[] {
+export function placePicks(s: State, j: Subject): Pick[] {
   const out: Pick[] = [];
   const add = (city: string, why: string) => {
     if (out.length < 4 && !out.some((p) => p.label === city) && PLACES.some((x) => x.city === city)) out.push({ label: city, why, patch: placePatch(city) });
@@ -53,7 +56,7 @@ function workingDay(today: number, days: number, countryIso: string): string {
   return addDays(today, n);
 }
 
-export function deadlinePicks(s: State, j: DemoJob): Pick[] {
+export function deadlinePicks(s: State, j: Subject): Pick[] {
   const pick = (days: number, why: string): Pick => {
     const d = workingDay(s.today, days, j.facts.iso);
     return { label: longDate(d), why, patch: { deadline: d } };
@@ -65,9 +68,37 @@ export function deadlinePicks(s: State, j: DemoJob): Pick[] {
   ];
 }
 
-export function contractPicks(s: State, j: DemoJob): Pick[] {
+export function contractPicks(s: State, j: Subject): Pick[] {
   const options = CONTRACTS[j.facts.engagement] ?? CONTRACTS.job;
   const by = s.org.orgType === 'un' ? 'UN agencies' : s.org.orgType === 'contractor' ? 'development contractors' : 'NGOs like yours';
   const kind = j.facts.engagement === 'consultancy' ? 'consultancies' : j.facts.engagement === 'internship' ? 'internships' : j.facts.engagement === 'volunteer' ? 'volunteer roles' : 'staff jobs';
   return options.slice(0, 3).map((c) => ({ label: c, why: `A contract type ${by} use for ${kind}`, patch: { contract: c } }));
+}
+
+/** How a pick reads when added to the first message ("in Juba, South Sudan", "closing 25 November 2026"). */
+export function pickPhrase(kind: 'place' | 'deadline' | 'contract', p: Pick): string {
+  if (kind === 'place') return p.patch.arrangement === 'remote' ? ', home-based' : ` in ${p.patch.location}`;
+  if (kind === 'deadline') return `, closing ${p.label}`;
+  return `, ${p.label.replace(/\s*\(.*\)/, '').toLowerCase()} contract`;
+}
+
+/** Organisation memory: one click to reuse the main facts of the most recent similar job, labelled as coming from it. */
+export function memoryPick(s: State, j: Subject): { label: string; why: string; text: string } | null {
+  const title = j.facts.title.toLowerCase();
+  const past: DemoJob | undefined = s.jobs
+    .filter((x) => x.id !== j.id && x.facts.location && (x.family === j.family || (title && x.facts.title.toLowerCase() === title)))
+    .sort((a, b) => (b.publishedAt ?? b.createdAt) - (a.publishedAt ?? a.createdAt))[0];
+  if (!past || (j.family === 'programme' && past.facts.title.toLowerCase() !== title)) return null;
+  const parts = [
+    !j.facts.location && past.facts.location ? `in ${past.facts.location}` : '',
+    !j.facts.duration && past.facts.duration ? `${past.facts.duration}` : '',
+    !j.facts.contract && past.facts.contract ? `${past.facts.contract.toLowerCase()} contract` : '',
+    !j.facts.grade && past.facts.grade ? `at ${past.facts.grade}` : '',
+  ].filter(Boolean);
+  if (parts.length < 2) return null;
+  return {
+    label: `Same as your last ${past.facts.title} (${past.facts.location.split(',')[0]})`,
+    why: `From your own job "${past.facts.title}": ${parts.join(', ')}. Check them; you can change any of them.`,
+    text: `, ${parts.join(', ')}`,
+  };
 }

@@ -16,8 +16,10 @@ jest.mock('next/link', () => ({
 
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
-import { answerFact, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
-import { getState, go, STORAGE_KEY } from '@/components/employer-demo/store';
+import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
+import { emptyFacts } from '@/components/employer-demo/engine';
+import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
+import { getState, go, resetDemo, STORAGE_KEY } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
 const network: string[] = [];
@@ -325,6 +327,43 @@ describe('employer demo: the conversation', () => {
     expect(getState().draftsUsed).toBe(before);
     act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
     expect(getState().draftsUsed).toBe(before + 1);
+  });
+});
+
+describe('employer demo: phase 4 helpers', () => {
+  it('offers the facts of a similar past job, labelled, and phrases picks for the first message', () => {
+    act(() => resetDemo());
+    const s = getState();
+    const memory = memoryPick(s, { id: '', family: 'logistics', facts: { ...emptyFacts(), title: 'Logistics Officer' } });
+    expect(memory?.label).toMatch(/^Same as your last /);
+    expect(memory?.text).toMatch(/^, in /);
+    expect(memory?.text).not.toContain('closing');
+    expect(pickPhrase('contract', { label: 'Temporary (under a year)', why: '', patch: {} })).toBe(', temporary contract');
+    expect(pickPhrase('deadline', { label: '25 November 2026', why: '', patch: {} })).toBe(', closing 25 November 2026');
+    expect(pickPhrase('place', { label: 'Juba', why: '', patch: { location: 'Juba, South Sudan' } })).toBe(' in Juba, South Sudan');
+  });
+
+  it('offers a shared pattern of headings as the base JD format, respects Not now, and can forget the base', () => {
+    act(() => resetDemo());
+    const pattern = basePattern(getState());
+    expect(pattern?.count).toBe(3);
+    expect(pattern?.order.map((o) => o.key)).toContain('assessment');
+    act(() => notNowBase(pattern!.sig));
+    expect(getState().baseDismissed).toBe(pattern!.sig);
+    act(() => setBaseFormat(pattern!.order, 'from your own job descriptions'));
+    expect(basePattern(getState())).toBeNull();
+    expect(getState().formats.find((f) => f.key === 'house')?.order.map((o) => o.heading)).toEqual(pattern!.order.map((o) => o.heading));
+    act(() => forgetBase());
+    expect(getState().formats.some((f) => f.key === 'house')).toBe(false);
+    expect(getState().jobs.some((j) => j.format === 'house')).toBe(false);
+  });
+
+  it('does not ask again straight after Forget, even without Not now', () => {
+    act(() => resetDemo());
+    expect(basePattern(getState())).not.toBeNull();
+    act(() => forgetBase());
+    const pattern = basePattern(getState());
+    expect(getState().baseDismissed).toBe(pattern?.sig);
   });
 });
 

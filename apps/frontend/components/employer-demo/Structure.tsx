@@ -6,6 +6,7 @@ import Tip from '@/components/site/Tip';
 import { applyFormat, formatOf, reorderSections, toggleCommitment, toggleSection } from './actions';
 import DragList, { moveItem } from './DragList';
 import { COMMITMENTS, commitmentText, FAMILIES_ORDER, GROUPS, headingFor, recommendSections, SECTIONS } from './engine';
+import BasePrompt from './BasePrompt';
 import CreateFormatDialog from './FormatBuilder';
 import type { DemoJob, State } from './types';
 import { Dialog } from './ui';
@@ -27,6 +28,7 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="JD outline">
       <fieldset className="ej-fieldset aj-scroll flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-3" disabled={Boolean(s.reviewerAs)} aria-label={s.reviewerAs ? 'JD outline, read only for reviewers' : undefined}>
+        <BasePrompt s={s} />
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="ej-panel-label" htmlFor="ej-style">

@@ -17,13 +17,27 @@ const TONES: Array<{ key: Tone; label: string; tip: string }> = [
 ];
 
 /** Name a format, choose and order its sections, and save it for reuse. */
-export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () => void; onSaved?: (key: string) => void }) {
+export default function CreateFormatDialog({
+  onClose,
+  onSaved,
+  initial,
+  onSave,
+  title = 'Create your own JD format',
+}: {
+  onClose: () => void;
+  onSaved?: (key: string) => void;
+  /** Headings to start from, for example a pattern found in the organisation's own job descriptions. */
+  initial?: { name: string; order: Format['order']; tone: Tone };
+  /** Saves somewhere other than a new named format, for example as the base JD format. */
+  onSave?: (name: string, order: Format['order'], tone: Tone) => void;
+  title?: string;
+}) {
   const s = useDemo();
   const formats = s.formats.filter((f) => !f.key.startsWith('pasted-'));
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initial?.name ?? '');
   const [from, setFrom] = useState('');
-  const [order, setOrder] = useState<Format['order']>([]);
-  const [tone, setTone] = useState<Tone>('warm');
+  const [order, setOrder] = useState<Format['order']>(initial?.order ?? []);
+  const [tone, setTone] = useState<Tone>(initial?.tone ?? 'warm');
   const has = (k: string) => order.some((o) => o.key === k);
   const toggle = (k: string) => setOrder(has(k) ? order.filter((o) => o.key !== k) : [...order, { key: k, heading: SECTION_BY_KEY[k].label }]);
   const startFrom = (key: string) => {
@@ -32,19 +46,19 @@ export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () =
     setOrder(f ? f.order.map((o) => ({ ...o })) : []);
     if (f) setTone(f.tone);
   };
-  const taken = formats.some((f) => f.label.toLowerCase() === name.trim().toLowerCase());
-  const problem = !name.trim() ? 'Give it a name' : taken ? 'A format with this name already exists' : order.length < 3 ? 'Choose at least 3 sections' : '';
+  const taken = !onSave && formats.some((f) => f.label.toLowerCase() === name.trim().toLowerCase());
+  const problem = !onSave && !name.trim() ? 'Give it a name' : taken ? 'A format with this name already exists' : order.length < 3 ? 'Choose at least 3 sections' : '';
   const save = () => {
     if (problem) return;
-    const key = createFormat(name.trim(), order, tone);
-    onSaved?.(key);
+    if (onSave) onSave(name.trim(), order, tone);
+    else onSaved?.(createFormat(name.trim(), order, tone));
     onClose();
   };
 
   return (
     <Dialog
-      title="Create your own JD format"
-      subtitle="Name it, choose its sections and headings, and reuse it for any job description"
+      title={title}
+      subtitle={onSave ? 'Choose the sections and headings new jobs start from' : 'Name it, choose its sections and headings, and reuse it for any job description'}
       onClose={onClose}
       wide
       footer={
@@ -60,10 +74,12 @@ export default function CreateFormatDialog({ onClose, onSaved }: { onClose: () =
     >
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
-            <span className="ej-panel-label">Name</span>
-            <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="For example: Riverstone field roles" autoFocus />
-          </label>
+          {!onSave && (
+            <label className="flex flex-col gap-1">
+              <span className="ej-panel-label">Name</span>
+              <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="For example: Riverstone field roles" autoFocus />
+            </label>
+          )}
           <label className="flex flex-col gap-1">
             <span className="ej-panel-label">Start from</span>
             <select className="ej-select" value={from} onChange={(e) => startFrom(e.target.value)}>

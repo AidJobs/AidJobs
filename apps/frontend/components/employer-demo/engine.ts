@@ -1185,3 +1185,40 @@ export function completeText(text: string, own: string[] = []): string {
   }
   return '';
 }
+
+export type FactMark = { start: number; end: number; label: string };
+
+/**
+ * Facts recognised in what is being typed, with where they are, for a faint underline: the duty station, the closing date, the grade, the
+ * contract, and the duration, each with how AidJobs read it and any useful note.
+ */
+export function recognise(text: string, today: number, ownGrades: string[] = []): FactMark[] {
+  const marks: FactMark[] = [];
+  const add = (re: RegExp, label: (m: RegExpExecArray) => string | null) => {
+    const m = re.exec(text);
+    if (!m) return;
+    const l = label(m);
+    if (l && !marks.some((x) => m.index < x.end && m.index + m[0].length > x.start)) marks.push({ start: m.index, end: m.index + m[0].length, label: l });
+  };
+  const place = PLACES.find((p) => new RegExp(String.raw`\b${p.city.replace(/[.*+?^${}()|[\]\\']/g, '.')}\b`, 'i').test(text));
+  if (place) add(new RegExp(String.raw`\b${place.city.replace(/[.*+?^${}()|[\]\\']/g, '.')}\b`, 'i'), () => `Duty station: ${place.city}, ${place.country}.${place.risky ? ' A high-risk duty station, so AidJobs adds a section on conditions.' : ''}`);
+  const date = (m: RegExpExecArray) => {
+    const d = extractFacts(`closing ${m[0]}`, today).facts.deadline;
+    if (!d) return null;
+    const day = new Date(parseIso(d)).toLocaleDateString('en-GB', { weekday: 'long' });
+    const note = weekend(d, place?.iso) ? ` That is a weekend${place ? ` in ${place.country}` : ''}; a working day is usually better.` : '';
+    return `Closing date: ${day} ${longDate(d)}.${note}`;
+  };
+  add(/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+20\d\d)?/i, date);
+  add(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d\d)?/i, date);
+  add(/\b\d{1,2}[/.]\d{1,2}[/.]20\d\d\b/, date);
+  add(/\b(?:in|within)\s+\d\s+weeks?\b/i, date);
+  if (ownGrades.length) add(new RegExp(String.raw`\b(${ownGrades.map((g) => g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\b`, 'i'), (m) => `Grade: ${m[1].toUpperCase()}, on your organisation's own scale.`);
+  add(/\b(P-?[1-5]|D-?[12]|NO-?[A-D]|G-?[1-7])\b/i, (m) => {
+    const g = m[1].toUpperCase().replace('-', '');
+    return `Grade: ${g}, ${g.startsWith('P') || g.startsWith('D') ? 'the UN professional scale' : g.startsWith('NO') ? 'the UN national officer scale' : 'the UN general service scale'}.`;
+  });
+  add(/\bfixed[- ]term\b|\btemporary\b|\bpermanent\b|\bopen[- ]ended\b|\bconsultan(?:cy|t)\b|\binternship\b/i, (m) => `Contract: ${m[0].toLowerCase()}.`);
+  add(/\b\d{1,2}[- ]?(?:month|months)\b/i, (m) => `Duration: ${m[0]}.`);
+  return marks.sort((a, b) => a.start - b.start);
+}

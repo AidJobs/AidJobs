@@ -1,8 +1,9 @@
 'use client';
 
 import { ArrowUp, CornerDownRight } from 'lucide-react';
-import { forwardRef, useId, useImperativeHandle, useRef, type ReactNode } from 'react';
+import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
+import type { FactMark } from './engine';
 
 export type Readiness = { done: number; total: number; missing: string[] };
 
@@ -55,11 +56,51 @@ const Composer = forwardRef<
     large?: boolean;
     tools?: ReactNode;
     readiness?: Readiness;
+    /** Facts recognised in the text, underlined; hover shows how they were read, a click selects them to retype. */
+    marks?: FactMark[];
+    /** Called when a long job description is pasted, to offer reading it as a document. */
+    onPasteLong?: (text: string) => void;
+    /** Called when a file is dropped on the box. */
+    onFile?: (file: File) => void;
   }
->(function Composer({ value, onChange, onSend, suggestion, placeholder, label, autoFocus, compact, large, tools, readiness }, handle) {
+>(function Composer({ value, onChange, onSend, suggestion, placeholder, label, autoFocus, compact, large, tools, readiness, marks, onPasteLong, onFile }, handle) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const layer = useRef<HTMLDivElement>(null);
+  const ghost = useRef<HTMLDivElement>(null);
+  const [dropping, setDropping] = useState(false);
   useImperativeHandle(handle, () => ({ focus: () => ref.current?.focus() }), []);
   const hintId = useId();
+  const readId = useId();
+  const shown = (marks ?? []).filter((m) => m.end <= value.length);
+  useLayoutEffect(() => {
+    const ta = ref.current;
+    if (!ta) return;
+    for (const el of [layer.current, ghost.current]) {
+      if (!el) continue;
+      el.style.height = `${ta.clientHeight}px`;
+      el.scrollTop = ta.scrollTop;
+    }
+  });
+  const select = (m: FactMark) => {
+    ref.current?.focus();
+    ref.current?.setSelectionRange(m.start, m.end);
+  };
+  const paste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const t = e.clipboardData.getData('text');
+    if (onPasteLong && t.length > 400 && t.split('\n').filter((l) => l.trim()).length >= 4) onPasteLong(t);
+  };
+  const drag = (e: DragEvent<HTMLDivElement>, over: boolean) => {
+    if (!onFile || !Array.from(e.dataTransfer.types).includes('Files')) return;
+    e.preventDefault();
+    if (over || !e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(over);
+  };
+  const drop = (e: DragEvent<HTMLDivElement>) => {
+    const file = e.dataTransfer.files?.[0];
+    if (!onFile || !file) return;
+    e.preventDefault();
+    setDropping(false);
+    onFile(file);
+  };
   const showGhost = Boolean(suggestion) && Boolean(value);
   const accept = () => {
     onChange(value + suggestion);
@@ -67,11 +108,33 @@ const Composer = forwardRef<
   };
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="ej-composer" data-size={compact ? 'compact' : large ? 'large' : undefined}>
+      <div className="ej-composer" data-size={compact ? 'compact' : large ? 'large' : undefined} data-drop={dropping || undefined} onDragOver={(e) => drag(e, true)} onDragLeave={(e) => drag(e, false)} onDrop={drop}>
         {showGhost && (
-          <div className="ej-ghost" aria-hidden>
+          <div ref={ghost} className="ej-ghost" aria-hidden>
             {value}
             <span>{suggestion}</span>
+          </div>
+        )}
+        {shown.length > 0 && (
+          <div
+            ref={layer}
+            className="ej-marks"
+            aria-hidden
+            onWheel={(e) => {
+              if (ref.current) ref.current.scrollTop += e.deltaY;
+            }}
+          >
+            {shown.map((m, i) => (
+              <span key={m.start}>
+                {value.slice(i ? shown[i - 1].end : 0, m.start)}
+                <Tip label={`${m.label} Click to retype it.`} className="ej-inline-tip">
+                  <span className="ej-fact-mark" onMouseDown={(e) => { e.preventDefault(); select(m); }}>
+                    {value.slice(m.start, m.end)}
+                  </span>
+                </Tip>
+              </span>
+            ))}
+            {value.slice(shown[shown.length - 1].end)}
           </div>
         )}
         <textarea
@@ -79,7 +142,13 @@ const Composer = forwardRef<
           value={value}
           autoFocus={autoFocus}
           aria-label={label}
-          aria-describedby={showGhost ? hintId : undefined}
+          aria-describedby={[showGhost ? hintId : '', shown.length ? readId : ''].filter(Boolean).join(' ') || undefined}
+          onPaste={paste}
+          onScroll={(e) => {
+            const top = e.currentTarget.scrollTop;
+            if (layer.current) layer.current.scrollTop = top;
+            if (ghost.current) ghost.current.scrollTop = top;
+          }}
           placeholder={placeholder}
           rows={compact ? 1 : 3}
           onChange={(e) => onChange(e.target.value)}
@@ -106,6 +175,11 @@ const Composer = forwardRef<
           <SendButton disabled={!value.trim()} onClick={() => value.trim() && onSend(value.trim())} readiness={readiness} />
         </div>
       </div>
+      {shown.length > 0 && (
+        <span id={readId} className="sr-only">
+          AidJobs read: {shown.map((m) => m.label).join(' ')}
+        </span>
+      )}
       {showGhost && (
         <span id={hintId} className="sr-only">
           Completion: {suggestion.trim()}. Press Tab or the right arrow to accept it.

@@ -5,6 +5,7 @@ import {
   applyEdit,
   completeText,
   looseLocation,
+  recognise,
   suggestTitle,
   buildSection,
   detectRole,
@@ -153,6 +154,21 @@ describe('places, spelling, and completion', () => {
     expect(completeText('Riverstone Fie', ['Riverstone Field Coordinator'])).toBe('ld Coordinator');
     expect(completeText('hiring a ')).toBe('');
     expect(completeText('in')).toBe('');
+  });
+});
+
+describe('recognised facts', () => {
+  it('underlines the duty station, closing date, grade, contract, and duration, with how each was read', () => {
+    const text = 'Hiring a WASH lead in Juba, closing 29 November 2026, P4, fixed-term, 12 months';
+    const marks = recognise(text, TODAY);
+    expect(marks.map((m) => text.slice(m.start, m.end))).toEqual(['Juba', '29 November 2026', 'P4', 'fixed-term', '12 months']);
+    expect(marks[0].label).toContain('high-risk duty station');
+    expect(marks[1].label).toContain('Sunday');
+    expect(marks[1].label).toContain('weekend');
+    expect(marks[2].label).toContain('UN professional scale');
+    const own = recognise('Hiring at c1 in Amman, closing 27 November 2026', TODAY, ['B2', 'C1']);
+    expect(own[0].label).toContain("organisation's own scale");
+    expect(own.find((m) => m.label.startsWith('Closing'))?.label).toContain('weekend in Jordan');
   });
 });
 

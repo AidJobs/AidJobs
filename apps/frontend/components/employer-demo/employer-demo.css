@@ -74,7 +74,8 @@
 }
 
 .ej-composer textarea,
-.ej-ghost {
+.ej-ghost,
+.ej-marks {
   font: inherit;
   font-size: 14px;
   line-height: 1.5;
@@ -243,7 +244,8 @@
 }
 
 .ej-composer[data-size='large'] textarea,
-.ej-composer[data-size='large'] .ej-ghost {
+.ej-composer[data-size='large'] .ej-ghost,
+.ej-composer[data-size='large'] .ej-marks {
   font-size: 15px;
 }
 
@@ -783,4 +785,49 @@
 .aj-root[data-theme='dark'] .ej-rail-badge,
 .aj-root[data-theme='dark'] .ej-count-badge {
   color: #1d1306;
+}
+
+/* Phase 4: recognised facts underlined over the text, the drop target, the fact slot, and the paste offer. */
+.ej-composer textarea,
+.ej-ghost,
+.ej-marks {
+  scrollbar-gutter: stable;
+}
+
+.ej-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+}
+
+
+.aj-tip.ej-inline-tip {
+  display: inline;
+}
+
+.ej-fact-mark {
+  border-bottom: 2px dotted var(--sage-5);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ej-composer[data-drop='true'] {
+  border-style: dashed;
+  border-color: var(--sage-7);
+  background: var(--sage-1);
+}
+
+.ej-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--sage-1);
+  color: var(--text);
+  font-size: 13px;
 }

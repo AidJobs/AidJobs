@@ -3,10 +3,11 @@
 import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, Sparkles, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
-import { invite, removeMember, setRole } from './actions';
+import { forgetBase, invite, removeMember, setRole } from './actions';
 import { FAMILIES_ORDER, SECTIONS } from './engine';
 import { nextId, update, useDemo } from './store';
 import type { ApprovalSetting, Format, Org, OrgType, Person, Tone } from './types';
+import BasePrompt from './BasePrompt';
 import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
 
@@ -532,6 +533,15 @@ export function Styles() {
         </button>
       </div>
       {creating && <CreateFormatDialog onClose={() => setCreating(false)} />}
+      <BasePrompt s={s} />
+      {s.formats.some((f) => f.key === 'house') && (
+        <p className="aj-faint m-0" style={{ fontSize: 12 }}>
+          Your base JD format is where new jobs start.{' '}
+          <button type="button" className="aj-text-btn" style={{ height: 24, padding: 0 }} onClick={forgetBase}>
+            Forget our base JD format
+          </button>
+        </p>
+      )}
       {FAMILIES_ORDER.map((fam) => {
         const list = shown.filter((f) => f.family === fam);
         if (!list.length) return null;

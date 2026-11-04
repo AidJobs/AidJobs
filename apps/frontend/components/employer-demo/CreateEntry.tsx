@@ -1,15 +1,17 @@
 'use client';
 
 import { Star } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Tip from '@/components/site/Tip';
-import { defaultFormatKey, formatOf, startJob } from './actions';
-import Composer from './Composer';
-import { FormatMenu, PlusMenu } from './ComposerTools';
-import { addSuggestions, completeText, detectRole, extractFacts, headingFor, PLACES, SECTION_BY_KEY } from './engine';
+import { defaultFormatKey, formatOf, importJobDescription, startJob } from './actions';
+import Composer, { type ComposerHandle } from './Composer';
+import { FactSlot, FormatMenu, PlusMenu } from './ComposerTools';
+import { addSuggestions, completeText, detectRole, extractFacts, headingFor, PLACES, recognise, ROLE_FAMILIES, SECTION_BY_KEY } from './engine';
 import CreateFormatDialog from './FormatBuilder';
 import { MARKET_SAMPLE } from './sample';
 import { go, useDemo } from './store';
+import { readJobFile } from './readFile';
+import type { State } from './types';
 import UploadDialog from './Upload';
 
 /** Set when a job starts from this screen, so its workspace opens once with the chat open and focused. */
@@ -28,12 +30,31 @@ const PILL_LABEL: Record<string, string> = {
   background: 'Background',
   setting: 'Setting',
 };
+
+/** Realistic examples for the empty box, from the organisation's own sectors and the places it works in. */
+function examplesFor(s: State): string[] {
+  const roles = ROLE_FAMILIES.filter((r) => s.org.sectors.includes(r.sector)).map((r) => r.title);
+  const cities = s.org.countries.map((c) => PLACES.find((p) => p.country === c)?.city).filter(Boolean) as string[];
+  const out = roles.flatMap((title, i) => (cities.length ? [`We're hiring a ${title} in ${cities[i % cities.length]}, 12-month fixed-term…`] : [`We're hiring a ${title}…`]));
+  return out.length ? out : ['Describe the role in a few lines'];
+}
+
 export default function CreateEntry() {
   const s = useDemo();
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
   const [extra, setExtra] = useState<string[]>([]);
   const [dialog, setDialog] = useState<'upload' | 'create' | null>(null);
+  const [offer, setOffer] = useState('');
+  const [note, setNote] = useState('');
+  const [example, setExample] = useState(0);
+  const box = useRef<ComposerHandle>(null);
+  const examples = examplesFor(s);
+  useEffect(() => {
+    if (text) return;
+    const t = setInterval(() => setExample((n) => n + 1), 4000);
+    return () => clearInterval(t);
+  }, [text]);
   const fkey = picked ?? defaultFormatKey(s);
   const format = formatOf(s, fkey);
   const { facts } = extractFacts(text, s.today);
@@ -49,6 +70,24 @@ export default function CreateEntry() {
     { ok: Boolean(facts.contract || facts.duration), name: 'the contract' },
   ];
   const readiness = { done: have.filter((h) => h.ok).length, total: have.length, missing: have.filter((h) => !h.ok).map((h) => h.name) };
+  const imported = (body: string) => {
+    const id = importJobDescription(body);
+    if (!id) return setNote('No headings or text were found in it. Headings work best on their own lines.');
+    setOffer('');
+    setText('');
+    go('create', id);
+  };
+  const dropped = async (file: File) => {
+    setNote('Reading the file…');
+    const r = await readJobFile(file);
+    if (r.error) return setNote(r.error);
+    setNote('');
+    imported(r.text ?? '');
+  };
+  const add = (phrase: string) => {
+    setText((t) => t.trimEnd().replace(/[.,;]$/, '') + phrase);
+    box.current?.focus();
+  };
   const send = (v: string) => {
     try {
       localStorage.setItem(OPEN_CHAT_KEY, '1');
@@ -73,12 +112,20 @@ export default function CreateEntry() {
 
         <div className="flex flex-col gap-2.5">
           <Composer
+            ref={box}
             value={text}
-            onChange={setText}
+            onChange={(v) => {
+              setText(v);
+              setNote('');
+              if (!v) setOffer('');
+            }}
             onSend={send}
             suggestion={completeText(text, own)}
             readiness={text.trim() ? readiness : undefined}
-            placeholder="Describe the role in a few lines"
+            placeholder={examples[example % examples.length]}
+            marks={text ? recognise(text, s.today, s.org.scale.map((g) => g.grade)) : undefined}
+            onPasteLong={setOffer}
+            onFile={(f) => void dropped(f)}
             label="Describe the role"
             large
             autoFocus
@@ -86,9 +133,26 @@ export default function CreateEntry() {
               <>
                 <PlusMenu s={s} onUpload={() => setDialog('upload')} />
                 <FormatMenu s={s} value={picked} onChange={setPicked} onCreate={() => setDialog('create')} />
+                {(role || facts.title) && <FactSlot s={s} facts={facts} family={role?.key ?? 'programme'} onAdd={add} />}
               </>
             }
           />
+          {offer && (
+            <div className="ej-offer" role="status">
+              <span className="min-w-0 flex-1">This looks like a job description. Read it as one, keeping its wording and headings?</span>
+              <button type="button" className="aj-ink-btn" style={{ height: 30 }} onClick={() => imported(text || offer)}>
+                Read it
+              </button>
+              <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => setOffer('')}>
+                Keep it as a message
+              </button>
+            </div>
+          )}
+          {note && (
+            <p className="m-0" role="status" style={{ fontSize: 12, color: note.startsWith('Reading') ? 'var(--text-2)' : 'var(--red)' }}>
+              {note}
+            </p>
+          )}
           <div className="aj-no-scrollbar flex items-center gap-1.5 overflow-x-auto whitespace-nowrap" role="group" aria-label="Add sections">
             <span className="aj-faint mr-0.5 shrink-0" style={{ fontSize: 12, fontWeight: 650 }}>
               Add:

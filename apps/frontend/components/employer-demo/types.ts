@@ -205,4 +205,6 @@ export type State = {
   reviewerAs: string | null;
   notice: Notice;
   seq: number;
+  /** The base JD format pattern the organisation answered "Not now" to; it is offered again only when the pattern grows. */
+  baseDismissed?: string;
 };

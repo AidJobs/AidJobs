@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, History, ListTree, Maximize2, MessagesSquare, Mini
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, deleteDraft, downloadCopy, isApproved } from './actions';
+import { approvalRequired, deleteDraft, downloadCopy, isApproved, updateBaseFromJob } from './actions';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ChatPanel, DocumentView, openChecks, ReviewArea, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
@@ -160,6 +160,7 @@ export default function Create({ id }: { id?: string }) {
             ...(phone && job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
             ...(phone && job.sections.length ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
+            ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
             {
               label: job.status === 'review' || job.status === 'approved' ? 'Withdraw from review and delete' : 'Delete job draft',
               danger: true,
