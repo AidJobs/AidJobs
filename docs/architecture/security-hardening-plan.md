@@ -1702,6 +1702,29 @@ One shared proxy helper for the route files under `apps/frontend/app/api/`: the 
 
 A proposal for a Cursor project hook, or another enforceable guard, that blocks common direct attempts to print `.env` files or connection strings, with a safe way to check whether a setting is present (set or not set, never the value). Tested against blocked and permitted commands. It does not claim to prevent every possible disclosure.
 
+#### Stage 5: implementation record
+
+Investigated read-only on 4 November 2026; plan approved by the user the same day with the agent's nine recommendations. Built as PR #102.
+
+- **The likely route of the 26 October leak** (Repository, from that chat's transcript): the agent's own search tool, in content mode, over `apps/backend/.env`, not a shell command. So the guard covers the agent's file tools as well as the shell.
+- **The guard** (`.cursor/hooks/secret-guard.mjs`, registered in the committed `.cursor/hooks.json`; Node, which every machine here has; Windows has no working `python3`). It refuses, and names the rule and the checker, never the command:
+  - shell commands that read an `.env` file (readers, copies, `git show` and similar), dump the environment, print a credential-named variable, run code that prints the environment or a credential, reveal stored credentials (`gh auth token`, `vercel env pull`, Render's env-vars API, `git credential fill`, `docker inspect`), or carry a connection string with a password for a remote host;
+  - the Read tool on `.env`, `.netrc`, `.git-credentials`, `.pgpass`, private keys and `.pem` files (templates such as `.env.sample` allowed); content searches of such a file or with an `.env` glob, and of a folder outside the workspace that holds one (inside, Grep honours `.gitignore`, which ignores the env files; a test checks that it still does); file-name searches are allowed;
+  - the browser on the Render, Vercel and Supabase pages that show secrets.
+  After each shell, read or search result, it compares the output with the values in the four env files and the secret-named process variables (whole values, and a URL's password); on a match it tells the agent to stop and that the value should be rotated, naming the variable only. A prompt that contains one of those values is stopped before it is sent.
+- **Fails closed:** the four refusing hooks have `failClosed: true` (if the guard cannot run, the action is refused), set after the manual check below passed.
+- **The checker** (`scripts/env_check.mjs NAME …`, `--names [TEXT]`): set or not set, the length, and for a URL its scheme, whether it has a password, and whether the host is local; never a value. AGENTS.md now points to it.
+- **Removed:** `apps/backend/scripts/run_db_checks.py` (unused; it printed database results with the connection read from `.env`).
+- **Edits to the guard are not blocked;** instead CI runs the guard's and the checker's tests in the frontend job, including a test that `.cursor/hooks.json` still registers the guard on every event, with the right matchers and fail-closed settings.
+
+**Results (Verified, 4 November 2026):**
+- Tests: 127 pass (`node --test .cursor/hooks/secret-guard.test.mjs scripts/env_check.test.mjs`). They use only fake values built at run time and check that no denial or warning repeats the command or the value.
+- Replay of every past shell, Read and Grep call in this project's agent transcripts through the guard: 6,291 shell commands, 3 refused, each a `Get-Content` of an `.env` file to list its names (the checker's `--names` replaces it); 3,668 reads and 2,374 searches, 8 refused, all of `.env` files. The first replay found 12 false refusals (a copy that excludes `.env`, presence checks such as `bool(os.getenv(...))` and `[bool]$env:...`, listings of names only, and `GetEnvironmentVariables(...).Keys`); each is now allowed and tested, and the matching unsafe forms are tested as still refused.
+- Manual check in Cursor on Windows, with a fake `.env` in a temporary folder: the Read tool refused; a content search of that folder printed the fake lines, which led to the outside-folder rule, after which it was refused and a file-name search still worked; a shell command printing a credential-named variable refused by the hook ("Command execution was blocked by a hook"); in a subagent, the Read and the search were both refused, so subagents are covered; the Write tool refused to create the fake `.env`, so agents cannot overwrite env files either (a side effect, kept); `node scripts/env_check.mjs` reported the real settings by shape only. Cursor's own auto-review stopped two shell probes before the hook ran.
+- **Not verified live:** the after-output warning and the prompt stop, which would need a real secret in the chat; both are covered by the tests' checks of the hook's answers.
+
+**Limits, recorded:** the guard matches patterns, so a determined or unusual command can still print a secret (for example, a script file that prints one, or a value encoded first); it protects the agent's tools in this project only, not the user's own terminal; the after-output check sees only the values in the four env files and the agent's process environment, not values held only on Render or Vercel.
+
 ### Stage 6. Least-privilege database roles
 
 A plan, after stages 3 and 4 are reviewed. It inventories the tables the backend reads and writes, the functions and privileges it needs, the existing Row-Level Security policies, schema-migration needs, the admin operations that run schema changes, and the rollback and verification steps. It separates an application role from a read-only diagnostic role. No role, grant, credential, or Render setting changes until the user approves the plan; the user then makes the changes step by step.

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10, "failClosed": true }
+    ],
+    "preToolUse": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "matcher": "Read|Grep", "timeout": 10, "failClosed": true }
+    ],
+    "beforeReadFile": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10, "failClosed": true }
+    ],
+    "beforeMCPExecution": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10, "failClosed": true }
+    ],
+    "postToolUse": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "matcher": "Shell|Read|Grep", "timeout": 10 }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "node .cursor/hooks/secret-guard.mjs", "timeout": 10 }
+    ]
+  }
+}
