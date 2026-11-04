@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { daysUntil, startOfDay } from './engine';
+import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
 import { initialState } from './sample';
 import type { DemoJob, State } from './types';
 
@@ -23,7 +23,10 @@ function save(s: State) {
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline. */
 function normalise(s: State): State {
   let changed = false;
-  const jobs = s.jobs.map((j): DemoJob => {
+  const jobs = s.jobs.map((j0): DemoJob => {
+    const tags = outlineOrder(j0.tags);
+    const j = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
+    if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;
       return { ...j, status: 'closed', closedAt: s.today, closeReason: 'deadline', audit: [...j.audit, { at: s.today, who: 'AidJobs', what: 'Closed automatically at the deadline' }] };

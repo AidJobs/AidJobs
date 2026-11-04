@@ -15,6 +15,8 @@ import {
   orderSections,
   parseIso,
   readPasted,
+  inOutlineOrder,
+  outlineOrder,
   recommendSections,
   suggestTitle,
   type BuildContext,
@@ -341,10 +343,10 @@ export function toggleSection(id: string, key: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
-      const tags = has ? j.tags.filter((t) => t !== key) : [...j.tags, key];
+      const tags = has ? j.tags.filter((t) => t !== key) : outlineOrder([...j.tags, key]);
       const next = reopenApproval({ ...j, tags });
       if (!j.sections.length) return next;
-      return { ...next, sections: has ? j.sections.filter((x) => x.key !== key) : [...j.sections, buildSection(key, ctxFor(s, next))] };
+      return { ...next, sections: has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, buildSection(key, ctxFor(s, next))], tags) };
     }),
   }));
 }
@@ -353,8 +355,8 @@ export function toggleSection(id: string, key: string) {
 export function reorderSections(id: string, keys: string[]) {
   updateJob(id, (j) => {
     const queue = [...keys];
-    const tags = j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t));
-    const sections = tags.map((t) => j.sections.find((x) => x.key === t)).filter(Boolean) as DemoJob['sections'];
+    const tags = outlineOrder(j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t)));
+    const sections = inOutlineOrder(j.sections, tags);
     return { ...j, tags, sections: j.sections.length ? sections : j.sections };
   });
 }
@@ -422,8 +424,8 @@ export function importPasted(text: string, fromHost?: string): string | null {
   update((st) => ({ ...st, formats: [...st.formats, format] }));
   const st2 = getState();
   const job = newJob(st2, id, facts, role?.key ?? 'programme', fkey);
-  job.tags = merged.map((m) => m.key);
-  job.sections = merged.map((m) => ({ key: m.key, title: m.heading, lines: m.lines, edited: true }));
+  job.tags = outlineOrder(merged.map((m) => m.key));
+  job.sections = inOutlineOrder(merged.map((m) => ({ key: m.key, title: m.heading, lines: m.lines, edited: true })), job.tags);
   job.versions = [{ n: 1, at: Date.now(), note: fromHost ? `Imported from ${fromHost}` : 'Imported from an uploaded job description', sections: job.sections }];
   const read = fromHost ? `I read ${merged.length} sections from the page on ${fromHost} (simulated in the demo: a sample job description stands in for the page)` : `I read ${merged.length} sections from your job description`;
   job.chat = [msg('ai', `${read} and kept the wording and headings. Check the facts in the top row, then ask for any changes.`, ['Shorter', 'More formal'])];
@@ -757,7 +759,7 @@ export function basePattern(s: State): { order: Format['order']; count: number; 
   const groups = new Map<string, { order: Format['order']; count: number }>();
   for (const j of s.jobs) {
     if (j.sections.length < 3) continue;
-    const order = j.sections.map((x) => ({ key: x.key, heading: x.title }));
+    const order = inOutlineOrder(j.sections, j.tags).map((x) => ({ key: x.key, heading: x.title }));
     const key = order.map((o) => o.heading.toLowerCase()).join('|');
     const g = groups.get(key);
     groups.set(key, { order, count: (g?.count ?? 0) + 1 });
@@ -785,7 +787,7 @@ export function notNowBase(sig: string) {
 /** Makes a job's outline the organisation's base JD format; offered from the job's menu, never applied automatically. */
 export function updateBaseFromJob(id: string) {
   const j = getState().jobs.find((x) => x.id === id);
-  if (j?.sections.length) setBaseFormat(j.sections.map((x) => ({ key: x.key, heading: x.title })), `from "${j.facts.title || 'a job description'}"`, j.tone);
+  if (j?.sections.length) setBaseFormat(inOutlineOrder(j.sections, j.tags).map((x) => ({ key: x.key, heading: x.title })), `from "${j.facts.title || 'a job description'}"`, j.tone);
 }
 
 /** Forgets the base JD format: it stays as an ordinary saved format, and new jobs start from the closest standard JD format again. */

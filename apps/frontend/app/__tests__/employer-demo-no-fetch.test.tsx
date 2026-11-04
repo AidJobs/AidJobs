@@ -18,9 +18,10 @@ import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
+import { reorderSections, toggleSection } from '@/components/employer-demo/actions';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
-import { getState, go, resetDemo, STORAGE_KEY } from '@/components/employer-demo/store';
+import { getState, go, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
 const network: string[] = [];
@@ -365,6 +366,33 @@ describe('employer demo: phase 4 helpers', () => {
     act(() => forgetBase());
     const pattern = basePattern(getState());
     expect(getState().baseDismissed).toBe(pattern?.sig);
+  });
+});
+
+describe('employer demo: outline and job description read in the same order', () => {
+  it('after adding and moving sections, the job description follows the outline exactly', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#create/job-comms');
+    const outlineBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('JD outline'));
+    if (!container.querySelector('[aria-label="JD outline"] .ej-drag-row')) act(() => (outlineBtn as HTMLElement)?.click());
+    act(() => {
+      toggleSection('job-comms', 'deliverables');
+      toggleSection('job-comms', 'team');
+      toggleSection('job-comms', 'assessment');
+    });
+    const job = () => getState().jobs.find((j) => j.id === 'job-comms')!;
+    const inGroup = job().tags.filter((k) => ['purpose', 'responsibilities', 'deliverables', 'relationships', 'learning', 'deployment', 'firstweeks'].includes(k));
+    act(() => reorderSections('job-comms', [inGroup[inGroup.length - 1], ...inGroup.slice(0, -1)]));
+    const outline = Array.from(container.querySelectorAll('[aria-label="JD outline"] .ej-drag-row')).map((r) => r.textContent?.trim());
+    const doc = Array.from(container.querySelectorAll('.ej-doc section[aria-label]')).map((s) => s.getAttribute('aria-label')).filter((t) => t !== 'Commitments');
+    expect(outline.length).toBeGreaterThan(5);
+    expect(doc).toEqual(outline);
+    expect(job().sections.map((x) => x.key)).toEqual(job().tags);
   });
 });
 

@@ -17,7 +17,7 @@ import {
   PRICE_LABEL,
   publish,
 } from './actions';
-import { addDays, arrangementLabel, commitmentText, COMMITMENTS, daysUntil, longDate, salaryText, slug } from './engine';
+import { addDays, arrangementLabel, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, longDate, salaryText, slug } from './engine';
 import { openSandboxCheckout, paddleConfigured, PRICE_PACK, PRICE_PREMIUM } from './paddle';
 import { go, notify, updateJob, useDemo } from './store';
 import type { DemoJob, Org, ReachRecord, State } from './types';
@@ -122,7 +122,7 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
           Apply on {s.org.short} <ExternalLink size={13} strokeWidth={2} />
         </a>
       </div>
-      {job.sections.map((sec) => (
+      {inOutlineOrder(job.sections, job.tags).map((sec) => (
         <section key={sec.key}>
           <h3>{sec.title}</h3>
           <Lines lines={sec.lines} />

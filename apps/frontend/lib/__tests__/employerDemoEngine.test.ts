@@ -5,6 +5,7 @@ import {
   applyEdit,
   completeText,
   looseLocation,
+  outlineOrder,
   recognise,
   suggestTitle,
   buildSection,
@@ -169,6 +170,30 @@ describe('recognised facts', () => {
     const own = recognise('Hiring at c1 in Amman, closing 27 November 2026', TODAY, ['B2', 'C1']);
     expect(own[0].label).toContain("organisation's own scale");
     expect(own.find((m) => m.label.startsWith('Closing'))?.label).toContain('weekend in Jordan');
+  });
+});
+
+describe('the outline order and the job description order', () => {
+  it('keeps every format in group order, so no format reads differently from its outline', () => {
+    const mixed = FORMATS.filter((f) => outlineOrder(f.order.map((o) => o.key)).join() !== f.order.map((o) => o.key).join()).map((f) => f.key);
+    expect(mixed).toEqual([]);
+  });
+
+  it('places a new section at the end of its own group, not at the bottom', () => {
+    const keys = ['about', 'purpose', 'responsibilities', 'requirements', 'offer', 'apply'];
+    expect(outlineOrder([...keys, 'deliverables'])).toEqual(['about', 'purpose', 'responsibilities', 'deliverables', 'requirements', 'offer', 'apply']);
+    expect(outlineOrder([...keys, 'team'])).toEqual(['about', 'team', 'purpose', 'responsibilities', 'requirements', 'offer', 'apply']);
+    expect(outlineOrder(['responsibilities', 'purpose', 'about'])).toEqual(['about', 'responsibilities', 'purpose']);
+  });
+
+  it('adds a section through the chat inside its group, in the text too', () => {
+    const f = { ...emptyFacts(), title: 'Finance Officer' };
+    const c = ctx(f);
+    const keys = ['about', 'purpose', 'responsibilities', 'requirements', 'apply'];
+    const sections = keys.map((k) => buildSection(k, c));
+    const r = applyEdit('add deliverables', keys, sections, c, TODAY);
+    expect(r.tags).toEqual(['about', 'purpose', 'responsibilities', 'deliverables', 'requirements', 'apply']);
+    expect(r.sections.map((x) => x.key)).toEqual(r.tags);
   });
 });
 

@@ -727,9 +727,31 @@ export function addSuggestions(format: Format, f: Facts): string[] {
   return ADD_RANK.filter((k) => !have.includes(k)).slice(0, 5);
 }
 
+/**
+ * The order the JD outline shows: group by group (the employer, the job, the person, the offer, applying), keeping the order inside each
+ * group. The job description always follows this order, so what the outline shows is what the job description reads.
+ */
+export function outlineOrder(keys: string[]): string[] {
+  const rank = (k: string) => {
+    const g = GROUPS.findIndex((x) => x.key === SECTION_BY_KEY[k]?.group);
+    return g < 0 ? GROUPS.length : g;
+  };
+  return keys
+    .map((k, i) => ({ k, i }))
+    .sort((a, b) => rank(a.k) - rank(b.k) || a.i - b.i)
+    .map((x) => x.k);
+}
+
+/** Sections put in the outline's order; any section without a key in the list keeps its place at the end. */
+export function inOutlineOrder<T extends { key: string }>(sections: T[], keys: string[]): T[] {
+  const order = outlineOrder(keys);
+  const listed = order.map((k) => sections.find((x) => x.key === k)).filter(Boolean) as T[];
+  return [...listed, ...sections.filter((x) => !order.includes(x.key))];
+}
+
 export function orderSections(keys: string[], format: Format): string[] {
   const own = format.order.map((o) => o.key);
-  return [...own.filter((k) => keys.includes(k)), ...DOC_ORDER.filter((k) => keys.includes(k) && !own.includes(k))];
+  return outlineOrder([...own.filter((k) => keys.includes(k)), ...DOC_ORDER.filter((k) => keys.includes(k) && !own.includes(k))]);
 }
 
 export function headingFor(key: string, format: Format): string {
@@ -1027,8 +1049,8 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   if (add) {
     const def = SECTIONS.find((x) => add[1].includes(x.label.toLowerCase()) || add[1].includes(x.key));
     if (def && !keys.includes(def.key)) {
-      const nextKeys = [...keys, def.key];
-      return { sections: [...sections, buildSection(def.key, ctx)], tags: nextKeys, tone, facts, reply: `Added ${headingFor(def.key, ctx.format)}.` };
+      const nextKeys = outlineOrder([...keys, def.key]);
+      return { sections: inOutlineOrder([...sections, buildSection(def.key, ctx)], nextKeys), tags: nextKeys, tone, facts, reply: `Added ${headingFor(def.key, ctx.format)}.` };
     }
   }
   const remove = t.match(/\b(?:remove|drop|delete)\s+(?:the\s+)?(.+)/);

@@ -7,7 +7,7 @@ import { addRemark, answerFact, dismissChange, editSection, markGenuine, sendCha
 import { contractPicks, deadlinePicks, placePatch, placePicks } from './answers';
 import { DOCUMENTS } from './apply';
 import Composer, { type ComposerHandle } from './Composer';
-import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
+import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
 import { ReviewerBar, ReviewSummary } from './Review';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
 import { getState } from './store';
@@ -407,7 +407,7 @@ export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; on
           </div>
           <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
-        {job.sections.map((sec) => (
+        {inOutlineOrder(job.sections, job.tags).map((sec) => (
           <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} />
         ))}
         {job.commitments.length > 0 && (
