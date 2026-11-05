@@ -6,7 +6,7 @@ import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
 import { daysUntil } from './engine';
 import { BADGE, BADGE_TIP } from './plans';
-import { JobPage } from './Publish';
+import { JobPageLangs } from './Publish';
 import { PUBLIC_SAMPLES } from './sample';
 import { useDemo } from './store';
 import type { DemoJob, State } from './types';
@@ -155,7 +155,7 @@ export default function Public({ id }: { id?: string }) {
       {open && (ownOpen || openCard) && (
         <Dialog title={ownOpen ? ownOpen.facts.title : (openCard?.title ?? '')} subtitle={ownOpen ? s.org.name : openCard?.org} onClose={() => setOpen(null)} wide>
           {ownOpen ? (
-            <JobPage job={ownOpen} s={s} />
+            <JobPageLangs job={ownOpen} s={s} />
           ) : (
             <p className="aj-muted">A sample job from another fictional organisation, to show the list. Its page is not part of this demo.</p>
           )}

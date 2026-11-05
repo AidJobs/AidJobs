@@ -220,7 +220,7 @@ describe('employer demo: never calls the network', () => {
     click('Amplify this job · US$28.40');
     click('Pay US$28.40');
     expect(getState().jobs.find((j) => j.id === id)?.plan).toBe('amplify');
-    expect(getState().freeUses.some((u) => u.jobId === id)).toBe(false);
+    expect(getState().freeUses.some((u) => u.jobId === id)).toBe(true);
 
     act(() => {
       const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
@@ -421,6 +421,45 @@ describe('employer demo: outline and job description read in the same order', ()
     expect(outline.length).toBeGreaterThan(5);
     expect(doc).toEqual(outline);
     expect(job().sections.map((x) => x.key)).toEqual(job().tags);
+  });
+});
+
+describe('employer demo: before you publish', () => {
+  it('opens the market check, reviews a French version, and prints the field-post notice, without the network', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#publish/job-fin');
+    shows('Before you publish');
+    shows('With Amplify');
+    click('Choose Amplify');
+    click(/^How does your job compare\?/);
+    shows('Sample figures in the demo');
+    click(/^See the \d+ similar jobs$/);
+    expect(container.querySelector('[aria-label="Similar open jobs (sample)"]')?.children.length).toBeGreaterThan(4);
+    click(/^Language versions/);
+    click('Add French');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.translations?.fr?.reviewed).toBe(false);
+    click('Review');
+    shows('French version');
+    click('Mark as reviewed');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.translations?.fr?.reviewed).toBe(true);
+    click(/^Français/);
+    shows('Clôture le');
+    expect(container.querySelector('article[lang="fr"]')).not.toBeNull();
+    click(/^Field-post notice/);
+    click('Open the notice');
+    expect(container.querySelector('svg[aria-label^="QR code for https://aidjobs.app/jobs/finance-officer"]')).not.toBeNull();
+    click('Français');
+    shows('Nous recrutons');
+    const print = jest.fn();
+    Object.defineProperty(window, 'print', { configurable: true, value: print });
+    click('Print');
+    expect(print).toHaveBeenCalled();
+    expect(network).toEqual([]);
   });
 });
 

@@ -478,9 +478,13 @@ export function daysUntil(today: number, iso: string): number {
   return Math.round((parseIso(iso) - startOfDay(today)) / DAY);
 }
 
-/** "a" or "an" before a word, by its sound: "an Education Specialist", "a UNICEF post", "an HR Officer". */
+/** Acronyms said as words, not letter by letter, so they take the article of their first sound: "a MEAL Coordinator". */
+const SAID_AS_WORDS = /^(MEAL|MERL|NATO|NORCAP|SMART|HEAT|RedR|FEWS|SPHERE|LEGS)\b/;
+
+/** "a" or "an" before a word, by its sound: "an Education Specialist", "a UNICEF post", "an HR Officer", "a MEAL Coordinator". */
 export function article(word: string): 'a' | 'an' {
   const w = word.trim();
+  if (SAID_AS_WORDS.test(w)) return /^[AEIOU]/.test(w) ? 'an' : 'a';
   if (/^(uni|use|usu|eu|one|once)/i.test(w) || /^U[A-Z]/.test(w)) return 'a';
   if (/^(hour|honest|honou?r|heir)/i.test(w) || /^[FHLMNRSX][A-Z]/.test(w)) return 'an';
   return /^[aeiou]/i.test(w) ? 'an' : 'a';

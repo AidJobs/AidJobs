@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
+  addTranslation,
   amplifyLive,
+  applyFix,
   applyFormat,
   approvalRequired,
   basePattern,
@@ -9,15 +11,19 @@ import {
   canSkipApproval,
   deleteDraft,
   editSection,
+  editTranslation,
   extend,
   isApproved,
   markGenuine,
   overrideApproval,
   publish,
   publishBlock,
+  refreshTranslation,
+  removeTranslation,
   reorderSections,
   restoreVersion,
   reviewerDecision,
+  reviewTranslation,
   saveEditedBase,
   sendChat,
   settleRemark,
@@ -27,7 +33,9 @@ import {
   toggleSection,
   undoLastChange,
 } from '../../components/employer-demo/actions';
-import { article, daysUntil, isoDay } from '../../components/employer-demo/engine';
+import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
+import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
+import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
 import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
 
@@ -290,11 +298,11 @@ describe('free jobs: two a calendar month, counted at first use', () => {
     expect(getState().freeUses.length).toBe(before);
   });
 
-  it('paying for a job that had counted gives its free job back', () => {
+  it('paying for a job that had counted does not give its free job back', () => {
     expect(freeLeft(getState())).toBe(1);
     buy('one', 'Communications Intern');
     expect(publish('job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe(true);
-    expect(freeLeft(getState())).toBe(2);
+    expect(freeLeft(getState())).toBe(1);
     expect(job('job-comms').plan).toBe('amplify');
   });
 
@@ -328,7 +336,7 @@ describe('packages and the subscription', () => {
     expect(amplifyLive('job-meal', 'onHand')).toBe(false);
   });
 
-  it('a package job amplifies a live free job and gives its free job back', () => {
+  it('a package job amplifies a live free job; the free job it used stays used', () => {
     const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
     publish(id, { plan: 'free', schedule: null });
     expect(freeLeft(getState())).toBe(0);
@@ -336,7 +344,7 @@ describe('packages and the subscription', () => {
     expect(amplifyLive(id, 'onHand')).toBe(true);
     expect(job(id).plan).toBe('amplify');
     expect(paidJobsLeft(getState())).toBe(4);
-    expect(freeLeft(getState())).toBe(1);
+    expect(freeLeft(getState())).toBe(0);
   });
 
   it('the subscription gives 3 jobs a month, extra jobs at US$18, and can be cancelled', () => {
@@ -389,6 +397,124 @@ describe('publishing without approval', () => {
   });
 });
 
+describe('the market check', () => {
+  it('compares with a labelled sample of similar open jobs, and says so when there are too few', () => {
+    const check = marketCheck(job('job-fin'), getState(), null);
+    expect(check.thin).toBe(false);
+    expect(check.count).toBeGreaterThanOrEqual(5);
+    expect(check.points.map((p) => p.key)).toEqual(['window', 'language', 'clash']);
+    expect(marketCheck(job('job-fin'), getState(), null).similar).toEqual(check.similar);
+    const thin = marketCheck(job('job-comms'), getState(), null);
+    expect(thin.thin).toBe(true);
+    expect(thin.points).toHaveLength(0);
+  });
+
+  it('a short window gets a later closing date on a working day, and Undo puts it back', () => {
+    const id = startJob('Hiring a WASH Officer in Nairobi, closing in 1 week, fixed-term');
+    const before = job(id).facts.deadline;
+    const point = marketCheck(job(id), getState(), null).points.find((p) => p.key === 'window');
+    expect(point?.ok).toBe(false);
+    applyFix(id, point!.fix!.fix, point!.fix!.label);
+    expect(job(id).facts.deadline).not.toBe(before);
+    expect(marketCheck(job(id), getState(), null).points.find((p) => p.key === 'window')?.ok).toBe(true);
+    undo();
+    expect(job(id).facts.deadline).toBe(before);
+  });
+
+  it('a deadline that clashes with similar jobs in the same country can be moved to a week without clashes', () => {
+    const similar = marketCheck(job('job-fin'), getState(), null).similar.filter((x) => x.iso === 'SS');
+    const busy = similar.map((x) => x.closes).find((d) => similar.filter((x) => Math.abs(daysUntil(parseIso(d), x.closes)) <= 3).length >= 2);
+    expect(busy).toBeTruthy();
+    setFacts('job-fin', { deadline: busy! });
+    const clash = marketCheck(job('job-fin'), getState(), null).points.find((p) => p.key === 'clash');
+    expect(clash?.ok).toBe(false);
+    applyFix('job-fin', clash!.fix!.fix, clash!.fix!.label);
+    expect(marketCheck(job('job-fin'), getState(), null).points.find((p) => p.key === 'clash')?.ok).toBe(true);
+  });
+
+  it('a language most similar jobs ask for is added as desirable, with its section', () => {
+    const id = startJob('Hiring a Programme Manager in Goma, closing in 5 weeks, fixed-term');
+    const point = marketCheck(job(id), getState(), null).points.find((p) => p.key === 'language');
+    expect(point?.fix?.label).toBe('Add French as desirable');
+    applyFix(id, point!.fix!.fix, point!.fix!.label);
+    expect(job(id).facts.languages).toContain('French');
+    expect(job(id).sections.find((x) => x.key === 'languages')?.lines.join(' ')).toContain('French');
+    outlineMatchesDocument(id);
+  });
+});
+
+describe('the advert checks', () => {
+  it('the basic check finds inclusive-language highlights, for free jobs too', () => {
+    expect(basicAdvertCheck(job('job-fin'), getState()).some((p) => !p.ok && p.title.includes('15 years'))).toBe(true);
+  });
+
+  it('the full check compares requirements and pay with similar jobs, and fixes them in one tap', () => {
+    const points = fullAdvertCheck(job('job-fin'), getState()).points;
+    const years = points.find((p) => p.key === 'years');
+    expect(years?.ok).toBe(false);
+    applyFix('job-fin', years!.fix!.fix, years!.fix!.label);
+    expect(job('job-fin').sections.find((x) => x.key === 'requirements')?.lines.join(' ')).not.toContain('15 years');
+    expect(blocked('job-fin')).toBe(true);
+    const pay = fullAdvertCheck(job('job-fin'), getState()).points.find((p) => p.key === 'pay');
+    if (pay && !pay.ok && pay.fix) {
+      applyFix('job-fin', pay.fix.fix, pay.fix.label);
+      expect(job('job-fin').facts.salaryMode).toBe('range');
+    }
+  });
+
+  it('too few similar jobs: the full check compares nothing', () => {
+    expect(fullAdvertCheck(job('job-comms'), getState())).toEqual({ thin: true, points: [] });
+  });
+});
+
+describe('language versions', () => {
+  it('a draft translates headings, standard sentences, dates, and the country; other lines stay in English for review', () => {
+    const id = startJob("We're hiring a WASH Programme Manager in Juba, 12-month fixed-term contract, closing 30 November 2026");
+    addTranslation(id, 'fr');
+    const t = job(id).translations!.fr!;
+    const text = JSON.stringify(t.sections);
+    expect(t.reviewed).toBe(false);
+    expect(t.sections.find((x) => x.key === 'apply')?.title).toBe('Comment postuler');
+    expect(text).toContain('30 novembre 2026');
+    expect(text).toContain('Soudan du Sud');
+    expect(text).not.toContain('South Sudan');
+    expect(untranslated(job(id), t)).toBeGreaterThan(0);
+    expect(langOf('ar').dir).toBe('rtl');
+  });
+
+  it('only reviewed, up-to-date versions of an amplified job are public; a change to the English asks for an update that keeps edits', () => {
+    const id = startJob("We're hiring a WASH Programme Manager in Juba, 12-month fixed-term contract, closing 30 November 2026");
+    addTranslation(id, 'es');
+    const resp = job(id).translations!.es!.sections.find((x) => x.key === 'responsibilities')!;
+    editTranslation(id, 'es', 'responsibilities', 0, 'Dirigir el programa de agua y saneamiento');
+    reviewTranslation(id, 'es');
+    expect(publicLangs(job(id))).toEqual([]);
+    buy('one', 'WASH Programme Manager');
+    publish(id, { plan: 'amplify', schedule: null, paid: 'direct' });
+    expect(publicLangs(job(id))).toEqual(['es']);
+    extend(id, 7);
+    expect(stale(job(id), job(id).translations!.es!)).toBe(true);
+    expect(publicLangs(job(id))).toEqual([]);
+    refreshTranslation(id, 'es');
+    const after = job(id).translations!.es!;
+    expect(after.reviewed).toBe(false);
+    expect(after.sections.find((x) => x.key === 'responsibilities')?.lines[0]).toBe('Dirigir el programa de agua y saneamiento');
+    expect(resp.lines.length).toBe(after.sections.find((x) => x.key === 'responsibilities')?.lines.length);
+    reviewTranslation(id, 'es');
+    expect(publicLangs(job(id))).toEqual(['es']);
+  });
+
+  it('reviewers cannot change a language version', () => {
+    addTranslation('job-fin', 'fr');
+    update((s) => ({ ...s, reviewerAs: 'amina' }));
+    const before = JSON.stringify(job('job-fin').translations);
+    editTranslation('job-fin', 'fr', 'about', 0, 'Changed by a reviewer');
+    reviewTranslation('job-fin', 'fr');
+    removeTranslation('job-fin', 'fr');
+    expect(JSON.stringify(job('job-fin').translations)).toBe(before);
+  });
+});
+
 describe('the base JD format offer', () => {
   it('"Edit it" saves the edited headings and the offer does not come back', () => {
     const p = basePattern(getState())!;
@@ -412,6 +538,10 @@ describe('a or an', () => {
     ['European Affairs Adviser', 'a'],
     ['Hour-based Consultant', 'an'],
     ['WASH Officer', 'a'],
+    ['MEAL Coordinator', 'a'],
+    ['NATO Liaison Officer', 'a'],
+    ['MSF Field Coordinator', 'an'],
+    ['NGO Coordinator', 'an'],
   ])('%s takes "%s"', (word, expected) => {
     expect(article(word)).toBe(expected);
   });

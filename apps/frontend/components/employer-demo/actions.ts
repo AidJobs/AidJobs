@@ -26,8 +26,10 @@ import {
   type BuildContext,
 } from './engine';
 import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, monthFor, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, Plan, ReachRecord, Review, State, Tone } from './types';
+import { draftTranslation, langOf, redraftTranslation } from './translate';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Lang, Person, Plan, ReachRecord, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -523,11 +525,6 @@ function useFree(s: State, id: string, month = currentMonth(s)): State {
   return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
 }
 
-/** A paid job gives back the free job it had used. */
-function giveBack(s: State, id: string): State {
-  return hasFreeUse(s, id) ? { ...s, freeUses: s.freeUses.filter((u) => u.jobId !== id) } : s;
-}
-
 /** Uses one paid job on hand, the soonest to lapse first. */
 function takePaidJob(s: State): State {
   const pick = nextPaidJob(s);
@@ -624,6 +621,72 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
   });
 }
 
+/** A one-tap fix from the market or advert check. Like any change it can be undone, and it withdraws an approval. */
+export function applyFix(id: string, fix: Fix, label: string) {
+  if (!ownerOnly()) return;
+  const j = getState().jobs.find((x) => x.id === id);
+  if (!j) return;
+  changeWithUndo(`${label}: done`, (st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => {
+      if (x.id !== id) return x;
+      if (fix.kind === 'deadline') return withFacts(st, x, { ...x.facts, deadline: fix.date });
+      if (fix.kind === 'facts') return withFacts(st, x, { ...x.facts, ...fix.patch });
+      if (fix.kind === 'language') {
+        const langs = x.facts.languages.length ? x.facts.languages : ['English'];
+        const tags = x.tags.includes('languages') ? x.tags : outlineOrder([...x.tags, 'languages']);
+        const next = withFacts(st, { ...x, tags }, { ...x.facts, languages: langs.includes(fix.lang) ? langs : [...langs, fix.lang] });
+        return { ...next, versions: [...next.versions, { n: next.versions.length + 1, at: Date.now(), note: label, sections: next.sections }] };
+      }
+      const sections = x.sections.map((sec) => (sec.key === fix.section ? { ...sec, lines: fix.lines, edited: true } : sec));
+      return { ...touched(x), sections, updatedAfterPublish: x.status === 'live' ? true : x.updatedAfterPublish, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: label, sections }] };
+    }),
+  }));
+}
+
+/** A first draft of a language version, for the employer to review. */
+export function addTranslation(id: string, lang: Lang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
+}
+
+/** Brings a version up to date after the English changed, keeping the wording of lines whose English did not change. */
+export function refreshTranslation(id: string, lang: Lang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const t = j.translations?.[lang];
+    return t ? { ...j, translations: { ...j.translations, [lang]: redraftTranslation(j, t, lang) } } : j;
+  });
+}
+
+export function removeTranslation(id: string, lang: Lang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const rest = { ...j.translations };
+    delete rest[lang];
+    return { ...j, translations: rest };
+  });
+}
+
+/** An edit to a version needs a new review. */
+export function editTranslation(id: string, lang: Lang, key: string, index: number | 'title', text: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const t = j.translations?.[lang];
+    if (!t) return j;
+    const sections = t.sections.map((sec) => (sec.key !== key ? sec : index === 'title' ? { ...sec, title: text } : { ...sec, lines: sec.lines.map((l, i) => (i === index ? text : l)) }));
+    return { ...j, translations: { ...j.translations, [lang]: { ...t, sections, reviewed: false } } };
+  });
+}
+
+export function reviewTranslation(id: string, lang: Lang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const t = j.translations?.[lang];
+    return t ? { ...j, translations: { ...j.translations, [lang]: { ...t, reviewed: true } }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version reviewed` }] } : j;
+  });
+}
+
 /** Who may publish without approval: only where approval is required, only the owner, and never when the organisation says nobody can skip it. */
 export function canSkipApproval(s: State, j: DemoJob): boolean {
   return !s.reviewerAs && s.me.role === 'owner' && !s.org.noSkip && approvalRequired(s, j) && !isApproved(j);
@@ -667,7 +730,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
 export function publish(id: string, o: PublishOptions): boolean {
   if (publishBlock(getState(), id, o)) return false;
   update((s0) => {
-    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : giveBack(s0, id);
+    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand') s = takePaidJob(s);
     const reach: ReachRecord | null = o.reach ? { ...o.reach, candidates: o.reach.candidates.map((r) => ({ ...r, status: 'queued' })), team: o.reach.team.map((r) => ({ ...r, status: 'queued' })) } : null;
     const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
@@ -696,17 +759,17 @@ export function publish(id: string, o: PublishOptions): boolean {
   return true;
 }
 
-/** Amplifies a live or scheduled free job: listed 100 days from publishing, featured, and its free job given back. */
+/** Amplifies a live or scheduled free job: listed 100 days from publishing, and featured. The free job it used stays used. */
 export function amplifyLive(id: string, paid: Paid): boolean {
   const s0 = getState();
   const j = s0.jobs.find((x) => x.id === id);
   if (!j || s0.reviewerAs || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
   if (paid === 'onHand' && !nextPaidJob(s0)) return false;
   update((s1) => {
-    const s = paid === 'onHand' ? takePaidJob(giveBack(s1, id)) : giveBack(s1, id);
+    const s = paid === 'onHand' ? takePaidJob(s1) : s1;
     return {
       ...s,
-      jobs: s.jobs.map((x) => (x.id === id ? { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing; its free job given back` }] } : x)),
+      jobs: s.jobs.map((x) => (x.id === id ? { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] } : x)),
     };
   });
   return true;
@@ -791,6 +854,7 @@ export function hireAgain(id: string, place?: string): string | null {
     closedAt: undefined,
     closeReason: undefined,
     updatedAfterPublish: false,
+    translations: undefined,
     lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };

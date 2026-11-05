@@ -955,3 +955,147 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+.ej-divide > * + * {
+  border-top: 1px solid var(--hair);
+}
+
+/* The field-post notice: an A4 page on screen, and the only thing printed. Always black on white, whatever the theme. */
+.ej-flyer-frame {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.ej-flyer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 210 / 297;
+  padding: 32px;
+  border-radius: 4px;
+  background: #fff;
+  color: #111;
+  font-size: 13px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+.ej-flyer .aj-mark {
+  background: #e1eedc;
+  color: #3a6e31;
+}
+
+.ej-flyer-kicker {
+  margin-top: 10px;
+  color: #3a6e31;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ej-flyer-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.ej-flyer-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ej-flyer-facts span {
+  padding: 3px 10px;
+  border: 1px solid #ccd5c8;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.ej-flyer-deadline {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ej-flyer-text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ej-flyer-list {
+  margin: 0;
+  padding-inline-start: 18px;
+  line-height: 1.5;
+}
+
+.ej-flyer-qr {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #e4e9e1;
+}
+
+.ej-flyer-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #4a5148;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .ej-flyer-frame {
+    padding: 8px;
+  }
+
+  .ej-flyer {
+    gap: 9px;
+    padding: 18px;
+    font-size: 11.5px;
+  }
+
+  .ej-flyer-title {
+    font-size: 21px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .ej-flyer,
+  .ej-flyer * {
+    visibility: visible !important;
+  }
+
+  .ej-flyer {
+    position: fixed;
+    inset: 0;
+    width: 210mm;
+    max-width: none;
+    height: 297mm;
+    aspect-ratio: auto;
+    padding: 18mm;
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 13pt;
+  }
+
+  .ej-flyer-title {
+    font-size: 30pt;
+  }
+}

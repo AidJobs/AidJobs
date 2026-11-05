@@ -152,6 +152,11 @@ export type ApplySettings = {
   anonymised: boolean;
 };
 
+export type Lang = 'fr' | 'ar' | 'es' | 'pt';
+
+/** A language version of the job page, drafted by AidJobs and reviewed by the employer. `source` is the English text it was made from. */
+export type Translation = { sections: Section[]; reviewed: boolean; source: string; at: number };
+
 /** Free, or Amplify: the paid offer (employer-side plan, section 16). */
 export type Plan = 'free' | 'amplify';
 
@@ -182,6 +187,8 @@ export type DemoJob = {
   closedAt?: number;
   closeReason?: 'deadline' | 'early' | 'filled' | 'withdrawn';
   updatedAfterPublish?: boolean;
+  /** Language versions of the job page; only reviewed ones are published, and only with Amplify. */
+  translations?: Partial<Record<Lang, Translation>>;
   audit: AuditEntry[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };

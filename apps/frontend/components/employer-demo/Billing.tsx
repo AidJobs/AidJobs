@@ -100,7 +100,7 @@ export default function Billing() {
             ))}
           </div>
           <span className="aj-faint" style={{ fontSize: 11.5 }}>
-            Placeholder prices, the same for every type of organisation. A package job can also amplify a live free job, which gives the free job back.
+            Placeholder prices, the same for every type of organisation. A package job can also amplify a live free job; a free job once used stays used, and the free jobs come back each month.
           </span>
         </div>
       </Section>

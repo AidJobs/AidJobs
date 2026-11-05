@@ -7,7 +7,7 @@ import { closeJob, deleteDraft, downloadCopy, extend, hireAgain } from './action
 import { addDays, daysUntil, holiday, longDate, PLACES, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
 import { BADGE, listedUntil } from './plans';
-import { CommunityButtons, JobPage, jobUrl, shareMessage } from './Publish';
+import { CommunityButtons, JobPageLangs, jobUrl, shareMessage } from './Publish';
 import { go, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
 import { Dialog, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
@@ -342,7 +342,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
       )}
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="aj-card p-4 lg:p-6">
-          <JobPage job={job} s={s} />
+          <JobPageLangs job={job} s={s} />
         </div>
         <div className="flex flex-col gap-4">
           {job.plan && job.status !== 'closed' && (

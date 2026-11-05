@@ -27,10 +27,12 @@ import {
   usd,
   type PackageKey,
 } from './plans';
-import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, longDate, salaryText, slug } from './engine';
+import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
+import BeforePublish from './Checks';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, notify, useDemo } from './store';
-import type { DemoJob, Org, Plan, State } from './types';
+import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
+import type { DemoJob, Lang, Org, Plan, State } from './types';
 import { DemoMark, Dialog, inputStyle, OrgMark } from './ui';
 
 export function jobUrl(j: DemoJob): string {
@@ -63,35 +65,44 @@ function Lines({ lines }: { lines: string[] }) {
     if (l.startsWith('- ')) list.push(l.slice(2));
     else {
       if (list.length) {
-        out.push(<ul key={`u${i}`}>{list.map((x, k) => <li key={k}>{x}</li>)}</ul>);
+        out.push(<ul key={`u${i}`}>{list.map((x, k) => <li key={k} dir="auto">{x}</li>)}</ul>);
         list = [];
       }
-      out.push(<p key={i}>{l}</p>);
+      out.push(
+        <p key={i} dir="auto">
+          {l}
+        </p>,
+      );
     }
   });
-  if (list.length) out.push(<ul key="uend">{list.map((x, k) => <li key={k}>{x}</li>)}</ul>);
+  if (list.length) out.push(<ul key="uend">{list.map((x, k) => <li key={k} dir="auto">{x}</li>)}</ul>);
   return <>{out}</>;
 }
 
-/** The job page as visitors will see it on AidJobs. */
-export function JobPage({ job, s }: { job: DemoJob; s: State }) {
+/** The job page as visitors will see it on AidJobs, in English or one of its language versions. */
+export function JobPage({ job, s, lang }: { job: DemoJob; s: State; lang?: Lang }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
+  const version = lang ? job.translations?.[lang] : undefined;
+  const l = version ? lang : undefined;
+  const say = (en: string, key: string, vars: Record<string, string | number> = {}) => (l ? ui(key, l, vars) : en);
+  const sections = version ? version.sections : inOutlineOrder(job.sections, job.tags);
+  const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : job.facts.arrangement === 'remote' ? term('Remote', l) : '';
   return (
-    <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview">
+    <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
       <div className="flex items-center gap-2">
         <OrgMark name={s.org.name} />
         <span className="aj-muted min-w-0 flex-1 truncate">{s.org.name}</span>
         {s.org.verified && (
           <Tip label="Verified employer">
             <span className="aj-chip" data-tone="sage">
-              <BadgeCheck size={11} strokeWidth={2} /> Verified
+              <BadgeCheck size={11} strokeWidth={2} /> {say('Verified', 'verified')}
             </span>
           </Tip>
         )}
         {job.plan === 'amplify' && (
           <Tip label={BADGE_TIP}>
             <span className="aj-chip" data-tone="sage" tabIndex={0}>
-              <Sparkles size={11} strokeWidth={2} /> {BADGE}
+              <Sparkles size={11} strokeWidth={2} /> {say(BADGE, 'badge')}
             </span>
           </Tip>
         )}
@@ -101,15 +112,17 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
         <div className="flex items-center gap-2">
           <MapPin size={14} strokeWidth={1.8} className="aj-faint" />
           <Flag iso={job.facts.iso || null} title={job.facts.country} />
-          <span>{job.facts.location || (job.facts.arrangement === 'remote' ? 'Remote' : '')}</span>
+          <span>{place}</span>
         </div>
         {job.facts.deadline && (
           <div className="flex items-center gap-2">
             <Clock size={14} strokeWidth={1.8} className="aj-faint" />
-            <span>Closes {longDate(job.facts.deadline)}</span>
+            <span>
+              {say('Closes', 'closes')} {localDate(job.facts.deadline, l)}
+            </span>
             {left !== null && left >= 0 && (
               <span className="aj-chip" data-tone={left <= 3 ? 'red' : left <= 7 ? 'amber' : undefined}>
-                {left === 0 ? 'Today' : `${left} days left`}
+                {left === 0 ? say('Today', 'today') : say(`${left} days left`, 'daysLeft', { n: left })}
               </span>
             )}
           </div>
@@ -118,10 +131,10 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
       <div className="flex flex-wrap gap-1.5">
         {[job.facts.contract, job.facts.duration, job.facts.grade, arrangementLabel(job.facts.arrangement), job.facts.recruitment === 'roster' ? 'Roster' : job.facts.recruitment === 'proposal' ? 'Proposal stage' : '', salaryText(job.facts)].filter(Boolean).map((x) => (
           <span key={x} className="aj-chip">
-            {x}
+            {term(x, l)}
           </span>
         ))}
-        {job.updatedAfterPublish && (
+        {job.updatedAfterPublish && !l && (
           <span className="aj-chip" data-tone="sage">
             Updated
           </span>
@@ -129,10 +142,10 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
       </div>
       <div>
         <a className="aj-ink-btn" href={`${s.org.careersUrl}/apply`} target="_blank" rel="noopener noreferrer">
-          Apply on {s.org.short} <ExternalLink size={13} strokeWidth={2} />
+          {say(`Apply on ${s.org.short}`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
         </a>
       </div>
-      {inOutlineOrder(job.sections, job.tags).map((sec) => (
+      {sections.map((sec) => (
         <section key={sec.key}>
           <h3>{sec.title}</h3>
           <Lines lines={sec.lines} />
@@ -140,22 +153,51 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
       ))}
       {job.commitments.length > 0 && (
         <section>
-          <h3>Our commitments</h3>
+          <h3>{say('Our commitments', 'commitments')}</h3>
           {job.commitments.map((k) => (
             <p key={k} className="ej-commitment">
-              <strong>{COMMITMENTS.find((c) => c.key === k)?.label}.</strong> {commitmentText(k, s.org, job.facts).text}
+              <strong>{commitmentLabel(k, COMMITMENTS.find((c) => c.key === k)?.label ?? k, l)}.</strong> <span lang="en">{commitmentText(k, s.org, job.facts).text}</span>
             </p>
           ))}
         </section>
       )}
       <div className="aj-faint flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 aj-hair" style={{ fontSize: 11.5 }}>
-        <span>Published by {s.org.name}</span>
-        <span>{job.publishedAt ? `Posted ${new Date(job.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Not published yet'}</span>
+        <span>{say(`Published by ${s.org.name}`, 'publishedBy', { org: s.org.name })}</span>
+        <span>{job.publishedAt ? say(`Posted ${localDate(isoDay(job.publishedAt))}`, 'posted', { date: localDate(isoDay(job.publishedAt), l) }) : say('Not published yet', 'notPublished')}</span>
         <span className="inline-flex items-center gap-1">
-          <FlagIcon size={11} strokeWidth={2} /> Report this job
+          <FlagIcon size={11} strokeWidth={2} /> {say('Report this job', 'report')}
         </span>
       </div>
     </article>
+  );
+}
+
+/** The job page with a switch between English and its language versions; `drafts` also shows versions not yet reviewed, labelled. */
+export function JobPageLangs({ job, s, drafts = false }: { job: DemoJob; s: State; drafts?: boolean }) {
+  const [lang, setLang] = useState<Lang | null>(null);
+  const shown = drafts ? LANGS.filter((x) => job.translations?.[x.key]).map((x) => x.key) : publicLangs(job);
+  const current = lang && shown.includes(lang) ? lang : null;
+  return (
+    <div className="flex flex-col gap-3">
+      {shown.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Language of the job page">
+          <button type="button" role="radio" aria-checked={!current} className="aj-pill" data-active={!current} style={{ height: 28 }} onClick={() => setLang(null)}>
+            English
+          </button>
+          {shown.map((k) => {
+            const t = job.translations?.[k];
+            const draft = !t?.reviewed || (t && stale(job, t));
+            return (
+              <button key={k} type="button" role="radio" aria-checked={current === k} className="aj-pill" data-active={current === k} style={{ height: 28 }} onClick={() => setLang(k)} lang={k}>
+                {langOf(k).native}
+                {draft && <span className="aj-faint"> · draft</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <JobPage job={job} s={s} lang={current ?? undefined} />
+    </div>
   );
 }
 
@@ -468,7 +510,8 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
         {job.facts.title}
       </h1>
       <p className="aj-muted" style={{ margin: 0 }}>
-        {job.plan === 'amplify' ? `Amplified: featured, with the “${BADGE}” badge, listed until ${longDate(until)}.` : `Free: standard placement, listed until ${longDate(until)}.`} In this demo it is published only in this browser.
+        {job.plan === 'amplify' ? `Amplified: featured, with the “${BADGE}” badge, listed until ${longDate(until)}.` : `Free: standard placement, listed until ${longDate(until)}.`}
+        {publicLangs(job).length > 0 ? ` In English and ${publicLangs(job).map((k) => langOf(k).label).join(' and ')}.` : ''} In this demo it is published only in this browser.
       </p>
       <div className="aj-card flex items-center gap-2 py-2 pl-3 pr-2">
         <span className="aj-muted min-w-0 flex-1 truncate">{url}</span>
@@ -622,6 +665,7 @@ export default function Publish({ id }: { id?: string }) {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
         <section className="order-2 flex min-w-0 flex-col gap-3 lg:order-1" aria-label="Preview">
+          <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} />
           <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" aria-label="Preview">
             {views.map(([k, l]) => (
               <button key={k} type="button" role="radio" aria-checked={view === k} data-active={view === k} onClick={() => setView(k)}>
@@ -631,7 +675,7 @@ export default function Publish({ id }: { id?: string }) {
           </div>
           {view === 'page' && (
             <div className="aj-card p-4 lg:p-6">
-              <JobPage job={shown} s={s} />
+              <JobPageLangs job={shown} s={s} drafts={chosen === 'amplify'} />
             </div>
           )}
           {view === 'google' && <GooglePreview job={shown} s={s} />}
@@ -723,8 +767,7 @@ export default function Publish({ id }: { id?: string }) {
                 {onHand ? (
                   <span className="aj-muted" style={{ fontWeight: 600 }}>
                     Uses 1 of your {onHandCount} package {onHandCount === 1 ? 'job' : 'jobs'}
-                    {onHand.kind === 'pack' ? `, to use by ${longDate(onHand.pack.ends)}` : `, for this month of “Always hiring”`}
-                    {upgrade ? '; the free job it used is given back.' : '.'}
+                    {onHand.kind === 'pack' ? `, to use by ${longDate(onHand.pack.ends)}.` : ', for this month of “Always hiring”.'}
                   </span>
                 ) : (
                   <>
@@ -764,7 +807,7 @@ export default function Publish({ id }: { id?: string }) {
                           );
                         })}
                         <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                          The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job, which gives the free job back.
+                          The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job; a free job once used stays used.
                         </span>
                       </div>
                     )}
