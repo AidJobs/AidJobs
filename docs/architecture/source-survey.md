@@ -152,8 +152,8 @@ Plan approved by the user on 5 November 2026 (the recommended choices). `tools/s
 The top 600's best guesses by system: own site, system not yet known 52; `careers.un.org` 44 (the UN Secretariat family); BambooHR 39; Workable 24; Workday 17; Greenhouse 15; iCIMS 12; Personio 5; SmartRecruiters, Jobvite, Recruitee and Taleo 3 or 4 each; Lever, Avature, Zoho Recruit and Teamtailor 1 each. Most organisations without a candidate are those whose websites are not read yet. Of the 38 top-600 organisations without a website, 36 are UN Secretariat offices that hire through `careers.un.org`, and 2 have none: SALT International (UNjobs' listing appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled) and The CH Foundation (UK), a grant-maker with no website.
 
 **Unresolved:**
-- 1,201 websites not yet read from the index; at one request every 10 seconds and with Common Crawl's refusals, several more days.
-- The next search batch: the 382 organisations ranked 601 to 1,724 still without a website.
+- 1,201 websites not yet read from the index (478 of them the top 600's); at one request every 10 seconds and with Common Crawl's refusals, several more days. **The user decided on 5 November 2026:** if the first run on 6 November again stops within minutes, read only the top 600's websites (`download sites --top 600`); step F finds the other organisations' careers pages when it contacts their sites.
+- The next search batch: the 382 organisations ranked 601 to 1,724 still without a website; approved by the user on 5 November 2026 and in progress.
 - 95 review rows below rank 600.
 - Found by the search to be outside the target or doubtful, for step G: Albo (a Mexican fintech company), CitizenLab (renamed Go Vocal, civic software), Sunflower Services (back-office services for US nonprofits), GoodPower (US renewable-energy advocacy, formerly the Alliance for Climate Education), and Land O'Lakes Venture37 (stopped work on 30 June 2026).
 

@@ -2,7 +2,7 @@
 
 Run on the user's machine; CI runs only `build`:
 
-  python tools/survey/careers.py download [wikidata|cluster|systems|sites]
+  python tools/survey/careers.py download [wikidata|cluster|systems|sites] [--top N]
   python tools/survey/careers.py extract    # raw downloads -> the small committed extract
   python tools/survey/careers.py build      # committed files -> candidates, review, websites
 
@@ -525,23 +525,24 @@ def scope_rows(survey: Path = SURVEY) -> list[dict]:
         return [r for r in csv.DictReader(handle) if r["evidence"] in SCOPE]
 
 
-def sites_to_read(survey: Path = SURVEY) -> list[str]:
-    """Every website of the ranked organisations, with those filled in step E, best rank first."""
+def sites_to_read(survey: Path = SURVEY, top: int | None = None) -> list[str]:
+    """Every website of the ranked organisations (or of the first `top`), with those filled in
+    step E, best rank first."""
     sites = []
     filled = {}
     path = survey / "websites-filled.csv"
     if path.exists():
         with path.open(encoding="utf-8") as handle:
             filled = {r["org_id"]: r["website"] for r in csv.DictReader(handle) if r["website"]}
-    for row in scope_rows(survey):
+    for row in scope_rows(survey)[:top]:
         host = site_host(row["website_domain"] or filled.get(row["org_id"], ""))
         if host and host not in PLATFORM_HOSTS and host not in sites:
             sites.append(host)
     return sites
 
 
-def download_sites(requester: Requester) -> None:
-    sites = sites_to_read()
+def download_sites(requester: Requester, top: int | None = None) -> None:
+    sites = sites_to_read(top=top)
     for crawl in CRAWLS:
         cluster = ClusterIndex.read(RAW / crawl / "cluster.idx")
         done = 0
@@ -661,7 +662,7 @@ def download(args) -> None:
         if part in ("all", "systems"):
             download_systems(requester)
         if part in ("all", "sites"):
-            download_sites(requester)
+            download_sites(requester, args.top)
 
 
 # --- extract (no network) ------------------------------------------------------------------
@@ -1124,6 +1125,10 @@ def main() -> int:
     get = commands.add_parser("download")
     get.add_argument("part", nargs="?", default="all",
                      choices=["all", "wikidata", "cluster", "systems", "sites"])
+    # The user's decision of 5 November 2026: if Common Crawl keeps refusing, read only the
+    # top 600's websites (--top 600); step F finds the rest's careers pages from their sites.
+    get.add_argument("--top", type=int, default=None,
+                     help="read only the websites of the first N ranked organisations")
     get.set_defaults(func=download)
     commands.add_parser("extract").set_defaults(func=extract)
     commands.add_parser("build").set_defaults(func=build)

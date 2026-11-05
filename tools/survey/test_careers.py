@@ -281,6 +281,15 @@ def test_wikidata_fills_websites_by_identifier_and_reviews_name_only_matches(tmp
     assert review == []
 
 
+def test_sites_are_read_best_rank_first_and_can_stop_at_a_rank(tmp_path):
+    orgs = [org("a", "A Aid", website="https://www.a-aid.org/", rank=1),
+            org("b", "B Aid", rank=2), org("c", "C Aid", website="c-aid.org", rank=3)]
+    build(tmp_path, orgs, decisions=[{"action": "website", "org_id": "b",
+                                      "value": "b-aid.org", "confidence": "", "reason": "x"}])
+    assert careers.sites_to_read(tmp_path) == ["a-aid.org", "b-aid.org", "c-aid.org"]
+    assert careers.sites_to_read(tmp_path, top=2) == ["a-aid.org", "b-aid.org"]
+
+
 def test_identifiers_are_written_as_wikidata_writes_them():
     assert careers.identifiers(org("a", "x", sources="irs:135660870; uk:1047501; oscr:sc012345")) \
         == [("irs", "13-5660870"), ("uk", "1047501"), ("oscr", "SC012345")]
