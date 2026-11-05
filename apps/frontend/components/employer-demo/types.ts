@@ -127,11 +127,22 @@ export type Review = {
 
 export type Version = { n: number; at: number; note: string; sections: Section[] };
 
-export type Delivery = 'queued' | 'sending' | 'sent' | 'failed';
+/** `waiting` is an email for a scheduled job, sent when the job goes live. */
+export type Delivery = 'waiting' | 'queued' | 'sending' | 'sent' | 'failed';
 
-export type Recipient = { email: string; status: Delivery };
+export type Recipient = { email: string; status: Delivery; round: number };
 
-export type ReachRecord = { candidates: Recipient[]; team: Recipient[]; community: boolean; intro: string };
+/** An email: the text before the job's button, and the closing after it. */
+export type Message = { subject: string; body: string; closing: string };
+
+/** One sending: at go-live, or "invite more" later. */
+export type ReachRound = { n: number; at: number; why: string; sendsOn?: string };
+
+/** What Reach sent for a job, round by round. Nothing about recipients is ever public. */
+export type ReachRecord = { candidates: Recipient[]; team: Recipient[]; rounds: ReachRound[]; candidateMsg: Message; teamMsg: Message };
+
+/** Reach prepared before sending: the people and the two messages, edited in their preview. */
+export type ReachPlan = { candidates: string[]; team: string[]; candidateMsg: Message; teamMsg: Message };
 
 export type ApplySettings = {
   method: 'system' | 'email' | 'form' | 'formOnly';
@@ -180,6 +191,11 @@ export type DemoJob = {
   versions: Version[];
   review: Review;
   reach: ReachRecord | null;
+  reachPlan?: ReachPlan;
+  /** Reminders to invite more people; on unless switched off for this job. */
+  reachReminders?: boolean;
+  /** Reminder moments answered with "Not now". */
+  reachDismissed?: string[];
   chat: ChatMsg[];
   createdAt: number;
   publishedAt?: number;
@@ -212,7 +228,7 @@ export type Subscription = { since: string; renews: string; left: number; cancel
 export type Notice = { text: string; undo?: DemoJob[] } | null;
 
 export type State = {
-  v: 3;
+  v: 4;
   today: number;
   signedIn: boolean;
   me: Person;

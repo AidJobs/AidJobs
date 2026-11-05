@@ -956,6 +956,32 @@
   font-weight: 700;
 }
 
+/* Reach: the email's own words, edited where they appear in its preview. */
+.ej-email-edit {
+  display: block;
+  padding: 4px 6px;
+  margin: 0 -6px 10px;
+  border: 1px dashed #c6d3c1;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ej-email-head .ej-email-edit {
+  display: inline-block;
+  margin: 0;
+  padding: 2px 6px;
+}
+
+.ej-email-edit:focus {
+  border-style: solid;
+  border-color: #6f9a62;
+  outline: none;
+}
+
 .ej-divide > * + * {
   border-top: 1px solid var(--hair);
 }

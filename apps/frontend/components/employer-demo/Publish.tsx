@@ -29,6 +29,8 @@ import {
 } from './plans';
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
 import BeforePublish from './Checks';
+import { deliveryText, planCount } from './invites';
+import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, notify, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
@@ -79,8 +81,17 @@ function Lines({ lines }: { lines: string[] }) {
   return <>{out}</>;
 }
 
-/** The job page as visitors will see it on AidJobs, in English or one of its language versions. */
-export function JobPage({ job, s, lang }: { job: DemoJob; s: State; lang?: Lang }) {
+async function copyText(text: string, what: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    notify(`${what} copied`);
+  } catch {
+    notify('Copy failed: select the text and copy it yourself');
+  }
+}
+
+/** The job page as visitors will see it on AidJobs, in English or one of its language versions; `share` adds the share buttons every visitor has. */
+export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: State; lang?: Lang; share?: boolean }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   const version = lang ? job.translations?.[lang] : undefined;
   const l = version ? lang : undefined;
@@ -168,12 +179,18 @@ export function JobPage({ job, s, lang }: { job: DemoJob; s: State; lang?: Lang 
           <FlagIcon size={11} strokeWidth={2} /> {say('Report this job', 'report')}
         </span>
       </div>
+      {share && (
+        <div className="flex flex-col gap-1.5" lang="en" dir="ltr">
+          <span className="aj-faint">Share this job</span>
+          <CommunityButtons msg={shareMessage(job, s.org)} url={jobUrl(job)} copy={copyText} />
+        </div>
+      )}
     </article>
   );
 }
 
 /** The job page with a switch between English and its language versions; `drafts` also shows versions not yet reviewed, labelled. */
-export function JobPageLangs({ job, s, drafts = false }: { job: DemoJob; s: State; drafts?: boolean }) {
+export function JobPageLangs({ job, s, drafts = false, share = false }: { job: DemoJob; s: State; drafts?: boolean; share?: boolean }) {
   const [lang, setLang] = useState<Lang | null>(null);
   const shown = drafts ? LANGS.filter((x) => job.translations?.[x.key]).map((x) => x.key) : publicLangs(job);
   const current = lang && shown.includes(lang) ? lang : null;
@@ -196,7 +213,7 @@ export function JobPageLangs({ job, s, drafts = false }: { job: DemoJob; s: Stat
           })}
         </div>
       )}
-      <JobPage job={job} s={s} lang={current ?? undefined} />
+      <JobPage job={job} s={s} lang={current ?? undefined} share={share} />
     </div>
   );
 }
@@ -258,108 +275,6 @@ function ShareCards({ job, s }: { job: DemoJob; s: State }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function emailFor(kind: 'candidate' | 'team', j: DemoJob, org: Org, intro: string) {
-  if (kind === 'candidate') {
-    return {
-      subject: `An opportunity you might be interested in – ${j.facts.title}`,
-      body: [
-        'Hello,',
-        ...(intro ? [intro] : []),
-        'We thought this opportunity might be of interest to you.',
-        `${org.name} is currently recruiting for the position of **${j.facts.title}**.`,
-        `The role is based in ${j.facts.location || 'the duty station'}${j.facts.deadline ? ` and applications are open until ${longDate(j.facts.deadline)}` : ''}.`,
-        'You can explore the complete job description and application details here:',
-      ],
-      button: 'View Job & Apply',
-      after: ["If this opportunity isn't right for you, please feel free to share it with someone who might be interested.", 'Best regards,', org.name],
-    };
-  }
-  return {
-    subject: `Help us spread the word – ${j.facts.title}`,
-    body: [
-      'Hello,',
-      ...(intro ? [intro] : []),
-      `We've just published a vacancy for **${j.facts.title}** at ${org.name}.`,
-      'Do you know someone with relevant experience who might be interested?',
-      'Please consider sharing this opportunity with suitable people in your professional network.',
-      'The vacancy details are available here:',
-    ],
-    button: 'View Vacancy',
-    after: ['A good candidate might be just one connection away.', 'Thank you for helping us reach the right people.', 'Best regards,', org.name],
-  };
-}
-
-function bold(t: string) {
-  const parts = t.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i}>{p}</span>));
-}
-
-export function EmailPreview({ job, s, intro, initial, to, onClose }: { job: DemoJob; s: State; intro: { candidate: string; team: string }; initial: 'candidate' | 'team'; to: { candidate: string[]; team: string[] }; onClose: () => void }) {
-  const [kind, setKind] = useState(initial);
-  const e = emailFor(kind, job, s.org, kind === 'candidate' ? intro.candidate : intro.team);
-  const recipient = (kind === 'candidate' ? to.candidate[0] : to.team[0]) ?? (kind === 'candidate' ? 'candidate@example.org' : `colleague@${s.org.domain}`);
-  return (
-    <Dialog title="Email preview" subtitle="Exactly what a recipient receives · simulated, nothing is sent" onClose={onClose} wide>
-      <div className="flex flex-col gap-3">
-        <div className="aj-switch" role="radiogroup" aria-label="Which email">
-          <button type="button" role="radio" aria-checked={kind === 'candidate'} data-active={kind === 'candidate'} onClick={() => setKind('candidate')}>
-            Candidate invitation
-          </button>
-          <button type="button" role="radio" aria-checked={kind === 'team'} data-active={kind === 'team'} onClick={() => setKind('team')}>
-            Team notification
-          </button>
-        </div>
-        <div className="ej-email">
-          <div className="ej-email-head">
-            <div>
-              <strong>From:</strong> {s.org.name} via AidJobs &lt;jobs@aidjobs.example.org&gt;
-            </div>
-            <div>
-              <strong>Reply-to:</strong> {s.me.email}
-            </div>
-            <div>
-              <strong>To:</strong> {recipient}
-              {(kind === 'candidate' ? to.candidate.length : to.team.length) > 1 ? ` (each recipient gets their own email; nobody sees the others)` : ''}
-            </div>
-            <div>
-              <strong>Subject:</strong> {e.subject}
-            </div>
-          </div>
-          <div className="ej-email-body">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: '#e1eedc', color: '#3a6e31', fontWeight: 800, fontSize: 12 }}>
-                {s.org.short.slice(0, 2).toUpperCase()}
-              </span>
-              <strong>{s.org.name}</strong>
-            </div>
-            {e.body.map((p, i) => (
-              <p key={i}>{bold(p)}</p>
-            ))}
-            <p>
-              <span className="ej-email-btn">{e.button}</span>
-            </p>
-            <p style={{ fontSize: 12, color: '#5b6259' }}>
-              {job.facts.title} · {job.facts.location}
-              {job.facts.deadline ? ` · closes ${longDate(job.facts.deadline)}` : ''}
-            </p>
-            {e.after.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-            <p style={{ fontStyle: 'italic', color: '#5b6259' }}>Shared through AidJobs.</p>
-            <hr style={{ border: 'none', borderTop: '1px solid #e4e9e1', margin: '14px 0' }} />
-            <p style={{ fontSize: 11, color: '#6f766d' }}>
-              {kind === 'candidate'
-                ? `You received this because ${s.org.name} thought this role might interest you. AidJobs has not added you to any list. Don't want invitations through AidJobs? Unsubscribe in one click.`
-                : `You received this because you work with ${s.org.name}. Unsubscribe from vacancy notifications.`}{' '}
-              AidJobs, on behalf of {s.org.name}.
-            </p>
-          </div>
-        </div>
-      </div>
-    </Dialog>
   );
 }
 
@@ -493,6 +408,7 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
   const url = jobUrl(job);
   const until = listedUntil(job, s.today);
   const scheduled = job.status === 'scheduled';
+  const round = job.reach?.rounds[job.reach.rounds.length - 1];
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -519,6 +435,25 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
           <Copy size={13} strokeWidth={1.8} /> Copy link
         </button>
       </div>
+      {job.plan === 'amplify' && (
+        <div className="aj-card flex flex-col gap-1 p-3" aria-live="polite">
+          <span style={{ fontWeight: 650 }}>Reach</span>
+          {round ? (
+            <>
+              <span className="aj-muted">Invitations: {deliveryText(job.reach?.candidates.filter((r) => r.round === round.n) ?? [])}</span>
+              <span className="aj-muted">Team: {deliveryText(job.reach?.team.filter((r) => r.round === round.n) ?? [])}</span>
+              <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                {round.sendsOn ? `Sent on ${longDate(round.sendsOn)}, when the job goes live.` : 'Simulated.'} The job is published either way: an email that fails never unpublishes it.
+              </span>
+            </>
+          ) : (
+            <span className="aj-muted">Nobody invited yet. You can invite people from the job&apos;s page while it is live, and AidJobs reminds you when it helps.</span>
+          )}
+        </div>
+      )}
+      {job.plan !== 'amplify' && (
+        <span className="aj-faint">Visitors can share it to WhatsApp, LinkedIn, and more from the job page.</span>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {!scheduled && (
           <button type="button" className="aj-ink-btn" onClick={() => go('public', job.id)}>
@@ -534,7 +469,7 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
       </div>
       {job.plan === 'free' && (
         <button type="button" className="aj-text-btn self-start" onClick={onAmplify}>
-          Amplify this job
+          Amplify to invite people directly
         </button>
       )}
     </div>
@@ -597,15 +532,17 @@ export default function Publish({ id }: { id?: string }) {
   const blocked = !upgrade && approvalRequired(s, job) && !isApproved(job);
   const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
+  const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
+  const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
   const label =
     reason ??
     (upgrade
-      ? `Amplify this job · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`
+      ? `Amplify this job${inviting} · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`
       : chosen === 'free'
         ? schedule
           ? `Schedule free${when}`
           : 'Publish free'
-        : `${schedule ? `Amplify and schedule${when}` : 'Amplify and publish'} · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`);
+        : `${schedule ? `Amplify and schedule${when}` : 'Amplify and publish'}${inviting} · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`);
   const shown: DemoJob = { ...job, plan: chosen, scheduledFor: schedule ?? job.scheduledFor };
   const freeUntil = listedUntil({ ...job, plan: 'free', publishedAt: undefined, scheduledFor: schedule ?? undefined }, s.today);
   const checkoutItem = payKey === 'one' ? `Amplify: ${job.facts.title}` : payKey === 'extra' ? `Extra job on “Always hiring”: ${job.facts.title}` : payKey === 'always' ? '“Always hiring” subscription, first month (3 jobs)' : `${packageOf(payKey).jobs} jobs, one used for ${job.facts.title}`;
@@ -823,6 +760,8 @@ export default function Publish({ id }: { id?: string }) {
                 )}
             </Choice>
           </div>
+
+          {chosen === 'amplify' && <ReachRow job={job} s={s} sendsOn={upgrade ? (job.status === 'scheduled' ? (job.scheduledFor ?? null) : null) : schedule} live={upgrade && job.status === 'live'} />}
 
           {!upgrade && (
             <div className="flex flex-wrap items-center gap-2">

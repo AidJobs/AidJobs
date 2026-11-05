@@ -28,8 +28,9 @@ import {
 import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, monthFor, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
+import { addRound } from './invites';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Lang, Person, Plan, ReachRecord, Review, State, Tone } from './types';
+import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -712,7 +713,7 @@ export function overrideApproval(id: string, reason: string): boolean {
  */
 export type Paid = 'direct' | 'onHand';
 
-export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid; reach?: ReachRecord | null };
+export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid };
 
 /** Whether the job can be published with these options; the reason when it cannot. */
 export function publishBlock(s: State, id: string, o: PublishOptions): string | null {
@@ -726,37 +727,80 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   return null;
 }
 
-/** Publishes, then queues any Reach emails. Publishing never waits for, or depends on, the emails. */
+/** The Reach round prepared for a paid job, sent when it goes live: now, or on its scheduled date. Free jobs send nothing. */
+function reachAtGoLive(j: DemoJob, sendsOn: string | null): Partial<DemoJob> {
+  const plan = j.reachPlan;
+  const reach = plan ? addRound(j, plan, 'At go-live', sendsOn) : null;
+  if (!reach) return {};
+  const round = reach.rounds[reach.rounds.length - 1];
+  const count = reach.candidates.filter((r) => r.round === round.n).length + reach.team.filter((r) => r.round === round.n).length;
+  return {
+    reach,
+    reachPlan: undefined,
+    audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `Reach: ${count} ${count === 1 ? 'email' : 'emails'} ${sendsOn ? `to send on ${longDate(sendsOn)}, when it goes live` : 'queued at go-live'} (simulated)` }],
+  };
+}
+
+/** Publishes, then queues the prepared Reach emails. Publishing never waits for, or depends on, the emails. */
 export function publish(id: string, o: PublishOptions): boolean {
   if (publishBlock(getState(), id, o)) return false;
+  let sending = false;
   update((s0) => {
     let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand') s = takePaidJob(s);
-    const reach: ReachRecord | null = o.reach ? { ...o.reach, candidates: o.reach.candidates.map((r) => ({ ...r, status: 'queued' })), team: o.reach.team.map((r) => ({ ...r, status: 'queued' })) } : null;
     const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     return {
       ...s,
-      jobs: s.jobs.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              status: o.schedule ? 'scheduled' : 'live',
-              plan: o.plan,
-              scheduledFor: o.schedule ?? undefined,
-              publishedAt: o.schedule ? undefined : Date.now(),
-              reach,
-              audit: [
-                ...x.audit,
-                { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` },
-                ...(reach ? [{ at: Date.now(), who: s.me.name, what: `Reach: ${reach.candidates.length} invitations, ${reach.team.length} team emails queued (simulated)` }] : []),
-              ],
-            }
-          : x,
-      ),
+      jobs: s.jobs.map((x) => {
+        if (x.id !== id) return x;
+        const next: DemoJob = {
+          ...x,
+          status: o.schedule ? 'scheduled' : 'live',
+          plan: o.plan,
+          scheduledFor: o.schedule ?? undefined,
+          publishedAt: o.schedule ? undefined : Date.now(),
+          audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
+        };
+        if (o.plan !== 'amplify') return next;
+        const reach = reachAtGoLive(next, o.schedule);
+        sending = Boolean(reach.reach && !o.schedule);
+        return { ...next, ...reach };
+      }),
     };
   });
-  if (o.reach) simulateDelivery(id);
+  if (sending) simulateDelivery(id);
   return true;
+}
+
+/** Saves the people and the messages for the next Reach round. Team emails go only to the organisation's own domain. */
+export function setReachPlan(id: string, plan: ReachPlan) {
+  if (!ownerOnly()) return;
+  const domain = getState().org.domain;
+  updateJob(id, (j) => ({ ...j, reachPlan: { ...plan, team: plan.team.filter((e) => e.endsWith(`@${domain}`)) } }));
+}
+
+/** "Invite more" for a live amplified job: the prepared round is sent now. */
+export function sendReach(id: string, why: string): number {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || j.plan !== 'amplify' || j.status !== 'live' || !j.reachPlan) return 0;
+  const reach = addRound(j, j.reachPlan, why, null);
+  if (!reach) return 0;
+  const n = reach.rounds.length;
+  const count = reach.candidates.filter((r) => r.round === n).length + reach.team.filter((r) => r.round === n).length;
+  updateJob(id, (x) => ({ ...x, reach, reachPlan: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Reach: ${count} more ${count === 1 ? 'email' : 'emails'} queued (${why.toLowerCase()}, simulated)` }] }));
+  simulateDelivery(id);
+  return count;
+}
+
+/** "Not now" on a reminder: it does not come back; the next moment still does. */
+export function dismissMoment(id: string, key: string) {
+  updateJob(id, (j) => ({ ...j, reachDismissed: [...(j.reachDismissed ?? []), key] }));
+}
+
+export function setReachReminders(id: string, on: boolean) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, reachReminders: on }));
 }
 
 /** Amplifies a live or scheduled free job: listed 100 days from publishing, and featured. The free job it used stays used. */
@@ -765,24 +809,34 @@ export function amplifyLive(id: string, paid: Paid): boolean {
   const j = s0.jobs.find((x) => x.id === id);
   if (!j || s0.reviewerAs || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
   if (paid === 'onHand' && !nextPaidJob(s0)) return false;
+  const sendsOn = j.status === 'scheduled' ? (j.scheduledFor ?? null) : null;
+  let sending = false;
   update((s1) => {
     const s = paid === 'onHand' ? takePaidJob(s1) : s1;
     return {
       ...s,
-      jobs: s.jobs.map((x) => (x.id === id ? { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] } : x)),
+      jobs: s.jobs.map((x) => {
+        if (x.id !== id) return x;
+        const next: DemoJob = { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
+        const reach = reachAtGoLive(next, sendsOn);
+        sending = Boolean(reach.reach && !sendsOn);
+        return { ...next, ...reach };
+      }),
     };
   });
+  if (sending) simulateDelivery(id);
   return true;
 }
 
-/** Simulated email progress: queued, sending, sent. Labelled as simulated everywhere it is shown. */
+/** Simulated email progress for emails queued now: sending, then sent. Labelled as simulated everywhere it is shown. */
 function simulateDelivery(id: string) {
-  const step = (status: 'sending' | 'sent', delay: number) =>
+  const step = (from: Delivery, status: Delivery, delay: number) =>
     setTimeout(() => {
-      update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id && j.reach ? { ...j, reach: { ...j.reach, candidates: j.reach.candidates.map((r) => ({ ...r, status })), team: j.reach.team.map((r) => ({ ...r, status })) } } : j)) }), true);
+      const move = (r: Recipient): Recipient => (r.status === from ? { ...r, status } : r);
+      update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id && j.reach ? { ...j, reach: { ...j.reach, candidates: j.reach.candidates.map(move), team: j.reach.team.map(move) } } : j)) }), true);
     }, delay);
-  step('sending', 1200);
-  step('sent', 3200);
+  step('queued', 'sending', 1200);
+  step('sending', 'sent', 3200);
 }
 
 function movedDeadline(today: number, current: string, days: number): string {
@@ -855,6 +909,8 @@ export function hireAgain(id: string, place?: string): string | null {
     closeReason: undefined,
     updatedAfterPublish: false,
     translations: undefined,
+    reachPlan: undefined,
+    reachDismissed: undefined,
     lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };

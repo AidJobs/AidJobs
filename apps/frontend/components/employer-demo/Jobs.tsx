@@ -7,7 +7,8 @@ import { closeJob, deleteDraft, downloadCopy, extend, hireAgain } from './action
 import { addDays, daysUntil, holiday, longDate, PLACES, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
 import { BADGE, listedUntil } from './plans';
-import { CommunityButtons, JobPageLangs, jobUrl, shareMessage } from './Publish';
+import { JobPageLangs, jobUrl } from './Publish';
+import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
 import { Dialog, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
@@ -149,22 +150,32 @@ function VariantDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: (
   );
 }
 
-function ReshareDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
-  const copy = async (t: string, what: string) => {
+/** The job's link; sharing to WhatsApp, LinkedIn, and the rest is on the public job page, for everyone (plan section 16, decision 8). */
+function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  const url = jobUrl(job);
+  const copy = async () => {
     try {
-      await navigator.clipboard.writeText(t);
-      notify(`${what} copied`);
+      await navigator.clipboard.writeText(url);
+      notify('Link copied');
     } catch {
-      notify('Copy failed');
+      notify('Copy failed: select the link and copy it yourself');
     }
   };
   return (
-    <Dialog title="Share again" subtitle={job.facts.title} onClose={onClose}>
+    <Dialog title="Share" subtitle={job.facts.title} onClose={onClose} half>
       <div className="flex flex-col gap-3">
-        <pre className="rounded-xl p-3" style={{ background: 'var(--surface-2)', whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }}>
-          {shareMessage(job, s.org)}
-        </pre>
-        <CommunityButtons msg={shareMessage(job, s.org)} url={jobUrl(job)} copy={copy} />
+        <div className="aj-card flex items-center gap-2 py-2 pl-3 pr-2">
+          <span className="aj-muted min-w-0 flex-1 truncate">{url}</span>
+          <button type="button" className="aj-pill shrink-0" onClick={copy}>
+            <Copy size={13} strokeWidth={1.8} /> Copy link
+          </button>
+        </div>
+        <span className="aj-muted">WhatsApp, LinkedIn, and the phone&apos;s share menu are on the job page, for you and every visitor.</span>
+        {job.status === 'live' && (
+          <button type="button" className="aj-text-btn self-start" onClick={() => go('public', job.id)}>
+            Open the job page
+          </button>
+        )}
       </div>
     </Dialog>
   );
@@ -184,7 +195,7 @@ function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: '
           <Pencil size={14} strokeWidth={1.8} /> Edit
         </button>
         <button type="button" className="aj-pill" onClick={() => onDialog('reshare')}>
-          <Share2 size={14} strokeWidth={1.8} /> Re-share
+          <Share2 size={14} strokeWidth={1.8} /> Share
         </button>
         <button type="button" className="aj-pill" onClick={() => onDialog('filled')}>
           <CheckCheck size={14} strokeWidth={1.8} /> Position filled
@@ -315,7 +326,6 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
   const [dialog, setDialog] = useState<null | 'extend' | 'filled' | 'variant' | 'reshare'>(null);
   const removal = job.closedAt ? Math.round((job.closedAt + 30 * DAY - s.today) / DAY) : null;
   const dropped = job.closedAt ? Math.round((job.closedAt + 90 * DAY - s.today) / DAY) : null;
-  const reach = job.reach;
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex items-center gap-2">
@@ -364,18 +374,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
             <span className="aj-section-label" style={{ padding: 0 }}>
               Reach
             </span>
-            {reach ? (
-              <ul className="aj-muted flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                <li>Candidate invitations: {reach.candidates.length ? `${reach.candidates.filter((r) => r.status === 'sent').length} of ${reach.candidates.length} sent` : 'not used'}</li>
-                <li>Team notifications: {reach.team.length ? `${reach.team.filter((r) => r.status === 'sent').length} of ${reach.team.length} sent` : 'not used'}</li>
-                <li>Community sharing: {reach.community ? 'ready' : 'not used'}</li>
-                <li className="aj-faint" style={{ fontSize: 11 }}>
-                  Simulated. &ldquo;Sent&rdquo; means handed to the email service, not proof of delivery.
-                </li>
-              </ul>
-            ) : (
-              <span className="aj-muted">Not used for this job.</span>
-            )}
+            <ReachLog job={job} s={s} onAmplify={() => go('publish', job.id)} />
           </section>
           <section className="aj-card flex flex-col gap-2 p-3">
             <span className="aj-section-label inline-flex items-center gap-1" style={{ padding: 0 }}>
@@ -408,7 +407,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
       {dialog === 'extend' && <ExtendDialog job={job} s={s} onClose={() => setDialog(null)} />}
       {dialog === 'filled' && <FilledDialog job={job} onClose={() => setDialog(null)} />}
       {dialog === 'variant' && <VariantDialog job={job} s={s} onClose={() => setDialog(null)} />}
-      {dialog === 'reshare' && <ReshareDialog job={job} s={s} onClose={() => setDialog(null)} />}
+      {dialog === 'reshare' && <ShareDialog job={job} onClose={() => setDialog(null)} />}
     </div>
   );
 }

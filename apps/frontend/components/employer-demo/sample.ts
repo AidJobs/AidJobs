@@ -1,5 +1,6 @@
 import { applyLines, defaultApply } from './apply';
 import { monthOf, orgZone } from './plans';
+import { defaultMessages } from './invites';
 import { addDays, buildSections, emptyFacts, FORMATS, orderSections } from './engine';
 import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } from './types';
 
@@ -109,18 +110,30 @@ function job(today: number, id: string, roleKey: string, formatKey: string, fact
   };
 }
 
+/** The Child Protection Specialist's Reach at go-live: two invitations and three colleagues. */
+function sampleReach(j: DemoJob, today: number): DemoJob {
+  const sent = (email: string) => ({ email, status: 'sent' as const, round: 1 });
+  return {
+    ...j,
+    reach: {
+      candidates: ['candidate1@example.org', 'candidate2@example.org'].map(sent),
+      team: ['amina', 'daniel', 'grace'].map((n) => sent(`${n}@riverstone.example.org`)),
+      rounds: [{ n: 1, at: today - 26 * DAY, why: 'At go-live' }],
+      ...defaultMessages(j, SAMPLE_ORG),
+    },
+  };
+}
+
 export function sampleJobs(today: number): DemoJob[] {
+  return sampleList(today).map((j) => (j.id === 'job-cps' ? sampleReach(j, today) : j));
+}
+
+function sampleList(today: number): DemoJob[] {
   return [
     job(today, 'job-cps', 'protection', 'house', { title: 'Child Protection Specialist', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', timezone: 'EAT', contract: 'Fixed-term', duration: '12 months', grade: 'C1', deadline: addDays(today, 2), salaryMode: 'range', salaryMin: '3,900', salaryMax: '4,400', currency: 'USD', safeguarding: 'high' }, {
       status: 'live',
       plan: 'amplify',
       publishedAt: today - 26 * DAY,
-      reach: {
-        candidates: [{ email: 'candidate1@example.org', status: 'sent' }, { email: 'candidate2@example.org', status: 'sent' }],
-        team: ['amina', 'daniel', 'grace'].map((n) => ({ email: `${n}@riverstone.example.org`, status: 'sent' as const })),
-        community: true,
-        intro: '',
-      },
       audit: [
         { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
         { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Amplified and published' },
@@ -181,7 +194,7 @@ export function sampleInbox(today: number): InboxItem[] {
 
 export function initialState(today: number): State {
   return {
-    v: 3,
+    v: 4,
     today,
     signedIn: false,
     me: SAMPLE_ME,

@@ -10,6 +10,7 @@ import {
   cancelSubscription,
   canSkipApproval,
   deleteDraft,
+  dismissMoment,
   editSection,
   editTranslation,
   extend,
@@ -26,6 +27,9 @@ import {
   reviewTranslation,
   saveEditedBase,
   sendChat,
+  sendReach,
+  setReachPlan,
+  setReachReminders,
   settleRemark,
   setApply,
   setFacts,
@@ -34,6 +38,7 @@ import {
   undoLastChange,
 } from '../../components/employer-demo/actions';
 import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
+import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
@@ -512,6 +517,74 @@ describe('language versions', () => {
     reviewTranslation('job-fin', 'fr');
     removeTranslation('job-fin', 'fr');
     expect(JSON.stringify(job('job-fin').translations)).toBe(before);
+  });
+});
+
+describe('Reach', () => {
+  const planned = (id: string, candidates: string[], team: string[] = []) => setReachPlan(id, { ...planFor(job(id), getState().org), candidates, team });
+
+  it('team emails go only to the organisation’s own domain', () => {
+    planned('job-fin', ['a@example.org'], ['amina@riverstone.example.org', 'friend@gmail.example.org']);
+    expect(job('job-fin').reachPlan?.team).toEqual(['amina@riverstone.example.org']);
+  });
+
+  it('a paid job sends at go-live; a free job sends nothing and keeps the plan', () => {
+    const paid = startJob('Hiring a Shelter Officer in Goma, closing in 4 weeks');
+    planned(paid, ['a@example.org', 'b@example.org'], ['grace@riverstone.example.org']);
+    buy('one', 'Shelter Officer');
+    publish(paid, { plan: 'amplify', schedule: null, paid: 'direct' });
+    expect(job(paid).reach?.rounds).toEqual([expect.objectContaining({ n: 1, why: 'At go-live' })]);
+    expect([...job(paid).reach!.candidates, ...job(paid).reach!.team].map((r) => r.status)).toEqual(['queued', 'queued', 'queued']);
+    expect(job(paid).reachPlan).toBeUndefined();
+    const free = startJob('Hiring a Driver in Goma, closing in 4 weeks');
+    planned(free, ['c@example.org']);
+    publish(free, { plan: 'free', schedule: null });
+    expect(job(free).reach).toBeNull();
+    expect(job(free).reachPlan?.candidates).toEqual(['c@example.org']);
+  });
+
+  it('a scheduled job sends on its date, when it goes live', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    planned(id, ['a@example.org']);
+    buy('one', 'Shelter Officer');
+    const date = isoDay(getState().today + 3 * 86_400_000);
+    publish(id, { plan: 'amplify', schedule: date, paid: 'direct' });
+    expect(job(id).reach?.candidates[0].status).toBe('waiting');
+    expect(job(id).reach?.rounds[0].sendsOn).toBe(date);
+    const later = goLive({ ...getState(), today: getState().today + 4 * 86_400_000 });
+    const after = later.jobs.find((j) => j.id === id)!;
+    expect(after.status).toBe('live');
+    expect(after.reach?.candidates[0].status).toBe('sent');
+  });
+
+  it('inviting more skips people already invited and those who unsubscribed, within the allowance', () => {
+    planned('job-cps', ['candidate1@example.org', 'new@example.org', 'optout@example.org']);
+    expect(sendReach('job-cps', 'Before closing')).toBe(1);
+    const reach = job('job-cps').reach!;
+    expect(reach.rounds.map((r) => r.why)).toEqual(['At go-live', 'Before closing']);
+    expect(reach.candidates.filter((r) => r.round === 2).map((r) => r.email)).toEqual(['new@example.org']);
+    planned('job-cps', Array.from({ length: 60 }, (_, i) => `p${i}@example.org`));
+    expect(sendReach('job-cps', 'Invited more')).toBe(REACH_EMAILS - 6);
+    expect(reachUsed(job('job-cps'))).toBe(REACH_EMAILS);
+  });
+
+  it('reminders come at the right moments, "Not now" moves on, and they can be switched off', () => {
+    const today = getState().today;
+    expect(reachMoment(job('job-cps'), today)?.key).toBe('closing');
+    dismissMoment('job-cps', 'closing');
+    expect(reachMoment(job('job-cps'), today)?.key).toBe('halfway');
+    extend('job-cps', 14);
+    expect(reachMoment(job('job-cps'), today)?.key).toMatch(/^extended-/);
+    setReachReminders('job-cps', false);
+    expect(reachMoment(job('job-cps'), today)).toBeNull();
+    expect(reachMoment(job('job-meal'), today)).toBeNull();
+  });
+
+  it('reviewers cannot prepare or send invitations', () => {
+    update((s) => ({ ...s, reviewerAs: 'amina' }));
+    planned('job-cps', ['new@example.org']);
+    expect(job('job-cps').reachPlan).toBeUndefined();
+    expect(sendReach('job-cps', 'Invited more')).toBe(0);
   });
 });
 

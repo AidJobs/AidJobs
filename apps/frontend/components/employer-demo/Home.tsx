@@ -6,6 +6,7 @@ import DayStrip, { type DayGroup } from '@/components/site/DayStrip';
 import Flag from '@/components/site/Flag';
 import {
   approvalRequired,
+  dismissMoment,
   downloadCopy,
   extend,
   hireAgain,
@@ -20,6 +21,7 @@ import {
 import Composer from './Composer';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { currentMonth, FREE_PER_MONTH, freeLeft, monthName } from './plans';
+import { reachMoment } from './invites';
 import { go, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
 import { Lifeline, PlanBadge, Section, stageOf } from './ui';
@@ -117,6 +119,21 @@ function briefing(s: State): Brief[] {
           ],
         });
       }
+    }
+  }
+  for (const j of s.jobs) {
+    const m = reachMoment(j, s.today);
+    if (m) {
+      out.push({
+        id: `reach-${j.id}`,
+        icon: <Send size={16} strokeWidth={1.8} style={{ color: 'var(--sage-7)' }} />,
+        title: m.title,
+        body: m.body,
+        actions: [
+          { label: 'Invite more', run: () => go('jobs', j.id), primary: true },
+          { label: 'Not now', run: () => dismissMoment(j.id, m.key) },
+        ],
+      });
     }
   }
   for (const p of s.packs) {

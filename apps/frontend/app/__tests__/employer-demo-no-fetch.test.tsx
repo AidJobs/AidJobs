@@ -18,7 +18,8 @@ import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
-import { reorderSections, toggleSection } from '@/components/employer-demo/actions';
+import { reorderSections, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
+import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
 import { getState, go, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
@@ -224,12 +225,14 @@ describe('employer demo: never calls the network', () => {
 
     act(() => {
       const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
-      publish(id2, { plan: 'amplify', paid: 'direct', schedule: null, reach: { candidates: [{ email: 'a@example.org', status: 'queued' }], team: [], community: true, intro: '' } });
+      const j2 = getState().jobs.find((j) => j.id === id2)!;
+      setReachPlan(id2, { ...planFor(j2, getState().org), candidates: ['a@example.org'] });
+      publish(id2, { plan: 'amplify', paid: 'direct', schedule: null });
       jest.advanceTimersByTime(5000);
       go('jobs', id2);
     });
     route(window.location.hash);
-    shows('1 of 1 sent');
+    shows('Invitations: 1 sent');
 
     route('#create/job-fin');
     const tagsOf = () => getState().jobs.find((j) => j.id === 'job-fin')?.tags ?? [];
@@ -268,7 +271,7 @@ describe('employer demo: never calls the network', () => {
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":3');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":4');
     for (const k of Object.keys(localStorage)) expect(k.startsWith('aidjobs.')).toBe(true);
   });
 });
@@ -459,6 +462,41 @@ describe('employer demo: before you publish', () => {
     Object.defineProperty(window, 'print', { configurable: true, value: print });
     click('Print');
     expect(print).toHaveBeenCalled();
+    expect(network).toEqual([]);
+  });
+});
+
+describe('employer demo: Reach', () => {
+  it('prepares invitations on the publish page, states them on the button, and offers to invite more on the job page', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#publish/job-fin');
+    click('Choose Amplify');
+    click(/^Reach: invite people when it goes live/);
+    shows('View Job & Apply');
+    shows('AidJobs wrote the first draft');
+    click(/^Your team/);
+    click(/Add your team \(3\)/);
+    click(/^Save · 3 people/);
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.reachPlan?.team).toHaveLength(3);
+    shows('Amplify and publish · invite 3 people when live · US$28.40');
+    route('#jobs/job-cps');
+    shows('A last round of invitations for Child Protection Specialist?');
+    shows('Reminders to invite more: on');
+    click('Invite more');
+    shows('Invite more people');
+    click('Cancel');
+    click('Not now');
+    expect(getState().jobs.find((j) => j.id === 'job-cps')?.reachDismissed).toContain('closing');
+    route('#jobs/job-meal');
+    shows('Amplify to invite people directly');
+    click('Share');
+    shows('WhatsApp, LinkedIn');
     expect(network).toEqual([]);
   });
 });

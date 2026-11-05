@@ -2,12 +2,13 @@
 
 import { useSyncExternalStore } from 'react';
 import { rollBilling } from './plans';
+import { goLive } from './invites';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
 import { initialState } from './sample';
 import type { DemoJob, State } from './types';
 
 /** Everything the demo keeps lives in this browser only, under its own keys, apart from the public site's. */
-export const STORAGE_KEY = 'aidjobs.employerDemo.v3';
+export const STORAGE_KEY = 'aidjobs.employerDemo.v4';
 
 const listeners = new Set<() => void>();
 let current: State | null = null;
@@ -23,7 +24,7 @@ function save(s: State) {
 
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline; lapses and renews paid jobs. */
 function normalise(s0: State): State {
-  const s = rollBilling(s0);
+  const s = goLive(rollBilling(s0));
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
     const tags = outlineOrder(j0.tags);
@@ -43,10 +44,11 @@ function load(): State {
   try {
     localStorage.removeItem('aidjobs.employerDemo.v1');
     localStorage.removeItem('aidjobs.employerDemo.v2');
+    localStorage.removeItem('aidjobs.employerDemo.v3');
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as State;
-      if (parsed && parsed.v === 3 && Array.isArray(parsed.jobs)) return normalise({ ...parsed, today });
+      if (parsed && parsed.v === 4 && Array.isArray(parsed.jobs)) return normalise({ ...parsed, today });
     }
   } catch {
     /* unreadable: start again */

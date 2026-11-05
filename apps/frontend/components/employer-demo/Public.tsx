@@ -155,7 +155,7 @@ export default function Public({ id }: { id?: string }) {
       {open && (ownOpen || openCard) && (
         <Dialog title={ownOpen ? ownOpen.facts.title : (openCard?.title ?? '')} subtitle={ownOpen ? s.org.name : openCard?.org} onClose={() => setOpen(null)} wide>
           {ownOpen ? (
-            <JobPageLangs job={ownOpen} s={s} />
+            <JobPageLangs job={ownOpen} s={s} share />
           ) : (
             <p className="aj-muted">A sample job from another fictional organisation, to show the list. Its page is not part of this demo.</p>
           )}
