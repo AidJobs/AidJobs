@@ -233,3 +233,53 @@ The chat is redesigned and built together with phase 3:
 Checked in the browser at 1366, 412, 390, and 360 px, in light and dark mode, including the phone sheets and dragging sections.
 
 This section was copied to `main` on 5 November 2026 with the shared tooltip fix (Item 2, A). The side menu's footer slot stays on the demo branch until the employer side is built.
+
+## 16. Round 4: publishing, paying, Reach, and review (agreed with the user in chat, 5 November 2026)
+
+Agreed item by item with the user. It supersedes sections 8 and 9, and section 15's item F, where they differ. All prices are placeholders; the demo uses sample data and simulated AI.
+
+### The idea
+
+A paid job is not a listing but a hiring campaign that AidJobs writes, checks against the market, translates, and spreads, with the employer approving each step. It draws on what ordinary job boards lack: AidJobs sees the aid job market (the crawled jobs), knows the sector (formats, grades, duty stations, holidays), and reaches people (job seekers, the organisation's team and community). AI is used on the employer's text and its distribution, never to judge candidates (no CV scoring or ranking; the EU AI Act lists recruitment as high-risk). Every market figure comes from AidJobs' own data, with its count shown; where data is thin the feature says so or stays quiet. AI appears as suggestions with one-tap actions inside the flow, not as another chat.
+
+### Decisions
+
+1. **Free:** 2 jobs per calendar month, in the organisation's time zone (from its headquarters); counted at first use (published, sent for review, or downloaded); per organisation, not per person; no carry-over; listed 60 days; standard placement. The terms are shown on the Free choice itself, with a one-time "I understand" the first time an organisation publishes a free job, and on the Billing page. Replaces "2 free jobs live at a time" and "3 job descriptions a month". Scheduling a job for the 1st of next month uses that month's allowance, and is offered when the month's two are used.
+2. **Free or paid, nothing in between:** no paid Standard job, no credit packs. Beyond the two free jobs, every job is paid.
+3. **The paid offer:** US$28.40 per job; listed 100 days; featured placement; Reach emails; the market check, the full advert check, language versions, and the field-post notice. Working name **Amplify** ("Publish free", "Amplify and publish"); the user may still rename it. "Reach" stays the name of the outreach feature inside it.
+4. **Public badge: "Actively hiring".** A paid job tells candidates the employer is looking now, the job comes straight from a verified organisation, and its details are checked. The paid placement is still disclosed, consistently: the badge's hover text reads "Promoted by the employer · posted directly by a verified organisation · details checked by AidJobs".
+5. **Packages (placeholders):**
+
+   | Package | Rule | Price | Per job |
+   |---|---|---|---|
+   | One job | paid when it is published | US$28.40 | 28.40 |
+   | 3 jobs | used within 2 months | US$66 | 22.00 |
+   | 5 jobs | used within 3 months | US$100 | 20.00 |
+   | "Always hiring" subscription | 3 jobs each month; unused ones lapse; extra jobs US$18; cancel any time | US$54 a month | 18.00 |
+
+   Unused package jobs lapse, after reminders 2 weeks and 3 days before the end. A package job can upgrade a live free job, which gives the free job back. Prices are the same for every type of organisation.
+6. **Before publishing:** free jobs get the writer and the basic advert check (clarity and inclusion); paid jobs add the **market check** ("How does your job compare?": similar open jobs, their closing windows, languages asked, clashing deadlines, each point with a one-tap fix), the **full advert check** (unrealistic requirements and missing pay information, compared with similar jobs), **language versions** (French, Arabic, Spanish, Portuguese; reviewed by the employer; each a version of the public job page), and a **field-post notice** (a printable one-page flyer with a QR code, in the chosen language).
+7. **Reach is prepared before publishing and sent at go-live:** for a paid job, an optional row in the publish panel ("Reach: invite people when it goes live · 0 people") opens the AI-written invitation and team email, edited inside their preview, with the people to send to. The main button states the whole outcome ("Amplify and publish · invite 12 people when live"). The job publishes first and the emails go as soon as it is live, so the link works; a scheduled job sends on its date. Afterwards the job's page shows what was sent, and simple reminders for each job (a few days after publishing, halfway, 5 days before closing, after an extension) invite more, in the home briefing and on the job's page, with an off switch per job.
+8. **Free jobs share the link only:** after publishing, the job's public link with "Copy link", and a quiet "Amplify to invite people directly". Sharing to WhatsApp, LinkedIn, and the rest happens from the public job page, for everyone. "Send from my own email" is removed.
+9. **Approval override:** only where approval is required; only the owner or an admin; a quiet "Publish without approval" link opens a small dialog asking for a reason; logged in the job's history (never public); the reviewers asked are told. An organisation setting, "Nobody can skip approval", removes the override.
+10. **Ask to pay:** for a person who publishes but does not pay (finance or the director holds the card). It sends that person a request ("Grace asks you to pay US$28.40 to publish Finance Officer – Juba"); they pay from a link; the job publishes once paid. It carries a tooltip, because it is otherwise confusing.
+11. **Payment:** a labelled simulated checkout now; Paddle's test checkout plugs in later without changing the screens. A failed or closed payment leaves the job a draft, with "Try again" or "Publish free instead".
+12. **Refunds:** a published refund policy that offers no refunds (beyond what the law requires).
+
+### Build phases (tick when pushed)
+
+- [ ] **Phase 1, the publish panel and pricing:** one page instead of four steps: the preview (job page, Google result, share cards) beside the choices, Free (with its terms) or Amplify, "Hiring more? Plan ahead and pay less per job" opening the packages, and one main button whose words say what happens; the simulated checkout and its failure path; upgrading a live free job; the approval block with the quiet override and the "Nobody can skip approval" setting; a Billing page (the month's free count and reset date, the package or subscription balance and end date, receipts).
+- [ ] **Phase 2, before publishing:** the market check from a labelled sample of similar open jobs; the advert check; language versions; the field-post notice.
+- [ ] **Phase 3, Reach:** the Reach row in the publish panel, messages edited in place, sent at go-live; the free link-only success; what was sent on the job's page; the simple reminders.
+- [ ] **Phase 4, review and Ask to pay:** review in the workspace's right-hand panel, a third view beside the JD outline and Chat, for the author and the reviewer; Ask to pay.
+
+Then one independent review of the round, its fixes, and the user's look on the preview.
+
+### For after launch (recorded, not built now)
+
+- Reach as a full campaign: a tracked link per channel and results by channel; campaign moments driven by data ("below similar jobs"); one-tap fixes explained by data (extend, translate, re-share, adjust the title); a weekly campaign summary email per organisation.
+- Hiring memory ("You hire a Finance Officer in Juba about every 6 months; draft the next one?") and the organisation's own data on what works.
+- A campaign promise (a free extension and Reach round when a paid job is clearly below similar jobs after 14 days), only once there is sizeable traffic from employers and candidates.
+- Paid jobs sent to AidJobs job seekers whose job alerts match, once job seekers can opt in to alerts (changes E10).
+- A refund policy beyond "none", and prices by type of organisation.
+- Production needs: the AI decision (E7); Paddle products, packages, and subscriptions; market data from the crawler (counts and dates, within each source's reuse terms); per-channel link tracking; the email set-up (section 9); contract changes, each with its own plan.
