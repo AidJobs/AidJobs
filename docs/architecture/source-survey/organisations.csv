@@ -176,8 +176,8 @@ rank,org_id,name,acronym,family,kind,country,website_domain,unjobs_jobs,income_u
 175,unjobs-un:45,International Centre for Migration Policy Development,ICMPD,,Multilateral; un-or-intergovernmental,AT,icmpd.org,10,,,hiring (UNjobs),iati:XM-OCHA-585; unjobs-un:45,
 176,unjobs-un:35,International Monetary Fund,IMF,,Multilateral; un-or-intergovernmental,US,imf.org,10,,,hiring (UNjobs),iati:XM-DAC-43000; unjobs-un:35,
 177,unjobs-nonun:293,International Union for Conservation of Nature,IUCN,International Union for Conservation of Nature,Other public sector; non-un,CH,iucn.org,10,,,hiring (UNjobs),iati:XM-DAC-30011; unjobs-nonun:293,
-178,unjobs-un:53,Office for the Coordination of Humanitarian Affairs,OCHA,UN Secretariat (careers.un.org),Multilateral; un-secretariat (likely),CH,unocha.org,10,,,hiring (UNjobs),iati:XI-IATI-OCHASDC; iati:XM-DAC-41127; iati:XM-OCHA-CBPF; unjobs-un:53,
-179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,INTERSOS,,EU humanitarian partner (DG ECHO); International NGO; non-un,IT,intersos.org,10,,,hiring (UNjobs),echo:93; iati:IT-CF-97091470589; unjobs-nonun:253,DG ECHO certificate: Partner (INTERSOS-IT)
+178,unjobs-nonun:253,INTERSOS,INTERSOS,,EU humanitarian partner (DG ECHO); International NGO; non-un,IT,intersos.org,10,,,hiring (UNjobs),echo:93; iati:IT-CF-97091470589; unjobs-nonun:253,DG ECHO certificate: Partner (INTERSOS-IT)
+179,unjobs-un:53,Office for the Coordination of Humanitarian Affairs,OCHA,UN Secretariat (careers.un.org),Multilateral; un-secretariat (likely),CH,unocha.org,10,,,hiring (UNjobs),iati:XI-IATI-OCHASDC; iati:XM-DAC-41127; iati:XM-OCHA-CBPF; unjobs-un:53,
 180,unjobs-un:90,UN Office at Geneva,UNOG,UN Secretariat (careers.un.org),un-secretariat (likely),,,10,,,hiring (UNjobs),unjobs-un:90,
 181,unjobs-nonun:284,International Livestock Research Institute,ILRI,,NTEE Q053; non-un,US,,9,95365000,"irs:521953157 (USD 95365000, 2024)",hiring (UNjobs),irs:521953157; unjobs-nonun:284,
 182,unjobs-nonun:38,BRAC,,BRAC,International NGO; non-un,BD,brac.net,9,,,hiring (UNjobs),iati:BD-NAB-002; unjobs-nonun:38,
@@ -2632,7 +2632,7 @@ rank,org_id,name,acronym,family,kind,country,website_domain,unjobs_jobs,income_u
 2631,iati:GB-GOV-50,Cross-Government Prosperity Fund,,,Government,GB,gov.uk,,,,listed only,iati:GB-GOV-50,
 2632,iati:GB-COH-03259922,Crown Agents Limited,,,Private sector,GB,,,,,listed only,iati:GB-COH-03259922,"private sector: development contractor or investor, for review"
 2633,eu:114264250966-94,CRTA,CRTA,,NGO: development or humanitarian aid,RS,crta.rs,,,,listed only,eu:114264250966-94,no income in this register
-2634,echo:53,"Cruz Roja Española, (e)",,,EU humanitarian partner (DG ECHO),ES,,,,,listed only,echo:53,DG ECHO certificate: Potential Programmatic Partner (CROIX-ROUGE-ES)
+2634,echo:53,Cruz Roja Española,,,EU humanitarian partner (DG ECHO),ES,,,,,listed only,echo:53,DG ECHO certificate: Potential Programmatic Partner (CROIX-ROUGE-ES)
 2635,eu:56502415122-32,"CSR Europe, The Business Network for Corporate Social Responsibility (CSR Europe)",,,NGO: development or humanitarian aid,BE,csreurope.org,,,,listed only,eu:56502415122-32,no income in this register
 2636,iati:TN-TIN-102123727,CUAMM Trustees,,,National NGO,TZ,,,,,listed only,iati:TN-TIN-102123727,
 2637,eu:869481349826-64,Cuba Demanda Inc. (CD INC),,,NGO: development or humanitarian aid,US,cuba-demanda.org,,,,listed only,eu:869481349826-64,no income in this register

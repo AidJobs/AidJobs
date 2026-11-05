@@ -33,10 +33,9 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
-from urllib.robotparser import RobotFileParser
 from xml.etree import ElementTree
 
-from careers import read_csv, strip_query, system_of
+from careers import SECOND_LEVEL, read_csv, strip_query, system_of
 
 HERE = Path(__file__).resolve().parent
 SURVEY = HERE.parents[1] / "docs" / "architecture" / "source-survey"
@@ -59,8 +58,8 @@ STOP_FAILURES = 5
 STEP_TIMEOUT, TOTAL_TIMEOUT = 20.0, 45.0
 
 OBSERVATION_FIELDS = ["org_id", "target_url", "found_by", "request", "robots", "status",
-                      "final_url", "redirects", "system", "system_evidence", "listing",
-                      "jobs_seen", "bot_protection", "error"]
+                      "final_url", "redirects", "destination_robots", "system",
+                      "system_evidence", "listing", "jobs_seen", "bot_protection", "error"]
 CONFIRMED_FIELDS = ["rank", "org_id", "name", "group", "outcome", "careers_page", "found_by",
                     "system", "system_evidence", "listing", "jobs_seen", "unjobs_jobs",
                     "bot_protection", "shares_site_with", "note"]
@@ -147,10 +146,60 @@ def safe_name(org_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", org_id)
 
 
+PRODUCT_TOKEN = USER_AGENT.split("/")[0].lower()
+
+
+def robots_rules(text: str, token: str = PRODUCT_TOKEN) -> list[tuple[bool, str]]:
+    """The (allow, pattern) rules that apply to the survey (RFC 9309, section 2.2): every group
+    naming its product token, else every '*' group; consecutive user-agent lines share a group."""
+    groups: list[tuple[set[str], list[tuple[bool, str]]]] = []
+    in_agents = False
+    for raw in text.splitlines():
+        key, sep, value = raw.split("#", 1)[0].partition(":")
+        key, value = key.strip().lower(), value.strip()
+        if not sep:
+            continue
+        if key == "user-agent":
+            if not in_agents:
+                groups.append((set(), []))
+            groups[-1][0].add(value.split("/")[0].strip().lower())
+            in_agents = True
+        elif key in ("allow", "disallow"):
+            in_agents = False
+            if groups and value:
+                groups[-1][1].append((key == "allow", value))
+        else:
+            in_agents = False
+    mine = [rule for agents, rules in groups if token in agents for rule in rules]
+    if any(token in agents for agents, _ in groups):
+        return mine
+    return [rule for agents, rules in groups if "*" in agents for rule in rules]
+
+
+def _pattern(rule: str) -> re.Pattern:
+    """A path pattern: '*' matches any characters, a final '$' the end of the path."""
+    end = rule.endswith("$")
+    body = re.escape(rule[:-1] if end else rule).replace(r"\*", ".*")
+    return re.compile(body + ("$" if end else ""))
+
+
+def robots_allows(text: str, url: str) -> bool:
+    """RFC 9309, section 2.2.2: the longest matching rule wins; on a tie, allow wins."""
+    parts = urlsplit(url)
+    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+    if parts.path == "/robots.txt":
+        return True
+    matches = [(len(rule), allow) for allow, rule in robots_rules(text)
+               if _pattern(rule).match(path)]
+    return max(matches)[1] if matches else True
+
+
 def robots_verdict(status: int | None, body: str, url: str) -> str:
     """'allowed', 'forbidden', 'refused' (401, 403, 429) or 'unreachable' (5xx, no answer).
     RFC 9309: a robots.txt that is not there (other 4xx) allows everything; one that cannot be
-    reached is treated as forbidding everything."""
+    reached is treated as forbidding everything. RFC 9309 also allows crawling when robots.txt
+    answers 401 or 403; the survey deliberately treats those as a refusal (its plan: a 403
+    stops that organisation)."""
     if status is None or status >= 500:
         return "unreachable"
     if status in (401, 403, 429):
@@ -159,13 +208,11 @@ def robots_verdict(status: int | None, body: str, url: str) -> str:
         return "allowed"
     if status != 200:
         return "unreachable"
-    parser = RobotFileParser()
-    parser.parse(body.splitlines())
-    return "allowed" if parser.can_fetch(USER_AGENT, url) else "forbidden"
+    return "allowed" if robots_allows(body, url) else "forbidden"
 
 
 # Pages that are a challenge, not the page asked for. Normal pages can carry a form's captcha or
-# a protection service's script, so those count only on a refusal (401, 403, 429, 503).
+# a protection service's script, so those count only on a refusal (401, 403, 429).
 CHALLENGES = [
     ("Cloudflare challenge", re.compile(r"<title>\s*(?:just a moment|attention required)"
                                         r"|cf_chl_opt|window\._cf_chl", re.IGNORECASE)),
@@ -259,9 +306,13 @@ class Fetcher:
         return result
 
 
+def robots_file(host: str) -> Path:
+    return RAW / "robots" / f"{safe_name(host)}.json"
+
+
 def fetch(args) -> int:
     fetcher = Fetcher(RAW / "requests.log")
-    robots_cache: dict[str, dict] = {}
+    robots_cache: dict[str, dict] = {}  # kept on disk too, so a resumed run asks no host twice
     refusals: list[tuple[str, str]] = []
     failures = done = 0
     for t in targets(batch=args.batch):
@@ -274,6 +325,9 @@ def fetch(args) -> int:
                   "robots": {}, "response": {}}
         parts = urlsplit(t["request_url"])
         host = (parts.hostname or "").lower()
+        asked = False  # whether this organisation's robots.txt was requested now
+        if host not in robots_cache and robots_file(host).exists():
+            robots_cache[host] = json.loads(robots_file(host).read_text(encoding="utf-8"))
         if host not in robots_cache:
             r = fetcher.get(f"{parts.scheme}://{parts.netloc}/robots.txt", "robots.txt")
             text = r["body"].decode("utf-8", "replace")
@@ -282,7 +336,12 @@ def fetch(args) -> int:
                 "text": text if r["status"] == 200 else "",
                 "bot_protection": bot_protection(r["status"], r["headers"], text)
                 if r["status"] != 200 else "",
-                "server": r["headers"].get("server", "")}
+                "server": r["headers"].get("server", ""),
+                "fetched_at": datetime.now(UTC).isoformat(timespec="seconds")}
+            robots_file(host).parent.mkdir(parents=True, exist_ok=True)
+            robots_file(host).write_text(json.dumps(robots_cache[host]), encoding="utf-8")
+            asked = True
+            failures = failures + 1 if r["status"] is None and r["error"] else 0
         cached = robots_cache[host]
         verdict = robots_verdict(cached["status"], cached["text"], t["request_url"])
         record["robots"] = {"host": host, "status": cached["status"], "error": cached["error"],
@@ -298,10 +357,13 @@ def fetch(args) -> int:
             (RAW / "bodies" / f"{safe_name(t['org_id'])}.bin").write_bytes(body)
             if r["status"] in (403, 429) or r["bot_protection"]:
                 refusal = (host, service_of(r["bot_protection"], r["headers"].get("server", "")))
-            failures = failures + 1 if r["error"] else 0
-        elif verdict == "refused":
+            failures = failures + 1 if r["status"] is None and r["error"] else 0
+        elif verdict == "refused" and asked:
             refusal = (host, service_of(cached["bot_protection"], cached["server"]))
-        refusals = [*refusals, refusal] if refusal else []
+        if refusal:
+            refusals = [*refusals, refusal]
+        elif asked or verdict == "allowed":
+            refusals = []  # an answer that was not a refusal; a cached verdict changes nothing
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(record, indent=1), encoding="utf-8")
         done += 1
@@ -381,6 +443,14 @@ def count_feed(system: str, body: bytes) -> int | None:
     return None
 
 
+def site_of(url: str) -> str:
+    """The registered site of an address: 'jobs.acme.org.uk' -> 'acme.org.uk'."""
+    labels = (urlsplit(url).hostname or "").lower().split(".")
+    if len(labels) >= 3 and labels[-2] in SECOND_LEVEL and len(labels[-1]) == 2:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
 def links_of(text: str, base: str) -> list[str]:
     """Every link, script and frame address on a page, made absolute."""
     out = []
@@ -412,8 +482,12 @@ def page_facts(final_url: str, text: str) -> dict:
             (system, host), count = seen.most_common(1)[0]
             evidence = f"links to {host} ({count})"
     jobs = set()
+    page_site = site_of(final_url)
     for link in links:
         path = urlsplit(link).path.lower()
+        # Postings on the page's own site or a recruitment system, not another job board's.
+        if site_of(link) != page_site and not system_of(link):
+            continue
         if JOB_LINK.search(link) and not path.endswith((".pdf", ".js", ".css", ".png", ".jpg",
                                                         ".svg", ".ico", ".woff2")):
             keeps_query = re.search(r"[?&](?:job_?id|jobid|reqid|requisitionid|vacancyid)=",
@@ -448,9 +522,14 @@ def observation(record: dict, body: bytes) -> dict:
            "found_by": record["found_by"], "request": record["request"],
            "robots": robots.get("verdict", ""), "status": response.get("status") or "",
            "final_url": strip_query(response.get("final_url", "")),
-           "redirects": response.get("redirects", ""), "system": "", "system_evidence": "",
-           "listing": "", "jobs_seen": "", "bot_protection": response.get("bot_protection", ""),
+           "redirects": response.get("redirects", ""), "destination_robots": "", "system": "",
+           "system_evidence": "", "listing": "", "jobs_seen": "",
+           "bot_protection": response.get("bot_protection", ""),
            "error": response.get("error") or robots.get("error") or ""}
+    final_host = (urlsplit(response.get("final_url", "")).hostname or "").lower()
+    if final_host and final_host != robots.get("host"):
+        # The fetch policy follows redirects itself; the destination's robots.txt was not read.
+        row["destination_robots"] = f"not checked ({final_host})"
     vendor = (urlsplit(response.get("final_url", "")).hostname or "").lower() in VENDOR_SITES
     if robots.get("verdict") != "allowed" or response.get("status") != 200 \
             or (row["bot_protection"] and not vendor):
@@ -557,7 +636,8 @@ def build(_args=None, survey: Path = SURVEY) -> int:
                "system": o.get("system", ""), "system_evidence": o.get("system_evidence", ""),
                "listing": o.get("listing", ""), "jobs_seen": o.get("jobs_seen", ""),
                "unjobs_jobs": w["unjobs_jobs"], "bot_protection": o.get("bot_protection", ""),
-               "note": ""}
+               "note": (f"redirected to another host, whose robots.txt was "
+                        f"{o['destination_robots']}") if o.get("destination_robots") else ""}
         if not row["system"] and feed:
             row["system"] = o["request"][len("feed ("):-1]
         if not row["system"] and page:

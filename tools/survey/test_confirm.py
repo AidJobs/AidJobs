@@ -37,6 +37,42 @@ def test_documented_public_feeds_are_used_for_their_systems():
     assert confirm.feed_for("https://www.rescue.org/careers") == ("", "")
 
 
+def test_robots_txt_follows_rfc_9309_longest_match_and_wildcards():
+    assert confirm.robots_allows("User-agent: *\nAllow: /\nDisallow: /jobs\n",
+                                 "https://x.org/jobs") is False
+    assert confirm.robots_allows("User-agent: *\nDisallow: /*/careers\n",
+                                 "https://x.org/en/careers") is False
+    assert confirm.robots_allows("User-agent: *\nDisallow: /jobs*\n",
+                                 "https://x.org/jobs/list") is False
+    assert confirm.robots_allows("User-agent: *\nDisallow: /jobs\nAllow: /jobs/open\n",
+                                 "https://x.org/jobs/open/1") is True
+    assert confirm.robots_allows("User-agent: *\nDisallow: /*.pdf$\n",
+                                 "https://x.org/a.pdf?x=1") is True
+    assert confirm.robots_allows("User-agent: *\nDisallow: /*.pdf$\n",
+                                 "https://x.org/a.pdf") is False
+    # Our own group, when there is one, replaces the '*' group; agents in a row share a group.
+    rules = ("User-agent: Googlebot\nUser-agent: AidJobsSurvey\nAllow: /\n\n"
+             "User-agent: *\nDisallow: /\n")
+    assert confirm.robots_allows(rules, "https://x.org/careers") is True
+    assert confirm.robots_allows("User-agent: *\nDisallow:\n", "https://x.org/a") is True
+    assert confirm.robots_allows("User-agent: *\nDisallow: /\n", "https://x.org/robots.txt")
+
+
+def test_a_cross_host_redirect_is_marked_its_robots_txt_unchecked():
+    record = {"org_id": "a", "target_url": "https://jobs.jobvite.com/pih", "found_by": "x",
+              "request": "page", "robots": {"verdict": "allowed", "host": "jobs.jobvite.com"},
+              "response": {"status": 200, "final_url": "https://www.pih.org/employment"}}
+    row = confirm.observation(record, b"<p>" + b"y" * 3000 + b"</p>")
+    assert row["destination_robots"] == "not checked (www.pih.org)"
+
+
+def test_postings_on_another_job_board_are_not_counted():
+    filler = "<p>" + "text " * 400 + "</p>"
+    page = ('<a href="https://reliefweb.int/job/4123456/officer">x</a>'
+            '<a href="https://careers.acme.org/jobs/123">y</a>') + filler
+    assert confirm.page_facts("https://www.acme.org/careers", page)["jobs_seen"] == 1
+
+
 def test_a_listing_keeps_only_the_parameters_it_needs():
     assert confirm.listing_url("https://phg.tbe.taleo.net/phg02/ats/careers/v2/jobSearch"
                                "?org=CAREUSA&cws=52&utm_source=x") \

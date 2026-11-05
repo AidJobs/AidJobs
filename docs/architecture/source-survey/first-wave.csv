@@ -148,7 +148,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 175,unjobs-un:45,International Centre for Migration Policy Development,development bank or other international body (UN page),10,,icmpd.org,,,1
 176,unjobs-un:35,International Monetary Fund,development bank or other international body (UN page),10,,imf.org,https://imf.wd5.myworkdayjobs.com/IMF,medium,1
 177,unjobs-nonun:293,International Union for Conservation of Nature,"NGO, INGO, consultancy or foundation",10,,iucn.org,,,1
-179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,"NGO, INGO, consultancy or foundation",10,,intersos.org,,,1
+178,unjobs-nonun:253,INTERSOS,"NGO, INGO, consultancy or foundation",10,,intersos.org,,,1
 181,unjobs-nonun:284,International Livestock Research Institute,"NGO, INGO, consultancy or foundation",9,95365000,ilri.org,,,2
 182,unjobs-nonun:38,BRAC,"NGO, INGO, consultancy or foundation",9,,brac.net,,,2
 183,unjobs-nonun:80,Center for European Policy Analysis,"NGO, INGO, consultancy or foundation",9,,cepa.org,,,2
@@ -609,7 +609,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 2537,echo:142,Comunità di S.Egidio ACAP APS,EU humanitarian partner (DG ECHO),,,acap.santegidio.org,,,2
 2629,iati:BE-BCE_KBO-0462132150,Croix-Rouge de Belgique Communauté francophone - Activités internationales ASBL,EU humanitarian partner (DG ECHO),,,croix-rouge.be,,,2
 2630,echo:55,Croix-Rouge Francaise,EU humanitarian partner (DG ECHO),,,croix-rouge.fr,,,2
-2634,echo:53,"Cruz Roja Española, (e)",EU humanitarian partner (DG ECHO),,,cruzroja.es,,,2
+2634,echo:53,Cruz Roja Española,EU humanitarian partner (DG ECHO),,,cruzroja.es,,,2
 2657,echo:59,Danish Committee for Aid to Afghan Refugees,EU humanitarian partner (DG ECHO),,,dacaar.org,,,2
 2659,iati:DK-CVR-20700211,Danish Red Cross,EU humanitarian partner (DG ECHO),,,rodekors.dk,,,2
 2666,echo:65,Dansk Folkehjælp,EU humanitarian partner (DG ECHO),,,folkehjaelp.dk,,,2

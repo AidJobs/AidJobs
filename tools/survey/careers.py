@@ -1261,6 +1261,7 @@ def added_groups(everything, ranked, decisions: Decisions) -> dict[str, str]:
             added[o["org_id"]] = ECHO_GROUP
     wave = {o["org_id"] for o in ranked if wave_group(o)} | set(added)
     wave |= {o["org_id"] for o in income_top(ranked, excluded)}
+    wave -= set(excluded)  # an excluded organisation brings no network with it
     families = {o["family"] for o in everything
                 if o["org_id"] in wave and o["family"] and o["family"] != UN_FAMILY}
     for o in everything:

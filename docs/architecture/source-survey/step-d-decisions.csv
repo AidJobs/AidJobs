@@ -1244,7 +1244,6 @@ family-link,unjobs-nonun:473,iati:AU-ABN-23068075525,national member of the Tran
 family-link,unjobs-nonun:473,iati:BD-NAB-1301,national member of the Transparency International network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
 family-link,unjobs-nonun:473,iati:KE-RCO-84486,national member of the Transparency International network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
 family-link,unjobs-nonun:473,eu:501222919-71,national member of the Transparency International network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
-family-link,unjobs-nonun:473,iati:XM-DAC-21033,national member of the Transparency International network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
 family-link,unjobs-nonun:473,iati:GB-CHC-1112842,national member of the Transparency International network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
 family-link,unjobs-nonun:233,irs:710699939,national member of the Heifer network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
 family-link,unjobs-nonun:233,iati:ZA-NPO-013484,national member of the Heifer network (the user's decision of 6 Nov 2026: national members of INGO networks in the first wave)
@@ -1301,3 +1300,4 @@ family,unjobs-nonun:473,Transparency International,the network's name
 family,unjobs-nonun:233,Heifer,the network's name
 family,irs:952680390,Food for the Hungry,the network's name
 family,irs:736108657,Feed the Children,the network's name
+name,unjobs-nonun:253,INTERSOS,the organisation's name (UNjobs lists it as 'INTERSOS - Organizzazione Umanitaria Onlus'; its IATI record's name was shown after the merge)
