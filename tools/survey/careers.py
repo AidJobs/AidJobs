@@ -45,7 +45,9 @@ USER_AGENT = "AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)"
 # Wikimedia's User-Agent policy asks for contact details, "bot" and the library.
 WD_USER_AGENT = "AidJobsSurveyBot/0.1 (mailto:aidjobz@gmail.com; employer survey) python-requests"
 
-CRAWLS = ["CC-MAIN-2026-43", "CC-MAIN-2026-39", "CC-MAIN-2026-34"]
+# The latest crawl only, decided by the user on 5 November 2026 after Common Crawl's data
+# server asked us to slow down (CC-MAIN-2026-39 and -34 dropped).
+CRAWLS = ["CC-MAIN-2026-43"]
 DATA = "https://data.commoncrawl.org/cc-index/collections/{crawl}/indexes/"
 SPARQL = "https://query.wikidata.org/sparql"
 SCOPE = {"hiring (UNjobs)", "income"}
@@ -53,7 +55,7 @@ SEARCH_TOP = 600
 UN_FAMILY = "UN Secretariat (careers.un.org)"  # step D: its offices hire through one site
 UN_CAREERS = "https://careers.un.org/"
 
-CC_INTERVAL = 1.0
+CC_INTERVAL = 10.0       # seconds between Common Crawl requests (the user's decision, 5 Nov 2026)
 WD_INTERVAL = 5.0
 BACKOFF = (5, 30, 120)
 STOP_AFTER = 3          # consecutive failed requests that stop a run
