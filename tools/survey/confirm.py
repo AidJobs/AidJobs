@@ -49,8 +49,13 @@ HEADERS = {"User-Agent": USER_AGENT,
 
 INTERVAL = 5.0          # seconds between any two requests
 HOST_INTERVAL = 10.0    # seconds between two requests to one host
-STOP_REFUSALS = 3       # refusals (403, 429, bot challenge) in a row that stop the run
-STOP_FAILURES = 5       # network failures in a row that stop the run
+# The user's rule of 6 November 2026, after the first run stopped on three refusals from three
+# unrelated sites: the run stops on signs of a block against the survey itself, that is
+# refusals (403, 429, bot challenge) in a row from one host or one protection service, or from
+# any sites, or network failures in a row.
+STOP_SAME = 3
+STOP_ANY = 5
+STOP_FAILURES = 5
 STEP_TIMEOUT, TOTAL_TIMEOUT = 20.0, 45.0
 
 OBSERVATION_FIELDS = ["org_id", "target_url", "found_by", "request", "robots", "status",
@@ -62,7 +67,7 @@ CONFIRMED_FIELDS = ["rank", "org_id", "name", "group", "outcome", "careers_page"
 SYSTEM_FIELDS = ["system", "organisations", "confirmed", "jobs_seen", "unjobs_jobs",
                  "listing_kinds", "examples"]
 DECISION_FIELDS = ["action", "org_id", "value", "confidence", "reason"]
-CORRECTABLE = {"system", "listing", "outcome", "note"}
+CORRECTABLE = {"system", "listing", "outcome", "jobs_seen", "note"}
 
 
 # --- what to read ----------------------------------------------------------------------------
@@ -190,6 +195,29 @@ def bot_protection(status: int | None, headers: dict, body: str) -> str:
     return ""
 
 
+def service_of(protection: str, server: str) -> str:
+    """The protection service behind a refusal, when it shows one ('' when unknown)."""
+    text = f"{protection} {server}".lower()
+    for name in ("cloudflare", "akamai", "imperva", "datadome", "perimeterx", "aws"):
+        if name in text:
+            return name
+    return ""
+
+
+def run_stop(refusals: list[tuple[str, str]]) -> str:
+    """Why the run must stop, given the refusals in a row so far as (host, service); ''."""
+    if len(refusals) >= STOP_ANY:
+        return f"{len(refusals)} refusals in a row"
+    last = refusals[-STOP_SAME:]
+    if len(last) == STOP_SAME:
+        if len({host for host, _ in last}) == 1:
+            return f"{STOP_SAME} refusals in a row from {last[0][0]}"
+        services = {service for _, service in last}
+        if len(services) == 1 and "" not in services:
+            return f"{STOP_SAME} refusals in a row from {last[0][1]}"
+    return ""
+
+
 class Fetcher:
     """One request at a time through the backend's fetch policy, spaced, logged."""
 
@@ -233,8 +261,9 @@ class Fetcher:
 
 def fetch(args) -> int:
     fetcher = Fetcher(RAW / "requests.log")
-    robots_cache: dict[str, tuple[int | None, str, str]] = {}
-    refusals = failures = done = 0
+    robots_cache: dict[str, dict] = {}
+    refusals: list[tuple[str, str]] = []
+    failures = done = 0
     for t in targets(batch=args.batch):
         target = RAW / "orgs" / f"{safe_name(t['org_id'])}.json"
         if target.exists() or not t["request_url"]:
@@ -247,11 +276,18 @@ def fetch(args) -> int:
         host = (parts.hostname or "").lower()
         if host not in robots_cache:
             r = fetcher.get(f"{parts.scheme}://{parts.netloc}/robots.txt", "robots.txt")
-            text = r["body"].decode("utf-8", "replace") if r["status"] == 200 else ""
-            robots_cache[host] = (r["status"], text, r["error"])
-        status, text, error = robots_cache[host]
-        verdict = robots_verdict(status, text, t["request_url"])
-        record["robots"] = {"host": host, "status": status, "error": error, "verdict": verdict}
+            text = r["body"].decode("utf-8", "replace")
+            robots_cache[host] = {
+                "status": r["status"], "error": r["error"],
+                "text": text if r["status"] == 200 else "",
+                "bot_protection": bot_protection(r["status"], r["headers"], text)
+                if r["status"] != 200 else "",
+                "server": r["headers"].get("server", "")}
+        cached = robots_cache[host]
+        verdict = robots_verdict(cached["status"], cached["text"], t["request_url"])
+        record["robots"] = {"host": host, "status": cached["status"], "error": cached["error"],
+                            "verdict": verdict, "bot_protection": cached["bot_protection"]}
+        refusal = None
         if verdict == "allowed":
             r = fetcher.get(t["request_url"], t["org_id"])
             body = r.pop("body")
@@ -260,18 +296,20 @@ def fetch(args) -> int:
             record["response"] = r
             (RAW / "bodies").mkdir(parents=True, exist_ok=True)
             (RAW / "bodies" / f"{safe_name(t['org_id'])}.bin").write_bytes(body)
-            refused = r["status"] in (403, 429) or bool(r["bot_protection"])
-            refusals = refusals + 1 if refused else 0
+            if r["status"] in (403, 429) or r["bot_protection"]:
+                refusal = (host, service_of(r["bot_protection"], r["headers"].get("server", "")))
             failures = failures + 1 if r["error"] else 0
-        else:
-            refusals = refusals + 1 if verdict == "refused" else 0
+        elif verdict == "refused":
+            refusal = (host, service_of(cached["bot_protection"], cached["server"]))
+        refusals = [*refusals, refusal] if refusal else []
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(record, indent=1), encoding="utf-8")
         done += 1
         print(f"{t['org_id']}: robots {verdict}; {record['response'].get('status') or ''}"
               f"{record['response'].get('error') or ''}", flush=True)
-        if refusals >= STOP_REFUSALS:
-            print(f"stopped: {refusals} refusals in a row")
+        why = run_stop(refusals)
+        if why:
+            print(f"stopped: {why}")
             return 1
         if failures >= STOP_FAILURES:
             print(f"stopped: {failures} network failures in a row")
@@ -286,11 +324,36 @@ HREF = re.compile(r"""(?:href|src|action|data-url)\s*=\s*["']([^"'<>\s]+)["']"""
 JOB_LINK = re.compile(
     r"/jobs?/[^/?#]*\d|/jobs?/[a-z0-9-]{12,}|/job-?details?/|/vacanc(?:y|ies)/[^/?#]+"
     r"|/careers?/[^/?#]+/[^/?#]*\d|/positions?/[^/?#]+|/openings?/[^/?#]+|/posting/"
-    r"|[?&](?:job_?id|jobid|reqid|requisitionid|vacancyid)=|/requisitions?/|/offres?/[^/?#]+"
-    r"|/stellen(?:angebote)?/[^/?#]+|/vacatures?/[^/?#]+|/ofertas?/[^/?#]+"
-    r"|/j/[A-Z0-9]{6,}|lever\.co/[^/]+/[0-9a-f-]{20,}|/careers/\d+", re.IGNORECASE)
-JS_SHELL = re.compile(r"""<div[^>]+id=["'](?:root|app|__next|__nuxt)["']|enable javascript"""
-                      r"""|javascript is (?:required|disabled)|noscript""", re.IGNORECASE)
+    r"|[?&](?:job_?id|jobid|reqid|requisitionid|vacancyid|rid)=\d|/requisitions?/"
+    r"|/offres?/[^/?#]+|/stellen(?:angebote)?/[^/?#]+|/vacatures?/[^/?#]+|/ofertas?/[^/?#]+"
+    r"|/j/[A-Z0-9]{6,}|lever\.co/[^/]+/[0-9a-f-]{20,}|/careers/\d+"
+    # Recruitment systems' own posting addresses: Breezy, JazzHR, Taleo Business Edition,
+    # refline, Zoho Recruit, SuccessFactors career sites.
+    r"|/p/[0-9a-f]{8,}-|/apply/[A-Za-z0-9]{8,}/|/viewrequisition|/\d+/pub/\d+/index\.html"
+    r"|/jobs/careers/\d{5,}|/job/[^/?#]+/\d{6,}/", re.IGNORECASE)
+APP_ROOT = re.compile(r"""<div[^>]+id=["'](?:root|app|__next|__nuxt)["']""", re.IGNORECASE)
+JOB_SCRIPT = re.compile(r"(?:job|vacanc|career|recruit|stellen|emploi)[^/]*\.js$", re.IGNORECASE)
+# Systems whose careers pages load their job list by script; a page there without job links
+# needs JavaScript (Workday's and Oracle's job search is also a POST request, contract §9).
+SCRIPT_LISTS = {"Workday", "Oracle Recruiting Cloud", "SuccessFactors", "Cornerstone",
+                "BambooHR", "Zoho Recruit", "iCIMS", "Dayforce", "UKG UltiPro", "Avature",
+                "Phenom", "Talentsoft"}
+SCRIPT_LIST_HOSTS = re.compile(r"(?:^|\.)(?:clearcompany\.com|applicantpool\.com"
+                               r"|applicantpro\.com|emply\.com|recman\.io|simplify\.hr)$")
+ERROR_PAGE = re.compile(r"(?:^|/)(?:404|error(?:pages)?|page[_-]?not[_-]?found)(?:[/._-]|$)",
+                        re.IGNORECASE)
+SIGN_IN_PAGE = re.compile(r"/(?:login|signin|sign-in)(?:\.php|\.aspx?|/|$)", re.IGNORECASE)
+# The recruitment systems' own sites: an account's address that ends there is closed.
+VENDOR_SITES = {"www.bamboohr.com", "bamboohr.com", "www.jobvite.com", "jobvite.com",
+                "www.workable.com", "www.greenhouse.io", "www.smartrecruiters.com",
+                "www.icims.com", "www.lever.co", "lever.co", "www.breezy.hr", "www.recruitee.com",
+                "www.teamtailor.com", "www.personio.com", "www.personio.de", "www.ashbyhq.com"}
+
+
+def visible_text(text: str) -> int:
+    """Characters of text a reader sees, scripts, styles and tags left out."""
+    return len(re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>|\s+", "", text,
+                      flags=re.DOTALL | re.IGNORECASE))
 
 
 def count_feed(system: str, body: bytes) -> int | None:
@@ -351,14 +414,27 @@ def page_facts(final_url: str, text: str) -> dict:
     jobs = set()
     for link in links:
         path = urlsplit(link).path.lower()
-        if JOB_LINK.search(link) and not path.endswith((".pdf", ".js", ".css", ".png", ".jpg")):
+        if JOB_LINK.search(link) and not path.endswith((".pdf", ".js", ".css", ".png", ".jpg",
+                                                        ".svg", ".ico", ".woff2")):
             keeps_query = re.search(r"[?&](?:job_?id|jobid|reqid|requisitionid|vacancyid)=",
                                     link, re.IGNORECASE)
             jobs.add(link.split("#")[0] if keeps_query else strip_query(link))
-    if jobs:
+    parts = urlsplit(final_url)
+    host = (parts.hostname or "").lower()
+    seen_text = visible_text(text)
+    if host in VENDOR_SITES:
+        listing, jobs = "the system's own site (the account seems closed)", set()
+    elif ERROR_PAGE.search(parts.path):
+        listing, jobs = "an error page", set()
+    elif SIGN_IN_PAGE.search(parts.path):
+        listing, jobs = "a sign-in page", set()
+    elif jobs:
         listing = "plain page with job links"
-    elif JS_SHELL.search(text) or len(re.sub(r"<[^>]+>|\s+", "", text)) < 2000 \
-            or system in ("Workday", "Oracle Recruiting Cloud", "SuccessFactors"):
+    elif evidence.startswith("links to"):
+        listing = f"links to its listing on {system}"
+    elif (seen_text < 1000 or (APP_ROOT.search(text) and seen_text < 3000)
+          or system in SCRIPT_LISTS or SCRIPT_LIST_HOSTS.search(host)
+          or any(JOB_SCRIPT.search(urlsplit(link).path) for link in links)):
         listing = "needs JavaScript"
     else:
         listing = "no job links seen"
@@ -375,9 +451,12 @@ def observation(record: dict, body: bytes) -> dict:
            "redirects": response.get("redirects", ""), "system": "", "system_evidence": "",
            "listing": "", "jobs_seen": "", "bot_protection": response.get("bot_protection", ""),
            "error": response.get("error") or robots.get("error") or ""}
+    vendor = (urlsplit(response.get("final_url", "")).hostname or "").lower() in VENDOR_SITES
     if robots.get("verdict") != "allowed" or response.get("status") != 200 \
-            or row["bot_protection"]:
+            or (row["bot_protection"] and not vendor):
         return row
+    if vendor:
+        row["bot_protection"] = ""  # the vendor's own site, not the account's page
     if record["request"].startswith("feed"):
         system = record["request"][len("feed ("):-1]
         jobs = count_feed(system, body)
@@ -424,19 +503,25 @@ def outcome(o: dict) -> str:
         return "robots.txt forbids"
     if o.get("robots") in ("refused", "unreachable"):
         return f"robots.txt {o['robots']}"
+    status = str(o.get("status") or "")
+    if status == "200" and o.get("listing", "").startswith("the system's own site"):
+        return "account not found"
     if o.get("bot_protection"):
         return "blocked"
-    status = str(o.get("status") or "")
     if o.get("error") or not status:
         return "error"
-    if status in ("404", "410"):
+    if status in ("404", "410") or o.get("listing") == "an error page":
         return "not found"
     if status != "200":
         return f"HTTP {status}"
     if o["listing"] in ("public job feed", "plain page with job links"):
         return "confirmed"
+    if o["listing"].startswith("links to its listing on"):
+        return "answers; links to its recruitment system"
     return {"needs JavaScript": "answers; needs JavaScript",
-            "no job links seen": "answers; no job links seen"}.get(o["listing"], "answers")
+            "no job links seen": "answers; no job links seen",
+            "a sign-in page": "wrong page (a sign-in page)",
+            "feed not readable": "answers; feed not readable"}.get(o["listing"], "answers")
 
 
 def careers_key(url: str) -> str:

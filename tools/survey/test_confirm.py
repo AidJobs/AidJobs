@@ -59,6 +59,16 @@ def test_robots_txt_rules_follow_rfc_9309_and_refusals_stop():
     assert confirm.robots_verdict(None, "", "https://x.org/a") == "unreachable"
 
 
+def test_the_run_stops_only_on_signs_of_a_block_against_the_survey():
+    cf = confirm.service_of("Cloudflare challenge", "cloudflare")
+    assert cf == "cloudflare" and confirm.service_of("refused (HTTP 403)", "") == ""
+    assert confirm.run_stop([("a.org", ""), ("b.org", ""), ("c.org", "")]) == ""
+    assert confirm.run_stop([("a.org", ""), ("a.org", ""), ("a.org", "")]).endswith("a.org")
+    assert confirm.run_stop([("a.org", cf), ("b.org", cf), ("c.org", cf)]).endswith("cloudflare")
+    assert confirm.run_stop([("a.org", cf), ("b.org", ""), ("c.org", cf)]) == ""
+    assert confirm.run_stop([(f"{n}.org", "") for n in "abcde"]) == "5 refusals in a row"
+
+
 def test_bot_challenges_are_recognised_but_a_normal_page_with_a_captcha_is_not():
     assert confirm.bot_protection(403, {"cf-mitigated": "challenge"}, "") == "Cloudflare challenge"
     assert confirm.bot_protection(503, {}, "<title>Just a moment...</title>") \
@@ -86,6 +96,37 @@ def test_a_page_shows_its_system_its_job_links_and_whether_it_needs_javascript()
                                '<div id="root"></div><noscript>enable JavaScript</noscript>')
     assert (shell["system"], shell["listing"], shell["jobs_seen"]) == (
         "Workday", "needs JavaScript", 0)
+
+
+def test_system_postings_error_pages_sign_in_pages_and_closed_accounts_are_told_apart():
+    filler = "<p>" + "text " * 400 + "</p>"
+    breezy = confirm.page_facts("https://acme.breezy.hr/",
+                                '<a href="/p/472440b1d6c2-programme-officer">x</a>' + filler)
+    assert (breezy["listing"], breezy["jobs_seen"]) == ("plain page with job links", 1)
+    taleo = confirm.page_facts("https://phg.tbe.taleo.net/phg02/ats/careers/v2/jobSearch",
+                               '<a href="viewRequisition?org=X&cws=52&rid=1234">x</a>' + filler)
+    assert taleo["jobs_seen"] == 1
+    assert confirm.page_facts("https://www.aiib.org/en/general/404.html", filler)["listing"] \
+        == "an error page"
+    assert confirm.page_facts("https://acme.bamboohr.com/login.php", filler)["listing"] \
+        == "a sign-in page"
+    closed = confirm.page_facts("https://www.bamboohr.com/", filler)
+    assert closed["listing"].startswith("the system's own site")
+    assert confirm.outcome({"target_url": "x", "robots": "allowed", "status": "200",
+                            "listing": closed["listing"]}) == "account not found"
+    assert confirm.outcome({"target_url": "x", "robots": "allowed", "status": "200",
+                            "listing": "an error page"}) == "not found"
+    rich = confirm.page_facts("https://www.acme.org/careers", '<a href="/about">x</a>' + filler)
+    assert rich["listing"] == "no job links seen"
+    pointer = confirm.page_facts("https://www.acme.org/careers",
+                                 '<a href="https://acme.wd3.myworkdayjobs.com/External">x</a>'
+                                 + filler)
+    assert pointer["listing"] == "links to its listing on Workday"
+    assert confirm.outcome({"target_url": "x", "robots": "allowed", "status": "200",
+                            "listing": pointer["listing"]}) \
+        == "answers; links to its recruitment system"
+    bamboo = confirm.page_facts("https://acme.bamboohr.com/careers", filler)
+    assert bamboo["listing"] == "needs JavaScript"
 
 
 def test_feeds_are_counted_per_system():

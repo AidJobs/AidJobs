@@ -164,3 +164,21 @@ careers-page,unjobs-nonun:509,https://job-boards.greenhouse.io/winrock,medium,"s
 careers-page,unjobs-nonun:113,https://phh.tbe.taleo.net/phh04/ats/careers/v2/jobSearch?cws=39&org=CONSERVATION,high,"step E's guess is not the jobs listing (https://samoa.conservation.org/vacancies); web search, 6 Nov 2026: Taleo Business Edition listing; query string required (search result https://phh.tbe.taleo.net/phh04/ats/careers/v2/jobSearch)"
 careers-page,unjobs-nonun:519,https://wri.wd501.myworkdayjobs.com/WRI,medium,"step E's guess is not the jobs listing (https://wri.wd501.myworkdayjobs.com/WRI_India); web search, 6 Nov 2026: Global WRI Workday site inferred from job URLs; wri.org/careers/jobs mirrors it (search result https://wri.wd501.myworkdayjobs.com/en-US/WRI/job/Critical-Mineral-Analyst_2026-JR100522)"
 careers-page,unjobs-nonun:61,https://www.care-international.org/careers,high,"step E's guess is not the jobs listing (https://job-boards.greenhouse.io/careportalinc); web search, 6 Nov 2026: Secretariat vacancies page; currently no open positions listed (search result https://www.care-international.org/careers)"
+correct,unjobs-un:26,outcome=answers; links to its recruitment system,,"the links counted are information pages (internships, conditions of employment); the page links to its SuccessFactors listing (/sfcareer/jobreqcareer)"
+correct,unjobs-un:26,listing=links to its listing on SuccessFactors,,"the links counted are information pages (internships, conditions of employment); the page links to its SuccessFactors listing (/sfcareer/jobreqcareer)"
+correct,unjobs-un:26,jobs_seen=0,,"the links counted are information pages (internships, conditions of employment); the page links to its SuccessFactors listing (/sfcareer/jobreqcareer)"
+correct,unjobs-nonun:448,outcome=answers; needs JavaScript,,"the two links counted are the job-detail and application templates, not postings; the list is loaded by script"
+correct,unjobs-nonun:448,listing=needs JavaScript,,"the two links counted are the job-detail and application templates, not postings; the list is loaded by script"
+correct,unjobs-nonun:448,jobs_seen=0,,"the two links counted are the job-detail and application templates, not postings; the list is loaded by script"
+correct,iati:GB-CHC-1099776,outcome=answers; no job links seen,,the one link counted is the privacy policy download
+correct,iati:GB-CHC-1099776,listing=no job links seen,,the one link counted is the privacy policy download
+correct,iati:GB-CHC-1099776,jobs_seen=0,,the one link counted is the privacy policy download
+correct,eu:74935891413-11,outcome=wrong page (the organisation's home page),,the address found is EWDE's home page; its jobs page is /ueber-uns/stellenangebote/ (a later batch reads it)
+correct,eu:74935891413-11,listing=no job links seen,,the address found is EWDE's home page; its jobs page is /ueber-uns/stellenangebote/ (a later batch reads it)
+correct,eu:74935891413-11,jobs_seen=0,,the address found is EWDE's home page; its jobs page is /ueber-uns/stellenangebote/ (a later batch reads it)
+correct,seed:17,outcome=answers; no postings listed,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)
+correct,seed:17,listing=no job links seen,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)
+correct,seed:17,jobs_seen=0,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)
+correct,seed:16,outcome=answers; no postings listed,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)
+correct,seed:16,listing=no job links seen,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)
+correct,seed:16,jobs_seen=0,,the links counted are the platform's search and job-alert pages; no posting links when read (6 Nov 2026)

@@ -1,6 +1,6 @@
 # Employer survey (W-31)
 
-**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) done on 5 November 2026 as a snapshot, and the first wave of employers decided the same day (below); step F's plan for the first 200 approved the same day (below). On 6 November 2026 the user widened the first wave (INGO head offices, DG ECHO's humanitarian partners, national members of networks) and excluded the 113 organisations the search marked outside the target (below); step F started the same day. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
+**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) done on 5 November 2026 as a snapshot, and the first wave of employers decided the same day (below); step F's plan for the first 200 approved the same day (below). On 6 November 2026 the user widened the first wave (INGO head offices, DG ECHO's humanitarian partners, national members of networks) and excluded the 113 organisations the search marked outside the target (below); step F's first batch (231) was confirmed the same night (below). The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
 
 ## Purpose
 
@@ -45,7 +45,7 @@ Each step needs the user's approval. Employers' own sites are first contacted in
 | C | ReliefWeb: organisations, websites, job counts per organisation (a few dozen requests) | ReliefWeb's API, with the user's `appname` |
 | D | Duplicate removal and ranking: website domain, then IATI ID, then cleaned name and acronym; uncertain matches to a review list for the user, nothing merged automatically; ranked by hiring evidence, then income | None |
 | E | Likely careers pages and recruitment systems, from Common Crawl's public URL index (per domain, and by recruitment-system host patterns) and the agent's web search for the top unresolved organisations | Common Crawl's index files, one request every 10 seconds (the user's decision of 5 November 2026); Wikidata's query service (in progress, below) |
-| F | Confirmation, at most two spaced requests per organisation (`robots.txt`, then the careers page or the vendor's documented public job API), in batches: first the 200 of the first wave's batch 1 (below) | Employers' sites: its own approval |
+| F | Confirmation, at most two spaced requests per organisation (`robots.txt`, then the careers page or the vendor's documented public job API), in batches: first the first wave's batch 1, 231 since 6 November (done, below) | Employers' sites: its own approval |
 | G | Output: careers sites grouped by recruitment system, ranked by jobs covered, with keyword families and each system's fields and reuse terms; the master CSV; the ledger | None |
 
 Scripts for steps B to F go in a new `tools/survey/` folder that the backend never imports, run on the user's machine (Python 3.11). Raw downloads stay in a git-ignored folder; only cleaned results are committed.
@@ -207,6 +207,37 @@ The first time the survey contacts employers' own sites. For the 200 organisatio
 - **Output:** a read-only script, `tools/survey/confirm.py`, with tests; one row per organisation, a summary of systems ranked by organisations and jobs covered, and the agent's corrections with reasons, all committed and checked by CI as in step E; this file and the ledger updated; then the independent review and the user's merge approval.
 - **Size:** about 115 web searches and up to 400 requests to employers' sites (200 `robots.txt`, 200 pages or feeds), about 40 minutes, from the user's machine. With the first batch widened to 231 on 6 November (above): 154 web searches (the 144 without a step E guess and the 10 whose guess was low) and up to 462 requests.
 - **Then:** the crawler's order is discussed with the confirmed list in hand.
+
+## Confirmation of the first batch (step F): done on 6 November 2026
+
+`tools/survey/confirm.py` (with tests; CI rebuilds its outputs) has three commands: `fetch`, run on the user's machine; `extract`, which turns the raw responses into the small committed `source-survey/step-f-observations.csv` (hosts and paths only, statuses, system and evidence, how the listing reads, job links seen, bot protection; no page content, emails or names); and `build`, which writes `step-f-confirmed.csv` (one row per organisation, with the agent's corrections) and `step-f-systems.csv` (systems ranked by organisations, then jobs seen).
+
+- **Careers pages before any request:** step E's guess where it was medium or high (66 of the 231); otherwise the agent's web search, search results only, each a `careers-page` decision in `step-f-decisions.csv` with its evidence: the 144 with no guess, the 10 with a low one, and 11 step E guesses that were not a jobs listing (IRC's Syria page, FHI 360's e-book page, HIAS's events page, CARE International's "careportalinc" account, which is CarePortal's, and 7 more); 3 none found. Only a listing's own query parameters are kept (Taleo's `org` and `cws`, SuccessFactors' `company`, Cornerstone's `c`, HRMDirect's `search`).
+- **Requests:** 410 on 5 and 6 November 2026 (19:46 to 21:17 UTC; 01:16 to 02:47 IST), all through the backend's fetch policy: 217 `robots.txt` (one per host) and 193 pages or feeds, every one logged (`tools/survey/raw/confirm/requests.log`, git-ignored). At most two per organisation; nothing retried.
+- **The stop rule, changed by the user:** the run stopped itself after three refusals in a row, 36 organisations in, from three unrelated sites while the sites around them answered. **The user decided** (6 November 2026) to stop the run only on signs of a block against the survey: three refusals in a row from one host or one protection service, five in a row from any sites, or five network failures in a row. It stopped once more on three Cloudflare sites in a row (JDC, Food for the Poor, Feed the Children) while 50 other Cloudflare sites had answered, the last 20 seconds before; **the user decided** to resume. Refused organisations were never asked again.
+
+**Result for the 231** (`step-f-confirmed.csv`):
+
+| Outcome | Organisations |
+| --- | --- |
+| Confirmed: the listing read, with postings (46 organisations, 805 jobs seen) | 46 |
+| Answers, the list built by script (Workday, Oracle, SuccessFactors, iCIMS, BambooHR and others) | 63 |
+| Answers, links to its listing on a recruitment system | 21 |
+| Answers, no job links seen (2 with no postings listed when read) | 27 |
+| Stopped by the site: a bot challenge (16 Cloudflare, 1 Pantheon) | 17 |
+| `robots.txt` forbids the page (among them SmartRecruiters' public API, UKG, Dayforce, Salesforce sites) | 14 |
+| `robots.txt` refused (HTTP 403) or unreachable (no connection) | 21 |
+| Network failure on the page (connection, DNS, an empty redirect) | 4 |
+| Wrong address: not found or an error page (7), a sign-in page (6, BambooHR accounts' root), the organisation's home page (1), a closed account (1) | 15 |
+| No careers page found | 3 |
+
+The 157 that answered cover 3,733 of the batch's 5,277 UNjobs jobs. Public job feeds: Workable 7, Greenhouse 6, Teamtailor 2, Personio 1 and Lever 1 read; SmartRecruiters' API forbidden by its `robots.txt` (3). Shared careers sites seen: International Medical Corps and IMC UK.
+
+**Recruitment systems** (`step-f-systems.csv`; organisations, UNjobs jobs): own site, system not seen 65 (941); Workday 20 (1,225); iCIMS 14 (233); BambooHR 12 (117); SuccessFactors 10 (275); Workable 8 (157); Taleo 8 (110); Greenhouse 6 (141); Teamtailor 5 (81); Oracle 4 (99); Cornerstone, Dayforce, SmartRecruiters and Zoho Recruit 3 each; JazzHR, Breezy, Jobvite and UKG 2 each; Lever, Personio, Paylocity and Talentsoft 1 each. Systems are known only where a page answered or the address shows them; the 56 stopped organisations' systems are mostly unknown.
+
+**The agent's corrections** (`correct` decisions, each with its reason): six pages counted as listings whose links were information or navigation pages (the ICC, Solidarités, Malaria Consortium, Diakonie Katastrophenhilfe's address, which was its home page, Tearfund and Christian Aid with no postings listed when read). Job links seen are an estimate (distinct addresses that look like postings).
+
+**What it shows, for the crawler's order:** Workday is the largest system by jobs (20 organisations, 1,225 UNjobs jobs, a POST job search: contract §9's decision); about one employer's site in nine refused the survey outright (17 bot challenges, 16 of them Cloudflare's, and 9 refused `robots.txt` files), which the crawler cannot pass and must not bypass, and 14 more forbid robots the page; SmartRecruiters' public API is closed to robots by its `robots.txt`; 14 sites failed to connect through the fetch policy from this machine (for example Oxfam International, WCS, GGGI, AFD), worth checking before the crawler relies on them. Not done: batch 2 (the rest of the first wave, the ECHO partners and the national members) and the organisations whose address was wrong; each needs its own run.
 
 ## Sources
 
