@@ -6,18 +6,18 @@ import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { approvalRequired, deleteDraft, downloadCopy, isApproved, updateBaseFromJob } from './actions';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
-import { ChatPanel, DocumentView, openChecks, ReviewArea, TitleEditor } from './DocPane';
+import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
 import { statusLine } from './Home';
 import MenuButton from './MenuButton';
-import { ReviewDialog, VersionsDialog } from './Review';
+import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
 import { go, useDemo } from './store';
 import Structure from './Structure';
 import { Dialog } from './ui';
 
 const SPLIT_KEY = 'aidjobs.employerDemo.split';
 const PANEL_KEY = 'aidjobs.employerDemo.panel';
-type Panel = 'outline' | 'chat' | null;
+type Panel = 'outline' | 'chat' | 'review' | null;
 
 function readNumber(key: string, fallback: number): number {
   try {
@@ -40,7 +40,7 @@ function readPanel(): Panel {
   try {
     if (openChatOnce()) return 'chat';
     const v = localStorage.getItem(PANEL_KEY);
-    return v === 'chat' || v === 'outline' ? v : v === 'none' ? null : 'outline';
+    return v === 'chat' || v === 'outline' || v === 'review' ? v : v === 'none' ? null : 'outline';
   } catch {
     return 'outline';
   }
@@ -80,7 +80,7 @@ export default function Create({ id }: { id?: string }) {
   const [split, setSplit] = useState(() => readNumber(SPLIT_KEY, 62));
   const [panel, setPanelState] = useState<Panel>(readPanel);
   const [dragging, setDragging] = useState(false);
-  const [sheet, setSheet] = useState<'outline' | 'chat' | null>(() => (phone && openChatOnce() ? 'chat' : null));
+  const [sheet, setSheet] = useState<'outline' | 'chat' | 'review' | null>(() => (phone && openChatOnce() ? 'chat' : null));
   const [chatFull, setChatFull] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -125,7 +125,9 @@ export default function Create({ id }: { id?: string }) {
   }
 
   const reviewing = Boolean(s.reviewerAs);
-  const shown: Panel = reviewing && panel === 'chat' ? 'outline' : panel;
+  const shown: Panel = reviewing && panel === 'chat' ? 'review' : panel;
+  const reviewerName = s.team.find((p) => p.id === s.reviewerAs)?.name;
+  const reviewBadge = reviewing ? (job.review.reviewers.some((r) => r.name === reviewerName && !r.decision) ? 1 : 0) : job.review.remarks.filter((r) => r.state === 'open').length;
   const blocked = approvalRequired(s, job) && !isApproved(job);
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
@@ -134,7 +136,7 @@ export default function Create({ id }: { id?: string }) {
     setPanelState(p);
     save(PANEL_KEY, p ?? 'none');
   };
-  const toggle = (p: 'outline' | 'chat') => setPanel(panel === p ? null : p);
+  const toggle = (p: 'outline' | 'chat' | 'review') => setPanel(panel === p ? null : p);
 
   const actions = (
     <>
@@ -214,6 +216,10 @@ export default function Create({ id }: { id?: string }) {
             <button type="button" className="aj-icon-btn" onClick={() => setSheet('outline')} aria-label="JD outline">
               <ListTree size={15} strokeWidth={1.8} />
             </button>
+            <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('review')} aria-label={reviewBadge ? `Review, ${reviewBadge} waiting` : 'Review'}>
+              <UserCheck size={15} strokeWidth={1.8} />
+              {reviewBadge ? <span className="ej-rail-badge">{reviewBadge}</span> : null}
+            </button>
             {!reviewing && (
               <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('chat')} aria-label={waiting ? 'Chat, 1 question waiting' : 'Chat'}>
                 <MessagesSquare size={15} strokeWidth={1.8} />
@@ -242,7 +248,6 @@ export default function Create({ id }: { id?: string }) {
         </div>
       )}
       <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-3 px-4 py-3 lg:px-6">
-        <ReviewArea job={job} s={s} />
         {job.sections.length ? (
           <DocumentView job={job} s={s} onSeeChat={reviewing ? undefined : () => (phone ? setSheet('chat') : setPanel('chat'))} />
         ) : (
@@ -280,6 +285,18 @@ export default function Create({ id }: { id?: string }) {
             </div>
           </Dialog>
         )}
+        {sheet === 'review' && (
+          <Dialog title="Review" subtitle={statusLine(s, job)} onClose={() => setSheet(null)}>
+            <ReviewPanel
+              job={job}
+              s={s}
+              onSend={() => {
+                setSheet(null);
+                setReviewOpen(true);
+              }}
+            />
+          </Dialog>
+        )}
         {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
         {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
       </div>
@@ -287,6 +304,7 @@ export default function Create({ id }: { id?: string }) {
   }
 
   const showChat = shown === 'chat';
+  const panelName = shown === 'chat' ? 'Chat with AidJobs' : shown === 'review' ? 'Review' : 'JD outline';
   return (
     <div ref={box} className="flex h-full min-h-0" style={{ userSelect: dragging ? 'none' : undefined }}>
       <div className="min-h-0 min-w-0" style={{ width: shown ? `${split}%` : undefined, flex: shown ? undefined : 1 }}>
@@ -299,7 +317,7 @@ export default function Create({ id }: { id?: string }) {
             data-dragging={dragging}
             role="separator"
             aria-orientation="vertical"
-            aria-label={showChat ? 'Resize the chat' : 'Resize the JD outline'}
+            aria-label={`Resize the ${shown === 'chat' ? 'chat' : shown === 'review' ? 'review panel' : 'JD outline'}`}
             aria-valuenow={Math.round(split)}
             aria-valuemin={40}
             aria-valuemax={75}
@@ -316,7 +334,7 @@ export default function Create({ id }: { id?: string }) {
               }
             }}
           />
-          <aside className="flex min-h-0 min-w-[300px] flex-1 flex-col border-l aj-hair" style={{ background: 'var(--surface)' }} aria-label={showChat ? 'Chat with AidJobs' : 'JD outline'}>
+          <aside className="flex min-h-0 min-w-[300px] flex-1 flex-col border-l aj-hair" style={{ background: 'var(--surface)' }} aria-label={panelName}>
             <div className="flex shrink-0 items-center gap-1.5 px-3 pt-2.5">
               <div className="ej-switch" role="group" aria-label="Show">
                 <button type="button" className="ej-switch-btn" aria-pressed={shown === 'outline'} onClick={() => setPanel('outline')}>
@@ -328,6 +346,10 @@ export default function Create({ id }: { id?: string }) {
                     {waiting && shown !== 'chat' ? <span className="ej-rail-badge static">1</span> : null}
                   </button>
                 )}
+                <button type="button" className="ej-switch-btn" aria-pressed={shown === 'review'} onClick={() => setPanel('review')}>
+                  <UserCheck size={14} strokeWidth={1.8} /> Review
+                  {reviewBadge && shown !== 'review' ? <span className="ej-rail-badge static">{reviewBadge}</span> : null}
+                </button>
               </div>
               <Tip label="Close this panel" side="bottom" className="ml-auto">
                 <button type="button" className="aj-icon-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel(null)} aria-label="Close this panel">
@@ -341,7 +363,9 @@ export default function Create({ id }: { id?: string }) {
               </span>
               {actions}
             </div>
-            <div className="min-h-0 flex-1">{showChat ? <ChatPanel job={job} s={s} autoFocus /> : <Structure job={job} s={s} bare />}</div>
+            <div className={shown === 'review' ? 'aj-scroll min-h-0 flex-1' : 'min-h-0 flex-1'}>
+              {showChat ? <ChatPanel job={job} s={s} autoFocus /> : shown === 'review' ? <ReviewPanel job={job} s={s} onSend={() => setReviewOpen(true)} /> : <Structure job={job} s={s} bare />}
+            </div>
           </aside>
         </>
       )}
@@ -349,6 +373,7 @@ export default function Create({ id }: { id?: string }) {
       <nav className="ej-rail" aria-label="Panels">
         <RailButton icon={<ListTree size={17} strokeWidth={1.8} />} label="JD outline" active={shown === 'outline'} onClick={() => toggle('outline')} />
         {!reviewing && <RailButton icon={<MessagesSquare size={17} strokeWidth={1.8} />} label="Chat" active={shown === 'chat'} badge={waiting} onClick={() => toggle('chat')} />}
+        <RailButton icon={<UserCheck size={17} strokeWidth={1.8} />} label="Review" active={shown === 'review'} badge={reviewBadge} onClick={() => toggle('review')} />
       </nav>
       )}
       {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}

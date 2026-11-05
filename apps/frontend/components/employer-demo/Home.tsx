@@ -14,6 +14,7 @@ import {
   letClose,
   markInbox,
   readIntent,
+  remindPayer,
   runIntent,
   startJob,
   type Intent,
@@ -32,6 +33,7 @@ type Brief = { id: string; icon: ReactNode; title: string; body: string; actions
 
 export function statusLine(s: State, j: DemoJob): string {
   const left = j.facts.deadline ? daysUntil(s.today, j.facts.deadline) : null;
+  if (j.payRequest && j.status !== 'live' && j.status !== 'scheduled') return `Waiting for ${j.payRequest.name.split(' ')[0]} to pay ${j.payRequest.amount}`;
   switch (j.status) {
     case 'draft':
       return j.sections.length ? 'Draft' : 'Draft · not written yet';
@@ -122,6 +124,19 @@ function briefing(s: State): Brief[] {
     }
   }
   for (const j of s.jobs) {
+    if (j.payRequest) {
+      const req = j.payRequest;
+      out.push({
+        id: `pay-${j.id}`,
+        icon: <Receipt size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />,
+        title: `Waiting for ${req.name.split(' ')[0]} to pay ${req.amount} for ${j.facts.title}`,
+        body: `Asked ${new Date(req.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. The job ${j.status === 'live' ? 'is amplified' : 'publishes'} once they have paid.`,
+        actions: [
+          { label: 'Remind', run: () => remindPayer(j.id), primary: true },
+          { label: 'Open', run: () => go('publish', j.id) },
+        ],
+      });
+    }
     const m = reachMoment(j, s.today);
     if (m) {
       out.push({

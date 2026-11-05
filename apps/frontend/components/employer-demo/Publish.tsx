@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2,
 import { useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
-import { amplifyLive, approvalRequired, buy, canSkipApproval, acceptFreeTerms, isApproved, overrideApproval, publish, type Paid } from './actions';
+import { acceptFreeTerms, amplifyLive, approvalRequired, askToPay, buy, cancelPayRequest, canSkipApproval, completePayRequest, isApproved, overrideApproval, publish, remindPayer, type Paid } from './actions';
 import {
   BADGE,
   BADGE_TIP,
@@ -34,8 +34,8 @@ import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, notify, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
-import type { DemoJob, Lang, Org, Plan, State } from './types';
-import { DemoMark, Dialog, inputStyle, OrgMark } from './ui';
+import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
+import { DemoMark, Dialog, Field, inputStyle, isEmail, OrgMark } from './ui';
 
 export function jobUrl(j: DemoJob): string {
   return `https://aidjobs.app/jobs/${slug(j.facts.title || 'job')}-${j.id.slice(-4)}`;
@@ -476,6 +476,135 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
   );
 }
 
+function jobLabel(job: DemoJob): string {
+  const city = job.facts.location.split(',')[0];
+  return `${job.facts.title}${city ? ` – ${city}` : ''}`;
+}
+
+/** "Ask to pay": choose who holds the card, see what they receive, send. */
+function AskToPayDialog({ job, s, request, onClose }: { job: DemoJob; s: State; request: Omit<PayRequest, 'at' | 'name' | 'email' | 'note'>; onClose: () => void }) {
+  const people = s.team.filter((p) => p.id !== s.me.id && p.role !== 'reviewer');
+  const [picked, setPicked] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const person = people.find((p) => p.id === picked);
+  const to = person ? { name: person.name, email: person.email } : isEmail(email) ? { name: email.trim(), email: email.trim() } : null;
+  return (
+    <Dialog
+      title="Ask someone else to pay"
+      subtitle={`${request.amount} · simulated, nothing is sent`}
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="aj-ink-btn" disabled={!to} onClick={() => to && askToPay(job.id, { ...request, ...to, note: note.trim() }) && onClose()}>
+            Send the request
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <span className="aj-muted">For when finance or your director holds the card. They get a link to pay; the job publishes once they have paid, and the receipt and invoice go to them.</span>
+        {people.length > 0 && (
+          <Field label="Someone in your team">
+            <div className="flex flex-wrap gap-1.5">
+              {people.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="aj-pill"
+                  data-active={picked === p.id}
+                  aria-pressed={picked === p.id}
+                  onClick={() => {
+                    setPicked(picked === p.id ? null : p.id);
+                    setEmail('');
+                  }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+        <Field label="Or an email address" hint="For example your finance team, who may not use AidJobs">
+          <input
+            style={inputStyle}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setPicked(null);
+            }}
+            placeholder={`finance@${s.org.domain}`}
+            inputMode="email"
+          />
+        </Field>
+        <Field label="A note (optional)">
+          <textarea style={{ ...inputStyle, minHeight: 56 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="For example: from the WASH budget line, please." />
+        </Field>
+        <div className="flex flex-col gap-1 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
+          <span className="aj-faint">What {to ? to.name.split(' ')[0] : 'they'} will receive</span>
+          <strong>
+            {s.me.name} asks you to pay {request.amount} to publish {jobLabel(job)}
+          </strong>
+          {note.trim() && <span className="aj-muted">&ldquo;{note.trim()}&rdquo;</span>}
+          <span className="aj-muted">{request.item}</span>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/** The payer's page, reached from the link in their email (simulated in the demo). */
+function PayerDialog({ job, s, onPaid, onClose }: { job: DemoJob; s: State; onPaid: () => void; onClose: () => void }) {
+  const [declined, setDeclined] = useState(false);
+  const req = job.payRequest;
+  if (!req) return null;
+  return (
+    <Dialog
+      title="Payment request"
+      subtitle={`Demo: what ${req.name.split(' ')[0]} sees from the link`}
+      onClose={onClose}
+      half
+      footer={
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="aj-text-btn mr-auto" onClick={() => setDeclined(true)}>
+            Simulate a declined card
+          </button>
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Close
+          </button>
+          <button type="button" className="aj-ink-btn" onClick={() => (completePayRequest(job.id) ? onPaid() : notify('It could not be published, so nothing was charged. Check the job, then ask again.'))}>
+            Pay {req.amount}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <OrgMark name={s.org.name} />
+          <strong>{s.org.name}</strong>
+        </div>
+        <span style={{ fontSize: 15, fontWeight: 650 }}>
+          {s.me.name} asks you to pay {req.amount} to publish {jobLabel(job)}
+        </span>
+        {req.note && <span className="aj-muted">&ldquo;{req.note}&rdquo;</span>}
+        <div className="aj-card flex items-center justify-between gap-3 p-3">
+          <span className="min-w-0">{req.item}</span>
+          <strong className="shrink-0">{req.amount}</strong>
+        </div>
+        {declined && (
+          <span role="alert" style={{ color: 'var(--red)' }}>
+            The card was declined (simulated). Nothing was charged, and the request stays open.
+          </span>
+        )}
+        <span className="aj-faint">Billed to {req.email}. Paddle is the merchant of record: it charges the card and sends the receipt and invoice to you. Prices are placeholders.</span>
+      </div>
+    </Dialog>
+  );
+}
+
 type View = 'page' | 'google' | 'share';
 
 /** The publish panel: the preview beside the choices, and one button that says what happens (employer-side plan, section 16). */
@@ -492,6 +621,8 @@ export default function Publish({ id }: { id?: string }) {
   const [terms, setTerms] = useState<{ schedule: string | null } | null>(null);
   const [skip, setSkip] = useState(false);
   const [done, setDone] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [payerOpen, setPayerOpen] = useState(false);
 
   if (!job) {
     return (
@@ -530,6 +661,7 @@ export default function Publish({ id }: { id?: string }) {
   const subscribed = Boolean(s.subscription && !s.subscription.cancelled);
   const payKey: PackageKey | 'extra' = pkg === 'one' ? single.key : pkg;
   const blocked = !upgrade && approvalRequired(s, job) && !isApproved(job);
+  const request = job.payRequest;
   const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
@@ -621,6 +753,29 @@ export default function Publish({ id }: { id?: string }) {
 
         <section className="order-1 flex flex-col gap-3 lg:sticky lg:top-4 lg:order-2" aria-label="How to publish">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
+          {request && (
+            <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--sage-3)' }} role="status">
+              <div style={{ fontWeight: 650 }}>
+                Waiting for {request.name} to pay {request.amount}
+              </div>
+              <span className="aj-muted">
+                Asked {new Date(request.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+                {request.reminded ? `, reminded ${new Date(request.reminded).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}` : ''}. The job {upgrade ? 'is amplified' : 'publishes'} as soon as they have paid
+                {invites ? `, and the ${invites} invitations go out` : ''}. You can still pay yourself below.
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button type="button" className="aj-ink-btn" onClick={() => setPayerOpen(true)}>
+                  See their payment page (demo)
+                </button>
+                <button type="button" className="aj-pill" onClick={() => remindPayer(job.id)}>
+                  Remind
+                </button>
+                <button type="button" className="aj-text-btn" onClick={() => cancelPayRequest(job.id)}>
+                  Cancel the request
+                </button>
+              </div>
+            </div>
+          )}
           {failed && (
             <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--red)' }} role="alert">
               <div className="flex items-center gap-2" style={{ fontWeight: 650 }}>
@@ -783,10 +938,32 @@ export default function Publish({ id }: { id?: string }) {
           <span className="aj-faint text-center" style={{ fontSize: 11.5 }}>
             {chosen === 'free' ? 'Nothing to pay.' : onHand ? 'Nothing to pay now: it uses a job you have already paid for.' : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
           </span>
+          {chosen === 'amplify' && !onHand && !reason && !request && (
+            <div className="flex justify-center">
+              <Tip label="For when someone else holds the card, such as finance or your director. They get a link to pay; the job publishes once they have paid, and the receipt goes to them.">
+                <button type="button" className="aj-text-btn" onClick={() => setAsking(true)}>
+                  Ask someone else to pay
+                </button>
+              </Tip>
+            </div>
+          )}
         </section>
       </div>
 
       {checkout && <Checkout item={checkoutItem} amount={checkoutAmount} onPaid={() => paid(checkout)} onDeclined={() => failedPay('declined')} onClose={() => failedPay('closed')} />}
+      {asking && <AskToPayDialog job={job} s={s} request={{ key: payKey, amount: checkoutAmount, item: checkoutItem, schedule: upgrade ? null : schedule }} onClose={() => setAsking(false)} />}
+      {payerOpen && (
+        <PayerDialog
+          job={job}
+          s={s}
+          onClose={() => setPayerOpen(false)}
+          onPaid={() => {
+            setPayerOpen(false);
+            setFailed(null);
+            setDone(true);
+          }}
+        />
+      )}
       {skip && (
         <SkipDialog
           job={job}

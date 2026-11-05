@@ -157,6 +157,10 @@
   box-shadow: inset 3px 0 0 var(--sage-5);
 }
 
+.ej-doc section[data-review-changed='true'] {
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
 .ej-amplified {
   border: 1px solid var(--sage-3);
   background: linear-gradient(135deg, var(--sage-1), var(--surface) 60%);

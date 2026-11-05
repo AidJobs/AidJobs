@@ -5,10 +5,14 @@ import {
   applyFix,
   applyFormat,
   approvalRequired,
+  askToPay,
   basePattern,
   buy,
+  cancelPayRequest,
   cancelSubscription,
   canSkipApproval,
+  changedSinceLastRound,
+  completePayRequest,
   deleteDraft,
   dismissMoment,
   editSection,
@@ -20,6 +24,8 @@ import {
   publish,
   publishBlock,
   refreshTranslation,
+  remindPayer,
+  remindReviewers,
   removeTranslation,
   reorderSections,
   restoreVersion,
@@ -27,6 +33,7 @@ import {
   reviewTranslation,
   saveEditedBase,
   sendChat,
+  sendForReview,
   sendReach,
   setReachPlan,
   setReachReminders,
@@ -38,6 +45,7 @@ import {
   undoLastChange,
 } from '../../components/employer-demo/actions';
 import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
+import { statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
@@ -585,6 +593,64 @@ describe('Reach', () => {
     planned('job-cps', ['new@example.org']);
     expect(job('job-cps').reachPlan).toBeUndefined();
     expect(sendReach('job-cps', 'Invited more')).toBe(0);
+  });
+});
+
+describe('review rounds', () => {
+  const people = [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }];
+
+  it('a new round shows only the sections changed since the last one', () => {
+    sendForReview('job-comms', people, '2026-12-01', 'any', '');
+    expect(changedSinceLastRound(job('job-comms'))).toEqual([]);
+    const key = job('job-comms').sections[1].key;
+    editSection('job-comms', key, 'Rewritten after the first round');
+    sendForReview('job-comms', people, '2026-12-01', 'any', '');
+    expect(job('job-comms').review.round).toBe(2);
+    expect(changedSinceLastRound(job('job-comms'))).toEqual([key]);
+  });
+
+  it('reminds only reviewers who have not answered, and logs it', () => {
+    remindReviewers('job-fin');
+    expect(job('job-fin').review.reminded).toBeTruthy();
+    expect(job('job-fin').audit.at(-1)?.what).toBe('Reminded Daniel to review');
+  });
+});
+
+describe('Ask to pay', () => {
+  const request = { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one' as const, amount: 'US$28.40', item: 'Amplify: Finance Officer', schedule: null };
+
+  it('the person asked pays from the link; the job publishes with its invitations, and they get the receipt', () => {
+    setReachPlan('job-fin', { ...planFor(job('job-fin'), getState().org), candidates: ['a@example.org'] });
+    expect(askToPay('job-fin', request)).toBe(true);
+    expect(statusLine(getState(), job('job-fin'))).toBe('Waiting for Grace to pay US$28.40');
+    remindPayer('job-fin');
+    expect(job('job-fin').payRequest?.reminded).toBeTruthy();
+    expect(completePayRequest('job-fin')).toBe(true);
+    expect(job('job-fin')).toMatchObject({ status: 'live', plan: 'amplify', payRequest: undefined });
+    expect(job('job-fin').reach?.candidates.map((r) => r.email)).toEqual(['a@example.org']);
+    expect(getState().receipts[0].item).toBe('Amplify: Finance Officer');
+    expect(getState().inbox[0].title).toBe('Grace paid US$28.40: Finance Officer is live');
+  });
+
+  it('it can amplify a live free job, and paying yourself closes the request', () => {
+    expect(askToPay('job-meal', { ...request, item: 'Amplify: MEAL Coordinator' })).toBe(true);
+    expect(completePayRequest('job-meal')).toBe(true);
+    expect(job('job-meal').plan).toBe('amplify');
+    askToPay('job-comms', request);
+    buy('one', 'Communications Intern');
+    publish('job-comms', { plan: 'amplify', schedule: null, paid: 'direct' });
+    expect(job('job-comms').payRequest).toBeUndefined();
+  });
+
+  it('not while approval is still needed; cancelled, it is gone; reviewers cannot ask', () => {
+    update((s) => ({ ...s, org: { ...s.org, approval: 'all' } }));
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(askToPay(id, request)).toBe(false);
+    askToPay('job-fin', request);
+    cancelPayRequest('job-fin');
+    expect(job('job-fin').payRequest).toBeUndefined();
+    update((s) => ({ ...s, reviewerAs: 'amina' }));
+    expect(askToPay('job-fin', request)).toBe(false);
   });
 });
 

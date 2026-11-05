@@ -30,7 +30,7 @@ import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
 import { addRound } from './invites';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
-import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
+import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -572,13 +572,33 @@ export function sendForReview(id: string, reviewers: Array<{ name: string; email
     const s = useFree(s0, id);
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
-    const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined };
+    const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined, sent: j.sections, before: j.review.sent };
     return {
       ...s,
       jobs: s.jobs.map((x) => (x.id === id ? { ...x, status: 'review', review, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Sent for review to ${reviewers.map((r) => r.name).join(', ')}${note ? `: "${note}"` : ''}` }] } : x)),
       notice: { text: `Sent to ${reviewers.length} ${reviewers.length === 1 ? 'reviewer' : 'reviewers'} (simulated). Outside reviewers get a private link that expires in 7 days.` },
     };
   });
+}
+
+/** Sections whose text changed between the last round and this one; empty in the first round. */
+export function changedSinceLastRound(j: DemoJob): string[] {
+  const { sent, before } = j.review;
+  if (!sent || !before) return [];
+  return sent.filter((sec) => JSON.stringify(before.find((b) => b.key === sec.key)?.lines) !== JSON.stringify(sec.lines)).map((sec) => sec.key);
+}
+
+/** A reminder to the reviewers who have not answered yet (simulated). */
+export function remindReviewers(id: string) {
+  if (!ownerOnly()) return;
+  const j = getState().jobs.find((x) => x.id === id);
+  const waiting = j?.review.reviewers.filter((r) => !r.decision).map((r) => r.name.split(' ')[0]) ?? [];
+  if (!j || !waiting.length) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((x) => (x.id === id ? { ...x, review: { ...x.review, reminded: Date.now() }, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Reminded ${waiting.join(' and ')} to review` }] } : x)),
+    notice: { text: `Reminded ${waiting.join(' and ')} (simulated)` },
+  }));
 }
 
 export function addRemark(id: string, section: string, kind: 'comment' | 'suggestion', text: string, suggestion?: string) {
@@ -759,6 +779,7 @@ export function publish(id: string, o: PublishOptions): boolean {
           plan: o.plan,
           scheduledFor: o.schedule ?? undefined,
           publishedAt: o.schedule ? undefined : Date.now(),
+          payRequest: undefined,
           audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
         };
         if (o.plan !== 'amplify') return next;
@@ -793,6 +814,54 @@ export function sendReach(id: string, why: string): number {
   return count;
 }
 
+/** "Ask to pay": someone else pays from a link; the job waits until then. Not while approval is still needed. */
+export function askToPay(id: string, req: Omit<PayRequest, 'at'>): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || (approvalRequired(s, j) && !isApproved(j) && j.status !== 'live' && j.status !== 'scheduled')) return false;
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, payRequest: { ...req, at: Date.now() }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Asked ${req.name} to pay ${req.amount} (simulated)` }] } : x)),
+    notice: { text: `Sent to ${req.name} (simulated). The job publishes once they have paid.` },
+  }));
+  return true;
+}
+
+export function remindPayer(id: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  if (!j?.payRequest || !ownerOnly()) return;
+  const name = j.payRequest.name;
+  update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === id && x.payRequest ? { ...x, payRequest: { ...x.payRequest, reminded: Date.now() } } : x)), notice: { text: `Reminded ${name} (simulated)` } }));
+}
+
+export function cancelPayRequest(id: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, payRequest: undefined, audit: j.payRequest ? [...j.audit, { at: Date.now(), who: getState().me.name, what: `Cancelled the payment request to ${j.payRequest.name}` }] : j.audit }));
+}
+
+/**
+ * The person asked has paid from their link (simulated): the receipt goes to them, and the job publishes, or a live free job is amplified,
+ * with any Reach invitations prepared. Nothing is charged if the job can no longer be published.
+ */
+export function completePayRequest(id: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  const req = j?.payRequest;
+  if (!j || !req) return false;
+  const how: Paid = req.key === 'one' || req.key === 'extra' ? 'direct' : 'onHand';
+  const upgrade = j.plan === 'free' && (j.status === 'live' || j.status === 'scheduled');
+  if (!upgrade && publishBlock(s, id, { plan: 'amplify', schedule: req.schedule, paid: 'direct' })) return false;
+  buy(req.key, j.facts.title);
+  const ok = upgrade ? amplifyLive(id, how) : publish(id, { plan: 'amplify', schedule: req.schedule, paid: how });
+  if (!ok) return false;
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: req.name, what: `Paid ${req.amount} from the payment link (simulated)` }] } : x)),
+    inbox: [{ id: `i${Date.now()}`, kind: 'receipt', jobId: id, title: `${req.name.split(' ')[0]} paid ${req.amount}: ${j.facts.title} is ${req.schedule && !upgrade ? 'scheduled' : 'live'}`, body: 'The receipt and invoice went to them (simulated).', at: Date.now() }, ...st.inbox],
+  }));
+  return true;
+}
+
 /** "Not now" on a reminder: it does not come back; the next moment still does. */
 export function dismissMoment(id: string, key: string) {
   updateJob(id, (j) => ({ ...j, reachDismissed: [...(j.reachDismissed ?? []), key] }));
@@ -817,7 +886,7 @@ export function amplifyLive(id: string, paid: Paid): boolean {
       ...s,
       jobs: s.jobs.map((x) => {
         if (x.id !== id) return x;
-        const next: DemoJob = { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
+        const next: DemoJob = { ...x, plan: 'amplify', payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
         const reach = reachAtGoLive(next, sendsOn);
         sending = Boolean(reach.reach && !sendsOn);
         return { ...next, ...reach };
@@ -911,6 +980,7 @@ export function hireAgain(id: string, place?: string): string | null {
     translations: undefined,
     reachPlan: undefined,
     reachDismissed: undefined,
+    payRequest: undefined,
     lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };

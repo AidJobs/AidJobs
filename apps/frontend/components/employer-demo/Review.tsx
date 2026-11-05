@@ -1,9 +1,9 @@
 'use client';
 
-import { Check, Send, UserCheck } from 'lucide-react';
+import { BellRing, Check, Send, UserCheck, X } from 'lucide-react';
 import { useState } from 'react';
-import { restoreVersion, reviewerDecision, sendForReview } from './actions';
-import { addDays, longDate, shortDate } from './engine';
+import { addRemark, approvalRequired, changedSinceLastRound, remindReviewers, restoreVersion, reviewerDecision, sendForReview, settleRemark } from './actions';
+import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { statusLine } from './Home';
 import { update } from './store';
 import type { DemoJob, State } from './types';
@@ -136,7 +136,7 @@ export function ReviewerBar({ job, s }: { job: DemoJob; s: State }) {
           </span>
         )}
       </div>
-      <span className="aj-muted">Comment or suggest on any section, then decide. {job.review.due ? `Answer by ${longDate(job.review.due)}.` : ''}</span>
+      <span className="aj-muted">Comment or suggest on any section, here or on the section itself, then decide. {job.review.due ? `Answer by ${longDate(job.review.due)}.` : ''}</span>
       <textarea style={{ ...inputStyle, minHeight: 56 }} placeholder="A note for the author (optional)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Note for the author" />
       <div className="flex flex-wrap gap-1.5">
         <button type="button" className="aj-ink-btn" onClick={() => reviewerDecision(job.id, 'approved', note)}>
@@ -152,26 +152,190 @@ export function ReviewerBar({ job, s }: { job: DemoJob; s: State }) {
 
 export function ReviewSummary({ job, s }: { job: DemoJob; s: State }) {
   if (job.review.state === 'none') return null;
-  const open = job.review.remarks.filter((r) => r.state === 'open').length;
+  const waiting = job.review.reviewers.filter((r) => !r.decision).length;
+  const late = job.review.due && daysUntil(s.today, job.review.due) < 0;
   return (
     <div className="aj-card flex flex-col gap-2 p-3">
       <div className="flex items-center gap-2" style={{ fontWeight: 650 }}>
         <UserCheck size={15} strokeWidth={1.8} /> {statusLine(s, job)}
       </div>
+      <span className="aj-faint">
+        Round {job.review.round} · {job.review.rule === 'any' ? 'one approval is enough' : 'every reviewer must approve'}
+        {job.review.due ? ` · ${late ? 'was due' : 'due'} ${longDate(job.review.due)}` : ''}
+      </span>
       <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {job.review.reviewers.map((r) => (
-          <li key={r.email} className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate">
-              {r.name}
-              {r.outside ? ' · outside, private link' : ''}
+          <li key={r.email} className="flex flex-col">
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate">
+                {r.name}
+                {r.outside ? ' · outside, private link' : ''}
+              </span>
+              <span className="aj-chip" data-tone={r.decision === 'approved' ? 'sage' : r.decision === 'changes' ? 'amber' : undefined}>
+                {r.decision === 'approved' ? 'Approved' : r.decision === 'changes' ? 'Changes' : 'Waiting'}
+              </span>
             </span>
-            <span className="aj-chip" data-tone={r.decision === 'approved' ? 'sage' : r.decision === 'changes' ? 'amber' : undefined}>
-              {r.decision === 'approved' ? 'Approved' : r.decision === 'changes' ? 'Changes' : 'Waiting'}
-            </span>
+            {r.note && <span className="aj-faint">&ldquo;{r.note}&rdquo;</span>}
           </li>
         ))}
       </ul>
-      {open > 0 && <span className="aj-muted">{open} open {open === 1 ? 'comment' : 'comments'} on the sections.</span>}
+      {!s.reviewerAs && waiting > 0 && job.review.state === 'open' && (
+        <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => remindReviewers(job.id)}>
+          <BellRing size={13} strokeWidth={1.8} /> Remind {waiting === 1 ? 'the reviewer' : `the ${waiting} reviewers`} who {waiting === 1 ? 'has' : 'have'} not answered
+          {job.review.reminded ? ` · reminded ${new Date(job.review.reminded).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function goToSection(key: string) {
+  const el = document.getElementById(`ej-sec-${key}`);
+  el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+}
+
+function titleOf(job: DemoJob, key: string): string {
+  return job.sections.find((x) => x.key === key)?.title ?? key;
+}
+
+/** A reviewer's comment or suggestion from the panel, on a section chosen from a list (also possible on the section itself). */
+function AddRemark({ job }: { job: DemoJob }) {
+  const [section, setSection] = useState(job.sections[0]?.key ?? '');
+  const [kind, setKind] = useState<'comment' | 'suggestion'>('comment');
+  const [text, setText] = useState('');
+  const [suggest, setSuggest] = useState('');
+  return (
+    <div className="aj-card flex flex-col gap-2 p-3">
+      <span style={{ fontWeight: 650 }}>Add a comment</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <select style={{ ...inputStyle, width: 'auto', minHeight: 32, flex: 1 }} value={section} onChange={(e) => setSection(e.target.value)} aria-label="Section">
+          {job.sections.map((sec) => (
+            <option key={sec.key} value={sec.key}>
+              {sec.title}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="aj-pill" style={{ height: 32 }} data-active={kind === 'comment'} onClick={() => setKind('comment')}>
+          Comment
+        </button>
+        <button type="button" className="aj-pill" style={{ height: 32 }} data-active={kind === 'suggestion'} onClick={() => setKind('suggestion')}>
+          Suggest text
+        </button>
+      </div>
+      <textarea style={{ ...inputStyle, minHeight: 56 }} value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'comment' ? 'Your comment' : 'Why this change?'} aria-label="Your comment" />
+      {kind === 'suggestion' && <textarea style={{ ...inputStyle, minHeight: 48 }} value={suggest} onChange={(e) => setSuggest(e.target.value)} placeholder="Text to add to the section" aria-label="Suggested text" />}
+      <button
+        type="button"
+        className="aj-pill self-start"
+        disabled={!text.trim() || !section}
+        onClick={() => {
+          addRemark(job.id, section, kind, text.trim(), kind === 'suggestion' && suggest.trim() ? `- ${suggest.trim()}` : undefined);
+          setText('');
+          setSuggest('');
+        }}
+      >
+        Add to {titleOf(job, section)}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Review in the workspace's right-hand panel (plan section 16, phase 4), for the author and the reviewer: the status, what changed since the
+ * last round, every comment and suggestion with its section, and the decision.
+ */
+export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend: () => void }) {
+  const [settledOpen, setSettledOpen] = useState(false);
+  const reviewing = Boolean(s.reviewerAs);
+  const open = job.review.remarks.filter((r) => r.state === 'open');
+  const settled = job.review.remarks.filter((r) => r.state !== 'open');
+  const changed = changedSinceLastRound(job);
+  const required = approvalRequired(s, job);
+  if (job.review.state === 'none') {
+    return (
+      <div className="flex flex-col gap-3 p-3">
+        <p className="aj-muted" style={{ margin: 0 }}>
+          {required ? 'Your organisation asks for approval on this job before it is published.' : 'Review is optional: ask colleagues, or someone outside with a private link, to comment and approve.'}
+        </p>
+        {!reviewing && job.sections.length > 0 && (
+          <button type="button" className="aj-ink-btn self-start" onClick={onSend}>
+            <Send size={14} strokeWidth={2} /> Send for review
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <ReviewSummary job={job} s={s} />
+      {reviewing && <ReviewerBar job={job} s={s} />}
+      {changed.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="ej-panel-label">Changed since round {job.review.round - 1}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {changed.map((k) => (
+              <button key={k} type="button" className="aj-pill" style={{ height: 28 }} onClick={() => goToSection(k)}>
+                {titleOf(job, k)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <span className="ej-panel-label">Comments and suggestions · {open.length} open</span>
+        {open.length === 0 && <span className="aj-muted">{reviewing ? 'Nothing yet. Comment on a section, or below.' : 'Nothing open.'}</span>}
+        {open.map((r) => (
+          <div key={r.id} className="flex flex-col gap-1 rounded-xl p-2.5" style={{ background: 'var(--amber-bg)' }}>
+            <button type="button" className="aj-text-btn self-start" style={{ height: 'auto', padding: 0 }} onClick={() => goToSection(r.section)}>
+              {titleOf(job, r.section)}
+            </button>
+            <span style={{ fontSize: 12.5 }}>
+              <strong>{r.author}</strong> {r.kind === 'suggestion' ? 'suggests' : 'commented'}: {r.text}
+            </span>
+            {r.suggestion && <span style={{ fontSize: 12.5, color: 'var(--sage-8)' }}>+ {r.suggestion.replace(/^- /, '')}</span>}
+            {!reviewing && (
+              <div className="flex flex-wrap gap-1.5">
+                {r.kind === 'suggestion' ? (
+                  <>
+                    <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => settleRemark(job.id, r.id, 'accepted')}>
+                      <Check size={12} strokeWidth={2} /> Accept
+                    </button>
+                    <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => settleRemark(job.id, r.id, 'rejected')}>
+                      <X size={12} strokeWidth={2} /> Reject
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => settleRemark(job.id, r.id, 'resolved')}>
+                    Resolve
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {settled.length > 0 && (
+          <>
+            <button type="button" className="aj-text-btn self-start" aria-expanded={settledOpen} onClick={() => setSettledOpen(!settledOpen)}>
+              {settledOpen ? 'Hide' : 'Show'} {settled.length} settled
+            </button>
+            {settledOpen &&
+              settled.map((r) => (
+                <span key={r.id} className="aj-faint">
+                  {titleOf(job, r.section)}: {r.author}, &ldquo;{r.text}&rdquo; · {r.state}
+                </span>
+              ))}
+          </>
+        )}
+      </div>
+      {reviewing && job.sections.length > 0 && <AddRemark job={job} />}
+      {!reviewing && (job.review.state === 'changes' || (job.review.state === 'open' && job.review.reviewers.some((r) => r.decision === 'changes'))) && (
+        <div className="flex flex-col gap-1.5">
+          <span className="aj-muted">When you have made the changes, send it back: the reviewers see only what changed.</span>
+          <button type="button" className="aj-ink-btn self-start" onClick={onSend}>
+            <Send size={14} strokeWidth={2} /> Send round {job.review.round + 1}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -123,6 +123,23 @@ export type Review = {
   rule: 'any' | 'all';
   approvedVersion?: number;
   remarks: Remark[];
+  /** The text as sent in this round, and in the round before: a new round highlights only what changed. */
+  sent?: Section[];
+  before?: Section[];
+  reminded?: number;
+};
+
+/** "Ask to pay": the person who holds the card gets a link; the job publishes once they have paid. */
+export type PayRequest = {
+  name: string;
+  email: string;
+  note: string;
+  key: 'one' | 'three' | 'five' | 'always' | 'extra';
+  amount: string;
+  item: string;
+  schedule: string | null;
+  at: number;
+  reminded?: number;
 };
 
 export type Version = { n: number; at: number; note: string; sections: Section[] };
@@ -192,6 +209,7 @@ export type DemoJob = {
   review: Review;
   reach: ReachRecord | null;
   reachPlan?: ReachPlan;
+  payRequest?: PayRequest;
   /** Reminders to invite more people; on unless switched off for this job. */
   reachReminders?: boolean;
   /** Reminder moments answered with "Not now". */

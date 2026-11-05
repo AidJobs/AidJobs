@@ -3,12 +3,11 @@
 import { AlertCircle, Check, CheckCircle2, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, answerFact, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange } from './actions';
+import { addRemark, answerFact, changedSinceLastRound, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange } from './actions';
 import { contractPicks, deadlinePicks, placePatch, placePicks } from './answers';
 import { DOCUMENTS } from './apply';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
-import { ReviewerBar, ReviewSummary } from './Review';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
@@ -204,10 +203,16 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat }: { job: DemoJob; 
   const reviewing = Boolean(s.reviewerAs);
   const remarks = job.review.remarks.filter((r) => r.section === sec.key && r.state === 'open');
   const changed = Boolean(job.lastChange?.keys.includes(sec.key));
+  const sinceLastRound = reviewing && changedSinceLastRound(job).includes(sec.key);
   return (
-    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
+    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="flex items-center gap-2">
         <h3 style={{ flex: 1 }}>{sec.title}</h3>
+        {sinceLastRound && (
+          <span className="aj-chip" data-tone="amber">
+            Changed since round {job.review.round - 1}
+          </span>
+        )}
         {sec.edited && <span className="aj-chip">Your text</span>}
         {!reviewing && sec.key === 'apply' && (
           <Tip label="Set up how to apply">
@@ -577,12 +582,3 @@ export function openChecks(job: DemoJob, s: State): string[] {
   const flags = job.sections.reduce((n, sec) => n + sec.lines.reduce((m, l) => m + findInclusive(l, job.format).filter((h) => !job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]).length, 0), 0);
   return flags ? [...items, `${flags} inclusive-language ${flags === 1 ? 'highlight' : 'highlights'} to look at`] : items;
 }
-export function ReviewArea({ job, s }: { job: DemoJob; s: State }) {
-  return (
-    <>
-      <ReviewSummary job={job} s={s} />
-      {s.reviewerAs && <ReviewerBar job={job} s={s} />}
-    </>
-  );
-}
-

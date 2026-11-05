@@ -501,6 +501,42 @@ describe('employer demo: Reach', () => {
   });
 });
 
+describe('employer demo: review panel and Ask to pay', () => {
+  it('reviews in the right-hand panel as author and reviewer, then has someone else pay', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-fin');
+    click(/^\d*\s*Review\s*\d*$/);
+    shows('Comments and suggestions · 1 open');
+    shows('Round 1 · one approval is enough');
+    click('Accept');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.review.remarks[0].state).toBe('accepted');
+    act(() => update((st) => ({ ...st, reviewerAs: 'daniel' })));
+    shows('Reviewing as Daniel Mwangi');
+    shows('Add a comment');
+    click(/^\s*Approve$/);
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.review.reviewers.find((r) => r.name === 'Daniel Mwangi')?.decision).toBe('approved');
+    act(() => update((st) => ({ ...st, reviewerAs: null })));
+    route('#publish/job-fin');
+    act(() => (Array.from(container.querySelectorAll('button[role="radio"]')).find((b) => b.textContent?.startsWith('Amplify')) as HTMLElement).click());
+    click('Ask someone else to pay');
+    click('Grace Akello');
+    shows('Sam Otieno asks you to pay US$28.40 to publish Finance Officer – Juba');
+    click('Send the request');
+    shows('Waiting for Grace Akello to pay US$28.40');
+    click('See their payment page (demo)');
+    click('Pay US$28.40');
+    shows('Live on AidJobs');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')).toMatchObject({ status: 'live', plan: 'amplify' });
+    expect(network).toEqual([]);
+  });
+});
+
 describe('employer demo: recovery', () => {
   it('shows a way out instead of a blank page when something in the demo fails', () => {
     const Broken = () => {
