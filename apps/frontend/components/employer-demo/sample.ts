@@ -1,4 +1,5 @@
 import { applyLines, defaultApply } from './apply';
+import { monthOf, orgZone } from './plans';
 import { addDays, buildSections, emptyFacts, FORMATS, orderSections } from './engine';
 import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } from './types';
 
@@ -37,8 +38,10 @@ export const SAMPLE_ORG: Org = {
   learned: { source: 'history', adverts: 3, confirmed: true },
   approval: 'senior',
   approvalRule: 'any',
+  noSkip: false,
   verified: true,
   setupDone: true,
+  freeTermsAccepted: false,
 };
 
 /** Riverstone's base JD format: the headings its own job descriptions share, confirmed by the organisation (sample). */
@@ -101,7 +104,6 @@ function job(today: number, id: string, roleKey: string, formatKey: string, fact
     reach: null,
     chat: [],
     createdAt: today - 6 * DAY,
-    countsAsFreeDraft: false,
     audit: [{ at: today - 6 * DAY, who: SAMPLE_ME.name, what: 'Created' }],
     ...extra,
   };
@@ -111,7 +113,7 @@ export function sampleJobs(today: number): DemoJob[] {
   return [
     job(today, 'job-cps', 'protection', 'house', { title: 'Child Protection Specialist', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', timezone: 'EAT', contract: 'Fixed-term', duration: '12 months', grade: 'C1', deadline: addDays(today, 2), salaryMode: 'range', salaryMin: '3,900', salaryMax: '4,400', currency: 'USD', safeguarding: 'high' }, {
       status: 'live',
-      plan: 'premium',
+      plan: 'amplify',
       publishedAt: today - 26 * DAY,
       reach: {
         candidates: [{ email: 'candidate1@example.org', status: 'sent' }, { email: 'candidate2@example.org', status: 'sent' }],
@@ -121,14 +123,14 @@ export function sampleJobs(today: number): DemoJob[] {
       },
       audit: [
         { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
-        { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Published as Premium' },
+        { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Amplified and published' },
       ],
     }, ['assessment']),
     job(today, 'job-meal', 'meal', 'house', { title: 'MEAL Coordinator', location: 'Addis Ababa, Ethiopia', country: 'Ethiopia', iso: 'ET', timezone: 'EAT', contract: 'Fixed-term', duration: '24 months', deadline: addDays(today, 9), salaryMode: 'scale' }, {
       status: 'live',
-      plan: 'standard',
+      plan: 'free',
       publishedAt: today - 12 * DAY,
-      audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published as Standard' }],
+      audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published free' }],
     }, ['assessment']),
     job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
       status: 'approved',
@@ -150,17 +152,17 @@ export function sampleJobs(today: number): DemoJob[] {
         { at: today - DAY, who: 'Amina Yusuf', what: 'Approved version 1' },
       ],
     }),
-    job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months' }, { status: 'draft', countsAsFreeDraft: true }),
+    job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months' }, { status: 'draft' }),
     job(today, 'job-log', 'logistics', 'house', { title: 'Logistics Assistant', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', contract: 'Fixed-term', duration: '6 months', deadline: addDays(today, -25) }, {
       status: 'closed',
-      plan: 'standard',
+      plan: 'free',
       publishedAt: today - 55 * DAY,
       closedAt: today - 25 * DAY,
       closeReason: 'deadline',
     }),
     job(today, 'job-wash-2026', 'wash', 'house', { title: 'WASH Programme Manager', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', grade: 'D2', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, -230), salaryMode: 'range', salaryMin: '5,200', salaryMax: '6,300', currency: 'USD' }, {
       status: 'closed',
-      plan: 'premium',
+      plan: 'amplify',
       publishedAt: today - 262 * DAY,
       closedAt: today - 230 * DAY,
       closeReason: 'filled',
@@ -179,7 +181,7 @@ export function sampleInbox(today: number): InboxItem[] {
 
 export function initialState(today: number): State {
   return {
-    v: 2,
+    v: 3,
     today,
     signedIn: false,
     me: SAMPLE_ME,
@@ -188,8 +190,10 @@ export function initialState(today: number): State {
     jobs: sampleJobs(today),
     formats: allFormats(),
     inbox: sampleInbox(today),
-    draftsUsed: 1,
-    credits: 0,
+    // The Communications Intern was downloaded this month, so one of the month's two free jobs is used.
+    freeUses: [{ jobId: 'job-comms', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) }],
+    packs: [],
+    subscription: null,
     receipts: [],
     reviewerAs: null,
     notice: null,
@@ -199,12 +203,12 @@ export function initialState(today: number): State {
 
 /** Sample jobs from other fictional organisations, for the public view only. */
 export const PUBLIC_SAMPLES = [
-  { id: 'p1', org: 'Harbour Health Alliance', title: 'Nutrition Officer', place: 'Lilongwe, Malawi', iso: 'MW', days: 6, premium: true },
-  { id: 'p2', org: 'Meridian Education Trust', title: 'Education in Emergencies Coordinator', place: "Cox's Bazar, Bangladesh", iso: 'BD', days: 14, premium: true },
-  { id: 'p3', org: 'Northfield Relief', title: 'Protection Monitoring Assistant', place: 'Goma, DR Congo', iso: 'CD', days: 3, premium: false },
-  { id: 'p4', org: 'Bluewater Climate Fund', title: 'Climate Finance Analyst', place: 'Geneva, Switzerland', iso: 'CH', days: 11, premium: false },
-  { id: 'p5', org: 'Open Hands Foundation', title: 'Grants Manager', place: 'London, United Kingdom', iso: 'GB', days: 19, premium: false },
-  { id: 'p6', org: 'Harbour Health Alliance', title: 'Community Health Supervisor', place: 'Maputo, Mozambique', iso: 'MZ', days: 8, premium: false },
+  { id: 'p1', org: 'Harbour Health Alliance', title: 'Nutrition Officer', place: 'Lilongwe, Malawi', iso: 'MW', days: 6, amplified: true },
+  { id: 'p2', org: 'Meridian Education Trust', title: 'Education in Emergencies Coordinator', place: "Cox's Bazar, Bangladesh", iso: 'BD', days: 14, amplified: true },
+  { id: 'p3', org: 'Northfield Relief', title: 'Protection Monitoring Assistant', place: 'Goma, DR Congo', iso: 'CD', days: 3, amplified: false },
+  { id: 'p4', org: 'Bluewater Climate Fund', title: 'Climate Finance Analyst', place: 'Geneva, Switzerland', iso: 'CH', days: 11, amplified: false },
+  { id: 'p5', org: 'Open Hands Foundation', title: 'Grants Manager', place: 'London, United Kingdom', iso: 'GB', days: 19, amplified: false },
+  { id: 'p6', org: 'Harbour Health Alliance', title: 'Community Health Supervisor', place: 'Maputo, Mozambique', iso: 'MZ', days: 8, amplified: false },
 ];
 
 /** Sample market context for the first screen; replaced by real AidJobs figures once there are enough jobs. */

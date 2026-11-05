@@ -1,27 +1,37 @@
 'use client';
 
-import { ArrowLeft, BadgeCheck, CalendarClock, Check, Clock, Copy, ExternalLink, Flag as FlagIcon, Linkedin, Mail, MapPin, Megaphone, MessageCircle, Share2, ShieldCheck, Sparkles, UserPlus, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2, Clock, Copy, ExternalLink, Flag as FlagIcon, Linkedin, MapPin, MessageCircle, Share2, Sparkles } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
-import { useSiteSettings } from '@/components/site/SiteRoot';
 import Tip from '@/components/site/Tip';
+import { amplifyLive, approvalRequired, buy, canSkipApproval, acceptFreeTerms, isApproved, overrideApproval, publish, type Paid } from './actions';
 import {
-  approvalRequired,
-  buyCredits,
-  FREE_LIVE,
-  isApproved,
-  liveStandard,
-  overrideApproval,
-  payPremium,
-  PREMIUM_EMAILS,
-  PRICE_LABEL,
-  publish,
-} from './actions';
+  BADGE,
+  BADGE_TIP,
+  canGoFree,
+  currentMonth,
+  FREE_PER_MONTH,
+  firstOfNextMonth,
+  freeLeft,
+  hasFreeUse,
+  LISTED_DAYS,
+  listedUntil,
+  monthFor,
+  monthName,
+  nextPaidJob,
+  packageOf,
+  PACKAGES,
+  paidJobsLeft,
+  priceLabel,
+  singlePrice,
+  usd,
+  type PackageKey,
+} from './plans';
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, longDate, salaryText, slug } from './engine';
-import { openSandboxCheckout, paddleConfigured, PRICE_PACK, PRICE_PREMIUM } from './paddle';
-import { go, notify, updateJob, useDemo } from './store';
-import type { DemoJob, Org, ReachRecord, State } from './types';
-import { Dialog, Field, inputStyle, OrgMark, RecipientInput } from './ui';
+import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
+import { getState, go, notify, useDemo } from './store';
+import type { DemoJob, Org, Plan, State } from './types';
+import { DemoMark, Dialog, inputStyle, OrgMark } from './ui';
 
 export function jobUrl(j: DemoJob): string {
   return `https://aidjobs.app/jobs/${slug(j.facts.title || 'job')}-${j.id.slice(-4)}`;
@@ -78,10 +88,10 @@ export function JobPage({ job, s }: { job: DemoJob; s: State }) {
             </span>
           </Tip>
         )}
-        {job.plan === 'premium' && (
-          <Tip label="A sponsored listing, paid for by the employer">
-            <span className="aj-chip" style={{ background: 'var(--ink)', color: 'var(--on-ink)' }}>
-              Premium · Sponsored
+        {job.plan === 'amplify' && (
+          <Tip label={BADGE_TIP}>
+            <span className="aj-chip" data-tone="sage" tabIndex={0}>
+              <Sparkles size={11} strokeWidth={2} /> {BADGE}
             </span>
           </Tip>
         )}
@@ -311,147 +321,6 @@ export function EmailPreview({ job, s, intro, initial, to, onClose }: { job: Dem
   );
 }
 
-export function ReachPanel({ job, s, value, onChange }: { job: DemoJob; s: State; value: ReachRecord & { on: { candidates: boolean; team: boolean } }; onChange: (v: ReachRecord & { on: { candidates: boolean; team: boolean } }) => void }) {
-  const premium = job.plan === 'premium';
-  const [preview, setPreview] = useState<'candidate' | 'team' | null>(null);
-  const [intro, setIntro] = useState({ candidate: '', team: '' });
-  const [msgOpen, setMsgOpen] = useState(false);
-  const msg = shareMessage(job, s.org);
-  const url = jobUrl(job);
-  const used = value.candidates.length + value.team.length;
-  const allowance = premium ? PREMIUM_EMAILS : 0;
-  const teamOnDomain = s.team.filter((p) => p.id !== s.me.id && p.email.endsWith(`@${s.org.domain}`)).map((p) => p.email);
-  const copy = async (text: string, what: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      notify(`${what} copied`);
-    } catch {
-      notify('Copy failed: select the text and copy it yourself');
-    }
-  };
-  const mailto = `mailto:?bcc=${encodeURIComponent(value.candidates.join(','))}&subject=${encodeURIComponent(emailFor('candidate', job, s.org, '').subject)}&body=${encodeURIComponent(`${DEMO_PREFIX}\n\n${emailFor('candidate', job, s.org, intro.candidate).body.join('\n\n').replace(/\*\*/g, '')}\n\n${url}`)}`;
-
-  const card = (n: string, icon: ReactNode, title: string, body: string, on: boolean, toggle: (() => void) | null, children: ReactNode) => (
-    <section className="aj-card flex flex-col gap-3 p-4" data-on={on} style={{ borderColor: on ? 'var(--sage-3)' : undefined }} aria-label={title}>
-      <div className="flex items-start gap-3">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: on ? 'var(--sage-2)' : 'var(--surface-2)', color: on ? 'var(--sage-8)' : 'var(--text-2)' }}>
-          {icon}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="aj-faint" style={{ fontSize: 11, fontWeight: 700 }}>
-            {n}
-          </div>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
-          <div className="aj-muted">{body}</div>
-        </div>
-        {toggle && (
-          <label className="flex shrink-0 items-center gap-1.5" style={{ cursor: 'pointer' }}>
-            <input type="checkbox" checked={on} onChange={toggle} aria-label={`Use: ${title}`} />
-            <span className="aj-faint">{on ? 'On' : 'Off'}</span>
-          </label>
-        )}
-      </div>
-      {on && children}
-    </section>
-  );
-
-  return (
-    <div className="flex flex-col gap-3">
-      {card(
-        '01',
-        <UserPlus size={17} strokeWidth={1.8} />,
-        'Invite people to apply',
-        'Know someone who could be a good fit? Send them a direct invitation to explore this opportunity.',
-        value.on.candidates,
-        () => onChange({ ...value, on: { ...value.on, candidates: !value.on.candidates } }),
-        <div className="flex flex-col gap-2">
-          {premium ? (
-            <RecipientInput label="Enter email addresses" value={value.candidates.map((r) => r.email)} onChange={(v) => onChange({ ...value, candidates: v.map((email) => ({ email, status: 'queued' })) })} max={Math.max(0, allowance - value.team.length)} placeholder="name@example.org, another@example.org" />
-          ) : (
-            <div className="rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
-              <div style={{ fontWeight: 650 }}>Emails through AidJobs come with Premium</div>
-              <div className="aj-muted">Premium includes {PREMIUM_EMAILS} Reach emails. With Standard, send the invitation from your own email instead.</div>
-            </div>
-          )}
-          <Field label="Your introduction (optional)">
-            <textarea style={{ ...inputStyle, minHeight: 56 }} value={intro.candidate} onChange={(e) => setIntro({ ...intro, candidate: e.target.value })} placeholder="For example: we met at the WASH cluster meeting in Juba." />
-          </Field>
-          <div className="flex flex-wrap gap-1.5">
-            <button type="button" className="aj-pill" onClick={() => setPreview('candidate')}>
-              <Mail size={13} strokeWidth={1.8} /> Preview email
-            </button>
-            <a className="aj-pill" href={mailto}>
-              <Send2 /> Send from my own email
-            </a>
-          </div>
-          <span className="aj-faint" style={{ fontSize: 11 }}>
-            Recipients are never added to an AidJobs list, never see each other, and can unsubscribe in one click.
-          </span>
-        </div>,
-      )}
-      {card(
-        '02',
-        <Users size={17} strokeWidth={1.8} />,
-        'Activate your team',
-        'Your colleagues might know someone who would be perfect for this opportunity. Ask them to share it with their professional networks.',
-        value.on.team,
-        () => onChange({ ...value, on: { ...value.on, team: !value.on.team } }),
-        <div className="flex flex-col gap-2">
-          {premium ? (
-            <>
-              <RecipientInput label="Enter colleagues' email addresses" value={value.team.map((r) => r.email)} onChange={(v) => onChange({ ...value, team: v.map((email) => ({ email, status: 'queued' })) })} max={Math.max(0, allowance - value.candidates.length)} domain={s.org.domain} placeholder={`colleague@${s.org.domain}`} />
-              {teamOnDomain.some((e) => !value.team.some((r) => r.email === e)) && (
-                <button type="button" className="aj-text-btn self-start" onClick={() => onChange({ ...value, team: Array.from(new Set([...value.team.map((r) => r.email), ...teamOnDomain])).map((email) => ({ email, status: 'queued' })) })}>
-                  + Add your team ({teamOnDomain.length})
-                </button>
-              )}
-            </>
-          ) : (
-            <div className="rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
-              <div style={{ fontWeight: 650 }}>Team emails come with Premium</div>
-              <div className="aj-muted">With Standard, copy the message below into your team&apos;s chat or mailing list.</div>
-            </div>
-          )}
-          <Field label="Your introduction (optional)">
-            <textarea style={{ ...inputStyle, minHeight: 56 }} value={intro.team} onChange={(e) => setIntro({ ...intro, team: e.target.value })} placeholder="For example: please share with your WASH contacts in the region." />
-          </Field>
-          <button type="button" className="aj-pill self-start" onClick={() => setPreview('team')}>
-            <Mail size={13} strokeWidth={1.8} /> Preview email
-          </button>
-          <span className="aj-faint" style={{ fontSize: 11 }}>
-            Team emails go only to addresses on your organisation&apos;s verified domain, @{s.org.domain}. Nobody has to take part.
-          </span>
-        </div>,
-      )}
-      {card(
-        '03',
-        <Megaphone size={17} strokeWidth={1.8} />,
-        'Share with your community',
-        'WhatsApp groups, LinkedIn, alumni networks, professional associations: AidJobs prepares a ready-to-share message.',
-        value.community,
-        () => onChange({ ...value, community: !value.community }),
-        <div className="flex flex-col gap-2">
-          <button type="button" className="aj-text-btn self-start" onClick={() => setMsgOpen(!msgOpen)} aria-expanded={msgOpen}>
-            {msgOpen ? 'Hide' : 'Preview'} sharing message
-          </button>
-          {msgOpen && <pre className="rounded-xl p-3" style={{ background: 'var(--surface-2)', whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }}>{msg}</pre>}
-          <CommunityButtons msg={msg} url={url} copy={copy} />
-        </div>,
-      )}
-      {premium && (
-        <span className="aj-faint">
-          Reach emails: {used} of {PREMIUM_EMAILS} used for this job.
-        </span>
-      )}
-      {preview && <EmailPreview job={job} s={s} intro={intro} initial={preview} to={{ candidate: value.candidates.map((r) => r.email), team: value.team.map((r) => r.email) }} onClose={() => setPreview(null)} />}
-    </div>
-  );
-}
-
-function Send2() {
-  return <Mail size={13} strokeWidth={1.8} />;
-}
-
 export function CommunityButtons({ msg, url, copy }: { msg: string; url: string; copy: (t: string, what: string) => void }) {
   const native = async () => {
     try {
@@ -482,369 +351,483 @@ export function CommunityButtons({ msg, url, copy }: { msg: string; url: string;
   );
 }
 
-function SimulatedCheckout({ item, amount, onPaid, onClose }: { item: string; amount: string; onPaid: () => void; onClose: () => void }) {
+function ApprovalBlock({ job, s, onSkip }: { job: DemoJob; s: State; onSkip: () => void }) {
+  const waiting = job.review.reviewers.filter((r) => !r.decision).map((r) => r.name.split(' ')[0]);
+  const why = s.org.approval === 'all' ? 'Your organisation asks for approval on every job.' : 'Your organisation asks for approval on senior roles (P4 and above, and D grades).';
+  const state = job.review.state === 'none' ? 'Send it for review first.' : job.review.state === 'changes' ? 'Changes were requested.' : waiting.length ? `Waiting for ${waiting.join(' and ')}.` : 'Waiting for your reviewers.';
+  return (
+    <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--amber)' }} role="status">
+      <div style={{ fontWeight: 650 }}>Approval is required for this job</div>
+      <span className="aj-muted">
+        {why} {state}
+      </span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <button type="button" className="aj-pill" onClick={() => go('create', job.id)}>
+          {job.review.state === 'none' ? 'Back to the job to send it for review' : 'Back to the job'}
+        </button>
+        {canSkipApproval(s, job) && (
+          <button type="button" className="aj-text-btn" onClick={onSkip}>
+            Publish without approval
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SkipDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const asked = job.review.reviewers.map((r) => r.name.split(' ')[0]);
   return (
     <Dialog
-      title="Checkout"
-      subtitle="Simulated · Paddle sandbox not configured"
+      title="Publish without approval"
+      subtitle={job.facts.title}
       onClose={onClose}
+      half
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" className="aj-pill" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="aj-ink-btn" onClick={onPaid}>
-            Pay {amount} (simulated)
+          <button type="button" className="aj-ink-btn" disabled={reason.trim().length < 5} onClick={() => overrideApproval(job.id, reason) && onDone()}>
+            Publish without approval
           </button>
         </div>
       }
     >
-      <div className="flex flex-col gap-3">
-        <div className="aj-card flex items-center justify-between p-3">
-          <span>{item}</span>
-          <strong>{amount}</strong>
-        </div>
-        <p className="aj-muted" style={{ margin: 0 }}>
-          In the real product, Paddle&apos;s checkout opens here. Paddle is the merchant of record: it charges the card, adds sales tax or VAT where it applies, and emails the receipt and invoice. Prices are placeholders.
+      <div className="flex flex-col gap-2">
+        <p style={{ margin: 0 }}>
+          Why does it need to go out without approval? The reason is kept in the job&apos;s history, which only your organisation sees
+          {asked.length ? `, and ${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told` : ''}.
         </p>
-        <p className="aj-faint" style={{ margin: 0 }}>
-          With the sandbox configured for this preview, Paddle&apos;s real test checkout opens instead, with test cards and a test receipt.
-        </p>
+        <textarea style={{ ...inputStyle, minHeight: 72 }} value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason for publishing without approval" placeholder="For example: the donor deadline is today and Daniel is travelling." />
       </div>
     </Dialog>
   );
 }
 
-type Draft = ReachRecord & { on: { candidates: boolean; team: boolean } };
+function TermsDialog({ s, action, onAccept, onClose }: { s: State; action: string; onAccept: () => void; onClose: () => void }) {
+  return (
+    <Dialog
+      title="Free jobs: the terms"
+      onClose={onClose}
+      half
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="aj-ink-btn" onClick={onAccept}>
+            I understand · {action}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <FreeTerms s={s} />
+        <span className="aj-faint">Shown once, the first time your organisation publishes a free job. The terms are also on the Billing page.</span>
+      </div>
+    </Dialog>
+  );
+}
 
+/** One choice, Free or Amplify: the radio is the heading button; the terms under it are information. */
+function Choice({ on, title, price, onSelect, children, amplified, disabled }: { on: boolean; title: string; price: string; onSelect: () => void; children: ReactNode; amplified?: boolean; disabled?: boolean }) {
+  return (
+    <div className={`${amplified ? 'ej-amplified ' : ''}aj-card flex flex-col gap-2 p-4`} style={{ borderColor: on ? 'var(--sage-5)' : undefined, boxShadow: on ? '0 0 0 1px var(--sage-5)' : undefined }}>
+      <button type="button" role="radio" aria-checked={on} disabled={disabled} onClick={onSelect} className="flex w-full items-center gap-2 text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: disabled ? 'default' : 'pointer', color: 'inherit', font: 'inherit' }}>
+        <span className="ej-radio" data-on={on} aria-hidden />
+        <span style={{ fontWeight: 700, fontSize: 15 }}>{title}</span>
+        <span className="ml-auto" style={{ fontWeight: 700 }}>
+          {price}
+        </span>
+      </button>
+      {children}
+    </div>
+  );
+}
+
+function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () => void }) {
+  const url = jobUrl(job);
+  const until = listedUntil(job, s.today);
+  const scheduled = job.status === 'scheduled';
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      notify('Link copied');
+    } catch {
+      notify('Copy failed: select the link and copy it yourself');
+    }
+  };
+  return (
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 px-4 py-6 lg:px-8 lg:py-10">
+      <span className="ej-panel-label inline-flex items-center gap-1.5">
+        <CheckCircle2 size={13} strokeWidth={2} style={{ color: 'var(--sage-7)' }} /> {scheduled ? `Scheduled for ${longDate(job.scheduledFor ?? '')}` : 'Live on AidJobs'}
+      </span>
+      <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+        {job.facts.title}
+      </h1>
+      <p className="aj-muted" style={{ margin: 0 }}>
+        {job.plan === 'amplify' ? `Amplified: featured, with the “${BADGE}” badge, listed until ${longDate(until)}.` : `Free: standard placement, listed until ${longDate(until)}.`} In this demo it is published only in this browser.
+      </p>
+      <div className="aj-card flex items-center gap-2 py-2 pl-3 pr-2">
+        <span className="aj-muted min-w-0 flex-1 truncate">{url}</span>
+        <button type="button" className="aj-pill shrink-0" onClick={copy}>
+          <Copy size={13} strokeWidth={1.8} /> Copy link
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {!scheduled && (
+          <button type="button" className="aj-ink-btn" onClick={() => go('public', job.id)}>
+            View the job page
+          </button>
+        )}
+        <button type="button" className="aj-pill" onClick={() => go('jobs', job.id)}>
+          Manage this job
+        </button>
+        <button type="button" className="aj-pill" onClick={() => go('create')}>
+          Create another job
+        </button>
+      </div>
+      {job.plan === 'free' && (
+        <button type="button" className="aj-text-btn self-start" onClick={onAmplify}>
+          Amplify this job
+        </button>
+      )}
+    </div>
+  );
+}
+
+type View = 'page' | 'google' | 'share';
+
+/** The publish panel: the preview beside the choices, and one button that says what happens (employer-side plan, section 16). */
 export default function Publish({ id }: { id?: string }) {
   const s = useDemo();
-  const { theme } = useSiteSettings();
   const job = s.jobs.find((j) => j.id === id);
-  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
-  const [plan, setPlan] = useState<'standard' | 'premium'>(job?.plan === 'premium' ? 'premium' : 'standard');
-  const [useCredit, setUseCredit] = useState(false);
-  const [checkout, setCheckout] = useState<null | 'premium' | 'pack'>(null);
-  const [paying, setPaying] = useState(false);
+  const [plan, setPlan] = useState<Plan>(() => (job && canGoFree(s, job.id, null) ? 'free' : 'amplify'));
+  const [pkg, setPkg] = useState<PackageKey>('one');
+  const [plansOpen, setPlansOpen] = useState(false);
   const [schedule, setSchedule] = useState<string | null>(null);
-  const [override, setOverride] = useState('');
-  const [reach, setReach] = useState<Draft>({ candidates: [], team: [], community: true, intro: '', on: { candidates: false, team: false } });
+  const [view, setView] = useState<View>('page');
+  const [checkout, setCheckout] = useState<PackageKey | 'extra' | null>(null);
+  const [failed, setFailed] = useState<null | 'declined' | 'closed'>(null);
+  const [terms, setTerms] = useState<{ schedule: string | null } | null>(null);
+  const [skip, setSkip] = useState(false);
+  const [done, setDone] = useState(false);
 
   if (!job) {
     return (
       <div className="p-6">
-        <button type="button" className="aj-ink-btn" onClick={() => go('home')}>
-          Back to home
+        <button type="button" className="aj-ink-btn" onClick={() => go('create')}>
+          Create a job
         </button>
       </div>
     );
   }
+  if (job.status === 'closed') {
+    return (
+      <div className="mx-auto flex max-w-[560px] flex-col items-start gap-3 p-6">
+        <p className="aj-muted" style={{ margin: 0 }}>
+          This job is closed. Hire again from Manage jobs to publish it anew.
+        </p>
+        <button type="button" className="aj-ink-btn" onClick={() => go('jobs', job.id)}>
+          Open in Manage jobs
+        </button>
+      </div>
+    );
+  }
+  const published = job.status === 'live' || job.status === 'scheduled';
+  const upgrade = published && job.plan === 'free' && !done;
+  if (done || (published && !upgrade)) return <Success job={job} s={s} onAmplify={() => setDone(false)} />;
 
-  const paid = job.plan === 'premium';
-  const standardFull = liveStandard(s) >= FREE_LIVE;
-  const required = approvalRequired(s, job);
-  const blocked = required && !isApproved(job);
-  const stepNames = ['Preview', 'Visibility', 'Reach', 'Live'];
-  const shownJob = { ...job, plan: plan === 'premium' && (paid || useCredit) ? ('premium' as const) : job.plan === 'premium' ? job.plan : plan === 'standard' ? ('standard' as const) : job.plan };
+  const chosen: Plan = upgrade ? 'amplify' : plan;
+  const nowMonth = currentMonth(s);
+  const month = monthFor(s, schedule);
+  const nextFirst = firstOfNextMonth(nowMonth);
+  const counted = hasFreeUse(s, job.id);
+  const freeOk = canGoFree(s, job.id, schedule);
+  const onHand = nextPaidJob(s);
+  const onHandCount = paidJobsLeft(s);
+  const single = singlePrice(s);
+  const subscribed = Boolean(s.subscription && !s.subscription.cancelled);
+  const payKey: PackageKey | 'extra' = pkg === 'one' ? single.key : pkg;
+  const blocked = !upgrade && approvalRequired(s, job) && !isApproved(job);
+  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  const when = schedule ? ` for ${longDate(schedule)}` : '';
+  const label =
+    reason ??
+    (upgrade
+      ? `Amplify this job · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`
+      : chosen === 'free'
+        ? schedule
+          ? `Schedule free${when}`
+          : 'Publish free'
+        : `${schedule ? `Amplify and schedule${when}` : 'Amplify and publish'} · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`);
+  const shown: DemoJob = { ...job, plan: chosen, scheduledFor: schedule ?? job.scheduledFor };
+  const freeUntil = listedUntil({ ...job, plan: 'free', publishedAt: undefined, scheduledFor: schedule ?? undefined }, s.today);
+  const checkoutItem = payKey === 'one' ? `Amplify: ${job.facts.title}` : payKey === 'extra' ? `Extra job on “Always hiring”: ${job.facts.title}` : payKey === 'always' ? '“Always hiring” subscription, first month (3 jobs)' : `${packageOf(payKey).jobs} jobs, one used for ${job.facts.title}`;
+  const checkoutAmount = payKey === 'extra' ? usd(single.amount) : usd(packageOf(payKey).price);
 
-  const startPayment = async (kind: 'premium' | 'pack') => {
-    const price = kind === 'premium' ? PRICE_PREMIUM : PRICE_PACK;
-    if (!paddleConfigured(price)) {
-      setCheckout(kind);
-      return;
-    }
-    setPaying(true);
-    try {
-      const tx = await openSandboxCheckout(price, 1, theme);
-      if (tx) paidFor(kind, 'paddle-sandbox');
-    } catch {
-      notify('Paddle sandbox could not open; showing the simulated checkout');
-      setCheckout(kind);
-    } finally {
-      setPaying(false);
-    }
+  const finish = (ok: boolean) => {
+    if (ok) {
+      setFailed(null);
+      setDone(true);
+    } else notify('It could not be published. Check the choices and try again.');
   };
-  const paidFor = (kind: 'premium' | 'pack', mode: 'paddle-sandbox' | 'simulated') => {
-    if (kind === 'pack') {
-      buyCredits(5, mode);
-      setUseCredit(true);
-      setPlan('premium');
-    } else {
-      payPremium(mode, job.facts.title);
-      updateJob(job.id, (j) => ({ ...j, plan: 'premium' }));
-      setPlan('premium');
-    }
+  const publishFree = (date: string | null) => {
+    if (!getState().org.freeTermsAccepted) setTerms({ schedule: date });
+    else finish(publish(job.id, { plan: 'free', schedule: date }));
+  };
+  const proceed = () => {
+    setFailed(null);
+    if (chosen === 'free') publishFree(schedule);
+    else if (onHand) finish(upgrade ? amplifyLive(job.id, 'onHand') : publish(job.id, { plan: 'amplify', schedule, paid: 'onHand' }));
+    else setCheckout(payKey);
+  };
+  const paid = (key: PackageKey | 'extra') => {
+    buy(key, job.facts.title);
     setCheckout(null);
-    notify(kind === 'pack' ? '5 Premium credits added; one will be used for this job' : 'Paid: this job is Premium');
+    const how: Paid = key === 'one' || key === 'extra' ? 'direct' : 'onHand';
+    finish(upgrade ? amplifyLive(job.id, how) : publish(job.id, { plan: 'amplify', schedule, paid: how }));
+  };
+  const failedPay = (why: 'declined' | 'closed') => {
+    setCheckout(null);
+    setFailed(why);
   };
 
-  const doPublish = (withReach: boolean) => {
-    const r: ReachRecord | null = withReach ? { candidates: reach.on.candidates ? reach.candidates : [], team: reach.on.team ? reach.team : [], community: reach.community, intro: '' } : null;
-    publish(job.id, { plan: plan === 'premium' && (paid || useCredit) ? 'premium' : 'standard', useCredit: plan === 'premium' && !paid && useCredit, schedule, reach: r });
-    setStep(3);
-  };
-
-  const premiumReady = plan === 'premium' ? paid || (useCredit && s.credits > 0) : !standardFull;
+  const views: Array<[View, string]> = [
+    ['page', 'Job page'],
+    ['google', 'In Google'],
+    ['share', 'When shared'],
+  ];
 
   return (
-    <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-8">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-6">
       <div className="flex items-center gap-2">
-        {step < 3 && (
-          <button type="button" className="aj-icon-btn" onClick={() => (step === 0 ? go('create', job.id) : setStep((step - 1) as 0 | 1 | 2))} aria-label="Back">
+        <Tip label={upgrade ? 'Back to the job' : 'Back to the job description'} side="bottom">
+          <button type="button" className="aj-icon-btn" onClick={() => (upgrade ? go('jobs', job.id) : go('create', job.id))} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
           </button>
-        )}
-        <ol className="flex flex-1 items-center gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }} aria-label="Steps">
-          {stepNames.map((n, i) => (
-            <li key={n} className="flex items-center gap-2" aria-current={i === step ? 'step' : undefined}>
-              <span className="aj-chip" data-tone={i === step ? 'sage' : undefined} style={i < step ? { color: 'var(--sage-8)' } : undefined}>
-                {i < step ? <Check size={11} strokeWidth={2.4} /> : i + 1} {n}
-              </span>
-            </li>
-          ))}
-        </ol>
+        </Tip>
+        <div className="min-w-0 flex-1">
+          <span className="ej-panel-label">{upgrade ? 'Amplify a live free job' : 'Publish'}</span>
+          <h1 className="aj-display aj-h1 truncate" style={{ margin: 0 }}>
+            {job.facts.title || 'Untitled job'}
+          </h1>
+        </div>
+        <span className="hidden sm:inline">
+          <DemoMark label="Demo · simulated payment, placeholder prices" />
+        </span>
       </div>
 
-      {step === 0 && (
-        <>
-          <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-            How it will look
-          </h1>
-          {blocked && (
-            <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--amber)' }} role="status">
-              <div style={{ fontWeight: 650 }}>Approval is required for this job</div>
-              <span className="aj-muted">Your organisation asks for approval on senior roles (P4 and above). {job.review.state === 'none' ? 'Send it for review first.' : 'Waiting for your reviewers.'}</span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button type="button" className="aj-pill" onClick={() => go('create', job.id)}>
-                  Back to the job
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+        <section className="order-2 flex min-w-0 flex-col gap-3 lg:order-1" aria-label="Preview">
+          <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" aria-label="Preview">
+            {views.map(([k, l]) => (
+              <button key={k} type="button" role="radio" aria-checked={view === k} data-active={view === k} onClick={() => setView(k)}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {view === 'page' && (
+            <div className="aj-card p-4 lg:p-6">
+              <JobPage job={shown} s={s} />
+            </div>
+          )}
+          {view === 'google' && <GooglePreview job={shown} s={s} />}
+          {view === 'share' && <ShareCards job={shown} s={s} />}
+        </section>
+
+        <section className="order-1 flex flex-col gap-3 lg:sticky lg:top-4 lg:order-2" aria-label="How to publish">
+          {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
+          {failed && (
+            <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--red)' }} role="alert">
+              <div className="flex items-center gap-2" style={{ fontWeight: 650 }}>
+                <AlertCircle size={15} strokeWidth={2} style={{ color: 'var(--red)' }} /> {failed === 'declined' ? 'The card was declined' : 'The payment was not completed'}
+              </div>
+              <span className="aj-muted">{upgrade ? 'The job stays free and live. Nothing was charged.' : 'The job is still a draft. Nothing was published or charged.'} (Simulated.)</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" className="aj-ink-btn" onClick={() => setCheckout(payKey)}>
+                  Try again
                 </button>
-                {s.me.role === 'owner' && (
-                  <>
-                    <input style={{ ...inputStyle, width: 260, minHeight: 34 }} placeholder="Reason, to publish without approval" value={override} onChange={(e) => setOverride(e.target.value)} aria-label="Reason for publishing without approval" />
-                    <button type="button" className="aj-pill" disabled={override.trim().length < 5} onClick={() => overrideApproval(job.id, override.trim())}>
-                      Publish without approval (logged)
-                    </button>
-                  </>
+                {!upgrade && canGoFree(s, job.id, null) && (
+                  <button
+                    type="button"
+                    className="aj-pill"
+                    onClick={() => {
+                      setFailed(null);
+                      setPlan('free');
+                      setSchedule(null);
+                      publishFree(null);
+                    }}
+                  >
+                    Publish free instead
+                  </button>
+                )}
+                {!upgrade && !canGoFree(s, job.id, null) && canGoFree(s, job.id, nextFirst) && (
+                  <button
+                    type="button"
+                    className="aj-pill"
+                    onClick={() => {
+                      setFailed(null);
+                      setPlan('free');
+                      setSchedule(nextFirst);
+                    }}
+                  >
+                    Schedule free for {longDate(nextFirst)} instead
+                  </button>
                 )}
               </div>
             </div>
           )}
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="aj-card p-4 lg:p-6">
-              <JobPage job={shownJob} s={s} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <span className="aj-section-label" style={{ padding: 0 }}>
-                In Google
-              </span>
-              <GooglePreview job={job} s={s} />
-              <span className="aj-section-label" style={{ padding: 0 }}>
-                When shared
-              </span>
-              <ShareCards job={job} s={s} />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button type="button" className="aj-ink-btn" disabled={blocked} onClick={() => setStep(1)}>
-              Continue
-            </button>
-          </div>
-        </>
-      )}
 
-      {step === 1 && (
-        <>
-          <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-            Choose visibility
-          </h1>
-          <div className="grid gap-3 md:grid-cols-2">
-            <button type="button" className="aj-card flex flex-col gap-2 p-4 text-left" style={{ cursor: standardFull && !paid ? 'not-allowed' : 'pointer', borderColor: plan === 'standard' ? 'var(--ink)' : undefined, opacity: standardFull ? 0.65 : 1 }} onClick={() => !standardFull && setPlan('standard')} aria-pressed={plan === 'standard'} disabled={standardFull}>
-              <div className="flex items-center gap-2">
-                <span style={{ fontWeight: 700, fontSize: 15 }}>Standard</span>
-                <span className="ml-auto" style={{ fontWeight: 700 }}>
-                  Free
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Free or Amplify">
+            {!upgrade && (
+              <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
+                <span className="aj-muted" style={{ fontWeight: 600 }}>
+                  {counted ? 'This job already counts as one of your free jobs: it was downloaded or sent for review.' : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}`}
                 </span>
-              </div>
-              <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18 }}>
-                <li>Listed on AidJobs for 30 days</li>
-                <li>Job page, Google job listings</li>
-                <li>Community sharing</li>
-              </ul>
-              <span className="aj-faint">
-                {liveStandard(s)} of {FREE_LIVE} free jobs live{standardFull ? ': close one, or choose Premium' : ''}
-              </span>
-            </button>
-            <button type="button" className="ej-premium aj-card flex flex-col gap-2 p-4 text-left" style={{ cursor: 'pointer', borderColor: plan === 'premium' ? 'var(--ink)' : undefined }} onClick={() => setPlan('premium')} aria-pressed={plan === 'premium'}>
-              <div className="flex items-center gap-2">
-                <Sparkles size={15} strokeWidth={1.8} style={{ color: 'var(--sage-7)' }} />
-                <span style={{ fontWeight: 700, fontSize: 15 }}>Premium</span>
-                <span className="ml-auto" style={{ fontWeight: 700 }}>
-                  {paid ? 'Paid' : `${PRICE_LABEL.premium}`}
-                </span>
-              </div>
-              <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18 }}>
-                <li>Featured section, highlighted card</li>
-                <li>On organisation, country, and hub pages</li>
-                <li>{PREMIUM_EMAILS} Reach emails to candidates and your team</li>
-                <li>Listed for 60 days</li>
-                <li>Unlimited edits; does not use a free job description</li>
-              </ul>
-              <span className="aj-faint">Labelled &ldquo;Premium · Sponsored&rdquo; for job seekers. Price is a placeholder.</span>
-            </button>
-          </div>
-          {plan === 'premium' && !paid && (
-            <div className="aj-card flex flex-col gap-3 p-4">
-              {s.credits > 0 ? (
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={useCredit} onChange={(e) => setUseCredit(e.target.checked)} /> Use a Premium credit ({s.credits} left)
-                </label>
-              ) : null}
-              {!useCredit && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className="aj-ink-btn" onClick={() => startPayment('premium')} disabled={paying}>
-                    {paying ? 'Opening Paddle…' : `Pay ${PRICE_LABEL.premium}`}
-                  </button>
-                  <button type="button" className="aj-pill" onClick={() => startPayment('pack')} disabled={paying}>
-                    Or 5 credits for {PRICE_LABEL.pack}
-                  </button>
-                  <span className="aj-faint inline-flex items-center gap-1">
-                    <ShieldCheck size={12} strokeWidth={2} /> Paddle {paddleConfigured(PRICE_PREMIUM) ? 'sandbox: test cards only, no real money' : 'checkout simulated'} · invoice by email
+                <FreeTerms s={s} />
+                {!freeOk && (
+                  <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
+                    <span>Both free jobs for {monthName(month)} are used.</span>
+                    {canGoFree(s, job.id, firstOfNextMonth(month)) && (
+                      <button
+                        type="button"
+                        className="aj-pill"
+                        onClick={() => {
+                          setPlan('free');
+                          setSchedule(firstOfNextMonth(month));
+                        }}
+                      >
+                        <CalendarClock size={13} strokeWidth={1.8} /> Schedule free for {longDate(firstOfNextMonth(month))}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {chosen === 'free' && job.facts.deadline && job.facts.deadline > freeUntil && (
+                  <span style={{ color: 'var(--amber)' }}>
+                    A free job is listed {LISTED_DAYS.free} days, so this one leaves AidJobs on {longDate(freeUntil)}, before its closing date. Amplify lists it {LISTED_DAYS.amplify} days.
                   </span>
-                </div>
-              )}
+                )}
+              </Choice>
+            )}
+            <Choice on={chosen === 'amplify'} title="Amplify" price={onHand ? 'Package job' : `${usd(pkg === 'one' ? single.amount : packageOf(pkg).price)}${pkg === 'always' ? ' a month' : ''}`} onSelect={() => setPlan('amplify')} amplified disabled={upgrade}>
+                {upgrade && (
+                  <span className="aj-muted" style={{ fontWeight: 600 }}>
+                    Now free, listed until {longDate(listedUntil(job, s.today))}.{' '}
+                    {listedUntil(shown, s.today) !== listedUntil(job, s.today) ? `Amplified, it is listed until ${longDate(listedUntil(shown, s.today))}.` : 'Its closing date comes first, so the listing ends then either way.'}
+                  </span>
+                )}
+                <AmplifyIncludes />
+                {onHand ? (
+                  <span className="aj-muted" style={{ fontWeight: 600 }}>
+                    Uses 1 of your {onHandCount} package {onHandCount === 1 ? 'job' : 'jobs'}
+                    {onHand.kind === 'pack' ? `, to use by ${longDate(onHand.pack.ends)}` : `, for this month of “Always hiring”`}
+                    {upgrade ? '; the free job it used is given back.' : '.'}
+                  </span>
+                ) : (
+                  <>
+                    <button type="button" className="aj-text-btn self-start" aria-expanded={plansOpen} onClick={() => setPlansOpen(!plansOpen)}>
+                      Hiring more? Plan ahead and pay less per job
+                    </button>
+                    {plansOpen && (
+                      <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Packages">
+                        {PACKAGES.filter((p) => !(p.key === 'always' && subscribed)).map((p) => {
+                          const extra = p.key === 'one' && single.key === 'extra';
+                          return (
+                            <button
+                              key={p.key}
+                              type="button"
+                              role="radio"
+                              aria-checked={pkg === p.key}
+                              className="aj-option"
+                              data-active={pkg === p.key}
+                              onClick={() => {
+                                setPkg(p.key);
+                                setPlan('amplify');
+                              }}
+                            >
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center">{pkg === p.key && <Check size={14} strokeWidth={2.4} />}</span>
+                              <span className="flex min-w-0 flex-1 flex-col">
+                                <span style={{ fontWeight: 650 }}>{extra ? 'One extra job' : p.label}</span>
+                                <span className="aj-faint">{extra ? 'On your “Always hiring” subscription' : p.rule}</span>
+                              </span>
+                              <span className="flex shrink-0 flex-col items-end">
+                                <strong>
+                                  {usd(extra ? single.amount : p.price)}
+                                  {p.key === 'always' ? ' a month' : ''}
+                                </strong>
+                                {p.key !== 'one' && <span className="aj-faint">{usd(p.perJob)} a job</span>}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                          The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job, which gives the free job back.
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {!s.org.verified && (
+                  <span style={{ color: 'var(--amber)' }}>
+                    Amplified jobs come from verified organisations.{' '}
+                    <button type="button" className="aj-text-btn" style={{ height: 'auto', padding: 0 }} onClick={() => go('org')}>
+                      Verify yours
+                    </button>
+                  </span>
+                )}
+            </Choice>
+          </div>
+
+          {!upgrade && (
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarClock size={15} strokeWidth={1.8} className="aj-faint" />
+              <span className="aj-muted">Publish</span>
+              <button type="button" className="aj-pill" data-active={!schedule} onClick={() => setSchedule(null)}>
+                Now
+              </button>
+              <button type="button" className="aj-pill" data-active={Boolean(schedule)} onClick={() => setSchedule(schedule ?? addDays(s.today, 1))}>
+                Schedule
+              </button>
+              {schedule && <input type="date" style={{ ...inputStyle, width: 170, minHeight: 34 }} value={schedule} min={addDays(s.today, 1)} onChange={(e) => setSchedule(e.target.value || null)} aria-label="Publish on" />}
             </div>
           )}
-          <div className="flex justify-end">
-            <button type="button" className="aj-ink-btn" disabled={!premiumReady} onClick={() => setStep(2)}>
-              Continue
-            </button>
-          </div>
-        </>
+
+          <button type="button" className="aj-ink-btn w-full justify-center" style={{ minHeight: 44 }} disabled={Boolean(reason)} onClick={proceed}>
+            {label}
+          </button>
+          <span className="aj-faint text-center" style={{ fontSize: 11.5 }}>
+            {chosen === 'free' ? 'Nothing to pay.' : onHand ? 'Nothing to pay now: it uses a job you have already paid for.' : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
+          </span>
+        </section>
+      </div>
+
+      {checkout && <Checkout item={checkoutItem} amount={checkoutAmount} onPaid={() => paid(checkout)} onDeclined={() => failedPay('declined')} onClose={() => failedPay('closed')} />}
+      {skip && (
+        <SkipDialog
+          job={job}
+          onClose={() => setSkip(false)}
+          onDone={() => {
+            setSkip(false);
+            proceed();
+          }}
+        />
       )}
-
-      {step === 2 && (
-        <>
-          <div>
-            <div className="aj-faint" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}>
-              YOUR VACANCY IS READY
-            </div>
-            <h1 className="aj-display aj-h1" style={{ margin: '2px 0 0' }}>
-              Let&apos;s get it seen.
-            </h1>
-            <p className="aj-muted" style={{ margin: '4px 0 0' }}>
-              Publishing your vacancy is just the beginning. Choose one, several, or none of these; you can also skip and publish normally.
-            </p>
-          </div>
-          <ReachPanel job={shownJob} s={s} value={reach} onChange={setReach} />
-          <div className="aj-card flex flex-wrap items-center gap-2 p-3">
-            <CalendarClock size={15} strokeWidth={1.8} />
-            <span>Publish</span>
-            <button type="button" className="aj-pill" data-active={!schedule} onClick={() => setSchedule(null)}>
-              Now
-            </button>
-            <button type="button" className="aj-pill" data-active={Boolean(schedule)} onClick={() => setSchedule(addDays(s.today, 1))}>
-              Schedule
-            </button>
-            {schedule && <input type="date" style={{ ...inputStyle, width: 170, minHeight: 34 }} value={schedule} min={addDays(s.today, 1)} onChange={(e) => setSchedule(e.target.value)} aria-label="Publish on" />}
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className="aj-pill" onClick={() => setStep(0)}>
-              Back to preview
-            </button>
-            <button type="button" className="aj-pill" onClick={() => doPublish(false)}>
-              Skip &amp; publish
-            </button>
-            <button type="button" className="aj-ink-btn" onClick={() => doPublish(true)} disabled={(reach.on.candidates && !reach.candidates.length) || (reach.on.team && !reach.team.length)}>
-              Publish &amp; start reaching people
-            </button>
-          </div>
-        </>
-      )}
-
-      {step === 3 && <Success job={s.jobs.find((j) => j.id === job.id) ?? job} s={s} />}
-
-      {checkout && (
-        <SimulatedCheckout
-          item={checkout === 'premium' ? `Premium job: ${job.facts.title}` : '5 Premium credits, valid 12 months'}
-          amount={checkout === 'premium' ? PRICE_LABEL.premium : PRICE_LABEL.pack}
-          onPaid={() => paidFor(checkout, 'simulated')}
-          onClose={() => setCheckout(null)}
+      {terms && (
+        <TermsDialog
+          s={s}
+          action={terms.schedule ? `Schedule free for ${longDate(terms.schedule)}` : 'Publish free'}
+          onClose={() => setTerms(null)}
+          onAccept={() => {
+            setTerms(null);
+            acceptFreeTerms();
+            finish(publish(job.id, { plan: 'free', schedule: terms.schedule }));
+          }}
         />
       )}
     </div>
   );
 }
 
-function deliveryText(list: Array<{ status: string }>): string {
-  if (!list.length) return 'Not used';
-  const by = (st: string) => list.filter((r) => r.status === st).length;
-  if (by('sent') + by('failed') === list.length) return `${by('sent')} sent${by('failed') ? `, ${by('failed')} failed` : ''} (simulated)`;
-  if (by('sending')) return `${by('sending')} sending (simulated)`;
-  return `${list.length} queued (simulated)`;
-}
-
-function Success({ job, s }: { job: DemoJob; s: State }) {
-  const url = jobUrl(job);
-  const msg = shareMessage(job, s.org);
-  const copy = async (t: string, what: string) => {
-    try {
-      await navigator.clipboard.writeText(t);
-      notify(`${what} copied`);
-    } catch {
-      notify('Copy failed');
-    }
-  };
-  const scheduled = job.status === 'scheduled';
-  const rows: Array<[string, string]> = [
-    ['Vacancy publication', scheduled ? `Scheduled for ${job.scheduledFor ? longDate(job.scheduledFor) : ''}` : 'Published'],
-    ['Candidate invitations', deliveryText(job.reach?.candidates ?? [])],
-    ['Team notifications', deliveryText(job.reach?.team ?? [])],
-    ['Community sharing', job.reach?.community || !job.reach ? 'Ready' : 'Not used'],
-  ];
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-          {scheduled ? 'Your vacancy is scheduled.' : 'Your vacancy is live!'}
-        </h1>
-        <p className="aj-muted" style={{ margin: '4px 0 0' }}>
-          {scheduled ? 'It goes live on the date you chose.' : 'It is published on AidJobs (in this demo, only here). Now let’s help it reach the right people.'}
-        </p>
-      </div>
-      <table className="aj-card w-full overflow-hidden" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-        <thead>
-          <tr>
-            <th className="aj-faint p-3 text-left" style={{ fontWeight: 600 }}>
-              Activity
-            </th>
-            <th className="aj-faint p-3 text-left" style={{ fontWeight: 600 }}>
-              Status
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([a, b]) => (
-            <tr key={a}>
-              <td className="border-t p-3 aj-hair">{a}</td>
-              <td className="border-t p-3 aj-hair" style={{ fontWeight: 600 }}>
-                {b}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="aj-faint" style={{ margin: 0 }}>
-        Publishing does not depend on the emails: a failed email never unpublishes the job. &ldquo;Sent&rdquo; means handed to the email service; it is not proof of delivery.
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        <button type="button" className="aj-ink-btn" onClick={() => go('public', job.id)}>
-          View published vacancy
-        </button>
-        <CommunityButtons msg={msg} url={url} copy={copy} />
-        <button type="button" className="aj-pill" onClick={() => go('home')}>
-          Return to dashboard
-        </button>
-      </div>
-    </div>
-  );
-}

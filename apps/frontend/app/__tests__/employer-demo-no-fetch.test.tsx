@@ -155,7 +155,10 @@ describe('employer demo: never calls the network', () => {
       route('#org');
       shows('Brand style');
       route('#public');
-      shows('Premium · sponsored by employers');
+      shows('Actively hiring · promoted by employers');
+      route('#billing');
+      shows('Refund policy');
+      shows('free jobs left in');
       route('#public/org');
       shows('Riverstone Aid');
       route('#home');
@@ -183,21 +186,45 @@ describe('employer demo: never calls the network', () => {
       });
     }
     route(`#publish/${id}`);
-    shows('How it will look');
-    click('Continue');
-    shows('Choose visibility');
-    click('Continue');
-    shows("Let's get it seen.");
-    click('Skip & publish');
-    shows('Your vacancy is live!');
+    shows('1 of 2 free jobs left in');
+    for (const v of ['In Google', 'When shared', 'Job page']) click(v);
+    click('Publish free');
+    shows('Free jobs: the terms');
+    click('I understand · Publish free');
+    shows('Live on AidJobs');
+    expect(getState().jobs.find((j) => j.id === id)).toMatchObject({ status: 'live', plan: 'free' });
+    expect(getState().org.freeTermsAccepted).toBe(true);
+
+    let paidId = '';
     act(() => {
-      jest.advanceTimersByTime(5000);
+      paidId = startJob('Hiring a Shelter Officer in Goma, closing in 4 weeks, fixed-term');
     });
-    expect(getState().jobs.find((j) => j.id === id)?.status).toBe('live');
+    route(`#publish/${paidId}`);
+    shows('Both free jobs for');
+    shows('Schedule free for');
+    click('Amplify and publish · US$28.40');
+    click('Simulate a declined card');
+    shows('The card was declined');
+    expect(getState().jobs.find((j) => j.id === paidId)?.status).toBe('draft');
+    shows('instead');
+    click('Try again');
+    click('Pay US$28.40');
+    shows('Live on AidJobs');
+    expect(getState().jobs.find((j) => j.id === paidId)?.plan).toBe('amplify');
+    expect(getState().receipts[0]?.item).toBe('Amplify: Shelter Officer');
+
+    route(`#jobs/${id}`);
+    click('Amplify this job');
+    route(window.location.hash);
+    shows('Amplify a live free job');
+    click('Amplify this job · US$28.40');
+    click('Pay US$28.40');
+    expect(getState().jobs.find((j) => j.id === id)?.plan).toBe('amplify');
+    expect(getState().freeUses.some((u) => u.jobId === id)).toBe(false);
 
     act(() => {
       const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
-      publish(id2, { plan: 'premium', useCredit: false, schedule: null, reach: { candidates: [{ email: 'a@example.org', status: 'queued' }], team: [], community: true, intro: '' } });
+      publish(id2, { plan: 'amplify', paid: 'direct', schedule: null, reach: { candidates: [{ email: 'a@example.org', status: 'queued' }], team: [], community: true, intro: '' } });
       jest.advanceTimersByTime(5000);
       go('jobs', id2);
     });
@@ -241,7 +268,7 @@ describe('employer demo: never calls the network', () => {
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":2');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('"v":3');
     for (const k of Object.keys(localStorage)) expect(k.startsWith('aidjobs.')).toBe(true);
   });
 });
@@ -320,15 +347,16 @@ describe('employer demo: the conversation', () => {
     expect(JSON.stringify(job().sections)).toContain('30 November 2026');
   });
 
-  it('counts a free job description the first time it is used, not when it is written', () => {
-    const before = getState().draftsUsed;
+  it('counts a free job the first time it is used, not when it is written', () => {
+    act(() => resetDemo());
+    const before = getState().freeUses.length;
     let id = '';
     act(() => {
       id = startJob('Hiring a Logistics Officer in Goma, closing in 3 weeks');
     });
-    expect(getState().draftsUsed).toBe(before);
+    expect(getState().freeUses.length).toBe(before);
     act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
-    expect(getState().draftsUsed).toBe(before + 1);
+    expect(getState().freeUses.length).toBe(before + 1);
   });
 });
 

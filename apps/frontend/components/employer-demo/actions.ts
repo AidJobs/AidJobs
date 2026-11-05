@@ -12,6 +12,7 @@ import {
   extractFacts,
   FORMAT_FOR_TYPE,
   headingFor,
+  isoDay,
   longDate,
   orderSections,
   parseIso,
@@ -24,13 +25,9 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
+import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, monthFor, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, ReachRecord, Review, State, Tone } from './types';
-
-export const FREE_DRAFTS = 3;
-export const FREE_LIVE = 2;
-export const PREMIUM_EMAILS = 50;
-export const PRICE_LABEL = { premium: 'US$149', pack: 'US$599' };
+import type { ApplySettings, ChatMsg, DemoJob, Facts, Format, Person, Plan, ReachRecord, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -86,13 +83,6 @@ function touched(j: DemoJob): DemoJob {
 /** Reviewers comment and decide; only the job's owner changes it. */
 function ownerOnly(): boolean {
   return !getState().reviewerAs;
-}
-export function freeDraftsLeft(s: State): number {
-  return Math.max(0, FREE_DRAFTS - s.draftsUsed);
-}
-
-export function liveStandard(s: State): number {
-  return s.jobs.filter((j) => (j.status === 'live' || j.status === 'scheduled') && j.plan === 'standard').length;
 }
 
 export function approvalRequired(s: State, j: DemoJob): boolean {
@@ -173,7 +163,6 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
     reach: null,
     chat: [],
     createdAt: Date.now(),
-    countsAsFreeDraft: false,
     audit: [{ at: Date.now(), who: s.me.name, what: 'Started in the chat' }],
   };
 }
@@ -524,16 +513,65 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   }));
   return key;
 }
-/** A free job description counts the first time it is used: published as Standard, sent for review, or downloaded. Exploring and editing are free. */
-function useFreeJob(s: State, id: string): State {
+/**
+ * A free job counts the first time it is used (published, sent for review, or downloaded), against the allowance of the month it is used in.
+ * Exploring and editing are free; with the month's free jobs used, nothing is counted and the job is paid for or scheduled when it is published.
+ */
+function useFree(s: State, id: string, month = currentMonth(s)): State {
   const j = s.jobs.find((x) => x.id === id);
-  if (!j || j.countsAsFreeDraft || j.plan === 'premium') return s;
-  return { ...s, draftsUsed: s.draftsUsed + 1, jobs: s.jobs.map((x) => (x.id === id ? { ...x, countsAsFreeDraft: true } : x)) };
+  if (!j || j.plan === 'amplify' || hasFreeUse(s, id) || freeLeft(s, month) === 0) return s;
+  return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
+}
+
+/** A paid job gives back the free job it had used. */
+function giveBack(s: State, id: string): State {
+  return hasFreeUse(s, id) ? { ...s, freeUses: s.freeUses.filter((u) => u.jobId !== id) } : s;
+}
+
+/** Uses one paid job on hand, the soonest to lapse first. */
+function takePaidJob(s: State): State {
+  const pick = nextPaidJob(s);
+  if (!pick) return s;
+  if (pick.kind === 'subscription') return s.subscription ? { ...s, subscription: { ...s.subscription, left: s.subscription.left - 1 } } : s;
+  return { ...s, packs: s.packs.map((p) => (p.id === pick.pack.id ? { ...p, left: p.left - 1 } : p)) };
+}
+
+export function acceptFreeTerms() {
+  update((s) => ({ ...s, org: { ...s.org, freeTermsAccepted: true } }));
+}
+
+/**
+ * Pays at the simulated checkout: one job, an extra job on the subscription, a pack of jobs, or the subscription.
+ * A pack or the subscription adds paid jobs on hand; one job or an extra job pays for the job named.
+ */
+export function buy(key: PackageKey | 'extra', jobTitle = '') {
+  update((s) => {
+    const today = isoDay(s.today);
+    const p = packageOf(key === 'extra' ? 'one' : key);
+    const amount = key === 'extra' ? EXTRA_JOB : p.price;
+    const ends = addMonths(today, p.months);
+    const item =
+      key === 'one' ? `Amplify: ${jobTitle}` : key === 'extra' ? `Extra job on “Always hiring”: ${jobTitle}` : key === 'always' ? '“Always hiring” subscription, one month' : `${p.jobs} jobs, to use by ${longDate(ends)}`;
+    const next: State = {
+      ...s,
+      packs: key === 'three' || key === 'five' ? [...s.packs, { id: `pk${Date.now()}`, jobs: p.jobs, left: p.jobs, ends, at: Date.now() }] : s.packs,
+      subscription: key === 'always' ? { since: today, renews: ends, left: SUBSCRIPTION_JOBS, cancelled: false } : s.subscription,
+      receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item, amount: `${usd(amount)} (placeholder)` }, ...s.receipts],
+      inbox: [{ id: `i${Date.now()}`, kind: 'receipt', title: `Receipt: ${item}`, body: 'Simulated payment: in the real product the receipt and invoice are emailed to the address used at checkout.', at: Date.now() }, ...s.inbox],
+    };
+    return next;
+  });
+}
+
+export function cancelSubscription() {
+  update((s) =>
+    s.subscription ? { ...s, subscription: { ...s.subscription, cancelled: true }, notice: { text: `Cancelled. This month's jobs stay until ${longDate(s.subscription.renews)}, and nothing more is charged.` } } : s,
+  );
 }
 
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
   update((s0) => {
-    const s = useFreeJob(s0, id);
+    const s = useFree(s0, id);
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
     const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined };
@@ -586,42 +624,55 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
   });
 }
 
-export function overrideApproval(id: string, reason: string) {
-  if (!ownerOnly()) return;
-  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'approved', review: { ...j.review, state: 'approved' }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Approval overridden by the owner: "${reason}"` }] } : j)) }));
+/** Who may publish without approval: only where approval is required, only the owner, and never when the organisation says nobody can skip it. */
+export function canSkipApproval(s: State, j: DemoJob): boolean {
+  return !s.reviewerAs && s.me.role === 'owner' && !s.org.noSkip && approvalRequired(s, j) && !isApproved(j);
 }
 
-export function buyCredits(n: number, mode: 'paddle-sandbox' | 'simulated') {
-  update((s) => ({
-    ...s,
-    credits: s.credits + n,
-    receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item: `${n} Premium credits`, amount: `${PRICE_LABEL.pack} (placeholder)`, mode }, ...s.receipts],
-    inbox: [{ id: `i${Date.now()}`, kind: 'receipt', title: `Receipt: ${n} Premium credits`, body: mode === 'paddle-sandbox' ? 'Paddle (sandbox) emailed the receipt and invoice to the address used at checkout.' : 'Simulated payment: in the real product Paddle emails the receipt and invoice.', at: Date.now() }, ...s.inbox],
+/** Publishing without approval: the reason is kept in the job's history (never public), and the reviewers asked are told. */
+export function overrideApproval(id: string, reason: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || !canSkipApproval(s, j) || reason.trim().length < 5) return false;
+  const asked = j.review.reviewers.map((r) => r.name.split(' ')[0]);
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'approved', review: { ...x.review, state: 'approved' }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Published without approval. Reason: "${reason.trim()}"` }] } : x)),
+    notice: asked.length ? { text: `${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told it was published without their approval (simulated).` } : st.notice,
   }));
+  return true;
 }
 
-export function payPremium(mode: 'paddle-sandbox' | 'simulated', title: string) {
-  update((s) => ({
-    ...s,
-    receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item: `Premium job: ${title}`, amount: `${PRICE_LABEL.premium} (placeholder)`, mode }, ...s.receipts],
-    inbox: [{ id: `i${Date.now()}`, kind: 'receipt', title: `Receipt: Premium job, ${title}`, body: mode === 'paddle-sandbox' ? 'Paddle (sandbox) emailed the receipt and invoice to the address used at checkout.' : 'Simulated payment: in the real product Paddle emails the receipt and invoice.', at: Date.now() }, ...s.inbox],
-  }));
+/**
+ * How a paid job is paid for: `direct` when this job was just paid for at the checkout (one job, or an extra job on the subscription),
+ * `onHand` to use a job from a pack or the subscription.
+ */
+export type Paid = 'direct' | 'onHand';
+
+export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid; reach?: ReachRecord | null };
+
+/** Whether the job can be published with these options; the reason when it cannot. */
+export function publishBlock(s: State, id: string, o: PublishOptions): string | null {
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs) return 'Only your organisation can publish';
+  if (j.status === 'live' || j.status === 'scheduled' || j.status === 'closed') return 'Already published';
+  if (approvalRequired(s, j) && !isApproved(j)) return 'Waiting for approval';
+  if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
+  if (o.plan === 'amplify' && !o.paid) return 'Not paid';
+  if (o.plan === 'amplify' && o.paid === 'onHand' && !nextPaidJob(s)) return 'No paid job on hand';
+  return null;
 }
 
-export type PublishOptions = { plan: 'standard' | 'premium'; useCredit: boolean; schedule: string | null; reach: ReachRecord | null };
-
-/** Publishes, then queues the chosen Reach emails. Publishing never waits for, or depends on, the emails. */
-export function publish(id: string, o: PublishOptions) {
+/** Publishes, then queues any Reach emails. Publishing never waits for, or depends on, the emails. */
+export function publish(id: string, o: PublishOptions): boolean {
+  if (publishBlock(getState(), id, o)) return false;
   update((s0) => {
-    const s = o.plan === 'standard' ? useFreeJob(s0, id) : s0;
-    const j = s.jobs.find((x) => x.id === id);
-    if (!j) return s;
-    const refund = o.plan === 'premium' && j.countsAsFreeDraft;
+    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : giveBack(s0, id);
+    if (o.plan === 'amplify' && o.paid === 'onHand') s = takePaidJob(s);
     const reach: ReachRecord | null = o.reach ? { ...o.reach, candidates: o.reach.candidates.map((r) => ({ ...r, status: 'queued' })), team: o.reach.team.map((r) => ({ ...r, status: 'queued' })) } : null;
+    const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     return {
       ...s,
-      credits: o.useCredit ? s.credits - 1 : s.credits,
-      draftsUsed: refund ? Math.max(0, s.draftsUsed - 1) : s.draftsUsed,
       jobs: s.jobs.map((x) =>
         x.id === id
           ? {
@@ -630,11 +681,10 @@ export function publish(id: string, o: PublishOptions) {
               plan: o.plan,
               scheduledFor: o.schedule ?? undefined,
               publishedAt: o.schedule ? undefined : Date.now(),
-              countsAsFreeDraft: refund ? false : x.countsAsFreeDraft,
               reach,
               audit: [
                 ...x.audit,
-                { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'} as ${o.plan === 'premium' ? `Premium${o.useCredit ? ' (credit)' : ''}` : 'Standard'}` },
+                { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` },
                 ...(reach ? [{ at: Date.now(), who: s.me.name, what: `Reach: ${reach.candidates.length} invitations, ${reach.team.length} team emails queued (simulated)` }] : []),
               ],
             }
@@ -642,7 +692,24 @@ export function publish(id: string, o: PublishOptions) {
       ),
     };
   });
-  simulateDelivery(id);
+  if (o.reach) simulateDelivery(id);
+  return true;
+}
+
+/** Amplifies a live or scheduled free job: listed 100 days from publishing, featured, and its free job given back. */
+export function amplifyLive(id: string, paid: Paid): boolean {
+  const s0 = getState();
+  const j = s0.jobs.find((x) => x.id === id);
+  if (!j || s0.reviewerAs || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
+  if (paid === 'onHand' && !nextPaidJob(s0)) return false;
+  update((s1) => {
+    const s = paid === 'onHand' ? takePaidJob(giveBack(s1, id)) : giveBack(s1, id);
+    return {
+      ...s,
+      jobs: s.jobs.map((x) => (x.id === id ? { ...x, plan: 'amplify', audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing; its free job given back` }] } : x)),
+    };
+  });
+  return true;
 }
 
 /** Simulated email progress: queued, sending, sent. Labelled as simulated everywhere it is shown. */
@@ -724,7 +791,6 @@ export function hireAgain(id: string, place?: string): string | null {
     closedAt: undefined,
     closeReason: undefined,
     updatedAfterPublish: false,
-    countsAsFreeDraft: false,
     lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
   };
@@ -734,7 +800,7 @@ export function hireAgain(id: string, place?: string): string | null {
 }
 
 export function downloadCopy(j: DemoJob, orgName: string) {
-  update((s) => useFreeJob(s, j.id));
+  update((s) => useFree(s, j.id));
   const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
   const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');

@@ -157,9 +157,22 @@
   box-shadow: inset 3px 0 0 var(--sage-5);
 }
 
-.ej-premium {
+.ej-amplified {
   border: 1px solid var(--sage-3);
   background: linear-gradient(135deg, var(--sage-1), var(--surface) 60%);
+}
+
+.ej-radio {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--text-3);
+  background: var(--surface);
+}
+
+.ej-radio[data-on='true'] {
+  border: 5px solid var(--sage-7);
 }
 
 .aj-root .ej-fact {

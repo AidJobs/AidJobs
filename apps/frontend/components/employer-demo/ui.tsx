@@ -241,13 +241,13 @@ export function Lifeline({ stage, attention }: { stage: string; attention: boole
 }
 
 export function PlanBadge({ plan }: { plan: DemoJob['plan'] }) {
-  if (plan === 'premium')
+  if (plan === 'amplify')
     return (
-      <span className="aj-chip" style={{ background: 'var(--ink)', color: 'var(--on-ink)' }}>
-        Premium
+      <span className="aj-chip" data-tone="sage">
+        Amplified
       </span>
     );
-  if (plan === 'standard') return <span className="aj-chip">Standard</span>;
+  if (plan === 'free') return <span className="aj-chip">Free</span>;
   return null;
 }
 

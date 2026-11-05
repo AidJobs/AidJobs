@@ -8,8 +8,6 @@ import {
   approvalRequired,
   downloadCopy,
   extend,
-  FREE_DRAFTS,
-  freeDraftsLeft,
   hireAgain,
   isApproved,
   letClose,
@@ -21,6 +19,7 @@ import {
 } from './actions';
 import Composer from './Composer';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
+import { currentMonth, FREE_PER_MONTH, freeLeft, monthName } from './plans';
 import { go, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
 import { Lifeline, PlanBadge, Section, stageOf } from './ui';
@@ -120,6 +119,21 @@ function briefing(s: State): Brief[] {
       }
     }
   }
+  for (const p of s.packs) {
+    const d = daysUntil(s.today, p.ends);
+    if (p.left > 0 && d <= 14) {
+      out.push({
+        id: `pk-${p.id}`,
+        icon: <Receipt size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />,
+        title: `${p.left} paid ${p.left === 1 ? 'job' : 'jobs'} left, ${d <= 0 ? 'ending today' : `ending in ${d} ${d === 1 ? 'day' : 'days'}`}`,
+        body: `Unused jobs from your ${p.jobs}-job package lapse on ${longDate(p.ends)}.`,
+        actions: [
+          { label: 'Create a job', run: () => go('create'), primary: true },
+          { label: 'Billing', run: () => go('billing') },
+        ],
+      });
+    }
+  }
   const unwritten = s.jobs.find((j) => j.status === 'draft');
   if (unwritten) out.push({ id: `dr-${unwritten.id}`, icon: <FileText size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />, title: `${unwritten.facts.title || 'A draft'} is waiting`, body: unwritten.sections.length ? 'Pick up where you left off.' : 'Not written yet.', actions: [{ label: 'Continue', run: () => go('create', unwritten.id), primary: true }] });
   return out;
@@ -182,7 +196,8 @@ export default function Home() {
   const [noMatch, setNoMatch] = useState(false);
   const [day, setDay] = useState<string | null>(null);
   const items = briefing(s);
-  const left = freeDraftsLeft(s);
+  const left = freeLeft(s);
+  const month = monthName(currentMonth(s));
 
   const active = s.jobs.filter((j) => j.status !== 'closed' || (j.closedAt && s.today - j.closedAt < 31 * DAY));
   const shown = day ? active.filter((j) => j.facts.deadline === day && (j.status === 'live' || j.status === 'scheduled')) : active;
@@ -249,7 +264,7 @@ export default function Home() {
           </ul>
         )}
 
-        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_DRAFTS} free job descriptions left this month</span>}>
+        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_PER_MONTH} free jobs left in {month}</span>}>
           <Composer
             value={text}
             onChange={setText}
@@ -260,7 +275,7 @@ export default function Home() {
             compact
           />
           <p className="aj-faint" style={{ margin: 0, fontSize: 11.5 }}>
-            Every change is confirmed first and can be undone. {left === 0 ? 'The free job descriptions are used up this month; a Premium job does not use one.' : 'A Premium job does not use a free job description.'}
+            Every change is confirmed first and can be undone. {left === 0 ? `Both free jobs for ${month} are used; an amplified job does not use one.` : 'An amplified job does not use a free job.'}
           </p>
           {noMatch && (
             <div className="aj-card p-3 aj-muted" role="status">

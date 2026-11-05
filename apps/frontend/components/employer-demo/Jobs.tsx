@@ -1,11 +1,12 @@
 'use client';
 
-import { ArrowLeft, CalendarPlus, CheckCheck, Copy, Download, History, MapPin, Pencil, Repeat2, Share2, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, CheckCheck, Copy, Download, History, MapPin, Pencil, Repeat2, Share2, Sparkles, Trash2, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 import Flag from '@/components/site/Flag';
 import { closeJob, deleteDraft, downloadCopy, extend, hireAgain } from './actions';
 import { addDays, daysUntil, holiday, longDate, PLACES, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
+import { BADGE, listedUntil } from './plans';
 import { CommunityButtons, JobPage, jobUrl, shareMessage } from './Publish';
 import { go, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
@@ -164,7 +165,6 @@ function ReshareDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: (
           {shareMessage(job, s.org)}
         </pre>
         <CommunityButtons msg={shareMessage(job, s.org)} url={jobUrl(job)} copy={copy} />
-        {job.plan === 'premium' && <span className="aj-faint">Premium: Reach emails left for this job are shown on the job; invitations work as when you published.</span>}
       </div>
     </Dialog>
   );
@@ -192,6 +192,11 @@ function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: '
         <button type="button" className="aj-pill" onClick={() => onDialog('variant')}>
           <Copy size={14} strokeWidth={1.8} /> Same role, another place
         </button>
+        {job.plan === 'free' && (
+          <button type="button" className="aj-pill" onClick={() => go('publish', job.id)}>
+            <Sparkles size={14} strokeWidth={1.8} /> Amplify
+          </button>
+        )}
       </div>
     );
   if (job.status === 'closed')
@@ -340,6 +345,21 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
           <JobPage job={job} s={s} />
         </div>
         <div className="flex flex-col gap-4">
+          {job.plan && job.status !== 'closed' && (
+            <section className="aj-card flex flex-col gap-1 p-3">
+              <span className="aj-section-label" style={{ padding: 0 }}>
+                Plan
+              </span>
+              <span className="aj-muted">
+                {job.plan === 'amplify' ? `Amplified: featured, “${BADGE}”` : 'Free: standard placement'} · listed until {longDate(listedUntil(job, s.today))}
+              </span>
+              {job.plan === 'free' && (
+                <button type="button" className="aj-text-btn self-start" onClick={() => go('publish', job.id)}>
+                  Amplify this job
+                </button>
+              )}
+            </section>
+          )}
           <section className="aj-card flex flex-col gap-2 p-3">
             <span className="aj-section-label" style={{ padding: 0 }}>
               Reach

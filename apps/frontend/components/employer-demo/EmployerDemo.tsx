@@ -1,8 +1,10 @@
 'use client';
 
-import { Briefcase, Building2, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Star, Users } from 'lucide-react';
+import { Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
+import Billing from './Billing';
+import { currentMonth, FREE_PER_MONTH, freeLeft, monthName, paidJobsLeft } from './plans';
 import Create from './Create';
 import Home from './Home';
 import Tip from '@/components/site/Tip';
@@ -103,7 +105,7 @@ export default function EmployerDemo() {
   ];
 
   const workspace = (route.screen === 'create' || route.screen === 'studio') && Boolean(route.id);
-  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home'].includes(route.screen);
+  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
     case 'create':
@@ -131,6 +133,9 @@ export default function EmployerDemo() {
     case 'home':
       screen = <Home />;
       break;
+    case 'billing':
+      screen = <Billing />;
+      break;
     default:
       screen = <Create />;
   }
@@ -142,12 +147,10 @@ export default function EmployerDemo() {
         sections={[
           {
             title: 'Your plan',
-            entries: [
-              { key: 'credits', label: `Premium credits · ${s.credits}`, icon: <Star size={15} strokeWidth={1.8} />, onSelect: () => go('home') },
-            ],
+            entries: [entry('billing', 'Billing', <CreditCard size={15} strokeWidth={1.8} />, paidJobsLeft(s) || undefined)],
             footer: (
               <div className="aj-faint px-2.5 pb-2" style={{ fontSize: 11 }}>
-                {Math.max(0, 3 - s.draftsUsed)} of 3 free job descriptions left this month. Receipts: {s.receipts.length}.
+                {freeLeft(s)} of {FREE_PER_MONTH} free jobs left in {monthName(currentMonth(s))}.{paidJobsLeft(s) ? ` ${paidJobsLeft(s)} paid ${paidJobsLeft(s) === 1 ? 'job' : 'jobs'} on hand.` : ''}
               </div>
             ),
           },

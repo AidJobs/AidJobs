@@ -52,8 +52,12 @@ export type Org = {
   learned: LearnedFormat | null;
   approval: ApprovalSetting;
   approvalRule: 'any' | 'all';
+  /** "Nobody can skip approval": removes the owner's "Publish without approval". */
+  noSkip: boolean;
   verified: boolean;
   setupDone: boolean;
+  /** The one-time "I understand" for the free terms, given the first time the organisation publishes a free job. */
+  freeTermsAccepted: boolean;
 };
 
 export type Engagement = 'job' | 'consultancy' | 'internship' | 'volunteer';
@@ -148,6 +152,9 @@ export type ApplySettings = {
   anonymised: boolean;
 };
 
+/** Free, or Amplify: the paid offer (employer-side plan, section 16). */
+export type Plan = 'free' | 'amplify';
+
 export type JobStatus = 'draft' | 'review' | 'approved' | 'scheduled' | 'live' | 'closed';
 
 export type AuditEntry = { at: number; who: string; what: string };
@@ -155,7 +162,7 @@ export type AuditEntry = { at: number; who: string; what: string };
 export type DemoJob = {
   id: string;
   status: JobStatus;
-  plan: 'standard' | 'premium' | null;
+  plan: Plan | null;
   facts: Facts;
   family: string;
   tags: string[];
@@ -175,7 +182,6 @@ export type DemoJob = {
   closedAt?: number;
   closeReason?: 'deadline' | 'early' | 'filled' | 'withdrawn';
   updatedAfterPublish?: boolean;
-  countsAsFreeDraft: boolean;
   audit: AuditEntry[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
@@ -185,12 +191,21 @@ export type InboxKind = 'approved' | 'changes' | 'comment' | 'deadline' | 'remov
 
 export type InboxItem = { id: string; kind: InboxKind; jobId?: string; title: string; body: string; at: number; done?: boolean };
 
-export type Receipt = { id: string; at: number; item: string; amount: string; mode: 'paddle-sandbox' | 'simulated' };
+export type Receipt = { id: string; at: number; item: string; amount: string };
+
+/** A free job counted against one calendar month's allowance, in the organisation's time zone. */
+export type FreeUse = { jobId: string; month: string };
+
+/** Paid jobs bought ahead: unused ones lapse at the end date. */
+export type Pack = { id: string; jobs: number; left: number; ends: string; at: number };
+
+/** "Always hiring": a number of jobs each month; unused ones lapse at renewal; cancelled, it runs to the renewal date. */
+export type Subscription = { since: string; renews: string; left: number; cancelled: boolean };
 
 export type Notice = { text: string; undo?: DemoJob[] } | null;
 
 export type State = {
-  v: 2;
+  v: 3;
   today: number;
   signedIn: boolean;
   me: Person;
@@ -199,8 +214,9 @@ export type State = {
   jobs: DemoJob[];
   formats: Format[];
   inbox: InboxItem[];
-  draftsUsed: number;
-  credits: number;
+  freeUses: FreeUse[];
+  packs: Pack[];
+  subscription: Subscription | null;
   receipts: Receipt[];
   reviewerAs: string | null;
   notice: Notice;

@@ -217,7 +217,17 @@ function ApprovalSettingView({ org }: { org: Org }) {
           every reviewer
         </button>
       </div>
-      <span className="aj-faint">An owner can publish without approval in an emergency; the reason is kept in the job&apos;s history.</span>
+      {org.approval !== 'off' && (
+        <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
+          <input type="checkbox" className="mt-0.5" checked={org.noSkip} onChange={(e) => setOrg({ noSkip: e.target.checked })} />
+          <span className="flex flex-col">
+            <span style={{ fontWeight: 650 }}>Nobody can skip approval</span>
+            <span className="aj-faint">
+              {org.noSkip ? 'Jobs that need approval are published only once they are approved.' : 'Without it, the owner can publish without approval in an emergency; the reason is kept in the job’s history and the reviewers are told.'}
+            </span>
+          </span>
+        </label>
+      )}
     </div>
   );
 }
@@ -253,7 +263,7 @@ function Verification({ org }: { org: Org }) {
           </button>
         </>
       )}
-      <span className="aj-faint">Verification protects candidates: fake vacancies that ask for fees are a known problem in this sector. Premium and Reach emails need a verified organisation.</span>
+      <span className="aj-faint">Verification protects candidates: fake vacancies that ask for fees are a known problem in this sector. Amplified jobs and Reach emails need a verified organisation.</span>
       {org.verified && (
         <button type="button" className="aj-text-btn self-start" onClick={() => setOrg({ verified: false })}>
           Show the unverified state

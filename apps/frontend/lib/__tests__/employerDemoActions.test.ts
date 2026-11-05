@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
+  amplifyLive,
   applyFormat,
   approvalRequired,
   basePattern,
+  buy,
+  cancelSubscription,
+  canSkipApproval,
   deleteDraft,
   editSection,
   extend,
   isApproved,
   markGenuine,
   overrideApproval,
+  publish,
+  publishBlock,
   reorderSections,
   restoreVersion,
   reviewerDecision,
@@ -21,7 +27,8 @@ import {
   toggleSection,
   undoLastChange,
 } from '../../components/employer-demo/actions';
-import { article } from '../../components/employer-demo/engine';
+import { article, daysUntil, isoDay } from '../../components/employer-demo/engine';
+import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
 import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -250,6 +257,135 @@ describe('reviewers comment and decide, but never change the job', () => {
     sendChat('job-fin', 'make it shorter');
     deleteDraft('job-fin');
     expect(JSON.stringify(job('job-fin'))).toBe(before);
+  });
+});
+
+describe('free jobs: two a calendar month, counted at first use', () => {
+  const free = (id: string, schedule: string | null = null) => publish(id, { plan: 'free', schedule });
+
+  it('the sample month has one free job left; a third free job this month is refused', () => {
+    expect(freeLeft(getState())).toBe(1);
+    const a = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(free(a)).toBe(true);
+    expect(freeLeft(getState())).toBe(0);
+    const b = startJob('Hiring a Driver in Goma, closing in 3 weeks');
+    expect(publishBlock(getState(), b, { plan: 'free', schedule: null })).toMatch(/No free job left/);
+    expect(free(b)).toBe(false);
+    expect(job(b).status).toBe('draft');
+  });
+
+  it('scheduling for the 1st of next month uses that month’s allowance', () => {
+    free(startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks'));
+    const b = startJob('Hiring a Driver in Goma, closing in 6 weeks');
+    const next = firstOfNextMonth(currentMonth(getState()));
+    expect(canGoFree(getState(), b, next)).toBe(true);
+    expect(free(b, next)).toBe(true);
+    expect(job(b)).toMatchObject({ status: 'scheduled', scheduledFor: next });
+    expect(freeLeft(getState(), next.slice(0, 7))).toBe(1);
+  });
+
+  it('a job already counted (downloaded or sent for review) publishes free without counting again', () => {
+    const before = getState().freeUses.length;
+    expect(free('job-comms')).toBe(true);
+    expect(getState().freeUses.length).toBe(before);
+  });
+
+  it('paying for a job that had counted gives its free job back', () => {
+    expect(freeLeft(getState())).toBe(1);
+    buy('one', 'Communications Intern');
+    expect(publish('job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe(true);
+    expect(freeLeft(getState())).toBe(2);
+    expect(job('job-comms').plan).toBe('amplify');
+  });
+
+  it('an amplified job is listed 100 days, a free one 60, never past the closing date', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma');
+    expect(job(id).facts.deadline).toBe('');
+    free(id);
+    const today = getState().today;
+    expect(daysUntil(today, listedUntil(job(id), today))).toBe(60);
+    buy('one', 'Shelter Officer');
+    amplifyLive(id, 'direct');
+    expect(daysUntil(today, listedUntil(job(id), today))).toBe(100);
+    expect(listedUntil(job('job-cps'), today)).toBe(job('job-cps').facts.deadline);
+  });
+});
+
+describe('packages and the subscription', () => {
+  it('a 3-job pack lasts 2 months and its jobs are used one at a time', () => {
+    buy('three');
+    expect(paidJobsLeft(getState())).toBe(3);
+    expect(getState().packs[0].ends).toBe(addMonths(isoDay(getState().today), 2));
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(publish(id, { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(true);
+    expect(paidJobsLeft(getState())).toBe(2);
+    expect(getState().receipts[0].amount).toContain('US$66');
+  });
+
+  it('without a paid job on hand, "onHand" is refused', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(publish(id, { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(false);
+    expect(amplifyLive('job-meal', 'onHand')).toBe(false);
+  });
+
+  it('a package job amplifies a live free job and gives its free job back', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    publish(id, { plan: 'free', schedule: null });
+    expect(freeLeft(getState())).toBe(0);
+    buy('five');
+    expect(amplifyLive(id, 'onHand')).toBe(true);
+    expect(job(id).plan).toBe('amplify');
+    expect(paidJobsLeft(getState())).toBe(4);
+    expect(freeLeft(getState())).toBe(1);
+  });
+
+  it('the subscription gives 3 jobs a month, extra jobs at US$18, and can be cancelled', () => {
+    buy('always');
+    expect(getState().subscription).toMatchObject({ left: 3, cancelled: false });
+    expect(singlePrice(getState())).toEqual({ key: 'extra', amount: 18 });
+    cancelSubscription();
+    expect(getState().subscription?.cancelled).toBe(true);
+    expect(singlePrice(getState()).key).toBe('one');
+  });
+
+  it('unused pack jobs lapse after the end date; the subscription renews, or ends once cancelled', () => {
+    const s = getState();
+    const day = 86_400_000;
+    const later = { ...s, today: s.today + 120 * day };
+    const withPack = { ...later, packs: [{ id: 'p', jobs: 3, left: 2, ends: isoDay(s.today + 60 * day), at: 0 }], subscription: { since: isoDay(s.today), renews: isoDay(s.today + 30 * day), left: 0, cancelled: false } };
+    const rolled = rollBilling(withPack);
+    expect(rolled.packs).toHaveLength(0);
+    expect(rolled.subscription?.left).toBe(3);
+    expect(rolled.subscription!.renews > isoDay(later.today)).toBe(true);
+    expect(rollBilling({ ...withPack, subscription: { ...withPack.subscription, cancelled: true } }).subscription).toBeNull();
+  });
+});
+
+describe('publishing without approval', () => {
+  beforeEach(() => update((s) => ({ ...s, org: { ...s.org, approval: 'all' } })));
+
+  it('needs approval first; the owner can skip it with a reason, kept in the history', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: null })).toBe('Waiting for approval');
+    expect(canSkipApproval(getState(), job(id))).toBe(true);
+    expect(overrideApproval(id, 'no')).toBe(false);
+    expect(overrideApproval(id, 'The donor deadline is today')).toBe(true);
+    expect(job(id).audit.at(-1)?.what).toContain('Published without approval. Reason: "The donor deadline is today"');
+    expect(publish(id, { plan: 'free', schedule: null })).toBe(true);
+  });
+
+  it('"Nobody can skip approval" removes the override', () => {
+    update((s) => ({ ...s, org: { ...s.org, noSkip: true } }));
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(canSkipApproval(getState(), job(id))).toBe(false);
+    expect(overrideApproval(id, 'The donor deadline is today')).toBe(false);
+    expect(publish(id, { plan: 'free', schedule: null })).toBe(false);
+  });
+
+  it('only the owner can skip it, never a member', () => {
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    expect(overrideApproval(id, 'The donor deadline is today')).toBe(false);
   });
 });
 

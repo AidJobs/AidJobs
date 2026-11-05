@@ -177,7 +177,7 @@ export default function Create({ id }: { id?: string }) {
         />
       )}
       {!reviewing && job.sections.length > 0 && job.status !== 'live' && (
-        <Tip label={blocked ? 'Approval is required before publishing' : checks.length ? `To look at before publishing: ${checks.join('; ')}.` : 'Nothing to check. Choose Standard or Premium, then publish.'} side="bottom">
+        <Tip label={blocked ? 'Approval is required before publishing' : checks.length ? `To look at before publishing: ${checks.join('; ')}.` : 'Nothing to check. Publish free or Amplify.'} side="bottom">
           <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
             {blocked ? 'Publish…' : 'Publish'}
             {checks.length > 0 && <span className="ej-count-badge">{checks.length}</span>}
