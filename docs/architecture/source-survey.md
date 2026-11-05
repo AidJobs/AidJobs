@@ -1,6 +1,6 @@
 # Employer survey (W-31)
 
-**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) done on 5 November 2026 as a snapshot, and the first wave of employers decided the same day (below); step F's plan comes next. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
+**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) done on 5 November 2026 as a snapshot, and the first wave of employers decided the same day (below); step F's plan for the first 200 approved the same day (below). The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
 
 ## Purpose
 
@@ -178,7 +178,19 @@ The survey was taking longer than expected, and the user wants live jobs sooner.
 
 US Fund for UNICEF and the United Nations Foundation are NGOs, not part of the UN system, and stay in the first wave. The top of the income tier includes medicine-donation charities (MAP International, Matthew 25 Ministries, Kingsway Charities) whose income is mostly donated goods; step F will show which of the 100 hire. Later wave: 40 UN-system organisations and the 44 UN Secretariat offices, 1,674 UNjobs jobs.
 
-**Step F's first batch: 200 organisations**, the first wave's 150 with the most UNjobs jobs (129 NGOs and INGOs, 13 development banks and international bodies, 8 development agencies; 5,255 jobs, 84% of the first wave's) and its 50 largest by income. Step E has a guess for 85 of them. Three first-wave organisations have no website (SALT International, The CH Foundation (UK), Moral Arc Foundation). Step F's plan, with its own approval, comes next; it then gives the list grouped by recruitment system and ranked by jobs, which orders the crawler's readers.
+**Step F's first batch: 200 organisations**, the first wave's 150 with the most UNjobs jobs (129 NGOs and INGOs, 13 development banks and international bodies, 8 development agencies; 5,255 jobs, 84% of the first wave's) and its 50 largest by income. Step E has a guess for 85 of them. Three first-wave organisations have no website (SALT International, The CH Foundation (UK), Moral Arc Foundation).
+
+## Confirmation of the first batch (step F): plan approved by the user on 5 November 2026
+
+The first time the survey contacts employers' own sites. For the 200 organisations of `first-wave.csv`'s batch 1, confirm the careers page, the recruitment system and how the listing can be read, and give the list grouped by recruitment system and ranked by jobs, which orders the crawler's readers. Built in its own chat and pull request, from `main` after step E's PR (#107) is merged.
+
+- **Careers page found first without contacting the employer:** step E's guess (85 of the 200), else the agent's web search (search results only), each recorded as a decision with its evidence.
+- **Then at most two requests per organisation:** its `robots.txt`, then one request to the careers page, or, where the page is on a system with a documented public job feed (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee, Personio, Teamtailor), one request to that feed instead. For Workday and Oracle only the careers page itself: their job search is a POST request, its own decision under the contract (§9).
+- **Politeness and safety:** every request through the backend's shared fetch policy (`apps/backend/contracts/outbound.py`: private addresses refused, redirect, size and time limits); an honest identity (`AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)`); one request at a time, about 5 seconds apart, never the same host within 10 seconds; a `robots.txt` that forbids the page stops that organisation; a 403, a 429 or a bot challenge is recorded and stops that organisation, never bypassed (no browser, no disguised retry); repeated refusals stop the run, as in step E.
+- **Recorded per organisation** (hosts and paths only; no page content, emails or names): the careers page after redirects and its status; the recruitment system and its evidence; how the listing can be read (a plain page with job links, a page that needs JavaScript, a feed, or a public API); the number of jobs seen against UNjobs' count; bot protection seen; other organisations sharing the site.
+- **Output:** a read-only script, `tools/survey/confirm.py`, with tests; one row per organisation, a summary of systems ranked by organisations and jobs covered, and the agent's corrections with reasons, all committed and checked by CI as in step E; this file and the ledger updated; then the independent review and the user's merge approval.
+- **Size:** about 115 web searches and up to 400 requests to employers' sites (200 `robots.txt`, 200 pages or feeds), about 40 minutes, from the user's machine.
+- **Then:** the crawler's order is discussed with the confirmed list in hand.
 
 ## Sources
 
