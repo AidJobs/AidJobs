@@ -168,7 +168,7 @@ rank,org_id,name,candidate_url,system_guess,crawls,status,redirect,rule,confiden
 159,unjobs-un:17,Economic and Social Commission for Asia and the Pacific,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
 161,unjobs-nonun:272,International Council on Clean Transportation,https://icct.bamboohr.com/careers/364,BambooHR,2026-43,,,"account by acronym, decided: abbreviation only; also the International Centre for Counter-Terrorism's abbreviation (step F) (6 captures)",low
 164,unjobs-nonun:413,Rare,https://careers-rare.icims.com/jobs/1776,iCIMS,2026-43,,,account by full name (12 captures),medium
-165,unjobs-nonun:438,Search for Common Ground,https://sfcg.bamboohr.com/jobs/view.php,BambooHR,2026-43,,,account by website name (2 captures),low
+165,unjobs-nonun:438,Search for Common Ground,https://sfcg.bamboohr.com/jobs/view.php,BambooHR,2026-43,,,"account by decided, decided: the account is Search for Common Ground's own website name (sfcg.org); the other organisation matches only through a website found by the search (2 captures)",medium
 166,unjobs-un:80,UN High Commissioner for Refugees,https://unhcr.wd3.myworkdayjobs.com/en-GB/External,Workday,2026-43,,,account by website name (156 captures),low
 167,unjobs-nonun:502,Wellcome Trust,https://wellcome.wd3.myworkdayjobs.com/en-GB/Wellcome,Workday,2026-43,,,account by website name (8 captures),medium
 169,unjobs-nonun:350,Near East Foundation,https://neareast.bamboohr.com/careers/531,BambooHR,2026-43,,,account by website name (3 captures),medium

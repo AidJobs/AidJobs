@@ -1,96 +1,32 @@
 rank,org_id,name,kind,detail,reason
-605,irs:541460147,Operation Smile Inc,wikidata: name only,Q1323294 Operation Smile (organization): operationsmile.org,a match by name alone is never automatic
 627,irs:363241033,ALIGHT,wikidata: identifiers disagree,Q4744809 arcrelief.org; Q4744809 wearealight.org,two or more websites
 628,irs:521314847,Adventist Development and Relief Agency International,"one account, many organisations","BambooHR:adra (https://adra.bamboohr.com/jobs/view.php), website name",also matches 3 other organisation(s)
 630,eu:6779772100986-67,Medical Aid for Palestinians,abbreviation only,"BambooHR:map (https://map.bamboohr.com/careers/308), acronym",abbreviation only
 630,eu:6779772100986-67,Medical Aid for Palestinians,abbreviation only,"Greenhouse:map (https://job-boards.greenhouse.io/map/jobs), acronym",abbreviation only
-635,irs:521447902,CNFA,wikidata: name only,Q21921812 Cercle des Nageurs de Fontainebleau-Avon (Swimming French Club): cnfa-natation.fr cnfa77.free.fr,a match by name alone is never automatic
 640,acnc:67001692566,Compassion Australia,"one account, many organisations","Workday:compassion (https://compassion.wd5.myworkdayjobs.com/CompassionCareers), website name",also matches 1 other organisation(s)
 655,irs:981135729,CGIAR,conflict,"Workable:cgiar (https://apply.workable.com/cgiar), full name",accounts in two or more systems
 655,irs:981135729,CGIAR,conflict,"Zoho Recruit:cgiar (https://cgiar.zohorecruit.com/jobs/Careers), full name",accounts in two or more systems
-655,irs:981135729,CGIAR,wikidata: name only,Q1128401 CGIAR (organization): cgiar.org,a match by name alone is never automatic
 657,irs:942607722,New Israel Fund,wikidata: identifiers disagree,Q2776489 nif.org; Q2776489 nif.org.il,two or more websites
-657,irs:942607722,New Israel Fund,wikidata: name only,Q2776489 New Israel Fund (American non-profit organization): nif.org nif.org.il,a match by name alone is never automatic
 663,cra:118871516RR0001,Compassion Canada,"one account, many organisations","Workday:compassion (https://compassion.wd5.myworkdayjobs.com/CompassionCareers), website name",also matches 1 other organisation(s)
 677,uk:1058226,Mission Aviation Fellowship International,"one account, many organisations","iCIMS:mafint (https://careers-mafint.icims.com/jobs/intro), website name",also matches 1 other organisation(s)
-684,seed:31,ICRISAT,wikidata: name only,"Q108737573 International Crops Research Institute for the Semi-Arid Tropics (government organization in Nairobi, Kenya): icrisat.org",a match by name alone is never automatic
-684,seed:31,ICRISAT,wikidata: name only,Q262250 International Crops Research Institute for the Semi-Arid Tropics (International research organization): icrisat.org,a match by name alone is never automatic
-685,irs:541884520,Christian Relief Services Charities Inc,wikidata: name only,Q54860102 Christian Relief Services Charities (http://www.crscfamily.org/): crsc-family.org,a match by name alone is never automatic
-686,irs:530243270,Amideast,wikidata: name only,Q4746156 Amideast (): amideast.org,a match by name alone is never automatic
-701,irs:465335435,Nova Ukraine,wikidata: name only,Q24534517 Nova Ukraine (U.S. nonprofit supporting Ukraine): novaukraine.org,a match by name alone is never automatic
-704,irs:521257425,Search for Common Ground,wikidata: name only,Q7441664 Search for Common Ground (International non-profit organization): sfcg.org,a match by name alone is never automatic
-722,irs:872410117,Human Appeal Inc,wikidata: name only,Q108943946 Human Appeal (charity based in Australia): humanappeal.org.au,a match by name alone is never automatic
-722,irs:872410117,Human Appeal Inc,wikidata: name only,Q25383518 Human Appeal (British international development and relief charity based in Manchester): humanappeal.org.uk,a match by name alone is never automatic
-737,irs:823285688,Internet Society Foundation,wikidata: name only,Q118957546 Internet Society Foundation (Funding Agency for internet related initiatives): isocfoundation.org,a match by name alone is never automatic
 771,irs:521838756,Women for Women International,"one account, many organisations","BambooHR:womenforwomen (https://womenforwomen.bamboohr.com/jobs/view.php), website name",also matches 1 other organisation(s)
-772,cra:119310241RR0001,Lotte and John Hecht Memorial Foundation,wikidata: name only,"Q140351989 Lotte and John Hecht Memorial Foundation (nonprofit organization in Vancouver, Canada): hecht.org",a match by name alone is never automatic
-778,irs:520848769,Partners of the Americas Inc,wikidata: name only,Q7140750 Partners of the Americas (): partners.net,a match by name alone is never automatic
 782,cra:132056813RR0001,Adra Canada,"one account, many organisations","BambooHR:adra (https://adra.bamboohr.com/jobs/view.php), website name",also matches 3 other organisation(s)
 798,irs:460743201,Inkomoko,conflict,"BambooHR:inkomoko (https://inkomoko.bamboohr.com/careers/43), full name",accounts in two or more systems
 798,irs:460743201,Inkomoko,conflict,"Workable:inkomoko (https://apply.workable.com/inkomoko), full name",accounts in two or more systems
-815,irs:472227058,Palestinian American Medical Association,wikidata: name only,Q136798778 Palestinian American Medical Association (): pamausa.org,a match by name alone is never automatic
-823,cra:118951169RR0001,Islamic Circle of North America,wikidata: name only,Q6082383 Islamic Circle of North America (Islamic North American organization): icna.org,a match by name alone is never automatic
-830,irs:541955545,Bancroft Global Development,wikidata: name only,Q29075579 Bancroft Global Development (security consulting firms): bancroftglobal.org,a match by name alone is never automatic
-877,irs:300545486,Cuso International,wikidata: name only,Q5196227 Cuso International (organization): cusointernational.org,a match by name alone is never automatic
-882,irs:311602376,West Africa Rice Development Association,wikidata: name only,Q383924 Africa Rice Center (research center in Ivory Coast): africarice-fr.org africarice.org,a match by name alone is never automatic
 884,acnc:24266240291,Adventist Development and Relief Agency Australia Ltd,"one account, many organisations","BambooHR:adra (https://adra.bamboohr.com/jobs/view.php), website name",also matches 3 other organisation(s)
-895,irs:203171837,Muso Inc,wikidata: name only,Q115945658 Muso (): muso.co.jp,a match by name alone is never automatic
-906,irs:980459537,African Agricultural Technology Foundation,wikidata: name only,"Q30267805 African Agricultural Technology Foundation (nonprofit organization in Nairobi, Kenya): aatf-africa.org",a match by name alone is never automatic
 910,uk:1078808,The Calleva Foundation,wikidata: name only,"Q120982975 Calleva Foundation (nonprofit organization in London, United Kingdom): calleva.org",a match by name alone is never automatic
-911,irs:520887806,International Economic Development Council Inc,wikidata: name only,Q16849140 International Economic Development Council (organization): iedconline.org,a match by name alone is never automatic
-919,irs:330648658,Iris Global,wikidata: name only,"Q27983232 Iris Global (Christian organization headquartered in Redding, California): irisglobal.org",a match by name alone is never automatic
 940,acnc:32004260860,MAF International,"one account, many organisations","iCIMS:mafint (https://careers-mafint.icims.com/jobs/intro), website name",also matches 1 other organisation(s)
-941,irs:311682275,Surgical Eye Expeditions International Inc,wikidata: name only,Q7646204 Surgical Eye Expeditions International (organization): seeintl.org,a match by name alone is never automatic
-968,irs:830396815,Project Healthy Children Inc,wikidata: name only,Q25345630 Project Healthy Children (organization): projecthealthychildren.com,a match by name alone is never automatic
 976,uk:1044521,Oasis CARE and Training Agency,abbreviation only,"Workday:octa (https://wd1.myworkdaysite.com/recruiting/octa), acronym",abbreviation only
-980,irs:954703607,Golden West Humanitarian Foundation,wikidata: name only,Q5579967 Golden West Humanitarian Foundation (): goldenwesthf.org,a match by name alone is never automatic
-988,irs:371710848,Airlink Inc,wikidata: name only,Q11850211 Airlink (virtual airline in Finland): airlink.fi,a match by name alone is never automatic
-988,irs:371710848,Airlink Inc,wikidata: name only,Q408831 Airlink (Regional airline in South Africa): flyairlink.com,a match by name alone is never automatic
-997,irs:453545761,African Fertilizer and Agribusiness Partnership,wikidata: name only,"Q30271555 African Fertilizer and Agribusiness Partnership (company in Johannesburg, South Africa): afap-partnership.org",a match by name alone is never automatic
-1001,irs:522193529,Polish-American Freedom Foundation,wikidata: name only,Q11822918 Polish-American Freedom Foundation (): pafw.pl,a match by name alone is never automatic
 1012,acnc:67159574133,Cambridge English,abbreviation only,"Workday:ttc (https://ttc.wd1.myworkdayjobs.com/AUS1), acronym",abbreviation only
-1034,irs:954804581,Eden Reforestation Projects,wikidata: name only,Q25831295 Eden Reforestation Projects (non-governmental organization): edenprojects.org,a match by name alone is never automatic
-1061,irs:264599860,Global Peace Foundation,wikidata: name only,Q199208 Global Peace Foundation (organization): globalpeace.org,a match by name alone is never automatic
-1065,irs:334606570,Kennan Institute,wikidata: name only,"Q6389513 Kennan Institute for Advanced Russian Studies (institute for Russia studies, formerly for Sovietology): wilsoncenter.org",a match by name alone is never automatic
-1101,irs:452368993,New Incentives,wikidata: name only,Q106170968 New Incentives (Nigerian non-governmental organization): newincentives.org,a match by name alone is never automatic
 1105,iati:GB-CHC-1089490,Hope and Homes for Children,abbreviation only,"Taleo:hhccareers (https://hhccareers.taleo.net/robots.txt), acronym",abbreviation only
-1110,irs:261603676,Binaytara,wikidata: name only,"Q18210219 Binaytara (United States-based non-profit organization focused on cancer care, continuing medical education, and implementation science research in the fields of hematology and oncology): binaytara.org",a match by name alone is never automatic
-1159,cra:862732815RR0001,Tula Foundation,wikidata: name only,"Q36875299 Tula Foundation (nonprofit organization in Vancouver, Canada): tula.org",a match by name alone is never automatic
-1165,irs:464493359,Educate Girls,wikidata: name only,Q5340835 Educate Girls (educating girl child): educategirls.ngo,a match by name alone is never automatic
 1173,cra:106993926RR0001,Crossroads Christian Communications Incorporated,conflict,"BambooHR:crossroads140 (https://crossroads140.bamboohr.com/careers/36), website name",accounts in two or more systems
 1173,cra:106993926RR0001,Crossroads Christian Communications Incorporated,conflict,"Workday:crossroadstreatmentcenters (https://crossroadstreatmentcenters.wd1.myworkdayjobs.com/crossroads/job), website name",accounts in two or more systems
-1195,irs:521580447,African Economic Research Consortium Inc,wikidata: name only,"Q30267817 African Economic Research Consortium (nonprofit organization in Nairobi, Kenya): aercafrica.org",a match by name alone is never automatic
 1211,irs:530204608,Middle East Institute,wikidata: identifiers disagree,Q6841337 arabic.mei.edu; Q6841337 mei.edu,two or more websites
-1211,irs:530204608,Middle East Institute,wikidata: name only,Q6841337 Middle East Institute (UAE/Saudi-funded think tank based in the US): arabic.mei.edu mei.edu,a match by name alone is never automatic
-1222,irs:020539734,Women for Afghan Women Inc,wikidata: name only,Q8031390 Women for Afghan Women (): womenforafghanwomen.org,a match by name alone is never automatic
-1223,irs:042062394,Harvard-Yenching Institute,wikidata: name only,"Q175863 Harvard–Yenching Institute (organization in Cambridge, United States): harvard-yenching.org",a match by name alone is never automatic
-1264,irs:522318905,Development Gateway Inc,wikidata: name only,Q5266695 Development Gateway (organization): developmentgateway.org,a match by name alone is never automatic
-1305,irs:460771608,Insulin for Life USA Inc,wikidata: name only,Q16986471 Insulin for Life USA (organization): ifl-usa.org insulinforlife.org,a match by name alone is never automatic
-1310,cra:129892659RR0001,Community of Christ,wikidata: name only,Q625363 Community of Christ (second-largest denomination in the Latter Day Saint movement): cofchrist.org,a match by name alone is never automatic
-1320,irs:320503382,Kheyti Inc,wikidata: name only,Q112133464 Kheyti (Farming Product & Service by Cosmos Green): kheyti.com,a match by name alone is never automatic
-1322,irs:900653286,Israel Policy Forum Inc,wikidata: name only,Q6087138 Israel Policy Forum (American Jewish organization): israelpolicyforum.org,a match by name alone is never automatic
-1332,irs:954457939,Buddhist Tzu Chi Medical Foundation,wikidata: name only,Q10886762 Buddhist Tzu Chi Medical Foundation (hospital network in Taiwan): tzuchi.com.tw,a match by name alone is never automatic
-1332,irs:954457939,Buddhist Tzu Chi Medical Foundation,wikidata: name only,"Q30271023 Buddhist Tzu Chi Medical Foundation (nonprofit organization in South El Monte, United States): tzuchimedical.us",a match by name alone is never automatic
-1363,irs:822385660,Scholars at Risk Inc,wikidata: name only,Q7432067 Scholars at Risk (network supporting academic freedom): scholarsatrisk.org,a match by name alone is never automatic
-1366,irs:271337098,Article 19 Inc,wikidata: name only,"Q61933271 Article 19 (nonprofit organization in São Paulo, Brazil): artigo19.org",a match by name alone is never automatic
 1369,iati:GB-CHC-1115109,Women for Women International (UK),"one account, many organisations","BambooHR:womenforwomen (https://womenforwomen.bamboohr.com/jobs/view.php), website name",also matches 1 other organisation(s)
-1410,irs:200934525,Kepler Inc,wikidata: name only,Q139254909 Kepler (Artificial intelligence company building verifiable AI): kepler.ai,a match by name alone is never automatic
-1410,irs:200934525,Kepler Inc,wikidata: name only,"Q17061929 Kepler (nonprofit higher education program that operates a university campus in Kigali, Rwanda): kepler.org",a match by name alone is never automatic
-1410,irs:200934525,Kepler Inc,wikidata: name only,Q6393191 Kepler (Lua-based free software project): keplerproject.org,a match by name alone is never automatic
-1419,irs:814618222,Maisha Meds Inc,wikidata: name only,"Q30268142 Maisha Meds (healthcare organization in Kisumu, Kenya): maishameds.org",a match by name alone is never automatic
-1424,irs:474504533,Nudge Foundation,wikidata: name only,Q60741137 Nudge Foundation (Indian non-profit organization): thenudge.org,a match by name alone is never automatic
 1430,irs:521570071,International Campaign for Tibet,wikidata: identifiers disagree,Q1344041 liaowangxizang.net; Q1344041 savetibet.de; Q1344041 savetibet.eu; Q1344041 savetibet.org,two or more websites
-1430,irs:521570071,International Campaign for Tibet,wikidata: name only,Q1344041 International Campaign for Tibet (organization): liaowangxizang.net savetibet.de savetibet.eu savetibet.org,a match by name alone is never automatic
-1449,irs:953956136,Physicians for Social Responsibility Inc,wikidata: name only,Q7189668 Physicians for Social Responsibility (non-profit organization in the United States): psr.org,a match by name alone is never automatic
-1472,irs:562614329,Building Tomorrow Inc,wikidata: name only,Q4986512 Building Tomorrow (international social-profit organization): buildingtomorrow.org,a match by name alone is never automatic
-1481,irs:471624899,Fuente Latina Inc,wikidata: name only,Q28980455 Fuente Latina (News agency): fuentelatina.org,a match by name alone is never automatic
 1502,uk:1097682,RAHMA,abbreviation only,"Workday:mercy (https://mercy.wd1.myworkdayjobs.com/en-US/mercycareers), acronym",abbreviation only
-1526,irs:522094677,Alliance for Global Justice,wikidata: name only,Q129502246 Alliance for Global Justice (non-governmental organisation): afgj.org,a match by name alone is never automatic
 1536,cra:144489671RR0001,Les 7 Doigts de la Main,wikidata: identifiers disagree,Q3230365 7doigts.com; Q3230365 7fingers.com,two or more websites
-1572,cra:888780178RR0001,Canadian Aboriginal AIDS Network,wikidata: name only,"Q30284272 Canadian Aboriginal AIDS Network (nonprofit organization in Vancouver, Canada): caan.ca",a match by name alone is never automatic
 1596,iati:GB-CHC-1074937,ADRA-UK,"one account, many organisations","BambooHR:adra (https://adra.bamboohr.com/jobs/view.php), website name",also matches 3 other organisation(s)
 1646,uk:282336,Lonia Limited,wikidata: name only,Q124364344 Lonia (convenience store chain in Croatia): lonia.hr,a match by name alone is never automatic
-1660,cra:118948074RR0001,Grey Sisters of the Immaculate Conception,wikidata: name only,Q3977254 Grey Sisters of the Immaculate Conception (Roman Catholic religious congregation for women): greysisters.ca,a match by name alone is never automatic
-1670,oscr:SC035799,Gloag Foundation,wikidata: name only,"Q59536645 Gloag Foundation (nonprofit organization in Perth, United Kingdom): gloagfoundation.org.uk",a match by name alone is never automatic
 1717,acnc:61000488442,American Bureau Of Shipping,conflict,"Ashby:eagle (https://jobs.ashbyhq.com/eagle/b5dd7b60-24d5-4053-a753-463cf7140822), website name",accounts in two or more systems
 1717,acnc:61000488442,American Bureau Of Shipping,conflict,"Workday:fgcu (https://fgcu.wd5.myworkdayjobs.com/eaglejobs/job), website name",accounts in two or more systems
