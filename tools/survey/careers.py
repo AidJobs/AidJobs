@@ -159,6 +159,43 @@ INDEX_FIELDS = ["crawl", "site", "landing", "status", "redirect", "below_ok", "b
 TENANT_FIELDS = ["system", "tenant", "sites", "crawls", "captures", "example"]
 WIKIDATA_FIELDS = ["match", "value", "item", "label", "description", "website"]
 DECISION_FIELDS = ["action", "org_id", "value", "confidence", "reason"]
+WAVE_FIELDS = ["rank", "org_id", "name", "group", "unjobs_jobs", "income_usd", "website",
+               "step_e_guess", "step_e_confidence", "step_f_batch"]
+
+# The first wave of employers (the user's decision, 5 November 2026): everything on UNjobs outside
+# the UN system, and the 100 largest organisations by income; the UN system comes later. These
+# are the bodies on UNjobs' UN page that are not part of the UN system.
+OUTSIDE_UN_SYSTEM = {
+    "unjobs-un:107",     # World Bank Group
+    "unjobs-un:32",      # International Finance Corporation
+    "unjobs-un:35",      # International Monetary Fund
+    "unjobs-un:14",      # European Bank for Reconstruction and Development
+    "unjobs-un:30",      # Inter-American Development Bank
+    "unjobs-un:2",       # Asian Infrastructure Investment Bank
+    "unjobs-un:1",       # Asian Development Bank
+    "unjobs-un:41",      # Islamic Development Bank
+    "unjobs-un:4",       # African Development Bank
+    "unjobs-un:51",      # Nordic Investment Bank
+    "unjobs-nonun:468",  # The Global Fund
+    "unjobs-un:26",      # International Criminal Court
+    "unjobs-un:61",      # OSCE
+    "unjobs-un:55",      # OECD
+    "unjobs-un:66",      # Pacific Community
+    "unjobs-un:45",      # International Centre for Migration Policy Development
+    "unjobs-un:47",      # International Food Policy Research Institute
+    "unjobs-un:3",       # ASEAN
+    "unjobs-un:6",       # CABI
+    "unjobs-un:28",      # International Commission on Missing Persons
+    "unjobs-un:106",     # World Trade Organization
+    "unjobs-un:22",      # European Forest Institute
+    "unjobs-un:38",      # Inter-Parliamentary Union
+    "unjobs-un:46",      # International Development Law Organization
+    "unjobs-un:48",      # International Institute for Applied Systems Analysis
+    "unjobs-un:39",      # International Renewable Energy Agency
+    "unjobs-un:62",      # Organisation of Eastern Caribbean States
+}
+WAVE_INCOME_TOP = 100   # the largest organisations of the income tier in the first wave
+STEP_F_FIRST = (150, 50)  # step F's first batch: the first wave's top by jobs, and by income
 
 # Wikidata properties for the identifiers the survey holds (checked on 5 November 2026).
 WD_PROPS = {
@@ -1103,10 +1140,62 @@ def build(_args=None, survey: Path = SURVEY) -> int:
     _write(survey / "careers-candidates.csv", CANDIDATE_FIELDS, rows)
     _write(survey / "careers-review.csv", REVIEW_FIELDS, review)
     _write(survey / "websites-filled.csv", WEBSITE_FIELDS, filled)
+    wave = first_wave(orgs, rows, websites)
+    _write(survey / "first-wave.csv", WAVE_FIELDS, wave)
     for top in (SEARCH_TOP, len(orgs)):
         print(f"top {top}: " + coverage(orgs[:top], rows, websites))
+    wave_ids = {w["org_id"] for w in wave}
+    print(f"first wave {len(wave)} ({dict(Counter(w['group'] for w in wave))}); step F batch 1: "
+          f"{sum(1 for w in wave if w['step_f_batch'] == 1)}; "
+          + coverage([o for o in orgs if o["org_id"] in wave_ids], rows, websites))
     print(f"websites filled: {sum(1 for f in filled if f['website'])}; review rows: {len(review)}")
     return 0
+
+
+def wave_group(org) -> str:
+    """The organisation's first-wave group, or '' for the UN system (a later wave)."""
+    kinds = {k.strip() for k in org["kind"].split(";")}
+    if org["org_id"] in OUTSIDE_UN_SYSTEM:
+        return "development bank, fund or other international body"
+    if org.get("family") == UN_FAMILY or kinds & {"un-or-intergovernmental",
+                                                   "un-secretariat (likely)"}:
+        return ""
+    if org["evidence"] != "hiring (UNjobs)":
+        return ""
+    if "non-un" in kinds:
+        return "NGO, INGO, consultancy or foundation"
+    if kinds & {"intergovernmental", "government agency"}:
+        return "development agency or intergovernmental body"
+    return ""
+
+
+def first_wave(orgs, rows, websites) -> list[dict]:
+    """The first wave in rank order, with step E's best guess and step F's batch."""
+    best = {}
+    for r in rows:
+        best.setdefault(r["org_id"], r)
+    income = [o for o in orgs if o["evidence"] == "income"][:WAVE_INCOME_TOP]
+    income_ids = {o["org_id"] for o in income}
+    by_jobs, by_income = STEP_F_FIRST
+    out, hiring_seen, income_seen = [], 0, 0
+    for o in orgs:
+        group = wave_group(o) or ("INGO member or funder (by income)"
+                                  if o["org_id"] in income_ids else "")
+        if not group:
+            continue
+        if o["org_id"] in income_ids:
+            income_seen += 1
+            batch = 1 if income_seen <= by_income else 2
+        else:
+            hiring_seen += 1
+            batch = 1 if hiring_seen <= by_jobs else 2
+        guess = best.get(o["org_id"], {})
+        out.append({"rank": o["rank"], "org_id": o["org_id"], "name": o["name"], "group": group,
+                    "unjobs_jobs": o["unjobs_jobs"], "income_usd": o["income_usd"],
+                    "website": websites.get(o["org_id"], ""),
+                    "step_e_guess": guess.get("candidate_url", ""),
+                    "step_e_confidence": guess.get("confidence", ""), "step_f_batch": batch})
+    return out
 
 
 def coverage(orgs, rows, websites) -> str:

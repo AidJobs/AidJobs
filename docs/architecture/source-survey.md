@@ -1,6 +1,6 @@
 # Employer survey (W-31)
 
-**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) in progress since 5 November 2026 (below). The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
+**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) done on 5 November 2026 as a snapshot, and the first wave of employers decided the same day (below); step F's plan comes next. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
 
 ## Purpose
 
@@ -45,7 +45,7 @@ Each step needs the user's approval. Employers' own sites are first contacted in
 | C | ReliefWeb: organisations, websites, job counts per organisation (a few dozen requests) | ReliefWeb's API, with the user's `appname` |
 | D | Duplicate removal and ranking: website domain, then IATI ID, then cleaned name and acronym; uncertain matches to a review list for the user, nothing merged automatically; ranked by hiring evidence, then income | None |
 | E | Likely careers pages and recruitment systems, from Common Crawl's public URL index (per domain, and by recruitment-system host patterns) and the agent's web search for the top unresolved organisations | Common Crawl's index files, one request every 10 seconds (the user's decision of 5 November 2026); Wikidata's query service (in progress, below) |
-| F | Confirmation, at most two spaced requests per organisation (`robots.txt`, then the careers page or the vendor's documented public job API), in batches such as the top 300 | Employers' sites: its own approval |
+| F | Confirmation, at most two spaced requests per organisation (`robots.txt`, then the careers page or the vendor's documented public job API), in batches: first the 200 of the first wave's batch 1 (below) | Employers' sites: its own approval |
 | G | Output: careers sites grouped by recruitment system, ranked by jobs covered, with keyword families and each system's fields and reuse terms; the master CSV; the ledger | None |
 
 Scripts for steps B to F go in a new `tools/survey/` folder that the backend never imports, run on the user's machine (Python 3.11). Raw downloads stay in a git-ignored folder; only cleaned results are committed.
@@ -124,7 +124,7 @@ Plan approved by the user on 4 November 2026, after asking how thorough it was a
 
 ## Likely careers pages and recruitment systems (step E)
 
-**In progress: paused for the day on 5 November 2026**, when Common Crawl refused two requests in a row (below). The committed outputs are a snapshot from part of the index and are rebuilt when the download finishes; the figures below are that snapshot's.
+**Done as a snapshot on 5 November 2026 (the user's decision).** Common Crawl refused too often to read every website in reasonable time (below), and step F checks each careers page directly and faster, so the download stops here: the committed outputs and the figures below are from part of the index (81 websites and all 16 systems), and serve as step F's starting guesses. The user wants live jobs sooner, from the employers most likely to pay to advertise; the first wave (next section) narrows the work to them.
 
 Plan approved by the user on 5 November 2026 (the recommended choices). `tools/survey/careers.py` has three commands: `download`, run on the user's machine; `extract`, which turns the raw downloads into a small committed extract (no network); and `build`, which turns the committed files into the outputs (no network; CI runs it and fails if the committed outputs differ). No employer's website and no recruitment system's page is contacted; that is step F. Scope: the 1,724 ranked organisations (hiring evidence or income).
 
@@ -154,11 +154,31 @@ The 96 without a website are the 36 UN Secretariat offices and the 60 the search
 Across all 1,724, 266 organisations have a candidate; their best guesses: BambooHR 59 (26 high), own site with the system not yet known 53, `careers.un.org` 44, Workable 28 (13 high), Greenhouse 21 (12 high), Workday 19, iCIMS 12, SmartRecruiters 8, Personio 5, Jobvite 4, Recruitee and Taleo 3 each, Teamtailor 2, Avature, Lever, Pinpoint, Zoho Recruit and Ashby 1 each. So 17 of the 30 systems the tool recognises have been seen so far. The other 13 (Oracle, SuccessFactors, UKG, Cornerstone and others) are found only when an organisation's own careers page redirects to them, and none of the 81 sites read so far has shown such a redirect yet; expect them among the large agencies once more sites are read. Careers pages on organisations' own sites: 56 organisations, 39 of them answered when Common Crawl captured them. The UN Secretariat offices are not yet high confidence because `un.org` is not read yet. None of this is confirmed and nothing is monitored: the candidates come from Common Crawl's index and name matching only; step F confirms them, and the crawler reads a site only after it is added through the add-source flow. Of the 38 top-600 organisations without a website, 36 are UN Secretariat offices that hire through `careers.un.org`, and 2 have none: SALT International (UNjobs' listing appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled) and The CH Foundation (UK), a grant-maker with no website.
 
 **Unresolved:**
-- 1,513 websites not yet read from the index (478 of them the top 600's); at one request every 10 seconds and with Common Crawl's refusals, several more days. **The user decided on 5 November 2026:** if the first run on 6 November again stops within minutes, read only the top 600's websites (`download sites --top 600`); step F finds the other organisations' careers pages when it contacts their sites.
+- 1,513 websites not read from the index. The user first decided (5 November 2026) to read only the top 600's if Common Crawl kept refusing (`download sites --top 600`, kept in the tool), then, the same evening, to stop the download and go to step F for the first wave.
 - 31 review rows below rank 600 (none in the top 600).
 - Found by the search to be outside the target or doubtful, for step G: in the top 600, Albo (a Mexican fintech company), CitizenLab (renamed Go Vocal, civic software), Sunflower Services (back-office services for US nonprofits), GoodPower (US renewable-energy advocacy, formerly the Alliance for Climate Education), and Land O'Lakes Venture37 (stopped work on 30 June 2026; its US registration, rank 833, is a duplicate step D missed). Below the top 600, 114 of the 382 searched are marked "OUTSIDE" in their decision's reason: family and grant-making foundations, synagogue, church and religious-order bodies, schools and universities' fundraising arms, local US and Canadian services, and companies. Step D reviewed the income tier by hand only down to its 300th; these are left in the ranking for the user's decision rather than excluded in step E. 14 were renamed and 2 closed (Venture37; Ne'eman Foundation Canada, whose charity status was revoked).
 
 **What step F must confirm:** every candidate is likely, not confirmed. For each organisation: that the page is its current careers page and lists jobs; which recruitment system it uses (most own-site candidates show none); that an accepted account is the organisation's own, above all those of low confidence and those matched by an abbreviation; the websites from the search (unverified); and, where an organisation has accounts in two systems, which one is current.
+
+## The first wave of employers (the user's decision, 5 November 2026)
+
+The survey was taking longer than expected, and the user wants live jobs sooner. The user's reasoning: UN agencies hardly pay to publish jobs online, so the site should not be filled with UN jobs first; it should first focus on international NGOs, international development agencies, and a mix of NGOs and other organisations, including funders and multilateral agencies; UN jobs can come later. The agent agreed, adding that crawled jobs bring the job seekers who make employers willing to pay, and that UN jobs are the strongest draw for job seekers in this sector and cheap to add later (one reader for `careers.un.org` covers 44 offices).
+
+**Decided by the user** (the agent's recommended options): the first wave is every organisation on UNjobs outside the UN system, and the 100 largest organisations by income; development banks are in the first wave; the UN system (its agencies, funds, programmes and related bodies on UNjobs' UN page, and the UN Secretariat's offices) comes in a later wave; UNICEF, already live, stays as it is. Step E stops as a snapshot, and step F starts with the first wave.
+
+`careers.py build` writes `source-survey/first-wave.csv` (CI checks it), in rank order, with each organisation's group, UNjobs jobs, income, website, step E's best guess and its step F batch:
+
+| Group | Organisations | UNjobs jobs |
+| --- | --- | --- |
+| NGOs, INGOs, consultancies and foundations on UNjobs | 399 | 5,630 |
+| Development banks, funds and other international bodies outside the UN system, on UNjobs' UN page (World Bank Group, IFC, IMF, EBRD, the Inter-American, Asian, Islamic, African and Nordic development banks, AIIB, the Global Fund, OSCE, OECD, the International Criminal Court, the Pacific Community and 12 more) | 27 | 384 |
+| Government development agencies and other intergovernmental bodies on UNjobs (GIZ, AFD, KfW, EIB, Sida, Enabel, the Green Climate Fund and others) | 29 | 230 |
+| INGO members and funders, the 100 largest by income (Gavi, World Vision US, Canada and Australia, CARE USA, Save the Children US and UK, MSF USA, Red Cross societies and others) | 100 | none (income only) |
+| **First wave** | **555** | **6,244** |
+
+US Fund for UNICEF and the United Nations Foundation are NGOs, not part of the UN system, and stay in the first wave. The top of the income tier includes medicine-donation charities (MAP International, Matthew 25 Ministries, Kingsway Charities) whose income is mostly donated goods; step F will show which of the 100 hire. Later wave: 40 UN-system organisations and the 44 UN Secretariat offices, 1,674 UNjobs jobs.
+
+**Step F's first batch: 200 organisations**, the first wave's 150 with the most UNjobs jobs (129 NGOs and INGOs, 13 development banks and international bodies, 8 development agencies; 5,255 jobs, 84% of the first wave's) and its 50 largest by income. Step E has a guess for 85 of them. Three first-wave organisations have no website (SALT International, The CH Foundation (UK), Moral Arc Foundation). Step F's plan, with its own approval, comes next; it then gives the list grouped by recruitment system and ranked by jobs, which orders the crawler's readers.
 
 ## Sources
 

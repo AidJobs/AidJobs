@@ -290,6 +290,28 @@ def test_sites_are_read_best_rank_first_and_can_stop_at_a_rank(tmp_path):
     assert careers.sites_to_read(tmp_path, top=2) == ["a-aid.org", "b-aid.org"]
 
 
+def test_the_first_wave_leaves_the_un_system_for_later(tmp_path, monkeypatch):
+    monkeypatch.setattr(careers, "STEP_F_FIRST", (1, 1))
+    monkeypatch.setattr(careers, "WAVE_INCOME_TOP", 2)
+
+    def hiring(oid, kind, rank, family=""):
+        return {**org(oid, oid, rank=rank), "evidence": "hiring (UNjobs)", "kind": kind,
+                "family": family}
+    orgs = [hiring("unjobs-un:23", "un-or-intergovernmental", 1),     # FAO: later
+            hiring("unjobs-un:107", "un-or-intergovernmental", 2),    # World Bank: first
+            hiring("unjobs-nonun:1", "NTEE Q33; non-un", 3),
+            hiring("unjobs-un:9", "un-secretariat (likely)", 4, careers.UN_FAMILY),
+            hiring("unjobs-nonun:2", "government agency", 5),
+            org("irs:1", "Big Charity", rank=6), org("irs:2", "Next Charity", rank=7),
+            org("irs:3", "Small Charity", rank=8)]
+    build(tmp_path, orgs)
+    wave = careers.read_csv(tmp_path / "first-wave.csv")
+    assert [(w["org_id"], w["step_f_batch"]) for w in wave] == [
+        ("unjobs-un:107", "1"), ("unjobs-nonun:1", "2"), ("unjobs-nonun:2", "2"),
+        ("irs:1", "1"), ("irs:2", "2")]
+    assert wave[0]["group"] == "development bank, fund or other international body"
+
+
 def test_identifiers_are_written_as_wikidata_writes_them():
     assert careers.identifiers(org("a", "x", sources="irs:135660870; uk:1047501; oscr:sc012345")) \
         == [("irs", "13-5660870"), ("uk", "1047501"), ("oscr", "SC012345")]

@@ -194,7 +194,7 @@ jobs:
           ruff check tools/survey/careers.py tools/survey/test_careers.py
           python -m pytest tools/survey/test_careers.py -q -p no:cacheprovider
           python tools/survey/careers.py build
-          git diff --exit-code -- docs/architecture/source-survey/careers-candidates.csv docs/architecture/source-survey/careers-review.csv docs/architecture/source-survey/websites-filled.csv
+          git diff --exit-code -- docs/architecture/source-survey/careers-candidates.csv docs/architecture/source-survey/careers-review.csv docs/architecture/source-survey/websites-filled.csv docs/architecture/source-survey/first-wave.csv
 
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
