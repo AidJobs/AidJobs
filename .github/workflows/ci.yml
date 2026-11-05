@@ -131,6 +131,18 @@ jobs:
           python tools/survey/dedupe.py
           git diff --exit-code -- docs/architecture/source-survey/organisations.csv docs/architecture/source-survey/step-d-review.csv
 
+      # The employer survey's step E: its tests, and the committed careers candidates, review list
+      # and filled websites must be exactly what the committed extract and decisions produce (no
+      # network: the download and the extract run only on the user's machine).
+      - name: Survey step E
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: .
+        run: |
+          ruff check tools/survey/careers.py tools/survey/test_careers.py
+          python -m pytest tools/survey/test_careers.py -q -p no:cacheprovider
+          python tools/survey/careers.py build
+          git diff --exit-code -- docs/architecture/source-survey/careers-candidates.csv docs/architecture/source-survey/careers-review.csv docs/architecture/source-survey/websites-filled.csv
+
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
