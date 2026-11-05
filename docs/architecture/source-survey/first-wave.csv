@@ -1,0 +1,552 @@
+rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confidence,step_f_batch
+1,seed:1,International Rescue Committee,"NGO, INGO, consultancy or foundation",671,1314041795,rescue.org,https://www.rescue.org/jobs-syria,high,1
+2,seed:8,Prosper Global (formerly Mercy Corps),"NGO, INGO, consultancy or foundation",234,376251780,prosperglobal.org,https://netherlands.prosperglobal.org/careers,high,1
+4,unjobs-nonun:341,Médecins Sans Frontières,"NGO, INGO, consultancy or foundation",197,,msf.org,https://msf.wd3.myworkdayjobs.com/work-with-msf-ocg-hq-lhs,medium,1
+7,unjobs-nonun:290,International Potato Center,"NGO, INGO, consultancy or foundation",145,61898141,cipotato.org,https://cipotato.org/jobs,high,1
+10,unjobs-nonun:520,World Wildlife Fund,"NGO, INGO, consultancy or foundation",100,,wwf.org,https://jobs.smartrecruiters.com/worldwildlifefundinc1,high,1
+11,unjobs-nonun:3,ACF International,"NGO, INGO, consultancy or foundation",93,,actioncontrelafaim.org,https://recrutement.actioncontrelafaim.org/travailler-avec-nous,medium,1
+12,unjobs-nonun:287,International Medical Corps,"NGO, INGO, consultancy or foundation",91,235323065,internationalmedicalcorps.org,,,1
+13,unjobs-nonun:463,TechnoServe,"NGO, INGO, consultancy or foundation",87,122123118,technoserve.org,https://www.technoserve.org/join-the-mission/careers-old,medium,1
+14,seed:11,Save the Children International,"NGO, INGO, consultancy or foundation",80,1221112378,savethechildren.net,,,1
+15,seed:7,Clinton Health Access Initiative,"NGO, INGO, consultancy or foundation",80,246122771,clintonhealthaccess.org,,,1
+16,unjobs-nonun:426,Room to Read,"NGO, INGO, consultancy or foundation",80,,roomtoread.org,https://osv-rtr.wd5.myworkdayjobs.com/RoomToRead,high,1
+19,seed:10,Danish Refugee Council,"NGO, INGO, consultancy or foundation",75,,drc.ngo,,,1
+20,unjobs-nonun:378,Palladium Group,"NGO, INGO, consultancy or foundation",73,,thepalladiumgroup.com,,,1
+21,unjobs-nonun:300,Islamic Relief,"NGO, INGO, consultancy or foundation",67,305464393,islamic-relief.org.uk,,,1
+22,unjobs-nonun:390,Plan International,"NGO, INGO, consultancy or foundation",63,779465250,plan-international.org,https://jobs.plan-international.org/,high,1
+23,unjobs-un:26,International Criminal Court,development bank or other international body (UN page),62,,icc-cpi.int,https://www.icc-cpi.int/jobs,medium,1
+24,seed:9,Norwegian Refugee Council,"NGO, INGO, consultancy or foundation",61,,nrc.no,,,1
+25,unjobs-nonun:368,One Acre Fund,"NGO, INGO, consultancy or foundation",58,351753463,oneacrefund.org,https://job-boards.greenhouse.io/oneacrefund,high,1
+26,unjobs-nonun:304,Jhpiego,"NGO, INGO, consultancy or foundation",58,,jhpiego.org,https://jhpiego.org/work-with-us,high,1
+28,unjobs-un:107,World Bank Group,development bank or other international body (UN page),58,,worldbank.org,,,1
+29,unjobs-nonun:180,FHI 360,"NGO, INGO, consultancy or foundation",57,539608705,fhi360.org,https://iwl.fhi360.org/careers-in-trade-ebook-viewer,high,1
+30,unjobs-nonun:418,Relief International,"NGO, INGO, consultancy or foundation",57,66127909,ri.org,https://www.ri.org/work-with-us,high,1
+31,unjobs-nonun:247,International Committee of the Red Cross,"NGO, INGO, consultancy or foundation",52,2299493810,icrc.org,https://careers.icrc.org/,high,1
+32,unjobs-nonun:448,Solidarités International,"NGO, INGO, consultancy or foundation",52,,solidarites.org,https://www.solidarites.org/en/since-1980/join-us,medium,1
+33,unjobs-nonun:125,DT Global,"NGO, INGO, consultancy or foundation",51,,dt-global.com,,,1
+35,unjobs-nonun:483,United States Pharmacopeial Convention,"NGO, INGO, consultancy or foundation",50,,usp.org,,,1
+36,unjobs-nonun:285,International Maize and Wheat Improvement Center,"NGO, INGO, consultancy or foundation",49,220531073,cimmyt.org,https://apply.workable.com/cimmyt-1/,medium,1
+37,unjobs-un:14,European Bank for Reconstruction and Development,development bank or other international body (UN page),49,,ebrd.com,https://jobs.ebrd.com/,high,1
+38,unjobs-nonun:252,IMPACT Initiatives,"NGO, INGO, consultancy or foundation",48,,impact-initiatives.org,https://www.impact-initiatives.org/work-with-us,low,1
+39,unjobs-nonun:257,Impact Investment Exchange,"NGO, INGO, consultancy or foundation",48,,iixglobal.com,,,1
+40,unjobs-nonun:74,Catholic Relief Services,"NGO, INGO, consultancy or foundation",45,,crs.org,https://crsafgjobs.crs.org/job.php,high,1
+41,unjobs-un:61,Organization for Security and Co-operation in Europe,development bank or other international body (UN page),44,,osce.org,https://jobs.osce.org/,high,1
+42,unjobs-nonun:115,Corus International,"NGO, INGO, consultancy or foundation",43,,corusinternational.org,,,1
+43,seed:12,Innovations for Poverty Action,"NGO, INGO, consultancy or foundation",43,,poverty-action.org,https://poverty-action.org/job,low,1
+44,unjobs-nonun:107,Committed To Good,"NGO, INGO, consultancy or foundation",42,,ctg.org,,,1
+46,unjobs-nonun:477,U.S. Committee for Refugees and Immigrants,"NGO, INGO, consultancy or foundation",39,,refugees.org,,,1
+47,seed:2,PATH,"NGO, INGO, consultancy or foundation",38,321942685,path.org,https://www.path.org/who-we-are/careers,high,1
+48,unjobs-nonun:342,Médecins du Monde,"NGO, INGO, consultancy or foundation",38,,medecinsdumonde.org,https://www.medecinsdumonde.org/nous-rejoindre,high,1
+50,unjobs-nonun:347,Nature Conservancy,"NGO, INGO, consultancy or foundation",37,,nature.org,https://nature.wd108.myworkdayjobs.com/ExternalCareers,medium,1
+51,unjobs-nonun:179,Evidence Action,"NGO, INGO, consultancy or foundation",35,36213681,evidenceaction.org,https://apply.workable.com/evidence-action/,medium,1
+52,unjobs-nonun:431,SCS Global Services,"NGO, INGO, consultancy or foundation",35,,scsglobalservices.com,,,1
+54,unjobs-nonun:283,International Institute of Tropical Agriculture,"NGO, INGO, consultancy or foundation",33,115116000,iita.org,https://apply.workable.com/iita/,low,1
+55,unjobs-nonun:15,Aga Khan Development Network,"NGO, INGO, consultancy or foundation",33,,the.akdn,https://the.akdn/careers,low,1
+56,unjobs-nonun:172,European External Action Service,development agency or intergovernmental body,33,,eeas.europa.eu,https://www.eeas.europa.eu/eeas/vacancies_de,high,1
+58,unjobs-nonun:136,Deutsche Gesellschaft für Internationale Zusammenarbeit,development agency or intergovernmental body,32,,giz.de,https://jobs.giz.de/,high,1
+60,unjobs-nonun:382,Partners In Health,"NGO, INGO, consultancy or foundation",30,,pih.org,https://jobs.jobvite.com/pih,low,1
+62,unjobs-nonun:230,HIAS,"NGO, INGO, consultancy or foundation",29,107582793,hias.org,https://hias.org/events/employment-authorization-102-maintaining-ead-continuity-afghan-clients,high,1
+63,unjobs-nonun:156,Elizabeth Glaser Pediatric AIDS Foundation,"NGO, INGO, consultancy or foundation",29,,pedaids.org,https://jobs.smartrecruiters.com/elizabethglaserpediatricaidsfoundation3,high,1
+64,seed:3,GiveDirectly,"NGO, INGO, consultancy or foundation",29,,givedirectly.org,https://job-boards.greenhouse.io/givedirectly,high,1
+65,unjobs-nonun:16,Agence Française de Développement,development agency or intergovernmental body,28,,afd.fr,https://metis.afd.fr/en/join-us,high,1
+67,unjobs-nonun:409,RTI International,"NGO, INGO, consultancy or foundation",28,,rti.org,https://www.rti.org/publication/recruitment-strategies-integration-mobile-health-sickle-cell-disease-care-increase-hydroxyurea-utili,high,1
+68,unjobs-nonun:394,Pro Mujer,"NGO, INGO, consultancy or foundation",27,66652586,promujer.org,,,1
+69,unjobs-nonun:36,Ayuda en Acción,"NGO, INGO, consultancy or foundation",27,,ayudaenaccion.org,,,1
+70,unjobs-nonun:12,Africa50,"NGO, INGO, consultancy or foundation",26,,africa50.com,,,1
+72,unjobs-nonun:404,Qatar Foundation,"NGO, INGO, consultancy or foundation",26,,qf.org.qa,,,1
+74,unjobs-nonun:94,ChildFund International,"NGO, INGO, consultancy or foundation",25,210435038,childfund.org,https://www.childfund.org/stories/2026/job-readiness-without-market-alignment-wont-deliver-impact,medium,1
+75,unjobs-nonun:509,Winrock International,"NGO, INGO, consultancy or foundation",25,119231319,winrock.org,https://wallacecenter.winrock.org/careers,high,1
+76,unjobs-nonun:289,International Planned Parenthood Federation,"NGO, INGO, consultancy or foundation",24,156866734,ippf.org,https://w03.ippf.org/jobs-and-opportunities,medium,1
+77,unjobs-nonun:406,RAND Corporation,"NGO, INGO, consultancy or foundation",24,,rand.org,https://rand.wd5.myworkdayjobs.com/External_Career_Site,medium,1
+78,unjobs-nonun:96,Church World Service,"NGO, INGO, consultancy or foundation",23,279865803,churchworldservice.org,https://careers-cwsglobal.icims.com/jobs,medium,1
+79,unjobs-nonun:242,Humanity and Inclusion,"NGO, INGO, consultancy or foundation",23,,hi.org,https://www.hi.org/en/jobs,high,1
+80,unjobs-nonun:322,Management Sciences for Health,"NGO, INGO, consultancy or foundation",22,131769559,msh.org,https://msh.org/work-with-us,high,1
+81,unjobs-nonun:214,Global Green Growth Institute,development agency or intergovernmental body,22,,gggi.org,https://gggi.org/who-we-are/careers,high,1
+82,unjobs-nonun:349,Navanti,"NGO, INGO, consultancy or foundation",22,,navantigroup.com,,,1
+83,unjobs-nonun:39,BURN Manufacturing,"NGO, INGO, consultancy or foundation",21,,burnstoves.com,,,1
+84,unjobs-nonun:506,Wildlife Conservation Society,"NGO, INGO, consultancy or foundation",21,,wcs.org,https://www.wcs.org/about-us/careers,medium,1
+85,unjobs-nonun:299,Ipas,"NGO, INGO, consultancy or foundation",20,55616322,ipas.org,https://ipas.wd5.myworkdayjobs.com/Ipas,medium,1
+86,unjobs-nonun:13,African Parks,"NGO, INGO, consultancy or foundation",20,,africanparks.org,,,1
+87,unjobs-nonun:35,Athena Infonomics,"NGO, INGO, consultancy or foundation",20,,athenainfonomics.com,,,1
+88,unjobs-nonun:66,CRDF Global,"NGO, INGO, consultancy or foundation",20,,crdfglobal.org,,,1
+89,unjobs-nonun:387,People in Need,"NGO, INGO, consultancy or foundation",20,,peopleinneed.net,https://career.peopleinneed.net/,high,1
+90,unjobs-nonun:17,Agency for Technical Cooperation and Development,"NGO, INGO, consultancy or foundation",19,,acted.org,,,1
+91,unjobs-nonun:47,Bill and Melinda Gates Foundation,"NGO, INGO, consultancy or foundation",19,,gatesfoundation.org,https://www.gatesfoundation.org/about/careers,high,1
+92,unjobs-nonun:48,Bioversity International,"NGO, INGO, consultancy or foundation",19,,bioversityinternational.org,,,1
+93,unjobs-nonun:61,CARE,"NGO, INGO, consultancy or foundation",19,,care-international.org,https://job-boards.greenhouse.io/careportalinc,medium,1
+94,unjobs-nonun:134,Democracy International,"NGO, INGO, consultancy or foundation",19,,democracyinternational.com,,,1
+95,unjobs-nonun:259,Institut Pasteur,"NGO, INGO, consultancy or foundation",19,,pasteur.fr,https://emploi.pasteur.fr/,medium,1
+96,unjobs-nonun:332,MicroSave Consulting,"NGO, INGO, consultancy or foundation",19,,microsave.net,,,1
+97,unjobs-nonun:389,Pew Charitable Trusts,"NGO, INGO, consultancy or foundation",19,,pewtrusts.org,https://pewtrusts.wd5.myworkdayjobs.com/TrustsExternal,medium,1
+98,unjobs-nonun:118,Council on Foreign Relations,"NGO, INGO, consultancy or foundation",18,99083520,cfr.org,https://www.cfr.org/career-opportunities,medium,1
+99,unjobs-nonun:84,Center for Strategic and International Studies,"NGO, INGO, consultancy or foundation",18,50281330,csis.org,https://www.csis.org/about/careers-culture,high,1
+100,unjobs-nonun:249,IDinsight,"NGO, INGO, consultancy or foundation",18,17272759,idinsight.org,https://idinsight.bamboohr.com/,high,1
+101,unjobs-nonun:50,Bixal,"NGO, INGO, consultancy or foundation",18,,bixal.com,,,1
+102,unjobs-nonun:113,Conservation International,"NGO, INGO, consultancy or foundation",18,,conservation.org,https://samoa.conservation.org/vacancies,high,1
+103,unjobs-nonun:220,Global Refuge,"NGO, INGO, consultancy or foundation",18,,globalrefuge.org,,,1
+104,unjobs-un:30,Inter-American Development Bank,development bank or other international body (UN page),18,,iadb.org,https://jobs.iadb.org/,high,1
+105,unjobs-nonun:402,Pure Earth,"NGO, INGO, consultancy or foundation",18,,pureearth.org,,,1
+106,unjobs-nonun:468,"The Global Fund - to Fight AIDS, TB, and Malaria",development bank or other international body (UN page),18,,theglobalfund.org,https://theglobalfund.wd1.myworkdayjobs.com/External,medium,1
+107,unjobs-un:2,Asian Infrastructure Investment Bank,development bank or other international body (UN page),17,,aiib.org,https://www.aiib.org/en/opportunities/career,medium,1
+108,unjobs-nonun:64,CLEAR Global,"NGO, INGO, consultancy or foundation",17,,clearglobal.org,,,1
+109,unjobs-nonun:333,Milken Institute,"NGO, INGO, consultancy or foundation",17,,milkeninstitute.org,https://milkeninstitute.org/about/careers,high,1
+110,unjobs-nonun:393,Première Urgence Internationale,"NGO, INGO, consultancy or foundation",17,,premiere-urgence.org,,,1
+112,unjobs-nonun:522,ZemiTek,"NGO, INGO, consultancy or foundation",17,,zemitek.com,https://careers-zemitek.icims.com/jobs,medium,1
+113,unjobs-nonun:254,IREX International,"NGO, INGO, consultancy or foundation",16,146620152,irex.org,,,1
+114,unjobs-nonun:496,War Child,"NGO, INGO, consultancy or foundation",16,25346001,warchild.org.uk,,,1
+115,unjobs-nonun:275,International Executive Service Corps,"NGO, INGO, consultancy or foundation",16,,iesc.org,,,1
+116,unjobs-un:55,Organisation for Economic Co-operation and Development,development bank or other international body (UN page),16,,oecd.org,https://jobs.smartrecruiters.com/oecd,low,1
+118,unjobs-nonun:454,Street Child,"NGO, INGO, consultancy or foundation",15,28446137,street-child.org,https://apply.workable.com/streetchildcareers/,high,1
+119,unjobs-nonun:391,Precision Development,"NGO, INGO, consultancy or foundation",15,9120743,precisiondev.org,https://precisiondev.bamboohr.com/,medium,1
+120,unjobs-nonun:63,CDP Worldwide,"NGO, INGO, consultancy or foundation",15,,cdp.net,https://cdpworldwide.teamtailor.com/,high,1
+121,unjobs-nonun:100,Clean Air Asia,"NGO, INGO, consultancy or foundation",15,,cleanairasia.org,,,1
+123,unjobs-nonun:174,European Investment Bank,development agency or intergovernmental body,15,,eib.org,,,1
+124,unjobs-nonun:195,Foundation for Innovative New Diagnostic,"NGO, INGO, consultancy or foundation",15,,finddx.org,,,1
+125,unjobs-nonun:206,GiveWell,"NGO, INGO, consultancy or foundation",15,,givewell.org,https://job-boards.greenhouse.io/givewell,high,1
+126,unjobs-nonun:261,Institute for Essential Services Reform,"NGO, INGO, consultancy or foundation",15,,iesr.or.id,,,1
+128,unjobs-un:1,Asian Development Bank,development bank or other international body (UN page),14,,adb.org,https://adb.taleo.net/,medium,1
+129,unjobs-nonun:104,Clinton Foundation,"NGO, INGO, consultancy or foundation",14,,clintonfoundation.org,https://job-boards.greenhouse.io/clintonfoundation,medium,1
+130,unjobs-nonun:215,Global Health Advocacy Incubator,"NGO, INGO, consultancy or foundation",14,,advocacyincubator.org,,,1
+132,unjobs-nonun:346,Natural Resources Defense Council,"NGO, INGO, consultancy or foundation",14,,nrdc.org,https://careers-nrdc.icims.com/jobs,low,1
+133,unjobs-un:66,Secretariat of the Pacific Community,development bank or other international body (UN page),14,,spc.int,,,1
+134,unjobs-nonun:456,Swaniti Initiative,"NGO, INGO, consultancy or foundation",14,,swaniti.com,,,1
+135,unjobs-nonun:519,World Resources Institute,"NGO, INGO, consultancy or foundation",13,213044770,wri.org,https://wri.wd501.myworkdayjobs.com/WRI_India,medium,1
+136,unjobs-nonun:127,DanChurchAid,"NGO, INGO, consultancy or foundation",13,,danchurchaid.org,,,1
+137,unjobs-un:41,Islamic Development Bank,development bank or other international body (UN page),13,,isdb.org,,,1
+138,unjobs-nonun:312,Landscape Alliance (CIFOR and ICRAF),"NGO, INGO, consultancy or foundation",13,,landscapealliance.org,,,1
+139,unjobs-nonun:313,Last Mile Health,"NGO, INGO, consultancy or foundation",13,,lastmilehealth.org,,,1
+140,unjobs-nonun:337,Miyamoto International,"NGO, INGO, consultancy or foundation",13,,miyamotointernational.com,,,1
+141,unjobs-nonun:434,SNV Netherlands Development Organisation,"NGO, INGO, consultancy or foundation",13,,snv.org,,,1
+142,unjobs-nonun:464,Technopolis Group,"NGO, INGO, consultancy or foundation",13,,technopolis-group.com,https://technopolis-group.jobs.personio.com/,high,1
+143,unjobs-nonun:475,Triggerise,"NGO, INGO, consultancy or foundation",13,,tiko.org,https://triggerise.bamboohr.com/,high,1
+144,unjobs-nonun:6,Abt Associates,"NGO, INGO, consultancy or foundation",12,,abtglobal.com,,,1
+145,unjobs-nonun:33,Aspen Institute,"NGO, INGO, consultancy or foundation",12,,aspeninstitute.org,,,1
+146,unjobs-nonun:116,Council of Europe Development Bank,development agency or intergovernmental body,12,,coebank.org,,,1
+150,unjobs-nonun:308,KfW Development Bank,development agency or intergovernmental body,12,,kfw-entwicklungsbank.de,,,1
+151,unjobs-nonun:363,Ocean Conservancy,"NGO, INGO, consultancy or foundation",12,,oceanconservancy.org,,,1
+152,unjobs-nonun:377,Pact,"NGO, INGO, consultancy or foundation",11,106219062,pactworld.org,https://careers-pactworld.icims.com/jobs,medium,1
+153,unjobs-nonun:82,Center for International Private Enterprise,"NGO, INGO, consultancy or foundation",11,33675671,cipe.org,,,1
+154,unjobs-nonun:153,East-West Center,"NGO, INGO, consultancy or foundation",11,31022316,eastwestcenter.org,,,1
+155,unjobs-nonun:55,Brookings Institution,"NGO, INGO, consultancy or foundation",11,,brookings.edu,https://careers-brookings.icims.com/jobs,medium,1
+156,unjobs-nonun:70,Caribbean Biodiversity Fund,"NGO, INGO, consultancy or foundation",11,,caribbeanbiodiversityfund.org,,,1
+157,unjobs-nonun:123,DAI Global,"NGO, INGO, consultancy or foundation",11,,dai.com,,,1
+158,unjobs-nonun:152,Earthworm Foundation,"NGO, INGO, consultancy or foundation",11,,earthworm.org,,,1
+160,unjobs-nonun:228,HEKS/EPER Swiss Church Aid,"NGO, INGO, consultancy or foundation",11,,heks.ch,,,1
+161,unjobs-nonun:272,International Council on Clean Transportation,"NGO, INGO, consultancy or foundation",11,,theicct.org,https://icct.bamboohr.com/,low,1
+163,unjobs-nonun:357,Norwegian People's Aid,"NGO, INGO, consultancy or foundation",11,,npaid.org,,,1
+164,unjobs-nonun:413,Rare,"NGO, INGO, consultancy or foundation",11,,rare.org,https://careers-rare.icims.com/jobs,medium,1
+165,unjobs-nonun:438,Search for Common Ground,"NGO, INGO, consultancy or foundation",11,,sfcg.org,https://sfcg.bamboohr.com/,medium,1
+167,unjobs-nonun:502,Wellcome Trust,"NGO, INGO, consultancy or foundation",11,,wellcome.org,https://wellcome.wd3.myworkdayjobs.com/Wellcome,medium,1
+168,unjobs-nonun:72,Carter Center,"NGO, INGO, consultancy or foundation",10,163882063,cartercenter.org,,,1
+169,unjobs-nonun:350,Near East Foundation,"NGO, INGO, consultancy or foundation",10,22102541,neareast.org,https://neareast.bamboohr.com/,medium,1
+170,unjobs-nonun:222,Goal,"NGO, INGO, consultancy or foundation",10,6596512,goalglobal.org,,,1
+171,unjobs-nonun:41,Banyan Global,"NGO, INGO, consultancy or foundation",10,,banyanglobal.com,https://careers-banyanglobal.icims.com/jobs,high,1
+172,unjobs-nonun:62,CBM,"NGO, INGO, consultancy or foundation",10,,cbm.de,,,1
+173,unjobs-nonun:78,Center for Civilians in Conflict,"NGO, INGO, consultancy or foundation",10,,civiliansinconflict.org,,,1
+174,unjobs-nonun:225,Green Climate Fund,development agency or intergovernmental body,10,,greenclimate.fund,,,1
+175,unjobs-un:45,International Centre for Migration Policy Development,development bank or other international body (UN page),10,,icmpd.org,,,1
+176,unjobs-un:35,International Monetary Fund,development bank or other international body (UN page),10,,imf.org,https://imf.wd5.myworkdayjobs.com/IMF,medium,1
+177,unjobs-nonun:293,International Union for Conservation of Nature,"NGO, INGO, consultancy or foundation",10,,iucn.org,,,1
+179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,"NGO, INGO, consultancy or foundation",10,,intersos.org,,,1
+181,unjobs-nonun:284,International Livestock Research Institute,"NGO, INGO, consultancy or foundation",9,95365000,ilri.org,,,1
+182,unjobs-nonun:38,BRAC,"NGO, INGO, consultancy or foundation",9,,brac.net,,,2
+183,unjobs-nonun:80,Center for European Policy Analysis,"NGO, INGO, consultancy or foundation",9,,cepa.org,,,2
+184,unjobs-nonun:112,Conrad N. Hilton Foundation,"NGO, INGO, consultancy or foundation",9,,hiltonfoundation.org,,,2
+185,unjobs-nonun:65,CORE Community Organized Relief Effort,"NGO, INGO, consultancy or foundation",9,,coreresponse.org,,,2
+186,unjobs-nonun:60,Development Bank of Latin America (CAF),development agency or intergovernmental body,9,,caf.com,,,2
+187,unjobs-nonun:216,Global Health Strategies,"NGO, INGO, consultancy or foundation",9,,globalhealthstrategies.com,,,2
+188,unjobs-nonun:355,Nonviolent Peaceforce International,"NGO, INGO, consultancy or foundation",9,,nonviolentpeaceforce.org,https://nonviolentpeaceforce.bamboohr.com/,medium,2
+189,unjobs-nonun:420,Resources for the Future,"NGO, INGO, consultancy or foundation",9,,rff.org,,,2
+190,unjobs-nonun:445,SoCha,"NGO, INGO, consultancy or foundation",9,,socha.net,,,2
+191,unjobs-nonun:478,U.S. Fund for UNICEF,"NGO, INGO, consultancy or foundation",8,835217861,unicefusa.org,,,2
+192,unjobs-nonun:374,Oxfam,"NGO, INGO, consultancy or foundation",8,433744839,oxfam.org.uk,,,2
+193,unjobs-nonun:498,WaterAid,"NGO, INGO, consultancy or foundation",8,140318765,wateraid.org,https://apply.workable.com/wateraid/,high,2
+194,unjobs-nonun:211,Global Communities,"NGO, INGO, consultancy or foundation",8,112100528,globalcommunities.org,,,2
+195,unjobs-nonun:255,International Rice Research Institute,"NGO, INGO, consultancy or foundation",8,85501524,irri.org,,,2
+196,unjobs-nonun:282,International Institute for Sustainable Development,"NGO, INGO, consultancy or foundation",8,46616924,iisd.org,https://iisd.bamboohr.com/,low,2
+197,unjobs-nonun:5,Abdul Latif Jameel Poverty Action Lab,"NGO, INGO, consultancy or foundation",8,,povertyactionlab.org,,,2
+198,unjobs-nonun:159,Belgian Development Agency,development agency or intergovernmental body,8,,enabel.be,,,2
+199,unjobs-nonun:142,Digital Green,"NGO, INGO, consultancy or foundation",8,,digitalgreen.org,,,2
+200,unjobs-nonun:170,European Climate Foundation,"NGO, INGO, consultancy or foundation",8,,europeanclimate.org,,,2
+201,unjobs-nonun:187,Finance in Motion,"NGO, INGO, consultancy or foundation",8,,finance-in-motion.com,,,2
+202,unjobs-un:47,International Food Policy Research Institute,development bank or other international body (UN page),8,,ifpri.org,,,2
+204,unjobs-nonun:383,Partnership for Supply Chain Management,"NGO, INGO, consultancy or foundation",8,,pfscm.org,https://pfscm.bamboohr.com/,low,2
+206,unjobs-nonun:491,VillageReach,"NGO, INGO, consultancy or foundation",8,,villagereach.org,https://apply.workable.com/villagereachcareers/,high,2
+208,unjobs-nonun:523,Zinc Network,"NGO, INGO, consultancy or foundation",8,,zincnetwork.com,,,2
+209,unjobs-nonun:294,International Vaccine Institute,development agency or intergovernmental body,7,68966984,ivi.int,,,2
+210,unjobs-nonun:9,Acción,"NGO, INGO, consultancy or foundation",7,23763541,accion.org,,,2
+211,unjobs-nonun:89,Chan Zuckerberg Initiative,"NGO, INGO, consultancy or foundation",7,,chanzuckerberg.com,https://job-boards.greenhouse.io/chanzuckerberginitiative,high,2
+214,unjobs-nonun:162,Environmental Defense Fund,"NGO, INGO, consultancy or foundation",7,,edf.org,,,2
+215,unjobs-nonun:273,International Development Group,"NGO, INGO, consultancy or foundation",7,,internationaldevelopmentgroup.com,,,2
+216,unjobs-un:32,International Finance Corporation,development bank or other international body (UN page),7,,ifc.org,,,2
+217,unjobs-nonun:302,Janaagraha Centre for Citizenship and Democracy,"NGO, INGO, consultancy or foundation",7,,janaagraha.org,,,2
+219,unjobs-nonun:493,W.K. Kellogg Foundation,"NGO, INGO, consultancy or foundation",7,,wkkf.org,,,2
+220,unjobs-nonun:515,World Council of Churches,"NGO, INGO, consultancy or foundation",7,,oikoumene.org,,,2
+222,unjobs-nonun:518,World Organisation for Animal Health,development agency or intergovernmental body,7,,woah.org,,,2
+223,unjobs-nonun:514,World Central Kitchen,"NGO, INGO, consultancy or foundation",6,327840221,wck.org,https://apply.workable.com/world-central-kitchen/,high,2
+224,unjobs-nonun:233,Heifer International,"NGO, INGO, consultancy or foundation",6,162027025,heifer.org,https://jobs.jobvite.com/heifer,medium,2
+225,unjobs-nonun:119,Counterpart International,"NGO, INGO, consultancy or foundation",6,43481542,counterpart.org,https://job-boards.greenhouse.io/counterpart,medium,2
+226,unjobs-nonun:181,FINCA International,"NGO, INGO, consultancy or foundation",6,42466280,finca.org,,,2
+227,seed:4,Human Rights Watch,"NGO, INGO, consultancy or foundation",6,18971513,hrw.org,https://job-boards.greenhouse.io/humanrightswatch,high,2
+228,unjobs-nonun:57,Busara Center for Behavioral Economics,"NGO, INGO, consultancy or foundation",6,8275441,busaracenter.org,https://jobs.lever.co/busaracenter,medium,2
+229,unjobs-nonun:22,American Bar Association Rule of Law Initiative,"NGO, INGO, consultancy or foundation",6,,americanbar.org,,,2
+230,unjobs-nonun:92,Chemonics,"NGO, INGO, consultancy or foundation",6,,chemonics.com,,,2
+231,unjobs-nonun:132,David and Lucile Packard Foundation (Packard Foundation),"NGO, INGO, consultancy or foundation",6,,packard.org,,,2
+232,unjobs-nonun:139,Development Alternatives,"NGO, INGO, consultancy or foundation",6,,devalt.org,,,2
+233,unjobs-nonun:193,Forest Stewardship Council,"NGO, INGO, consultancy or foundation",6,,fsc.org,https://fsc.jobs.personio.com/,low,2
+234,unjobs-nonun:217,Global Initiative Against Transnational Organized Crime,"NGO, INGO, consultancy or foundation",6,,globalinitiative.net,https://globalinitiative.bamboohr.com/,medium,2
+235,unjobs-nonun:224,GoodPower,"NGO, INGO, consultancy or foundation",6,,goodpower.org,,,2
+238,unjobs-nonun:325,Medical Care Development,"NGO, INGO, consultancy or foundation",6,,mcd.org,,,2
+239,unjobs-nonun:381,Panthera,"NGO, INGO, consultancy or foundation",6,,panthera.org,,,2
+240,unjobs-nonun:392,Preferred by Nature,"NGO, INGO, consultancy or foundation",6,,preferredbynature.org,,,2
+241,unjobs-nonun:429,Roundtable on Sustainable Palm Oil,"NGO, INGO, consultancy or foundation",6,,rspo.org,,,2
+242,unjobs-nonun:453,Stockholm Environment Institute,"NGO, INGO, consultancy or foundation",6,,sei.org,,,2
+243,unjobs-nonun:474,Transport and Environment,"NGO, INGO, consultancy or foundation",6,,transportenvironment.org,,,2
+247,unjobs-nonun:503,Welthungerhilfe,"NGO, INGO, consultancy or foundation",6,,welthungerhilfe.de,,,2
+248,unjobs-nonun:521,WorldFish,"NGO, INGO, consultancy or foundation",6,,worldfishcenter.org,https://apply.workable.com/worldfish/,high,2
+249,unjobs-nonun:384,Pathfinder International,"NGO, INGO, consultancy or foundation",5,104896435,pathfinder.org,,,2
+250,unjobs-nonun:482,United Nations Foundation,"NGO, INGO, consultancy or foundation",5,77013346,unfoundation.org,,,2
+251,unjobs-nonun:276,International Fertilizer Development Center,"NGO, INGO, consultancy or foundation",5,60259240,ifdc.org,,,2
+252,unjobs-nonun:317,Living Goods,"NGO, INGO, consultancy or foundation",5,23777495,livinggoods.org,,,2
+253,unjobs-nonun:81,Center for International Environmental Law,"NGO, INGO, consultancy or foundation",5,14374319,ciel.org,,,2
+255,unjobs-nonun:37,B Lab,"NGO, INGO, consultancy or foundation",5,,bcorporation.net,https://job-boards.greenhouse.io/blab,medium,2
+256,unjobs-nonun:42,Barcelona Institute for Global Health,"NGO, INGO, consultancy or foundation",5,,isglobal.org,,,2
+257,unjobs-nonun:53,Blue Ventures,"NGO, INGO, consultancy or foundation",5,,blueventures.org,,,2
+258,unjobs-nonun:526,charity: water,"NGO, INGO, consultancy or foundation",5,,charitywater.org,,,2
+259,unjobs-nonun:120,Cowater International,"NGO, INGO, consultancy or foundation",5,,cowater.com,,,2
+260,unjobs-nonun:138,"DevTech Systems, Inc.","NGO, INGO, consultancy or foundation",5,,devtechsys.com,https://careers-devtechsys.icims.com/jobs,medium,2
+261,unjobs-nonun:186,Fika,"NGO, INGO, consultancy or foundation",5,,fika.org,,,2
+262,unjobs-nonun:250,International Federation of Red Cross and Red Crescent Societies,"NGO, INGO, consultancy or foundation",5,,ifrc.org,,,2
+264,unjobs-nonun:305,John D. and Catherine T. MacArthur Foundation,"NGO, INGO, consultancy or foundation",5,,macfound.org,https://macfound.wd1.myworkdayjobs.com/MAC_FOUND_EXT_CAREERS,medium,2
+265,unjobs-nonun:365,Oceana,"NGO, INGO, consultancy or foundation",5,,oceana.org,,,2
+269,unjobs-nonun:373,Oxfam Novib,"NGO, INGO, consultancy or foundation",5,,oxfamnovib.nl,,,2
+270,unjobs-nonun:395,ProVeg International,"NGO, INGO, consultancy or foundation",5,,proveg.org,https://proveg.jobs.personio.de/,medium,2
+271,unjobs-nonun:408,RMI,"NGO, INGO, consultancy or foundation",5,,rmi.org,,,2
+272,unjobs-nonun:444,Smart Freight Centre,"NGO, INGO, consultancy or foundation",5,,smartfreightcentre.org,,,2
+273,unjobs-nonun:455,Sunflower Services,"NGO, INGO, consultancy or foundation",5,,sunflowerservicespbc.com,,,2
+274,unjobs-nonun:457,Swedish International Development Cooperation Agency,development agency or intergovernmental body,5,,openaid.se,,,2
+277,unjobs-nonun:500,WeWorld Onlus,"NGO, INGO, consultancy or foundation",5,,weworld.it,,,2
+278,unjobs-nonun:511,Women's World Banking,"NGO, INGO, consultancy or foundation",5,,womensworldbanking.org,,,2
+279,unjobs-nonun:10,Acumen Fund,"NGO, INGO, consultancy or foundation",4,46387713,acumen.org,https://job-boards.greenhouse.io/acumen,medium,2
+280,unjobs-nonun:30,Ashoka,"NGO, INGO, consultancy or foundation",4,35143033,ashoka.org,https://jobs.jobvite.com/ashoka,medium,2
+281,unjobs-nonun:345,Natural Resource Governance Institute,"NGO, INGO, consultancy or foundation",4,13574743,resourcegovernance.org,,,2
+282,unjobs-nonun:421,Restless Development,"NGO, INGO, consultancy or foundation",4,10690028,restlessdevelopment.org,https://restlessdevelopment.bamboohr.com/,high,2
+283,unjobs-nonun:329,Mennonite Economic Development Associates,"NGO, INGO, consultancy or foundation",4,9546791,meda.org,https://meda.bamboohr.com/,low,2
+284,unjobs-nonun:32,Asia Pacific Foundation of Canada (APF Canada),"NGO, INGO, consultancy or foundation",4,3813044,asiapacific.ca,https://asiapacific.bamboohr.com/,medium,2
+285,unjobs-un:3,Association of Southeast Asian Nations,development bank or other international body (UN page),4,,asean.org,,,2
+286,unjobs-un:6,CABI,development bank or other international body (UN page),4,,cabi.org,,,2
+287,unjobs-nonun:122,D-tree,"NGO, INGO, consultancy or foundation",4,,d-tree.org,,,2
+290,unjobs-nonun:161,Enveritas,"NGO, INGO, consultancy or foundation",4,,enveritas.org,https://job-boards.greenhouse.io/enveritas,high,2
+291,unjobs-nonun:183,Fairtrade International,"NGO, INGO, consultancy or foundation",4,,fairtrade.net,,,2
+292,unjobs-nonun:184,Fashion for Good,"NGO, INGO, consultancy or foundation",4,,fashionforgood.com,,,2
+293,unjobs-nonun:207,Global Alliance for Improved Nutrition,"NGO, INGO, consultancy or foundation",4,,gainhealth.org,,,2
+294,unjobs-nonun:226,Greenpeace,"NGO, INGO, consultancy or foundation",4,,greenpeace.org,https://greenpeace.bamboohr.com/,high,2
+295,unjobs-nonun:239,Hivos,"NGO, INGO, consultancy or foundation",4,,hivos.org,https://hivos.bamboohr.com/,medium,2
+296,unjobs-nonun:251,IGAD Climate Prediction and Applications Centre,development agency or intergovernmental body,4,,icpac.net,,,2
+298,unjobs-un:28,International Commission on Missing Persons,development bank or other international body (UN page),4,,icmp.int,https://icmp.bamboohr.com/,low,2
+299,unjobs-nonun:291,International Refugee Assistance Project,"NGO, INGO, consultancy or foundation",4,,refugeerights.org,https://jobs.lever.co/refugeerights,medium,2
+300,unjobs-nonun:335,Mines Advisory Group,"NGO, INGO, consultancy or foundation",4,,maginternational.org,https://apply.workable.com/mag-international/,medium,2
+301,unjobs-un:51,Nordic Investment Bank,development bank or other international body (UN page),4,,nib.int,,,2
+302,unjobs-nonun:424,Rockefeller Foundation,"NGO, INGO, consultancy or foundation",4,,rockefellerfoundation.org,,,2
+303,unjobs-nonun:437,Sea-Watch,"NGO, INGO, consultancy or foundation",4,,sea-watch.org,,,2
+307,unjobs-nonun:484,University Research Co.,"NGO, INGO, consultancy or foundation",4,,urc-chs.com,,,2
+308,unjobs-nonun:324,MasterCard Foundation,"NGO, INGO, consultancy or foundation",3,9761582395,mastercardfdn.org,https://job-boards.greenhouse.io/mastercardfoundation,high,2
+309,unjobs-nonun:144,Direct Relief,"NGO, INGO, consultancy or foundation",3,2398998642,directrelief.org,,,2
+310,unjobs-nonun:443,Sightsavers,"NGO, INGO, consultancy or foundation",3,362770792,sightsavers.org,,,2
+311,unjobs-nonun:380,Panorama Global,"NGO, INGO, consultancy or foundation",3,63496064,panoramaglobal.org,,,2
+312,unjobs-nonun:27,Armed Conflict Location and Event Data Project,"NGO, INGO, consultancy or foundation",3,14699244,acleddata.com,https://acleddata.bamboohr.com/,medium,2
+313,unjobs-nonun:11,Adam Smith International,"NGO, INGO, consultancy or foundation",3,,adamsmithinternational.com,https://adamsmithinternational1.recruitee.com/,high,2
+314,unjobs-nonun:20,Alinea International,"NGO, INGO, consultancy or foundation",3,,alineainternational.com,,,2
+315,unjobs-nonun:25,Amnesty International,"NGO, INGO, consultancy or foundation",3,,amnesty.eu,,,2
+316,unjobs-nonun:34,Asylum Access,"NGO, INGO, consultancy or foundation",3,,refugeeslead.org,,,2
+317,unjobs-nonun:40,Banco Centroamericano de Integración Económica,development agency or intergovernmental body,3,,bcie.org,,,2
+318,unjobs-nonun:44,Berghof Foundation,"NGO, INGO, consultancy or foundation",3,,berghof-foundation.org,,,2
+319,unjobs-nonun:46,Bezos Earth Fund,"NGO, INGO, consultancy or foundation",3,,bezosearthfund.org,,,2
+320,unjobs-nonun:49,BirdLife International,"NGO, INGO, consultancy or foundation",3,,birdlife.org,,,2
+321,unjobs-nonun:51,Bloomberg Philanthropies,"NGO, INGO, consultancy or foundation",3,,bloomberg.org,https://bloomberg.avature.net/,low,2
+322,unjobs-nonun:54,BlueOrchard Finance Ltd,"NGO, INGO, consultancy or foundation",3,,blueorchard.com,https://blueorchard.bamboohr.com/,medium,2
+323,unjobs-nonun:59,C40 Cities,"NGO, INGO, consultancy or foundation",3,,c40.org,,,2
+324,unjobs-nonun:101,Climate Analytics,"NGO, INGO, consultancy or foundation",3,,climateanalytics.org,,,2
+325,unjobs-nonun:103,Climate Policy Initiative,"NGO, INGO, consultancy or foundation",3,,climatepolicyinitiative.org,,,2
+326,unjobs-nonun:133,Delivery Associates,"NGO, INGO, consultancy or foundation",3,,deliveryassociates.org,,,2
+327,unjobs-nonun:135,Democracy Reporting International,"NGO, INGO, consultancy or foundation",3,,democracy-reporting.org,,,2
+328,unjobs-nonun:146,Doctors with Africa CUAMM,"NGO, INGO, consultancy or foundation",3,,doctorswithafrica.org,,,2
+329,unjobs-nonun:155,Education Development Center,"NGO, INGO, consultancy or foundation",3,,edc.org,https://jobs.smartrecruiters.com/educationdevelopmentcenter,high,2
+330,unjobs-nonun:157,Ellen MacArthur Foundation,"NGO, INGO, consultancy or foundation",3,,ellenmacarthurfoundation.org,,,2
+331,unjobs-nonun:160,Energy Innovation,"NGO, INGO, consultancy or foundation",3,,energyinnovation.org,,,2
+332,unjobs-nonun:163,Environmental Investigation Agency,"NGO, INGO, consultancy or foundation",3,,eia-international.org,,,2
+333,unjobs-nonun:198,Fòs Feminista,"NGO, INGO, consultancy or foundation",3,,fosfeminista.org,https://fosfeminista.bamboohr.com/,high,2
+334,unjobs-nonun:203,"Gender Resources, Inc.","NGO, INGO, consultancy or foundation",3,,genderresources.com,,,2
+335,unjobs-nonun:219,Global Partnerships,"NGO, INGO, consultancy or foundation",3,,globalpartnerships.org,,,2
+336,unjobs-nonun:199,GOPA Consulting Group,"NGO, INGO, consultancy or foundation",3,,gopa.eu,,,2
+337,unjobs-nonun:227,Guttmacher Institute,"NGO, INGO, consultancy or foundation",3,,guttmacher.org,,,2
+338,unjobs-nonun:260,Institute for Energy Economics and Financial Analysis,"NGO, INGO, consultancy or foundation",3,,ieefa.org,https://ieefa.bamboohr.com/,low,2
+339,unjobs-nonun:263,Institute for Transportation and Development Policy,"NGO, INGO, consultancy or foundation",3,,itdp.org,,,2
+340,unjobs-nonun:264,Institute for War and Peace Reporting,"NGO, INGO, consultancy or foundation",3,,iwpr.net,,,2
+341,unjobs-nonun:281,International Institute for Strategic Studies,"NGO, INGO, consultancy or foundation",3,,iiss.org,,,2
+342,unjobs-nonun:286,International Media Support,"NGO, INGO, consultancy or foundation",3,,mediasupport.org,,,2
+343,unjobs-nonun:301,Istituto per la Cooperazione Universitaria,"NGO, INGO, consultancy or foundation",3,,icu.it,,,2
+344,unjobs-nonun:256,ITAD Limited,"NGO, INGO, consultancy or foundation",3,,itad.com,https://itadltd.bamboohr.com/,medium,2
+345,unjobs-nonun:309,Kvinna till Kvinna,"NGO, INGO, consultancy or foundation",3,,kvinnatillkvinna.org,,,2
+346,unjobs-nonun:319,Lutheran World Federation,"NGO, INGO, consultancy or foundation",3,,lutheranworld.org,,,2
+347,unjobs-nonun:354,New Development Bank,development agency or intergovernmental body,3,,ndb.int,,,2
+350,unjobs-nonun:375,Oxford Policy Management,"NGO, INGO, consultancy or foundation",3,,opml.co.uk,https://careers-opml.icims.com/jobs,low,2
+351,unjobs-nonun:400,Public Health Institute,"NGO, INGO, consultancy or foundation",3,,phi.org,,,2
+352,unjobs-nonun:403,Q2 Impact,"NGO, INGO, consultancy or foundation",3,,q2impact.com,,,2
+353,unjobs-nonun:539,rand-europe,"NGO, INGO, consultancy or foundation",3,,rand.org,https://apply.workable.com/rand-europe/,high,2
+354,unjobs-nonun:415,Refugees International,"NGO, INGO, consultancy or foundation",3,,refugeesinternational.org,https://refugeesinternational.bamboohr.com/,high,2
+355,unjobs-nonun:417,Relief Applications,"NGO, INGO, consultancy or foundation",3,,reliefapplications.org,,,2
+356,unjobs-nonun:419,Resolve to Save Lives,"NGO, INGO, consultancy or foundation",3,,resolvetosavelives.org,https://job-boards.greenhouse.io/resolvetosavelives,high,2
+357,unjobs-nonun:422,Rights and Resources Initiative,"NGO, INGO, consultancy or foundation",3,,rightsandresources.org,,,2
+358,unjobs-nonun:425,Rockefeller Philanthropy Advisors,"NGO, INGO, consultancy or foundation",3,,rockpa.org,,,2
+360,unjobs-nonun:472,Transform Health,"NGO, INGO, consultancy or foundation",3,,transformhealthcoalition.org,,,2
+364,unjobs-nonun:479,US Department of State Bureau for International Narcotics and Law Enforcement Affairs,development agency or intergovernmental body,3,,state.gov,,,2
+365,unjobs-nonun:490,Village Capital,"NGO, INGO, consultancy or foundation",3,,vilcap.com,https://vilcap.bamboohr.com/,medium,2
+366,unjobs-nonun:507,William and Flora Hewlett Foundation (Hewlett Foundation),"NGO, INGO, consultancy or foundation",3,,hewlett.org,,,2
+367,unjobs-nonun:513,World Business Council for Sustainable Development,"NGO, INGO, consultancy or foundation",3,,wbcsd.org,,,2
+368,unjobs-un:106,World Trade Organization,development bank or other international body (UN page),3,,wto.org,https://wto.wd3.myworkdayjobs.com/External,low,2
+369,unjobs-nonun:95,Children's Investment Fund Foundation,"NGO, INGO, consultancy or foundation",2,88489413,ciff.org,https://apply.workable.com/ciff/,low,2
+370,unjobs-nonun:71,Carnegie Endowment,"NGO, INGO, consultancy or foundation",2,57574887,carnegieendowment.org,,,2
+371,unjobs-nonun:121,Cuso International,"NGO, INGO, consultancy or foundation",2,18710286,cusointernational.org,https://apply.workable.com/cuso-international/,medium,2
+372,unjobs-nonun:110,Conciliation Resources,"NGO, INGO, consultancy or foundation",2,16231268,c-r.org,,,2
+373,unjobs-nonun:414,RefugePoint,"NGO, INGO, consultancy or foundation",2,15706207,refugepoint.org,,,2
+374,unjobs-nonun:270,International Center for Biosaline Agriculture,"NGO, INGO, consultancy or foundation",2,11127823,biosaline.org,,,2
+375,unjobs-nonun:1,350.org,"NGO, INGO, consultancy or foundation",2,,350.org,https://350.bamboohr.com/,low,2
+376,unjobs-nonun:7,Access Now,"NGO, INGO, consultancy or foundation",2,,accessnow.org,https://accessnow.bamboohr.com/,high,2
+377,unjobs-nonun:8,Access to Medicine Foundation,"NGO, INGO, consultancy or foundation",2,,accesstomedicinefoundation.org,,,2
+378,unjobs-nonun:24,American Public Health Association,"NGO, INGO, consultancy or foundation",2,,apha.org,https://job-boards.greenhouse.io/americanpublichealthassociation,medium,2
+379,unjobs-nonun:43,Basel Institute on Governance,"NGO, INGO, consultancy or foundation",2,,baselgovernance.org,,,2
+380,unjobs-nonun:45,Better Cotton,"NGO, INGO, consultancy or foundation",2,,bettercotton.org,,,2
+381,unjobs-nonun:58,Business and Human Rights Resource Centre,"NGO, INGO, consultancy or foundation",2,,business-humanrights.org,https://bhrrc.bamboohr.com/,medium,2
+382,unjobs-nonun:87,Centre for Information Resilience,"NGO, INGO, consultancy or foundation",2,,info-res.org,https://apply.workable.com/centre-for-information-resilience/,high,2
+383,unjobs-nonun:88,Ceres,"NGO, INGO, consultancy or foundation",2,,ceres.org,,,2
+385,unjobs-nonun:106,Comitato Collaborazione Medica,"NGO, INGO, consultancy or foundation",2,,ccm-italia.org,,,2
+386,unjobs-nonun:109,Commonland,"NGO, INGO, consultancy or foundation",2,,commonland.com,https://commonland.recruitee.com/,high,2
+387,unjobs-nonun:126,Dalberg Global Development Advisors,"NGO, INGO, consultancy or foundation",2,,dalberg.com,,,2
+389,unjobs-nonun:166,Epicentre,"NGO, INGO, consultancy or foundation",2,,epicentre.msf.org,,,2
+391,unjobs-nonun:171,European Endowment for Democracy,"NGO, INGO, consultancy or foundation",2,,democracyendowment.eu,https://apply.workable.com/eed/,low,2
+392,unjobs-nonun:191,Fondazione CESVI,"NGO, INGO, consultancy or foundation",2,,cesvi.org,,,2
+393,unjobs-nonun:210,Global Citizen,"NGO, INGO, consultancy or foundation",2,,globalcitizen.org,https://globalcitizen.bamboohr.com/,high,2
+394,unjobs-nonun:212,Global Energy Monitor,"NGO, INGO, consultancy or foundation",2,,globalenergymonitor.org,https://globalenergymonitor.bamboohr.com/,high,2
+395,unjobs-nonun:213,Global Fishing Watch,"NGO, INGO, consultancy or foundation",2,,globalfishingwatch.org,https://job-boards.greenhouse.io/globalfishingwatch,high,2
+396,unjobs-nonun:221,Global Reporting Initiative,"NGO, INGO, consultancy or foundation",2,,globalreporting.org,https://gri.recruitee.com/,low,2
+397,unjobs-nonun:232,Heartland Alliance,"NGO, INGO, consultancy or foundation",2,,heartlandalliance.org,,,2
+398,unjobs-nonun:229,HELP Logistics,"NGO, INGO, consultancy or foundation",2,,help-logistics.org,,,2
+401,unjobs-nonun:274,International Dialogue Centre,development agency or intergovernmental body,2,,kaiciid.org,,,2
+402,unjobs-nonun:278,International Fund for Animal Welfare,"NGO, INGO, consultancy or foundation",2,,ifaw.org,,,2
+403,unjobs-nonun:288,International NGO Safety Organisation,"NGO, INGO, consultancy or foundation",2,,ngosafety.org,,,2
+404,unjobs-nonun:298,Internews Network,"NGO, INGO, consultancy or foundation",2,,internews.org,,,2
+405,unjobs-nonun:303,Japan International Cooperation Agency,development agency or intergovernmental body,2,,jica.go.jp,,,2
+406,unjobs-nonun:327,Medicines for Malaria Venture,"NGO, INGO, consultancy or foundation",2,,mmv.org,,,2
+407,unjobs-nonun:531,myAgro Farms,"NGO, INGO, consultancy or foundation",2,,myagro.org,,,2
+408,unjobs-nonun:352,Netherlands Development Finance Company,development agency or intergovernmental body,2,,fmo.nl,,,2
+409,unjobs-nonun:356,Norwegian Church Aid,"NGO, INGO, consultancy or foundation",2,,kirkensnodhjelp.no,,,2
+412,unjobs-nonun:367,Omidyar Network,"NGO, INGO, consultancy or foundation",2,,omidyar.com,https://job-boards.greenhouse.io/omidyarnetwork,high,2
+413,unjobs-nonun:369,Open Society Foundations,"NGO, INGO, consultancy or foundation",2,,opensocietyfoundations.org,,,2
+414,unjobs-nonun:370,Organization of American States,development agency or intergovernmental body,2,,oas.org,,,2
+415,unjobs-nonun:379,Panagora Group,"NGO, INGO, consultancy or foundation",2,,panagoragroup.net,https://panagoragroup.zohorecruit.com/,high,2
+416,unjobs-nonun:376,PAX sapiens,"NGO, INGO, consultancy or foundation",2,,paxsapiens.org,,,2
+417,unjobs-nonun:386,Penal Reform International,"NGO, INGO, consultancy or foundation",2,,penalreform.org,,,2
+418,unjobs-nonun:388,Peterson Institute for International Economics,"NGO, INGO, consultancy or foundation",2,,piie.com,,,2
+419,unjobs-nonun:396,Proforest,"NGO, INGO, consultancy or foundation",2,,proforest.net,,,2
+420,unjobs-nonun:416,Regional Community Forestry Training Center for Asia and the Pacific,"NGO, INGO, consultancy or foundation",2,,recoftc.org,,,2
+421,unjobs-nonun:435,Samaritan's Purse,"NGO, INGO, consultancy or foundation",2,,samaritanspurse.org,,,2
+422,unjobs-nonun:433,SEEK Development,"NGO, INGO, consultancy or foundation",2,,seekdevelopment.org,https://seek-development.jobs.personio.de/,high,2
+423,unjobs-nonun:452,"Statistical, Economic and Social Research and Training Centre for Islamic Countries",development agency or intergovernmental body,2,,sesric.org,,,2
+424,unjobs-nonun:460,Systemic Justice,"NGO, INGO, consultancy or foundation",2,,systemicjustice.ngo,https://systemicjustice.bamboohr.com/,high,2
+425,unjobs-nonun:466,Textile Exchange,"NGO, INGO, consultancy or foundation",2,,textileexchange.org,https://textileexchange.bamboohr.com/,high,2
+426,unjobs-nonun:473,Transparency International,"NGO, INGO, consultancy or foundation",2,,transparency.org,,,2
+427,unjobs-nonun:476,Trócaire,"NGO, INGO, consultancy or foundation",2,,trocaire.org,https://apply.workable.com/trocaire/,high,2
+428,unjobs-nonun:489,Verra,"NGO, INGO, consultancy or foundation",2,,verra.org,https://verra.bamboohr.com/,medium,2
+429,unjobs-nonun:492,Vizzuality,"NGO, INGO, consultancy or foundation",2,,vizzuality.com,https://vizzuality.bamboohr.com/,high,2
+430,unjobs-nonun:504,Westerwelle Foundation,"NGO, INGO, consultancy or foundation",2,,westerwelle-foundation.com,,,2
+431,unjobs-nonun:510,Women's Refugee Commission,"NGO, INGO, consultancy or foundation",2,,womensrefugeecommission.org,,,2
+432,unjobs-nonun:517,World Economic Forum,"NGO, INGO, consultancy or foundation",1,528837504,weforum.org,https://weforum.wd3.myworkdayjobs.com/Forum_Careers,medium,2
+433,unjobs-nonun:469,The Halo Trust,"NGO, INGO, consultancy or foundation",1,211713431,halotrust.org,https://apply.workable.com/the-halo-trust/,high,2
+434,unjobs-nonun:248,Intl Development Research Centre,"NGO, INGO, consultancy or foundation",1,185968693,idrc.ca,,,2
+435,unjobs-nonun:343,National Democratic Institute,"NGO, INGO, consultancy or foundation",1,107205654,ndi.org,,,2
+436,unjobs-nonun:31,Asia Foundation,"NGO, INGO, consultancy or foundation",1,91533507,asiafoundation.org,,,2
+437,unjobs-nonun:196,Fred Hollows Foundation,"NGO, INGO, consultancy or foundation",1,74941920,hollows.org,,,2
+438,unjobs-nonun:451,Start Network,"NGO, INGO, consultancy or foundation",1,66703773,startnetwork.org,,,2
+439,unjobs-nonun:528,iDE Global,"NGO, INGO, consultancy or foundation",1,43358388,ideglobal.org,,,2
+440,unjobs-nonun:245,International Center for Agricultural Research in the Dry Areas,"NGO, INGO, consultancy or foundation",1,33431021,icarda.org,https://apply.workable.com/icarda/,medium,2
+441,unjobs-nonun:497,Water.org,"NGO, INGO, consultancy or foundation",1,31261309,water.org,https://apply.workable.com/waterorg/,medium,2
+442,unjobs-nonun:85,Center for Victims of Torture,"NGO, INGO, consultancy or foundation",1,28594850,cvt.org,,,2
+443,unjobs-nonun:158,Elton John AIDS Foundation,"NGO, INGO, consultancy or foundation",1,24910189,eltonjohnaidsfoundation.org,,,2
+444,unjobs-nonun:91,Chatham House,"NGO, INGO, consultancy or foundation",1,24251655,chathamhouse.org,,,2
+445,unjobs-nonun:441,ShelterBox International,"NGO, INGO, consultancy or foundation",1,22949564,shelterbox.org,,,2
+446,unjobs-nonun:238,Henry L. Stimson Center,"NGO, INGO, consultancy or foundation",1,14861548,stimson.org,,,2
+447,unjobs-nonun:188,Financing Alliance for Health,"NGO, INGO, consultancy or foundation",1,13506421,financingalliance.org,https://fahinc.bamboohr.com/,medium,2
+448,unjobs-nonun:440,Shelter For Life International,"NGO, INGO, consultancy or foundation",1,8499135,shelter.org,,,2
+449,unjobs-nonun:73,Catalpa,"NGO, INGO, consultancy or foundation",1,3715082,catalpa.io,https://apply.workable.com/catalpa/,medium,2
+450,unjobs-un:4,African Development Bank,development bank or other international body (UN page),1,,afdb.org,,,2
+451,unjobs-nonun:14,African Wildlife Foundation,"NGO, INGO, consultancy or foundation",1,,awf.org,,,2
+452,unjobs-nonun:29,Article 19,"NGO, INGO, consultancy or foundation",1,,article19.org,,,2
+453,unjobs-nonun:4,ASEAN Coordinating Centre for Humanitarian Assistance on Disaster Management (AHA Centre),development agency or intergovernmental body,1,,ahacentre.org,,,2
+454,unjobs-nonun:56,Bruegel,"NGO, INGO, consultancy or foundation",1,,bruegel.org,,,2
+455,unjobs-nonun:97,Citizen Lab,"NGO, INGO, consultancy or foundation",1,,citizenlab.ca,,,2
+456,unjobs-nonun:108,Committee to Protect Journalists,"NGO, INGO, consultancy or foundation",1,,cpj.org,,,2
+457,unjobs-nonun:117,Council of the Baltic Sea States,development agency or intergovernmental body,1,,cbss.org,,,2
+458,unjobs-nonun:130,DataKind,"NGO, INGO, consultancy or foundation",1,,datakind.org,https://job-boards.greenhouse.io/datakindinc,high,2
+461,unjobs-nonun:140,Development Media International,"NGO, INGO, consultancy or foundation",1,,developmentmedia.net,,,2
+462,unjobs-nonun:124,DHIS2,"NGO, INGO, consultancy or foundation",1,,dhis2.org,,,2
+463,unjobs-nonun:147,Drugs for Neglected Diseases initiative,"NGO, INGO, consultancy or foundation",1,,dndi.org,https://careers-dndi.icims.com/jobs,low,2
+464,unjobs-nonun:154,Ecologic,"NGO, INGO, consultancy or foundation",1,,ecologic.eu,,,2
+465,unjobs-nonun:149,EFI Foundation,"NGO, INGO, consultancy or foundation",1,,efifoundation.org,,,2
+466,unjobs-nonun:164,Environmental Justice Foundation,"NGO, INGO, consultancy or foundation",1,,ejfoundation.org,,,2
+467,unjobs-nonun:169,European Centre for Press and Media Freedom,"NGO, INGO, consultancy or foundation",1,,ecpmf.eu,,,2
+468,unjobs-un:22,European Forest Institute,development bank or other international body (UN page),1,,efi.int,,,2
+469,unjobs-nonun:173,European Institute of Innovation and Technology,development agency or intergovernmental body,1,,eit.europa.eu,,,2
+470,unjobs-nonun:185,Fauna & Flora International,"NGO, INGO, consultancy or foundation",1,,fauna-flora.org,,,2
+471,unjobs-nonun:182,FLOCERT,"NGO, INGO, consultancy or foundation",1,,flocert.net,,,2
+472,unjobs-nonun:192,Ford Foundation,"NGO, INGO, consultancy or foundation",1,,fordfoundation.org,https://fordfoundation.wd1.myworkdayjobs.com/FordFoundationCareerPage,high,2
+473,unjobs-nonun:194,Fossil Fuel Treaty,"NGO, INGO, consultancy or foundation",1,,fossilfueltreaty.org,,,2
+474,unjobs-nonun:197,Future Advocacy,"NGO, INGO, consultancy or foundation",1,,futureadvocacy.com,,,2
+475,unjobs-nonun:204,Geneva International Centre for Humanitarian Demining,"NGO, INGO, consultancy or foundation",1,,gichd.org,,,2
+476,unjobs-nonun:208,Global Antibiotic Research and Development Partnership,"NGO, INGO, consultancy or foundation",1,,gardp.org,,,2
+477,unjobs-nonun:209,Global Canopy,"NGO, INGO, consultancy or foundation",1,,globalcanopy.org,,,2
+478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),"NGO, INGO, consultancy or foundation",1,,goldstandard.org,https://goldstandard.bamboohr.com/,medium,2
+479,unjobs-nonun:235,Heising-Simons Foundation,"NGO, INGO, consultancy or foundation",1,,hsfoundation.org,,,2
+480,unjobs-nonun:237,Helvetas,"NGO, INGO, consultancy or foundation",1,,helvetas.org,,,2
+481,unjobs-nonun:246,"ICDDR,B - Centre for Health and Population Research","NGO, INGO, consultancy or foundation",1,,icddrb.org,,,2
+483,unjobs-un:38,Inter-Parliamentary Union,development bank or other international body (UN page),1,,ipu.org,,,2
+484,unjobs-nonun:267,International Anti-Corruption Academy,development agency or intergovernmental body,1,,iaca.int,,,2
+486,unjobs-un:46,International Development Law Organization,development bank or other international body (UN page),1,,idlo.int,https://careers-idlo.icims.com/jobs,low,2
+487,unjobs-nonun:279,International Fund for Public Interest Media,"NGO, INGO, consultancy or foundation",1,,ifpim.org,,,2
+488,unjobs-un:48,International Institute for Applied Systems Analysis,development bank or other international body (UN page),1,,iiasa.ac.at,,,2
+489,unjobs-nonun:280,International Institute for Democracy and Electoral Assistance (International IDEA),development agency or intergovernmental body,1,,idea.int,,,2
+490,unjobs-un:39,International Renewable Energy Agency,development bank or other international body (UN page),1,,irena.org,,,2
+492,unjobs-nonun:295,International Water Management Institute,"NGO, INGO, consultancy or foundation",1,,iwmi.cgiar.org,https://apply.workable.com/international-water-management-institute/,high,2
+493,unjobs-nonun:311,Landesa,"NGO, INGO, consultancy or foundation",1,,landesa.org,,,2
+494,unjobs-nonun:314,Laterite,"NGO, INGO, consultancy or foundation",1,,laterite.com,,,2
+495,unjobs-nonun:315,Laudato Si Movement,"NGO, INGO, consultancy or foundation",1,,laudatosimovement.org,,,2
+496,unjobs-nonun:316,Libraries Without Borders,"NGO, INGO, consultancy or foundation",1,,librarieswithoutborders.org,,,2
+497,unjobs-nonun:321,Malteser International,"NGO, INGO, consultancy or foundation",1,,malteser-international.org,,,2
+498,unjobs-nonun:326,Medicines Patent Pool,"NGO, INGO, consultancy or foundation",1,,medicinespatentpool.org,,,2
+499,unjobs-nonun:328,Meedan,"NGO, INGO, consultancy or foundation",1,,meedan.com,,,2
+500,unjobs-nonun:334,Minderoo Foundation,"NGO, INGO, consultancy or foundation",1,,minderoo.org,,,2
+501,unjobs-nonun:336,Mission East,"NGO, INGO, consultancy or foundation",1,,missioneast.org,https://missioneast.bamboohr.com/,high,2
+502,unjobs-nonun:344,National Endowment for Democracy,"NGO, INGO, consultancy or foundation",1,,ned.org,,,2
+503,unjobs-nonun:360,Nutrition International,"NGO, INGO, consultancy or foundation",1,,nutritionintl.org,https://apply.workable.com/nutritionintl/,medium,2
+511,unjobs-nonun:361,ONE Campaign,"NGO, INGO, consultancy or foundation",1,,one.org,,,2
+512,unjobs-nonun:362,OPEC Fund for International Development,development agency or intergovernmental body,1,,ofid.org,,,2
+513,unjobs-un:62,Organisation of Eastern Caribbean States,development bank or other international body (UN page),1,,oecs.org,,,2
+514,unjobs-nonun:371,Organized Crime and Corruption Reporting Project,"NGO, INGO, consultancy or foundation",1,,occrp.org,,,2
+515,unjobs-nonun:385,Patrick J. McGovern Foundation,"NGO, INGO, consultancy or foundation",1,,mcgovern.org,,,2
+516,unjobs-nonun:401,Pulitzer Center on Crisis Reporting,"NGO, INGO, consultancy or foundation",1,,pulitzercenter.org,,,2
+517,unjobs-nonun:405,Quincy Institute for Responsible Statecraft,"NGO, INGO, consultancy or foundation",1,,responsiblestatecraft.org,,,2
+518,unjobs-nonun:410,Rainforest Foundation Norway,"NGO, INGO, consultancy or foundation",1,,regnskog.no,,,2
+519,unjobs-nonun:411,Rainforest Foundation US,"NGO, INGO, consultancy or foundation",1,,rainforestfoundation.org,,,2
+520,unjobs-nonun:412,Raoul Wallenberg Institute of Human Rights and Humanitarian Law,"NGO, INGO, consultancy or foundation",1,,rwi.lu.se,,,2
+522,unjobs-nonun:428,Roundtable on Sustainable Biomaterials,"NGO, INGO, consultancy or foundation",1,,rsb.org,,,2
+523,unjobs-nonun:432,SDSN Association,"NGO, INGO, consultancy or foundation",1,,unsdsn.org,,,2
+524,unjobs-nonun:442,Sight and Life,"NGO, INGO, consultancy or foundation",1,,sightandlife.org,,,2
+525,unjobs-nonun:447,Solidaridad Network,"NGO, INGO, consultancy or foundation",1,,solidaridadnetwork.org,,,2
+526,unjobs-nonun:458,Swiss Tropical and Public Health Institute,"NGO, INGO, consultancy or foundation",1,,swisstph.ch,,,2
+527,unjobs-nonun:467,The Commonwealth,development agency or intergovernmental body,1,,thecommonwealth.org,https://jobs.jobvite.com/commonwealthcareers,high,2
+528,unjobs-nonun:148,Third Generation Environmentalism,"NGO, INGO, consultancy or foundation",1,,e3g.org,https://e3g.bamboohr.com/,medium,2
+529,unjobs-nonun:471,Thomson Reuters Foundation,"NGO, INGO, consultancy or foundation",1,,trust.org,https://trust.bamboohr.com/,low,2
+536,unjobs-nonun:487,VNG International,"NGO, INGO, consultancy or foundation",1,,vng-international.nl,,,2
+537,unjobs-nonun:512,World Bicycle Relief,"NGO, INGO, consultancy or foundation",1,,worldbicyclerelief.org,,,2
+538,unjobs-nonun:516,World Data Lab,"NGO, INGO, consultancy or foundation",1,,worlddatalab.com,https://world-data-lab.jobs.personio.com/,high,2
+539,unjobs-nonun:495,WRAP,"NGO, INGO, consultancy or foundation",1,,wrap.ngo,,,2
+540,irs:980593375,Gavi Alliance,INGO member or funder (by income),,2547417284,gavi.org,,,1
+541,irs:061008595,Americares Foundation Inc,INGO member or funder (by income),,1851063617,americares.org,https://careers-americares.icims.com/jobs,medium,1
+542,irs:951922279,World Vision,INGO member or funder (by income),,1423305144,worldvision.org,https://worldvision.wd1.myworkdayjobs.com/WorldVisionInternational,medium,1
+543,irs:362586390,Map International,INGO member or funder (by income),,1379040410,map.org,,,1
+544,iati:GB-CHC-209131,British Council,INGO member or funder (by income),,1291448819,britishcouncil.org,,,1
+545,irs:060726487,Save the Children Federation Inc,INGO member or funder (by income),,920455828,savethechildren.org,,,1
+546,irs:131685039,Cooperative for Assistance and Relief Everywhere Inc,INGO member or funder (by income),,832911696,care.org,,,1
+547,irs:133433452,Medecins Sans Frontieres USA Inc,INGO member or funder (by income),,776922926,doctorswithoutborders.org,,,1
+548,acnc:50169561394,Australian Red Cross Society,INGO member or funder (by income),,669562515,redcross.org.au,,,1
+549,irs:131656634,American Jewish Joint Distribution Committee Inc,INGO member or funder (by income),,412907647,jdc.org,,,1
+550,irs:592174510,Food for the Poor Inc,INGO member or funder (by income),,412105034,foodforthepoor.com,,,1
+551,irs:736108657,Feed the Children Inc,INGO member or funder (by income),,386446959,feedthechildren.org,,,1
+552,iati:GB-CHC-220949,British Red Cross,INGO member or funder (by income),,375122350,redcross.org.uk,,,1
+553,seed:21,Habitat for Humanity,INGO member or funder (by income),,370010910,habitat.org,https://habitat.wd12.myworkdayjobs.com/External,low,1
+554,irs:205704991,Carter Center Collaborative Inc,INGO member or funder (by income),,367877415,cartercenter.org,,,1
+555,irs:481108359,Heart to Heart International Inc,INGO member or funder (by income),,347317501,hearttoheart.org,,,1
+556,cra:119304855RR0001,World Vision Canada-Vision Mondiale Canada,INGO member or funder (by income),,341816884,worldvision.ca,,,1
+557,iati:GB-COH-213890,Save the Children UK,INGO member or funder (by income),,335511475,savethechildren.org.uk,,,1
+558,irs:135602319,Catholic Medical Mission Board Inc,INGO member or funder (by income),,326399389,cmmb.org,,,1
+559,iati:US-EIN-237297651,Orbis International,INGO member or funder (by income),,323437845,orbis.org,,,1
+560,cra:119219814RR0001,The Canadian Red Cross Society la Société Canadienne de la Croix-Rouge,INGO member or funder (by income),,322911575,redcross.ca,,,1
+561,acnc:28004778081,World Vision Australia,INGO member or funder (by income),,292047211,worldvision.com.au,,,1
+562,irs:311348100,Matthew 25 Ministries Inc,INGO member or funder (by income),,279440386,m25m.org,,,1
+563,irs:541668650,Kingsway Charities Inc,INGO member or funder (by income),,266303035,kingswaycharities.org,,,1
+564,irs:262414132,Mercy Ships International,INGO member or funder (by income),,250375032,mercyships.fr,,,1
+565,irs:954335462,Childrens Hunger Fund,INGO member or funder (by income),,215110859,childrenshungerfund.org,,,1
+566,iati:US-EIN-23-6393344,World Relief Corp of National Association of Evangelicals,INGO member or funder (by income),,205941236,worldrelief.org,,,1
+567,uk:1072612,The United Kingdom Committee for UNICEF,INGO member or funder (by income),,187437199,unicef.org.uk,,,1
+568,iati:US-EIN-58-1593137,DKT International,INGO member or funder (by income),,182329221,dktinternational.org,,,1
+569,cra:118928993RR0001,Plan International Canada Inc.,INGO member or funder (by income),,181660691,plancanada.ca,,,1
+570,eu:0450515100724-79,American Near East Refugee Aid,INGO member or funder (by income),,176317328,anera.org,,,1
+571,iati:GB-CHC-1093861,International Medical Corps UK,INGO member or funder (by income),,174278291,internationalmedicalcorps.org.uk,,,1
+572,irs:520811461,Acdi Voca,INGO member or funder (by income),,162518399,acdivoca.org,,,1
+573,iati:US-EIN-13-3327220,Action Against Hunger USA,INGO member or funder (by income),,160756238,actionagainsthunger.org,https://apply.workable.com/action-against-hunger/,low,1
+574,irs:530242962,Project Hope - the People-To-People Health Foundation Inc,INGO member or funder (by income),,157270945,projecthope.org,,,1
+575,irs:161541024,Rise Against Hunger,INGO member or funder (by income),,155585447,riseagainsthunger.org,,,1
+576,irs:952680390,Food for the Hungry Inc,INGO member or funder (by income),,155404798,fh.org,,,1
+577,irs:237187762,Centro International de Agricultura Tropical Incorporated,INGO member or funder (by income),,153085609,alliancebioversityciat.org,,,1
+579,iati:GB-CHC-1029161,Camfed International,INGO member or funder (by income),,150172652,camfed.org,,,1
+580,irs:954453134,Islamic Development & Empowerment in America,INGO member or funder (by income),,147232658,irusa.org,,,1
+581,uk:1105319,The Against Malaria Foundation,INGO member or funder (by income),,145617014,againstmalaria.com,,,1
+582,irs:270165743,Mana Nutritive Aid Products Inc,INGO member or funder (by income),,138046810,mananutrition.org,,,1
+583,irs:993025512,Rescue Democracy International - Rdi,INGO member or funder (by income),,135100000,rescuedemocracyintl.org,,,1
+584,uk:1154288,Human Appeal,INGO member or funder (by income),,134326393,humanappeal.org.uk,https://humanappeal.bamboohr.com/,medium,1
+585,uk:1026588,Medecins Sans Frontieres (UK),INGO member or funder (by income),,133794849,msf.org.uk,,,1
+586,iati:GB-CHC-1065972,International Rescue Committee UK,INGO member or funder (by income),,133006755,rescue-uk.org,,,1
+587,irs:223419667,Vital Strategies Inc,INGO member or funder (by income),,132394975,theunion.org,,,1
+588,irs:541722887,International Justice Mission,INGO member or funder (by income),,129931939,ijm.org,,,1
+589,iati:GB-CHC-1099776,Malaria Consortium,INGO member or funder (by income),,127099376,malariaconsortium.org,,,1
+590,iati:US-EIN-98-0513530,Alliance for a Green Revolution for Africa,INGO member or funder (by income),,126759117,agra.org,,,1
+591,acnc:30157737329,Latter-day Saint Charities Australia,INGO member or funder (by income),,124700134,latterdaysaintcharities.org,,,2
+592,irs:522340908,Arab Gulf Programme for Development,INGO member or funder (by income),,124323993,agfund.org,,,2
+593,uk:251988,The Gatsby Charitable Foundation,INGO member or funder (by income),,122093059,gatsby.org.uk,,,2
+594,irs:112494808,United Palestinian Appeal Inc,INGO member or funder (by income),,120665815,upaconnect.org,,,2
+595,eu:6685547101951-74,Helen Keller,INGO member or funder (by income),,120225051,helenkellerintl.org,,,2
+596,iati:GB-COH-1100897,Aga Khan Foundation (United Kingdom),INGO member or funder (by income),,116652187,akf.org,,,2
+597,irs:526054268,Pan American Development Foundation Inc,INGO member or funder (by income),,113531319,padf.org,,,2
+598,irs:810799662,Multifaith Alliance Inc,INGO member or funder (by income),,110316945,multifaithalliance.org,,,2
+599,irs:346562544,Brothers Brother Foundation,INGO member or funder (by income),,108316502,brothersbrother.org,,,2
+600,irs:521231983,Aga Khan Foundation USA,INGO member or funder (by income),,106705948,akfusa.org,,,2
+601,uk:1000566,The Salvation Army International Trust,INGO member or funder (by income),,104528130,salvationarmy.org,,,2
+602,iati:US-EIN-13-3870223,International Aids Vaccine Initiative,INGO member or funder (by income),,103360669,iavi.org,,,2
+603,seed:17,Tearfund,INGO member or funder (by income),,102552188,tearfund.org,,,2
+604,uk:1107385,Depaul International,INGO member or funder (by income),,100355134,int.depaulcharity.org,,,2
+605,irs:541460147,Operation Smile Inc,INGO member or funder (by income),,100175924,operationsmile.org,,,2
+606,cra:100072586RR0001,Aga Khan Foundation Canada/fondation Aga Khan Canada,INGO member or funder (by income),,99677006,akfc.ca,,,2
+607,irs:522158152,HALO Trust USA Inc,INGO member or funder (by income),,97207878,halousa.org,,,2
+608,irs:521662800,United States Association for UNHCR,INGO member or funder (by income),,95683592,unrefugees.org,,,2
+609,uk:1126808,Al-Khair Foundation,INGO member or funder (by income),,95589190,alkhair.org,,,2
+610,irs:931057665,Palestine Childrens Relief Fund,INGO member or funder (by income),,94873840,pcrf.net,,,2
+611,cra:821896875RR0001,Islamic Relief - Ir Canada,INGO member or funder (by income),,91887438,islamicreliefcanada.org,,,2
+612,uk:1000851,Amanat Charity Trust,INGO member or funder (by income),,91864157,uwt.org,,,2
+613,seed:16,Christian Aid,INGO member or funder (by income),,91256340,christianaid.org.uk,,,2
+614,iati:US-EIN-300108263,GlobalGiving.org,INGO member or funder (by income),,91098723,globalgiving.org,,,2
+615,iati:US-EIN-23-7069110,Oxfam America,INGO member or funder (by income),,85074205,oxfamamerica.org,https://jobs.smartrecruiters.com/oxfamamerica2,high,2
+616,iati:GB-CHC-285908,World Vision UK,INGO member or funder (by income),,84475019,worldvision.org.uk,,,2
+617,irs:223304404,C I S Development Foundation Inc,INGO member or funder (by income),,82326733,cisdevelopmentfoundation.org,,,2
+618,iati:GB-CHC-292506,CARE International UK,INGO member or funder (by income),,81882755,careinternational.org.uk,,,2
+620,acnc:74068758654,Medecins Sans Frontieres Australia Limited,INGO member or funder (by income),,79781619,msf.org.au,,,2
+621,irs:132907656,Citihope International Inc,INGO member or funder (by income),,79519432,citihope.org,,,2
+622,iati:GB-COH-1364201,Plan International UK,INGO member or funder (by income),,78833208,plan-uk.org,,,2
+624,irs:541382657,Operation Blessing International Relief & Development Corp,INGO member or funder (by income),,78244217,ob.org,,,2
+625,irs:411601449,Feed My Starving Children,INGO member or funder (by income),,77545563,fmsc.org,,,2
+626,irs:200942434,Baitulmaal Inc,INGO member or funder (by income),,77434379,baitulmaal.org,,,2
+627,irs:363241033,ALIGHT,INGO member or funder (by income),,76492994,wearealight.org,,,2
+628,irs:521314847,Adventist Development and Relief Agency International,INGO member or funder (by income),,75928709,adra.org,,,2
+629,irs:930878944,Medical Teams International,INGO member or funder (by income),,74492048,medicalteams.org,,,2
+630,eu:6779772100986-67,Medical Aid for Palestinians,INGO member or funder (by income),,72279111,map.org.uk,,,2
+631,irs:813404708,Good Neighbors Global Partnership Center,INGO member or funder (by income),,72097240,goodneighbors.org,,,2
+632,seed:18,CAFOD,INGO member or funder (by income),,71829220,cafod.org.uk,,,2
+633,irs:132574963,Lutheran World Relief Inc,INGO member or funder (by income),,71718541,lwr.org,,,2
+634,oscr:SC045223,Mary's Meals International Organisation,INGO member or funder (by income),,71170998,marysmeals.org,,,2
+635,irs:521447902,CNFA,INGO member or funder (by income),,70211705,cnfa.org,,,2
+636,irs:520742294,Atlantic Council of the U S Inc,INGO member or funder (by income),,69901633,atlanticcouncil.org,,,2
+637,irs:131656647,Freedom House Inc,INGO member or funder (by income),,69437963,freedomhouse.org,,,2
+638,iati:GB-CHC-1077216,Compassion UK,INGO member or funder (by income),,68030707,compassionuk.org,,,2
+639,irs:262087340,True Sojourners,INGO member or funder (by income),,66770727,truesojourners.org,,,2
+640,acnc:67001692566,Compassion Australia,INGO member or funder (by income),,65732160,compassion.com.au,,,2
+641,irs:133712030,Concern Worldwide U S Inc,INGO member or funder (by income),,65656850,concernusa.org,,,2
+642,irs:592339140,Salvadoran American Humanitarian Foundation Inc,INGO member or funder (by income),,65520408,sahf.org,,,2

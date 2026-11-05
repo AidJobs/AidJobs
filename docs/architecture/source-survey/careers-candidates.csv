@@ -1,0 +1,349 @@
+rank,org_id,name,candidate_url,system_guess,crawls,status,redirect,rule,confidence
+1,seed:1,International Rescue Committee,https://www.rescue.org/jobs-syria,own site (system unknown),2026-43,200,,"own site, careers page",high
+1,seed:1,International Rescue Committee,https://www.rescue.org/praca-dla-wszystkich,own site (system unknown),2026-43,200,,"own site, careers page",high
+1,seed:1,International Rescue Committee,https://airbel.rescue.org/projects/employment-hub,own site (system unknown),2026-43,200,,"own site, careers page",high
+2,seed:8,Prosper Global (formerly Mercy Corps),https://netherlands.prosperglobal.org/careers,own site (system unknown),2026-43,200,,"own site, careers page; 3 pages below answered",high
+2,seed:8,Prosper Global (formerly Mercy Corps),https://www.prosperglobal.org/careers,own site (system unknown),2026-43,200,,"own site, careers page; 3 pages below answered",high
+2,seed:8,Prosper Global (formerly Mercy Corps),https://europe.prosperglobal.org/en-gb/careers,own site (system unknown),2026-43,200,,"own site, careers page; 3 pages below answered",high
+3,unjobs-un:108,United Nations Children's Fund,https://jobs.unicef.org/,own site (system unknown),2026-43,302,https://jobs.unicef.org/en-us/listing/,"own site, careers page redirects; 116 pages below answered",medium
+3,unjobs-un:108,United Nations Children's Fund,https://unicef.org/employment,own site (system unknown),2026-43,301,https://www.unicef.org/employment,"own site, careers page redirects",medium
+3,unjobs-un:108,United Nations Children's Fund,https://www.unicef.org/employment,own site (system unknown),2026-43,404,,"own site, careers path not answering",low
+4,unjobs-nonun:341,Médecins Sans Frontières,https://msf.wd3.myworkdayjobs.com/work-with-msf-ocg-hq-lhs,Workday,2026-43,,,"account by acronym, decided: the site name says work-with-msf-ocg, MSF's Operational Centre Geneva, an MSF section's account; UNjobs' MSF listing covers the movement's jobs (8 captures)",medium
+6,unjobs-un:23,Food and Agriculture Organization of the United Nations,https://fao.taleo.net/,Taleo,2026-43,,,"account by acronym, decided: FAO has long recruited through fao.taleo.net (its careersection pages); whether it still does is step F (7 captures)",medium
+6,unjobs-un:23,Food and Agriculture Organization of the United Nations,https://jobs.fao.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 201 pages below answered",medium
+6,unjobs-un:23,Food and Agriculture Organization of the United Nations,https://www.fao.org/employment,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 3 pages below answered",medium
+7,unjobs-nonun:290,International Potato Center,https://cipotato.org/jobs,own site (system unknown),2026-43,200,,"own site, careers page",high
+7,unjobs-nonun:290,International Potato Center,https://cipotato.org/about-cip/jobs,own site (system unknown),2026-43,200,,"own site, careers page; 3 pages below answered",high
+8,unjobs-un:73,United Nations Development Programme,https://www.undp.org/careers,own site (system unknown),2026-43,200,,"own site, careers page; 23 pages below answered",high
+8,unjobs-un:73,United Nations Development Programme,https://jobs.undp.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 5 pages below answered",medium
+8,unjobs-un:73,United Nations Development Programme,https://www.undp.org/es/careers,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 6 pages below answered",medium
+9,unjobs-un:102,World Food Programme,https://www.wfp.org/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+9,unjobs-un:102,World Food Programme,https://wd3.myworkdaysite.com/recruiting/wfp/job_openings,Workday,2026-43,,,"account by acronym, decided: WFP's job openings are on Workday at myworkdaysite.com/recruiting/wfp/job_openings, 116 captures (116 captures)",high
+9,unjobs-un:102,World Food Programme,https://ja.wfp.org/careers,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 2 pages below answered",medium
+10,unjobs-nonun:520,World Wildlife Fund,https://jobs.smartrecruiters.com/worldwildlifefundinc1,SmartRecruiters,2026-43,,,account by full name (4 captures),high
+11,unjobs-nonun:3,ACF International,https://recrutement.actioncontrelafaim.org/travailler-avec-nous,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+11,unjobs-nonun:3,ACF International,https://recrutement.actioncontrelafaim.org/en/work-with-us,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 3 pages below answered",medium
+11,unjobs-nonun:3,ACF International,https://www.actioncontrelafaim.org/s-engager/nous-rejoindre,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+13,unjobs-nonun:463,TechnoServe,https://www.technoserve.org/join-the-mission/careers-old,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+13,unjobs-nonun:463,TechnoServe,https://www.technoserve.org/jobs,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+16,unjobs-nonun:426,Room to Read,https://osv-rtr.wd5.myworkdayjobs.com/RoomToRead,Workday,2026-43,,,account by full name (19 captures),high
+16,unjobs-nonun:426,Room to Read,https://www.roomtoread.org/about-us/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+17,unjobs-un:103,World Health Organization,https://careers.who.int/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path (shared host); 3 pages below answered",medium
+17,unjobs-un:103,World Health Organization,https://who.taleo.net/,Taleo,2026-43,,,"account by acronym, decided: WHO's vacancies have been on who.taleo.net (careersection ex); whether it still does is step F (6 captures)",medium
+22,unjobs-nonun:390,Plan International,https://jobs.plan-international.org/,own site (system unknown),2026-43,200,,"own site, careers page; 1785 pages below answered",high
+23,unjobs-un:26,International Criminal Court,https://www.icc-cpi.int/jobs,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 4 pages below answered",medium
+25,unjobs-nonun:368,One Acre Fund,https://job-boards.greenhouse.io/oneacrefund,Greenhouse,2026-43,,,account by full name (30 captures),high
+25,unjobs-nonun:368,One Acre Fund,https://job-boards.greenhouse.io/oneacrefundglobal,Greenhouse,2026-43,,,account by full name (1 captures),high
+25,unjobs-nonun:368,One Acre Fund,https://oneacrefund.org/careers,own site (system unknown),2026-43,200,,"own site, careers page; 11 pages below answered",high
+26,unjobs-nonun:304,Jhpiego,https://jhpiego.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+26,unjobs-nonun:304,Jhpiego,https://career.jhpiego.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+27,unjobs-un:79,United Nations Population Fund,https://www.unfpa.org/jobs,own site (system unknown),2026-43,200,,"own site, careers page; 29 pages below answered",high
+27,unjobs-un:79,United Nations Population Fund,https://esaro.unfpa.org/en/vacancies,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+27,unjobs-un:79,United Nations Population Fund,https://kazakhstan.unfpa.org/ru/vacancies,own site (system unknown),2026-43,403,,"own site, pages below a careers path; 1 pages below answered",medium
+29,unjobs-nonun:180,FHI 360,https://iwl.fhi360.org/careers-in-trade-ebook-viewer,own site (system unknown),2026-43,200,,"own site, careers page",high
+29,unjobs-nonun:180,FHI 360,https://wbl.fhi360.org/job-shadows,own site (system unknown),2026-43,200,,"own site, careers page",high
+29,unjobs-nonun:180,FHI 360,https://www.fhi360.org/careers-benefits,own site (system unknown),2026-43,200,,"own site, careers page",high
+29,unjobs-nonun:180,FHI 360,https://fhi.wd1.myworkdayjobs.com/FHI_360_External_Career_Portal,Workday,2026-43,,,account by full name (188 captures),medium
+30,unjobs-nonun:418,Relief International,https://www.ri.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+31,unjobs-nonun:247,International Committee of the Red Cross,https://careers.icrc.org/,own site (system unknown),2026-43,200,,"own site, careers page; 8224 pages below answered",high
+31,unjobs-nonun:247,International Committee of the Red Cross,https://icrc.org/jobs,own site (system unknown),2026-43,308,https://www.icrc.org/jobs,"own site, careers page redirects",medium
+31,unjobs-nonun:247,International Committee of the Red Cross,https://www.icrc.org/jobs,own site (system unknown),2026-43,404,,"own site, careers path not answering",low
+32,unjobs-nonun:448,Solidarités International,https://www.solidarites.org/en/since-1980/join-us,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 15 pages below answered",medium
+32,unjobs-nonun:448,Solidarités International,https://www.solidarites.org/fr/depuis-1980/travailler-avec-nous,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 27 pages below answered",medium
+34,unjobs-un:69,UN Women,https://www.unwomen.org/en/jobs,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+34,unjobs-un:69,UN Women,https://www.unwomen.org/es/jobs,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+34,unjobs-un:69,UN Women,https://www.unwomen.org/fr/jobs,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+36,unjobs-nonun:285,International Maize and Wheat Improvement Center,https://apply.workable.com/cimmyt-1/,Workable,2026-43,,,account by website name (4 captures),medium
+37,unjobs-un:14,European Bank for Reconstruction and Development,https://jobs.ebrd.com/,own site (system unknown),2026-43,200,,"own site, careers page; 91 pages below answered",high
+38,unjobs-nonun:252,IMPACT Initiatives,https://www.impact-initiatives.org/work-with-us,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+40,unjobs-nonun:74,Catholic Relief Services,https://crsafgjobs.crs.org/job.php,own site (system unknown),2026-43,200,,"own site, careers page",high
+40,unjobs-nonun:74,Catholic Relief Services,https://crs.org/about-us/careers,own site (system unknown),2026-43,301,https://www.crs.org/about-us/careers,"own site, careers page redirects",medium
+40,unjobs-nonun:74,Catholic Relief Services,https://www.crs.org/about-us/careers,own site (system unknown),2026-43,403,,"own site, careers path not answering",low
+41,unjobs-un:61,Organization for Security and Co-operation in Europe,https://jobs.osce.org/,own site (system unknown),2026-43,200,,"own site, careers page; 45 pages below answered",high
+41,unjobs-un:61,Organization for Security and Co-operation in Europe,https://talent.osce.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+41,unjobs-un:61,Organization for Security and Co-operation in Europe,https://vacancies.osce.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 19 pages below answered",medium
+43,seed:12,Innovations for Poverty Action,https://poverty-action.org/job,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+43,seed:12,Innovations for Poverty Action,https://www.poverty-action.org/job,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+47,seed:2,PATH,https://www.path.org/who-we-are/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+47,seed:2,PATH,https://path.wd1.myworkdayjobs.com/External,Workday,2026-43,,,account by full name (34 captures),medium
+48,unjobs-nonun:342,Médecins du Monde,https://www.medecinsdumonde.org/nous-rejoindre,own site (system unknown),2026-43,200,,"own site, careers page; 4 pages below answered",high
+48,unjobs-nonun:342,Médecins du Monde,https://www.medecinsdumonde.org/job,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 4 pages below answered",medium
+48,unjobs-nonun:342,Médecins du Monde,https://www.medecinsdumonde.org/en/job,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 5 pages below answered",medium
+48,unjobs-nonun:342,Médecins du Monde,https://apply.workable.com/medecins-du-monde/,Workable,2026-43,,,"account by decided, decided: the account's name is the organisation's full name; which national section of Médecins du Monde uses it is unknown (step F) (1 captures)",low
+49,unjobs-un:63,Resident Coordinator System,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+50,unjobs-nonun:347,Nature Conservancy,https://nature.wd108.myworkdayjobs.com/ExternalCareers,Workday,2026-43,,,account by website name (49 captures),medium
+51,unjobs-nonun:179,Evidence Action,https://apply.workable.com/evidence-action/,Workable,2026-43,,,"account by full name, decided: full name, 32 captures; the likely current system (32 captures)",medium
+51,unjobs-nonun:179,Evidence Action,https://evidenceaction.bamboohr.com/,BambooHR,2026-43,,,"account by full name, decided: full name, 5 captures; possibly an earlier system (step F) (5 captures)",low
+53,unjobs-un:56,Office of the High Commissioner for Human Rights,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+54,unjobs-nonun:283,International Institute of Tropical Agriculture,https://apply.workable.com/iita/,Workable,2026-43,,,account by website name (49 captures),low
+55,unjobs-nonun:15,Aga Khan Development Network,https://the.akdn/careers,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+55,unjobs-nonun:15,Aga Khan Development Network,https://www.the.akdn/careers,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+56,unjobs-nonun:172,European External Action Service,https://www.eeas.europa.eu/eeas/vacancies_de,own site (system unknown),2026-43,200,,"own site, careers page",high
+56,unjobs-nonun:172,European External Action Service,https://www.eeas.europa.eu/eeas/vacancies_en,own site (system unknown),2026-43,200,,"own site, careers page",high
+56,unjobs-nonun:172,European External Action Service,https://www.eeas.europa.eu/delegations/albania/vacancy-mobile-journalist-europe-house_en,own site (system unknown),2026-43,200,,"own site, careers page",medium
+57,unjobs-un:95,UN Relief and Works Agency for Palestine Refugees,https://keeplearning.unrwa.org/lebanon/jobs-and-occupations,own site (system unknown),2026-43,301,https://keeplearning.unrwa.org/404,"own site, careers page redirects",medium
+57,unjobs-un:95,UN Relief and Works Agency for Palestine Refugees,https://jobs.unrwa.org/,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+58,unjobs-nonun:136,Deutsche Gesellschaft für Internationale Zusammenarbeit,https://jobs.giz.de/,own site (system unknown),2026-43,200,,"own site, careers page; 44 pages below answered",high
+58,unjobs-nonun:136,Deutsche Gesellschaft für Internationale Zusammenarbeit,https://www.giz.de/de/karriere,own site (system unknown),2026-43,200,,"own site, careers page; 10 pages below answered",high
+58,unjobs-nonun:136,Deutsche Gesellschaft für Internationale Zusammenarbeit,https://www.giz.de/en/career,own site (system unknown),2026-43,200,,"own site, careers page; 6 pages below answered",high
+59,unjobs-un:43,International Telecommunication Union,https://jobs.itu.int/,own site (system unknown),2026-43,200,,"own site, careers page; 133 pages below answered",high
+60,unjobs-nonun:382,Partners In Health,https://jobs.jobvite.com/pih,Jobvite,2026-43,,,"account by acronym, decided: abbreviation only, 12 captures; Partners In Health is the best-known 'PIH' employer, unconfirmed (step F) (12 captures)",low
+62,unjobs-nonun:230,HIAS,https://hias.org/events/employment-authorization-102-maintaining-ead-continuity-afghan-clients,own site (system unknown),2026-43,200,,"own site, careers page",high
+62,unjobs-nonun:230,HIAS,https://hias.org/who/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+62,unjobs-nonun:230,HIAS,https://hias.org/career-and-internship-opportunities,own site (system unknown),2026-43,301,https://hias.org/who/careers/,"own site, careers page redirects",medium
+63,unjobs-nonun:156,Elizabeth Glaser Pediatric AIDS Foundation,https://jobs.smartrecruiters.com/elizabethglaserpediatricaidsfoundation3,SmartRecruiters,2026-43,,,account by full name (1 captures),high
+63,unjobs-nonun:156,Elizabeth Glaser Pediatric AIDS Foundation,https://pedaids.org/contracting-opportunities/job-advert,own site (system unknown),2026-43,200,,"own site, careers page",high
+63,unjobs-nonun:156,Elizabeth Glaser Pediatric AIDS Foundation,https://pedaids.org/get-involved/careers,own site (system unknown),2026-43,200,,"own site, careers page; 2 pages below answered",high
+64,seed:3,GiveDirectly,https://job-boards.greenhouse.io/givedirectly,Greenhouse,2026-43,,,account by full name (109 captures),high
+64,seed:3,GiveDirectly,https://www.givedirectly.org/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+65,unjobs-nonun:16,Agence Française de Développement,https://metis.afd.fr/en/join-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+65,unjobs-nonun:16,Agence Française de Développement,https://cambodia-kh.afd.fr/fr/thematiques/emploi,own site (system unknown),2026-43,200,,"own site, careers page",medium
+66,unjobs-un:11,Department of Operational Support,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+67,unjobs-nonun:409,RTI International,https://www.rti.org/publication/recruitment-strategies-integration-mobile-health-sickle-cell-disease-care-increase-hydroxyurea-utili,own site (system unknown),2026-43,200,,"own site, careers page",high
+67,unjobs-nonun:409,RTI International,https://careers.rti.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 15 pages below answered",medium
+67,unjobs-nonun:409,RTI International,https://www.rti.org/careers,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 3 pages below answered",medium
+71,unjobs-un:89,Office on Drugs and Crime,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+74,unjobs-nonun:94,ChildFund International,https://www.childfund.org/stories/2026/job-readiness-without-market-alignment-wont-deliver-impact,own site (system unknown),2026-43,200,,"own site, careers page",medium
+75,unjobs-nonun:509,Winrock International,https://wallacecenter.winrock.org/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+75,unjobs-nonun:509,Winrock International,https://winrock.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page; 14 pages below answered",high
+75,unjobs-nonun:509,Winrock International,https://winrock.org/wp-content/uploads/2020/09/Recruitment-Platform-Feasibility-Study.pdf,own site (system unknown),2026-43,200,,"own site, careers page",medium
+76,unjobs-nonun:289,International Planned Parenthood Federation,https://w03.ippf.org/jobs-and-opportunities,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 4 pages below answered",medium
+76,unjobs-nonun:289,International Planned Parenthood Federation,https://africa.ippf.org/jobs-and-opportunities,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+76,unjobs-nonun:289,International Planned Parenthood Federation,https://ippf.jobs.personio.com/,Personio,2026-43,,,account by website name (18 captures),low
+77,unjobs-nonun:406,RAND Corporation,https://rand.wd5.myworkdayjobs.com/External_Career_Site,Workday,2026-43,,,account by full name (22 captures),medium
+78,unjobs-nonun:96,Church World Service,https://careers-cwsglobal.icims.com/jobs,iCIMS,2026-43,,,"account by acronym, decided: the account is the organisation's own website name (cwsglobal.org) (9 captures)",medium
+79,unjobs-nonun:242,Humanity and Inclusion,https://www.hi.org/en/jobs,own site (system unknown),2026-43,200,,"own site, careers page",high
+79,unjobs-nonun:242,Humanity and Inclusion,https://www.hi.org/fr/emplois,own site (system unknown),2026-43,200,,"own site, careers page",high
+80,unjobs-nonun:322,Management Sciences for Health,https://msh.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+80,unjobs-nonun:322,Management Sciences for Health,https://msh.wd1.myworkdayjobs.com/External,Workday,2026-43,,,"account by acronym, decided: abbreviation only, on a generic site name (External); Management Sciences for Health is a likely owner, unconfirmed (step F) (7 captures)",low
+81,unjobs-nonun:214,Global Green Growth Institute,https://gggi.org/who-we-are/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+81,unjobs-nonun:214,Global Green Growth Institute,https://careers.gggi.org/,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 24 pages below answered",medium
+84,unjobs-nonun:506,Wildlife Conservation Society,https://www.wcs.org/about-us/careers,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+85,unjobs-nonun:299,Ipas,https://ipas.wd5.myworkdayjobs.com/Ipas,Workday,2026-43,,,account by full name (18 captures),medium
+89,unjobs-nonun:387,People in Need,https://career.peopleinneed.net/,own site (system unknown),2026-43,200,,"own site, careers page",high
+89,unjobs-nonun:387,People in Need,https://apply.workable.com/people-in-need-2/,Workable,2026-43,,,account by full name (19 captures),high
+89,unjobs-nonun:387,People in Need,https://www.peopleinneed.net/career,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 19 pages below answered",medium
+91,unjobs-nonun:47,Bill and Melinda Gates Foundation,https://www.gatesfoundation.org/about/careers,own site (system unknown),2026-43,200,,"own site, careers page; 2 pages below answered",high
+91,unjobs-nonun:47,Bill and Melinda Gates Foundation,https://gatesfoundation.wd1.myworkdayjobs.com/Gates,Workday,2026-43,,,account by website name (50 captures),medium
+93,unjobs-nonun:61,CARE,https://job-boards.greenhouse.io/careportalinc,Greenhouse,2026-43,,,account by full name (3 captures),medium
+95,unjobs-nonun:259,Institut Pasteur,https://emploi.pasteur.fr/,own site (system unknown),2026-43,302,https://emploi.pasteur.fr/accueil.aspx,"own site, careers page redirects; 327 pages below answered",medium
+95,unjobs-nonun:259,Institut Pasteur,https://www.pasteur.fr/en/careers,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+97,unjobs-nonun:389,Pew Charitable Trusts,https://pewtrusts.wd5.myworkdayjobs.com/TrustsExternal,Workday,2026-43,,,account by website name (19 captures),medium
+98,unjobs-nonun:118,Council on Foreign Relations,https://www.cfr.org/career-opportunities,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+98,unjobs-nonun:118,Council on Foreign Relations,https://careers-cfr.icims.com/jobs,iCIMS,2026-43,,,"account by acronym, decided: abbreviation only, 34 captures; the Council on Foreign Relations is the likeliest owner (step F) (34 captures)",low
+99,unjobs-nonun:84,Center for Strategic and International Studies,https://www.csis.org/about/careers-culture,own site (system unknown),2026-43,200,,"own site, careers page; 1 pages below answered",high
+99,unjobs-nonun:84,Center for Strategic and International Studies,https://careers.csis.org/,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+99,unjobs-nonun:84,Center for Strategic and International Studies,https://www.csis.org/about-us/careers-culture,own site (system unknown),2026-43,not captured,,"own site, careers path not answering",low
+100,unjobs-nonun:249,IDinsight,https://idinsight.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+102,unjobs-nonun:113,Conservation International,https://samoa.conservation.org/vacancies,own site (system unknown),2026-43,200,,"own site, careers page",high
+102,unjobs-nonun:113,Conservation International,https://japan.conservation.org/about/recruitment,own site (system unknown),2026-43,200,,"own site, careers page",high
+104,unjobs-un:30,Inter-American Development Bank,https://jobs.iadb.org/,own site (system unknown),2026-43,200,,"own site, careers page; 46 pages below answered",high
+104,unjobs-un:30,Inter-American Development Bank,https://blogs.iadb.org/trabajo/es/empleo-en-el-g20-promoviendo-la-diversidad-y-una-transicion-justa,own site (system unknown),2026-43,301,https://www.iadb.org/es/blog-del-bid,"own site, careers page redirects",medium
+104,unjobs-un:30,Inter-American Development Bank,https://blogs.iadb.org/trabajo/es/empleo-femenino-al-centro-de-la-recuperacion,own site (system unknown),2026-43,301,https://www.iadb.org/es/blog-del-bid,"own site, careers page redirects",medium
+106,unjobs-nonun:468,"The Global Fund - to Fight AIDS, TB, and Malaria",https://theglobalfund.wd1.myworkdayjobs.com/External,Workday,2026-43,,,account by website name (4 captures),medium
+107,unjobs-un:2,Asian Infrastructure Investment Bank,https://www.aiib.org/en/opportunities/career,own site (system unknown),2026-43,not captured,,"own site, pages below a careers path; 1 pages below answered",medium
+109,unjobs-nonun:333,Milken Institute,https://milkeninstitute.org/about/careers,own site (system unknown),2026-43,200,,"own site, careers page",high
+109,unjobs-nonun:333,Milken Institute,https://milkeninstitute.org/careers,own site (system unknown),2026-43,301,https://milkeninstitute.org/about/careers,"own site, careers page redirects",medium
+109,unjobs-nonun:333,Milken Institute,https://www.milkeninstitute.org/careers,own site (system unknown),2026-43,301,https://milkeninstitute.org/careers,"own site, careers page redirects",medium
+111,unjobs-un:98,United Nations Volunteers,https://toolkit.unv.org/recruitment,own site (system unknown),2026-43,200,,"own site, careers page",high
+112,unjobs-nonun:522,ZemiTek,https://careers-zemitek.icims.com/jobs,iCIMS,2026-43,,,account by full name (3 captures),medium
+116,unjobs-un:55,Organisation for Economic Co-operation and Development,https://jobs.smartrecruiters.com/oecd,SmartRecruiters,2026-43,,,account by website name (3 captures),low
+118,unjobs-nonun:454,Street Child,https://apply.workable.com/streetchildcareers/,Workable,2026-43,,,account by full name (7 captures),high
+119,unjobs-nonun:391,Precision Development,https://precisiondev.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),medium
+120,unjobs-nonun:63,CDP Worldwide,https://cdpworldwide.teamtailor.com/,Teamtailor,2026-43,,,account by full name (26 captures),high
+120,unjobs-nonun:63,CDP Worldwide,https://apply.workable.com/cdp/,Workable,2026-43,,,"account by acronym, decided: abbreviation only, 1 capture; CDP Worldwide is a likely owner (step F) (1 captures)",low
+122,unjobs-un:13,Department of Political Affairs and Peace-building,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+125,unjobs-nonun:206,GiveWell,https://job-boards.greenhouse.io/givewell,Greenhouse,2026-43,,,account by full name (30 captures),high
+128,unjobs-un:1,Asian Development Bank,https://adb.taleo.net/,Taleo,2026-43,,,"account by acronym, decided: the Asian Development Bank has recruited through adb.taleo.net; whether it still does is step F (10 captures)",medium
+129,unjobs-nonun:104,Clinton Foundation,https://job-boards.greenhouse.io/clintonfoundation,Greenhouse,2026-43,,,"account by full name, decided: full name, 19 captures; the likely current system (19 captures)",medium
+129,unjobs-nonun:104,Clinton Foundation,https://careers-clintonfoundation.icims.com/jobs,iCIMS,2026-43,,,"account by full name, decided: full name, 3 captures; possibly an earlier system (step F) (3 captures)",low
+132,unjobs-nonun:346,Natural Resources Defense Council,https://careers-nrdc.icims.com/jobs,iCIMS,2026-43,,,account by website name (22 captures),low
+135,unjobs-nonun:519,World Resources Institute,https://wri.wd501.myworkdayjobs.com/WRI_India,Workday,2026-43,,,"account by acronym, decided: WRI's own sites on Workday (WRI, WRI_India) (5 captures)",medium
+135,unjobs-nonun:519,World Resources Institute,https://jobs.jobvite.com/wri,Jobvite,2026-43,,,"account by acronym, decided: abbreviation only, 3 captures; possibly WRI's earlier system (step F) (3 captures)",low
+142,unjobs-nonun:464,Technopolis Group,https://technopolis-group.jobs.personio.com/,Personio,2026-43,,,account by full name (9 captures),high
+143,unjobs-nonun:475,Triggerise,https://triggerise.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
+147,unjobs-un:75,Economic Commission for Africa,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+148,unjobs-un:16,Economic Commission for Latin America and the Caribbean,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+149,unjobs-un:24,International Atomic Energy Agency,https://iaea.taleo.net/,Taleo,2026-43,,,account by website name (35 captures),low
+152,unjobs-nonun:377,Pact,https://careers-pactworld.icims.com/jobs,iCIMS,2026-43,,,"account by website name, decided: the account is the organisation's own website name (pactworld.org) (13 captures)",medium
+155,unjobs-nonun:55,Brookings Institution,https://careers-brookings.icims.com/jobs,iCIMS,2026-43,,,account by website name (31 captures),medium
+159,unjobs-un:17,Economic and Social Commission for Asia and the Pacific,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+161,unjobs-nonun:272,International Council on Clean Transportation,https://icct.bamboohr.com/,BambooHR,2026-43,,,"account by acronym, decided: abbreviation only; also the International Centre for Counter-Terrorism's abbreviation (step F) (6 captures)",low
+164,unjobs-nonun:413,Rare,https://careers-rare.icims.com/jobs,iCIMS,2026-43,,,account by full name (12 captures),medium
+165,unjobs-nonun:438,Search for Common Ground,https://sfcg.bamboohr.com/,BambooHR,2026-43,,,"account by decided, decided: the account is Search for Common Ground's own website name (sfcg.org); the other organisation matches only through a website found by the search (2 captures)",medium
+166,unjobs-un:80,UN High Commissioner for Refugees,https://unhcr.wd3.myworkdayjobs.com/External,Workday,2026-43,,,account by website name (156 captures),low
+167,unjobs-nonun:502,Wellcome Trust,https://wellcome.wd3.myworkdayjobs.com/Wellcome,Workday,2026-43,,,account by website name (8 captures),medium
+169,unjobs-nonun:350,Near East Foundation,https://neareast.bamboohr.com/,BambooHR,2026-43,,,account by website name (3 captures),medium
+171,unjobs-nonun:41,Banyan Global,https://careers-banyanglobal.icims.com/jobs,iCIMS,2026-43,,,account by full name (5 captures),high
+176,unjobs-un:35,International Monetary Fund,https://imf.wd5.myworkdayjobs.com/IMF,Workday,2026-43,,,"account by acronym, decided: the IMF's careers site on Workday (site IMF), 44 captures (44 captures)",medium
+178,unjobs-un:53,Office for the Coordination of Humanitarian Affairs,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+180,unjobs-un:90,UN Office at Geneva,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+188,unjobs-nonun:355,Nonviolent Peaceforce International,https://nonviolentpeaceforce.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),medium
+193,unjobs-nonun:498,WaterAid,https://apply.workable.com/wateraid/,Workable,2026-43,,,account by full name (17 captures),high
+196,unjobs-nonun:282,International Institute for Sustainable Development,https://iisd.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),low
+204,unjobs-nonun:383,Partnership for Supply Chain Management,https://pfscm.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),low
+206,unjobs-nonun:491,VillageReach,https://apply.workable.com/villagereachcareers/,Workable,2026-43,,,account by full name (9 captures),high
+207,unjobs-un:104,World Intellectual Property Organization,https://wipo.taleo.net/,Taleo,2026-43,,,account by website name (28 captures),low
+211,unjobs-nonun:89,Chan Zuckerberg Initiative,https://job-boards.greenhouse.io/chanzuckerberginitiative,Greenhouse,2026-43,,,account by full name (18 captures),high
+212,unjobs-un:9,Department of Global Communications,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+213,unjobs-un:18,Economic and Social Commission for Western Asia,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+218,unjobs-un:100,United Nations Support Office in Haiti,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+223,unjobs-nonun:514,World Central Kitchen,https://apply.workable.com/world-central-kitchen/,Workable,2026-43,,,account by full name (5 captures),high
+224,unjobs-nonun:233,Heifer International,https://jobs.jobvite.com/heifer,Jobvite,2026-43,,,account by website name (13 captures),medium
+225,unjobs-nonun:119,Counterpart International,https://job-boards.greenhouse.io/counterpart,Greenhouse,2026-43,,,account by website name (2 captures),medium
+227,seed:4,Human Rights Watch,https://job-boards.greenhouse.io/humanrightswatch,Greenhouse,2026-43,,,account by full name (25 captures),high
+228,unjobs-nonun:57,Busara Center for Behavioral Economics,https://jobs.lever.co/busaracenter,Lever,2026-43,,,account by website name (1 captures),medium
+228,unjobs-nonun:57,Busara Center for Behavioral Economics,https://apply.workable.com/busara/,Workable,2026-43,,,"account by acronym, decided: a distinctive name (Busara Center for Behavioral Economics) (2 captures)",medium
+233,unjobs-nonun:193,Forest Stewardship Council,https://fsc.jobs.personio.com/,Personio,2026-43,,,"account by acronym, decided: abbreviation only; the Forest Stewardship Council is based in Bonn, where Personio is common; unconfirmed (step F) (8 captures)",low
+234,unjobs-nonun:217,Global Initiative Against Transnational Organized Crime,https://globalinitiative.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),medium
+245,unjobs-un:91,UN Office at Nairobi,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+246,unjobs-un:74,UN Office for Disaster Risk Reduction,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+248,unjobs-nonun:521,WorldFish,https://apply.workable.com/worldfish/,Workable,2026-43,,,account by full name (12 captures),high
+254,unjobs-nonun:19,Albo,https://albo.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),medium
+255,unjobs-nonun:37,B Lab,https://job-boards.greenhouse.io/blab,Greenhouse,2026-43,,,account by full name (10 captures),medium
+260,unjobs-nonun:138,"DevTech Systems, Inc.",https://careers-devtechsys.icims.com/jobs,iCIMS,2026-43,,,account by website name (2 captures),medium
+264,unjobs-nonun:305,John D. and Catherine T. MacArthur Foundation,https://macfound.wd1.myworkdayjobs.com/MAC_FOUND_EXT_CAREERS,Workday,2026-43,,,account by website name (12 captures),medium
+266,unjobs-un:52,Office of Administration of Justice,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+267,unjobs-un:58,Office of Internal Oversight Services,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+270,unjobs-nonun:395,ProVeg International,https://proveg.jobs.personio.de/,Personio,2026-43,,,account by website name (1 captures),medium
+276,unjobs-un:50,UN Organisation Stabilization Mission in the DR Congo,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+279,unjobs-nonun:10,Acumen Fund,https://job-boards.greenhouse.io/acumen,Greenhouse,2026-43,,,account by website name (5 captures),medium
+280,unjobs-nonun:30,Ashoka,https://jobs.jobvite.com/ashoka,Jobvite,2026-43,,,account by full name (1 captures),medium
+282,unjobs-nonun:421,Restless Development,https://restlessdevelopment.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+283,unjobs-nonun:329,Mennonite Economic Development Associates,https://meda.bamboohr.com/,BambooHR,2026-43,,,"account by decided, decided: MEDA's website name; which MEDA entity uses it is unknown (step F) (2 captures)",low
+284,unjobs-nonun:32,Asia Pacific Foundation of Canada (APF Canada),https://asiapacific.bamboohr.com/,BambooHR,2026-43,,,account by website name (3 captures),medium
+288,unjobs-un:7,Department of Economic and Social Affairs,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+289,unjobs-un:10,"Department of Management Strategy, Policy and Compliance",https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+290,unjobs-nonun:161,Enveritas,https://job-boards.greenhouse.io/enveritas,Greenhouse,2026-43,,,account by full name (2 captures),high
+294,unjobs-nonun:226,Greenpeace,https://greenpeace.bamboohr.com/,BambooHR,2026-43,,,account by full name (9 captures),high
+295,unjobs-nonun:239,Hivos,https://hivos.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),medium
+298,unjobs-un:28,International Commission on Missing Persons,https://icmp.bamboohr.com/,BambooHR,2026-43,,,"account by website name, decided: ICMP's website name (icmp.int); a short name, unconfirmed (step F) (5 captures)",low
+299,unjobs-nonun:291,International Refugee Assistance Project,https://jobs.lever.co/refugeerights,Lever,2026-43,,,account by website name (3 captures),medium
+300,unjobs-nonun:335,Mines Advisory Group,https://apply.workable.com/mag-international/,Workable,2026-43,,,account by website name (4 captures),medium
+306,unjobs-nonun:481,United Nations Convention to Combat Desertification,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+308,unjobs-nonun:324,MasterCard Foundation,https://job-boards.greenhouse.io/mastercardfoundation,Greenhouse,2026-43,,,account by full name (6 captures),high
+312,unjobs-nonun:27,Armed Conflict Location and Event Data Project,https://acleddata.bamboohr.com/,BambooHR,2026-43,,,account by website name (6 captures),medium
+313,unjobs-nonun:11,Adam Smith International,https://adamsmithinternational1.recruitee.com/,Recruitee,2026-43,,,account by full name (13 captures),high
+321,unjobs-nonun:51,Bloomberg Philanthropies,https://bloomberg.avature.net/,Avature,2026-43,,,"account by website name, decided: Bloomberg's careers site; Bloomberg Philanthropies' jobs may be listed there (step F) (926 captures)",low
+322,unjobs-nonun:54,BlueOrchard Finance Ltd,https://blueorchard.bamboohr.com/,BambooHR,2026-43,,,account by website name (6 captures),medium
+329,unjobs-nonun:155,Education Development Center,https://jobs.smartrecruiters.com/educationdevelopmentcenter,SmartRecruiters,2026-43,,,account by full name (1 captures),high
+333,unjobs-nonun:198,Fòs Feminista,https://fosfeminista.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+338,unjobs-nonun:260,Institute for Energy Economics and Financial Analysis,https://ieefa.bamboohr.com/,BambooHR,2026-43,,,account by website name (3 captures),low
+344,unjobs-nonun:256,ITAD Limited,https://itadltd.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),medium
+348,unjobs-un:57,Office of Information and Communications Technology,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+349,unjobs-nonun:534,office-of-the-special-adviser-on-africa,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+350,unjobs-nonun:375,Oxford Policy Management,https://careers-opml.icims.com/jobs,iCIMS,2026-43,,,account by website name (2 captures),low
+353,unjobs-nonun:539,rand-europe,https://apply.workable.com/rand-europe/,Workable,2026-43,,,account by full name (2 captures),high
+354,unjobs-nonun:415,Refugees International,https://refugeesinternational.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
+356,unjobs-nonun:419,Resolve to Save Lives,https://job-boards.greenhouse.io/resolvetosavelives,Greenhouse,2026-43,,,account by full name (4 captures),high
+361,unjobs-un:71,UN Assistance Mission in Afghanistan,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+365,unjobs-nonun:490,Village Capital,https://vilcap.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),medium
+368,unjobs-un:106,World Trade Organization,https://wto.wd3.myworkdayjobs.com/External,Workday,2026-43,,,"account by acronym, decided: abbreviation only (site External); the World Trade Organization is the likeliest owner (step F) (7 captures)",low
+369,unjobs-nonun:95,Children's Investment Fund Foundation,https://apply.workable.com/ciff/,Workable,2026-43,,,account by website name (4 captures),low
+371,unjobs-nonun:121,Cuso International,https://apply.workable.com/cuso-international/,Workable,2026-43,,,"account by decided, decided: full name, 6 captures (6 captures)",medium
+371,unjobs-nonun:121,Cuso International,https://cusointernational.bamboohr.com/,BambooHR,2026-43,,,"account by decided, decided: full name, 2 captures; possibly an earlier system (step F) (2 captures)",low
+375,unjobs-nonun:1,350.org,https://350.bamboohr.com/,BambooHR,2026-43,,,"account by acronym, decided: 350.org's name; a bare number, unconfirmed (step F) (7 captures)",low
+376,unjobs-nonun:7,Access Now,https://accessnow.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+378,unjobs-nonun:24,American Public Health Association,https://job-boards.greenhouse.io/americanpublichealthassociation,Greenhouse,2026-43,,,"account by full name, decided: full name (1 captures)",medium
+381,unjobs-nonun:58,Business and Human Rights Resource Centre,https://bhrrc.bamboohr.com/,BambooHR,2026-43,,,"account by acronym, decided: a distinctive abbreviation (Business and Human Rights Resource Centre) (5 captures)",medium
+382,unjobs-nonun:87,Centre for Information Resilience,https://apply.workable.com/centre-for-information-resilience/,Workable,2026-43,,,account by full name (4 captures),high
+386,unjobs-nonun:109,Commonland,https://commonland.recruitee.com/,Recruitee,2026-43,,,account by full name (5 captures),high
+388,unjobs-un:12,Department of Peace Operations,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+390,unjobs-un:20,Ethics Office,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+391,unjobs-nonun:171,European Endowment for Democracy,https://apply.workable.com/eed/,Workable,2026-43,,,"account by acronym, decided: abbreviation only, 11 captures; the European Endowment for Democracy is a likely owner (step F) (11 captures)",low
+393,unjobs-nonun:210,Global Citizen,https://globalcitizen.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+394,unjobs-nonun:212,Global Energy Monitor,https://globalenergymonitor.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
+395,unjobs-nonun:213,Global Fishing Watch,https://job-boards.greenhouse.io/globalfishingwatch,Greenhouse,2026-43,,,account by full name (2 captures),high
+396,unjobs-nonun:221,Global Reporting Initiative,https://gri.recruitee.com/,Recruitee,2026-43,,,"account by decided, decided: the Global Reporting Initiative is in Amsterdam and Recruitee is a Dutch system; unconfirmed (step F) (6 captures)",low
+399,unjobs-nonun:529,independent-institution-on-missing-persons-in-the-syrian-arab-republic-iimp,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+410,unjobs-un:88,Office of Counter-Terrorism,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+411,unjobs-nonun:537,office-of-the-united-nations-ombudsman-and-mediation-services,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+412,unjobs-nonun:367,Omidyar Network,https://job-boards.greenhouse.io/omidyarnetwork,Greenhouse,2026-43,,,account by full name (3 captures),high
+415,unjobs-nonun:379,Panagora Group,https://panagoragroup.zohorecruit.com/,Zoho Recruit,2026-43,,,account by full name (2 captures),high
+422,unjobs-nonun:433,SEEK Development,https://seek-development.jobs.personio.de/,Personio,2026-43,,,account by full name (3 captures),high
+424,unjobs-nonun:460,Systemic Justice,https://systemicjustice.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+425,unjobs-nonun:466,Textile Exchange,https://textileexchange.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+427,unjobs-nonun:476,Trócaire,https://apply.workable.com/trocaire/,Workable,2026-43,,,account by full name (12 captures),high
+428,unjobs-nonun:489,Verra,https://verra.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),medium
+429,unjobs-nonun:492,Vizzuality,https://vizzuality.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+432,unjobs-nonun:517,World Economic Forum,https://weforum.wd3.myworkdayjobs.com/Forum_Careers,Workday,2026-43,,,account by website name (30 captures),medium
+433,unjobs-nonun:469,The Halo Trust,https://apply.workable.com/the-halo-trust/,Workable,2026-43,,,account by full name (3 captures),high
+440,unjobs-nonun:245,International Center for Agricultural Research in the Dry Areas,https://apply.workable.com/icarda/,Workable,2026-43,,,account by website name (4 captures),medium
+441,unjobs-nonun:497,Water.org,https://apply.workable.com/waterorg/,Workable,2026-43,,,"account by full name, decided: the organisation's full name (2 captures)",medium
+447,unjobs-nonun:188,Financing Alliance for Health,https://fahinc.bamboohr.com/,BambooHR,2026-43,,,"account by acronym, decided: 'FAH Inc', the organisation's US registered name (Financing Alliance for Health, Inc.) (2 captures)",medium
+449,unjobs-nonun:73,Catalpa,https://apply.workable.com/catalpa/,Workable,2026-43,,,account by full name (2 captures),medium
+458,unjobs-nonun:130,DataKind,https://job-boards.greenhouse.io/datakindinc,Greenhouse,2026-43,,,account by full name (8 captures),high
+459,unjobs-un:8,Department for General Assembly and Conference Management,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+460,unjobs-nonun:527,department-for-general-assembly-and-conference-management-dcs-nairobi,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+463,unjobs-nonun:147,Drugs for Neglected Diseases initiative,https://careers-dndi.icims.com/jobs,iCIMS,2026-43,,,account by website name (2 captures),low
+472,unjobs-nonun:192,Ford Foundation,https://fordfoundation.wd1.myworkdayjobs.com/FordFoundationCareerPage,Workday,2026-43,,,account by full name (14 captures),high
+478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),https://goldstandard.bamboohr.com/,BambooHR,2026-43,,,account by website name (3 captures),medium
+482,unjobs-nonun:530,information-and-communications-technology-division,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+486,unjobs-un:46,International Development Law Organization,https://careers-idlo.icims.com/jobs,iCIMS,2026-43,,,account by website name (5 captures),low
+492,unjobs-nonun:295,International Water Management Institute,https://apply.workable.com/international-water-management-institute/,Workable,2026-43,,,account by full name (7 captures),high
+501,unjobs-nonun:336,Mission East,https://missioneast.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+503,unjobs-nonun:360,Nutrition International,https://apply.workable.com/nutritionintl/,Workable,2026-43,,,account by website name (9 captures),medium
+504,unjobs-un:54,Office for Disarmament Affairs,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+505,unjobs-un:59,Office of Legal Affairs,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+506,unjobs-un:65,Office of the Special Envoy of the Secretary-General on the Great Lakes Region,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+507,unjobs-un:96,Office of the UN Special Coordinator for the Middle East Peace Process,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+508,unjobs-nonun:533,office-of-the-high-representative-for-the-least-developed-countries-landlocked-developing-countries-and-small-island-developing-states,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+509,unjobs-nonun:535,office-of-the-special-envoy-of-the-secretary-general-for-yemen,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+510,unjobs-nonun:536,office-of-the-srsg-for-children-and-armed-conflict,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+521,unjobs-un:64,Regional Service Centre Entebbe,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+527,unjobs-nonun:467,The Commonwealth,https://jobs.jobvite.com/commonwealthcareers,Jobvite,2026-43,,,account by full name (7 captures),high
+528,unjobs-nonun:148,Third Generation Environmentalism,https://e3g.bamboohr.com/,BambooHR,2026-43,,,"account by acronym, decided: a distinctive abbreviation (E3G, Third Generation Environmentalism) (2 captures)",medium
+529,unjobs-nonun:471,Thomson Reuters Foundation,https://trust.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
+531,unjobs-un:87,UN Mine Action Service,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+532,unjobs-un:94,UN Office at Vienna,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+533,unjobs-un:92,UN Office for Outer Space Affairs,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+534,unjobs-un:97,UN Truce Supervision Organization,https://careers.un.org/,UN Inspira (careers.un.org),,not captured,,family: the UN Secretariat's offices hire through careers.un.org,medium
+538,unjobs-nonun:516,World Data Lab,https://world-data-lab.jobs.personio.com/,Personio,2026-43,,,account by full name (2 captures),high
+541,irs:061008595,Americares Foundation Inc,https://careers-americares.icims.com/jobs,iCIMS,2026-43,,,account by website name (2 captures),medium
+542,irs:951922279,World Vision,https://worldvision.wd1.myworkdayjobs.com/WorldVisionInternational,Workday,2026-43,,,"account by full name, decided: World Vision's Workday site (WorldVisionInternational, 251 captures); whether World Vision US posts there is step F (251 captures)",medium
+553,seed:21,Habitat for Humanity,https://habitat.wd12.myworkdayjobs.com/External,Workday,2026-43,,,"account by decided, decided: Habitat for Humanity's website name; 'habitat' is also a common word, unconfirmed (step F) (3 captures)",low
+573,iati:US-EIN-13-3327220,Action Against Hunger USA,https://apply.workable.com/action-against-hunger/,Workable,2026-43,,,"account by decided, decided: the network's name; which Action Against Hunger member uses it is unknown (step F) (14 captures)",low
+584,uk:1154288,Human Appeal,https://humanappeal.bamboohr.com/,BambooHR,2026-43,,,"account by decided, decided: full name, 22 captures (22 captures)",medium
+615,iati:US-EIN-23-7069110,Oxfam America,https://jobs.smartrecruiters.com/oxfamamerica2,SmartRecruiters,2026-43,,,account by full name (1 captures),high
+659,iati:GB-CHC-1098106,Relief International UK,https://www.ri.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+698,irs:042791159,Grassroots International Inc,https://grassrootsinternational.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+711,eu:929331127035-69,World Animal Protection,https://worldanimalprotection.pinpointhq.com/,Pinpoint,2026-43,,,account by full name (2 captures),high
+718,cra:119304848RR0001,World University Service of Canada/l'entraide Universitaire Mondiale du Canada,https://wusc.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),low
+724,iati:CA-CC-020387-4,Equality Fund,https://equalityfund.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+757,iati:GB-CHC-1166956,UK-Med,https://job-boards.greenhouse.io/ukmed,Greenhouse,2026-43,,,account by full name (10 captures),medium
+767,iati:US-EIN-770155782,Global Fund for Women,https://globalfundforwomen.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+777,acnc:16641057338,Canva Foundation Limited,https://jobs.smartrecruiters.com/canva,SmartRecruiters,2026-43,,,account by website name (26 captures),low
+784,irs:593564329,Hope for Haiti Inc,https://hopeforhaiti.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+795,iati:US-EIN-37-1552838,GSMA Foundation,https://gsma.wd3.myworkdayjobs.com/External_Careers,Workday,2026-43,,,account by website name (7 captures),low
+804,uk:297540,The Virgin Foundation,https://apply.workable.com/virgin/,Workable,2026-43,,,account by website name (2 captures),medium
+822,uk:1043886,The Fairtrade Foundation,https://fairtradefoundation.teamtailor.com/,Teamtailor,2026-43,,,account by full name (18 captures),high
+829,iati:US-EIN-14-1945286,"The Global Development Incubator, Inc",https://globaldevelopmentincubator1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+839,uk:1141155,Girl Effect,https://job-boards.greenhouse.io/girleffect,Greenhouse,2026-43,,,account by full name (6 captures),high
+849,irs:770071852,Thousand Currents,https://thousandcurrents.bamboohr.com/,BambooHR,2026-43,,,account by full name (5 captures),high
+876,irs:300181674,Wateraid America Inc,https://wateraidamerica.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+888,irs:522151557,Vital Voices Global Partnership Inc,https://job-boards.greenhouse.io/vitalvoicesglobalpartnership,Greenhouse,2026-43,,,account by full name (1 captures),high
+892,iati:US-EIN-84-3344516,"Aceli Africa, Inc.",https://jobs.smartrecruiters.com/aceliafrica,SmartRecruiters,2026-43,,,account by full name (2 captures),high
+956,irs:113579187,Children of Armenia Fund Inc,https://coaf.bamboohr.com/,BambooHR,2026-43,,,account by website name (9 captures),low
+1003,irs:521211059,Center for Third World Organizing,https://ctwo.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
+1008,irs:050258886,Dorcas International Institute of Rhode Island Inc,https://diiri.bamboohr.com/,BambooHR,2026-43,,,account by website name (6 captures),low
+1009,cra:118838234RR0001,Cardinal Léger et Ses Oeuvres / Cardinal Léger & His Endeavours,https://jobs.smartrecruiters.com/leger2,SmartRecruiters,2026-43,,,account by website name (1 captures),low
+1022,irs:320112278,Water for Good,https://waterforgood.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+1024,irs:133660566,Equality Now Inc,https://equalitynow.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+1069,irs:133931449,Endeavor Global Inc,https://apply.workable.com/endeavor-talent/,Workable,2026-43,,,account by website name (2 captures),medium
+1075,irs:131867411,Amref Health Africa Inc,https://jobs.smartrecruiters.com/amrefhealthafrica4,SmartRecruiters,2026-43,,,account by full name (4 captures),high
+1090,cra:107659427RR0001,Rick Hansen Foundation,https://rickhansenfoundation.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+1128,iati:US-EIN-84-1648607,Educate!,https://job-boards.greenhouse.io/educate,Greenhouse,2026-43,,,account by full name (9 captures),medium
+1133,iati:US-EIN-13-3287064,InterAction,https://jobs.ashbyhq.com/interaction,Ashby,2026-43,,,account by full name (1 captures),high
+1159,cra:862732815RR0001,Tula Foundation,https://job-boards.greenhouse.io/tula,Greenhouse,2026-43,,,account by website name (3 captures),low
+1189,irs:814109426,Waterequity Inc,https://apply.workable.com/waterequity/,Workable,2026-43,,,account by full name (2 captures),high
+1205,cra:118834878RR0001,CODE,https://job-boards.greenhouse.io/code3,Greenhouse,2026-43,,,account by full name (2 captures),medium
+1263,irs:452275630,Spark Microgrants,https://sparkmicrogrants.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+1315,irs:943050434,Pacific Institute for Studies in Development Environment and Securi,https://pacinst.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),medium
+1410,irs:200934525,Kepler Inc,https://kepler1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
+1419,irs:814618222,Maisha Meds Inc,https://maishameds.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
+1438,cra:118830983RR0001,Kinvia,https://kinvia.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
+1470,iati:US-EIN-45-5015494,Instiglio,https://job-boards.greenhouse.io/instiglio,Greenhouse,2026-43,,,account by full name (2 captures),high
+1472,irs:562614329,Building Tomorrow Inc,https://buildingtomorrow.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+1571,acnc:73154390575,Circa Contemporary Circus Ltd,https://circahr.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
+1574,acnc:18084268655,Nossal Institute Limited,https://unimelb.wd105.myworkdayjobs.com/UoM_External_Career,Workday,2026-43,,,account by website name (14 captures),medium
+1588,acnc:16394284169,Destiny Rescue Limited,https://apply.workable.com/destiny-rescue/,Workable,2026-43,,,account by full name (2 captures),high

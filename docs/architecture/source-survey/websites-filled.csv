@@ -1,0 +1,965 @@
+rank,org_id,name,website,source,detail
+10,unjobs-nonun:520,World Wildlife Fund,wwf.org,"wikidata (name, accepted)","Q117892: the item is this organisation: WWF International (international non-governmental environmental organization); UNjobs lists the WWF network's jobs; WWF International is the network's head office (the US member, worldwildlife.org, is a separate national organisation)"
+12,unjobs-nonun:287,International Medical Corps,internationalmedicalcorps.org,wikidata (identifier),Q17087816 by P1297 95-3949646
+16,unjobs-nonun:426,Room to Read,roomtoread.org,"wikidata (name, accepted)",Q13920: the item is this organisation: Room to Read (American non-profit focused on literacy)
+20,unjobs-nonun:378,Palladium Group,thepalladiumgroup.com,unverified (search-engine copy),"web search, 5 Nov 2026: Palladium, international development company (a GISI company) (https://thepalladiumgroup.com/)"
+22,unjobs-nonun:390,Plan International,plan-international.org,wikidata (identifier),Q1350284 by P1297 51-0169168
+23,unjobs-un:26,International Criminal Court,icc-cpi.int,"wikidata (name, accepted)",Q47488: the item is this organisation: International Criminal Court (intergovernmental organization and international tribunal)
+24,seed:9,Norwegian Refugee Council,nrc.no,decided by the agent,"the Norwegian Refugee Council's international site; Wikidata gave its Norwegian site, flyktninghjelpen.no (the independent review of PR #107)"
+25,unjobs-nonun:368,One Acre Fund,oneacrefund.org,wikidata (identifier),Q1529217 by P13305 US-DOS-64562614
+26,unjobs-nonun:304,Jhpiego,jhpiego.org,"wikidata (name, accepted)",Q6191185: the item is this organisation: Jhpiego (organization)
+30,unjobs-nonun:418,Relief International,ri.org,"wikidata (name, accepted)",Q7311083: the item is this organisation: Relief International (non-profit organization)
+33,unjobs-nonun:125,DT Global,dt-global.com,unverified (search-engine copy),"web search, 5 Nov 2026: DT Global, international development company (https://dt-global.com/)"
+35,unjobs-nonun:483,United States Pharmacopeial Convention,usp.org,unverified (search-engine copy),"web search, 5 Nov 2026: US Pharmacopeia, nonprofit standards body (https://www.usp.org/)"
+36,unjobs-nonun:285,International Maize and Wheat Improvement Center,cimmyt.org,"wikidata (name, accepted)",Q1666745: the item is this organisation: International Maize and Wheat Improvement Center (organization in Mexico); the headquarters item (Mexico); the others are its country offices
+37,unjobs-un:14,European Bank for Reconstruction and Development,ebrd.com,wikidata (identifier),Q488981 by P13305 XI-IATI-EBRD
+39,unjobs-nonun:257,Impact Investment Exchange,iixglobal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Impact Investment Exchange, Singapore impact investor (https://iixglobal.com/)"
+41,unjobs-un:61,Organization for Security and Co-operation in Europe,osce.org,"wikidata (name, accepted)",Q81299: the item is this organisation: Organization for Security and Co-operation in Europe (security-oriented intergovernmental organization)
+44,unjobs-nonun:107,Committed To Good,ctg.org,unverified (search-engine copy),"web search, 5 Nov 2026: Committed To Good, humanitarian staffing (https://ctg.org/)"
+46,unjobs-nonun:477,U.S. Committee for Refugees and Immigrants,refugees.org,"wikidata (name, accepted)",Q7863138: the item is this organisation: U.S. Committee for Refugees and Immigrants (American nonprofit organization)
+49,unjobs-un:63,Resident Coordinator System,,not needed,"hires through the family's careers site, careers.un.org"
+51,unjobs-nonun:179,Evidence Action,evidenceaction.org,unverified (search-engine copy),"web search, 5 Nov 2026: Evidence Action, global health nonprofit (https://www.evidenceaction.org/)"
+52,unjobs-nonun:431,SCS Global Services,scsglobalservices.com,"wikidata (name, accepted)","Q133810867: the item is this organisation: Scientific Certification Services, Inc. (United States) (company in Emeryville, United States); Scientific Certification Services trades as SCS Global Services (the same website)"
+53,unjobs-un:56,Office of the High Commissioner for Human Rights,ohchr.org,"wikidata (name, accepted)",Q656812: the item is this organisation: Office of the High Commissioner for Human Rights (UN department that promotes human rights under international law)
+55,unjobs-nonun:15,Aga Khan Development Network,the.akdn,"wikidata (name, accepted)","Q389812: the item is this organisation: Aga Khan Development Network (network of private, non-denominational development agencies); the network item; the.akdn is its current website"
+56,unjobs-nonun:172,European External Action Service,eeas.europa.eu,"wikidata (name, accepted)",Q672941: the item is this organisation: European External Action Service (diplomatic service of the European Union)
+58,unjobs-nonun:136,Deutsche Gesellschaft für Internationale Zusammenarbeit,giz.de,"wikidata (name, accepted)",Q462763: the item is this organisation: Deutsche Gesellschaft für Internationale Zusammenarbeit (German government international aid agency); the agency itself; the other item is its Manila office
+59,unjobs-un:43,International Telecommunication Union,itu.int,"wikidata (name, accepted)",Q376150: the item is this organisation: International Telecommunication Union (specialized agency of the United Nations for information and communication technologies)
+60,unjobs-nonun:382,Partners In Health,pih.org,"wikidata (name, accepted)",Q4346050: the item is this organisation: Partners In Health (non-profit health care organization founded in 1987)
+62,unjobs-nonun:230,HIAS,hias.org,wikidata (identifier),Q2910087 by P1297 13-5633307
+63,unjobs-nonun:156,Elizabeth Glaser Pediatric AIDS Foundation,pedaids.org,"wikidata (name, accepted)",Q16992396: the item is this organisation: Elizabeth Glaser Pediatric AIDS Foundation (non-profit organization in the USA); the US head office; the others are country offices
+65,unjobs-nonun:16,Agence Française de Développement,afd.fr,wikidata (identifier),Q2826643 by P13305 FR-3
+66,unjobs-un:11,Department of Operational Support,operationalsupport.un.org,"wikidata (name, accepted)",Q130534067: the item is this organisation: United Nations Department of Operational Support (organization through UN)
+67,unjobs-nonun:409,RTI International,rti.org,"wikidata (name, accepted)","Q7277844: the item is this organisation: RTI International (independent, nonprofit research institute, headquartered in Research Triangle Park, NC, US)"
+68,unjobs-nonun:394,Pro Mujer,promujer.org,wikidata (identifier),Q4543840 by P1297 98-0115409
+70,unjobs-nonun:12,Africa50,africa50.com,unverified (search-engine copy),"web search, 5 Nov 2026: Africa50, pan-African infrastructure investor (African Development Bank) (https://www.africa50.com/)"
+71,unjobs-un:89,Office on Drugs and Crime,,not needed,"hires through the family's careers site, careers.un.org"
+72,unjobs-nonun:404,Qatar Foundation,qf.org.qa,"wikidata (name, accepted)","Q1575900: the item is this organisation: Qatar Foundation (semi-private chartered, non-profit organization in Qatar, founded in 1995 by then-emir Sheikh Hamad bin Khalifa Al Thani and his second wife Moza bint Nasser)"
+73,unjobs-un:70,United Nations Human Settlements Programme,unhabitat.org,"wikidata (name, accepted)",Q487883: the item is this organisation: United Nations Human Settlements Programme (UN agency for human settlements and sustainable urban development)
+74,unjobs-nonun:94,ChildFund International,childfund.org,wikidata (identifier),Q17189927 by P13305 US-EIN-54-0536100
+75,unjobs-nonun:509,Winrock International,winrock.org,"wikidata (name, accepted)","Q4053181: the item is this organisation: Winrock International (nonprofit organization based in Little Rock, Arkansas, US)"
+77,unjobs-nonun:406,RAND Corporation,rand.org,"wikidata (name, accepted)",Q861141: the item is this organisation: RAND Corporation (American research organization); the US organisation; RAND Europe is a separate UNjobs entry
+78,unjobs-nonun:96,Church World Service,churchworldservice.org,wikidata (identifier),Q5116734 by P1297 13-4080201
+80,unjobs-nonun:322,Management Sciences for Health,msh.org,wikidata (identifier),Q21061083 by P1297 04-2482188
+82,unjobs-nonun:349,Navanti,navantigroup.com,unverified (search-engine copy),"web search, 5 Nov 2026: Navanti Group, research and analysis contractor (https://navantigroup.com/)"
+83,unjobs-nonun:39,BURN Manufacturing,burnstoves.com,unverified (search-engine copy),"web search, 5 Nov 2026: BURN Manufacturing, clean cookstoves, Nairobi (https://www.burnstoves.com/)"
+87,unjobs-nonun:35,Athena Infonomics,athenainfonomics.com,unverified (search-engine copy),"web search, 5 Nov 2026: Athena Infonomics, development research firm, Chennai (https://www.athenainfonomics.com/)"
+88,unjobs-nonun:66,CRDF Global,crdfglobal.org,"wikidata (name, accepted)",Q5013851: the item is this organisation: CRDF Global (nonprofit organization promoting safety etc. via innovation etc.)
+91,unjobs-nonun:47,Bill and Melinda Gates Foundation,gatesfoundation.org,"wikidata (name, accepted)",Q655286: the item is this organisation: Gates Foundation (private foundation)
+92,unjobs-nonun:48,Bioversity International,bioversityinternational.org,"wikidata (name, accepted)","Q864909: the item is this organisation: Bioversity International (former global research for development organization, merged with CIAT (Q1054314)); merged with CIAT (the Alliance); its own website is still listed"
+93,unjobs-nonun:61,CARE,care-international.org,unverified (search-engine copy),"web search, 5 Nov 2026: CARE International, the confederation's secretariat (https://www.care-international.org/who-we-are/global-network)"
+94,unjobs-nonun:134,Democracy International,democracyinternational.com,"wikidata (name, accepted)",Q1185816: the item is this organisation: Democracy International (); the US elections and governance firm that hires for aid projects (not the German Democracy International)
+95,unjobs-nonun:259,Institut Pasteur,pasteur.fr,"wikidata (name, accepted)",Q391083: the item is this organisation: Pasteur Institute (French research institute (1887-))
+96,unjobs-nonun:332,MicroSave Consulting,microsave.net,unverified (search-engine copy),"web search, 5 Nov 2026: MicroSave Consulting, financial inclusion consultancy (https://www.microsave.net/)"
+97,unjobs-nonun:389,Pew Charitable Trusts,pewtrusts.org,"wikidata (name, accepted)","Q201296: the item is this organisation: The Pew Charitable Trusts (American non-profit, non-governmental organization)"
+98,unjobs-nonun:118,Council on Foreign Relations,cfr.org,wikidata (identifier),Q594712 by P1297 13-1628168
+99,unjobs-nonun:84,Center for Strategic and International Studies,csis.org,wikidata (identifier),Q1053614 by P1297 52-1501082
+101,unjobs-nonun:50,Bixal,bixal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Bixal, US government and development contractor (https://www.bixal.com/contract-vehicles/usaid-comp-ta)"
+103,unjobs-nonun:220,Global Refuge,globalrefuge.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Refuge, renamed from Lutheran Immigration and Refugee Service in 2024 (https://www.globalrefuge.org/news/lirs-global-refuge/)"
+105,unjobs-nonun:402,Pure Earth,pureearth.org,"wikidata (name, accepted)",Q145590: the item is this organisation: Pure Earth (environmental organization)
+107,unjobs-un:2,Asian Infrastructure Investment Bank,aiib.org,"wikidata (name, accepted)",Q18109843: the item is this organisation: Asian Infrastructure Investment Bank (international financial institution)
+108,unjobs-nonun:64,CLEAR Global,clearglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: CLEAR Global, formerly Translators without Borders (https://clearglobal.org/)"
+109,unjobs-nonun:333,Milken Institute,milkeninstitute.org,"wikidata (name, accepted)",Q17090319: the item is this organisation: Milken Institute (US economic think tank)
+111,unjobs-un:98,United Nations Volunteers,unv.org,"wikidata (name, accepted)",Q488065: the item is this organisation: United Nations Volunteers (non-governmental organization (1970-))
+112,unjobs-nonun:522,ZemiTek,zemitek.com,unverified (search-engine copy),"web search, 5 Nov 2026: ZemiTek, US federal IT and management contractor (https://www.zemitek.com/)"
+115,unjobs-nonun:275,International Executive Service Corps,iesc.org,"wikidata (name, accepted)",Q6050342: the item is this organisation: International Executive Service Corps (International not-for-profit organization)
+116,unjobs-un:55,Organisation for Economic Co-operation and Development,oecd.org,wikidata (identifier),Q41550 by P13305 XM-DAC-47080
+119,unjobs-nonun:391,Precision Development,precisiondev.org,unverified (search-engine copy),"web search, 5 Nov 2026: Precision Development, renamed from Precision Agriculture for Development (https://precisiondev.org/introducing-precision-development/)"
+121,unjobs-nonun:100,Clean Air Asia,cleanairasia.org,"wikidata (name, accepted)","Q141737204: the item is this organisation: Clean Air Asia (international organisation working for better air quality and healthier, more liveable cities across Asia)"
+122,unjobs-un:13,Department of Political Affairs and Peace-building,,not needed,"hires through the family's careers site, careers.un.org"
+125,unjobs-nonun:206,GiveWell,givewell.org,"wikidata (name, accepted)",Q5565607: the item is this organisation: GiveWell (American charity)
+126,unjobs-nonun:261,Institute for Essential Services Reform,iesr.or.id,"wikidata (name, accepted)","Q142024215: the item is this organisation: Institute for Essential Services Reform (think tank in Jakarta, Indonesia)"
+128,unjobs-un:1,Asian Development Bank,adb.org,wikidata (identifier),Q188822 by P13305 XM-DAC-46004
+129,unjobs-nonun:104,Clinton Foundation,clintonfoundation.org,"wikidata (name, accepted)",Q1974620: the item is this organisation: Clinton Foundation (non-profit organization in the USA); the US head office; the others are country offices
+130,unjobs-nonun:215,Global Health Advocacy Incubator,advocacyincubator.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Health Advocacy Incubator, an initiative of Campaign for Tobacco-Free Kids (https://www.advocacyincubator.org/)"
+132,unjobs-nonun:346,Natural Resources Defense Council,nrdc.org,"wikidata (name, accepted)","Q841895: the item is this organisation: Natural Resources Defense Council (non-profit international environmental advocacy group, with its headquarters in New York City)"
+133,unjobs-un:66,Secretariat of the Pacific Community,spc.int,"wikidata (name, accepted)",Q871511: the item is this organisation: Pacific Community (principal scientific and technical organization in the Pacific region); the Secretariat of the Pacific Community is now the Pacific Community
+134,unjobs-nonun:456,Swaniti Initiative,swaniti.com,unverified (search-engine copy),"web search, 5 Nov 2026: Swaniti Initiative, Indian governance social enterprise (https://swaniti.com/)"
+138,unjobs-nonun:312,Landscape Alliance (CIFOR and ICRAF),landscapealliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: CIFOR-ICRAF, renamed Landscape Alliance in June 2026 (old site cifor-icraf.org) (https://www.landscapealliance.org/)"
+140,unjobs-nonun:337,Miyamoto International,miyamotointernational.com,"wikidata (name, accepted)",Q16934150: the item is this organisation: Miyamoto International (American structural engineering and disaster management firm)
+142,unjobs-nonun:464,Technopolis Group,technopolis-group.com,unverified (search-engine copy),"web search, 5 Nov 2026: Technopolis Group, policy research consultancy (https://technopolis-group.com/)"
+143,unjobs-nonun:475,Triggerise,tiko.org,unverified (search-engine copy),"web search, 5 Nov 2026: Triggerise, renamed Tiko in 2024 (https://tiko.org/)"
+144,unjobs-nonun:6,Abt Associates,abtglobal.com,wikidata (identifier),"Q30281397 by P13305 US-EIN-042347643; the item is this organisation: Abt Global (company in Cambridge, Massachusetts, United States); Abt Associates renamed itself Abt Global; abtglobal.com is the current website"
+145,unjobs-nonun:33,Aspen Institute,aspeninstitute.org,"wikidata (name, accepted)",Q457528: the item is this organisation: Aspen Institute (international nonprofit organization founded in 1950)
+146,unjobs-nonun:116,Council of Europe Development Bank,coebank.org,"wikidata (name, accepted)",Q611107: the item is this organisation: Council of Europe Development Bank (international lending institution to promote social cohesion)
+147,unjobs-un:75,Economic Commission for Africa,,not needed,"hires through the family's careers site, careers.un.org"
+148,unjobs-un:16,Economic Commission for Latin America and the Caribbean,cepal.org,"wikidata (name, accepted)",Q32874: the item is this organisation: United Nations Economic Commission for Latin America and the Caribbean (United Nations Commission for economic cooperation among its member states)
+149,unjobs-un:24,International Atomic Energy Agency,iaea.org,"wikidata (name, accepted)",Q41984: the item is this organisation: International Atomic Energy Agency (international organisation)
+150,unjobs-nonun:308,KfW Development Bank,kfw-entwicklungsbank.de,"wikidata (name, accepted)","Q140351133: the item is this organisation: KfW Development Bank (government organization in Frankfurt am Main, Germany)"
+151,unjobs-nonun:363,Ocean Conservancy,oceanconservancy.org,"wikidata (name, accepted)",Q3348656: the item is this organisation: Ocean Conservancy (non-profit organization in the USA)
+154,unjobs-nonun:153,East-West Center,eastwestcenter.org,"wikidata (name, accepted)",Q5331041: the item is this organisation: East–West Center (Organization)
+155,unjobs-nonun:55,Brookings Institution,brookings.edu,"wikidata (name, accepted)",Q929154: the item is this organisation: Brookings Institution (American think tank)
+156,unjobs-nonun:70,Caribbean Biodiversity Fund,caribbeanbiodiversityfund.org,"wikidata (name, accepted)",Q131387057: the item is this organisation: Caribbean Biodiversity Fund ()
+157,unjobs-nonun:123,DAI Global,dai.com,unverified (search-engine copy),"web search, 5 Nov 2026: DAI Global, international development company (https://www.dai.com/faq)"
+159,unjobs-un:17,Economic and Social Commission for Asia and the Pacific,,not needed,"hires through the family's careers site, careers.un.org"
+160,unjobs-nonun:228,HEKS/EPER Swiss Church Aid,heks.ch,unverified (search-engine copy),"web search, 5 Nov 2026: HEKS/EPER, Swiss Protestant aid agency (https://en.heks.ch/)"
+161,unjobs-nonun:272,International Council on Clean Transportation,theicct.org,"wikidata (name, accepted)",Q21002457: the item is this organisation: International Council on Clean Transportation (non-governmental organization for clean transporation)
+162,unjobs-nonun:310,Land O'Lakes Venture37,landolakesventure37.org,unverified (search-engine copy),"web search, 5 Nov 2026: Land O'Lakes Venture37; the search result says it stopped work on 30 June 2026 and is closing (https://www.landolakesventure37.org/)"
+164,unjobs-nonun:413,Rare,rare.org,"wikidata (name, accepted)",Q22073418: the item is this organisation: Rare (conservation organization); the conservation organisation (not the news site or the games developer)
+165,unjobs-nonun:438,Search for Common Ground,sfcg.org,"wikidata (name, accepted)",Q7441664: the item is this organisation: Search for Common Ground (International non-profit organization)
+167,unjobs-nonun:502,Wellcome Trust,wellcome.org,"wikidata (name, accepted)","Q326276: the item is this organisation: Wellcome Trust (healthcare research charity based in London, United Kingdom)"
+171,unjobs-nonun:41,Banyan Global,banyanglobal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Banyan Global, development consulting firm (https://banyanglobal.com/)"
+172,unjobs-nonun:62,CBM,cbm.de,"wikidata (name, accepted)","Q314997: the item is this organisation: CBM International (international organization); CBM International (Christian Blind Mission); cbm.de is its German site, cbm.org the international one, to confirm in step F; the UNjobs entry may instead be CBM Global (cbm-global.org), the network that separated from CBM Christoffel-Blindenmission in 2021"
+179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,intersos.org,unverified (search-engine copy),"web search, 5 Nov 2026: INTERSOS, Italian humanitarian NGO (https://www.intersos.org/)"
+180,unjobs-un:90,UN Office at Geneva,,not needed,"hires through the family's careers site, careers.un.org"
+181,unjobs-nonun:284,International Livestock Research Institute,ilri.org,"wikidata (name, accepted)",Q1666743: the item is this organisation: International Livestock Research Institute (an international agricultural research institute within the CGIAR – formerly the Consultative Group for International Agricultural Research); the institute itself; the other item is its Addis Ababa office
+183,unjobs-nonun:80,Center for European Policy Analysis,cepa.org,"wikidata (name, accepted)",Q5059628: the item is this organisation: Center for European Policy Analysis (American organization)
+184,unjobs-nonun:112,Conrad N. Hilton Foundation,hiltonfoundation.org,"wikidata (name, accepted)",Q1126934: the item is this organisation: Conrad N. Hilton Foundation (foundation)
+185,unjobs-nonun:65,CORE Community Organized Relief Effort,coreresponse.org,unverified (search-engine copy),"web search, 5 Nov 2026: CORE, US relief NGO (formerly J/P HRO) (https://www.coreresponse.org/)"
+186,unjobs-nonun:60,Development Bank of Latin America (CAF),caf.com,unverified (search-engine copy),"web search, 5 Nov 2026: CAF, Development Bank of Latin America and the Caribbean (https://www.caf.com/en/)"
+187,unjobs-nonun:216,Global Health Strategies,globalhealthstrategies.com,unverified (search-engine copy),"web search, 5 Nov 2026: Global Health Strategies, consultancy (https://globalhealthstrategies.com/)"
+189,unjobs-nonun:420,Resources for the Future,rff.org,"wikidata (name, accepted)","Q7315844: the item is this organisation: Resources for the Future (Washington, D.C.-based research institution on environmental, energy and natural resource economics, founded in 1952)"
+190,unjobs-nonun:445,SoCha,socha.net,unverified (search-engine copy),"web search, 5 Nov 2026: SoCha, monitoring and evaluation consultancy (https://socha.net/)"
+191,unjobs-nonun:478,U.S. Fund for UNICEF,unicefusa.org,wikidata (identifier),Q54557197 by P1297 13-1760110
+194,unjobs-nonun:211,Global Communities,globalcommunities.org,wikidata (identifier),Q25047905 by P1297 52-0846183
+195,unjobs-nonun:255,International Rice Research Institute,irri.org,"wikidata (name, accepted)",Q1204921: the item is this organisation: International Rice Research Institute (organization)
+197,unjobs-nonun:5,Abdul Latif Jameel Poverty Action Lab,povertyactionlab.org,"wikidata (name, accepted)",Q774437: the item is this organisation: Abdul Latif Jameel Poverty Action Lab (global research center working to reduce poverty)
+199,unjobs-nonun:142,Digital Green,digitalgreen.org,"wikidata (name, accepted)",Q17085188: the item is this organisation: Digital Green (organization)
+201,unjobs-nonun:187,Finance in Motion,finance-in-motion.com,unverified (search-engine copy),"web search, 5 Nov 2026: Finance in Motion, impact asset manager, Frankfurt (https://www.finance-in-motion.com/)"
+204,unjobs-nonun:383,Partnership for Supply Chain Management,pfscm.org,unverified (search-engine copy),"web search, 5 Nov 2026: Partnership for Supply Chain Management (https://pfscm.org/)"
+205,unjobs-un:85,UN Institute for Training and Research,unitar.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNITAR (https://unitar.org/)"
+206,unjobs-nonun:491,VillageReach,villagereach.org,"wikidata (name, accepted)",Q7930610: the item is this organisation: VillageReach (organization)
+207,unjobs-un:104,World Intellectual Property Organization,wipo.int,"wikidata (name, accepted)",Q177773: the item is this organisation: World Intellectual Property Organization (specialized UN agency focused on intellectual property protection)
+208,unjobs-nonun:523,Zinc Network,zincnetwork.com,"wikidata (name, accepted)",Q128433863: the item is this organisation: Zinc Network (British public relations company)
+209,unjobs-nonun:294,International Vaccine Institute,ivi.int,"wikidata (name, accepted)","Q6054186: the item is this organisation: International Vaccine Institute (independent, nonprofit, international organization)"
+210,unjobs-nonun:9,Acción,accion.org,wikidata (identifier),Q288106 by P1297 13-2535763
+211,unjobs-nonun:89,Chan Zuckerberg Initiative,chanzuckerberg.com,"wikidata (name, accepted)",Q21623039: the item is this organisation: Chan Zuckerberg Initiative (company)
+212,unjobs-un:9,Department of Global Communications,,not needed,"hires through the family's careers site, careers.un.org"
+213,unjobs-un:18,Economic and Social Commission for Western Asia,unescwa.org,"wikidata (name, accepted)",Q1355485: the item is this organisation: United Nations Economic and Social Commission for Western Asia (United Nations Commission for economic cooperation among its member states)
+214,unjobs-nonun:162,Environmental Defense Fund,edf.org,"wikidata (name, accepted)","Q1345899: the item is this organisation: Environmental Defense Fund (United States environmental advocacy organization, headquartered in New York City)"
+215,unjobs-nonun:273,International Development Group,internationaldevelopmentgroup.com,"wikidata (name, accepted)","Q141669515: the item is this organisation: International Development Group (United States) (company in Arlington, United States); the Arlington development consultancy of this name"
+217,unjobs-nonun:302,Janaagraha Centre for Citizenship and Democracy,janaagraha.org,unverified (search-engine copy),"web search, 5 Nov 2026: Janaagraha, Bengaluru (https://www.janaagraha.org/)"
+218,unjobs-un:100,United Nations Support Office in Haiti,,not needed,"hires through the family's careers site, careers.un.org"
+219,unjobs-nonun:493,W.K. Kellogg Foundation,wkkf.org,"wikidata (name, accepted)",Q7945762: the item is this organisation: W. K. Kellogg Foundation (philanthropic foundation in the United States)
+221,unjobs-un:105,World Meteorological Organization,wmo.int,"wikidata (name, accepted)",Q170424: the item is this organisation: World Meteorological Organization (specialized agency of the United Nations for meteorology)
+222,unjobs-nonun:518,World Organisation for Animal Health,woah.org,"wikidata (name, accepted)",Q1058594: the item is this organisation: World Organisation for Animal Health (intergovernmental organization)
+223,unjobs-nonun:514,World Central Kitchen,wck.org,"wikidata (name, accepted)",Q55316399: the item is this organisation: World Central Kitchen (not-for-profit non-governmental organization)
+224,unjobs-nonun:233,Heifer International,heifer.org,wikidata (identifier),Q2462543 by P1297 35-1019477
+225,unjobs-nonun:119,Counterpart International,counterpart.org,wikidata (identifier),Q5176998 by P1297 13-6183605
+226,unjobs-nonun:181,FINCA International,finca.org,"wikidata (name, accepted)",Q3079938: the item is this organisation: FINCA International (Microfinance organization)
+228,unjobs-nonun:57,Busara Center for Behavioral Economics,busaracenter.org,wikidata (identifier),Q30271658 by P1297 46-2695042
+229,unjobs-nonun:22,American Bar Association Rule of Law Initiative,americanbar.org,unverified (search-engine copy),"web search, 5 Nov 2026: ABA Rule of Law Initiative, a section of americanbar.org with no site of its own (https://www.americanbar.org/advocacy/global-programs/who-we-are/rule-law-initiative/)"
+231,unjobs-nonun:132,David and Lucile Packard Foundation (Packard Foundation),packard.org,unverified (search-engine copy),"web search, 5 Nov 2026: Packard Foundation (https://www.packard.org/)"
+232,unjobs-nonun:139,Development Alternatives,devalt.org,unverified (search-engine copy),"web search, 5 Nov 2026: Development Alternatives Group, New Delhi (the UNjobs posts are this one) (https://devalt.org/work-with-us)"
+233,unjobs-nonun:193,Forest Stewardship Council,fsc.org,"wikidata (name, accepted)",Q748367: the item is this organisation: Forest Stewardship Council (organization promoting and certifying responsible management of forest)
+235,unjobs-nonun:224,GoodPower,goodpower.org,unverified (search-engine copy),"web search, 5 Nov 2026: GoodPower, renamed from Alliance for Climate Education (https://goodpower.org/blog/goodpower-is-here/)"
+236,unjobs-un:33,"IIIM Syria - International, Impartial and Independent Mechanism",iiim.un.org,unverified (search-engine copy),"web search, 5 Nov 2026: IIIM Syria, a UN mechanism (https://iiim.un.org/)"
+237,unjobs-un:36,International Maritime Organization,imo.org,"wikidata (name, accepted)",Q201054: the item is this organisation: International Maritime Organization (specialized UN agency concerned with legal and regulatory aspects of maritime activity)
+238,unjobs-nonun:325,Medical Care Development,mcd.org,unverified (search-engine copy),"web search, 5 Nov 2026: Medical Care Development (MCD Global Health) (https://www.mcd.org/)"
+244,unjobs-un:86,UN Joint Staff Pension Fund,unjspf.org,unverified (search-engine copy),"web search, 5 Nov 2026: UN Joint Staff Pension Fund (https://www.unjspf.org/)"
+245,unjobs-un:91,UN Office at Nairobi,,not needed,"hires through the family's careers site, careers.un.org"
+246,unjobs-un:74,UN Office for Disaster Risk Reduction,,not needed,"hires through the family's careers site, careers.un.org"
+248,unjobs-nonun:521,WorldFish,worldfishcenter.org,"wikidata (name, accepted)",Q1486149: the item is this organisation: WorldFish (organization); the centre itself; the others are country offices
+252,unjobs-nonun:317,Living Goods,livinggoods.org,wikidata (identifier),Q54834256 by P1297 20-5010527
+254,unjobs-nonun:19,Albo,albo.com,unverified (search-engine copy),"web search, 5 Nov 2026: Albo, a Mexican fintech company, not an aid organisation (outside the target; for step G's review) (https://albo.com/)"
+255,unjobs-nonun:37,B Lab,bcorporation.net,"wikidata (name, accepted)","Q16983456: the item is this organisation: B Lab (U.S. non-profit organization); B Lab, the non-profit (not the certification)"
+256,unjobs-nonun:42,Barcelona Institute for Global Health,isglobal.org,"wikidata (name, accepted)","Q30256793: the item is this organisation: Barcelona Institute for Global Health (healthcare organization in Barcelona, Spain)"
+257,unjobs-nonun:53,Blue Ventures,blueventures.org,"wikidata (name, accepted)",Q4929991: the item is this organisation: Blue Ventures (science-led social enterprise that develops approaches for marine conservation)
+258,unjobs-nonun:526,charity: water,charitywater.org,unverified (search-engine copy),"web search, 5 Nov 2026: charity: water (https://www.charitywater.org/)"
+260,unjobs-nonun:138,"DevTech Systems, Inc.",devtechsys.com,unverified (search-engine copy),"web search, 5 Nov 2026: DevTech Systems, development consulting firm (https://devtechsys.com/)"
+261,unjobs-nonun:186,Fika,fika.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fika, rural trail bridges, formerly Bridges to Prosperity (https://fika.org/join-us/)"
+263,unjobs-un:49,International Seabed Authority,isa.org.jm,"wikidata (name, accepted)",Q333727: the item is this organisation: International Seabed Authority (Intergovernmental body to regulate mineral-related activities on the seabed)
+264,unjobs-nonun:305,John D. and Catherine T. MacArthur Foundation,macfound.org,"wikidata (name, accepted)",Q1424691: the item is this organisation: John D. and Catherine T. MacArthur Foundation (private foundation (US))
+265,unjobs-nonun:365,Oceana,oceana.org,"wikidata (name, accepted)",Q7076166: the item is this organisation: Oceana (organization); the ocean conservation organisation (not the nightclubs or the singer)
+266,unjobs-un:52,Office of Administration of Justice,,not needed,"hires through the family's careers site, careers.un.org"
+267,unjobs-un:58,Office of Internal Oversight Services,,not needed,"hires through the family's careers site, careers.un.org"
+268,unjobs-un:60,Organization for the Prohibition of Chemical Weapons,opcw.org,"wikidata (name, accepted)",Q842490: the item is this organisation: Organisation for the Prohibition of Chemical Weapons (international organization based in The Hague)
+270,unjobs-nonun:395,ProVeg International,proveg.org,unverified (search-engine copy),"web search, 5 Nov 2026: ProVeg International (https://proveg.org/)"
+271,unjobs-nonun:408,RMI,rmi.org,"wikidata (name, accepted)","Q1795496: the item is this organisation: RMI (USA non-profit think tank); RMI, the US energy think tank (formerly Rocky Mountain Institute)"
+272,unjobs-nonun:444,Smart Freight Centre,smartfreightcentre.org,unverified (search-engine copy),"web search, 5 Nov 2026: Smart Freight Centre, Dutch nonprofit (https://www.smartfreightcentre.org/en/about-sfc/about-us/)"
+273,unjobs-nonun:455,Sunflower Services,sunflowerservicespbc.com,unverified (search-engine copy),"web search, 5 Nov 2026: Sunflower Services PBC, back-office services for nonprofits (took over Arabella Advisors' operations in 2025); found through a job board's employer page (https://jobs.philanthropy.com/employer/33219e78-2b76-4c8b-9cef-b25d102df361/sunflower-services-pbc)"
+275,unjobs-un:78,UN Framework Convention on Climate Change,unfccc.int,unverified (search-engine copy),"web search, 5 Nov 2026: UNFCCC secretariat, Bonn (https://www.unfccc.int/)"
+276,unjobs-un:50,UN Organisation Stabilization Mission in the DR Congo,,not needed,"hires through the family's careers site, careers.un.org"
+278,unjobs-nonun:511,Women's World Banking,womensworldbanking.org,"wikidata (name, accepted)",Q8031103: the item is this organisation: Women's World Banking (organization)
+280,unjobs-nonun:30,Ashoka,ashoka.org,wikidata (identifier),Q85060 by P1297 51-0255908
+283,unjobs-nonun:329,Mennonite Economic Development Associates,meda.org,"wikidata (name, accepted)","Q30271855: the item is this organisation: Mennonite Economic Development Associates (organization in Waterloo, Canada)"
+285,unjobs-un:3,Association of Southeast Asian Nations,asean.org,"wikidata (name, accepted)",Q7768: the item is this organisation: ASEAN (international organisation of Southeast Asian countries)
+287,unjobs-nonun:122,D-tree,d-tree.org,unverified (search-engine copy),"web search, 5 Nov 2026: D-tree, digital health nonprofit (https://www.d-tree.org/our-work/)"
+288,unjobs-un:7,Department of Economic and Social Affairs,,not needed,"hires through the family's careers site, careers.un.org"
+289,unjobs-un:10,"Department of Management Strategy, Policy and Compliance",un.org,"wikidata (name, accepted)","Q137441704: the item is this organisation: United Nations Department of Management Strategy, Policy and Compliance (section of the United Nations Secretariat)"
+290,unjobs-nonun:161,Enveritas,enveritas.org,unverified (search-engine copy),"web search, 5 Nov 2026: Enveritas, coffee sustainability nonprofit (https://www.enveritas.org/)"
+292,unjobs-nonun:184,Fashion for Good,fashionforgood.com,"wikidata (name, accepted)",Q110995897: the item is this organisation: Fashion for Good (museum in Netherlands); the Fashion for Good initiative (its museum shares the website)
+293,unjobs-nonun:207,Global Alliance for Improved Nutrition,gainhealth.org,wikidata (identifier),Q5570101 by P13305 CH-FDJP-CHE-110347351
+294,unjobs-nonun:226,Greenpeace,greenpeace.org,unverified (search-engine copy),"web search, 5 Nov 2026: Greenpeace International, a section of greenpeace.org (https://www.greenpeace.org/international/)"
+296,unjobs-nonun:251,IGAD Climate Prediction and Applications Centre,icpac.net,unverified (search-engine copy),"web search, 5 Nov 2026: ICPAC, IGAD's climate centre, Nairobi (https://www.icpac.net/)"
+297,unjobs-un:29,International Civil Service Commission,icsc.un.org,"wikidata (name, accepted)",Q25104179: the item is this organisation: International Civil Service Commission (Subsidiary of the United Nations General Assembly)
+299,unjobs-nonun:291,International Refugee Assistance Project,refugeerights.org,"wikidata (name, accepted)",Q30325304: the item is this organisation: International Refugee Assistance Project (US non-profit organization)
+301,unjobs-un:51,Nordic Investment Bank,nib.int,"wikidata (name, accepted)","Q2020649: the item is this organisation: Nordic Investment Bank (the joint international financial institution of Denmark, Finland, Iceland, Norway, and Sweden)"
+302,unjobs-nonun:424,Rockefeller Foundation,rockefellerfoundation.org,"wikidata (name, accepted)",Q862034: the item is this organisation: Rockefeller Foundation (United States-based philanthropic organization)
+303,unjobs-nonun:437,Sea-Watch,sea-watch.org,"wikidata (name, accepted)",Q20850693: the item is this organisation: Sea-Watch (German non-governmental organisation dedicated to rescung refugees in the Mediterranean)
+304,unjobs-un:67,Technology Bank for the Least Developed Countries,un.org,unverified (search-engine copy),"web search, 5 Nov 2026: Technology Bank for the Least Developed Countries, a section of un.org (hires through careers.un.org) (https://www.un.org/technologybank/en)"
+305,unjobs-un:83,UN Institute for Disarmament Research,unidir.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNIDIR (https://unidir.org/)"
+306,unjobs-nonun:481,United Nations Convention to Combat Desertification,unccd.int,"wikidata (name, accepted)",Q331520: the item is this organisation: United Nations Convention to Combat Desertification (International treaty on environmental protection)
+307,unjobs-nonun:484,University Research Co.,urc-chs.com,unverified (search-engine copy),"web search, 5 Nov 2026: University Research Co. (https://www.urc-chs.com/)"
+309,unjobs-nonun:144,Direct Relief,directrelief.org,wikidata (identifier),Q1227469 by P1297 95-1831116
+311,unjobs-nonun:380,Panorama Global,panoramaglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Panorama Global (https://panoramaglobal.org/)"
+312,unjobs-nonun:27,Armed Conflict Location and Event Data Project,acleddata.com,"wikidata (name, accepted)",Q18354074: the item is this organisation: Armed Conflict Location & Event Data Project (American non-governmental organization)
+313,unjobs-nonun:11,Adam Smith International,adamsmithinternational.com,wikidata (identifier),Q132472623 by P13305 GB-COH-2732176
+319,unjobs-nonun:46,Bezos Earth Fund,bezosearthfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Bezos Earth Fund (https://www.bezosearthfund.org/)"
+320,unjobs-nonun:49,BirdLife International,birdlife.org,"wikidata (name, accepted)",Q210108: the item is this organisation: BirdLife International (global partnership of conservation organizations that strives to conserve birds)
+321,unjobs-nonun:51,Bloomberg Philanthropies,bloomberg.org,"wikidata (name, accepted)",Q16987920: the item is this organisation: Bloomberg Philanthropies (charitable organization)
+322,unjobs-nonun:54,BlueOrchard Finance Ltd,blueorchard.com,unverified (search-engine copy),"web search, 5 Nov 2026: BlueOrchard, impact investment manager (Schroders) (https://www.blueorchard.com/)"
+323,unjobs-nonun:59,C40 Cities,c40.org,"wikidata (name, accepted)",Q485087: the item is this organisation: C40 Cities Climate Leadership Group (group of cities around the world)
+324,unjobs-nonun:101,Climate Analytics,climateanalytics.org,"wikidata (name, accepted)",Q98471481: the item is this organisation: Climate Analytics (non-profit organization focused on climate science and climate policy)
+325,unjobs-nonun:103,Climate Policy Initiative,climatepolicyinitiative.org,"wikidata (name, accepted)",Q55006595: the item is this organisation: Climate Policy Initiative (U.S. non-profit organization.)
+331,unjobs-nonun:160,Energy Innovation,energyinnovation.org,"wikidata (name, accepted)",Q137918445: the item is this organisation: Energy Innovation (US energy and climate policy research group promoting the most effective emission-cutting policies)
+332,unjobs-nonun:163,Environmental Investigation Agency,eia-international.org,unverified (search-engine copy),"web search, 5 Nov 2026: Environmental Investigation Agency (UK); EIA US is eia.org (https://eia-international.org/)"
+333,unjobs-nonun:198,Fòs Feminista,fosfeminista.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fòs Feminista (https://fosfeminista.org/what-we-do/initiatives/)"
+334,unjobs-nonun:203,"Gender Resources, Inc.",genderresources.com,unverified (search-engine copy),"web search, 5 Nov 2026: Gender Resources, Inc.; found through Devex's organisation page (a search result, not read) (https://www.devex.com/organizations/gender-resources-inc-123985)"
+335,unjobs-nonun:219,Global Partnerships,globalpartnerships.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Partnerships, impact investor, Seattle (https://globalpartnerships.org/)"
+336,unjobs-nonun:199,GOPA Consulting Group,gopa.eu,unverified (search-engine copy),"web search, 5 Nov 2026: GOPA Consulting Group (https://www.gopa.eu/en/)"
+338,unjobs-nonun:260,Institute for Energy Economics and Financial Analysis,ieefa.org,"wikidata (name, accepted)",Q135192960: the item is this organisation: Institute for Energy Economics and Financial Analysis (think tank)
+339,unjobs-nonun:263,Institute for Transportation and Development Policy,itdp.org,"wikidata (name, accepted)",Q6039711: the item is this organisation: Institute for Transportation and Development Policy (organization)
+341,unjobs-nonun:281,International Institute for Strategic Studies,iiss.org,"wikidata (name, accepted)",Q1206709: the item is this organisation: International Institute for Strategic Studies (British research institute (or think tank) in the area of international affairs)
+346,unjobs-nonun:319,Lutheran World Federation,lutheranworld.org,"wikidata (name, accepted)",Q942284: the item is this organisation: Lutheran World Federation (global communion of national and regional Lutheran churches)
+347,unjobs-nonun:354,New Development Bank,ndb.int,"wikidata (name, accepted)",Q8579145: the item is this organisation: New Development Bank (multilateral development bank)
+348,unjobs-un:57,Office of Information and Communications Technology,unite.un.org,"wikidata (name, accepted)",Q130533752: the item is this organisation: United Nations Office of Information and Communications Technology (office of the United Nations Secretariat)
+349,unjobs-nonun:534,office-of-the-special-adviser-on-africa,,not needed,"hires through the family's careers site, careers.un.org"
+351,unjobs-nonun:400,Public Health Institute,phi.org,"wikidata (name, accepted)","Q30252845: the item is this organisation: Public Health Institute (healthcare organization in Oakland, United States)"
+352,unjobs-nonun:403,Q2 Impact,q2impact.com,unverified (search-engine copy),"web search, 5 Nov 2026: Q2 Impact, monitoring and evaluation consultancy (https://www.q2impact.com/about/)"
+353,unjobs-nonun:539,rand-europe,rand.org,unverified (search-engine copy),"web search, 5 Nov 2026: RAND Europe, a section of rand.org (https://www.rand.org/randeurope.html)"
+355,unjobs-nonun:417,Relief Applications,reliefapplications.org,unverified (search-engine copy),"web search, 5 Nov 2026: Relief Applications, humanitarian software (https://reliefapplications.org/)"
+356,unjobs-nonun:419,Resolve to Save Lives,resolvetosavelives.org,unverified (search-engine copy),"web search, 5 Nov 2026: Resolve to Save Lives (https://resolvetosavelives.org/)"
+359,unjobs-nonun:430,SALT International,,none found (searched),"web search, 5 Nov 2026: no organisation of this name found; UNjobs' listing (https://unjobs.org/vacancies/1777680527167, a search result) appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled"
+360,unjobs-nonun:472,Transform Health,transformhealthcoalition.org,unverified (search-engine copy),"web search, 5 Nov 2026: Transform Health coalition (https://transformhealthcoalition.org/)"
+361,unjobs-un:71,UN Assistance Mission in Afghanistan,,not needed,"hires through the family's careers site, careers.un.org"
+362,unjobs-un:72,UN Conference on Trade and Development,unctad.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNCTAD (UN Trade and Development) (https://unctad.org/)"
+363,unjobs-un:101,United Nations University,unu.edu,"wikidata (name, accepted)",Q492442: the item is this organisation: United Nations University (academic and research arm of the United Nations); the university itself; the other item is its Guimarães unit
+364,unjobs-nonun:479,US Department of State Bureau for International Narcotics and Law Enforcement Affairs,state.gov,unverified (search-engine copy),"web search, 5 Nov 2026: INL, a bureau of the US State Department, a section of state.gov (https://www.state.gov/about-us-bureau-of-international-narcotics-and-law-enforcement-affairs)"
+365,unjobs-nonun:490,Village Capital,vilcap.com,unverified (search-engine copy),"web search, 5 Nov 2026: Village Capital (https://vilcap.com/)"
+366,unjobs-nonun:507,William and Flora Hewlett Foundation (Hewlett Foundation),hewlett.org,wikidata (identifier),Q1288412 by P13305 US-EIN-941655673
+367,unjobs-nonun:513,World Business Council for Sustainable Development,wbcsd.org,"wikidata (name, accepted)",Q677910: the item is this organisation: World Business Council for Sustainable Development (membership organization for companies)
+368,unjobs-un:106,World Trade Organization,wto.org,"wikidata (name, accepted)",Q7825: the item is this organisation: World Trade Organization (intergovernmental organization that intends to supervise and liberalize international trade)
+370,unjobs-nonun:71,Carnegie Endowment,carnegieendowment.org,wikidata (identifier),Q1153595 by P1297 13-0552040
+373,unjobs-nonun:414,RefugePoint,refugepoint.org,unverified (search-engine copy),"web search, 5 Nov 2026: RefugePoint (https://refugepoint.org/)"
+374,unjobs-nonun:270,International Center for Biosaline Agriculture,biosaline.org,"wikidata (name, accepted)","Q25227016: the item is this organisation: International Center for Biosaline Agriculture (international, not-for-profit applied agricultural research center with a unique focus on marginal environment)"
+375,unjobs-nonun:1,350.org,350.org,"wikidata (name, accepted)",Q2091619: the item is this organisation: 350.org (international environmental NGO)
+376,unjobs-nonun:7,Access Now,accessnow.org,"wikidata (name, accepted)",Q4672520: the item is this organisation: Access Now (non-profit organization)
+378,unjobs-nonun:24,American Public Health Association,apha.org,"wikidata (name, accepted)","Q4744758: the item is this organisation: American Public Health Association (Washington, D.C.-based professional organization)"
+383,unjobs-nonun:88,Ceres,ceres.org,"wikidata (name, accepted)","Q2981087: the item is this organisation: Ceres (non-profit organization advocating sustainability); the sustainability non-profit (not the city, the game or the companies)"
+384,unjobs-nonun:98,CitizenLab,govocal.com,unverified (search-engine copy),"web search, 5 Nov 2026: CitizenLab, renamed Go Vocal in 2024, a civic software company (outside aid; for step G's review) (https://www.govocal.com/citizenlab-becomes-go-vocal)"
+385,unjobs-nonun:106,Comitato Collaborazione Medica,ccm-italia.org,unverified (search-engine copy),"web search, 5 Nov 2026: Comitato Collaborazione Medica, Turin; found through an Italian nonprofit directory (https://italianonprofit.it/scheda-ente/comitato-collaborazione-medica/)"
+387,unjobs-nonun:126,Dalberg Global Development Advisors,dalberg.com,"wikidata (name, accepted)",Q5210246: the item is this organisation: Dalberg Global Development Advisors (policy advisory firm)
+388,unjobs-un:12,Department of Peace Operations,,not needed,"hires through the family's careers site, careers.un.org"
+389,unjobs-nonun:166,Epicentre,epicentre.msf.org,"wikidata (name, accepted)",Q107013885: the item is this organisation: Epicentre (part of Médecins Sans Frontières)
+390,unjobs-un:20,Ethics Office,,not needed,"hires through the family's careers site, careers.un.org"
+393,unjobs-nonun:210,Global Citizen,globalcitizen.org,"wikidata (name, accepted)",Q5570568: the item is this organisation: Global Citizen (organization)
+394,unjobs-nonun:212,Global Energy Monitor,globalenergymonitor.org,"wikidata (name, accepted)",Q65086937: the item is this organisation: Global Energy Monitor (nonprofit tracking fossil fuel and energy infrastructure projects worldwide)
+398,unjobs-nonun:229,HELP Logistics,help-logistics.org,unverified (search-engine copy),"web search, 5 Nov 2026: HELP Logistics (Kühne Foundation) (https://www.help-logistics.org/)"
+399,unjobs-nonun:529,independent-institution-on-missing-persons-in-the-syrian-arab-republic-iimp,,not needed,"hires through the family's careers site, careers.un.org"
+400,unjobs-un:27,International Court of Justice,icj-cij.org,"wikidata (name, accepted)",Q7801: the item is this organisation: International Court of Justice (primary judicial organ of the United Nations)
+401,unjobs-nonun:274,International Dialogue Centre,kaiciid.org,"wikidata (name, accepted)",Q6324948: the item is this organisation: KAICIID Dialogue Centre (interfaith dialogue international organization); the International Dialogue Centre is KAICIID
+404,unjobs-nonun:298,Internews Network,internews.org,"wikidata (name, accepted)",Q6056118: the item is this organisation: Internews (organization)
+405,unjobs-nonun:303,Japan International Cooperation Agency,jica.go.jp,wikidata (identifier),Q958590 by P13305 XM-DAC-701-8
+406,unjobs-nonun:327,Medicines for Malaria Venture,mmv.org,"wikidata (name, accepted)",Q6806774: the item is this organisation: Medicines for Malaria Venture (organization)
+407,unjobs-nonun:531,myAgro Farms,myagro.org,unverified (search-engine copy),"web search, 5 Nov 2026: myAgro (https://www.myagro.org/)"
+410,unjobs-un:88,Office of Counter-Terrorism,,not needed,"hires through the family's careers site, careers.un.org"
+411,unjobs-nonun:537,office-of-the-united-nations-ombudsman-and-mediation-services,,not needed,"hires through the family's careers site, careers.un.org"
+413,unjobs-nonun:369,Open Society Foundations,opensocietyfoundations.org,"wikidata (name, accepted)",Q786194: the item is this organisation: Open Society Foundations (international grantmaking network)
+414,unjobs-nonun:370,Organization of American States,oas.org,"wikidata (name, accepted)",Q123759: the item is this organisation: Organization of American States (international organization of states in the Americas)
+415,unjobs-nonun:379,Panagora Group,panagoragroup.net,unverified (search-engine copy),"web search, 5 Nov 2026: Panagora Group (https://panagoragroup.net/)"
+416,unjobs-nonun:376,PAX sapiens,paxsapiens.org,unverified (search-engine copy),"web search, 5 Nov 2026: PAX sapiens (https://paxsapiens.org/)"
+418,unjobs-nonun:388,Peterson Institute for International Economics,piie.com,"wikidata (name, accepted)","Q2981447: the item is this organisation: Peterson Institute for International Economics (think tank based in Washington, DC, USA)"
+420,unjobs-nonun:416,Regional Community Forestry Training Center for Asia and the Pacific,recoftc.org,unverified (search-engine copy),"web search, 5 Nov 2026: RECOFTC, Bangkok (https://www.recoftc.org/)"
+421,unjobs-nonun:435,Samaritan's Purse,samaritanspurse.org,"wikidata (name, accepted)",Q3470648: the item is this organisation: Samaritan's Purse (Christian humanitarian aid organization)
+422,unjobs-nonun:433,SEEK Development,seekdevelopment.org,unverified (search-engine copy),"web search, 5 Nov 2026: SEEK Development, Berlin (https://www.seekdevelopment.org/)"
+423,unjobs-nonun:452,"Statistical, Economic and Social Research and Training Centre for Islamic Countries",sesric.org,"wikidata (name, accepted)","Q20988519: the item is this organisation: Statistical, Economic and Social Research and Training Centre for Islamic Countries (subsidiary organ of the Organisation of Islamic Cooperation serving OIC members in the area of statistics)"
+424,unjobs-nonun:460,Systemic Justice,systemicjustice.ngo,unverified (search-engine copy),"web search, 5 Nov 2026: Systemic Justice, Amsterdam (https://systemicjustice.ngo/)"
+426,unjobs-nonun:473,Transparency International,transparency.org,"wikidata (name, accepted)","Q174240: the item is this organisation: Transparency International (international, non-governmental umbrella organization)"
+429,unjobs-nonun:492,Vizzuality,vizzuality.com,"wikidata (name, accepted)",Q22909667: the item is this organisation: Vizzuality (a science and technology company focused on data visualization)
+440,unjobs-nonun:245,International Center for Agricultural Research in the Dry Areas,icarda.org,"wikidata (name, accepted)",Q601277: the item is this organisation: International Center for Agricultural Research in the Dry Areas (agricultural research institute); the institute itself; the others are its Rabat and Amman offices
+441,unjobs-nonun:497,Water.org,water.org,wikidata (identifier),Q7973231 by P1297 58-2060131
+442,unjobs-nonun:85,Center for Victims of Torture,cvt.org,wikidata (identifier),Q5059917 by P1297 36-3383933
+444,unjobs-nonun:91,Chatham House,chathamhouse.org,"wikidata (name, accepted)",Q263016: the item is this organisation: Chatham House (international affairs think tank)
+446,unjobs-nonun:238,Henry L. Stimson Center,stimson.org,"wikidata (name, accepted)",Q5724590: the item is this organisation: Henry L. Stimson Center (American think tank)
+447,unjobs-nonun:188,Financing Alliance for Health,financingalliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: Financing Alliance for Health, Nairobi (https://financingalliance.org/)"
+448,unjobs-nonun:440,Shelter For Life International,shelter.org,unverified (search-engine copy),"web search, 5 Nov 2026: Shelter For Life International (https://shelter.org/)"
+453,unjobs-nonun:4,ASEAN Coordinating Centre for Humanitarian Assistance on Disaster Management (AHA Centre),ahacentre.org,unverified (search-engine copy),"web search, 5 Nov 2026: AHA Centre, Jakarta (https://ahacentre.org/)"
+454,unjobs-nonun:56,Bruegel,bruegel.org,"wikidata (name, accepted)",Q544706: the item is this organisation: Bruegel (European think tank); the European think tank (not the Belgian festival)
+455,unjobs-nonun:97,Citizen Lab,citizenlab.ca,"wikidata (name, accepted)",Q5122568: the item is this organisation: Citizen Lab (research organization based in Canada)
+456,unjobs-nonun:108,Committee to Protect Journalists,cpj.org,"wikidata (name, accepted)",Q1115813: the item is this organisation: Committee to Protect Journalists (American nonprofit organization)
+457,unjobs-nonun:117,Council of the Baltic Sea States,cbss.org,"wikidata (name, accepted)",Q789769: the item is this organisation: Council of the Baltic Sea States (intergovernmental organization)
+458,unjobs-nonun:130,DataKind,datakind.org,"wikidata (name, accepted)",Q97135421: the item is this organisation: DataKind (organization)
+459,unjobs-un:8,Department for General Assembly and Conference Management,,not needed,"hires through the family's careers site, careers.un.org"
+460,unjobs-nonun:527,department-for-general-assembly-and-conference-management-dcs-nairobi,,not needed,"hires through the family's careers site, careers.un.org"
+462,unjobs-nonun:124,DHIS2,dhis2.org,"wikidata (name, accepted)",Q19698946: the item is this organisation: DHIS2 (District Health Information System 2)
+464,unjobs-nonun:154,Ecologic,ecologic.eu,unverified (search-engine copy),"web search, 5 Nov 2026: Ecologic Institute, Berlin (https://www.ecologic.eu/)"
+465,unjobs-nonun:149,EFI Foundation,efifoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: EFI Foundation, formerly Energy Futures Initiative (https://efifoundation.org/about-us/our-impact/)"
+468,unjobs-un:22,European Forest Institute,efi.int,"wikidata (name, accepted)",Q580400: the item is this organisation: European Forest Institute (organization)
+469,unjobs-nonun:173,European Institute of Innovation and Technology,eit.europa.eu,"wikidata (name, accepted)","Q993120: the item is this organisation: European Institute of Innovation and Technology (research institute, independent EU body)"
+471,unjobs-nonun:182,FLOCERT,flocert.net,"wikidata (name, accepted)",Q986530: the item is this organisation: FLOCert (certification organization)
+472,unjobs-nonun:192,Ford Foundation,fordfoundation.org,"wikidata (name, accepted)",Q1313036: the item is this organisation: Ford Foundation (private foundation based in New York City)
+474,unjobs-nonun:197,Future Advocacy,futureadvocacy.com,unverified (search-engine copy),"web search, 5 Nov 2026: Future Advocacy, London (https://futureadvocacy.com/who-we-are/)"
+478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),goldstandard.org,unverified (search-engine copy),"web search, 5 Nov 2026: Gold Standard Foundation, Geneva (https://www.goldstandard.org/contact)"
+479,unjobs-nonun:235,Heising-Simons Foundation,hsfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Heising-Simons Foundation (https://www.hsfoundation.org/about/)"
+480,unjobs-nonun:237,Helvetas,helvetas.org,"wikidata (name, accepted)",Q467480: the item is this organisation: HELVETAS Swiss Intercooperation (Swiss international development and humanitarian organization)
+481,unjobs-nonun:246,"ICDDR,B - Centre for Health and Population Research",icddrb.org,unverified (search-engine copy),"web search, 5 Nov 2026: icddr,b, Dhaka (https://www.icddrb.org/about-us)"
+482,unjobs-nonun:530,information-and-communications-technology-division,,not needed,"hires through the family's careers site, careers.un.org"
+483,unjobs-un:38,Inter-Parliamentary Union,ipu.org,"wikidata (name, accepted)",Q176815: the item is this organisation: Interparliamentary Union (international organization of national parliaments)
+484,unjobs-nonun:267,International Anti-Corruption Academy,iaca.int,"wikidata (name, accepted)",Q876957: the item is this organisation: International Anti-Corruption Academy (organization)
+485,unjobs-un:25,International Civil Aviation Organization,icao.int,"wikidata (name, accepted)","Q125761: the item is this organisation: International Civil Aviation Organization (specialized agency of the United Nations, coordinates the international civil aviation regulations and policy)"
+488,unjobs-un:48,International Institute for Applied Systems Analysis,iiasa.ac.at,"wikidata (name, accepted)",Q212102: the item is this organisation: International Institute for Applied Systems Analysis (international research organization in Austria)
+489,unjobs-nonun:280,International Institute for Democracy and Electoral Assistance (International IDEA),idea.int,unverified (search-engine copy),"web search, 5 Nov 2026: International IDEA, Stockholm (https://www.idea.int/about-us)"
+490,unjobs-un:39,International Renewable Energy Agency,irena.org,"wikidata (name, accepted)",Q392739: the item is this organisation: International Renewable Energy Agency (international organization)
+491,unjobs-un:40,International Residual Mechanism for Criminal Tribunals,irmct.org,"wikidata (name, accepted)",Q1667632: the item is this organisation: International Residual Mechanism for Criminal Tribunals (international criminal tribunal)
+492,unjobs-nonun:295,International Water Management Institute,iwmi.cgiar.org,"wikidata (name, accepted)",Q868028: the item is this organisation: International Water Management Institute (organization); the institute itself; the others are country offices
+493,unjobs-nonun:311,Landesa,landesa.org,"wikidata (name, accepted)","Q4042590: the item is this organisation: Landesa (nonprofit organization in Seattle, United States)"
+494,unjobs-nonun:314,Laterite,laterite.com,unverified (search-engine copy),"web search, 5 Nov 2026: Laterite, development research firm (https://www.laterite.com/about/)"
+495,unjobs-nonun:315,Laudato Si Movement,laudatosimovement.org,unverified (search-engine copy),"web search, 5 Nov 2026: Laudato Si' Movement, formerly Global Catholic Climate Movement (https://laudatosimovement.org/gccm-announces-its-new-name-laudato-si-movement/)"
+496,unjobs-nonun:316,Libraries Without Borders,librarieswithoutborders.org,unverified (search-engine copy),"web search, 5 Nov 2026: Libraries Without Borders (Bibliothèques Sans Frontières; French site bibliosansfrontieres.org) (https://www.librarieswithoutborders.org/about-us/)"
+497,unjobs-nonun:321,Malteser International,malteser-international.org,"wikidata (name, accepted)",Q318221: the item is this organisation: Malteser International (organization)
+498,unjobs-nonun:326,Medicines Patent Pool,medicinespatentpool.org,"wikidata (name, accepted)",Q17006726: the item is this organisation: Medicines Patent Pool (organization)
+499,unjobs-nonun:328,Meedan,meedan.com,"wikidata (name, accepted)",Q6807493: the item is this organisation: Meedan ()
+501,unjobs-nonun:336,Mission East,missioneast.org,unverified (search-engine copy),"web search, 5 Nov 2026: Mission East, Danish NGO (https://missioneast.org/en/we-are-mission-east/)"
+504,unjobs-un:54,Office for Disarmament Affairs,,not needed,"hires through the family's careers site, careers.un.org"
+505,unjobs-un:59,Office of Legal Affairs,,not needed,"hires through the family's careers site, careers.un.org"
+506,unjobs-un:65,Office of the Special Envoy of the Secretary-General on the Great Lakes Region,,not needed,"hires through the family's careers site, careers.un.org"
+507,unjobs-un:96,Office of the UN Special Coordinator for the Middle East Peace Process,,not needed,"hires through the family's careers site, careers.un.org"
+508,unjobs-nonun:533,office-of-the-high-representative-for-the-least-developed-countries-landlocked-developing-countries-and-small-island-developing-states,,not needed,"hires through the family's careers site, careers.un.org"
+509,unjobs-nonun:535,office-of-the-special-envoy-of-the-secretary-general-for-yemen,,not needed,"hires through the family's careers site, careers.un.org"
+510,unjobs-nonun:536,office-of-the-srsg-for-children-and-armed-conflict,,not needed,"hires through the family's careers site, careers.un.org"
+513,unjobs-un:62,Organisation of Eastern Caribbean States,oecs.org,"wikidata (name, accepted)",Q392770: the item is this organisation: Organisation of Eastern Caribbean States (inter-governmental organization)
+515,unjobs-nonun:385,Patrick J. McGovern Foundation,mcgovern.org,"wikidata (name, accepted)",Q122189199: the item is this organisation: Patrick J. McGovern Foundation (foundation named after Patrick J. McGovern)
+516,unjobs-nonun:401,Pulitzer Center on Crisis Reporting,pulitzercenter.org,"wikidata (name, accepted)",Q7259349: the item is this organisation: Pulitzer Center on Crisis Reporting (nonprofit news media organization)
+517,unjobs-nonun:405,Quincy Institute for Responsible Statecraft,responsiblestatecraft.org,"wikidata (name, accepted)",Q65053205: the item is this organisation: Quincy Institute for Responsible Statecraft (American think tank)
+518,unjobs-nonun:410,Rainforest Foundation Norway,regnskog.no,unverified (search-engine copy),"web search, 5 Nov 2026: Rainforest Foundation Norway (Regnskogfondet) (https://www.regnskog.no/en/what-we-do/about-us)"
+519,unjobs-nonun:411,Rainforest Foundation US,rainforestfoundation.org,"wikidata (name, accepted)",Q7284878: the item is this organisation: Rainforest Foundation US (non-profit organization based in the U.S.)
+521,unjobs-un:64,Regional Service Centre Entebbe,,not needed,"hires through the family's careers site, careers.un.org"
+522,unjobs-nonun:428,Roundtable on Sustainable Biomaterials,rsb.org,unverified (search-engine copy),"web search, 5 Nov 2026: Roundtable on Sustainable Biomaterials, Geneva (https://rsb.org/about-rsb/who-we-are/)"
+524,unjobs-nonun:442,Sight and Life,sightandlife.org,"wikidata (name, accepted)","Q631151: the item is this organisation: Sight and Life (organization in Basel, Switzerland)"
+526,unjobs-nonun:458,Swiss Tropical and Public Health Institute,swisstph.ch,"wikidata (name, accepted)",Q3152651: the item is this organisation: Swiss Tropical and Public Health Institute (health institute)
+528,unjobs-nonun:148,Third Generation Environmentalism,e3g.org,"wikidata (name, accepted)",Q28224706: the item is this organisation: E3G (global climate change think tank (2004-)); Third Generation Environmentalism is E3G
+530,unjobs-un:82,UN Interregional Crime and Justice Research Institute,unicri.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNICRI, Turin (https://www.unicri.org/institute/about_unicri)"
+531,unjobs-un:87,UN Mine Action Service,,not needed,"hires through the family's careers site, careers.un.org"
+532,unjobs-un:94,UN Office at Vienna,,not needed,"hires through the family's careers site, careers.un.org"
+533,unjobs-un:92,UN Office for Outer Space Affairs,,not needed,"hires through the family's careers site, careers.un.org"
+534,unjobs-un:97,UN Truce Supervision Organization,,not needed,"hires through the family's careers site, careers.un.org"
+535,unjobs-un:99,Universal Postal Union,upu.int,"wikidata (name, accepted)",Q17495: the item is this organisation: Universal Postal Union (specialized agency of the United Nations focused on cooperation within the postal sector)
+537,unjobs-nonun:512,World Bicycle Relief,worldbicyclerelief.org,"wikidata (name, accepted)",Q8035409: the item is this organisation: World Bicycle Relief (non-profit organization specializing in bicycle distribution programs to aid poverty relief in developing countries)
+538,unjobs-nonun:516,World Data Lab,worlddatalab.com,unverified (search-engine copy),"web search, 5 Nov 2026: World Data Lab, Vienna (https://worlddatalab.com/about-us)"
+540,irs:980593375,Gavi Alliance,gavi.org,wikidata (identifier),Q688592 by P1297 98-0593375
+541,irs:061008595,Americares Foundation Inc,americares.org,wikidata (identifier),Q4742473 by P1297 06-1008595
+542,irs:951922279,World Vision,worldvision.org,wikidata (identifier),Q2593851 by P1297 95-1922279
+543,irs:362586390,Map International,map.org,wikidata (identifier),Q17009463 by P1297 36-2586390
+545,irs:060726487,Save the Children Federation Inc,savethechildren.org,wikidata (identifier),Q7428099 by P1297 06-0726487
+546,irs:131685039,Cooperative for Assistance and Relief Everywhere Inc,care.org,unverified (search-engine copy),"web search, 5 Nov 2026: CARE USA (the legal name of EIN 13-1685039) (https://www.care.org/about-us/faqs/)"
+547,irs:133433452,Medecins Sans Frontieres USA Inc,doctorswithoutborders.org,wikidata (identifier),Q50356725 by P1297 13-3433452
+549,irs:131656634,American Jewish Joint Distribution Committee Inc,jdc.org,wikidata (identifier),Q1702533 by P1297 13-1656634; the item is this organisation: American Jewish Joint Distribution Committee (Jewish relief organization based in New York City); the same organisation; jdc.org is its main site (thejoint.org.il is its Israel site)
+550,irs:592174510,Food for the Poor Inc,foodforthepoor.com,wikidata (identifier),Q5465483 by P1297 59-2174510
+551,irs:736108657,Feed the Children Inc,feedthechildren.org,wikidata (identifier),Q5441193 by P1297 73-6108657
+553,seed:21,Habitat for Humanity,habitat.org,wikidata (identifier),Q1192147 by P1297 91-1914868
+554,irs:205704991,Carter Center Collaborative Inc,cartercenter.org,unverified (search-engine copy),"web search, 5 Nov 2026: a supporting entity of The Carter Center, which shares its website; found through Charity Navigator (https://www.charitynavigator.org/ein/205704991)"
+555,irs:481108359,Heart to Heart International Inc,hearttoheart.org,wikidata (identifier),Q5692500 by P1297 48-1108359
+558,irs:135602319,Catholic Medical Mission Board Inc,cmmb.org,wikidata (identifier),Q30255653 by P1297 13-5602319
+562,irs:311348100,Matthew 25 Ministries Inc,m25m.org,wikidata (identifier),Q6789864 by P1297 31-1348100
+563,irs:541668650,Kingsway Charities Inc,kingswaycharities.org,wikidata (identifier),Q54826342 by P1297 54-1668650
+564,irs:262414132,Mercy Ships International,mercyships.fr,wikidata (identifier),Q314703 by P1297 26-2414132
+565,irs:954335462,Childrens Hunger Fund,childrenshungerfund.org,wikidata (identifier),Q5098135 by P1297 95-4335462
+572,irs:520811461,Acdi Voca,acdivoca.org,unverified (search-engine copy),"web search, 5 Nov 2026: ACDI/VOCA (https://acdivoca.org/)"
+574,irs:530242962,Project Hope - the People-To-People Health Foundation Inc,projecthope.org,wikidata (identifier),Q7249127 by P1297 53-0242962
+575,irs:161541024,Rise Against Hunger,riseagainsthunger.org,wikidata (identifier),Q7619722 by P1297 16-1541024
+576,irs:952680390,Food for the Hungry Inc,fh.org,wikidata (identifier),Q5465482 by P1297 95-2680390
+577,irs:237187762,Centro International de Agricultura Tropical Incorporated,alliancebioversityciat.org,unverified (search-engine copy),"web search, 5 Nov 2026: CIAT's US entity; CIAT merged with Bioversity in 2019 as the Alliance (https://alliancebioversityciat.org/who-we-are/history-alliance)"
+578,uk:1156222,The Ch Foundation (UK),,none found (searched),"web search, 5 Nov 2026: a grant-making charity; no public website, and the register lists none (https://www.hinchilla.com/funder-directory/the-ch-foundation-uk)"
+580,irs:954453134,Islamic Development & Empowerment in America,irusa.org,wikidata (identifier),Q16997337 by P1297 95-4453134
+582,irs:270165743,Mana Nutritive Aid Products Inc,mananutrition.org,unverified (search-engine copy),"web search, 5 Nov 2026: MANA Nutrition, RUTF maker; found through Charity Navigator (https://www.charitynavigator.org/ein/270165743)"
+583,irs:993025512,Rescue Democracy International - Rdi,rescuedemocracyintl.org,unverified (search-engine copy),"web search, 5 Nov 2026: Rescue Democracy International, San Diego (https://rescuedemocracyintl.org/)"
+587,irs:223419667,Vital Strategies Inc,theunion.org,wikidata (identifier),Q2096638 by P1297 22-3419667
+588,irs:541722887,International Justice Mission,ijm.org,wikidata (identifier),Q1423565 by P1297 54-1722887
+591,acnc:30157737329,Latter-day Saint Charities Australia,latterdaysaintcharities.org,unverified (search-engine copy),"web search, 5 Nov 2026: the Australian arm of Latter-day Saint Charities, which has no Australian site of its own (https://www.devex.com/organizations/latter-day-saint-charities-177722)"
+592,irs:522340908,Arab Gulf Programme for Development,agfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: AGFUND (Arab Gulf Programme for Development), Riyadh (https://www.agfund.org/en/about/brief)"
+594,irs:112494808,United Palestinian Appeal Inc,upaconnect.org,wikidata (identifier),Q54557116 by P1297 11-2494808
+597,irs:526054268,Pan American Development Foundation Inc,padf.org,"wikidata (name, accepted)",Q7129600: the item is this organisation: Pan American Development Foundation (organization)
+598,irs:810799662,Multifaith Alliance Inc,multifaithalliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: Multifaith Alliance, formerly Multifaith Alliance for Syrian Refugees (https://multifaithalliance.org/about)"
+599,irs:346562544,Brothers Brother Foundation,brothersbrother.org,wikidata (identifier),Q54834556 by P1297 34-6562544
+600,irs:521231983,Aga Khan Foundation USA,akfusa.org,wikidata (identifier),Q54828497 by P1297 52-1231983
+605,irs:541460147,Operation Smile Inc,operationsmile.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global nonprofit providing free cleft surgery and care (https://www.operationsmile.org/)"
+607,irs:522158152,HALO Trust USA Inc,halousa.org,unverified (search-engine copy),"web search, 5 Nov 2026: US fundraising arm of The HALO Trust, landmine clearance (https://www.halousa.org/about-us)"
+608,irs:521662800,United States Association for UNHCR,unrefugees.org,wikidata (identifier),Q54826589 by P1297 52-1662800
+610,irs:931057665,Palestine Childrens Relief Fund,pcrf.net,wikidata (identifier),Q7127292 by P1297 93-1057665
+614,iati:US-EIN-300108263,GlobalGiving.org,globalgiving.org,wikidata (identifier),Q4039485 by P13305 US-EIN-300108263
+617,irs:223304404,C I S Development Foundation Inc,cisdevelopmentfoundation.org,wikidata (identifier),Q54688371 by P1297 22-3304404
+619,cra:118974294RR0001,Moral Arc Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: RENAMED: ex-Jewish Heritage Foundation of Canada; funds Jewish schools; no website (https://www.charityintelligence.ca/charity-details/1050-moral-arc-foundation)"
+621,irs:132907656,Citihope International Inc,citihope.org,wikidata (identifier),Q54848430 by P1297 13-2907656
+623,cra:810540476RR0001,Amant Global Foundation,amant.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: a family foundation funding Amant contemporary art centre, Brooklyn (https://www.amant.org/about)"
+624,irs:541382657,Operation Blessing International Relief & Development Corp,ob.org,wikidata (identifier),Q4335257 by P1297 54-1382657
+625,irs:411601449,Feed My Starving Children,fmsc.org,wikidata (identifier),Q21015705 by P1297 41-1601449
+626,irs:200942434,Baitulmaal Inc,baitulmaal.org,wikidata (identifier),Q54670065 by P1297 20-0942434
+627,irs:363241033,ALIGHT,wearealight.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: Alight, formerly American Refugee Committee; humanitarian aid for displaced (https://www.wearealight.org/who-we-are)"
+628,irs:521314847,Adventist Development and Relief Agency International,adra.org,wikidata (identifier),Q290625 by P1297 52-1314847
+629,irs:930878944,Medical Teams International,medicalteams.org,wikidata (identifier),Q30268129 by P1297 93-0878944
+631,irs:813404708,Good Neighbors Global Partnership Center,goodneighbors.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global office of Good Neighbors international humanitarian development alliance (https://www.goodneighbors.org/our-structure/)"
+633,irs:132574963,Lutheran World Relief Inc,lwr.org,wikidata (identifier),Q6705754 by P1297 13-2574963
+635,irs:521447902,CNFA,cnfa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Cultivating New Frontiers in Agriculture; international agricultural development (https://cnfa.org/)"
+636,irs:520742294,Atlantic Council of the U S Inc,atlanticcouncil.org,wikidata (identifier),Q756373 by P1297 52-0742294
+637,irs:131656647,Freedom House Inc,freedomhouse.org,wikidata (identifier),Q242424 by P1297 13-1656647
+639,irs:262087340,True Sojourners,truesojourners.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian international development nonprofit; Nepal, India, Malawi, UAE projects (https://www.truesojourners.org/)"
+641,irs:133712030,Concern Worldwide U S Inc,concernusa.org,wikidata (identifier),Q54631074 by P1297 13-3712030
+642,irs:592339140,Salvadoran American Humanitarian Foundation Inc,sahf.org,wikidata (identifier),Q54821583 by P1297 59-2339140
+645,irs:582248383,Cure International Inc,cure.org,wikidata (identifier),Q5014716 by P1297 58-2248383
+646,irs:133786524,Ukraine-Moldova American Enterprise Fund,umaef.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: ex-Western NIS Enterprise Fund; US-backed SME investment, Ukraine/Moldova (https://umaef.org/)"
+647,irs:273941186,End Fund Inc,endfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Private philanthropy fund fighting neglected tropical diseases (https://endfund.org/)"
+649,irs:122680572,Canadian UNICEF Committee-Comite UNICEF Canada,unicef.ca,wikidata (identifier),Q50363511 by P1297 12-2680572
+650,irs:520851555,Amnesty International of the USA Inc,amnestyusa.org,wikidata (identifier),Q2843739 by P1297 52-0851555
+653,irs:362976266,Assyrian Universal Alliance Foundation Inc,auaf.us,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: RENAMED: now Assyrian Cultural Foundation; Chicago senior home care, culture (https://www.auaf.us/)"
+655,irs:981135729,CGIAR,cgiar.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global agricultural research partnership for development (https://www.cgiar.org/)"
+656,irs:822401466,Global Alliance for Viksit Bharat Foundation,piramalfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of Piramal Foundation's GAVB; funds India poverty, health programmes (https://www.guidestar.org/profile/82-2401466)"
+657,irs:942607722,New Israel Fund,nif.org,unverified (search-engine copy),"web search, 5 Nov 2026: Funds Israeli civil society for democracy, equality, human rights (https://nif.org/)"
+658,irs:810925158,Blumont Global Development Inc,blumont.org,unverified (search-engine copy),"web search, 5 Nov 2026: International humanitarian relief and development implementer (https://blumont.org/)"
+660,irs:454810098,Pure Hand for Mankind Inc,purehands.org,unverified (search-engine copy),"web search, 5 Nov 2026: Pure Hands; humanitarian relief and malnutrition programmes in Yemen (https://www.purehands.org/)"
+662,irs:311614650,Orphan Grain Train Inc,ogt.org,wikidata (identifier),Q54854657 by P1297 31-1614650
+664,irs:131687001,Population Council Inc,popcouncil.org,wikidata (identifier),Q7229776 by P1297 13-1687001
+669,irs:351902841,Lifesong for Orphans Inc,lifesongfororphans.org,wikidata (identifier),Q54857570 by P1297 35-1902841
+670,irs:521842864,Center for Social Change Inc,centerforsocialchange.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Maryland residential and employment services for people with disabilities (https://www.guidestar.org/profile/52-1842864)"
+671,iati:US-IRS-13-5661832,Plan International USA,planusa.org,wikidata (identifier),Q7200910 by P13305 US-IRS-13-5661832
+672,irs:202714426,Unrwa USA National Committee Inc,unrwausa.org,unverified (search-engine copy),"web search, 5 Nov 2026: US nonprofit supporting UNRWA's aid to Palestine refugees (https://www.unrwausa.org/)"
+673,irs:550914744,Handicap International,hi-us.org,wikidata (identifier),Q131859237 by P1297 55-0914744
+675,irs:540907624,Opportunity International Inc,opportunity.org,wikidata (identifier),Q877991 by P1297 54-0907624
+681,irs:330412751,International Relief Teams,irteams.org,wikidata (identifier),Q55803600 by P1297 33-0412751
+682,irs:161756484,Foundation for the Global Compact,unglobalcompact.org,unverified (search-engine copy),"web search, 5 Nov 2026: US nonprofit funding and supporting the UN Global Compact (https://unglobalcompact.org/about/foundation)"
+683,irs:954402149,Life for Relief and Development Inc,lifeusa.org,wikidata (identifier),Q54857655 by P1297 95-4402149
+684,seed:31,ICRISAT,icrisat.org,unverified (search-engine copy),"web search, 5 Nov 2026: CGIAR international dryland crops research institute (https://www.icrisat.org/)"
+685,irs:541884520,Christian Relief Services Charities Inc,crscfamily.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian relief charity family: housing, food, water, medical care worldwide (https://crscfamily.org/)"
+686,irs:530243270,Amideast,amideast.org,unverified (search-engine copy),"web search, 5 Nov 2026: Education, training and development nonprofit in Middle East, North Africa (https://www.amideast.org/)"
+687,irs:135562367,United Board for Christian Higher Education in Asia,unitedboard.org,wikidata (identifier),Q18208143 by P1297 13-5562367
+688,irs:222584370,American Jewish World Service Inc,ajws.org,wikidata (identifier),Q4064193 by P1297 22-2584370
+690,irs:132626199,United Nations Development Corporation,undc.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: New York State corporation developing office space for UN community (https://undc.org/)"
+694,irs:133500609,Rainforest Trust,rainforesttrust.org,wikidata (identifier),Q8035905 by P1297 13-3500609
+697,irs:571116978,Water Missions International,watermission.org,wikidata (identifier),Q54624543 by P1297 57-1116978
+698,irs:042791159,Grassroots International Inc,grassrootsonline.org,wikidata (identifier),Q54628358 by P1297 04-2791159
+701,irs:465335435,Nova Ukraine,novaukraine.org,unverified (search-engine copy),"web search, 5 Nov 2026: US nonprofit providing humanitarian aid to Ukraine (https://novaukraine.org/)"
+703,irs:232836648,Hope International,hopeinternational.org,wikidata (identifier),Q16984831 by P1297 23-2836648
+704,irs:521257425,Search for Common Ground,sfcg.org,unverified (search-engine copy),"web search, 5 Nov 2026: International peacebuilding and conflict transformation NGO (https://www.sfcg.org/)"
+706,irs:882071011,Worldwide Friends Foundation,worldwidefriendsfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian aid nonprofit focused on Israel and Ukraine (https://www.guidestar.org/profile/88-2071011)"
+707,irs:710992446,Kiva Microfunds,kiva.org,wikidata (identifier),Q1423787 by P1297 71-0992446
+708,irs:030362926,Himalayan Cataract Project Inc,cureblindness.org,wikidata (identifier),Q5764990 by P1297 03-0362926
+709,irs:141790920,Abrahams Blessing,jezreelinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Operates as Jezreel International; ships donated relief goods worldwide (https://jezreelinternational.org/)"
+712,irs:520954751,German Marshall Fund of the US,gmfus.org,wikidata (identifier),Q908779 by P1297 52-0954751
+714,irs:262009162,Doulos Partners,doulospartners.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Christian church-planting missions funding ministry, Birmingham Alabama (https://www.doulospartners.org/)"
+715,irs:131845455,International Planned Parenthood Federation,ippfwhr.org,wikidata (identifier),Q27718360 by P1297 13-1845455
+720,irs:261197590,Allegro Organizational Solutions Inc,allegrosolutions.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Houston fiscal sponsor providing back-office services to charitable projects (https://allegrosolutions.org/)"
+721,irs:980169910,Aisg Inc,aisgz.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: American International School of Guangzhou, K-12 school in China (https://www.charitynavigator.org/ein/980169910)"
+722,irs:872410117,Human Appeal Inc,humanappealusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: US branch of Human Appeal international humanitarian charity (https://humanappealusa.org/)"
+725,irs:043348171,Planet Aid Inc,planetaid.org,wikidata (identifier),Q7201055 by P1297 04-3348171
+726,irs:464604398,Razom Inc,razomforukraine.org,unverified (search-engine copy),"web search, 5 Nov 2026: Razom for Ukraine; humanitarian relief, health, advocacy for Ukraine (https://www.razomforukraine.org/)"
+728,irs:251679348,International Orthodox Christian Charities Inc,iocc.org,wikidata (identifier),Q6052281 by P1297 25-1679348
+729,irs:455297608,Mercy Without Limits Inc,mwl.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian charity for orphans, widows, refugees in 16 countries (https://mwl.org/about-us/)"
+730,irs:954578963,Unto Inc,unto.com,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: ex-GAiN International; Cru's humanitarian aid ministry (https://unto.com/about-us/)"
+731,cra:119229466RR0001,Everlight Charitable Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: CLOSED: renamed from a family foundation; charity status revoked May 2026 (https://www.civicsproject.org/regions/canada/gazette/d8ba64e2-18d1-4d4e-b935-0bd04b927780)"
+732,irs:381575570,World Medical Relief Incorporated,worldmedicalrelief.org,wikidata (identifier),Q8035954 by P1297 38-1575570
+734,irs:922204466,Human Development Fund,hdfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Michigan Muslim humanitarian charity: relief, orphans, WASH, education (https://hdfund.org/your-questions-answered/)"
+735,uk:273425,Sarjudas Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: RENAMED: ex-BAPS Swaminarayan Sanstha; Hindu temple charity, Neasden (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/273425/governance)"
+737,irs:823285688,Internet Society Foundation,isocfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Internet Society grantmaker for global internet access and inclusion (https://www.isocfoundation.org/)"
+739,irs:134174402,Foundation for the Defense of Democracies Inc,fdd.org,wikidata (identifier),Q5474411 by P1297 13-4174402
+741,irs:452545452,The Yonkofa Project Inc,yonkofa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Nonprofit running rural medical clinics in Western Ghana (https://www.yonkofa.org/)"
+742,irs:446005794,Children International,children.org,wikidata (identifier),Q945897 by P1297 44-6005794
+747,iati:US-EIN-84-1166148,Water for People,waterforpeople.org,wikidata (identifier),Q7973296 by P13305 US-EIN-84-1166148
+748,irs:542033897,Camfed U S a Foundation,camfed.org,wikidata (identifier),Q54826362 by P1297 54-2033897
+753,irs:133234632,Asia Society,asiasociety.org,wikidata (identifier),Q842828 by P1297 13-3234632
+758,irs:050574837,DASRA,dasra.org,unverified (search-engine copy),"web search, 5 Nov 2026: Indian strategic philanthropy organisation driving social sector change (https://dasra.org/)"
+760,irs:812039508,United Hands Relief Inc,uhrelief.org,unverified (search-engine copy),"web search, 5 Nov 2026: Texas humanitarian relief and development nonprofit, worldwide and US (https://uhrelief.org/)"
+763,irs:352051932,Christel House International Inc,christelhouse.org,wikidata (identifier),Q5109127 by P1297 35-2051932
+764,uk:1123010,The Risman Foundation,rismanfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: UK grantmaking foundation for young people and humanitarian programmes (https://www.rismanfoundation.org/)"
+766,irs:411627391,Books for Africa Inc,booksforafrica.org,wikidata (identifier),Q4943279 by P1297 41-1627391
+771,irs:521838756,Women for Women International,womenforwomen.org,wikidata (identifier),Q8031394 by P1297 52-1838756
+772,cra:119310241RR0001,Lotte and John Hecht Memorial Foundation,hecht.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Vancouver foundation funding cancer research, economic education, local poverty (https://www.hecht.org/)"
+773,irs:592672303,Love a Child Inc,loveachild.com,wikidata (identifier),Q55472961 by P1297 59-2672303
+777,acnc:16641057338,Canva Foundation Limited,canva.com,unverified (search-engine copy),"web search, 5 Nov 2026: Canva's corporate charitable foundation; philanthropic donations to charities (https://www.canva.com/step-two/)"
+778,irs:520848769,Partners of the Americas Inc,partners.net,unverified (search-engine copy),"web search, 5 Nov 2026: Development programmes and volunteer chapters across the Americas (https://partners.net/)"
+779,irs:680249466,Volunteers for Interamerican Development Assistance,vidausa.org,wikidata (identifier),Q55471475 by P1297 68-0249466
+780,irs:201687786,Spirit of America Worldwide,spiritofamerica.org,wikidata (identifier),Q7577952 by P1297 20-1687786
+781,irs:541637257,Coptic Orphans Support Association,copticorphans.org,wikidata (identifier),Q5169024 by P1297 54-1637257
+783,irs:453117252,Humanitarian Experience Inc,hxp.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: HXP, formerly HEFY; youth service trips building schools, clinics (https://hxp.org/donate/)"
+784,irs:593564329,Hope for Haiti Inc,hopeforhaiti.com,wikidata (identifier),Q5899656 by P1297 59-3564329
+786,irs:481256219,Global Outreach International Inc,globaloutreach.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Mississippi Christian missionary sending and care organisation (https://globaloutreach.org/)"
+787,irs:942443282,Global Hunger Project,thp.org,wikidata (identifier),Q1169014 by P1297 94-2443282
+788,irs:261303951,Lwala Community Alliance Inc,lwala.org,unverified (search-engine copy),"web search, 5 Nov 2026: Kenyan-led community health organisation (https://lwala.org/)"
+790,irs:208635797,Luke Commission Inc,lukecommission.org,wikidata (identifier),Q54851522 by P1297 20-8635797
+793,irs:223128648,Buildon Inc,buildon.org,wikidata (identifier),Q4986385 by P1297 22-3128648
+794,uk:294807,Dawat-E-Hadiyah Trust (united Kingdom),,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Dawoodi Bohra religious trust; register lists no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/294807/contact-information)"
+797,irs:841087689,Onechild Global,onechildmatters.org,wikidata (identifier),Q55471352 by P1297 84-1087689
+798,irs:460743201,Inkomoko,inkomoko.com,unverified (search-engine copy),"web search, 5 Nov 2026: Finance and business support for displaced entrepreneurs in Africa (https://www.inkomoko.com/)"
+799,irs:331215331,Marys Meals USA Inc,marysmealsusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: US affiliate of Mary's Meals, school feeding in poor countries (https://www.marysmealsusa.org/)"
+802,irs:811708977,Lifting Hands International,lhi.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian aid to refugees in US and abroad (https://www.lhi.org/)"
+806,irs:471304361,Rahma Worldwide Aid and Development,rahmaww.org,unverified (search-engine copy),"web search, 5 Nov 2026: International humanitarian relief and development organisation, Michigan-based (https://www.rahmaww.org/)"
+809,irs:208456741,BRAC USA Inc,bracusa.org,wikidata (identifier),Q4836319 by P1297 20-8456741
+810,irs:943373670,Give2asia,give2asia.org,unverified (search-engine copy),"web search, 5 Nov 2026: US charity facilitating cross-border grantmaking to Asia (https://give2asia.org/)"
+811,uk:283322,A W Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: grants to Orthodox Jewish institutions in UK; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/283322/contact-information)"
+813,irs:208744927,Immap Inc,immap.org,unverified (search-engine copy),"web search, 5 Nov 2026: Information management and analysis services for humanitarian organisations (https://immap.org/about-us)"
+814,irs:331186746,Innovation Africa,innoafrica.org,unverified (search-engine copy),"web search, 5 Nov 2026: Solar-powered clean water for villages in Sub-Saharan Africa (https://innoafrica.org/)"
+815,irs:472227058,Palestinian American Medical Association,pamausa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Palestinian-American doctors' charity providing healthcare and relief in Palestine (https://pamausa.org/)"
+816,irs:411848081,Transfair USA,fairtradecertified.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Fair Trade USA, fair trade certifier (https://www.fairtradecertified.org/about-us/our-history/)"
+817,irs:043478123,Root Capital Inc,rootcapital.org,wikidata (identifier),Q7366548 by P1297 04-3478123
+823,cra:118951169RR0001,Islamic Circle of North America,icna.ca,unverified (search-engine copy),"web search, 5 Nov 2026: ICNA Canada Muslim organisation; relief arm at icnareliefcanada.ca (https://www.icnareliefcanada.ca/about-us/)"
+825,cra:119264885RR0001,Tim Horton Childrens Foundation Inc.,timscamps.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Tim Hortons Foundation Camps, youth camps charity (https://timscamps.com/about-tims-camps/)"
+827,irs:521376034,Washington Institute for Near East Policy,washingtoninstitute.org,wikidata (identifier),Q1778471 by P1297 52-1376034
+830,irs:541955545,Bancroft Global Development,bancroftglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Conflict-zone capacity building and demining nonprofit, mainly Somalia (https://www.bancroftglobal.org/)"
+833,irs:474378405,Land Olakes Venture37,landolakesventure37.org,unverified (search-engine copy),"web search, 5 Nov 2026: CLOSED: agricultural development nonprofit, wound down June 2026 (https://www.landolakesventure37.org/)"
+834,irs:770243475,Assist International Inc,assistinternational.org,wikidata (identifier),Q54860831 by P1297 77-0243475
+836,irs:135631502,Amit Children Inc,amitchildren.org,wikidata (identifier),Q54857095 by P1297 13-5631502
+837,cra:735511925RR0001,Zichron Chaim Charity,,none found (searched),"web search, 5 Nov 2026: none found; Montreal public foundation, poverty relief and adult education; no website (https://www.charityintelligence.ca/charity-details/1025-zichron-chaim-charity)"
+838,irs:651229309,Friends of the Orphans,nphusa.org,wikidata (identifier),Q55457692 by P1297 65-1229309
+841,irs:351985485,World Hope International Inc,worldhope.org,wikidata (identifier),Q54857572 by P1297 35-1985485
+844,irs:453929881,Mercury One Inc,mercuryone.org,wikidata (identifier),Q126723191 by P1297 45-3929881
+845,irs:521332702,Committee for Accuracy in Middle East Reporting in America Inc,camera.org,wikidata (identifier),Q484798 by P1297 52-1332702
+846,irs:753029336,Fund for Global Human Rights,globalhumanrights.org,wikidata (identifier),Q30288978 by P1297 75-3029336
+847,irs:882454707,Heal Palestine Inc,healpalestine.org,unverified (search-engine copy),"web search, 5 Nov 2026: Health, education and aid for children in Gaza (https://www.healpalestine.org/)"
+848,irs:251017587,Grant Foundation,hashaiti.org,wikidata (identifier),Q3145130 by P1297 25-1017587
+849,irs:770071852,Thousand Currents,thousandcurrents.org,wikidata (identifier),Q54813895 by P1297 77-0071852
+850,irs:311140515,Kids Alive International Inc,kidsalive.org,wikidata (identifier),Q55473023 by P1297 31-1140515
+851,irs:132923701,Salvation Army World Service Office Sawso,sawso.org,unverified (search-engine copy),"web search, 5 Nov 2026: Salvation Army's international development office in USA (https://www.sawso.org/)"
+852,irs:980493088,Global Witness,globalwitness.org,wikidata (identifier),Q3108981 by P1297 98-0493088
+854,irs:474235863,Barnabas Aid International,barnabasaid.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian aid umbrella for persecuted Christians worldwide (https://www.barnabasaid.org/nz/international/)"
+857,irs:814198808,Samu Foundation,samufirstresponse.org,unverified (search-engine copy),"web search, 5 Nov 2026: SAMU First Response, humanitarian and emergency relief nonprofit (https://samufirstresponse.org/)"
+858,irs:611659704,Mass Design Group,modelofarchitecture.org,unverified (search-engine copy),"web search, 5 Nov 2026: MASS Design Group, nonprofit architecture for underserved communities (https://modelofarchitecture.org/about)"
+859,irs:953464287,Giving Children Hope,givingchildrenhope.org,wikidata (identifier),Q5565859 by P1297 95-3464287
+864,irs:272210659,World Health Clinicians Incorporated,circlecarecenter.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Connecticut HIV primary care clinic and pharmacy (https://www.guidestar.org/profile/27-2210659)"
+865,irs:473414039,Kailash Satyarthi Childrens Foundation of America Inc,satyarthi-us.org,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of Kailash Satyarthi Children's Foundation, child labour (https://satyarthi-us.org/)"
+867,irs:770054266,Mission Without Borders International,missionwithoutborders.international,unverified (search-engine copy),"web search, 5 Nov 2026: Christian aid and sponsorship for poor families in Eastern Europe (https://www.missionwithoutborders.international/)"
+869,irs:883598841,Cplc Refugee and Humanitarian Services Inc,cplc.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Chicanos Por La Causa affiliate; US shelters for unaccompanied children (https://www.guidestar.org/profile/88-3598841)"
+870,irs:822828138,Womens World Banking Inc,womensworldbanking.org,unverified (search-engine copy),"web search, 5 Nov 2026: Financial inclusion for low-income women worldwide (https://www.womensworldbanking.org/)"
+873,irs:262061324,Hope of Life International,hopeoflifeintl.org,unverified (search-engine copy),"web search, 5 Nov 2026: Faith-based humanitarian nonprofit fighting malnutrition and poverty in Guatemala (https://www.hopeoflifeintl.org/)"
+875,irs:134075779,Blacksmith Institute Inc,pureearth.org,wikidata (identifier),Q145590 by P1297 13-4075779
+876,irs:300181674,Wateraid America Inc,wateraidamerica.org,wikidata (identifier),Q30271954 by P1297 30-0181674
+877,irs:300545486,Cuso International,cusointernational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian international development organisation placing skilled volunteers (https://cusointernational.org/)"
+878,irs:760415986,Faith in Practice,faithinpractice.org,wikidata (identifier),Q54860802 by P1297 76-0415986
+880,irs:462090059,Strongminds Inc,strongminds.org,unverified (search-engine copy),"web search, 5 Nov 2026: Group talk therapy for depression across Africa (https://strongminds.org/)"
+881,irs:943074600,Middle East Childrens Alliance,mecaforpeace.org,wikidata (identifier),Q54834508 by P1297 94-3074600
+882,irs:311602376,West Africa Rice Development Association,africarice.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Africa Rice Center, CGIAR rice research (https://www.africarice.org/profile-of-africarice)"
+883,irs:270892545,EDIFY,edify.org,unverified (search-engine copy),"web search, 5 Nov 2026: Supports Christian low-fee schools in Africa and Latin America (https://edify.org/)"
+885,irs:900447211,Us-Japan Council,usjapancouncil.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US-Japan bilateral relations and leadership network (https://www.usjapancouncil.org/)"
+886,cra:126479468RR0001,Manitoba Habitat Heritage Corporation,mbhabitat.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: RENAMED: Manitoba Habitat Conservancy, provincial habitat conservation (https://mbhabitat.ca/make-a-donation/)"
+888,irs:522151557,Vital Voices Global Partnership Inc,vitalvoices.org,wikidata (identifier),Q7936762 by P1297 52-2151557
+889,irs:133115145,Tibet Fund,tibetfund.org,wikidata (identifier),Q3528091 by P1297 13-3115145
+891,irs:561719871,The Family Health International Foundation,fhifoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Supporting foundation funding Family Health International (FHI 360) (https://www.guidestar.org/profile/56-1719871)"
+894,irs:953551085,English Language Institute in China,elic.org,wikidata (identifier),Q54622614 by P1297 95-3551085
+895,irs:203171837,Muso Inc,musohealth.org,unverified (search-engine copy),"web search, 5 Nov 2026: Community health care systems in Mali and Côte d'Ivoire (https://www.musohealth.org/)"
+899,irs:811488809,Heroic Hearts Organization Nfp,hchearts.org,unverified (search-engine copy),"web search, 5 Nov 2026: International humanitarian relief for orphans, widows and refugees (https://hchearts.org/about-us)"
+900,irs:522289435,Nuclear Threat Initiative Inc,nti.org,wikidata (identifier),Q453521 by P1297 52-2289435
+902,irs:463158845,Vsk Foundation,vskfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Grantmaker supporting healthcare and education charities in rural India (https://vskfoundation.org/about/)"
+904,cra:836727644RR0001,Nature United/ Nature Unie,natureunited.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Canadian conservation affiliate of The Nature Conservancy (https://www.natureunited.ca/about-us/faq/)"
+905,uk:1064823,The Hadley Trust,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: UK grant-making trust, mainly domestic social welfare; no website (https://www.bathnes.gov.uk/node/88323)"
+906,irs:980459537,African Agricultural Technology Foundation,aatf-africa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Agricultural technology transfer for smallholder farmers in Sub-Saharan Africa (https://www.aatf-africa.org/)"
+910,uk:1078808,The Calleva Foundation,calleva.org,"wikidata (name, accepted)","Q120982975: the item is this organisation: Calleva Foundation (nonprofit organization in London, United Kingdom); the search found no website, Wikidata gives calleva.org; the search marked it outside the target"
+911,irs:520887806,International Economic Development Council Inc,iedconline.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: membership association for economic developers, mainly US (https://www.iedconline.org/)"
+915,irs:132563745,Jerusalem Foundation Inc,jerusalemfoundation.org,wikidata (identifier),Q954536 by P1297 13-2563745
+917,irs:526054124,Association for Cultural Interchange Inc,culturalinterchange.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: grants and loans to educational institutions, Opus Dei-linked (https://www.culturalinterchange.org/)"
+918,uk:1147248,The Kenneth & Susan Green Charitable Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: UK family grant-making foundation; register lists no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/5027355/contact-information)"
+919,irs:330648658,Iris Global,irisglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian missions and relief organisation, mainly Mozambique (https://www.irisglobal.org/)"
+920,irs:981316013,Sasakawa Africa Association,saa-safe.org,unverified (search-engine copy),"web search, 5 Nov 2026: Agricultural extension support for smallholder farmers in Africa (https://www.saa-safe.org/)"
+922,irs:135562163,American Leprosy Missions Inc,leprosy.org,wikidata (identifier),Q50037810 by P1297 13-5562163
+924,irs:113466176,Friends of Ir David Inc,friendsofirdavid.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US fundraiser for City of David archaeology, Jerusalem (https://friendsofirdavid.org/)"
+925,irs:273663856,African Mission Healthcare Foundation,africanmissionhealthcare.org,unverified (search-engine copy),"web search, 5 Nov 2026: Strengthens mission hospitals across sub-Saharan Africa (https://africanmissionhealthcare.org/)"
+928,cra:118924448RR0001,La Fondation Paul Gerin-Lajoie Pour la Cooperation Internationale / the Paul Gerin-Lajoie Foundation for International Co-Operation,fondationpgl.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Quebec foundation for education-focused international cooperation in 11 countries (https://fondationpgl.ca/)"
+931,irs:134040377,Dress for Success Worldwide,dressforsuccess.org,wikidata (identifier),Q54851174 by P1297 13-4040377
+932,irs:362284267,Christian Medical & Dental Society,cmda.org,wikidata (identifier),Q5109902 by P1297 36-2284267
+933,irs:381945104,Maranatha Volunteers International Inc,maranatha.org,wikidata (identifier),Q6754785 by P1297 38-1945104
+935,irs:382935397,International Youth Foundation,iyfnet.org,wikidata (identifier),Q55472785 by P1297 38-2935397
+936,irs:731681366,The Center for Advanced Defense Studies Inc,c4ads.org,unverified (search-engine copy),"web search, 5 Nov 2026: C4ADS: DC nonprofit investigating illicit networks threatening global security (https://c4ads.org/)"
+937,irs:223090463,Impactisrael Inc,yeminorde.org,wikidata (identifier),Q54688950 by P1297 22-3090463
+939,irs:933985556,Prevail Foundry Inc,prevailfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Legal entity of Prevail Fund; foundational learning funding, Africa/South Asia (https://www.prevailfund.org/)"
+941,irs:311682275,Surgical Eye Expeditions International Inc,seeintl.org,unverified (search-engine copy),"web search, 5 Nov 2026: SEE International: volunteer eye surgery expeditions worldwide (https://www.seeintl.org/)"
+942,cra:769784893RR0001,Myriad Canada Foundation,myriadcanada.org,unverified (search-engine copy),"web search, 5 Nov 2026: Myriad Canada (formerly KBF Canada): cross-border philanthropy for projects worldwide (https://www.myriadcanada.org/en/news/development-and-engagement-officer/)"
+945,irs:873525191,August Mission,augustmission.org,unverified (search-engine copy),"web search, 5 Nov 2026: Small Utah humanitarian healthcare/resettlement charity; IRS status reportedly revoked (https://augustmission.org/wp-content/uploads/2024/06/August-Mission-IRS-Letter-of-Determination.pdf)"
+946,cra:804921963RR0001,Wynn Family Charitable Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Private family foundation granting to Canadian and Israeli Jewish charities (https://charitybreakdown.ca/charity/wynn-family-charitable-foundation)"
+947,irs:330052976,Floresta USA Incorporated,plantwithpurpose.org,wikidata (identifier),Q17014069 by P1297 33-0052976
+948,irs:453737015,Srd Foundation,srd.ngo,unverified (search-engine copy),"web search, 5 Nov 2026: Syria Relief & Development: humanitarian relief and development for Syrians (https://www.guidestar.org/profile/45-3737015)"
+950,irs:366069820,One Collective Nfp,onecollective.org,wikidata (identifier),Q55230266 by P1297 36-6069820
+954,irs:264695101,Advocates for World Health Inc,awhealth.org,unverified (search-engine copy),"web search, 5 Nov 2026: Recovers surplus medical supplies for hospitals worldwide (https://awhealth.org/)"
+955,irs:371028228,Caring Partners International Inc,caringpartners.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian medical mission ministry supplying church medical missions abroad (https://www.caringpartners.org/)"
+956,irs:113579187,Children of Armenia Fund Inc,coaf.org,wikidata (identifier),Q5098408 by P1297 11-3579187
+959,irs:541411430,Freedom Alliance,americanfreedomalliance.org,wikidata (identifier),Q54826433 by P1297 54-1411430
+962,cra:119043891RR0001,Mizrachi Organization of Canada,mizrachi.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Religious Zionist community and education organisation in Canada (https://mizrachi.ca/)"
+963,cra:896469921RR0001,Fondation B'nai Levy/b'nai Levy Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Hasidic religious education and synagogue charity, Boisbriand; no website (https://www.charityintelligence.ca/charity-details/899-b-nai-levy-foundation)"
+964,irs:273994158,Tov Vchesed Foundation Inc,tovvchesed.com,unverified (search-engine copy),"web search, 5 Nov 2026: Food, orphan support and wedding aid for poor families in Israel (https://www.tovvchesed.com/)"
+966,irs:521706852,Pyxera Global Inc,pyxeraglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Cross-sector partnerships for global development (formerly Citizens Democracy Corps) (https://www.pyxeraglobal.org/)"
+967,irs:521440944,Sisters of Mary Boystowns and Girlstowns Inc,worldvillages.org,wikidata (identifier),Q55473451 by P1297 52-1440944
+968,irs:830396815,Project Healthy Children Inc,sanku.com,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: Project Healthy Children now operates as Sanku; food fortification East Africa (https://sanku.com/our-story/)"
+969,irs:510183054,Christian Relief Fund,christianrelieffund.org,wikidata (identifier),Q28404159 by P1297 51-0183054
+971,irs:861778799,Advancing American Freedom Inc,advancingamericanfreedom.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US conservative policy and advocacy group(https://advancingamericanfreedom.com/)"
+975,irs:542092145,Making a Difference Foundation,themadf.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Tacoma food bank and housing charity, domestic services (https://themadf.org/about/)"
+977,irs:923079413,Humaniti Foundation,humanitifoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Texas humanitarian relief charity: water, food, emergency aid in 31 countries (https://humanitifoundation.org/)"
+979,irs:010732928,U S Russia Foundation for Ecnomic Advancement and the Rule of Law,usrf.us,unverified (search-engine copy),"web search, 5 Nov 2026: Grantmaker for Russian civil society, rule of law, independent media (https://www.usrf.us/)"
+980,irs:954703607,Golden West Humanitarian Foundation,goldenwesthf.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian mine action technology and training NGO (https://goldenwesthf.org/)"
+981,cra:840790950RR0001,The Jay and Barbara Hennick Family Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Private Toronto family foundation funding Canadian health, education, arts (https://charitybreakdown.ca/charity/the-jay-and-barbara-hennick-family-foundation)"
+984,irs:133280194,Madre Inc,madre.org,wikidata (identifier),Q53769035 by P1297 13-3280194
+985,cra:106863061RR0001,Canadian Magen David Adom for Israel/Magen David Adom Canadien pour Israel,cmdai.org,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian fundraiser for Magen David Adom, Israel's emergency medical service (https://cmdai.org/)"
+986,iati:US-EIN-27-5026293,Disability Rights Fund,disabilityrightsfund.org,wikidata (identifier),Q30264715 by P13305 US-EIN-27-5026293
+987,irs:203644749,Good Neighbors USA,goodneighbors.us,wikidata (identifier),Q54834635 by P1297 20-3644749
+988,irs:371710848,Airlink Inc,airlinkflight.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian airlift and logistics for disaster relief NGOs (https://airlinkflight.org/)"
+990,irs:204268851,The Global Foodbanking Network,foodbanking.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global network supporting food banks in 50+ countries (https://www.foodbanking.org/)"
+992,irs:810616238,Institute for Governance and Sustainable Development Inc,igsd.org,unverified (search-engine copy),"web search, 5 Nov 2026: Climate mitigation and sustainable development policy institute (https://www.igsd.org/)"
+993,irs:461604854,Sofi Tucker Foundation,sofitucker.org,unverified (search-engine copy),"web search, 5 Nov 2026: Grantmaker for disadvantaged women and families in US and Africa (https://furp.org/org/sofi-tucker-foundation-461604854)"
+997,irs:453545761,African Fertilizer and Agribusiness Partnership,afap-partnership.org,unverified (search-engine copy),"web search, 5 Nov 2026: African fertilizer and agribusiness development non-profit, HQ South Africa (https://afap-partnership.org/)"
+998,irs:330776828,Far Reaching Ministries,frmusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian missions with relief, chaplaincy and orphan care in war zones (https://frmusa.org/)"
+1000,irs:135562271,Kolel Shomre Hachomos of Jerusalem Inc,rebmeir.org,unverified (search-engine copy),"web search, 5 Nov 2026: Kollel Shomrei HaChomos: aid for widows, orphans, needy in Jerusalem (https://www.rebmeir.org/)"
+1001,irs:522193529,Polish-American Freedom Foundation,pafw.pl,unverified (search-engine copy),"web search, 5 Nov 2026: Polish-American Freedom Foundation: civil society and development grants in Poland (https://pafw.pl/)"
+1003,irs:521211059,Center for Third World Organizing,ctwo.org,wikidata (identifier),Q54862705 by P1297 52-1211059
+1005,irs:453452689,Ywam Ships Orange County,ywamshipskona.org,unverified (search-engine copy),"web search, 5 Nov 2026: Operates as YWAM Ships Kona: medical ships serving remote Pacific islands (https://www.ywamshipskona.org/factsheet/)"
+1007,irs:462568671,Africa Relief and Community Development Inc,africarelief.org,unverified (search-engine copy),"web search, 5 Nov 2026: Africa Relief: water, food, health, orphan programs across Africa (https://africarelief.org/)"
+1008,irs:050258886,Dorcas International Institute of Rhode Island Inc,diiri.org,wikidata (identifier),Q140078907 by P1297 05-0258886
+1010,cra:843395195RR0001,Maharam Tav Fund,maharamtavfund.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Montreal fund giving interest-free loans and aid to the poor (https://www.charityintelligence.ca/charity-details/1051-maharam-tav-fund)"
+1011,irs:520848094,Global Ties US,globaltiesus.org,wikidata (identifier),Q6971886 by P1297 52-0848094
+1012,acnc:67159574133,Cambridge English,cambridgeenglish.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Australian arm of Cambridge English language testing (https://www.cambridgeenglish.org/news/view/five-cambridge-backed-english-tests-approved-by-australian-government-for-visa-and-migration-applications/)"
+1013,irs:042738794,Peace Development Fund Inc,peacedevelopmentfund.org,wikidata (identifier),Q16821462 by P1297 04-2738794
+1015,irs:842494757,Dt Institute,dt-institute.org,unverified (search-engine copy),"web search, 5 Nov 2026: Peace and development funder and implementer in fragile states (https://www.dt-institute.org/)"
+1016,irs:710699939,Heifer International Foundation,myheiferfoundationgiving.org,unverified (search-engine copy),"web search, 5 Nov 2026: Heifer Foundation: endowment supporting Heifer International's anti-poverty work (https://myheiferfoundationgiving.org/)"
+1017,irs:810903010,Blumont International Inc,blumont.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian relief, stabilization and development in crisis regions (https://blumont.org/)"
+1020,irs:061135999,Haitian Health Foundation Inc,haitianhealthfoundation.org,wikidata (identifier),Q3373086 by P1297 06-1135999
+1022,irs:320112278,Water for Good,waterforgood.org,wikidata (identifier),Q54857527 by P1297 32-0112278
+1024,irs:133660566,Equality Now Inc,equalitynow.org,wikidata (identifier),Q3523207 by P1297 13-3660566
+1026,irs:834705654,Peoples Welfare Association,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: 501(c)(4) funder of foreign advocacy and journalism groups (https://www.guidestar.org/profile/83-4705654)"
+1028,irs:770554248,Ekal Vidyalaya Foundation of USA Inc,ekal.org,wikidata (identifier),Q50326843 by P1297 77-0554248
+1030,irs:237336331,Good News in Action Inc,goodnewsinaction.org,unverified (search-engine copy),"web search, 5 Nov 2026: Evangelism and church-planting mission in Latin America (https://www.goodnewsinaction.org/)"
+1031,cra:863719936RR0001,Regent Christian Academy Society,regent.bc.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Christian K-12 school in Surrey, British Columbia (https://regent.bc.ca/)"
+1033,irs:760548161,Medical Bridges Inc,medicalbridges.org,wikidata (identifier),Q54813794 by P1297 76-0548161
+1034,irs:954804581,Eden Reforestation Projects,eden-plus.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Eden: People+Planet; community landscape restoration (https://eden-plus.org/2024/06/13/rename-announcement/)"
+1035,cra:703227322RR0001,Charité Tzedakah Montréal / Charity Tzedakah Montréal,,none found (searched),"web search, 5 Nov 2026: none found; Montreal poverty-relief charity sending aid to needy in Israel; no website (https://www.charityintelligence.ca/charity-details/1106-charity-tzedakah-montreal)"
+1037,irs:030529005,Empower-Emerging Markets Foundation,empowerweb.org,wikidata (identifier),Q54556603 by P1297 03-0529005
+1038,irs:133392711,Friends of Israel Disabled Veterans Inc Beit Halochem,fidv.org,wikidata (identifier),Q54688996 by P1297 13-3392711
+1041,irs:461723968,Afsnc Inc,startupnationcentral.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: American Friends of Start-Up Nation Central, Israeli tech ecosystem (https://startupnationcentral.org/)"
+1043,irs:521714111,Korea Society,koreasociety.org,wikidata (identifier),Q54826634 by P1297 52-1714111
+1044,irs:461387794,Metro World Child Foundation Inc,metroworldchild.org,unverified (search-engine copy),"web search, 5 Nov 2026: Faith-based children's ministry and humanitarian work in 24 countries (https://www.metroworldchild.org/about/)"
+1045,irs:770428724,Iit Bombay Heritage Foundation,iitbombay.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US fundraising foundation for IIT Bombay university (https://www.iitbombay.org/page/iitbhf)"
+1046,irs:522183112,Fair Labor Association,fairlabor.org,unverified (search-engine copy),"web search, 5 Nov 2026: Labor rights accountability in global supply chains (https://www.fairlabor.org/)"
+1048,irs:043129839,Hope Worldwide Ltd,hopeww.org,wikidata (identifier),Q54833779 by P1297 04-3129839
+1049,irs:626046138,Medical Benevolence Foundation,mbfoundation.org,wikidata (identifier),Q54816519 by P1297 62-6046138
+1050,irs:841141078,Friendship Bridge,friendshipbridge.org,wikidata (identifier),Q5504383 by P1297 84-1141078
+1052,irs:421747258,Fidelis Educational Net Inc,,none found (searched),"web search, 5 Nov 2026: none found; Houston charity owning school real estate in Mexico; no website found (https://www.guidestar.org/profile/42-1747258)"
+1057,irs:311714653,Amigos of Costa Rica Inc,amigosofcostarica.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fiscal sponsor and donor bridge for Costa Rican nonprofits (https://www.amigosofcostarica.org/)"
+1058,irs:046186012,Unitarian Universalist Service Committee Inc,uusc.org,wikidata (identifier),Q2495076 by P1297 04-6186012
+1060,irs:521699641,Institute of World Politics,iwp.edu,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: graduate school of national security and international affairs, Washington DC (https://www.iwp.edu/)"
+1061,irs:264599860,Global Peace Foundation,globalpeace.org,unverified (search-engine copy),"web search, 5 Nov 2026: Values-based peacebuilding and development NGO in 21 countries (https://globalpeace.org/)"
+1062,irs:133966503,Friends of Fondation de France Inc,friendsoffdf.org,unverified (search-engine copy),"web search, 5 Nov 2026: US conduit for gifts to French and international nonprofits (https://www.friendsoffdf.org/)"
+1063,irs:752824844,Mission Enablers International,meigiving.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian fiscal sponsor processing donations for overseas mission volunteers (https://www.causeiq.com/organizations/mission-enablers-international,752824844/)"
+1064,irs:475128573,One World Surgery,oneworldsurgery.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global surgery nonprofit running surgical centres in Honduras and Dominican Republic (https://oneworldsurgery.org/)"
+1065,irs:334606570,Kennan Institute,kennaninstitute.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Washington think tank researching the former Soviet Union (https://www.kennaninstitute.org/)"
+1066,irs:030391561,Polaris Project,polarisproject.org,wikidata (identifier),Q54556509 by P1297 03-0391561
+1067,irs:133568629,Financial Services Volunteer Corps Inc,fsvc.org,wikidata (identifier),Q5449659 by P1297 13-3568629
+1068,irs:382231279,Seva Foundation,seva.org,wikidata (identifier),Q2578143 by P1297 38-2231279
+1069,irs:133931449,Endeavor Global Inc,endeavor.org,wikidata (identifier),Q1340293 by P1297 13-3931449
+1072,irs:530173054,National Council of Negro Women Inc,ncnw.org,wikidata (identifier),Q6971923 by P1297 53-0173054
+1075,irs:131867411,Amref Health Africa Inc,amrefusa.org,wikidata (identifier),Q30286536 by P1297 13-1867411
+1077,irs:452212393,Friends of Elnet,elnetus.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US fundraising arm of ELNET, Europe-Israel relations advocacy (https://www.guidestar.org/profile/45-2212393)"
+1079,irs:900018359,Jewish Voice for Peace Leadership and Culture Lab,jewishvoiceforpeace.org,wikidata (identifier),Q2900848 by P1297 90-0018359
+1082,irs:521726273,American Academy in Berlin,americanacademy.de,wikidata (identifier),Q463262 by P1297 52-1726273
+1084,irs:630340866,Junior Achievement of Alabama Inc,juniorachievement.org,wikidata (identifier),Q54816561 by P1297 63-0340866
+1086,irs:364635877,Alliance for Medical Outreach and Relief,amorelief.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fresno nonprofit running hospital in Kabul and aid in Ukraine (https://amorelief.org/)"
+1087,irs:131766596,A M G International,amginternational.org,wikidata (identifier),Q4652638 by P1297 13-1766596
+1088,irs:882131119,Jewish Relief Network Ukraine,jrnu.org,unverified (search-engine copy),"web search, 5 Nov 2026: Jewish humanitarian aid network in Ukraine (https://www.jrnu.org/)"
+1089,cra:720704295RR0001,Oceans North Conservation Society,oceansnorth.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Canadian marine conservation charity, Arctic and Atlantic (https://oceansnorth.org/)"
+1092,irs:260397519,Alima USA Inc,alima.ngo,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of ALIMA, international medical humanitarian NGO (https://alima.ngo/en/about-us/who-we-are/governance/alima-usa-board-directors/)"
+1093,irs:320360887,Hope Advancement Inc,hopeinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: HOPE International subsidiary holding microfinance investments (https://www.guidestar.org/profile/32-0360887)"
+1094,irs:136161195,Business Council for International Understanding Inc,bciu.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: business council for commercial diplomacy and trade (https://bciu.org/)"
+1095,irs:954719735,Santa Verena Charity Inc,santaverena.org,unverified (search-engine copy),"web search, 5 Nov 2026: Coptic diocese charity fighting poverty mainly in Egypt (https://santaverena.org/)"
+1097,irs:382635531,Adventist Frontier Missions Inc,afmonline.org,wikidata (identifier),Q55230286 by P1297 38-2635531
+1098,irs:581657207,Mustard Seed Communities Inc,mustardseed.com,wikidata (identifier),Q54855771 by P1297 58-1657207
+1100,irs:814112042,Yemen Aid Inc,yemenaid.org,unverified (search-engine copy),"web search, 5 Nov 2026: Yemeni-American humanitarian relief and recovery NGO in Yemen (https://yemenaid.org/)"
+1101,irs:452368993,New Incentives,newincentives.org,unverified (search-engine copy),"web search, 5 Nov 2026: Cash incentives for childhood vaccination in northern Nigeria (https://www.newincentives.org/)"
+1102,irs:821614152,Maxwell Leadership Foundation Inc,maxwellleadership.org,wikidata (identifier),Q141888379 by P1297 82-1614152
+1103,irs:810690876,Global Emergency Relief Recovery and Reconstruction,ger3.org,unverified (search-engine copy),"web search, 5 Nov 2026: International disaster relief, recovery and reconstruction NGO (https://www.ger3.org/)"
+1108,irs:431535009,Worldserve International,worldserveintl.org,wikidata (identifier),Q55472608 by P1297 43-1535009
+1109,irs:742477089,Rafiki Foundation Incorporated,rafikifoundation.org,wikidata (identifier),Q54862824 by P1297 74-2477089
+1110,irs:261603676,Binaytara,binaytara.org,unverified (search-engine copy),"web search, 5 Nov 2026: Cancer care and oncology education nonprofit, US and Nepal (https://binaytara.org/)"
+1111,irs:411989714,American Relief Agency for the Horn of Africa Araha,araha.org,wikidata (identifier),Q54833289 by P1297 41-1989714
+1112,irs:141880905,Samaritans Feet International,samaritansfeet.org,wikidata (identifier),Q22908467 by P1297 14-1880905
+1113,irs:453982583,World Coffee Research,worldcoffeeresearch.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: coffee-industry agricultural research organisation, 501(c)(5) (https://worldcoffeeresearch.org/)"
+1114,irs:262467690,Destiny Rescue USA Inc,destinyrescue.org,unverified (search-engine copy),"web search, 5 Nov 2026: Rescues children from sexual exploitation and trafficking worldwide (https://www.destinyrescue.org/)"
+1115,irs:453706112,Maestro Cares Foundation,maestrocares.org,unverified (search-engine copy),"web search, 5 Nov 2026: Marc Anthony foundation helping children in Latin America (https://maestrocares.org/)"
+1117,irs:392540209,Future of Israel Fund,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: new New York fund for civic unity in Israel (https://philanthropy.org/990/report/392540209/future-of-israel-fund)"
+1119,irs:590871446,Junior Achievement of South Florida,jasouthflorida.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: local youth financial literacy programme in South Florida (https://jasouthflorida.org/)"
+1121,irs:920815214,Global Whole Being Fund,gwbf.org,unverified (search-engine copy),"web search, 5 Nov 2026: Grantmaker supporting refugees and displaced people worldwide (https://www.charitynavigator.org/ein/920815214)"
+1125,irs:363532234,Global Health Ministries,ghm.org,wikidata (identifier),Q54855631 by P1297 36-3532234
+1126,irs:262437362,I-Care Fund America Inc,i-care-america.org,unverified (search-engine copy),"web search, 5 Nov 2026: US donor-advised fund for vetted Pakistani charities (https://i-care-america.org/)"
+1127,uk:1105843,Sf Foundation,sf-foundation.co.uk,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: UK grantmaker for Jewish religion, education and poverty relief (https://sf-foundation.co.uk/)"
+1129,irs:272782213,Albanian-American Development Foundation,aadf.org,unverified (search-engine copy),"web search, 5 Nov 2026: USAID-legacy foundation for social and economic development in Albania (https://www.aadf.org/)"
+1134,irs:453066179,Hope Haven Charitable Trust,hopehavenrwanda.org,unverified (search-engine copy),"web search, 5 Nov 2026: Runs school and permaculture programme in Murindi, Rwanda (https://impala.digital/public/profiles/45-3066179/programs)"
+1135,irs:562125831,Organization for Tropical Studies Inc,ots.ac.cr,wikidata (identifier),Q7101950 by P1297 56-2125831
+1136,irs:273298862,Anschei Chesed Fund Inc,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Brooklyn Orthodox Jewish grantmaker, no website (https://www.guidestar.org/profile/27-3298862)"
+1137,irs:582433968,Medshare International,medshare.org,wikidata (identifier),Q6804937 by P1297 58-2433968
+1139,irs:911703263,Management Technologies International Inc,lifeplusworldwide.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: LifePlus, operator of international schools and education services (https://lifeplusworldwide.com/)"
+1140,irs:450594639,Neverthirst Inc,neverthirstwater.org,wikidata (identifier),Q54862644 by P1297 45-0594639
+1141,irs:300481520,Anudip Foundation,anudip.org,unverified (search-engine copy),"web search, 5 Nov 2026: Digital skills and livelihoods training for marginalised youth in India (https://anudip.org/)"
+1144,irs:411417198,Capi USA,capiusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: immigrant and refugee services in Minnesota, domestic (https://www.capiusa.org/about-capi)"
+1145,irs:522148976,Sudan Relief Fund Inc,sudanreliefund.com,wikidata (identifier),Q54826501 by P1297 52-2148976
+1146,irs:132569185,Americas Society Inc,americas-society.org,wikidata (identifier),Q4745666 by P1297 13-2569185
+1147,irs:237348277,International Disaster Emergency Service Inc,ides.org,wikidata (identifier),Q6050178 by P1297 23-7348277
+1149,oscr:SC037072,WildHearts Foundation Limited,wildheartsgroup.com,unverified (search-engine copy),"web search, 5 Nov 2026: Glasgow charity: microfinance for women, girls' education abroad (https://www.wildheartsgroup.com/wildhearts-2024-impact-report/)"
+1151,irs:205274028,Reach Now International Inc,reachnow.net,unverified (search-engine copy),"web search, 5 Nov 2026: Christian relief group shipping meal packs overseas (https://reachnow.net/donate/)"
+1152,irs:841589324,Engineers Without Borders USA Inc,ewb-usa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Engineering projects with communities worldwide for basic needs (https://ewb-usa.org/)"
+1155,irs:981273658,African Institute for Development Policy Research and Dialogue,afidep.org,unverified (search-engine copy),"web search, 5 Nov 2026: African development policy research institute, Kenya and Malawi (https://afidep.org/)"
+1158,irs:581647546,Remote Area Medical,ramusa.org,wikidata (identifier),Q7312084 by P1297 58-1647546
+1159,cra:862732815RR0001,Tula Foundation,tula.org,unverified (search-engine copy),"web search, 5 Nov 2026: BC charitable foundation; science research, Hakai Institute, global outreach (https://tula.org/)"
+1161,irs:113195338,One Israel Fund Ltd,oneisraelfund.org,wikidata (identifier),Q54833787 by P1297 11-3195338
+1164,irs:541953305,World Pediatrics,worldpediatricproject.org,wikidata (identifier),Q54826358 by P1297 54-1953305
+1165,irs:464493359,Educate Girls,educategirls.us,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of Educate Girls, girls' education in rural India (https://educategirls.us/)"
+1169,irs:133706646,Fund for Armenian Relief Inc,farusa.org,wikidata (identifier),Q5508876 by P1297 13-3706646
+1171,irs:814739107,International Consortium of Investigative Journalists Inc,icij.org,wikidata (identifier),Q16166292 by P1297 81-4739107
+1175,irs:463820097,Divine Will Foundation,divinewillfoundation.com,unverified (search-engine copy),"web search, 5 Nov 2026: Funds free healthcare, education, food projects, mainly India (https://www.charitynavigator.org/ein/463820097)"
+1178,irs:311591503,Cape Eleuthera Foundation Inc,capeeleutherafoundation.org,wikidata (identifier),Q45134596 by P1297 31-1591503
+1181,irs:133791391,Healthright International Inc,healthright.org,wikidata (identifier),Q5690411 by P1297 13-3791391
+1182,irs:208392006,Turkish Philanthropy Funds Inc,tpfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Donor-advised philanthropy platform for Türkiye and beyond (https://www.tpfund.org/)"
+1183,irs:474007262,Health Systems Insight,healthsystemsinsight.org,unverified (search-engine copy),"web search, 5 Nov 2026: Health systems strengthening in low- and middle-income countries (ex-ThinkWell Institute) (https://healthsystemsinsight.org/)"
+1189,irs:814109426,Waterequity Inc,waterequity.com,unverified (search-engine copy),"web search, 5 Nov 2026: Water.org impact investment manager for water and sanitation (https://waterequity.com/)"
+1190,irs:463075530,Pivotworks Inc,pivotworks.org,unverified (search-engine copy),"web search, 5 Nov 2026: Health system strengthening NGO in rural Madagascar (http://pivotworks.org/)"
+1191,cra:890963416RR0001,The Centre for International Governance Innovation,cigionline.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Waterloo think tank on international governance and technology (https://www.cigionline.org/about/)"
+1193,irs:521136126,Federation for American Immigration Reform,fairus.org,wikidata (identifier),Q5440746 by P1297 52-1136126
+1194,cra:132219494RR0001,Christian Aid Ministries of Waterloo,christianaidministries.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian arm of Christian Aid Ministries, international relief (https://christianaidministries.ca/about-us/)"
+1195,irs:521580447,African Economic Research Consortium Inc,aercafrica.org,unverified (search-engine copy),"web search, 5 Nov 2026: Economic research and training consortium for sub-Saharan Africa (https://aercafrica.org/)"
+1197,irs:454671349,Zoe Empowers,zoeempowers.org,unverified (search-engine copy),"web search, 5 Nov 2026: Empowers orphans and vulnerable youth out of poverty in Africa, India (https://zoeempowers.org/)"
+1198,cra:878544204RR0001,Oeuvres Regis-Vernet,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Quebec fund for Sisters of Presentation of Mary works (https://charitybreakdown.ca/charity/oeuvres-regis-vernet)"
+1199,irs:911276578,Agros International,agros.org,wikidata (identifier),Q54812389 by P1297 91-1276578
+1201,cra:119149417RR0001,Shri Param Hans Advait Mat Ontario,jyotidham.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Hindu devotional centre and ashram in Toronto (https://jyotidham.ca/)"
+1202,irs:640811705,Baptist Medical & Dental Mission International Inc,bmdmi.org,wikidata (identifier),Q54816387 by P1297 64-0811705
+1203,irs:731502797,Grameen Foundation USA,grameenfoundation.org,wikidata (identifier),Q5593623 by P1297 73-1502797
+1204,irs:510175510,Bread for the World Institute Inc,bread.org,wikidata (identifier),Q30267850 by P1297 51-0175510
+1206,irs:132961273,Israel Tennis Centers Foundation Inc,itecenters.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Israel Tennis & Education Centers; youth programmes in Israel (https://itecenters.org/israel-tennis-centers-foundation-is-now-israel-tennis-education-centers-foundation-new-name-same-mission/)"
+1207,irs:770337939,Centro Binacional Para El Desarrollo Indigena Oaxaqueno,centrobinacional.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Indigenous Mexican migrant community organising in California (https://www.centrobinacional.org/)"
+1209,oscr:SC043093,East African Tea Investments,thewoodfoundation.org.uk,unverified (search-engine copy),"web search, 5 Nov 2026: Wood Foundation vehicle supporting smallholder tea factories in Rwanda (https://www.thewoodfoundation.org.uk/africa/our-portfolio/agriculture/tea)"
+1211,irs:530204608,Middle East Institute,mei.edu,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Washington think tank on Middle East policy and culture (https://mei.edu/)"
+1212,uk:286232,Sparquote Limited,,none found (searched),"web search, 5 Nov 2026: none found; Orthodox Jewish grant-making charity, no website listed (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/286232)"
+1214,irs:943065016,Partnersglobal,partnersglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Civil society, democracy and conflict resolution NGO, Washington DC (https://www.partnersglobal.org/)"
+1215,irs:475225697,Favor International Inc,favorintl.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian mission with development work in Uganda, South Sudan, Chad (https://favorintl.org/)"
+1216,irs:521654284,Environmental Investigation Agency,eia-global.org,wikidata (identifier),Q1345905 by P1297 52-1654284
+1218,irs:874477821,Hias Foundation Inc,hiasfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Endowment foundation supporting HIAS refugee agency (https://www.hiasfoundation.org/about-us/)"
+1219,irs:521233683,The Jewish Institute for National Security of America,jinsa.org,wikidata (identifier),Q380412 by P1297 52-1233683
+1221,cra:735295487RR0001,Jésuites du Canada / Jesuits of Canada,jesuits.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Catholic religious order, Canada province (also jesuites.ca) (https://jesuits.ca/)"
+1222,irs:020539734,Women for Afghan Women Inc,womenforafghanwomen.org,unverified (search-engine copy),"web search, 5 Nov 2026: Afghan women's rights and services in Afghanistan and US (https://womenforafghanwomen.org/)"
+1223,irs:042062394,Harvard-Yenching Institute,harvard-yenching.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: academic foundation for higher education in Asia (https://www.harvard-yenching.org/)"
+1226,irs:621585366,Healing Hands International Inc,hhi.org,wikidata (identifier),Q55231412 by P1297 62-1585366
+1230,cra:827292921RR0001,Leket Canada,leketcanada.org,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian fundraiser for food rescue in Israel (https://leketcanada.org/)"
+1231,acnc:68654483333,Jasonn Foundation Ltd,,none found (searched),"web search, 5 Nov 2026: none found; Australian grant-making PBI funding overseas projects; no site found (https://www.gg.org.au/charity/68654483333/jasonn-foundation-ltd/)"
+1233,irs:591098499,Junior Achievement of Tampa Bay,jatampabay.org,wikidata (identifier),Q54821899 by P1297 59-1098499
+1235,irs:521937154,Focus Humanitarian Assistance U S a,focus-usa.org,wikidata (identifier),Q54826495 by P1297 52-1937154
+1238,irs:561704863,Rural Advancement Foundation International-Usa,rafiusa.org,wikidata (identifier),Q55230496 by P1297 56-1704863
+1240,irs:980118876,Tostan Inc,tostan.org,wikidata (identifier),Q2445375 by P1297 98-0118876
+1242,irs:432004779,Africa Renewal Ministries Inc,africarenewal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian ministry: child sponsorship, health, education in Uganda (https://africarenewal.org/)"
+1244,irs:264188445,Shanti Bhavan Childrens Project,shantibhavanchildren.org,unverified (search-engine copy),"web search, 5 Nov 2026: Boarding schools for India's poorest children (https://www.shantibhavanchildren.org/)"
+1246,irs:814018785,Project Expedite Justice,projectexpeditejustice.org,unverified (search-engine copy),"web search, 5 Nov 2026: International justice for atrocity crime survivors (https://www.projectexpeditejustice.org/)"
+1248,irs:030213226,International Peace Institute Inc,ipinst.org,wikidata (identifier),Q6052366 by P1297 03-0213226
+1249,irs:942718837,Rural California Broadcasting Corp Krcb-Tv Channel 22,krcb.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Northern California public TV and radio broadcaster (https://www.krcb.org/about-krcb)"
+1250,irs:208227425,Child Impact International,childimpact.org,unverified (search-engine copy),"web search, 5 Nov 2026: Child education and anti-trafficking in 20+ countries (https://childimpact.org/)"
+1254,cra:875849192RR0001,Ptarmigan Charitable Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Calgary private family foundation; domestic and international grants (https://charitybreakdown.ca/charity/ptarmigan-charitable-foundation)"
+1255,irs:741153957,Junior Achievement of Southeast Texas Inc,juniorachievement.org,wikidata (identifier),Q54815726 by P1297 74-1153957
+1257,irs:521081455,International Center for Research on Women,icrw.org,wikidata (identifier),Q6049050 by P1297 52-1081455
+1258,cra:768891137RR0001,Age of Union Alliance / Alliance Âge de l'Union,ageofunion.com,unverified (search-engine copy),"web search, 5 Nov 2026: Montreal-founded global conservation funding nonprofit (https://ageofunion.com/)"
+1259,irs:522303126,Hope for a Healthier Humanity Foundation Inc,hopeforahealthierhumanity.org,unverified (search-engine copy),"web search, 5 Nov 2026: Health and nutrition NGO in Central America (https://www.hopeforahealthierhumanity.org/)"
+1260,irs:421628144,Caras of the Americas,carasconcausa.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Puerto Rico community development (Caras con Causa) (https://carasconcausa.org/)"
+1261,irs:362181969,Chicago Council on Global Affairs,globalaffairs.org,wikidata (identifier),Q5095561 by P1297 36-2181969
+1262,irs:270904821,Lifenet International,lninternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Faith-based health facility network across Africa (https://www.lninternational.org/)"
+1263,irs:452275630,Spark Microgrants,sparkmicrogrants.org,unverified (search-engine copy),"web search, 5 Nov 2026: Village-led development grants in East Africa (https://www.sparkmicrogrants.org/)"
+1264,irs:522318905,Development Gateway Inc,developmentgateway.org,unverified (search-engine copy),"web search, 5 Nov 2026: Data and digital solutions for international development (IREX venture) (https://developmentgateway.org/)"
+1266,irs:981486281,Comedor Santa Maria Ac,comedorsantamaria.org.mx,unverified (search-engine copy),"web search, 5 Nov 2026: Mexican charity feeding vulnerable children (https://comedorsantamaria.org.mx/)"
+1267,irs:582484257,Amigos for Christ,amigosforchrist.org,wikidata (identifier),Q55471598 by P1297 58-2484257
+1268,irs:330430285,Childrens Hopechest Inc,hopechest.org,wikidata (identifier),Q55803603 by P1297 33-0430285
+1270,irs:133116646,Human Rights First,humanrightsfirst.org,wikidata (identifier),Q3143126 by P1297 13-3116646
+1271,irs:824277642,Advance Democracy Inc,advance-democracy.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US public-interest research and investigations nonprofit (https://www.advance-democracy.org/)"
+1277,irs:541968322,Afghan Health and Development Services,ahds.org,unverified (search-engine copy),"web search, 5 Nov 2026: Afghan health and development NGO (https://ahds.org/)"
+1278,irs:320403737,Empowers Africa Inc,empowersafrica.org,wikidata (identifier),Q30268068 by P1297 32-0403737
+1279,irs:840430495,Junior Achievement Rocky Mountain,jacolorado.org,wikidata (identifier),Q54813338 by P1297 84-0430495
+1280,irs:521908117,The American Fund for Lse,lse.ac.uk,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US fundraising arm of London School of Economics (http://www.lse.ac.uk/supporting-lse/give-to-lse/american-fund)"
+1283,acnc:45312652866,The Trustee For Pratt Foundation,theprattfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Australian family philanthropic foundation, Melbourne (https://fconline.foundationcenter.org/fdo-grantmaker-profile/?activity=result&collection=grantmakers&key=2941646)"
+1284,irs:521555563,India Development and Relief Fund Inc,idrf.org,wikidata (identifier),Q6019277 by P1297 52-1555563
+1288,cra:118831080RR0001,Canadian Food for Children,canadianfoodforchildren.net,unverified (search-engine copy),"web search, 5 Nov 2026: Ships food to poor in developing countries (http://www.canadianfoodforchildren.net/)"
+1293,irs:263717278,Oneworld Health,oneworldhealth.com,unverified (search-engine copy),"web search, 5 Nov 2026: Sustainable healthcare in Uganda, Nicaragua, Honduras (https://www.oneworldhealth.com/)"
+1294,irs:593445250,Watoto Child CARE Ministry Inc,watoto.com,wikidata (identifier),Q54816734 by P1297 59-3445250
+1296,irs:330412343,International Christian Adoptions,icakids.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian adoption, foster care and humanitarian aid agency (https://icakids.org/)"
+1297,irs:821852606,Integral Global Health Inc,integralglobal.net,unverified (search-engine copy),"web search, 5 Nov 2026: Nonprofit public health programmes in Asia, Africa, Eastern Europe (https://www.integralglobal.net/integral-global-health/)"
+1300,cra:889956793RR0001,Kapoor Singh Siddoo Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Private foundation running free outpatient hospital in Punjab, India (https://opengovca.com/charity/889956793RR0001)"
+1301,irs:833464851,Sudanese American Physicians Association,sapa-usa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Sudanese American physicians; humanitarian medical aid to Sudan (https://sapa-usa.org/)"
+1302,irs:841671995,The Boma Project Inc,boma.ngo,unverified (search-engine copy),"web search, 5 Nov 2026: Poverty graduation for women in Africa's drylands (https://www.boma.ngo/)"
+1305,irs:460771608,Insulin for Life USA Inc,iflusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Free insulin and diabetes supplies, US and worldwide (https://iflusa.org/)"
+1306,irs:954714047,ONESKY,onesky.org,wikidata (identifier),Q54857678 by P1297 95-4714047
+1307,irs:134131482,Brazil Foundation,brazilfoundation.org,wikidata (identifier),Q54632987 by P1297 13-4131482
+1308,uk:1142565,Chasdei Aharon Limited,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Orthodox Jewish synagogue and poverty grants, UK and Israel (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/5016304)"
+1309,irs:593785405,Project Peanut Butter,projectpeanutbutter.org,unverified (search-engine copy),"web search, 5 Nov 2026: Treats child malnutrition in Africa with local RUTF (https://www.projectpeanutbutter.org/)"
+1310,cra:129892659RR0001,Community of Christ,communityofchrist.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Christian church denomination in Canada (https://www.communityofchrist.ca/)"
+1311,irs:475165837,Penny Appeal USA Inc,pennyappealusa.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian and poverty relief charity (https://www.pennyappealusa.org/)"
+1312,irs:611555718,Amazima Ministries International Education and Empowerment for East,amazima.org,wikidata (identifier),Q54816574 by P1297 61-1555718
+1313,irs:383293173,Partners Worldwide,partnersworldwide.org,wikidata (identifier),Q55473266 by P1297 38-3293173
+1314,irs:275121564,Concordia Summit Inc,concordia.net,wikidata (identifier),Q5158989 by P1297 27-5121564
+1315,irs:943050434,Pacific Institute for Studies in Development Environment and Securi,pacinst.org,unverified (search-engine copy),"web search, 5 Nov 2026: Water resilience research institute (Pacific Institute), Oakland (https://pacinst.org/)"
+1316,irs:474782701,Amazi Water,amaziwater.org,unverified (search-engine copy),"web search, 5 Nov 2026: Clean water provision in Burundi (https://amaziwater.org/)"
+1317,uk:1080521,Teresa Ball International Solidarity Fund,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: fund of Loreto Sisters religious congregation (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3969603/contact-information)"
+1318,irs:260415131,Bayis Lepleitos Ateres Bonos Inc,,none found (searched),"web search, 5 Nov 2026: none found; Brooklyn fundraising charity assisting needy individuals and organisations (https://projects.propublica.org/nonprofits/organizations/260415131)"
+1320,irs:320503382,Kheyti Inc,kheyti.com,unverified (search-engine copy),"web search, 5 Nov 2026: Climate-smart greenhouses for smallholder farmers in India (https://www.kheyti.com/)"
+1322,irs:900653286,Israel Policy Forum Inc,israelpolicyforum.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US policy advocacy group on Israel and two-state solution (https://israelpolicyforum.org/)"
+1324,irs:521629060,Global Links,globallinks.org,wikidata (identifier),Q55230295 by P1297 52-1629060
+1329,irs:131623937,China Institute in America Incorporated,chinainstitute.org,wikidata (identifier),Q5099728 by P1297 13-1623937
+1330,irs:264212487,Clean the World Foundation Inc,thewashfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now The WASH Foundation, global water, sanitation and hygiene charity (https://thewashfoundation.org/news/introducing-the-wash-foundation/)"
+1332,irs:954457939,Buddhist Tzu Chi Medical Foundation,tzuchimedical.us,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US arm running free community clinics in California (https://tzuchimedical.us/)"
+1333,irs:204105702,Mully Childrens Family USA Inc,mcfus.org,unverified (search-engine copy),"web search, 5 Nov 2026: US support for Mully Children's Family, child care in Kenya (https://mcfus.org/)"
+1335,irs:461384815,The Exodus Road Inc,theexodusroad.com,unverified (search-engine copy),"web search, 5 Nov 2026: International anti-human-trafficking NGO, intervention and aftercare (https://theexodusroad.com/)"
+1338,irs:232056390,Bucks County Organization for Intercultural Advancement,bcoia.org,unverified (search-engine copy),"web search, 5 Nov 2026: US nonprofit supporting education in Guatemala (https://bcoia.org/)"
+1339,irs:362170141,Junior Achievement of Chicago,jachicago.org,wikidata (identifier),Q54857534 by P1297 36-2170141
+1340,acnc:28658260194,Intergenerational Health Justice Fund Limited,,none found (searched),"web search, 5 Nov 2026: none found; Perth health promotion charity; no official website found (https://www.helptia.com/charities/intergenerational-health-justice-fund-limited/)"
+1341,uk:327854,The Puri Foundation,purico.co.uk,unverified (search-engine copy),"web search, 5 Nov 2026: Nottingham grant-making trust supporting causes in Nottingham and India (https://www.purico.co.uk/charities/puri-foundation)"
+1342,irs:133041381,Womens International Zionist Organization,wizousa.org,wikidata (identifier),Q54834436 by P1297 13-3041381
+1343,irs:850488931,Share Trust Inc,thesharetrust.org,unverified (search-engine copy),"web search, 5 Nov 2026: International nonprofit supporting Self Help Groups and locally led development (https://thesharetrust.org/)"
+1346,irs:951799192,Junior Achievement of Southern Ca,jasocal.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Southern California youth financial literacy education nonprofit (https://jasocal.org/)"
+1348,cra:119050292RR0001,Nac Foreign Extension Inc.,naccanada.org,unverified (search-engine copy),"web search, 5 Nov 2026: New Apostolic Church Canada overseas mission and aid charity (https://www.naccanada.org/IMIS_PROD/NAC/Care/Missionary.aspx)"
+1349,irs:454664343,Together for Girls Inc,togetherforgirls.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global partnership ending violence against children, especially sexual violence (https://www.togetherforgirls.org/en)"
+1350,irs:845182130,Hatch Technologies,hatch-tech.org,unverified (search-engine copy),"web search, 5 Nov 2026: Nonprofit supplying newborn medical devices in sub-Saharan Africa (https://hatch-tech.org/)"
+1352,uk:1087870,Cmz Ltd,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: London Orthodox Jewish education and poverty grant-maker, no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3982888/contact-information)"
+1353,irs:133492792,Goal USA Inc,goalglobal.org,wikidata (identifier),Q54857451 by P1297 13-3492792
+1354,irs:205450672,Nest Inc,buildanest.org,wikidata (identifier),Q141244758 by P1297 20-5450672
+1355,cra:826008302RR0001,Services de santé communautaire Sainte-Élisabeth,sehc.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Quebec affiliate of SE Health, domestic home care (https://sehc.com/)"
+1357,cra:118833292RR0001,International Centre for Human Rights Education / Equitas - Centre International D'Education Aux Droits Humains,equitas.org,unverified (search-engine copy),"web search, 5 Nov 2026: Montreal international human rights education NGO (https://equitas.org/)"
+1359,irs:842569391,Pan-African Academy of Christian Surgeons,paacs.net,unverified (search-engine copy),"web search, 5 Nov 2026: Christian network training African surgeons at mission hospitals (https://paacs.net/)"
+1360,irs:263618722,Pencils of Promise Incorporated,pencilsofpromise.org,wikidata (identifier),Q7162341 by P1297 26-3618722
+1361,irs:223098727,Institute for Sustainable Communities,sustain.org,wikidata (identifier),Q164257 by P1297 22-3098727
+1363,irs:822385660,Scholars at Risk Inc,scholarsatrisk.org,unverified (search-engine copy),"web search, 5 Nov 2026: International network protecting threatened scholars and academic freedom (https://www.scholarsatrisk.org/)"
+1366,irs:271337098,Article 19 Inc,article19.org,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of international freedom of expression organisation (https://www.article19.org/)"
+1367,irs:821697268,Heroic Hearts Project Inc,heroicheartsproject.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US veterans psychedelic therapy retreat nonprofit (https://heroicheartsproject.org/)"
+1370,irs:132989216,Netherland-America Foundation Incorporated,thenaf.org,wikidata (identifier),Q2112673 by P1297 13-2989216
+1371,irs:261455510,The Water Project Inc,thewaterproject.org,unverified (search-engine copy),"web search, 5 Nov 2026: Clean water projects in sub-Saharan Africa (https://thewaterproject.org/)"
+1376,irs:431536498,Mentors International,mentorsinternational.org,wikidata (identifier),Q55472606 by P1297 43-1536498
+1377,irs:351661941,Haiti Benefit Auction,haitibenefitauction.org,unverified (search-engine copy),"web search, 5 Nov 2026: Anabaptist auctions funding mission and relief work in Haiti (https://www.haitibenefitauction.org/)"
+1380,irs:863735350,Salem for Refugees Association,salemforrefugees.org,unverified (search-engine copy),"web search, 5 Nov 2026: Refugee resettlement agency in Salem, Oregon (https://www.salemforrefugees.org/our-services)"
+1381,cra:827112327RR0001,Centre Missionnaire Sainte-Thérèse,centremissionnairecapucin.org,unverified (search-engine copy),"web search, 5 Nov 2026: Capuchin mission centre funding development projects in Global South (https://centremissionnairecapucin.org/)"
+1383,uk:1197633,FUNDD,fundd.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: London Orthodox Jewish giving platform and grant-maker (https://fundd.org/page/terms-of-service)"
+1384,irs:660705571,Guara Bi Inc,westcare.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: WestCare Puerto Rico affiliate, addiction, housing, social services (https://westcare.com/places/puerto-rico/)"
+1385,irs:813165165,314action,314action.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US political group electing scientists to office (https://314action.org/)"
+1387,irs:710982808,Love Justice International,lovejustice.ngo,wikidata (identifier),Q136431739 by P1297 71-0982808
+1391,irs:383213457,Unknown Nations,worldmission.cc,wikidata (identifier),Q54624657 by P1297 38-3213457
+1392,irs:465508120,Advocates for Africa Inc,advocatesforafrica.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian nonprofit: education, water and training in Rwanda (https://www.advocatesforafrica.org/blog)"
+1393,irs:931052909,All Gods Children International,allgodschildren.org,wikidata (identifier),Q54860864 by P1297 93-1052909
+1395,irs:133145161,American Committee for Tel Aviv Fdn Inc,telavivfoundation.org,wikidata (identifier),Q54675379 by P1297 13-3145161
+1396,irs:473438072,Neeman Foundation USA,neemanfoundation.com,unverified (search-engine copy),"web search, 5 Nov 2026: US conduit channelling donations to Israeli charities (https://www.neemanfoundation.com/)"
+1399,uk:1047416,The Haramead Trust,,none found (searched),"web search, 5 Nov 2026: none found; UK grant-making trust, UK and overseas charities; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/1047416)"
+1402,irs:237179996,Save Venice Inc,savevenice.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US nonprofit conserving Venetian art and heritage (https://www.savevenice.org/)"
+1407,irs:131623897,American-Scandinavian Foundation,amscan.org,wikidata (identifier),Q7713416 by P1297 13-1623897
+1408,irs:680224596,Nepal Youth Foundation,nepalyouthfoundation.org,wikidata (identifier),Q6994443 by P1297 68-0224596
+1410,irs:200934525,Kepler Inc,kepler.org,unverified (search-engine copy),"web search, 5 Nov 2026: Higher education and employment for vulnerable youth and refugees, Rwanda (https://kepler.org/)"
+1411,irs:350922731,Junior Achievement of Northern Indiana,northernindiana.ja.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Indiana youth financial literacy education chapter (https://northernindiana.ja.org/)"
+1412,cra:893354639RR0001,Master's International Ministries,,none found (searched),"web search, 5 Nov 2026: none found; Mennonite ministry shipping aid to Ukraine; no website found (https://my.charitableimpact.com/charities/master-s-international-ministries)"
+1413,iati:US-EIN-81-2108637,Dalberg Catalyst,dalbergcatalyst.org,wikidata (identifier),Q131845603 by P13305 US-EIN-81-2108637
+1414,cra:135506483RR0001,Hadassah-Wizo Organization of Canada - L'Organisation Hadassah-Wizo du Canada,chw.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian Hadassah-WIZO, supports health, education, women in Israel (https://chw.ca/)"
+1416,cra:107988511RR0001,Societe des Missions Etrangeres de la Province de Quebec,smelaval.org,unverified (search-engine copy),"web search, 5 Nov 2026: Quebec Catholic foreign missionary society (https://www.smelaval.org/)"
+1418,uk:1137836,Foundation for the Parks and Reserves of Cote D'Ivoire,fondationparc.ci,unverified (search-engine copy),"web search, 5 Nov 2026: UK arm of Ivorian protected-areas conservation trust fund (https://fire.biofin.org/single/fondation-des-parcs-et-reserves-de-c%C3%B4te-d%27ivoire)"
+1419,irs:814618222,Maisha Meds Inc,maishameds.org,unverified (search-engine copy),"web search, 5 Nov 2026: Health technology nonprofit for African pharmacies and clinics (https://maishameds.org/)"
+1422,uk:1097231,The Goodman Foundation,,none found (searched),"web search, 5 Nov 2026: none found; a family grant-making foundation, Ireland and overseas; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3999496/contact-information)"
+1423,irs:760574590,Millennium Relief and Development Services Inc,mrds.org,wikidata (identifier),Q54860840 by P1297 76-0574590
+1424,irs:474504533,Nudge Foundation,thenudge.us,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of The/Nudge, poverty alleviation in India (https://thenudge.us/)"
+1426,irs:562623813,Orphan Outreach,everknown.org,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Everknown, Christian care for vulnerable children worldwide (https://everknown.org/after-20-years-of-impact-orphan-outreach-announces-new-name-everknown/)"
+1427,cra:852490200RR0001,Health Standards Organization / Organisation de normes en santé,healthstandards.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Canadian health care standards and accreditation body (https://healthstandards.org/)"
+1428,irs:271153340,Weconnect International Inc,weconnectinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global network connecting women-owned businesses to buyers (https://weconnectinternational.org/what-we-do/)"
+1429,irs:880577422,Grid3 Inc,grid3.org,unverified (search-engine copy),"web search, 5 Nov 2026: Geospatial data nonprofit for development in sub-Saharan Africa (https://grid3.org/about-us)"
+1430,irs:521570071,International Campaign for Tibet,savetibet.org,unverified (search-engine copy),"web search, 5 Nov 2026: Human rights advocacy organisation for the Tibetan people (https://savetibet.org/)"
+1434,irs:833252944,Rule of Law Society Iv Inc,rol-society.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: 501(c)(4) political advocacy group against Chinese Communist Party (https://rol-society.org/rol-society-english)"
+1435,irs:271505747,Christian Health Service Corps,healthservicecorps.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian medical mission providing health care in developing countries (https://www.healthservicecorps.org/)"
+1437,uk:259892,David & Ruth Lewis Family Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; London family grant-making trust; register says no website (https://www.bathnes.gov.uk/node/89876)"
+1439,irs:474993561,Pams Foundation Inc,pamsfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: US arm of PAMS Foundation, conservation and community support in Tanzania (https://pamsfoundation.org/)"
+1441,irs:274431021,Compassionate Hope Foundation,compassionatehope.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian charity running children's homes against trafficking in Southeast Asia (https://compassionatehope.org/)"
+1442,irs:742129017,International Educational Programs Inc,uag.edu,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US admissions office for UAG medical school, Guadalajara (https://uag.edu/)"
+1443,irs:710929252,African Vision of Hope,africanvisionofhope.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian charity: education, nutrition, rescue homes for children in Zambia (https://africanvisionofhope.org/)"
+1444,irs:133593806,Sakhi for South Asian Survivors Inc,sakhi.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: New York domestic violence service for South Asian survivors (https://sakhi.org/)"
+1445,irs:521614093,Armenian Assembly of America Inc,aaainc.org,wikidata (identifier),Q4793157 by P1297 52-1614093
+1446,uk:1060228,Hollick Family Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: UK family grant-maker for London, Sussex, Kent causes; no website (https://www.hinchilla.com/funder-directory/hollick-family-foundation)"
+1447,cra:890666761RR0001,Friends of Simon Wiesenthal Center for Holocaust Studies,fswc.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Canadian Holocaust education and anti-hate advocacy organisation (https://www.fswc.ca/about-us)"
+1449,irs:953956136,Physicians for Social Responsibility Inc,psr-la.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: PSR Los Angeles, environmental health and nuclear advocacy (https://www.psr-la.org/)"
+1452,irs:133836763,Idealistorg Inc,idealist.org,wikidata (identifier),Q4677169 by P1297 13-3836763
+1453,irs:275097190,Partners in Food Solutions,partnersinfoodsolutions.com,unverified (search-engine copy),"web search, 5 Nov 2026: Nonprofit linking food-company volunteers with African food processors (https://www.partnersinfoodsolutions.com/)"
+1456,irs:411560297,Common Hope Inc,commonhope.org,wikidata (identifier),Q5153390 by P1297 41-1560297
+1457,irs:201648411,Asia Harvest,asiaharvest.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian ministry in Asia: Bibles, evangelists, humanitarian aid funds (https://www.asiaharvest.org/)"
+1461,uk:220124,P F Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: a family grant-making trust for UK causes; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/220124)"
+1462,irs:823705696,Mission Mutual,missionmutual.org,unverified (search-engine copy),"web search, 5 Nov 2026: Backbone support for global Christian mission and ministry alliances (https://missionmutual.org/)"
+1463,cra:886093798RR0001,Prelature Armenienne du Canada Inc/armenian Prelacy of Canada Inc,armenianprelacy.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Armenian Apostolic church prelacy in Canada (https://armenianprelacy.ca/)"
+1464,irs:520788947,Institute for Policy Studies,ips-dc.org,wikidata (identifier),Q3152799 by P1297 52-0788947
+1465,irs:264080644,Cova Agua,covaagua.org,unverified (search-engine copy),"web search, 5 Nov 2026: Cova (formerly EOS International), safe water in Central America (https://covaagua.org/)"
+1466,irs:201257910,Meds & Food for Kids,mfkhaiti.org,wikidata (identifier),Q6807293 by P1297 20-1257910
+1467,acnc:59921106235,Christian Providence,,none found (searched),"web search, 5 Nov 2026: none found; Australian Christian charitable trust, Warrimoo NSW; no own website found (https://civicgraph.app/entities/AU-ABN-59921106235)"
+1468,irs:450545435,Village Health Works,villagehealthworks.org,wikidata (identifier),Q54862645 by P1297 45-0545435
+1472,irs:562614329,Building Tomorrow Inc,buildingtomorrow.org,unverified (search-engine copy),"web search, 5 Nov 2026: Education NGO improving literacy and numeracy in Uganda and Rwanda (https://www.buildingtomorrow.org/)"
+1473,irs:471686704,Hope 4 Kids International,hope4kidsinternational.org,wikidata (identifier),Q55472644 by P1297 47-1686704
+1474,irs:731130590,Blessings International,blessing.org,unverified (search-engine copy),"web search, 5 Nov 2026: Nonprofit supplier of medicines to mission teams and clinics worldwide (https://www.blessing.org/)"
+1475,uk:508470,The Guru Nanak Nishkam Sewak Jatha (birmingham) UK,gnnsj.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Sikh gurdwara and faith charity in Birmingham (https://gnnsj.org/about-us/)"
+1476,irs:136157253,International Foundation for Ewha Womans Univ Inc,ewhafoundation.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US fundraising foundation for Ewha Womans University, Seoul (https://ewhafoundation.com/)"
+1477,irs:133392006,Synergos Institute Inc,synergos.org,wikidata (identifier),Q7662384 by P1297 13-3392006
+1478,irs:870512889,Cache Community Food Pantry Inc,cachefood.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: local food pantry in Logan, Utah (https://cachefood.org/)"
+1480,irs:274638772,Radius International,radiusinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: missionary church-planting training school in Mexico (https://www.radiusinternational.org/about)"
+1481,irs:471624899,Fuente Latina Inc,fuentelatina.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Spanish-language media organisation on Israel coverage (https://fuentelatina.org/en/)"
+1482,irs:113585917,One Family Fund,onefamilytogether.org,wikidata (identifier),Q54853535 by P1297 11-3585917
+1483,irs:454050957,Whitaker Peace and Development Initiative,wpdi.org,unverified (search-engine copy),"web search, 5 Nov 2026: Forest Whitaker's youth peacebuilding NGO in conflict-affected countries (https://www.wpdi.org/)"
+1484,irs:273152104,Conservation Council of Nations,internationalconservation.org,unverified (search-engine copy),"web search, 5 Nov 2026: ICCF Group: conservation policy network for legislators in Africa, Latin America (https://www.guidestar.org/profile/27-3152104)"
+1485,irs:660798610,Voces Coalicion de Inmunizacion y Promociion de la Salud Inc,vocespr.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Puerto Rico immunization and health promotion coalition (https://www.vocespr.org/)"
+1486,cra:118796150RR0001,Atlantic Salmon Federation (canada) / Federation du Saumon Atlantique (canada),asf.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: wild Atlantic salmon conservation organisation (https://www.asf.ca/)"
+1488,irs:860184349,Junior Achievement of Arizona,jaaz.org,wikidata (identifier),Q54812701 by P1297 86-0184349
+1489,irs:981079526,Alliance Cooperative Internationale,ica.coop,unverified (search-engine copy),"web search, 5 Nov 2026: International Cooperative Alliance, global apex body of cooperatives, Brussels (https://ica.coop/en)"
+1490,irs:813006634,Clooney Foundation for Justice,cfj.org,wikidata (identifier),Q122939919 by P1297 81-3006634
+1492,irs:208827879,Thesentry Org Inc,thesentry.org,wikidata (identifier),Q1218701 by P1297 20-8827879
+1493,irs:850922903,Mojaloop Foundation Inc,mojaloop.io,unverified (search-engine copy),"web search, 5 Nov 2026: Open-source payments software foundation for financial inclusion (https://mojaloop.io/foundation/)"
+1494,uk:1138785,Jamma International,jammaconservationandcommunities.com,unverified (search-engine copy),"web search, 5 Nov 2026: Jamma Conservation and Communities: community conservation in southern Africa (https://jammaconservationandcommunities.com/)"
+1495,irs:201051471,Peacetrees Vietnam,peacetreesvietnam.org,unverified (search-engine copy),"web search, 5 Nov 2026: Mine clearance and community development in central Vietnam (https://www.peacetreesvietnam.org/)"
+1497,uk:1136917,British Friends of Ezrat Yisrael Kiryat Sefer,,none found (searched),"web search, 5 Nov 2026: none found; UK grant-maker relieving financial hardship of people in Israel (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/4050388)"
+1499,irs:392067502,Many Hopes Inc,manyhopes.org,unverified (search-engine copy),"web search, 5 Nov 2026: Rescues children from abuse and slavery in Africa and Latin America (https://manyhopes.org/about/)"
+1501,irs:356048156,Junior Achievement of Southwestern Indiana Inc,swindiana.ja.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: local Junior Achievement chapter, Evansville, Indiana (https://swindiana.ja.org/)"
+1503,irs:204714242,Auschwitz Institute for the Prevention of Genocide and Mass at,auschwitzinstitute.org,unverified (search-engine copy),"web search, 5 Nov 2026: Trains governments worldwide on genocide and mass atrocity prevention (https://www.auschwitzinstitute.org/)"
+1506,irs:300312368,Lingap Childrens Foundation,lingapcenter.org,unverified (search-engine copy),"web search, 5 Nov 2026: US foundation funding a children's crisis centre in Cebu, Philippines (https://www.lingapcenter.org/)"
+1507,irs:474648581,Free the Oppressed,freeburmarangers.org,unverified (search-engine copy),"web search, 5 Nov 2026: Funding arm of Free Burma Rangers, relief in conflict zones (https://wp.freeburmarangers.org/fto/)"
+1509,irs:832080058,Muslim Response USA for Relief and Development,rusard.org,unverified (search-engine copy),"web search, 5 Nov 2026: Muslim humanitarian relief and development charity, Virginia (https://www.rusard.org/about-us/)"
+1510,irs:590972112,Junior Achievement of Central Florida Inc,juniorachievement.org,wikidata (identifier),Q55472185 by P1297 59-0972112
+1513,irs:465355232,International Network for Aid Relief and Assistance Inc,inara.org,unverified (search-engine copy),"web search, 5 Nov 2026: Medical and mental-health care for war-affected children (https://inara.org/about/)"
+1514,irs:113013369,Abdul Sattar Edhi International Foundation Inc,edhina.org,unverified (search-engine copy),"web search, 5 Nov 2026: US branch of Pakistan's Edhi Foundation welfare and relief network (https://edhina.org/usa/)"
+1516,irs:454301089,Yad David Inc,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Brooklyn Jewish religious study outreach and grant fund (https://www.guidestar.org/profile/45-4301089)"
+1518,irs:942764520,Ploughshares Fund Inc,ploughshares.org,wikidata (identifier),Q7205153 by P1297 94-2764520
+1519,irs:314385042,Junior Achievement of Central Ohio,juniorachievement.org,wikidata (identifier),Q54857517 by P1297 31-4385042
+1522,irs:161533544,We Charity,we.org,unverified (search-engine copy),"web search, 5 Nov 2026: WE Charity US: youth programmes and WE Villages development abroad (https://www.we.org/en-us/get-doing/donate/)"
+1523,uk:1094397,Samjo Limited,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Manchester Jewish religious and educational grant-maker (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3989305)"
+1526,irs:522094677,Alliance for Global Justice,afgj.org,unverified (search-engine copy),"web search, 5 Nov 2026: US grassroots social and economic justice network, fiscal sponsor (https://afgj.org/)"
+1530,irs:352374190,Fund for Israels Tomorrow,thankisraelisoldiers.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Thank Israeli Soldiers, welfare support for IDF soldiers (https://www.guidestar.org/profile/35-2374190)"
+1531,irs:450473508,World Savvy Inc,worldsavvy.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: US K-12 global competence education nonprofit (https://www.worldsavvy.org/)"
+1532,irs:540761510,Children Incorporated,childrenincorporated.org,wikidata (identifier),Q5098275 by P1297 54-0761510
+1533,irs:825003065,Sitare Foundation,sitare.org,unverified (search-engine copy),"web search, 5 Nov 2026: Education scholarships for underprivileged children in India (https://sitare.org/)"
+1534,irs:952248462,Project Concern International,pciglobal.org,wikidata (identifier),Q7249033 by P1297 95-2248462
+1535,cra:898194170RR0001,Masterpiece Charitable Foundation,,none found (searched),"web search, 5 Nov 2026: none found; RENAMED: renamed from a memorial foundation; Toronto private grant-maker (https://ised-isde.canada.ca/cc/lgcy/fdrlCrpDtls.html?Open=1&corpId=3123669&wbdisable=true)"
+1536,cra:144489671RR0001,Les 7 Doigts de la Main,7doigts.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: contemporary circus company in Montreal (https://7doigts.com/)"
+1538,irs:271493841,Groundswell International Inc,groundswellinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Agroecology network supporting smallholder farmers in the Global South (https://www.groundswellinternational.org/)"
+1540,irs:411397062,Wellshare International,wellshareinternational.org,unverified (search-engine copy),"web search, 5 Nov 2026: Community health worker NGO serving Minnesota and Tanzania (https://wellshareinternational.org/)"
+1542,irs:060665972,Junior Achievement of Southwest New England,jaconn.org,wikidata (identifier),Q54556212 by P1297 06-0665972
+1545,irs:470865426,Numbersusa Education & Research Foundation,numbersusa.com,wikidata (identifier),Q1326235 by P1297 47-0865426
+1549,irs:841369453,Globous Relief Fund,globusrelief.org,wikidata (identifier),Q55467896 by P1297 84-1369453
+1550,irs:371449493,Wayuu Taya Foundation Inc,wayuutaya.org,unverified (search-engine copy),"web search, 5 Nov 2026: NGO aiding indigenous communities in Venezuela and Colombia (https://wayuutaya.org/)"
+1553,uk:295393,Clydpride Limited,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Orthodox Jewish grant-making trust, religion and poverty relief (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/295393)"
+1554,irs:412155341,Nascent Solutions Inc,nascents.org,unverified (search-engine copy),"web search, 5 Nov 2026: Humanitarian and development NGO working in rural Africa (https://nascents.org/)"
+1556,irs:811401967,Hope for Ukraine Inc,hfu.org,unverified (search-engine copy),"web search, 5 Nov 2026: US humanitarian nonprofit delivering aid in Ukraine (https://hfu.org/who-we-are/)"
+1558,irs:237297770,Resurge International,resurge.org,unverified (search-engine copy),"web search, 5 Nov 2026: Reconstructive surgery and surgeon training in low-income countries (https://resurge.org/)"
+1559,irs:331441343,International Action Network,,none found (searched),"web search, 5 Nov 2026: none found; 501(c)(4) advocating democratic governance in Africa (https://plaincharity.com/org/331441343)"
+1561,uk:328678,The Laduma Dhamecha Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; Family grant-making trust: health, education, poverty, culture (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/328678/charity-overview)"
+1567,cra:887613156RR0001,Sef Foundation,,none found (searched),"web search, 5 Nov 2026: none found; RENAMED: formerly Canadian Jaffari Muslim Foundation; funds overseas schools, relief (https://ised-isde.canada.ca/cc/lgcy/fdrlCrpDtls.html?corpId=2364417)"
+1570,cra:118924083RR0001,Fondation Mariannhill / Mariannhill Foundation,mariannhill.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: foundation funding Mariannhill Missionaries' education and mission work (https://mariannhill.ca/)"
+1572,cra:888780178RR0001,Canadian Aboriginal AIDS Network,caan.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: RENAMED: Indigenous HIV network in Canada, now Communities, Alliances & Networks (https://www.caan.ca/)"
+1579,cra:888897063RR0001,Ukrainian World Congress Foundation,ukrainianworldcongress.org,unverified (search-engine copy),"web search, 5 Nov 2026: Ukrainian World Congress charity arm; humanitarian aid to Ukraine (https://www.ukrainianworldcongress.org/uwfcanada/)"
+1583,acnc:77625855101,JR Darling Foundation Limited,,none found (searched),"web search, 5 Nov 2026: none found; Australian private grant-making foundation supporting other charities (https://www.australiacheck.com/nsw/jr-darling-foundation)"
+1587,uk:292199,The Band Aid Charitable Trust,bandaidtrust.co.uk,unverified (search-engine copy),"web search, 5 Nov 2026: Band Aid trust funding famine and poverty relief in Africa (https://www.bandaidtrust.co.uk/)"
+1589,cra:125113910RR0001,Life Outreach International,lifetoday.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Christian TV ministry (LIFE Today) with overseas humanitarian relief (https://causes.benevity.org/causes/124-125113910RR0001)"
+1598,cra:813278272RR0001,The Canadian Institute for the Study of Global Anti-Semitis m and Policy / L'Institut Canadien pour l 'étude de l'antisémitisme et de la Politique,canisa.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: research and education institute on antisemitism (https://canisa.org/)"
+1603,cra:714585726RR0001,MEDA Impact Investments,meda.org,unverified (search-engine copy),"web search, 5 Nov 2026: MEDA subsidiary managing impact investments in African agri-food (https://www.meda.org/about/governance/)"
+1605,cra:119151454RR0001,Sisters Servants of Mary Immaculate Provincial Home,ssmi.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Ukrainian Catholic religious congregation, Canadian province (https://ssmi.org/)"
+1616,uk:1163502,Good Shepherd Sisters GB CIO,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Catholic religious congregation, pastoral and care work in Britain (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/5066150)"
+1618,cra:859964942RR0001,Fonds Bedford / Bedford Fund,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Marist Brothers' investment fund granting to Institute units (https://champagnat.org/en/bedford-fund-annual-meeting/)"
+1623,uk:1178335,Delta Philanthropies,deltaphilanthropies.org,unverified (search-engine copy),"web search, 5 Nov 2026: Masiyiwa family charity funding human development in Africa (https://deltaphilanthropies.org/)"
+1625,cra:834998965RR0001,Heseg Foundation,heseg.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: scholarships for former IDF lone soldiers in Israel (https://www.heseg.com/)"
+1629,cra:118966381RR0001,Ignat Kaneff Charitable Foundation,kaneffgolf.com,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: family foundation funding Ontario hospitals and education (https://kaneffgolf.com/ikcf/)"
+1633,cra:137508370RR0001,Canadian Foundation for the Education and Welfare of Jews Ofthe C I S,jep.ca,unverified (search-engine copy),"web search, 5 Nov 2026: Supports Jewish schools and welfare in former Soviet states (http://www.jep.ca/europe.html)"
+1635,cra:746004092RR0001,Belonging Forum,belongingforum.org,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: RENAMED: social connectedness research body, formerly Samuel Centre (https://belongingforum.org/a-new-chapter-in-our-movement-for-belonging/)"
+1637,cra:804212421RR0001,The Balsillie Family Foundation,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Canadian family foundation, food security and literature grants (https://charitycompass.ca/charity/804212421RR0001)"
+1639,cra:855070728RR0001,Kinship Canada,kinship786.com,unverified (search-engine copy),"web search, 5 Nov 2026: RENAMED: now Kinship786; poverty relief in India, Africa, Middle East (https://kinship786.com/)"
+1643,acnc:16491378993,Krishna Somers Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; Trust funding refugee and migrant support organisations in Australia (https://abr.business.gov.au/ABN/View/16491378993)"
+1644,uk:1099567,Teshuvoh Tefilloh Tzedokoh,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Orthodox Jewish grant-making trust in Salford (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/4002670)"
+1646,uk:282336,Lonia Limited,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: Orthodox Jewish grant-making charity, religion and poverty relief (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/282336)"
+1653,cra:107834863RR0001,Pentecostal Tabernacle of Calgary,fa.church,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: RENAMED: Pentecostal church congregation in Calgary, now First Assembly (https://www.fa.church/about)"
+1657,cra:119017069RR0001,Société des Missionnaires D'Afrique (pères Blancs) - Canada / Society of Missionaries of Africa (white Fathers) - Canada,mafr.net,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Catholic missionary society (White Fathers) serving Africa, Canadian province (https://mafr.net/mafr-1/our-society)"
+1660,cra:118948074RR0001,Grey Sisters of the Immaculate Conception,greysisters.ca,unverified (search-engine copy),"web search, 5 Nov 2026: OUTSIDE: Catholic sisters' congregation based in Pembroke, Ontario (https://linkedin.com/company/grey-sisters-of-the-immaculate-conception)"
+1661,cra:862048758RR0001,Hungry for Life International,hungryforlife.org,unverified (search-engine copy),"web search, 5 Nov 2026: Christian relief and development charity linking churches to projects (https://www.hungryforlife.org/)"
+1662,cra:831110473RR0001,Sajjadiyya Trust,,none found (searched),"web search, 5 Nov 2026: none found; Medical and education aid in India and Pakistan; Shia religion (https://charitycompass.ca/charity/831110473RR0001)"
+1666,cra:838255180RR0001,United Hatzalah Canada,israelrescue.org,unverified (search-engine copy),"web search, 5 Nov 2026: Canadian fundraising arm of Israel's volunteer emergency medics (https://israelrescue.org/en_CA/)"
+1668,cra:810956565RR0001,Ne'eman Foundation Canada,,none found (searched),"web search, 5 Nov 2026: none found; CLOSED: CRA revoked charity status 2024; funded projects in Israel (https://thecjn.ca/news/jewish-national-fund-and-neeman-foundation/)"
+1670,oscr:SC035799,Gloag Foundation,gloagfoundation.org.uk,unverified (search-engine copy),"web search, 5 Nov 2026: Grant trust for poverty, health, education in UK and overseas (https://www.gloagfoundation.org.uk/)"
+1682,uk:801465,Central Hardship and Relief Trust,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: poverty relief for Brethren church members worldwide (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/801465)"
+1698,uk:1093528,Gilmoor Benevolent Fund Limited,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: grant-maker for Orthodox Jewish religious and educational institutions (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3991347)"
+1702,acnc:83459359573,The V & C Comino Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Australian family foundation granting to youth charities (https://civicgraph.app/entities/AU-ABN-83459359573)"
+1703,uk:292984,Grace Charitable Trust,,none found (searched),"web search, 5 Nov 2026: none found; Christian family grant-making trust based in Chester (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/292984/full-print)"
+1708,uk:294775,The Rock Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Christian grant-making trust: education, poverty relief, faith (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/294775)"
+1715,oscr:SC046335,The Milne Family Foundation,,none found (searched),"web search, 5 Nov 2026: none found; Aberdeen family foundation making Christian and community grants (https://www.oscr.org.uk/about-charities/search-the-register/charity-details?number=SC046335)"
+1722,uk:1073795,Missionaries of Charity of Mother Teresa of Calcutta Trust,,none found (searched),"web search, 5 Nov 2026: none found; OUTSIDE: UK trust of Mother Teresa's religious congregation (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3958915)"
