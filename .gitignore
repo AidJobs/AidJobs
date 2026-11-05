@@ -26,6 +26,7 @@ _meili_data/
 
 # Crawl output and diagnostic dumps. Not product source.
 /raw-html/
+/tools/survey/raw/
 apps/backend/report/
 
 apps/backend/.env

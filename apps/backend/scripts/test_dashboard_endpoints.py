@@ -34,8 +34,8 @@ def print_result(name: str, success: bool, details: Any = None):
             print(f"   Details: {details}")
 
 def test_db_status() -> bool:
-    """Test /api/db/status endpoint"""
-    print_section("Database Status Endpoint")
+    """Public /api/db/status: exactly {"ok": true} (security stage 7), or a fixed failure."""
+    print_section("Database Status Endpoint (public)")
     try:
         url = f"{BACKEND_URL}/api/db/status"
         print(f"Testing: GET {url}")
@@ -44,42 +44,65 @@ def test_db_status() -> bool:
         print(f"Status Code: {response.status_code}")
         
         if response.status_code != 200:
-            print_result("Database Status", False, f"HTTP {response.status_code}: {response.text[:200]}")
+            print_result("Database Status", False, f"HTTP {response.status_code}")
             return False
         
         try:
             data = response.json()
-        except json.JSONDecodeError as e:
-            print_result("Database Status", False, f"Invalid JSON: {e}. Response: {response.text[:200]}")
+        except json.JSONDecodeError:
+            print_result("Database Status", False, "Invalid JSON")
             return False
         
-        if not isinstance(data, dict):
-            print_result("Database Status", False, f"Expected dict, got {type(data)}")
-            return False
-        
-        # Check required fields
-        has_ok = "ok" in data
-        if data.get("ok"):
-            has_row_counts = "row_counts" in data
-            has_jobs = "row_counts" in data and "jobs" in data.get("row_counts", {})
-            has_sources = "row_counts" in data and "sources" in data.get("row_counts", {})
-            
-            print_result("Database Status", True, {
-                "ok": data.get("ok"),
-                "jobs": data.get("row_counts", {}).get("jobs", 0),
-                "sources": data.get("row_counts", {}).get("sources", 0)
-            })
+        if data == {"ok": True}:
+            print_result("Database Status", True, data)
             return True
-        else:
-            error = data.get("error", "Unknown error")
-            print_result("Database Status", False, f"Database not OK: {error}")
+        if isinstance(data, dict) and data.get("ok") is False and set(data) == {"ok", "error"}:
+            print_result("Database Status", False, f"Database not OK: {data['error']}")
             return False
+        print_result("Database Status", False, f"Unexpected answer with keys {sorted(data) if isinstance(data, dict) else type(data).__name__}")
+        return False
             
     except requests.exceptions.RequestException as e:
-        print_result("Database Status", False, f"Request failed: {e}")
+        print_result("Database Status", False, f"Request failed: {type(e).__name__}")
         return False
-    except Exception as e:
-        print_result("Database Status", False, f"Unexpected error: {e}")
+
+
+def test_admin_db_status(cookie: str) -> bool:
+    """Admin /api/admin/db/status: the counts and the open jobs per source."""
+    print_section("Database Status Endpoint (admin)")
+    if not cookie:
+        print("⚠️  No admin session, skipping")
+        return False
+    
+    try:
+        url = f"{BACKEND_URL}/api/admin/db/status"
+        print(f"Testing: GET {url}")
+        unsigned = requests.get(url, timeout=10)
+        if unsigned.status_code != 401:
+            print_result("Admin Database Status", False, f"Without a session: HTTP {unsigned.status_code}, expected 401")
+            return False
+        
+        response = requests.get(url, cookies={"aidjobs_admin_session": cookie}, timeout=30)
+        print(f"Status Code: {response.status_code}")
+        if response.status_code != 200:
+            print_result("Admin Database Status", False, f"HTTP {response.status_code}")
+            return False
+        
+        data = response.json()
+        counts = data.get("row_counts") or {}
+        breakdown = data.get("source_breakdown")
+        if data.get("ok") and {"jobs", "active_jobs", "sources"} <= set(counts) and isinstance(breakdown, list):
+            print_result("Admin Database Status", True, {
+                "jobs": counts["jobs"],
+                "active_jobs": counts["active_jobs"],
+                "sources": counts["sources"],
+                "sources_listed": len(breakdown),
+            })
+            return True
+        print_result("Admin Database Status", False, data.get("error", "Missing counts or per-source list"))
+        return False
+    except (requests.exceptions.RequestException, ValueError) as e:
+        print_result("Admin Database Status", False, f"Request failed: {type(e).__name__}")
         return False
 
 def test_search_status() -> bool:
@@ -273,6 +296,7 @@ def main():
         "db_status": False,
         "search_status": False,
         "admin_login": False,
+        "admin_db_status": False,
         "search_init": False,
         "search_reindex": False,
     }
@@ -287,6 +311,7 @@ def main():
         results["admin_login"] = login_success
         
         if login_success:
+            results["admin_db_status"] = test_admin_db_status(cookie)
             results["search_init"] = test_search_init(cookie)
             # Only test reindex if user wants (it's slow)
             # results["search_reindex"] = test_search_reindex(cookie)

@@ -14,7 +14,8 @@ const nextConfig = {
     const backend = api.replace(/\/api$/, '');
 
     return [
-      // Rewrite public API routes (search, healthz, db status, etc.) to backend
+      // Rewrite public API routes (search, healthz, etc.) to backend. These run after the route
+      // files, so a path with its own app/api route (such as /api/db/status) never reaches them.
       // Exclude /api/admin/* - those are handled by Next.js API routes in app/api/admin/*
       {
         source: '/api/search/:path*',
@@ -31,11 +32,6 @@ const nextConfig = {
       {
         source: '/api/jobs/:path*',
         destination: `${backend}/api/jobs/:path*`,
-      },
-      {
-        // Dashboard uses this for the Database card
-        source: '/api/db/status',
-        destination: `${backend}/api/db/status`,
       },
       // Note: /api/admin/* routes are NOT rewritten - they are handled by Next.js API routes
       // in app/api/admin/* which act as proxies to the backend

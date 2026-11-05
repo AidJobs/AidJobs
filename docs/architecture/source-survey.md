@@ -1,10 +1,19 @@
 # Employer survey (W-31)
 
-**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
+**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
 
 ## Purpose
 
 Find every relevant employer's careers site and group the sites by recruitment system, so the crawler's readers can be built in the order that covers the most jobs (W-38 onwards). The unit of record is one careers site: an affiliate or national office with its own site is its own record, and organisations that share one site (probably the UN Secretariat offices on `careers.un.org`) are one record.
+
+## Target (the user's decision, 4 November 2026)
+
+International development and aid organisations, and major national organisations, that hire regularly and are most likely to pay to advertise jobs. The user set the target and income as a cut-off, and left the rest to the agent, who decided:
+- **In:** UN agencies and other intergovernmental bodies; bilateral agencies (for example GIZ, AFD, JICA, Enabel, SIDA, KfW); international NGOs; major national NGOs (for example BRAC); development consultancies that hire for aid projects (for example DAI, Chemonics, Palladium); large foundations that fund development.
+- **Out:** hospitals, universities, colleges and schools; companies outside aid (Zipline, Mozilla, Euroclear, Control Risks); small local charities without aid work. Church-run aid agencies (for example Catholic Relief Services, World Vision) stay in.
+- **The 19 proposed NGOs** (seed additions) stay in: all are aid organisations.
+- **Ranking:** hiring evidence first (jobs on UNjobs, later ReliefWeb), by job count; then income.
+- **Other open decisions settled by the agent:** a provisional keyword set (UN, NGO, nonprofit, charity, humanitarian, international development); no paid search service (Common Crawl's index and the agent's own search, step E); the step F script follows the backend's fetch policy; UNjobs names and job counts are kept.
 
 ## Seed lists (step A)
 
@@ -32,7 +41,7 @@ Each step needs the user's approval. Employers' own sites are first contacted in
 | Step | What | Contacts |
 | --- | --- | --- |
 | A | Seed lists and this file | None (done) |
-| B | Merged organisation list from open data: IATI Dashboard, ACNC, CRA, UK Charity Commission, IRS, and chosen European registers, filtered by a size threshold | Downloads from the publishers' servers |
+| B | Candidate organisations from open data: IATI Dashboard, IRS, UK Charity Commission, OSCR, ACNC, CRA, EU Transparency Register, filtered by the target and an income cut-off | Downloads from the publishers' servers (built, below) |
 | C | ReliefWeb: organisations, websites, job counts per organisation (a few dozen requests) | ReliefWeb's API, with the user's `appname` |
 | D | Duplicate removal and ranking: website domain, then IATI ID, then cleaned name and acronym; uncertain matches to a review list for the user, nothing merged automatically; ranked by hiring evidence, then income | None |
 | E | Likely careers pages and recruitment systems, from Common Crawl's public URL index (per domain, and by recruitment-system host patterns) and the agent's web search for the top unresolved organisations | Common Crawl, about one request a second (its terms checked in that step) |
@@ -40,6 +49,78 @@ Each step needs the user's approval. Employers' own sites are first contacted in
 | G | Output: careers sites grouped by recruitment system, ranked by jobs covered, with keyword families and each system's fields and reuse terms; the master CSV; the ledger | None |
 
 Scripts for steps B to F go in a new `tools/survey/` folder that the backend never imports, run on the user's machine (Python 3.11). Raw downloads stay in a git-ignored folder; only cleaned results are committed.
+
+## Candidates from public registers (step B)
+
+`tools/survey/registers.py download` fetches 15 public files and IATI's organisation list (2,132 organisations) into `tools/survey/raw/` (git-ignored), one at a time, with an honest identity (`AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)`), recording each file's size and checksum; `build` filters them and writes `source-survey/register-candidates.csv` and `source-survey/register-counts.csv`. Run on 4 November 2026; the registers' extract dates are those of that day (IRS posted 13 October 2026; CRA's list is the 2024 returns; ACNC's income is the 2023 statements; the EU file is the June 2026 export).
+
+**Filters, per source:**
+
+| Source | In the target when | Income |
+| --- | --- | --- |
+| IATI | organisation type government, other public sector, NGO (international, national, regional, partner-country), public-private partnership, multilateral or foundation; private sector kept and marked for review (development contractors and investors); academic and other dropped | none (all kept) |
+| IRS (US) | NTEE major group Q (international, foreign affairs), without domestic national security (Q43) and exchange programmes (Q21 to Q23) | revenue, US$5m |
+| UK Charity Commission (England and Wales) | registered main charity classified "Overseas aid/famine relief" (code 106) | latest income, £2.5m |
+| OSCR (Scotland) | active, and geographical spread "Overseas only", or "UK and overseas" with aid work abroad in its stated objectives (for example "developing countries", "humanitarian", "throughout the world") | most recent income, £2.5m |
+| ACNC (Australia) | operates in a country other than Australia (register), or ran programmes overseas (2023 statement) | 2023 total revenue, A$5m; with no statement, kept if the register says Large (A$3m or more), marked |
+| CRA (Canada) | carried out programmes in another country (schedule 2), or answered yes to activities outside Canada (T3010 line 2100), which covers agencies working through partners | 2024 total revenue (line 4700), C$5m |
+| EU Transparency Register | non-governmental organisation with "development" or "humanitarian aid" among its interests | none in this register (all kept) |
+
+In every source, names that say hospital, university, college or school, with singular and plural forms in English, French, Spanish, Italian, German and Dutch (also "health sciences", "health system", "polytechnique"), are dropped: 689 in all, at any income (`excluded_by_name` in the counts), for example the University of Alberta, Université de Montréal, the American Hospital of Paris and Hamilton Health Sciences. Aid organisations with such words in their names are kept by name, each checked: World University Service of Canada, United World Schools, Haiti Hospital Appeal (that name only), Promoting Equality in African Schools, Baylor College of Medicine Children's Foundation Malawi. Mission hospitals stay out (hospitals are outside the target).
+
+**Counts** (`register-counts.csv`; "in target" before the name filter):
+
+| Source | Records | In target | Lower cut-off | Recommended | Higher cut-off |
+| --- | --- | --- | --- | --- | --- |
+| IATI | 2,132 | 1,894 | — | 1,887 (no income) | — |
+| IRS | 1,975,975 | 20,205 | 1,084 at US$2.5m | 674 at US$5m | 431 at US$10m |
+| UK | 171,919 | 9,246 | 549 at £1m | 307 at £2.5m | 192 at £5m |
+| OSCR | 22,617 active | 769 | 120 at £1m | 88 at £2.5m | 57 at £5m |
+| ACNC | 65,979 | 4,051 | 281 at A$2.5m | 174 at A$5m | 94 at A$10m |
+| CRA | 83,761 | 5,103 | 619 at C$2.5m | 378 at C$5m | 215 at C$10m |
+| EU | 17,424 | 2,801 | — | 2,780 (no income) | — |
+
+The candidate list at the recommended cut-offs has 6,349 rows (with 61 Australian charities whose income is not reported but whose size is Large), before duplicates are removed: the same organisation often appears in several sources (for example Oxfam in the UK register, OSCR, IATI and the EU register). Duplicate removal and ranking are step D. The record totals match each publisher's own figure (IATI's API count, the IRS page's 1,975,975, the EU file's declared 17,424); OSCR's file has 24,982 rows, of which 22,617 are active (the others "Not Submitted" or "Not Monitored"); ACNC's 65,979 leave out 614 lines that continue a quoted field.
+
+**Known gaps and noise, for step D:**
+- **Large US aid organisations outside group Q:** for example Samaritan's Purse (X20), Partners In Health (E70), GiveDirectly (P60), Internews, the International Republican Institute and IntraHealth, and Population Services International and Smile Train, which have no NTEE code (12,801 organisations at US$5m or more have none). They are found through IATI, UNjobs and ReliefWeb in steps C and D.
+- **Canada, line 2100:** 102 of the Canadian candidates qualify by line 2100 alone; most are aid agencies working through partners, but some are not (YMCAs, dioceses, Special Olympics, the Terry Fox Foundation). Step D's ranking puts hiring evidence first.
+- **Scotland:** about a third of the "UK and overseas" candidates at the recommended cut-off are not aid agencies; a generic phrase in their objectives ("throughout the world", "overseas", "abroad") matched: churches and religious bodies (for example the Church of Scotland), arts and research bodies (the Royal Scottish National Orchestra, Moredun), professional bodies, Dogs Trust, the British Council. Dropping those phrases would also drop real aid agencies that match only on them (Christian Aid, WaterAid, UNICEF UK, the British Red Cross), so step D sorts them. English charities registered in Scotland too repeat the UK list.
+- **Name filter casualties to check in step D:** School for Life Foundation Australia (schools in Uganda, A$4.8m) and Royal College Canada International (C$10.4m), both below or near the cut-off; CHESTRAD International (UK, under £20k).
+- **IATI:** one organisation ID (`NL-KVK-30285304`) is used by two publishers (Stichting Humana and Sympany+).
+
+**Spot checks** (well-known agencies, at the recommended cut-offs): present: International Rescue Committee, Mercy Corps, CARE USA, Save the Children (US and UK), World Vision (US, Australia, Canada), Oxfam (UK, Australia, Canada), Christian Aid, Plan International Canada, GIZ, the UK's Foreign, Commonwealth and Development Office, UNICEF national committees, CARE International. The first build missed four; each was fixed: Australian charities listing only Australia counted as overseas (the filter now needs another country); Oxfam Australia has no 2023 statement (now kept by its size band); World Vision, Plan International and CARE Canada work through partners and are not in schedule 2 (now also line 2100). Mercy Corps Europe is not on Scotland's register (correct). After the independent review the name filter, the US and Scottish filters and the blank Australian lines were corrected (see the review in the pull request); SCIAF (Scotland's Catholic aid agency) was checked to stay in.
+
+**Each row** (`register-candidates.csv`): source, the source's own ID, name, country, kind (type or category), website domain (IRS has no website), income and currency, income year, whether it meets the recommended cut-off, and a note. Nothing else is read from the files: no emails, phone numbers, addresses or people's names.
+
+## One ranked list of organisations (step D)
+
+Plan approved by the user on 4 November 2026, after asking how thorough it was and on what basis each point was decided (answered from the data measured first and the decisions already recorded). `tools/survey/dedupe.py` reads the committed files only (no network): the 6,349 register candidates, the 647 UNjobs entries (108 on the UN page, 539 on the other) and the 31 seed additions, 7,027 records, with the decisions in `source-survey/step-d-decisions.csv`. It writes `source-survey/organisations.csv`, one row per organisation, and `source-survey/step-d-review.csv`, the pairs still awaiting a decision (none). CI rebuilds the list and fails if the committed one differs.
+
+**Joined automatically, when certainly the same organisation** (joins that merged two groups, by rule):
+- the same registry number: an IATI identifier carrying a UK, Scottish, US, Canadian or Australian register number (`GB-CHC-1047501` is UK charity 1047501; US EINs with or without a hyphen) (130);
+- the same website, in the same country, with compatible names (similar words, or one is the other's acronym) (172); hosts shared by unrelated bodies (`gov.uk`, `facebook.com`, `sites.google.com`, `un.org`, `who.int` and others) never count as evidence, though one can still be shown as an organisation's website (`who.int` for WHO);
+- the same name in the same country, after case, accents, punctuation, legal forms ("Inc", "Ltd", "Stichting") and acronyms in brackets are set aside, and "UN" read as "United Nations"; a country in brackets stays part of the name, so "Médecins Sans Frontières (UK)" is the UK section (46);
+- the same acronym and a similar name where the countries do not differ ("WFP - World Food Programme" and "United Nations World Food Programme (WFP)") (12);
+- a UNjobs entry or seed addition with the same name as records in one country only (192), or as another UNjobs entry or seed addition (18); UNjobs' own repeats (4).
+
+**National affiliates stay separate, as one family:** records with the same website or the same distinctive name in different countries are kept apart (each usually has its own registration and careers site, the survey's unit of record) and given a family name taken from the words they share, or else the strongest member's name: 71 families (for example ActionAid, Save the Children, World Vision, WaterAid), and the UN Secretariat's departments and offices on UNjobs' UN page, which hire through one site, as the family "UN Secretariat (careers.un.org)" (44 organisations); 208 organisations in families in all. A recorded family decision renames a whole family or, as "none", removes it (three donor governments' foreign ministries are not one family).
+
+**Decided by the agent, each with its reason** (`step-d-decisions.csv`, 807 decisions, the user spot-checks a sample):
+- **120 joins** the rules could not make: a UNjobs entry or seed addition and the organisation it names, usually its headquarters (ACTED, MSF International in Geneva, the ICRC, Save the Children International, CIFF, FHI 360, whose legal name is Family Health International, Humanity & Inclusion, which IATI lists as the Handicap International Federation, Médecins du Monde France); the organisations' own US registrations (the ICRC, IITA, CIP, IISD, the Mastercard Foundation, the World Economic Forum and Chatham House); the same organisation registered twice under different names (Cesvi; ICCO, which merged into Cordaid; THET, now Global Health Partnerships).
+- **232 kept apart:** 45 pairs are different organisations (the Asia Foundation and the Asia Society; charity: water and Water.org); 180 are a separate national member, arm or fund of one network; 7 undo or prevent a join to a country office or a national registration (Kvinna till Kvinna's Jordan office, Partners In Health's Malawi office, Samaritan's Purse's Cambodia office, Médecins du Monde Canada, World Vision's US registration twice, NIMD's Central America office).
+- **4 names and 13 family labels:** Mercy Corps has operated as Prosper Global since 9 September 2026 (its announcement; the same organisation and legal identity), shown as "Prosper Global (formerly Mercy Corps)"; three foreign ministries named with their countries; the network's name for the ActionAid, CARE, Amref Health Africa and World Vision families.
+- **438 records excluded** as outside the target, with the reasons counted: churches, religious orders and religious bodies 126; donor funds and family or members' foundations that do not run aid work ("American Friends of …", donor-advised funds) 52; domestic social, youth and sport services (YMCAs, Age UK, Junior Achievement chapters) 39; missionary and evangelism bodies 36; companies outside aid (climate, software and finance companies on UNjobs' list, among them Zipline, Control Risks, Mozilla and Euroclear) 32; bodies working mainly on domestic issues in one country (US domestic policy institutes, for example) 31; industry, professional, standards and internet bodies 30; universities, colleges and schools, or parts of one (the user's rule) 21; science and space bodies 17; domestic health and medical research 16; arts, heritage and zoos 12; central banks and financial, food-safety or measurement bodies (the ECB, BIS, BIPM) 6; domestic environment 5; government bodies that report aid spending but do not run aid work 5; hospitals and health services (the user's rule) 4; political movements 2; lobbying and media monitoring 2; animal welfare 2. Reviewed by hand: every UNjobs entry, the Scottish "UK and overseas" candidates and the Canadian line-2100-only candidates (the noise step B recorded), the top 300 of the income tier, and every name that signals a category outside the target (245 matches). Kept when unsure, and kept when the work is aid: church development bodies in aid countries (Ethiopian Orthodox DICAC), faith-based agencies (Compassion, Tearfund, World Relief), national YWCAs in aid countries, donor ministries (bilateral agencies), international think tanks and environmental organisations.
+
+**Ranking:** hiring evidence first (UNjobs job count; ReliefWeb's counts join in step C), then income in US dollars (Federal Reserve G.5A, 2024 annual averages: £1 = $1.2781, A$1 = $0.6597, C$1 = $0.7300; used only for ordering), then the rest by name.
+
+**Result:** 5,915 organisations: 539 with hiring evidence (7,918 UNjobs jobs), 1,185 ranked by income, 4,191 listed only (mostly the IATI and EU entries, which carry no income); 4,487 with a website; 504 drawn from two or more sources. The top: International Rescue Committee (671 jobs), Prosper Global (formerly Mercy Corps) (234), UNICEF (227), Médecins Sans Frontières (197), IOM (173), FAO (147), the International Potato Center (145), UNDP (131), WFP (105), WWF (100). Each row: rank, an ID (its main record), name, acronym, family, kind, country, website, UNjobs jobs, income in dollars and where it comes from, the kind of evidence, every source record, and notes.
+
+**Independent review** (head `67ead74`): request changes, all taken. It read all 476 multi-source groups and found 3 wrong joins (about 0.6%; World Vision's seed joined to its US office, two Mouvement Européen branches, three Junior Achievement chapters), and about 30 missed duplicates in the top 600, among them seven UN agencies, because register names keep their acronym in brackets ("(WFP)") and "UN" was not read as "United Nations". Both are now handled in the code (acronyms read from every register; the acronym rule; a suggestion when a UNjobs name is a register name plus a country), and each missed pair is joined by rule or decision. Also taken: the six US registrations joined, more exclusions from the income and hiring tiers, the website column (shared hosts as a fallback; junk values dropped), names recased only from the registers that write in capitals, family labels, the join counts above (merges, not attempted pairs), and the UN Secretariat family. The re-review (head `a5c2e7e`): approve with changes; every earlier item confirmed resolved, the 12 joins of the acronym rule all correct; its changes taken: three more duplicates (People in Need, IFPIM, the Fossil Fuel Treaty) and Chatham House's US registration joined, 21 more exclusions from the income tier's top 300, the family labels above, and Australian and Scottish names recased.
+
+**Limits:** the listed-only tier (4,191, mostly the EU register's development NGOs and IATI publishers) was reviewed only by the name scan, not one by one; it ranks last and steps E and F will show which hire. Income is a register's latest year (2023 to 2025), converted at 2024 rates. Some international organisations are absent from the registers (Partners In Health's and Samaritan's Purse's head offices, outside the IRS group Q); they appear from UNjobs without income.
+
+**Other job boards, checked read-only on 4 November 2026** at the user's question, for more hiring evidence: none allows its employer data to be collected for another job site. Devex's user agreement forbids using the service to build a competing product; Impactpool's terms forbid scraping or copying platform data without permission; DevelopmentAid's daily limits exist "to prevent automated data extraction" and its API is for internal use only; DevNetJobs forbids reproducing its content without permission (and charges international organisations to post); UN Talent forbids copying or reproducing its material; Idealist forbids recording information about the service; CharityJob grants a limited licence for normal use; Bond's job board (every advert paid) allows reuse only with its consent; Guardian Jobs closed in October 2026. Decided by the user: no data from these boards, and no permission request for now. Hiring evidence comes from UNjobs (copied by hand by the user), ReliefWeb's API (step C) and employers' own sites (step F).
 
 ## Sources
 
@@ -51,7 +132,8 @@ Scripts for steps B to F go in a new `tools/survey/` folder that the backend nev
 - **UK: Charity Commission register (England and Wales).** Daily full extract, JSON or tab-separated, free ([download page](https://register-of-charities.charitycommission.gov.uk/en/register/full-register-download), checked). Income and website in the main `charity` file; email and phone dropped as the file is read (not checked). Open Government Licence (not checked). About 170,000 charities (not checked). The trustee file is never downloaded. Scotland and Northern Ireland have their own registers (open decision 2).
 - **Australia: ACNC register.** CSV or Excel, weekly (last 2 November 2026), Creative Commons Attribution 3.0 Australia ([data.gov.au](https://data.gov.au/data/dataset/acnc-register), checked). Income in the separate Annual Information Statement datasets. About 60,000 charities and a website column (not checked).
 - **Canada: CRA list of charities.** "2024 List of charities", CSV from charities' yearly returns, updated 4 October 2026: identification, financial data, a contact web address file ([open.canada.ca](https://open.canada.ca/data/en/dataset/80c00cdb-1358-415c-bb8b-0de7f12675b8), seen through search). Open Government Licence – Canada (seen through search). The directors file is never downloaded.
-- **Europe.** Not chosen yet (open decision 2). Candidate: the EU Transparency Register, about 17,000 organisations, daily XML or Excel, a non-governmental organisations category and a website column ([data.europa.eu](https://data.europa.eu/data/datasets/transparency-register?locale=en); size and columns from a third-party description, not checked). National registers vary.
+- **Scotland: OSCR register.** CSV in a zip from `oscr.org.uk/download/charity-register`, 24,982 rows (22,617 active): income, website, geographical spread and main operating location (checked by download, 4 November 2026). Its site refused one connection and answered the next.
+- **Europe: EU Transparency Register.** The June 2026 XML export: 17,424 organisations, each with a registration category, interests, head-office country and website; it also lists phone numbers and people, which are not read (checked by download). XML 1.1: references to control characters are removed before parsing.
 - **Network member lists**, as a final gap check: InterAction 170+ members (2024 post); ICVA about 175 (not checked); Bond 330+ members, its list only on request to its membership team ([Bond](https://www.bond.org.uk/about-us/), checked); VOICE and CHS Alliance not checked.
 
 ## Privacy rules
@@ -63,11 +145,9 @@ Scripts for steps B to F go in a new `tools/survey/` folder that the backend nev
 
 ## Open decisions (the user's)
 
-1. A size threshold per register (for example yearly income of at least £5m, US$10m, A$10m or C$10m). Without one the registers hold over 2 million organisations; the earlier estimate of 2,500 to 3,500 organisations predates the widening.
-2. Europe: the EU Transparency Register only, or named national registers; and whether Scotland and Northern Ireland join England and Wales.
-3. Finding careers pages without a paid search API: Common Crawl's index plus the agent's web search (proposed), or a paid search API with a key kept as a secret.
-4. Whether the step F script reuses the backend's fetch policy (recommended, since its addresses come from outside lists).
-5. UNjobs data in the private repository: names and counts (recommended) or names only.
-6. The ReliefWeb `appname`: requested or received (steps C and W-41 wait on it).
-7. The for-profit entries and the 19 proposed NGOs (step D).
-8. A provisional keyword-family set (UN, NGO, nonprofit, charity, humanitarian, international development) until the growth plan's families (section 4.5) are drafted.
+Settled on 4 November 2026 (see Target): the size threshold (income, as above; the user confirms the levels after seeing the counts); Europe (the EU Transparency Register; Scotland added; Northern Ireland not, for now); finding careers pages (Common Crawl and the agent's search); the step F script on the fetch policy; UNjobs names and counts kept; the for-profit entries and the 19 NGOs; the provisional keyword set.
+
+The income cut-offs: the user confirmed the recommended levels on 4 November 2026.
+
+Still open:
+1. The ReliefWeb `appname` (steps C and W-41 wait on it). ReliefWeb's request form (a Google Form linked from `apidoc.reliefweb.int`) asks for a name, organisation, purpose, preferred appname and website, and processes only official organisation email addresses (not Gmail or similar). On 4 November 2026 the agent filled it with the user's details but did not send it; the user expects the AidJobs domain and an address on it in about 8 or 9 days.

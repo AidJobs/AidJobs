@@ -57,6 +57,8 @@ export type ProxyCall = {
   /** An admin call: the browser's session goes with it (adminBackendFetch). */
   session?: SessionRequest;
   errorBody: ErrorBody;
+  /** A public answer that must not be stored by the browser or a cache (admin answers never are). */
+  noStore?: boolean;
 };
 
 /** A status the browser can be given with a JSON body or none; others would make Next throw. */
@@ -98,11 +100,13 @@ function backendMessage(status: number, parsed: unknown): string {
   return `The service failed (HTTP ${status}). Try again.`;
 }
 
-function answer(body: object | null, status: number, requestId: string | null, admin: boolean) {
+const ADMIN_CACHING = 'private, no-store';
+
+function answer(body: object | null, status: number, requestId: string | null, caching: string | null) {
   const response =
     body === null ? new NextResponse(null, { status }) : NextResponse.json(body, { status });
   if (requestId) response.headers.set('X-Request-ID', requestId);
-  if (admin) response.headers.set('Cache-Control', 'private, no-store');
+  if (caching) response.headers.set('Cache-Control', caching);
   return response;
 }
 
@@ -121,9 +125,10 @@ function hasDotSegment(path: string): boolean {
 
 export async function proxyToBackend(call: ProxyCall): Promise<NextResponse> {
   const admin = call.session !== undefined;
+  const caching = admin ? ADMIN_CACHING : call.noStore ? 'no-store' : null;
   if (hasDotSegment(call.path)) {
     logFailure(call.route, 'refused, a dot segment in the path', null);
-    return answer(call.errorBody(MESSAGES.invalidRequest, 'invalid-request', null), 400, null, admin);
+    return answer(call.errorBody(MESSAGES.invalidRequest, 'invalid-request', null), 400, null, caching);
   }
   const init: RequestInit = { method: call.method ?? 'GET' };
   if (call.body !== undefined) {
@@ -143,7 +148,7 @@ export async function proxyToBackend(call: ProxyCall): Promise<NextResponse> {
   } catch (error) {
     logFailure(call.route, `backend unreachable, ${errorCode(error)}`, null);
     const message = admin ? MESSAGES.adminUnavailable : MESSAGES.unavailable;
-    return answer(call.errorBody(message, 'unavailable', null), 503, null, admin);
+    return answer(call.errorBody(message, 'unavailable', null), 503, null, caching);
   }
 
   const requestId = requestIdOf(response);
@@ -152,30 +157,30 @@ export async function proxyToBackend(call: ProxyCall): Promise<NextResponse> {
     text = await response.text();
   } catch (error) {
     logFailure(call.route, `answer unreadable, ${errorCode(error)}`, requestId);
-    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, admin);
+    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, caching);
   }
 
   if (!passable(response.status)) {
     logFailure(call.route, `backend ${response.status} status not passed on`, requestId);
-    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, admin);
+    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, caching);
   }
 
   if (response.ok) {
     if (response.status === 204 || response.status === 205 || text === '') {
-      return answer(null, response.status, requestId, admin);
+      return answer(null, response.status, requestId, caching);
     }
     const parsed = parseJson(text);
     if (parsed.ok && parsed.value !== null && typeof parsed.value === 'object') {
-      return answer(parsed.value, response.status, requestId, admin);
+      return answer(parsed.value, response.status, requestId, caching);
     }
     logFailure(call.route, `backend ${response.status} answer not JSON`, requestId);
-    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, admin);
+    return answer(call.errorBody(MESSAGES.unreadable, 'unreadable', requestId), 502, requestId, caching);
   }
 
   const parsed = parseJson(text);
   logFailure(call.route, `backend ${response.status}`, requestId);
   const message = backendMessage(response.status, parsed.ok ? parsed.value : null);
-  return answer(call.errorBody(message, 'backend', requestId), response.status, requestId, admin);
+  return answer(call.errorBody(message, 'backend', requestId), response.status, requestId, caching);
 }
 
 /** The browser's JSON body, or a 400 with fixed text when it is not JSON. */
@@ -189,7 +194,9 @@ export async function readJsonBody(
   } catch {
     return {
       ok: false,
-      response: answer(errorBody(MESSAGES.invalidJson, 'invalid-request', null), 400, null, admin),
+      response: answer(
+        errorBody(MESSAGES.invalidJson, 'invalid-request', null), 400, null, admin ? ADMIN_CACHING : null
+      ),
     };
   }
 }

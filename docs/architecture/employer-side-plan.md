@@ -219,4 +219,17 @@ The chat is redesigned and built together with phase 3:
 
 **Visual revisions after the user's first look at phases 1 to 4 (4 November 2026, evening):** the closed right-hand rail is narrow (44 px, vertical labels) and disappears while a panel is open; the panel's header carries the switch between the JD outline and the chat; the chat box grows as you type, with the text above a slim row and a small, light Send button; Publish is smaller and light green rather than black, and so is the selected side-menu item; the active chat box has the same plain green border as the first screen.
 
-Open: the copy of this plan on `main` needs its own docs pull request when the user asks.
+**Order fix (4 November 2026, night):** the job description and the published job page always follow the JD outline's order. A section added from the outline or the chat goes at the end of its own group, not at the bottom; moving a section in the outline moves it in the document; jobs saved in the browser are put back in that order when the demo loads. No JD format's order changed.
+
+**Review of the two pages (5 November 2026):** an independent review of the first screen and the workspace found eight problems, all fixed, and two short re-reviews of the fixes found more, also fixed (demo commits `e2efdfa` to `52addf1`):
+- Undo never brings back old copies over later work.
+- Any real change to the text, outline, facts, JD format, commitments, How to apply, or closing date withdraws approvals and sends the job back to review; changes that change nothing keep them.
+- Reviewers cannot change a job by any route, but can open the outline and jump to sections.
+- "Edit it" on the base JD format offer does not bring the offer back.
+- Dialogs and menus manage focus.
+- The chat reads whole messages: tone, length, undo, and section requests are understood from their phrasing; thanks and requests it cannot act on change nothing; content sentences are added.
+- Also: a typed place gets its own country, "an Education Specialist", larger title target on phones, no delete on scheduled jobs, Enter in the place search.
+
+Checked in the browser at 1366, 412, 390, and 360 px, in light and dark mode, including the phone sheets and dragging sections.
+
+This section was copied to `main` on 5 November 2026 with the shared tooltip fix (Item 2, A). The side menu's footer slot stays on the demo branch until the employer side is built.

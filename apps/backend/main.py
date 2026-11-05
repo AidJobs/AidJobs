@@ -22,6 +22,7 @@ from app.errors import (  # noqa: E402
     log_failure,
 )
 from app.config import Capabilities
+from app.db_health import db_check
 from app.search import search_service
 from app.sources import router as sources_router
 from app.analytics import analytics_tracker
@@ -232,13 +233,13 @@ async def search_status():
 
 
 @app.get("/api/db/status")
-async def db_status():
-    """Get database status with job count (public endpoint, production-safe)"""
+async def db_status(response: Response):
+    """Whether the database answers: {"ok": true} or a fixed failure (public; stage 7)."""
+    response.headers["Cache-Control"] = "no-store"
     try:
-        result = await search_service.get_db_status()
-        return result
+        return await db_check.status()
     except Exception as e:
-        logger.error(f"[api/db/status] Error: {e}", exc_info=True)
+        logger.error("[api/db/status] Error: %s", type(e).__name__)
         return {
             "ok": False,
             "error": "Failed to get database status"
@@ -386,7 +387,7 @@ async def get_job_by_id(job_id: str):
 
 @app.get("/api/admin/db/status")
 async def admin_db_status(admin: str = Depends(admin_required)):
-    """Database status for the admin dashboard."""
+    """Database status for the admin dashboard: the counts and the open jobs per source."""
     return await search_service.get_db_status()
 
 

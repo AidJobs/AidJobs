@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 import app.job_management as job_management
 import app.search as search
 import main as main_module
+from app.db_health import DatabaseCheck
 from main import app
 
 SECRET_DETAIL = "detail-that-must-not-leak"
@@ -134,21 +135,41 @@ def _failing_connect(message):
 
 
 @pytest.mark.parametrize("env", ["dev", "production"])
-def test_public_db_status_hides_driver_errors(monkeypatch, env):
+def test_public_db_status_hides_driver_errors(monkeypatch, env, caplog):
     monkeypatch.setenv("AIDJOBS_ENV", env)
+    monkeypatch.setattr(search.db_config, "supabase_db_url", "postgresql://probe@127.0.0.1:1/postgres")
     monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
     monkeypatch.setattr(search.psycopg2, "connect", _failing_connect(DRIVER_ERROR))
-    monkeypatch.setattr(main_module, "search_service", _db_service())
+    monkeypatch.setattr(main_module, "db_check", DatabaseCheck())
 
-    response = TestClient(app).get("/api/db/status")
+    with caplog.at_level("ERROR"):
+        response = TestClient(app).get("/api/db/status")
 
     assert response.status_code == 200
     assert response.json() == {"ok": False, "error": "Database unavailable"}
     for marker in LEAK_MARKERS:
         assert marker not in response.text
+    if env == "production":
+        for marker in LEAK_MARKERS:
+            assert marker not in caplog.text
 
 
-def test_db_status_log_masks_connection_strings(monkeypatch, caplog):
+def test_admin_db_status_logs_only_the_failure_type_in_production(monkeypatch, caplog):
+    monkeypatch.setenv("AIDJOBS_ENV", "production")
+    monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
+    monkeypatch.setattr(search.psycopg2, "connect", _failing_connect(DRIVER_ERROR))
+
+    with caplog.at_level("ERROR", logger=search.logger.name):
+        result = asyncio.run(_db_service().get_db_status())
+
+    assert result == {"ok": False, "error": "Database unavailable"}
+    assert "Database status check failed: OperationalError" in caplog.text
+    for marker in LEAK_MARKERS:
+        assert marker not in caplog.text
+
+
+def test_db_status_log_masks_connection_strings_in_development(monkeypatch, caplog):
+    monkeypatch.setenv("AIDJOBS_ENV", "dev")
     fake_password = "fake" + "-test-value"
     address = "postgresql" + "://user:" + fake_password + "@db.example.internal:5432/postgres"
     monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
@@ -192,7 +213,8 @@ class _StatusConn:
         pass
 
 
-def test_db_status_success_is_unchanged(monkeypatch):
+def test_admin_db_status_detail_is_unchanged(monkeypatch):
+    """The admin dashboard's answer (/api/admin/db/status) keeps its counts and per-source list."""
     monkeypatch.setattr(search.db_config, "get_connection_params", lambda: {"host": "test"})
     monkeypatch.setattr(search.psycopg2, "connect", lambda **kwargs: _StatusConn())
 

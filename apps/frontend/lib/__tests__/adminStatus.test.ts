@@ -1,4 +1,5 @@
 import {
+  adminErrorMessage,
   aiKeyStatus,
   COUNT_LABELS,
   databaseStatus,
@@ -180,6 +181,21 @@ describe('Settings', () => {
     expect(meiliSetupStatus('fail', null)).toEqual({ text: 'Not responding', tone: 'error' });
     expect(meiliSetupStatus('warn', { enabled: false, error: 'Meilisearch client not initialized' }).tone).toBe('warn');
     expect(meiliSetupStatus('ok', { enabled: true }).text).toBe('Connected');
+  });
+});
+
+describe('Admin failure messages', () => {
+  it('reads the message of an admin proxy\'s failure answer', () => {
+    const body = { status: 'error', error: 'Authentication required', detail: 'Authentication required' };
+    expect(adminErrorMessage(JSON.stringify(body))).toBe('Authentication required');
+    expect(adminErrorMessage(JSON.stringify({ detail: ' Not found ' }))).toBe('Not found');
+  });
+
+  it('gives nothing for text that is not such an answer', () => {
+    expect(adminErrorMessage('<html>Bad gateway</html>')).toBeNull();
+    expect(adminErrorMessage('')).toBeNull();
+    expect(adminErrorMessage('null')).toBeNull();
+    expect(adminErrorMessage(JSON.stringify({ error: 42 }))).toBeNull();
   });
 });
 
