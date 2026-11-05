@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2,
 import { useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
-import { acceptFreeTerms, amplifyLive, approvalRequired, askToPay, buy, cancelPayRequest, canSkipApproval, completePayRequest, isApproved, overrideApproval, publish, remindPayer, type Paid } from './actions';
+import { acceptFreeTerms, amplifyLive, approvalRequired, askToPay, buy, cancelPayRequest, canSkipApproval, completePayRequest, isApproved, overrideApproval, publish, remindPayer, scheduleBlock, type Paid } from './actions';
 import {
   BADGE,
   BADGE_TIP,
@@ -35,7 +35,7 @@ import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, notify, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
-import { DemoMark, Dialog, Field, inputStyle, isEmail, OrgMark } from './ui';
+import { DemoMark, Dialog, Field, inputStyle, isEmail, OrgMark, radioKeys } from './ui';
 
 export function jobUrl(j: DemoJob): string {
   return `https://aidjobs.app/jobs/${slug(j.facts.title || 'job')}-${j.id.slice(-4)}`;
@@ -60,24 +60,32 @@ export function shareMessage(j: DemoJob, org: Org): string {
   ].join('\n');
 }
 
-function Lines({ lines }: { lines: string[] }) {
+/** A section's lines; in a language version, `english` holds the English lines, and a line still word for word in English is marked as English. */
+function Lines({ lines, english }: { lines: string[]; english?: string[] }) {
   const out: ReactNode[] = [];
-  let list: string[] = [];
+  let list: Array<{ text: string; en: boolean }> = [];
+  const lang = (en: boolean) => (en ? 'en' : undefined);
+  const items = () => list.map((x, k) => (
+    <li key={k} dir="auto" lang={lang(x.en)}>
+      {x.text}
+    </li>
+  ));
   lines.forEach((l, i) => {
-    if (l.startsWith('- ')) list.push(l.slice(2));
+    const en = Boolean(english && english[i] === l && /[a-z]{3}/i.test(l));
+    if (l.startsWith('- ')) list.push({ text: l.slice(2), en });
     else {
       if (list.length) {
-        out.push(<ul key={`u${i}`}>{list.map((x, k) => <li key={k} dir="auto">{x}</li>)}</ul>);
+        out.push(<ul key={`u${i}`}>{items()}</ul>);
         list = [];
       }
       out.push(
-        <p key={i} dir="auto">
+        <p key={i} dir="auto" lang={lang(en)}>
           {l}
         </p>,
       );
     }
   });
-  if (list.length) out.push(<ul key="uend">{list.map((x, k) => <li key={k} dir="auto">{x}</li>)}</ul>);
+  if (list.length) out.push(<ul key="uend">{items()}</ul>);
   return <>{out}</>;
 }
 
@@ -159,7 +167,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
       {sections.map((sec) => (
         <section key={sec.key}>
           <h3>{sec.title}</h3>
-          <Lines lines={sec.lines} />
+          <Lines lines={sec.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.lines : undefined} />
         </section>
       ))}
       {job.commitments.length > 0 && (
@@ -197,7 +205,7 @@ export function JobPageLangs({ job, s, drafts = false, share = false }: { job: D
   return (
     <div className="flex flex-col gap-3">
       {shown.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Language of the job page">
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Language of the job page">
           <button type="button" role="radio" aria-checked={!current} className="aj-pill" data-active={!current} style={{ height: 28 }} onClick={() => setLang(null)}>
             English
           </button>
@@ -443,7 +451,7 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
               <span className="aj-muted">Invitations: {deliveryText(job.reach?.candidates.filter((r) => r.round === round.n) ?? [])}</span>
               <span className="aj-muted">Team: {deliveryText(job.reach?.team.filter((r) => r.round === round.n) ?? [])}</span>
               <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                {round.sendsOn ? `Sent on ${longDate(round.sendsOn)}, when the job goes live.` : 'Simulated.'} The job is published either way: an email that fails never unpublishes it.
+                {round.sendsOn && job.status === 'scheduled' ? `Sends on ${longDate(round.sendsOn)}, when the job goes live.` : 'Simulated.'} The job is published either way: an email that fails never unpublishes it.
               </span>
             </>
           ) : (
@@ -662,7 +670,10 @@ export default function Publish({ id }: { id?: string }) {
   const payKey: PackageKey | 'extra' = pkg === 'one' ? single.key : pkg;
   const blocked = !upgrade && approvalRequired(s, job) && !isApproved(job);
   const request = job.payRequest;
-  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
+  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  /** The 1st of a month is offered for a free job only when the job is still open then. */
+  const freeFrom = (first: string) => canGoFree(s, job.id, first) && !scheduleBlock(s, job, first);
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
@@ -735,7 +746,7 @@ export default function Publish({ id }: { id?: string }) {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
         <section className="order-2 flex min-w-0 flex-col gap-3 lg:order-1" aria-label="Preview">
           <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} />
-          <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" aria-label="Preview">
+          <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" onKeyDown={radioKeys} aria-label="Preview">
             {views.map(([k, l]) => (
               <button key={k} type="button" role="radio" aria-checked={view === k} data-active={view === k} onClick={() => setView(k)}>
                 {l}
@@ -800,7 +811,7 @@ export default function Publish({ id }: { id?: string }) {
                     Publish free instead
                   </button>
                 )}
-                {!upgrade && !canGoFree(s, job.id, null) && canGoFree(s, job.id, nextFirst) && (
+                {!upgrade && !canGoFree(s, job.id, null) && freeFrom(nextFirst) && (
                   <button
                     type="button"
                     className="aj-pill"
@@ -817,7 +828,7 @@ export default function Publish({ id }: { id?: string }) {
             </div>
           )}
 
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Free or Amplify">
+          <div className="flex flex-col gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Free or Amplify">
             {!upgrade && (
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
@@ -827,7 +838,7 @@ export default function Publish({ id }: { id?: string }) {
                 {!freeOk && (
                   <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
                     <span>Both free jobs for {monthName(month)} are used.</span>
-                    {canGoFree(s, job.id, firstOfNextMonth(month)) && (
+                    {freeFrom(firstOfNextMonth(month)) && (
                       <button
                         type="button"
                         className="aj-pill"
@@ -867,8 +878,8 @@ export default function Publish({ id }: { id?: string }) {
                       Hiring more? Plan ahead and pay less per job
                     </button>
                     {plansOpen && (
-                      <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Packages">
-                        {PACKAGES.filter((p) => !(p.key === 'always' && subscribed)).map((p) => {
+                      <div className="flex flex-col gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Packages">
+                        {PACKAGES.filter((p) => !(p.key === 'always' && s.subscription)).map((p) => {
                           const extra = p.key === 'one' && single.key === 'extra';
                           return (
                             <button

@@ -127,6 +127,8 @@ export type Review = {
   sent?: Section[];
   before?: Section[];
   reminded?: number;
+  /** The owner's reason for skipping approval; written to the history as "published without approval" only once it is published. */
+  skipped?: string;
 };
 
 /** "Ask to pay": the person who holds the card gets a link; the job publishes once they have paid. */

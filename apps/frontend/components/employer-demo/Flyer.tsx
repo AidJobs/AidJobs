@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { inOutlineOrder } from './engine';
 import { countryName, LANGS, langOf, localDate, stale, term, ui } from './translate';
 import type { DemoJob, Lang, State } from './types';
-import { Dialog, OrgMark } from './ui';
+import { Dialog, OrgMark, radioKeys } from './ui';
 
 /** A QR code drawn as one SVG path, so it prints sharply at any size. */
 export function QrCode({ text, size = 132, label }: { text: string; size?: number; label: string }) {
@@ -106,7 +106,7 @@ export function FlyerDialog({ job, s, url, onClose }: { job: DemoJob; s: State; 
       }
     >
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Language of the notice">
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Language of the notice">
           <button type="button" role="radio" aria-checked={!lang} className="aj-pill" data-active={!lang} onClick={() => setLang(null)}>
             English
           </button>

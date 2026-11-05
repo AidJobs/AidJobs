@@ -124,7 +124,7 @@ function briefing(s: State): Brief[] {
     }
   }
   for (const j of s.jobs) {
-    if (j.payRequest) {
+    if (j.payRequest && j.status !== 'closed') {
       const req = j.payRequest;
       out.push({
         id: `pay-${j.id}`,

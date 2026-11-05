@@ -2,7 +2,7 @@
 
 import { BellRing, Check, Send, UserCheck, X } from 'lucide-react';
 import { useState } from 'react';
-import { addRemark, approvalRequired, changedSinceLastRound, remindReviewers, restoreVersion, reviewerDecision, sendForReview, settleRemark } from './actions';
+import { addRemark, approvalRequired, changedSinceLastRound, isReviewable, remindReviewers, restoreVersion, reviewerDecision, sendForReview, settleRemark } from './actions';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { statusLine } from './Home';
 import { update } from './store';
@@ -136,7 +136,11 @@ export function ReviewerBar({ job, s }: { job: DemoJob; s: State }) {
           </span>
         )}
       </div>
-      <span className="aj-muted">Comment or suggest on any section, here or on the section itself, then decide. {job.review.due ? `Answer by ${longDate(job.review.due)}.` : ''}</span>
+      <span className="aj-muted">
+        {isReviewable(job)
+          ? `Comment or suggest on any section, here or on the section itself, then decide. ${job.review.due ? `Answer by ${longDate(job.review.due)}.` : ''}`
+          : 'This job is already published. Your answer goes to the author and into its history; it does not change the published job.'}
+      </span>
       <textarea style={{ ...inputStyle, minHeight: 56 }} placeholder="A note for the author (optional)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Note for the author" />
       <div className="flex flex-wrap gap-1.5">
         <button type="button" className="aj-ink-btn" onClick={() => reviewerDecision(job.id, 'approved', note)}>
@@ -257,11 +261,12 @@ export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend
         <p className="aj-muted" style={{ margin: 0 }}>
           {required ? 'Your organisation asks for approval on this job before it is published.' : 'Review is optional: ask colleagues, or someone outside with a private link, to comment and approve.'}
         </p>
-        {!reviewing && job.sections.length > 0 && (
+        {!reviewing && job.sections.length > 0 && isReviewable(job) && (
           <button type="button" className="aj-ink-btn self-start" onClick={onSend}>
             <Send size={14} strokeWidth={2} /> Send for review
           </button>
         )}
+        {!isReviewable(job) && <span className="aj-faint">Review happens before publishing; this job is already {job.status === 'closed' ? 'closed' : 'published'}.</span>}
       </div>
     );
   }
@@ -328,7 +333,7 @@ export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend
         )}
       </div>
       {reviewing && job.sections.length > 0 && <AddRemark job={job} />}
-      {!reviewing && (job.review.state === 'changes' || (job.review.state === 'open' && job.review.reviewers.some((r) => r.decision === 'changes'))) && (
+      {!reviewing && isReviewable(job) && (job.review.state === 'changes' || job.review.reviewers.some((r) => r.decision === 'changes')) && (
         <div className="flex flex-col gap-1.5">
           <span className="aj-muted">When you have made the changes, send it back: the reviewers see only what changed.</span>
           <button type="button" className="aj-ink-btn self-start" onClick={onSend}>

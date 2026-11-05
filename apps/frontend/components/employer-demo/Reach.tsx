@@ -7,7 +7,7 @@ import { longDate } from './engine';
 import { deliveryText, planCount, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf, SUPPRESSED } from './invites';
 import { notify } from './store';
 import type { DemoJob, Message, ReachPlan, State } from './types';
-import { Dialog, RecipientInput } from './ui';
+import { Dialog, radioKeys, RecipientInput } from './ui';
 
 function rows(text: string): number {
   return Math.max(2, text.split('\n').length + 1);
@@ -109,7 +109,7 @@ export function ReachDialog({ job, s, mode, why = 'Invited more', momentKey, sen
       }
     >
       <div className="flex flex-col gap-3">
-        <div className="aj-switch self-start" role="radiogroup" aria-label="Which email">
+        <div className="aj-switch self-start" role="radiogroup" onKeyDown={radioKeys} aria-label="Which email">
           <button type="button" role="radio" aria-checked={tab === 'candidate'} data-active={tab === 'candidate'} onClick={() => setTab('candidate')}>
             Invite people to apply · {candidates.length}
           </button>

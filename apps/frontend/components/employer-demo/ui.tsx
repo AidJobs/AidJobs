@@ -1,11 +1,25 @@
 'use client';
 
 import { Sparkles, Undo2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { dismissNotice, undo, useDemo } from './store';
 import type { DemoJob, JobStatus } from './types';
+
+/** Arrow keys move between the options of a radio group and choose the one they land on; nested groups keep their own options. */
+export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
+  const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+  if (!forward && e.key !== 'ArrowLeft' && e.key !== 'ArrowUp') return;
+  const group = e.currentTarget;
+  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled])')].filter((r) => r.closest('[role="radiogroup"]') === group);
+  const at = radios.indexOf(document.activeElement as HTMLElement);
+  if (at < 0) return;
+  e.preventDefault();
+  const next = radios[(at + (forward ? 1 : -1) + radios.length) % radios.length];
+  next.focus();
+  next.click();
+}
 
 export function DemoMark({ label = 'Demo · sample data' }: { label?: string }) {
   return (

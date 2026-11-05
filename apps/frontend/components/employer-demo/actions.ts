@@ -74,7 +74,7 @@ function reopenApproval(j: DemoJob): DemoJob {
   return {
     ...j,
     status: j.status === 'approved' ? 'review' : j.status,
-    review: { ...j.review, state: j.review.state === 'none' ? 'none' : 'open', approvedVersion: undefined, reviewers: j.review.reviewers.map((r) => (r.decision === 'approved' ? { ...r, decision: undefined } : r)) },
+    review: { ...j.review, state: j.review.state === 'none' ? 'none' : 'open', approvedVersion: undefined, skipped: undefined, reviewers: j.review.reviewers.map((r) => (r.decision === 'approved' ? { ...r, decision: undefined } : r)) },
   };
 }
 
@@ -561,13 +561,25 @@ export function buy(key: PackageKey | 'extra', jobTitle = '') {
   });
 }
 
+/** A cancelled subscription can be resumed before it ends, keeping this month's jobs; buying again would replace them. */
+export function resumeSubscription() {
+  update((s) => (s.subscription?.cancelled ? { ...s, subscription: { ...s.subscription, cancelled: false }, notice: { text: `Resumed. It renews on ${longDate(s.subscription.renews)}.` } } : s));
+}
+
 export function cancelSubscription() {
   update((s) =>
     s.subscription ? { ...s, subscription: { ...s.subscription, cancelled: true }, notice: { text: `Cancelled. This month's jobs stay until ${longDate(s.subscription.renews)}, and nothing more is charged.` } } : s,
   );
 }
 
+/** Review happens before publishing: a live, scheduled, or closed job is not sent for review. */
+export function isReviewable(j: DemoJob): boolean {
+  return j.status === 'draft' || j.status === 'review' || j.status === 'approved';
+}
+
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
+  const j0 = getState().jobs.find((x) => x.id === id);
+  if (!j0 || !isReviewable(j0)) return;
   update((s0) => {
     const s = useFree(s0, id);
     const j = s.jobs.find((x) => x.id === id);
@@ -612,15 +624,35 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
     if (!j) return s;
     const reviewers = j.review.reviewers.map((r) => (r.name === name ? { ...r, decision, note } : r));
     const next: DemoJob = { ...j, review: { ...j.review, reviewers } };
-    const approved = isApproved(next);
-    next.review.state = decision === 'changes' ? 'changes' : approved ? 'approved' : 'open';
+    const approved = isApproved({ ...next, review: { ...next.review, state: 'open' } });
+    // Under "any one reviewer", an approval already given stands; a later request for changes is a note for the author.
+    next.review.state = approved ? 'approved' : decision === 'changes' ? 'changes' : 'open';
     if (approved) next.review.approvedVersion = j.versions.length;
-    next.status = approved ? 'approved' : 'review';
+    // A late answer on a job already published is recorded for the author; it never takes the job off the site.
+    if (isReviewable(j)) next.status = approved ? 'approved' : 'review';
     next.audit = [...j.audit, { at: Date.now(), who: name, what: decision === 'approved' ? `Approved version ${j.versions.length}` : 'Requested changes' }];
     return {
       ...s,
       jobs: s.jobs.map((x) => (x.id === id ? next : x)),
-      inbox: [{ id: `i${Date.now()}`, kind: decision === 'approved' ? 'approved' : 'changes', jobId: id, title: `${name.split(' ')[0]} ${decision === 'approved' ? 'approved' : 'requested changes on'} ${j.facts.title}`, body: note || (decision === 'approved' ? 'Ready to publish.' : 'See the comments on the sections.'), at: Date.now() }, ...s.inbox],
+      inbox: [
+        {
+          id: `i${Date.now()}`,
+          kind: decision === 'approved' ? 'approved' : 'changes',
+          jobId: id,
+          title: `${name.split(' ')[0]} ${decision === 'approved' ? 'approved' : 'requested changes on'} ${j.facts.title}`,
+          body:
+            note ||
+            (!isReviewable(j)
+              ? 'The job is already published; their answer is in its history.'
+              : decision === 'approved'
+                ? 'Ready to publish.'
+                : approved
+                  ? 'An approval already given still stands under your rule; see the comments on the sections.'
+                  : 'See the comments on the sections.'),
+          at: Date.now(),
+        },
+        ...s.inbox,
+      ],
       notice: { text: decision === 'approved' ? 'Approval sent (simulated)' : 'Changes requested (simulated)' },
     };
   });
@@ -718,13 +750,21 @@ export function overrideApproval(id: string, reason: string): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || !canSkipApproval(s, j) || reason.trim().length < 5) return false;
-  const asked = j.review.reviewers.map((r) => r.name.split(' ')[0]);
   update((st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'approved', review: { ...x.review, state: 'approved' }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Published without approval. Reason: "${reason.trim()}"` }] } : x)),
-    notice: asked.length ? { text: `${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told it was published without their approval (simulated).` } : st.notice,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'approved', review: { ...x.review, state: 'approved', skipped: reason.trim() }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Approval skipped by the owner. Reason: "${reason.trim()}"` }] } : x)),
   }));
   return true;
+}
+
+/** When a job whose approval was skipped is published: the history says so, and the reviewers asked are told. */
+function skippedOnPublish(x: DemoJob, me: string): { audit: DemoJob['audit']; notice?: string } {
+  if (!x.review.skipped) return { audit: x.audit };
+  const asked = x.review.reviewers.map((r) => r.name.split(' ')[0]);
+  return {
+    audit: [...x.audit, { at: Date.now(), who: me, what: `Published without approval. Reason: "${x.review.skipped}"${asked.length ? `; ${asked.join(' and ')} told (simulated)` : ''}` }],
+    notice: asked.length ? `${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told it was published without their approval (simulated).` : undefined,
+  };
 }
 
 /**
@@ -735,12 +775,23 @@ export type Paid = 'direct' | 'onHand';
 
 export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid };
 
+/** A publishing date must be from tomorrow, and before the job closes; the date picker's limits alone can be typed past. */
+export function scheduleBlock(s: State, j: DemoJob, schedule: string | null): string | null {
+  if (!schedule) return null;
+  if (schedule <= isoDay(s.today)) return 'Choose a date from tomorrow';
+  if (j.facts.deadline && schedule >= j.facts.deadline) return 'It would close before it goes live';
+  return null;
+}
+
 /** Whether the job can be published with these options; the reason when it cannot. */
 export function publishBlock(s: State, id: string, o: PublishOptions): string | null {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs) return 'Only your organisation can publish';
   if (j.status === 'live' || j.status === 'scheduled' || j.status === 'closed') return 'Already published';
   if (approvalRequired(s, j) && !isApproved(j)) return 'Waiting for approval';
+  const block = scheduleBlock(s, j, o.schedule);
+  if (block) return block;
+  if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
   if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
   if (o.plan === 'amplify' && !o.paid) return 'Not paid';
   if (o.plan === 'amplify' && o.paid === 'onHand' && !nextPaidJob(s)) return 'No paid job on hand';
@@ -765,29 +816,31 @@ function reachAtGoLive(j: DemoJob, sendsOn: string | null): Partial<DemoJob> {
 export function publish(id: string, o: PublishOptions): boolean {
   if (publishBlock(getState(), id, o)) return false;
   let sending = false;
+  let told: string | undefined;
   update((s0) => {
     let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand') s = takePaidJob(s);
     const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
-    return {
-      ...s,
-      jobs: s.jobs.map((x) => {
-        if (x.id !== id) return x;
-        const next: DemoJob = {
-          ...x,
-          status: o.schedule ? 'scheduled' : 'live',
-          plan: o.plan,
-          scheduledFor: o.schedule ?? undefined,
-          publishedAt: o.schedule ? undefined : Date.now(),
-          payRequest: undefined,
-          audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
-        };
-        if (o.plan !== 'amplify') return next;
-        const reach = reachAtGoLive(next, o.schedule);
-        sending = Boolean(reach.reach && !o.schedule);
-        return { ...next, ...reach };
-      }),
-    };
+    const jobs = s.jobs.map((x) => {
+      if (x.id !== id) return x;
+      const skipped = skippedOnPublish(x, s.me.name);
+      told = skipped.notice;
+      const next: DemoJob = {
+        ...x,
+        status: o.schedule ? 'scheduled' : 'live',
+        plan: o.plan,
+        scheduledFor: o.schedule ?? undefined,
+        publishedAt: o.schedule ? undefined : Date.now(),
+        payRequest: undefined,
+        review: { ...x.review, skipped: undefined },
+        audit: [...skipped.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
+      };
+      if (o.plan !== 'amplify') return next;
+      const reach = reachAtGoLive(next, o.schedule);
+      sending = Boolean(reach.reach && !o.schedule);
+      return { ...next, ...reach };
+    });
+    return { ...s, jobs, notice: told ? { text: told } : s.notice };
   });
   if (sending) simulateDelivery(id);
   return true;
@@ -936,7 +989,7 @@ export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', t
   const label = reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early';
   changeWithUndo(`${j.facts.title}: ${label.toLowerCase()}${tellReach ? '; the people it was shared with are told (simulated)' : ''}`, (st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'closed', closedAt: st.today, closeReason: reason, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: label }] } : x)),
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'closed', closedAt: st.today, closeReason: reason, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: label }] } : x)),
     inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)),
   }));
 }
@@ -980,6 +1033,8 @@ export function hireAgain(id: string, place?: string): string | null {
     translations: undefined,
     reachPlan: undefined,
     reachDismissed: undefined,
+    reachReminders: undefined,
+    scheduledFor: undefined,
     payRequest: undefined,
     lastChange: undefined,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
@@ -1077,7 +1132,7 @@ export function runIntent(intent: NonNullable<Intent>): string | null {
   if (intent.kind === 'close') {
     changeWithUndo(intent.summary.replace('Close', 'Closed').replace(' now', ''), (st) => ({
       ...st,
-      jobs: st.jobs.map((j) => (intent.jobIds.includes(j.id) ? { ...j, status: 'closed', closedAt: st.today, closeReason: 'early', audit: [...j.audit, { at: Date.now(), who: st.me.name, what: 'Closed early from the chat' }] } : j)),
+      jobs: st.jobs.map((j) => (intent.jobIds.includes(j.id) ? { ...j, status: 'closed', closedAt: st.today, closeReason: 'early', payRequest: undefined, audit: [...j.audit, { at: Date.now(), who: st.me.name, what: 'Closed early from the chat' }] } : j)),
     }));
     return null;
   }

@@ -10,6 +10,7 @@ import {
   buy,
   cancelPayRequest,
   cancelSubscription,
+  closeJob,
   canSkipApproval,
   changedSinceLastRound,
   completePayRequest,
@@ -18,6 +19,7 @@ import {
   editSection,
   editTranslation,
   extend,
+  hireAgain,
   isApproved,
   markGenuine,
   overrideApproval,
@@ -29,6 +31,7 @@ import {
   removeTranslation,
   reorderSections,
   restoreVersion,
+  resumeSubscription,
   reviewerDecision,
   reviewTranslation,
   saveEditedBase,
@@ -46,7 +49,7 @@ import {
 } from '../../components/employer-demo/actions';
 import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
 import { statusLine } from '../../components/employer-demo/Home';
-import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed } from '../../components/employer-demo/invites';
+import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
@@ -391,8 +394,18 @@ describe('publishing without approval', () => {
     expect(canSkipApproval(getState(), job(id))).toBe(true);
     expect(overrideApproval(id, 'no')).toBe(false);
     expect(overrideApproval(id, 'The donor deadline is today')).toBe(true);
-    expect(job(id).audit.at(-1)?.what).toContain('Published without approval. Reason: "The donor deadline is today"');
+    expect(job(id).audit.at(-1)?.what).toBe('Approval skipped by the owner. Reason: "The donor deadline is today"');
+    expect(job(id).audit.some((a) => a.what.startsWith('Published without approval'))).toBe(false);
     expect(publish(id, { plan: 'free', schedule: null })).toBe(true);
+    expect(job(id).audit.some((a) => a.what.startsWith('Published without approval. Reason: "The donor deadline is today"'))).toBe(true);
+  });
+
+  it('a skipped approval is reset by a later change, and is not "published" until it is', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    overrideApproval(id, 'The donor deadline is today');
+    editSection(id, job(id).sections[1].key, 'Changed after skipping');
+    expect(job(id).review.skipped).toBeUndefined();
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: null })).toBe('Waiting for approval');
   });
 
   it('"Nobody can skip approval" removes the override', () => {
@@ -651,6 +664,102 @@ describe('Ask to pay', () => {
     expect(job('job-fin').payRequest).toBeUndefined();
     update((s) => ({ ...s, reviewerAs: 'amina' }));
     expect(askToPay('job-fin', request)).toBe(false);
+  });
+});
+
+describe('fixes from the round 4 review', () => {
+  const amina = [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }];
+  const asReviewer = (id: string, fn: () => void) => {
+    update((s) => ({ ...s, reviewerAs: id }));
+    fn();
+    update((s) => ({ ...s, reviewerAs: null }));
+  };
+
+  it('1. a reviewer answering after the job is published never takes it off the site', () => {
+    sendForReview('job-comms', amina, '2026-12-01', 'any', '');
+    expect(publish('job-comms', { plan: 'free', schedule: null })).toBe(true);
+    asReviewer('amina', () => reviewerDecision('job-comms', 'changes', 'Too late'));
+    expect(job('job-comms').status).toBe('live');
+    expect(getState().inbox[0].body).toBe('Too late');
+  });
+
+  it('2. a scheduled or live job is not sent for review', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    publish(id, { plan: 'free', schedule: isoDay(getState().today + 3 * 86_400_000) });
+    sendForReview(id, amina, '2026-12-01', 'any', '');
+    expect(job(id).status).toBe('scheduled');
+  });
+
+  it('3 and 5. a schedule date in the past, today, or on or after the closing date is refused', () => {
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 1 week');
+    const day = (n: number) => isoDay(getState().today + n * 86_400_000);
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: day(-40) })).toBe('Choose a date from tomorrow');
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: day(0) })).toBe('Choose a date from tomorrow');
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: job(id).facts.deadline })).toBe('It would close before it goes live');
+    expect(publish(id, { plan: 'free', schedule: day(-40) })).toBe(false);
+    expect(getState().freeUses.some((u) => u.jobId === id)).toBe(false);
+    expect(publishBlock(getState(), id, { plan: 'free', schedule: day(2) })).toBeNull();
+  });
+
+  it('6. Ask to pay charges nothing when the job can no longer be published', () => {
+    askToPay('job-fin', { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one', amount: 'US$28.40', item: 'Amplify: Finance Officer', schedule: null });
+    editSection('job-fin', 'responsibilities', '- Changed after the request');
+    const receipts = getState().receipts.length;
+    expect(completePayRequest('job-fin')).toBe(false);
+    expect(getState().receipts.length).toBe(receipts);
+    expect(job('job-fin').status).toBe('review');
+  });
+
+  it('7. closing a job closes its payment request', () => {
+    askToPay('job-meal', { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one', amount: 'US$28.40', item: 'Amplify: MEAL Coordinator', schedule: null });
+    closeJob('job-meal', 'early');
+    expect(job('job-meal').payRequest).toBeUndefined();
+  });
+
+  it('9. undo puts a job back but never "unsends" Reach emails', () => {
+    const sampleDeadline = job('job-cps').facts.deadline;
+    setReachPlan('job-cps', { ...planFor(job('job-cps'), getState().org), candidates: ['new@example.org'] });
+    sendReach('job-cps', 'Invited more');
+    extend('job-cps', 7);
+    update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === 'job-cps' && x.reach ? { ...x, reach: { ...x.reach, candidates: x.reach.candidates.map((r) => ({ ...r, status: 'sent' as const })) } } : x)) }), true);
+    undo();
+    expect(job('job-cps').facts.deadline).toBe(sampleDeadline);
+    expect(job('job-cps').reach?.candidates.every((r) => r.status === 'sent')).toBe(true);
+  });
+
+  it('10. a cancelled subscription is resumed, not bought again', () => {
+    buy('always');
+    cancelSubscription();
+    resumeSubscription();
+    expect(getState().subscription?.cancelled).toBe(false);
+  });
+
+  it('11. "Hire again" starts without the old schedule or reminder setting', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === 'job-log' ? { ...x, scheduledFor: '2026-01-01', reachReminders: false } : x)) }));
+    const copy = job(hireAgain('job-log')!);
+    expect(copy.scheduledFor).toBeUndefined();
+    expect(copy.reachReminders).toBeUndefined();
+  });
+
+  it('13. an address in both Reach lists gets one email, as a candidate', () => {
+    const plan = { ...planFor(job('job-fin'), getState().org), candidates: ['amina@riverstone.example.org'], team: ['amina@riverstone.example.org', 'grace@riverstone.example.org'] };
+    expect(recipientsOf(job('job-fin'), plan)).toMatchObject({ candidates: ['amina@riverstone.example.org'], team: ['grace@riverstone.example.org'] });
+  });
+
+  it('14. under "any one reviewer" an approval stands after a later request for changes; under "every reviewer" it does not', () => {
+    asReviewer('daniel', () => reviewerDecision('job-fin', 'changes', 'One more thing'));
+    expect(job('job-fin').status).toBe('approved');
+    expect(job('job-fin').review.state).toBe('approved');
+    expect(blocked('job-fin')).toBe(false);
+    update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === 'job-fin' ? { ...x, review: { ...x.review, rule: 'all' } } : x)) }));
+    asReviewer('daniel', () => reviewerDecision('job-fin', 'changes', 'One more thing'));
+    expect(job('job-fin').status).toBe('review');
+    expect(blocked('job-fin')).toBe(true);
+  });
+
+  it('15. an unverified organisation cannot amplify, by any route', () => {
+    update((s) => ({ ...s, org: { ...s.org, verified: false } }));
+    expect(publishBlock(getState(), 'job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe('Verify your organisation to amplify');
   });
 });
 

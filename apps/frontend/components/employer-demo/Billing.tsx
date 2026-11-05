@@ -2,7 +2,7 @@
 
 import { Receipt as ReceiptIcon } from 'lucide-react';
 import { useState } from 'react';
-import { buy, cancelSubscription } from './actions';
+import { buy, cancelSubscription, resumeSubscription } from './actions';
 import { currentMonth, EXTRA_JOB, FREE_PER_MONTH, freeLeft, monthName, ONE_JOB, packageOf, PACKAGES, resetText, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import { daysUntil, longDate } from './engine';
 import { Checkout, FreeTerms } from './Pricing';
@@ -18,7 +18,6 @@ export default function Billing() {
   const used = s.freeUses.filter((u) => u.month === month).map((u) => s.jobs.find((j) => j.id === u.jobId)?.facts.title || 'a deleted job draft');
   const sub = s.subscription;
   const packs = s.packs.filter((p) => p.left > 0);
-  const subscribed = Boolean(sub && !sub.cancelled);
   const soon = (ends: string) => {
     const d = daysUntil(s.today, ends);
     return d <= 14 ? `Ends ${d <= 0 ? 'today' : `in ${d} ${d === 1 ? 'day' : 'days'}`}: unused jobs lapse then.` : null;
@@ -54,7 +53,11 @@ export default function Billing() {
                 {sub.left} of {SUBSCRIPTION_JOBS} jobs left this month · {sub.cancelled ? `cancelled: it ends on ${longDate(sub.renews)}` : `renews on ${longDate(sub.renews)}`}
               </span>
               <span className="aj-faint">Unused jobs lapse at renewal. Extra jobs {usd(EXTRA_JOB)} each.</span>
-              {!sub.cancelled && (
+              {sub.cancelled ? (
+                <button type="button" className="aj-pill mt-1 self-start" onClick={resumeSubscription}>
+                  Resume the subscription
+                </button>
+              ) : (
                 <button type="button" className="aj-pill mt-1 self-start" onClick={cancelSubscription}>
                   Cancel the subscription
                 </button>
@@ -88,7 +91,7 @@ export default function Billing() {
                   {p.key !== 'one' && <span className="aj-faint">{usd(p.perJob)} a job</span>}
                 </span>
                 <span className="flex w-[64px] shrink-0 justify-end">
-                  {p.key === 'one' ? null : p.key === 'always' && subscribed ? (
+                  {p.key === 'one' ? null : p.key === 'always' && sub ? (
                     <span className="aj-faint">Yours</span>
                   ) : (
                     <button type="button" className="aj-pill" onClick={() => setCheckout(p.key)}>

@@ -72,6 +72,12 @@ export const SAMPLE_TEAM: Person[] = [
   { id: 'grace', name: 'Grace Akello', email: 'grace@riverstone.example.org', role: 'member' },
 ];
 
+/** Three days before the start of this month: the sample's free job published last month, whatever today's date. */
+function lastMonth(today: number): number {
+  const d = new Date(today);
+  return new Date(d.getFullYear(), d.getMonth(), 1).getTime() - 3 * DAY;
+}
+
 function noReview(): Review {
   return { state: 'none', reviewers: [], due: '', round: 0, rule: 'any', remarks: [] };
 }
@@ -142,8 +148,8 @@ function sampleList(today: number): DemoJob[] {
     job(today, 'job-meal', 'meal', 'house', { title: 'MEAL Coordinator', location: 'Addis Ababa, Ethiopia', country: 'Ethiopia', iso: 'ET', timezone: 'EAT', contract: 'Fixed-term', duration: '24 months', deadline: addDays(today, 9), salaryMode: 'scale' }, {
       status: 'live',
       plan: 'free',
-      publishedAt: today - 12 * DAY,
-      audit: [{ at: today - 12 * DAY, who: 'Grace Akello', what: 'Published free' }],
+      publishedAt: lastMonth(today),
+      audit: [{ at: lastMonth(today), who: 'Grace Akello', what: 'Published free' }],
     }, ['assessment']),
     job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
       status: 'approved',
@@ -203,8 +209,11 @@ export function initialState(today: number): State {
     jobs: sampleJobs(today),
     formats: allFormats(),
     inbox: sampleInbox(today),
-    // The Communications Intern was downloaded this month, so one of the month's two free jobs is used.
-    freeUses: [{ jobId: 'job-comms', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) }],
+    // The Communications Intern was downloaded this month, so one of the month's two free jobs is used; the MEAL Coordinator used last month's.
+    freeUses: [
+      { jobId: 'job-comms', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) },
+      { jobId: 'job-meal', month: monthOf(lastMonth(today), orgZone(SAMPLE_ORG).zone) },
+    ],
     packs: [],
     subscription: null,
     receipts: [],

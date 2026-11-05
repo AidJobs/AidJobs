@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, History, ListTree, Maximize2, MessagesSquare, Mini
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, deleteDraft, downloadCopy, isApproved, updateBaseFromJob } from './actions';
+import { approvalRequired, deleteDraft, downloadCopy, isApproved, isReviewable, updateBaseFromJob } from './actions';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
@@ -147,7 +147,7 @@ export default function Create({ id }: { id?: string }) {
           </button>
         </Tip>
       )}
-      {!phone && !reviewing && job.sections.length > 0 && job.status !== 'live' && (
+      {!phone && !reviewing && job.sections.length > 0 && isReviewable(job) && (
         <Tip label={job.review.state === 'none' ? 'Send for review (optional)' : 'Review again'} side="bottom">
           <button type="button" className="aj-icon-btn" onClick={() => setReviewOpen(true)} aria-label="Send for review">
             <UserCheck size={15} strokeWidth={1.8} />
@@ -160,7 +160,7 @@ export default function Create({ id }: { id?: string }) {
           trigger={<MoreHorizontal size={15} strokeWidth={1.8} />}
           actions={[
             ...(phone && job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
-            ...(phone && job.sections.length ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
+            ...(phone && job.sections.length && isReviewable(job) ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
             ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
             ...(job.status === 'draft' || job.status === 'review' || job.status === 'approved'

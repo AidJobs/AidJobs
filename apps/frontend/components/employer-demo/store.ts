@@ -113,8 +113,16 @@ export function changeWithUndo(text: string, fn: (s: State) => State) {
   update((s) => ({ ...fn(s), notice: { text, undo: s.jobs } }));
 }
 
+/** Undo puts the jobs back, except what Reach has already sent: an email cannot be unsent. */
 export function undo() {
-  update((s) => (s.notice?.undo ? { ...s, jobs: s.notice.undo, notice: { text: 'Undone' } } : s));
+  update((s) => {
+    if (!s.notice?.undo) return s;
+    const jobs = s.notice.undo.map((old) => {
+      const now = s.jobs.find((j) => j.id === old.id);
+      return now ? { ...old, reach: now.reach } : old;
+    });
+    return { ...s, jobs, notice: { text: 'Undone' } };
+  });
 }
 
 export function notify(text: string) {

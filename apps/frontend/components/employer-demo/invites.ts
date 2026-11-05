@@ -51,8 +51,8 @@ export function recipientsOf(job: DemoJob, plan: ReachPlan): { candidates: strin
       return true;
     });
   const room = Math.max(0, REACH_EMAILS - reachUsed(job));
-  const candidates = keep(plan.candidates).slice(0, room);
-  const team = keep(plan.team).slice(0, Math.max(0, room - candidates.length));
+  const candidates = keep([...new Set(plan.candidates)]).slice(0, room);
+  const team = keep([...new Set(plan.team)].filter((e) => !plan.candidates.includes(e))).slice(0, Math.max(0, room - candidates.length));
   return { candidates, team, skipped };
 }
 

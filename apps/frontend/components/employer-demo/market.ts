@@ -220,10 +220,10 @@ export function basicAdvertCheck(job: DemoJob, s: State): Point[] {
     .filter((q) => q.level !== 'ok')
     .map((q) => ({ key: q.key, ok: false, title: q.text, section: q.section }));
   for (const sec of job.sections) {
-    for (const line of sec.lines) {
+    for (const [n, line] of sec.lines.entries()) {
       for (const h of findInclusive(line, job.format)) {
         if (job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]) continue;
-        points.push({ key: `inclusive-${sec.key}-${h.rule.id}-${h.match}`, ok: false, section: sec.key, title: `“${h.match}” in ${sec.title}`, detail: `${h.rule.why} ${h.rule.alt}.` });
+        points.push({ key: `inclusive-${sec.key}-${n}-${h.index}-${h.rule.id}`, ok: false, section: sec.key, title: `“${h.match}” in ${sec.title}`, detail: `${h.rule.why} ${h.rule.alt}.` });
       }
     }
   }
