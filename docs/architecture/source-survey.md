@@ -155,7 +155,7 @@ The top 600's best guesses by system: own site, system not yet known 52; `career
 - 1,201 websites not yet read from the index; at one request every 10 seconds and with Common Crawl's refusals, several more days.
 - The next search batch: the 382 organisations ranked 601 to 1,724 still without a website.
 - 95 review rows below rank 600.
-- Found by the search to be outside the target, for step G: Albo (a Mexican fintech company), CitizenLab (renamed Go Vocal, civic software), and Land O'Lakes Venture37 (stopped work on 30 June 2026).
+- Found by the search to be outside the target or doubtful, for step G: Albo (a Mexican fintech company), CitizenLab (renamed Go Vocal, civic software), Sunflower Services (back-office services for US nonprofits), GoodPower (US renewable-energy advocacy, formerly the Alliance for Climate Education), and Land O'Lakes Venture37 (stopped work on 30 June 2026).
 
 **What step F must confirm:** every candidate is likely, not confirmed. For each organisation: that the page is its current careers page and lists jobs; which recruitment system it uses (most own-site candidates show none); that an accepted account is the organisation's own, above all those of low confidence and those matched by an abbreviation; the websites from the search (unverified); and, where an organisation has accounts in two systems, which one is current.
 
