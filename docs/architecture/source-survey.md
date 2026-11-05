@@ -1,6 +1,6 @@
 # Employer survey (W-31)
 
-**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
+**Status: in progress.** Step A (this file and the seed lists) done on 3 November 2026. Step B (candidates from public registers) done on 4 November 2026 (below). Step D (one ranked list of organisations) built on 4 November 2026 (below); step C waits for ReliefWeb's `appname`. Step E (likely careers pages and recruitment systems) in progress since 5 November 2026 (below). The survey is read-only: no source is added, nothing is crawled, no database is touched. Each step has its own approval and pull request. The rules and the plan's place in the order are in `progress-ledger.md` (W-31) and `security-hardening-plan.md` (stage 8).
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Each step needs the user's approval. Employers' own sites are first contacted in
 | B | Candidate organisations from open data: IATI Dashboard, IRS, UK Charity Commission, OSCR, ACNC, CRA, EU Transparency Register, filtered by the target and an income cut-off | Downloads from the publishers' servers (built, below) |
 | C | ReliefWeb: organisations, websites, job counts per organisation (a few dozen requests) | ReliefWeb's API, with the user's `appname` |
 | D | Duplicate removal and ranking: website domain, then IATI ID, then cleaned name and acronym; uncertain matches to a review list for the user, nothing merged automatically; ranked by hiring evidence, then income | None |
-| E | Likely careers pages and recruitment systems, from Common Crawl's public URL index (per domain, and by recruitment-system host patterns) and the agent's web search for the top unresolved organisations | Common Crawl, about one request a second (its terms checked in that step) |
+| E | Likely careers pages and recruitment systems, from Common Crawl's public URL index (per domain, and by recruitment-system host patterns) and the agent's web search for the top unresolved organisations | Common Crawl's index files, one request every 10 seconds (the user's decision of 5 November 2026); Wikidata's query service (in progress, below) |
 | F | Confirmation, at most two spaced requests per organisation (`robots.txt`, then the careers page or the vendor's documented public job API), in batches such as the top 300 | Employers' sites: its own approval |
 | G | Output: careers sites grouped by recruitment system, ranked by jobs covered, with keyword families and each system's fields and reuse terms; the master CSV; the ledger | None |
 
@@ -121,6 +121,43 @@ Plan approved by the user on 4 November 2026, after asking how thorough it was a
 **Limits:** the listed-only tier (4,191, mostly the EU register's development NGOs and IATI publishers) was reviewed only by the name scan, not one by one; it ranks last and steps E and F will show which hire. Income is a register's latest year (2023 to 2025), converted at 2024 rates. Some international organisations are absent from the registers (Partners In Health's and Samaritan's Purse's head offices, outside the IRS group Q); they appear from UNjobs without income.
 
 **Other job boards, checked read-only on 4 November 2026** at the user's question, for more hiring evidence: none allows its employer data to be collected for another job site. Devex's user agreement forbids using the service to build a competing product; Impactpool's terms forbid scraping or copying platform data without permission; DevelopmentAid's daily limits exist "to prevent automated data extraction" and its API is for internal use only; DevNetJobs forbids reproducing its content without permission (and charges international organisations to post); UN Talent forbids copying or reproducing its material; Idealist forbids recording information about the service; CharityJob grants a limited licence for normal use; Bond's job board (every advert paid) allows reuse only with its consent; Guardian Jobs closed in October 2026. Decided by the user: no data from these boards, and no permission request for now. Hiring evidence comes from UNjobs (copied by hand by the user), ReliefWeb's API (step C) and employers' own sites (step F).
+
+## Likely careers pages and recruitment systems (step E)
+
+**In progress: paused for the day on 5 November 2026**, when Common Crawl refused two requests in a row (below). The committed outputs are a snapshot from part of the index and are rebuilt when the download finishes; the figures below are that snapshot's.
+
+Plan approved by the user on 5 November 2026 (the recommended choices). `tools/survey/careers.py` has three commands: `download`, run on the user's machine; `extract`, which turns the raw downloads into a small committed extract (no network); and `build`, which turns the committed files into the outputs (no network; CI runs it and fails if the committed outputs differ). No employer's website and no recruitment system's page is contacted; that is step F. Scope: the 1,724 ranked organisations (hiring evidence or income).
+
+**Method:**
+- **Websites first**, for the organisations without one: Wikidata, by the identifiers the survey holds (US EIN, UK and Scottish charity numbers, Canada's business number, Australia's ABN and charity ID, IATI and EU Transparency Register IDs; the eight properties checked on 5 November 2026), then by exact name, which is never accepted automatically; then the agent's web search for the top 600 still without one, marked "unverified (search-engine copy)", search results only (no site opened).
+- **Common Crawl's URL index, read as files** from `data.commoncrawl.org`, not through its query server: a crawl's table of contents (`cluster.idx`), then only the index blocks that may hold the wanted addresses, by HTTP Range requests. Two readings: every account of 16 recruitment systems whose accounts carry a name (Workday, Greenhouse, Lever, Ashby, SmartRecruiters, Jobvite, iCIMS, BambooHR, Workable, Pinpoint, Teamtailor, Recruitee, Personio, Avature, Taleo, Zoho Recruit); and each organisation's website, whole when it fits in four index blocks, otherwise only its careers-like paths and subdomains (careers words in 13 languages). 14 more systems (Oracle, SuccessFactors, UKG, Cornerstone, PageUp, Webcruiter and others) are recognised when an organisation's page redirects to them.
+- **`extract`** keeps careers-like pages on each organisation's own site (the landing page, its status, any redirect, how many pages below it answered) and the system accounts whose name could match an organisation; hosts and paths only, query strings dropped, no page content.
+- **`build`** rates each candidate. High: the organisation's careers page redirects to a recruitment system, or it answered and is at most two levels deep; or an account carries the full name (8 letters or more) or is the one the organisation's own page redirects to. Medium: a deeper or redirecting careers page, or pages below it that answered; an account named after the website (6 letters or more); anything on a host shared by unrelated bodies. Low: a careers address that did not answer; a shorter website name. The UN Secretariat family's offices get `careers.un.org`. **Never automatic, sent to review:** an account matching only an abbreviation; one account matching two or more organisations; and an account in another system than the one the organisation's page points to, or accounts in two systems.
+- **Decisions** (`step-e-decisions.csv`, each with its reason, as in step D): 186 on Wikidata's matches (171 accepted, 15 rejected); 112 websites from the search (110 found, 2 none); the 66 account matches to review in the top 600 (40 accepted with a confidence, 26 rejected). Rejected, for example: `Workday:primerica` matched Penal Reform International only through a site named "PRI"; `Taleo:inl` is Idaho National Laboratory's, not the State Department bureau's; `Workday:bloomberg`'s site is Bloomberg Industry Group's. The account decisions rest on the account's name, its captured site names and capture counts, and what is known of the organisation; none was opened.
+
+**Terms checked (5 November 2026):** Common Crawl's [terms of use](https://commoncrawl.org/terms-of-use) (last updated 7 March 2024): a limited licence; no interfering with or disrupting the service or its servers; no collecting personal information for use apart from the crawled content; crawled content may be subject to its owners' terms. The survey keeps only hosts and paths of careers pages and accounts, no content and no personal data. Wikidata's data is CC0; requests follow Wikimedia's User-Agent policy (contact details and "bot" in the identity), one every 5 seconds.
+
+**Requests made** (every one logged in `tools/survey/raw/*/requests.log`, git-ignored), with an honest identity:
+- Wikidata: 32 queries, all answered.
+- Common Crawl: 390 requests on 5 November 2026: 152 answered, 212 refused with 503 "SlowDown", 26 connections dropped. The first run read the last three crawls (2026-43, -39 and -34) at about one request a second, and the data server refused 208 of 374 requests. **The user decided the same day:** read only the latest crawl, CC-MAIN-2026-43; wait 10 seconds between requests; pause for the day after repeated refusals: the tool now stops itself after two refusals in a row, and at once on a 403 (none seen). Resumed at 15:38 IST: 16 requests, 11 answered, 4 refused, 1 dropped; two refusals in a row at 15:41 IST stopped it for the day. The older crawls' partial files are kept but not read.
+- **Downloaded so far** from CC-MAIN-2026-43: the table of contents; all 16 systems (21,325 accounts seen, 402 whose name could match an organisation); 81 of the 1,282 websites, in rank order.
+
+**Coverage in this snapshot** (each organisation by its best candidate):
+
+| Organisations | High | Medium | Low | None yet | Without a website |
+| --- | --- | --- | --- | --- | --- |
+| Top 600 | 81 | 115 | 30 | 374 | 38 |
+| All 1,724 | 106 | 123 | 37 | 1,458 | 420 |
+
+The top 600's best guesses by system: own site, system not yet known 52; `careers.un.org` 44 (the UN Secretariat family); BambooHR 39; Workable 24; Workday 17; Greenhouse 15; iCIMS 12; Personio 5; SmartRecruiters, Jobvite, Recruitee and Taleo 3 or 4 each; Lever, Avature, Zoho Recruit and Teamtailor 1 each. Most organisations without a candidate are those whose websites are not read yet. Of the 38 top-600 organisations without a website, 36 are UN Secretariat offices that hire through `careers.un.org`, and 2 have none: SALT International (UNjobs' listing appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled) and The CH Foundation (UK), a grant-maker with no website.
+
+**Unresolved:**
+- 1,201 websites not yet read from the index; at one request every 10 seconds and with Common Crawl's refusals, several more days.
+- The next search batch: the 382 organisations ranked 601 to 1,724 still without a website.
+- 95 review rows below rank 600.
+- Found by the search to be outside the target, for step G: Albo (a Mexican fintech company), CitizenLab (renamed Go Vocal, civic software), and Land O'Lakes Venture37 (stopped work on 30 June 2026).
+
+**What step F must confirm:** every candidate is likely, not confirmed. For each organisation: that the page is its current careers page and lists jobs; which recruitment system it uses (most own-site candidates show none); that an accepted account is the organisation's own, above all those of low confidence and those matched by an abbreviation; the websites from the search (unverified); and, where an organisation has accounts in two systems, which one is current.
 
 ## Sources
 
