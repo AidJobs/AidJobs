@@ -150,7 +150,7 @@ describe('the chat reads what was meant', () => {
   const lastReply = (id: string) => job(id).chat.slice(-2).map((m) => m.text).join(' ');
   const text = (id: string) => JSON.stringify(job(id).sections);
 
-  it.each(['ok, thanks', 'great, thank you!', 'no thanks', 'looks great', 'thanks a lot', 'please include something about safeguarding', 'mention the travel to field sites', 'try again', 'can you make it better?'])(
+  it.each(['ok, thanks', 'great, thank you!', 'no thanks', 'looks great', 'thanks a lot', 'Yes please', 'Looks good to me', 'Sounds good', 'Great job', 'Love it', 'please include something about safeguarding', 'try again', 'can you make it better?'])(
     '"%s" changes nothing',
     (said) => {
       const before = text('job-comms');
@@ -159,11 +159,63 @@ describe('the chat reads what was meant', () => {
     },
   );
 
-  it.each(['Experience in human rights monitoring is an asset', 'The post has two direct reports', 'Use of KoboToolbox is an asset', 'Set up and run community feedback mechanisms'])('"%s" is added as text, in the same tone', (said) => {
+  it.each([
+    'Experience in human rights monitoring is an asset',
+    'The post has two direct reports',
+    'Use of KoboToolbox is an asset',
+    'Set up and run community feedback mechanisms',
+    'Change management experience is an asset',
+    'Make regular field visits to project sites',
+    'Edit and proofread donor reports',
+    'Include gender analysis in all assessments',
+    'Sound knowledge of IPSAS and a formal accounting qualification',
+    'Expand partnerships with local NGOs',
+    'Cut through complexity to explain results to donors',
+  ])('"%s" is added as text, with the same tone and sections', (said) => {
     const tone = job('job-comms').tone;
+    const tags = job('job-comms').tags;
     sendChat('job-comms', said);
     expect(text('job-comms')).toContain(said);
     expect(job('job-comms').tone).toBe(tone);
+    expect(job('job-comms').tags).toEqual(tags);
+  });
+
+  it('"Add value through cross-team learning" is text, not the Team purpose section', () => {
+    const tags = job('job-comms').tags;
+    sendChat('job-comms', 'Add value through cross-team learning');
+    expect(job('job-comms').tags).toEqual(tags);
+  });
+
+  it.each([
+    ['more formal please', 'warm', 'formal'],
+    ['can you make it more formal', 'warm', 'formal'],
+    ['make it sound more formal', 'warm', 'formal'],
+    ['too formal', 'formal', 'warm'],
+    ['less formal please', 'formal', 'warm'],
+    ['not so formal', 'formal', 'warm'],
+    ['more casual', 'formal', 'warm'],
+    ['use a friendlier tone', 'formal', 'warm'],
+    ['less warm', 'warm', 'formal'],
+    ['plainer', 'warm', 'plain'],
+  ])('"%s" turns a %s job %s', (said, from, to) => {
+    if (job('job-comms').tone !== from) sendChat('job-comms', from === 'formal' ? 'more formal' : from === 'warm' ? 'warmer' : 'plainer');
+    expect(job('job-comms').tone).toBe(from);
+    sendChat('job-comms', said);
+    expect(job('job-comms').tone).toBe(to);
+  });
+
+  it.each(['please undo', 'undo that please', 'go back'])('"%s" undoes the last change', (said) => {
+    const before = text('job-comms');
+    sendChat('job-comms', 'shorten the responsibilities');
+    expect(text('job-comms')).not.toBe(before);
+    sendChat('job-comms', said);
+    expect(text('job-comms')).toBe(before);
+  });
+
+  it.each(['shorter', 'make the responsibilities shorter', 'shorten the responsibilities'])('"%s" shortens', (said) => {
+    const before = text('job-comms');
+    sendChat('job-comms', said);
+    expect(text('job-comms')).not.toBe(before);
   });
 
   it('"more formal" and "make it warmer" change the tone; asking for the tone it has says so', () => {

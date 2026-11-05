@@ -17,9 +17,11 @@ import {
   parseIso,
   readPasted,
   inOutlineOrder,
+  lengthRequest,
   outlineOrder,
   recommendSections,
   suggestTitle,
+  toneRequest,
   type BuildContext,
 } from './engine';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
@@ -247,6 +249,13 @@ const ASK_HINT: Record<NonNullable<ChatMsg['ask']>, string> = {
   contract: 'a contract type. Pick one above, or write "fixed-term", "temporary", or "open-ended"',
 };
 
+const UNDO = /^(please\s+)?(undo|revert|go back)( it| that| (the )?last change| to the previous version)?([\s,]+please)?[.!]?$/;
+
+/** A request about the text (tone, length, undo), which a waiting question must not swallow as its answer. */
+function isRequest(text: string): boolean {
+  return Boolean(toneRequest(text) || lengthRequest(text.toLowerCase()) || UNDO.test(text.toLowerCase().trim()));
+}
+
 export function sendChat(id: string, text: string) {
   if (!ownerOnly()) return;
   chatTurn(id, text);
@@ -274,7 +283,7 @@ function chatTurn(id: string, text: string) {
       return;
     }
   }
-  if (pending === 'title' && !EDIT_WORDS.test(text) && text.trim().split(/\s+/).length <= 8) {
+  if (pending === 'title' && !EDIT_WORDS.test(text) && !isRequest(text) && text.trim().split(/\s+/).length <= 8) {
     const { facts, role } = extractFacts(`hiring a ${text.trim()}`, s.today, j.facts);
     const title = facts.title || text.trim().replace(/\b\p{Ll}/gu, (ch) => ch.toUpperCase());
     update((st) => ({
@@ -287,7 +296,7 @@ function chatTurn(id: string, text: string) {
     }));
     return;
   }
-  if (pending && pending !== 'title' && !EDIT_WORDS.test(text)) {
+  if (pending && pending !== 'title' && !EDIT_WORDS.test(text) && !isRequest(text)) {
     const { facts, role } = extractFacts(answerToText(text, pending), s.today, j.facts);
     if (!answered(pending, facts)) {
       updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', `I couldn't read that as ${ASK_HINT[pending]}.`, undefined, pending)] }));
@@ -303,7 +312,7 @@ function chatTurn(id: string, text: string) {
     }));
     return;
   }
-  if (/^(undo|revert)( it| that| (the )?last change)?[.!]?$/.test(lower.trim())) {
+  if (UNDO.test(lower.trim())) {
     updateJob(id, (x) => {
       if (x.lastChange) return { ...undone(x), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
       const prev = x.versions[x.versions.length - 2];
