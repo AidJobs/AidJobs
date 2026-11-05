@@ -134,6 +134,18 @@ def test_accounts_are_read_from_each_system():
         assert careers.tenant_of(url) == expected, url
 
 
+def test_an_account_is_shown_by_a_page_that_answered_not_by_its_robots_txt():
+    lines = [row("https://rescue.wd1.myworkdayjobs.com/robots.txt"),
+             row("https://rescue.wd1.myworkdayjobs.com/en-US/External/job/1", "404"),
+             row("https://rescue.wd1.myworkdayjobs.com/en-US/External/job/2"),
+             row("https://rescue.wd1.myworkdayjobs.com/en-US/External/job/3")]
+    accounts = {}
+    careers.system_accounts("Workday", "CC-MAIN-2026-43", lines, accounts)
+    entry = accounts[("Workday", "rescue")]
+    assert entry["example"] == "https://rescue.wd1.myworkdayjobs.com/en-US/External"
+    assert set(entry["sites"]) == {"External"} and entry["captures"] == 4
+
+
 def test_account_keys_drop_generic_endings_and_digits():
     assert {"rescue", "rescue1"} <= careers.tenant_keys("rescue1")
     assert "msf" in careers.tenant_keys("msfcareers")

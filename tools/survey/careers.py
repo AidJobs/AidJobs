@@ -265,7 +265,7 @@ def tenant_of(url: str) -> tuple[str, str, str]:
     account, site = "", ""
     if system == "Workday":
         match = re.match(r"^([a-z0-9-]+)\.(?:wd\d+|impl-wd\d+)\.myworkdayjobs\.com$", host)
-        rest = [s for s in segs if not LOCALE.match(s)]
+        rest = [s for s in segs if not LOCALE.match(s) and s.lower() != "robots.txt"]
         if match and ".impl-" not in host and "impl-wd" not in host:
             account, site = match.group(1), (rest[0] if rest else "")
         elif host.endswith("myworkdaysite.com") and "recruiting" in rest:
@@ -723,14 +723,17 @@ def system_accounts(system: str, crawl: str, lines, accounts: dict) -> None:
         if found != system or not account:
             continue
         entry = accounts.setdefault((system, account), {
-            "sites": Counter(), "crawls": set(), "captures": 0, "example": ""})
+            "sites": Counter(), "crawls": set(), "captures": 0, "example": "", "best": (9, 9)})
         entry["crawls"].add(crawl)
         entry["captures"] += 1
         if site:
             entry["sites"][site] += 1
-        if not entry["example"] or str(row.get("status")) == "200":
-            parts = urlsplit(row["url"])
-            segs = [s for s in parts.path.split("/") if s]
+        parts = urlsplit(row["url"])
+        segs = [s for s in parts.path.split("/") if s]
+        # A page that answered is the best example; the account's robots.txt only the last.
+        rank = (segs[-1:] == ["robots.txt"], str(row.get("status")) != "200")
+        if rank < entry["best"]:
+            entry["best"] = rank
             entry["example"] = f"https://{parts.hostname}/" + "/".join(segs[:2])
 
 

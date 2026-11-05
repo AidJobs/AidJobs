@@ -297,3 +297,69 @@ website,irs:522340908,agfund.org,,"web search, 5 Nov 2026: AGFUND (Arab Gulf Pro
 website,irs:810799662,multifaithalliance.org,,"web search, 5 Nov 2026: Multifaith Alliance, formerly Multifaith Alliance for Syrian Refugees (https://multifaithalliance.org/about)"
 no-website,unjobs-nonun:430,,,"web search, 5 Nov 2026: no organisation of this name found; UNjobs' listing (https://unjobs.org/vacancies/1777680527167, a search result) appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled"
 no-website,uk:1156222,,,"web search, 5 Nov 2026: Sir Chris Hohn's grant-making charity; no public website, and the register lists none (https://www.hinchilla.com/funder-directory/the-ch-foundation-uk)"
+accept-tenant,unjobs-nonun:341,Workday:msf,medium,"the site name says work-with-msf-ocg, MSF's Operational Centre Geneva, an MSF section's account; UNjobs' MSF listing covers the movement's jobs"
+reject-tenant,unjobs-nonun:341,BambooHR:msfltd,,"abbreviation only; 'MSF Ltd' is a company name, no sign it is Médecins Sans Frontières"
+reject-tenant,unjobs-nonun:341,Greenhouse:msfcareers,,abbreviation only; which organisation 'msfcareers' belongs to is unknown; MSF's own careers pages decide in step F
+reject-tenant,unjobs-nonun:341,Recruitee:msf,,abbreviation only; 'msf' is used by several companies; nothing ties this account to Médecins Sans Frontières
+accept-tenant,unjobs-un:23,Taleo:fao,medium,FAO has long recruited through fao.taleo.net (its careersection pages); whether it still does is step F
+accept-tenant,unjobs-un:102,Workday:wfp,high,"WFP's job openings are on Workday at myworkdaysite.com/recruiting/wfp/job_openings, 116 captures"
+reject-tenant,seed:7,iCIMS:chai,,abbreviation only; 'chai' is a common word and a company name; CHAI is not known to use iCIMS
+accept-tenant,unjobs-un:103,Taleo:who,medium,WHO's vacancies have been on who.taleo.net (careersection ex); whether it still does is step F
+reject-tenant,unjobs-un:26,Workday:icc,,"abbreviation shared by several bodies (International Chamber of Commerce, International Code Council); nothing ties it to the Court"
+accept-tenant,unjobs-nonun:342,Workable:medecins-du-monde,low,the account's name is the organisation's full name; which national section of Médecins du Monde uses it is unknown (step F)
+accept-tenant,unjobs-nonun:179,Workable:evidence-action,medium,"full name, 32 captures; the likely current system"
+accept-tenant,unjobs-nonun:179,BambooHR:evidenceaction,low,"full name, 5 captures; possibly an earlier system (step F)"
+accept-tenant,unjobs-nonun:382,Jobvite:pih,low,"abbreviation only, 12 captures; Partners In Health is the best-known 'PIH' employer, unconfirmed (step F)"
+reject-tenant,unjobs-nonun:409,Greenhouse:rti,,abbreviation shared by several companies; RTI International is not known to use Greenhouse
+accept-tenant,unjobs-nonun:96,iCIMS:cwsglobal,medium,the account is the organisation's own website name (cwsglobal.org)
+reject-tenant,unjobs-nonun:96,Workday:cws,,abbreviation shared by many companies; the iCIMS account named after cwsglobal.org is the likely one
+accept-tenant,unjobs-nonun:322,Workday:msh,medium,Management Sciences for Health's external careers site on Workday (site External); unconfirmed (step F)
+accept-tenant,unjobs-nonun:118,iCIMS:cfr,low,"abbreviation only, 34 captures; the Council on Foreign Relations is the likeliest owner (step F)"
+reject-tenant,unjobs-nonun:118,Workday:cfr,,"its site is 'Buc-careers', not the Council on Foreign Relations"
+accept-tenant,unjobs-nonun:63,Workable:cdp,low,"abbreviation only, 1 capture; CDP Worldwide is a likely owner (step F)"
+accept-tenant,unjobs-un:1,Taleo:adb,medium,the Asian Development Bank has recruited through adb.taleo.net; whether it still does is step F
+accept-tenant,unjobs-nonun:104,Greenhouse:clintonfoundation,medium,"full name, 19 captures; the likely current system"
+accept-tenant,unjobs-nonun:104,iCIMS:clintonfoundation,low,"full name, 3 captures; possibly an earlier system (step F)"
+accept-tenant,unjobs-nonun:519,Workday:wri,medium,"WRI's own sites on Workday (WRI, WRI_India)"
+accept-tenant,unjobs-nonun:519,Jobvite:wri,low,"abbreviation only, 3 captures; possibly WRI's earlier system (step F)"
+accept-tenant,unjobs-nonun:377,iCIMS:pactworld,medium,the account is the organisation's own website name (pactworld.org)
+reject-tenant,unjobs-nonun:377,BambooHR:pact,,'pact' is a common word used by many companies; the iCIMS account named after pactworld.org is the likely one
+accept-tenant,unjobs-nonun:272,BambooHR:icct,low,abbreviation only; also the International Centre for Counter-Terrorism's abbreviation (step F)
+reject-tenant,unjobs-nonun:350,Workable:nef,,abbreviation shared with the New Economics Foundation (UK) and others
+accept-tenant,unjobs-un:35,Workday:imf,medium,"the IMF's careers site on Workday (site IMF), 44 captures"
+reject-tenant,unjobs-nonun:60,BambooHR:caf,,abbreviation shared with the Charities Aid Foundation and others; a development bank of CAF's size is unlikely on BambooHR
+reject-tenant,unjobs-un:9,Personio:dgc,,"a UN Secretariat department hires through careers.un.org, not Personio"
+accept-tenant,unjobs-nonun:57,Workable:busara,medium,a distinctive name (Busara Center for Behavioral Economics)
+accept-tenant,unjobs-nonun:193,Personio:fsc,low,"abbreviation only; the Forest Stewardship Council is based in Bonn, where Personio is common; unconfirmed (step F)"
+reject-tenant,unjobs-nonun:453,Workable:sei,,"abbreviation shared by many companies (SEI Investments and others), 1 capture"
+accept-tenant,unjobs-nonun:329,BambooHR:meda,low,MEDA's website name; which MEDA entity uses it is unknown (step F)
+accept-tenant,unjobs-un:28,BambooHR:icmp,low,"ICMP's website name (icmp.int); a short name, unconfirmed (step F)"
+reject-tenant,unjobs-un:28,Workable:icmp-6,,a numbered name ('icmp-6') suggests one of several unrelated 'icmp' accounts
+accept-tenant,unjobs-nonun:51,Avature:bloomberg,low,Bloomberg's careers site; Bloomberg Philanthropies' jobs may be listed there (step F)
+reject-tenant,unjobs-nonun:51,Workday:bloomberg,,"its site is Bloomberg Industry Group's, a different company"
+accept-tenant,unjobs-nonun:221,Recruitee:gri,low,the Global Reporting Initiative is in Amsterdam and Recruitee is a Dutch system; unconfirmed (step F)
+reject-tenant,unjobs-nonun:203,Recruitee:gri,,the Global Reporting Initiative (Amsterdam) is the likelier owner of this Dutch system's account
+reject-tenant,unjobs-nonun:354,Greenhouse:ndb,,abbreviation shared by several companies; nothing ties it to the New Development Bank
+reject-tenant,unjobs-nonun:479,Taleo:inl,,"inl.taleo.net is Idaho National Laboratory's, not the State Department bureau's"
+accept-tenant,unjobs-un:106,Workday:wto,low,abbreviation only (site External); the World Trade Organization is the likeliest owner (step F)
+accept-tenant,unjobs-nonun:121,Workable:cuso-international,medium,"full name, 6 captures"
+accept-tenant,unjobs-nonun:121,BambooHR:cusointernational,low,"full name, 2 captures; possibly an earlier system (step F)"
+accept-tenant,unjobs-nonun:1,BambooHR:350,low,"350.org's name; a bare number, unconfirmed (step F)"
+accept-tenant,unjobs-nonun:24,Greenhouse:americanpublichealthassociation,medium,full name
+reject-tenant,unjobs-nonun:24,iCIMS:apha,,abbreviation shared by several associations; the Greenhouse account with the full name is the likely one
+reject-tenant,unjobs-nonun:45,Workday:bci,,"its sites (Scholarships_External, BCI_Careers) suggest another 'BCI'; Better Cotton is not known to use Workday"
+accept-tenant,unjobs-nonun:58,BambooHR:bhrrc,medium,a distinctive abbreviation (Business and Human Rights Resource Centre)
+reject-tenant,unjobs-nonun:87,Workday:cir,,abbreviation shared by many companies; a small UK NGO is unlikely on Workday
+accept-tenant,unjobs-nonun:171,Workable:eed,low,"abbreviation only, 11 captures; the European Endowment for Democracy is a likely owner (step F)"
+reject-tenant,unjobs-nonun:386,Workday:primerica,,"Primerica, a US financial company; matched only through its site name 'PRI'"
+accept-tenant,unjobs-nonun:497,Workable:waterorg,medium,the organisation's full name
+reject-tenant,unjobs-nonun:497,Personio:water,,a common word; nothing ties it to Water.org
+accept-tenant,unjobs-nonun:188,BambooHR:fahinc,medium,"'FAH Inc', the organisation's US registered name (Financing Alliance for Health, Inc.)"
+reject-tenant,unjobs-nonun:361,Workday:insbrk,,an insurance company's account; matched only through its site name 'One80Careers'
+reject-tenant,unjobs-nonun:361,Workday:skechers,,"Skechers, a shoe company; matched only through its site name 'One-career-site'"
+accept-tenant,unjobs-nonun:148,BambooHR:e3g,medium,"a distinctive abbreviation (E3G, Third Generation Environmentalism)"
+accept-tenant,irs:951922279,Workday:worldvision,medium,"World Vision's Workday site (WorldVisionInternational, 251 captures); whether World Vision US posts there is step F"
+reject-tenant,irs:951922279,BambooHR:worldvision,,"4 captures; which World Vision office, if any, uses it is unknown"
+accept-tenant,seed:21,Workday:habitat,low,"Habitat for Humanity's website name; 'habitat' is also a common word, unconfirmed (step F)"
+accept-tenant,iati:US-EIN-13-3327220,Workable:action-against-hunger,low,the network's name; which Action Against Hunger member uses it is unknown (step F)
+accept-tenant,uk:1154288,BambooHR:humanappeal,medium,"full name, 22 captures"
