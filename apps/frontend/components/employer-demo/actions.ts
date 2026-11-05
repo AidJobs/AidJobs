@@ -625,11 +625,15 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
     const reviewers = j.review.reviewers.map((r) => (r.name === name ? { ...r, decision, note } : r));
     const next: DemoJob = { ...j, review: { ...j.review, reviewers } };
     const approved = isApproved({ ...next, review: { ...next.review, state: 'open' } });
-    // Under "any one reviewer", an approval already given stands; a later request for changes is a note for the author.
-    next.review.state = approved ? 'approved' : decision === 'changes' ? 'changes' : 'open';
-    if (approved) next.review.approvedVersion = j.versions.length;
-    // A late answer on a job already published is recorded for the author; it never takes the job off the site.
-    if (isReviewable(j)) next.status = approved ? 'approved' : 'review';
+    // A late answer on a job already published is recorded for the author; it changes neither the job nor its review state.
+    if (isReviewable(j)) {
+      // Under "any one reviewer", an approval already given stands; a later request for changes is a note for the author.
+      next.review.state = approved ? 'approved' : decision === 'changes' ? 'changes' : 'open';
+      if (approved) next.review.approvedVersion = j.versions.length;
+      next.status = approved ? 'approved' : 'review';
+      // A reviewer's answer replaces the owner's skip: the job is now approved, or waits again, on its merits.
+      next.review.skipped = undefined;
+    }
     next.audit = [...j.audit, { at: Date.now(), who: name, what: decision === 'approved' ? `Approved version ${j.versions.length}` : 'Requested changes' }];
     return {
       ...s,
@@ -903,14 +907,16 @@ export function completePayRequest(id: string): boolean {
   if (!j || !req) return false;
   const how: Paid = req.key === 'one' || req.key === 'extra' ? 'direct' : 'onHand';
   const upgrade = j.plan === 'free' && (j.status === 'live' || j.status === 'scheduled');
-  if (!upgrade && publishBlock(s, id, { plan: 'amplify', schedule: req.schedule, paid: 'direct' })) return false;
+  // Paid after the date asked for: the job goes live now rather than not at all.
+  const schedule = req.schedule && req.schedule > isoDay(s.today) ? req.schedule : null;
+  if (upgrade ? !s.org.verified : publishBlock(s, id, { plan: 'amplify', schedule, paid: 'direct' })) return false;
   buy(req.key, j.facts.title);
-  const ok = upgrade ? amplifyLive(id, how) : publish(id, { plan: 'amplify', schedule: req.schedule, paid: how });
+  const ok = upgrade ? amplifyLive(id, how) : publish(id, { plan: 'amplify', schedule, paid: how });
   if (!ok) return false;
   update((st) => ({
     ...st,
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: req.name, what: `Paid ${req.amount} from the payment link (simulated)` }] } : x)),
-    inbox: [{ id: `i${Date.now()}`, kind: 'receipt', jobId: id, title: `${req.name.split(' ')[0]} paid ${req.amount}: ${j.facts.title} is ${req.schedule && !upgrade ? 'scheduled' : 'live'}`, body: 'The receipt and invoice went to them (simulated).', at: Date.now() }, ...st.inbox],
+    inbox: [{ id: `i${Date.now()}`, kind: 'receipt', jobId: id, title: `${req.name.split(' ')[0]} paid ${req.amount}: ${j.facts.title} is ${schedule && !upgrade ? 'scheduled' : 'live'}`, body: 'The receipt and invoice went to them (simulated).', at: Date.now() }, ...st.inbox],
   }));
   return true;
 }
@@ -929,7 +935,7 @@ export function setReachReminders(id: string, on: boolean) {
 export function amplifyLive(id: string, paid: Paid): boolean {
   const s0 = getState();
   const j = s0.jobs.find((x) => x.id === id);
-  if (!j || s0.reviewerAs || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
+  if (!j || s0.reviewerAs || !s0.org.verified || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
   if (paid === 'onHand' && !nextPaidJob(s0)) return false;
   const sendsOn = j.status === 'scheduled' ? (j.scheduledFor ?? null) : null;
   let sending = false;

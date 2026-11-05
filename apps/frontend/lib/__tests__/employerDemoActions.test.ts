@@ -48,7 +48,7 @@ import {
   undoLastChange,
 } from '../../components/employer-demo/actions';
 import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
-import { statusLine } from '../../components/employer-demo/Home';
+import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
@@ -760,6 +760,39 @@ describe('fixes from the round 4 review', () => {
   it('15. an unverified organisation cannot amplify, by any route', () => {
     update((s) => ({ ...s, org: { ...s.org, verified: false } }));
     expect(publishBlock(getState(), 'job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe('Verify your organisation to amplify');
+    expect(amplifyLive('job-meal', 'direct')).toBe(false);
+    askToPay('job-meal', { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one', amount: 'US$28.40', item: 'Amplify: MEAL Coordinator', schedule: null });
+    const receipts = getState().receipts.length;
+    expect(completePayRequest('job-meal')).toBe(false);
+    expect(getState().receipts.length).toBe(receipts);
+    expect(job('job-meal').plan).toBe('free');
+  });
+
+  it('re-review A. a reviewer answering after the owner skipped approval replaces the skip', () => {
+    update((s) => ({ ...s, org: { ...s.org, approval: 'all' } }));
+    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    sendForReview(id, amina, '2026-12-01', 'any', '');
+    overrideApproval(id, 'The donor deadline is today');
+    asReviewer('amina', () => reviewerDecision(id, 'approved', ''));
+    expect(job(id).review.skipped).toBeUndefined();
+    publish(id, { plan: 'free', schedule: null });
+    expect(job(id).audit.some((a) => a.what.startsWith('Published without approval'))).toBe(false);
+  });
+
+  it('re-review B. a late request for changes on a published job leaves nothing waiting', () => {
+    sendForReview('job-comms', amina, '2026-12-01', 'any', '');
+    publish('job-comms', { plan: 'free', schedule: null });
+    asReviewer('amina', () => reviewerDecision('job-comms', 'changes', ''));
+    expect(job('job-comms').review.state).toBe('open');
+    expect(needsYou(getState(), job('job-comms'))).toBe(false);
+  });
+
+  it('re-review D. paid after the date asked for, the job goes live now', () => {
+    const tomorrow = isoDay(getState().today + 86_400_000);
+    askToPay('job-fin', { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one', amount: 'US$28.40', item: 'Amplify: Finance Officer', schedule: tomorrow });
+    update((s) => ({ ...s, today: s.today + 2 * 86_400_000 }));
+    expect(completePayRequest('job-fin')).toBe(true);
+    expect(job('job-fin').status).toBe('live');
   });
 });
 

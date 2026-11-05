@@ -166,7 +166,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
       </div>
       {sections.map((sec) => (
         <section key={sec.key}>
-          <h3>{sec.title}</h3>
+          <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? 'en' : undefined}>{sec.title}</h3>
           <Lines lines={sec.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.lines : undefined} />
         </section>
       ))}

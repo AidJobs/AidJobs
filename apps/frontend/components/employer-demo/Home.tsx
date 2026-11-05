@@ -11,6 +11,7 @@ import {
   extend,
   hireAgain,
   isApproved,
+  isReviewable,
   letClose,
   markInbox,
   readIntent,
@@ -58,7 +59,7 @@ export function statusLine(s: State, j: DemoJob): string {
 
 export function needsYou(s: State, j: DemoJob): boolean {
   const left = j.facts.deadline ? daysUntil(s.today, j.facts.deadline) : null;
-  if (j.status === 'approved' || j.review.state === 'changes') return true;
+  if (j.status === 'approved' || (j.review.state === 'changes' && isReviewable(j))) return true;
   if (j.status === 'review' && isApproved(j)) return true;
   if (j.status === 'live' && left !== null && left <= 3 && !s.inbox.some((i) => i.jobId === j.id && i.kind === 'deadline' && i.done)) return true;
   return false;
@@ -85,7 +86,7 @@ function briefing(s: State): Brief[] {
           { label: 'Open', run: () => go('create', j.id) },
         ],
       });
-    } else if (j.review.state === 'changes') {
+    } else if (j.review.state === 'changes' && isReviewable(j)) {
       out.push({ id: `chg-${j.id}`, icon: <MessageSquareWarning size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />, title: `Changes requested on ${j.facts.title}`, body: 'See the comments on the sections.', actions: [{ label: 'Open', run: () => go('create', j.id), primary: true }] });
     }
     if (j.status === 'live' && left !== null && left <= 3 && !s.inbox.some((i) => i.jobId === j.id && i.kind === 'deadline' && i.done)) {
