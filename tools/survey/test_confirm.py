@@ -56,6 +56,23 @@ def test_robots_txt_follows_rfc_9309_longest_match_and_wildcards():
     assert confirm.robots_allows(rules, "https://x.org/careers") is True
     assert confirm.robots_allows("User-agent: *\nDisallow:\n", "https://x.org/a") is True
     assert confirm.robots_allows("User-agent: *\nDisallow: /\n", "https://x.org/robots.txt")
+    # A byte-order mark, and a Sitemap line between user-agent lines, change nothing.
+    assert confirm.robots_allows("\ufeffUser-agent: *\nDisallow: /\n", "https://x.org/a") is False
+    assert confirm.robots_allows("User-agent: aidjobssurvey\nSitemap: https://x.org/s.xml\n"
+                                 "User-agent: b\nDisallow: /\n", "https://x.org/a") is False
+    # Rules outside ASCII are compared percent-encoded, as addresses are.
+    assert confirm.robots_allows("User-agent: *\nDisallow: /karrière\n",
+                                 "https://x.org/karri%C3%A8re") is False
+
+
+def test_the_streaks_count_only_requests_made():
+    cf = ("a.org", "cloudflare")
+    refusals, failures = confirm.tally([], 0, cf, False)
+    assert (refusals, failures) == ([cf], 0)
+    refusals, failures = confirm.tally(refusals, failures, None, True)  # a network failure
+    assert (refusals, failures) == ([cf], 1)
+    refusals, failures = confirm.tally(refusals, failures, None, False)  # an answer
+    assert (refusals, failures) == ([], 0)
 
 
 def test_a_cross_host_redirect_is_marked_its_robots_txt_unchecked():

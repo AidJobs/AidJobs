@@ -32,7 +32,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 from xml.etree import ElementTree
 
 from careers import SECOND_LEVEL, read_csv, strip_query, system_of
@@ -154,7 +154,8 @@ def robots_rules(text: str, token: str = PRODUCT_TOKEN) -> list[tuple[bool, str]
     naming its product token, else every '*' group; consecutive user-agent lines share a group."""
     groups: list[tuple[set[str], list[tuple[bool, str]]]] = []
     in_agents = False
-    for raw in text.splitlines():
+    # Only a rule line ends a run of user-agent lines (Sitemap, Crawl-delay and others do not).
+    for raw in text.lstrip("\ufeff").splitlines():
         key, sep, value = raw.split("#", 1)[0].partition(":")
         key, value = key.strip().lower(), value.strip()
         if not sep:
@@ -168,8 +169,6 @@ def robots_rules(text: str, token: str = PRODUCT_TOKEN) -> list[tuple[bool, str]
             in_agents = False
             if groups and value:
                 groups[-1][1].append((key == "allow", value))
-        else:
-            in_agents = False
     mine = [rule for agents, rules in groups if token in agents for rule in rules]
     if any(token in agents for agents, _ in groups):
         return mine
@@ -177,9 +176,11 @@ def robots_rules(text: str, token: str = PRODUCT_TOKEN) -> list[tuple[bool, str]
 
 
 def _pattern(rule: str) -> re.Pattern:
-    """A path pattern: '*' matches any characters, a final '$' the end of the path."""
+    """A path pattern: '*' matches any characters, a final '$' the end of the path. Characters
+    outside ASCII are percent-encoded, as addresses are (RFC 9309, section 2.2.2)."""
     end = rule.endswith("$")
-    body = re.escape(rule[:-1] if end else rule).replace(r"\*", ".*")
+    rule = quote(rule[:-1] if end else rule, safe="/?=&*$%:;@+,!~'()#[]")
+    body = re.escape(rule).replace(r"\*", ".*")
     return re.compile(body + ("$" if end else ""))
 
 
@@ -265,6 +266,16 @@ def run_stop(refusals: list[tuple[str, str]]) -> str:
     return ""
 
 
+def tally(refusals: list[tuple[str, str]], failures: int, refusal: tuple[str, str] | None,
+          failed: bool) -> tuple[list[tuple[str, str]], int]:
+    """The streaks after one request actually made (a verdict reused from the cache is none):
+    a refusal extends the refusals in a row, any other answer ends them; a network failure
+    extends the failures in a row and leaves the refusals as they were."""
+    if failed:
+        return refusals, failures + 1
+    return ([*refusals, refusal] if refusal else []), 0
+
+
 class Fetcher:
     """One request at a time through the backend's fetch policy, spaced, logged."""
 
@@ -338,15 +349,20 @@ def fetch(args) -> int:
                 if r["status"] != 200 else "",
                 "server": r["headers"].get("server", ""),
                 "fetched_at": datetime.now(UTC).isoformat(timespec="seconds")}
-            robots_file(host).parent.mkdir(parents=True, exist_ok=True)
-            robots_file(host).write_text(json.dumps(robots_cache[host]), encoding="utf-8")
+            if r["status"] is not None:  # a network failure is not kept for later runs
+                robots_file(host).parent.mkdir(parents=True, exist_ok=True)
+                robots_file(host).write_text(json.dumps(robots_cache[host]), encoding="utf-8")
             asked = True
-            failures = failures + 1 if r["status"] is None and r["error"] else 0
         cached = robots_cache[host]
         verdict = robots_verdict(cached["status"], cached["text"], t["request_url"])
         record["robots"] = {"host": host, "status": cached["status"], "error": cached["error"],
                             "verdict": verdict, "bot_protection": cached["bot_protection"]}
-        refusal = None
+        if asked:
+            refusals, failures = tally(
+                refusals, failures,
+                (host, service_of(cached["bot_protection"], cached["server"]))
+                if verdict == "refused" else None,
+                cached["status"] is None and bool(cached["error"]))
         if verdict == "allowed":
             r = fetcher.get(t["request_url"], t["org_id"])
             body = r.pop("body")
@@ -355,15 +371,12 @@ def fetch(args) -> int:
             record["response"] = r
             (RAW / "bodies").mkdir(parents=True, exist_ok=True)
             (RAW / "bodies" / f"{safe_name(t['org_id'])}.bin").write_bytes(body)
-            if r["status"] in (403, 429) or r["bot_protection"]:
-                refusal = (host, service_of(r["bot_protection"], r["headers"].get("server", "")))
-            failures = failures + 1 if r["status"] is None and r["error"] else 0
-        elif verdict == "refused" and asked:
-            refusal = (host, service_of(cached["bot_protection"], cached["server"]))
-        if refusal:
-            refusals = [*refusals, refusal]
-        elif asked or verdict == "allowed":
-            refusals = []  # an answer that was not a refusal; a cached verdict changes nothing
+            refused = r["status"] in (403, 429) or bool(r["bot_protection"])
+            refusals, failures = tally(
+                refusals, failures,
+                (host, service_of(r["bot_protection"], r["headers"].get("server", "")))
+                if refused else None,
+                r["status"] is None and bool(r["error"]))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(record, indent=1), encoding="utf-8")
         done += 1
@@ -642,9 +655,11 @@ def build(_args=None, survey: Path = SURVEY) -> int:
             row["system"] = o["request"][len("feed ("):-1]
         if not row["system"] and page:
             row["system"] = system_of(page) or ""
-        for field, value, reason in corrections.get(oid, []):
+        for field, value, _ in corrections.get(oid, []):
             row[field] = value
-            row["note"] = "; ".join(x for x in (row["note"], f"corrected: {reason}") if x)
+        reasons = list(dict.fromkeys(reason for _, _, reason in corrections.get(oid, [])))
+        row["note"] = "; ".join([*([row["note"]] if row["note"] else []),
+                                 *(f"corrected: {reason}" for reason in reasons)])
         rows.append(row)
         if page and row["outcome"] not in ("no careers page found",):
             by_site[careers_key(page)].append(oid)
