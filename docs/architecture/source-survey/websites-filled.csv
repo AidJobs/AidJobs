@@ -2,23 +2,23 @@ rank,org_id,name,website,source,detail
 10,unjobs-nonun:520,World Wildlife Fund,wwf.org,"wikidata (name, accepted)","Q117892: the item is this organisation: WWF International (international non-governmental environmental organization); UNjobs lists the WWF network's jobs; WWF International is the network's head office (the US member, worldwildlife.org, is a separate national organisation)"
 12,unjobs-nonun:287,International Medical Corps,internationalmedicalcorps.org,wikidata (identifier),Q17087816 by P1297 95-3949646
 16,unjobs-nonun:426,Room to Read,roomtoread.org,"wikidata (name, accepted)",Q13920: the item is this organisation: Room to Read (American non-profit focused on literacy)
-20,unjobs-nonun:378,Palladium Group,,not yet searched,next search batch
+20,unjobs-nonun:378,Palladium Group,thepalladiumgroup.com,unverified (search-engine copy),"web search, 5 Nov 2026: Palladium, international development company (a GISI company) (https://thepalladiumgroup.com/)"
 22,unjobs-nonun:390,Plan International,plan-international.org,wikidata (identifier),Q1350284 by P1297 51-0169168
 23,unjobs-un:26,International Criminal Court,icc-cpi.int,"wikidata (name, accepted)",Q47488: the item is this organisation: International Criminal Court (intergovernmental organization and international tribunal)
 24,seed:9,Norwegian Refugee Council,flyktninghjelpen.no,wikidata (identifier),Q1247077 by P13305 NO-BRC-977538319
 25,unjobs-nonun:368,One Acre Fund,oneacrefund.org,wikidata (identifier),Q1529217 by P13305 US-DOS-64562614
 26,unjobs-nonun:304,Jhpiego,jhpiego.org,"wikidata (name, accepted)",Q6191185: the item is this organisation: Jhpiego (organization)
 30,unjobs-nonun:418,Relief International,ri.org,"wikidata (name, accepted)",Q7311083: the item is this organisation: Relief International (non-profit organization)
-33,unjobs-nonun:125,DT Global,,not yet searched,next search batch
-35,unjobs-nonun:483,United States Pharmacopeial Convention,,not yet searched,next search batch
+33,unjobs-nonun:125,DT Global,dt-global.com,unverified (search-engine copy),"web search, 5 Nov 2026: DT Global, international development company (https://dt-global.com/)"
+35,unjobs-nonun:483,United States Pharmacopeial Convention,usp.org,unverified (search-engine copy),"web search, 5 Nov 2026: US Pharmacopeia, nonprofit standards body (https://www.usp.org/)"
 36,unjobs-nonun:285,International Maize and Wheat Improvement Center,cimmyt.org,"wikidata (name, accepted)",Q1666745: the item is this organisation: International Maize and Wheat Improvement Center (organization in Mexico); the headquarters item (Mexico); the others are its country offices
 37,unjobs-un:14,European Bank for Reconstruction and Development,ebrd.com,wikidata (identifier),Q488981 by P13305 XI-IATI-EBRD
-39,unjobs-nonun:257,Impact Investment Exchange,,not yet searched,next search batch
+39,unjobs-nonun:257,Impact Investment Exchange,iixglobal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Impact Investment Exchange, Singapore impact investor (https://iixglobal.com/)"
 41,unjobs-un:61,Organization for Security and Co-operation in Europe,osce.org,"wikidata (name, accepted)",Q81299: the item is this organisation: Organization for Security and Co-operation in Europe (security-oriented intergovernmental organization)
-44,unjobs-nonun:107,Committed To Good,,not yet searched,next search batch
+44,unjobs-nonun:107,Committed To Good,ctg.org,unverified (search-engine copy),"web search, 5 Nov 2026: Committed To Good, humanitarian staffing (https://ctg.org/)"
 46,unjobs-nonun:477,U.S. Committee for Refugees and Immigrants,refugees.org,"wikidata (name, accepted)",Q7863138: the item is this organisation: U.S. Committee for Refugees and Immigrants (American nonprofit organization)
 49,unjobs-un:63,Resident Coordinator System,,not needed,"hires through the family's careers site, careers.un.org"
-51,unjobs-nonun:179,Evidence Action,,not yet searched,next search batch
+51,unjobs-nonun:179,Evidence Action,evidenceaction.org,unverified (search-engine copy),"web search, 5 Nov 2026: Evidence Action, global health nonprofit (https://www.evidenceaction.org/)"
 52,unjobs-nonun:431,SCS Global Services,scsglobalservices.com,"wikidata (name, accepted)","Q133810867: the item is this organisation: Scientific Certification Services, Inc. (United States) (company in Emeryville, United States); Scientific Certification Services trades as SCS Global Services (the same website)"
 53,unjobs-un:56,Office of the High Commissioner for Human Rights,ohchr.org,"wikidata (name, accepted)",Q656812: the item is this organisation: Office of the High Commissioner for Human Rights (UN department that promotes human rights under international law)
 55,unjobs-nonun:15,Aga Khan Development Network,the.akdn,"wikidata (name, accepted)","Q389812: the item is this organisation: Aga Khan Development Network (network of private, non-denominational development agencies founded by Aga Khan); the network item; the.akdn is its current website"
@@ -32,7 +32,7 @@ rank,org_id,name,website,source,detail
 66,unjobs-un:11,Department of Operational Support,operationalsupport.un.org,"wikidata (name, accepted)",Q130534067: the item is this organisation: United Nations Department of Operational Support (organization through UN)
 67,unjobs-nonun:409,RTI International,rti.org,"wikidata (name, accepted)","Q7277844: the item is this organisation: RTI International (independent, nonprofit research institute, headquartered in Research Triangle Park, NC, US)"
 68,unjobs-nonun:394,Pro Mujer,promujer.org,wikidata (identifier),Q4543840 by P1297 98-0115409
-70,unjobs-nonun:12,Africa50,,not yet searched,next search batch
+70,unjobs-nonun:12,Africa50,africa50.com,unverified (search-engine copy),"web search, 5 Nov 2026: Africa50, pan-African infrastructure investor (African Development Bank) (https://www.africa50.com/)"
 71,unjobs-un:89,Office on Drugs and Crime,,not needed,"hires through the family's careers site, careers.un.org"
 72,unjobs-nonun:404,Qatar Foundation,qf.org.qa,"wikidata (name, accepted)","Q1575900: the item is this organisation: Qatar Foundation (semi-private chartered, non-profit organization in Qatar, founded in 1995 by then-emir Sheikh Hamad bin Khalifa Al Thani and his second wife Moza bint Nasser)"
 73,unjobs-un:70,United Nations Human Settlements Programme,unhabitat.org,"wikidata (name, accepted)",Q487883: the item is this organisation: United Nations Human Settlements Programme (UN agency for human settlements and sustainable urban development)
@@ -41,44 +41,44 @@ rank,org_id,name,website,source,detail
 77,unjobs-nonun:406,RAND Corporation,rand.org,"wikidata (name, accepted)",Q861141: the item is this organisation: RAND Corporation (American research organization); the US organisation; RAND Europe is a separate UNjobs entry
 78,unjobs-nonun:96,Church World Service,churchworldservice.org,wikidata (identifier),Q5116734 by P1297 13-4080201
 80,unjobs-nonun:322,Management Sciences for Health,msh.org,wikidata (identifier),Q21061083 by P1297 04-2482188
-82,unjobs-nonun:349,Navanti,,not yet searched,next search batch
-83,unjobs-nonun:39,BURN Manufacturing,,not yet searched,next search batch
-87,unjobs-nonun:35,Athena Infonomics,,not yet searched,next search batch
+82,unjobs-nonun:349,Navanti,navantigroup.com,unverified (search-engine copy),"web search, 5 Nov 2026: Navanti Group, research and analysis contractor (https://navantigroup.com/)"
+83,unjobs-nonun:39,BURN Manufacturing,burnstoves.com,unverified (search-engine copy),"web search, 5 Nov 2026: BURN Manufacturing, clean cookstoves, Nairobi (https://www.burnstoves.com/)"
+87,unjobs-nonun:35,Athena Infonomics,athenainfonomics.com,unverified (search-engine copy),"web search, 5 Nov 2026: Athena Infonomics, development research firm, Chennai (https://www.athenainfonomics.com/)"
 88,unjobs-nonun:66,CRDF Global,crdfglobal.org,"wikidata (name, accepted)",Q5013851: the item is this organisation: CRDF Global (nonprofit organization promoting safety etc. via innovation etc.)
 91,unjobs-nonun:47,Bill and Melinda Gates Foundation,gatesfoundation.org,"wikidata (name, accepted)",Q655286: the item is this organisation: Gates Foundation (private foundation founded by Bill and Melinda Gates)
 92,unjobs-nonun:48,Bioversity International,bioversityinternational.org,"wikidata (name, accepted)","Q864909: the item is this organisation: Bioversity International (former global research for development organization, merged with CIAT (Q1054314)); merged with CIAT (the Alliance); its own website is still listed"
-93,unjobs-nonun:61,CARE,,not yet searched,next search batch
+93,unjobs-nonun:61,CARE,care-international.org,unverified (search-engine copy),"web search, 5 Nov 2026: CARE International, the confederation's secretariat (https://www.care-international.org/who-we-are/global-network)"
 94,unjobs-nonun:134,Democracy International,democracyinternational.com,"wikidata (name, accepted)",Q1185816: the item is this organisation: Democracy International (); the US elections and governance firm that hires for aid projects (not the German Democracy International)
 95,unjobs-nonun:259,Institut Pasteur,pasteur.fr,"wikidata (name, accepted)",Q391083: the item is this organisation: Pasteur Institute (French research institute (1887-))
-96,unjobs-nonun:332,MicroSave Consulting,,not yet searched,next search batch
+96,unjobs-nonun:332,MicroSave Consulting,microsave.net,unverified (search-engine copy),"web search, 5 Nov 2026: MicroSave Consulting, financial inclusion consultancy (https://www.microsave.net/)"
 97,unjobs-nonun:389,Pew Charitable Trusts,pewtrusts.org,"wikidata (name, accepted)","Q201296: the item is this organisation: The Pew Charitable Trusts (American non-profit, non-governmental organization)"
 98,unjobs-nonun:118,Council on Foreign Relations,cfr.org,wikidata (identifier),Q594712 by P1297 13-1628168
 99,unjobs-nonun:84,Center for Strategic and International Studies,csis.org,wikidata (identifier),Q1053614 by P1297 52-1501082
-101,unjobs-nonun:50,Bixal,,not yet searched,next search batch
-103,unjobs-nonun:220,Global Refuge,,not yet searched,next search batch
+101,unjobs-nonun:50,Bixal,bixal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Bixal, US government and development contractor (https://www.bixal.com/contract-vehicles/usaid-comp-ta)"
+103,unjobs-nonun:220,Global Refuge,globalrefuge.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Refuge, renamed from Lutheran Immigration and Refugee Service in 2024 (https://www.globalrefuge.org/news/lirs-global-refuge/)"
 105,unjobs-nonun:402,Pure Earth,pureearth.org,"wikidata (name, accepted)",Q145590: the item is this organisation: Pure Earth (environmental organization)
 107,unjobs-un:2,Asian Infrastructure Investment Bank,aiib.org,"wikidata (name, accepted)",Q18109843: the item is this organisation: Asian Infrastructure Investment Bank (international financial institution)
-108,unjobs-nonun:64,CLEAR Global,,not yet searched,next search batch
+108,unjobs-nonun:64,CLEAR Global,clearglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: CLEAR Global, formerly Translators without Borders (https://clearglobal.org/)"
 109,unjobs-nonun:333,Milken Institute,milkeninstitute.org,"wikidata (name, accepted)",Q17090319: the item is this organisation: Milken Institute (US economic think tank)
 111,unjobs-un:98,United Nations Volunteers,unv.org,"wikidata (name, accepted)",Q488065: the item is this organisation: United Nations Volunteers (non-governmental organization (1970-))
-112,unjobs-nonun:522,ZemiTek,,not yet searched,next search batch
+112,unjobs-nonun:522,ZemiTek,zemitek.com,unverified (search-engine copy),"web search, 5 Nov 2026: ZemiTek, US federal IT and management contractor (https://www.zemitek.com/)"
 115,unjobs-nonun:275,International Executive Service Corps,iesc.org,"wikidata (name, accepted)",Q6050342: the item is this organisation: International Executive Service Corps (International not-for-profit organization)
 116,unjobs-un:55,Organisation for Economic Co-operation and Development,oecd.org,wikidata (identifier),Q41550 by P13305 XM-DAC-47080
-119,unjobs-nonun:391,Precision Development,,not yet searched,next search batch
+119,unjobs-nonun:391,Precision Development,precisiondev.org,unverified (search-engine copy),"web search, 5 Nov 2026: Precision Development, renamed from Precision Agriculture for Development (https://precisiondev.org/introducing-precision-development/)"
 121,unjobs-nonun:100,Clean Air Asia,cleanairasia.org,"wikidata (name, accepted)","Q141737204: the item is this organisation: Clean Air Asia (international organisation working for better air quality and healthier, more liveable cities across Asia)"
 122,unjobs-un:13,Department of Political Affairs and Peace-building,,not needed,"hires through the family's careers site, careers.un.org"
 125,unjobs-nonun:206,GiveWell,givewell.org,"wikidata (name, accepted)",Q5565607: the item is this organisation: GiveWell (American charity)
 126,unjobs-nonun:261,Institute for Essential Services Reform,iesr.or.id,"wikidata (name, accepted)","Q142024215: the item is this organisation: Institute for Essential Services Reform (think tank in Jakarta, Indonesia)"
 128,unjobs-un:1,Asian Development Bank,adb.org,wikidata (identifier),Q188822 by P13305 XM-DAC-46004
 129,unjobs-nonun:104,Clinton Foundation,clintonfoundation.org,"wikidata (name, accepted)",Q1974620: the item is this organisation: Clinton Foundation (non-profit organization in the USA); the US head office; the others are country offices
-130,unjobs-nonun:215,Global Health Advocacy Incubator,,not yet searched,next search batch
+130,unjobs-nonun:215,Global Health Advocacy Incubator,advocacyincubator.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Health Advocacy Incubator, an initiative of Campaign for Tobacco-Free Kids (https://www.advocacyincubator.org/)"
 132,unjobs-nonun:346,Natural Resources Defense Council,nrdc.org,"wikidata (name, accepted)","Q841895: the item is this organisation: Natural Resources Defense Council (non-profit international environmental advocacy group, with its headquarters in New York City)"
 133,unjobs-un:66,Secretariat of the Pacific Community,spc.int,"wikidata (name, accepted)",Q871511: the item is this organisation: Pacific Community (principal scientific and technical organization in the Pacific region); the Secretariat of the Pacific Community is now the Pacific Community
-134,unjobs-nonun:456,Swaniti Initiative,,not yet searched,next search batch
-138,unjobs-nonun:312,Landscape Alliance (CIFOR and ICRAF),,not yet searched,next search batch
+134,unjobs-nonun:456,Swaniti Initiative,swaniti.com,unverified (search-engine copy),"web search, 5 Nov 2026: Swaniti Initiative, Indian governance social enterprise (https://swaniti.com/)"
+138,unjobs-nonun:312,Landscape Alliance (CIFOR and ICRAF),landscapealliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: CIFOR-ICRAF, renamed Landscape Alliance in June 2026 (old site cifor-icraf.org) (https://www.landscapealliance.org/)"
 140,unjobs-nonun:337,Miyamoto International,miyamotointernational.com,"wikidata (name, accepted)",Q16934150: the item is this organisation: Miyamoto International (American structural engineering and disaster management firm)
-142,unjobs-nonun:464,Technopolis Group,,not yet searched,next search batch
-143,unjobs-nonun:475,Triggerise,,not yet searched,next search batch
+142,unjobs-nonun:464,Technopolis Group,technopolis-group.com,unverified (search-engine copy),"web search, 5 Nov 2026: Technopolis Group, policy research consultancy (https://technopolis-group.com/)"
+143,unjobs-nonun:475,Triggerise,tiko.org,unverified (search-engine copy),"web search, 5 Nov 2026: Triggerise, renamed Tiko in 2024 (https://tiko.org/)"
 144,unjobs-nonun:6,Abt Associates,abtglobal.com,wikidata (identifier),"Q30281397 by P13305 US-EIN-042347643; the item is this organisation: Abt Global (company in Cambridge, Massachusetts, United States); Abt Associates renamed itself Abt Global; abtglobal.com is the current website"
 145,unjobs-nonun:33,Aspen Institute,aspeninstitute.org,"wikidata (name, accepted)",Q457528: the item is this organisation: Aspen Institute (international nonprofit organization founded in 1950)
 146,unjobs-nonun:116,Council of Europe Development Bank,coebank.org,"wikidata (name, accepted)",Q611107: the item is this organisation: Council of Europe Development Bank (international lending institution to promote social cohesion)
@@ -90,34 +90,34 @@ rank,org_id,name,website,source,detail
 154,unjobs-nonun:153,East-West Center,eastwestcenter.org,"wikidata (name, accepted)",Q5331041: the item is this organisation: East–West Center (Organization established by U.S. Congress in Hawaii)
 155,unjobs-nonun:55,Brookings Institution,brookings.edu,"wikidata (name, accepted)",Q929154: the item is this organisation: Brookings Institution (American think tank)
 156,unjobs-nonun:70,Caribbean Biodiversity Fund,caribbeanbiodiversityfund.org,"wikidata (name, accepted)",Q131387057: the item is this organisation: Caribbean Biodiversity Fund ()
-157,unjobs-nonun:123,DAI Global,,not yet searched,next search batch
+157,unjobs-nonun:123,DAI Global,dai.com,unverified (search-engine copy),"web search, 5 Nov 2026: DAI Global, international development company (https://www.dai.com/faq)"
 159,unjobs-un:17,Economic and Social Commission for Asia and the Pacific,,not needed,"hires through the family's careers site, careers.un.org"
-160,unjobs-nonun:228,HEKS/EPER Swiss Church Aid,,not yet searched,next search batch
+160,unjobs-nonun:228,HEKS/EPER Swiss Church Aid,heks.ch,unverified (search-engine copy),"web search, 5 Nov 2026: HEKS/EPER, Swiss Protestant aid agency (https://en.heks.ch/)"
 161,unjobs-nonun:272,International Council on Clean Transportation,theicct.org,"wikidata (name, accepted)",Q21002457: the item is this organisation: International Council on Clean Transportation (non-governmental organization for clean transporation)
-162,unjobs-nonun:310,Land O'Lakes Venture37,,not yet searched,next search batch
+162,unjobs-nonun:310,Land O'Lakes Venture37,landolakesventure37.org,unverified (search-engine copy),"web search, 5 Nov 2026: Land O'Lakes Venture37; the search result says it stopped work on 30 June 2026 and is closing (https://www.landolakesventure37.org/)"
 164,unjobs-nonun:413,Rare,rare.org,"wikidata (name, accepted)",Q22073418: the item is this organisation: Rare (conservation organization); the conservation organisation (not the news site or the games developer)
 165,unjobs-nonun:438,Search for Common Ground,sfcg.org,"wikidata (name, accepted)",Q7441664: the item is this organisation: Search for Common Ground (International non-profit organization)
 167,unjobs-nonun:502,Wellcome Trust,wellcome.org,"wikidata (name, accepted)","Q326276: the item is this organisation: Wellcome Trust (healthcare research charity based in London, United Kingdom)"
-171,unjobs-nonun:41,Banyan Global,,not yet searched,next search batch
+171,unjobs-nonun:41,Banyan Global,banyanglobal.com,unverified (search-engine copy),"web search, 5 Nov 2026: Banyan Global, development consulting firm (https://banyanglobal.com/)"
 172,unjobs-nonun:62,CBM,cbm.de,"wikidata (name, accepted)","Q314997: the item is this organisation: CBM International (international organization); CBM International (Christian Blind Mission); cbm.de is its German site, cbm.org the international one, to confirm in step F"
-179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,,not yet searched,next search batch
+179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,intersos.org,unverified (search-engine copy),"web search, 5 Nov 2026: INTERSOS, Italian humanitarian NGO (https://www.intersos.org/)"
 180,unjobs-un:90,UN Office at Geneva,,not needed,"hires through the family's careers site, careers.un.org"
 181,unjobs-nonun:284,International Livestock Research Institute,ilri.org,"wikidata (name, accepted)",Q1666743: the item is this organisation: International Livestock Research Institute (an international agricultural research institute within the CGIAR – formerly the Consultative Group for International Agricultural Research); the institute itself; the other item is its Addis Ababa office
 183,unjobs-nonun:80,Center for European Policy Analysis,cepa.org,"wikidata (name, accepted)",Q5059628: the item is this organisation: Center for European Policy Analysis (American organization)
 184,unjobs-nonun:112,Conrad N. Hilton Foundation,hiltonfoundation.org,"wikidata (name, accepted)",Q1126934: the item is this organisation: Conrad N. Hilton Foundation (foundation)
-185,unjobs-nonun:65,CORE Community Organized Relief Effort,,not yet searched,next search batch
-186,unjobs-nonun:60,Development Bank of Latin America (CAF),,not yet searched,next search batch
-187,unjobs-nonun:216,Global Health Strategies,,not yet searched,next search batch
+185,unjobs-nonun:65,CORE Community Organized Relief Effort,coreresponse.org,unverified (search-engine copy),"web search, 5 Nov 2026: CORE, US relief NGO (formerly J/P HRO) (https://www.coreresponse.org/)"
+186,unjobs-nonun:60,Development Bank of Latin America (CAF),caf.com,unverified (search-engine copy),"web search, 5 Nov 2026: CAF, Development Bank of Latin America and the Caribbean (https://www.caf.com/en/)"
+187,unjobs-nonun:216,Global Health Strategies,globalhealthstrategies.com,unverified (search-engine copy),"web search, 5 Nov 2026: Global Health Strategies, consultancy (https://globalhealthstrategies.com/)"
 189,unjobs-nonun:420,Resources for the Future,rff.org,"wikidata (name, accepted)","Q7315844: the item is this organisation: Resources for the Future (Washington, D.C.-based research institution on environmental, energy and natural resource economics, founded in 1952)"
-190,unjobs-nonun:445,SoCha,,not yet searched,next search batch
+190,unjobs-nonun:445,SoCha,socha.net,unverified (search-engine copy),"web search, 5 Nov 2026: SoCha, monitoring and evaluation consultancy (https://socha.net/)"
 191,unjobs-nonun:478,U.S. Fund for UNICEF,unicefusa.org,wikidata (identifier),Q54557197 by P1297 13-1760110
 194,unjobs-nonun:211,Global Communities,globalcommunities.org,wikidata (identifier),Q25047905 by P1297 52-0846183
 195,unjobs-nonun:255,International Rice Research Institute,irri.org,"wikidata (name, accepted)",Q1204921: the item is this organisation: International Rice Research Institute (organization)
 197,unjobs-nonun:5,Abdul Latif Jameel Poverty Action Lab,povertyactionlab.org,"wikidata (name, accepted)",Q774437: the item is this organisation: Abdul Latif Jameel Poverty Action Lab (global research center working to reduce poverty)
 199,unjobs-nonun:142,Digital Green,digitalgreen.org,"wikidata (name, accepted)",Q17085188: the item is this organisation: Digital Green (organization)
-201,unjobs-nonun:187,Finance in Motion,,not yet searched,next search batch
-204,unjobs-nonun:383,Partnership for Supply Chain Management,,not yet searched,next search batch
-205,unjobs-un:85,UN Institute for Training and Research,,not yet searched,next search batch
+201,unjobs-nonun:187,Finance in Motion,finance-in-motion.com,unverified (search-engine copy),"web search, 5 Nov 2026: Finance in Motion, impact asset manager, Frankfurt (https://www.finance-in-motion.com/)"
+204,unjobs-nonun:383,Partnership for Supply Chain Management,pfscm.org,unverified (search-engine copy),"web search, 5 Nov 2026: Partnership for Supply Chain Management (https://pfscm.org/)"
+205,unjobs-un:85,UN Institute for Training and Research,unitar.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNITAR (https://unitar.org/)"
 206,unjobs-nonun:491,VillageReach,villagereach.org,"wikidata (name, accepted)",Q7930610: the item is this organisation: VillageReach (organization)
 207,unjobs-un:104,World Intellectual Property Organization,wipo.int,"wikidata (name, accepted)",Q177773: the item is this organisation: World Intellectual Property Organization (specialized UN agency focused on intellectual property protection)
 208,unjobs-nonun:523,Zinc Network,zincnetwork.com,"wikidata (name, accepted)",Q128433863: the item is this organisation: Zinc Network (British public relations company)
@@ -128,7 +128,7 @@ rank,org_id,name,website,source,detail
 213,unjobs-un:18,Economic and Social Commission for Western Asia,unescwa.org,"wikidata (name, accepted)",Q1355485: the item is this organisation: United Nations Economic and Social Commission for Western Asia (United Nations Commission for economic cooperation among its member states)
 214,unjobs-nonun:162,Environmental Defense Fund,edf.org,"wikidata (name, accepted)","Q1345899: the item is this organisation: Environmental Defense Fund (United States environmental advocacy organization, headquartered in New York City)"
 215,unjobs-nonun:273,International Development Group,internationaldevelopmentgroup.com,"wikidata (name, accepted)","Q141669515: the item is this organisation: International Development Group (United States) (company in Arlington, United States); the Arlington development consultancy of this name"
-217,unjobs-nonun:302,Janaagraha Centre for Citizenship and Democracy,,not yet searched,next search batch
+217,unjobs-nonun:302,Janaagraha Centre for Citizenship and Democracy,janaagraha.org,unverified (search-engine copy),"web search, 5 Nov 2026: Janaagraha, Bengaluru (https://www.janaagraha.org/)"
 218,unjobs-un:100,United Nations Support Office in Haiti,,not needed,"hires through the family's careers site, careers.un.org"
 219,unjobs-nonun:493,W.K. Kellogg Foundation,wkkf.org,"wikidata (name, accepted)",Q7945762: the item is this organisation: W. K. Kellogg Foundation (philanthropic foundation in the United States)
 221,unjobs-un:105,World Meteorological Organization,wmo.int,"wikidata (name, accepted)",Q170424: the item is this organisation: World Meteorological Organization (specialized agency of the United Nations for meteorology)
@@ -138,76 +138,76 @@ rank,org_id,name,website,source,detail
 225,unjobs-nonun:119,Counterpart International,counterpart.org,wikidata (identifier),Q5176998 by P1297 13-6183605
 226,unjobs-nonun:181,FINCA International,finca.org,"wikidata (name, accepted)",Q3079938: the item is this organisation: FINCA International (Microfinance organization)
 228,unjobs-nonun:57,Busara Center for Behavioral Economics,busaracenter.org,wikidata (identifier),Q30271658 by P1297 46-2695042
-229,unjobs-nonun:22,American Bar Association Rule of Law Initiative,,not yet searched,next search batch
-231,unjobs-nonun:132,David and Lucile Packard Foundation (Packard Foundation),,not yet searched,next search batch
-232,unjobs-nonun:139,Development Alternatives,,not yet searched,next search batch
+229,unjobs-nonun:22,American Bar Association Rule of Law Initiative,americanbar.org,unverified (search-engine copy),"web search, 5 Nov 2026: ABA Rule of Law Initiative, a section of americanbar.org with no site of its own (https://www.americanbar.org/advocacy/global-programs/who-we-are/rule-law-initiative/)"
+231,unjobs-nonun:132,David and Lucile Packard Foundation (Packard Foundation),packard.org,unverified (search-engine copy),"web search, 5 Nov 2026: Packard Foundation (https://www.packard.org/)"
+232,unjobs-nonun:139,Development Alternatives,devalt.org,unverified (search-engine copy),"web search, 5 Nov 2026: Development Alternatives Group, New Delhi (the UNjobs posts are this one) (https://devalt.org/work-with-us)"
 233,unjobs-nonun:193,Forest Stewardship Council,fsc.org,"wikidata (name, accepted)",Q748367: the item is this organisation: Forest Stewardship Council (organization promoting and certifying responsible management of forest)
-235,unjobs-nonun:224,GoodPower,,not yet searched,next search batch
-236,unjobs-un:33,"IIIM Syria - International, Impartial and Independent Mechanism",,not yet searched,next search batch
+235,unjobs-nonun:224,GoodPower,goodpower.org,unverified (search-engine copy),"web search, 5 Nov 2026: GoodPower, renamed from Alliance for Climate Education (https://goodpower.org/blog/goodpower-is-here/)"
+236,unjobs-un:33,"IIIM Syria - International, Impartial and Independent Mechanism",iiim.un.org,unverified (search-engine copy),"web search, 5 Nov 2026: IIIM Syria, a UN mechanism (https://iiim.un.org/)"
 237,unjobs-un:36,International Maritime Organization,imo.org,"wikidata (name, accepted)",Q201054: the item is this organisation: International Maritime Organization (specialized UN agency concerned with legal and regulatory aspects of maritime activity)
-238,unjobs-nonun:325,Medical Care Development,,not yet searched,next search batch
-244,unjobs-un:86,UN Joint Staff Pension Fund,,not yet searched,next search batch
+238,unjobs-nonun:325,Medical Care Development,mcd.org,unverified (search-engine copy),"web search, 5 Nov 2026: Medical Care Development (MCD Global Health) (https://www.mcd.org/)"
+244,unjobs-un:86,UN Joint Staff Pension Fund,unjspf.org,unverified (search-engine copy),"web search, 5 Nov 2026: UN Joint Staff Pension Fund (https://www.unjspf.org/)"
 245,unjobs-un:91,UN Office at Nairobi,,not needed,"hires through the family's careers site, careers.un.org"
 246,unjobs-un:74,UN Office for Disaster Risk Reduction,,not needed,"hires through the family's careers site, careers.un.org"
 248,unjobs-nonun:521,WorldFish,worldfishcenter.org,"wikidata (name, accepted)",Q1486149: the item is this organisation: WorldFish (organization); the centre itself; the others are country offices
 252,unjobs-nonun:317,Living Goods,livinggoods.org,wikidata (identifier),Q54834256 by P1297 20-5010527
-254,unjobs-nonun:19,Albo,,not yet searched,next search batch
+254,unjobs-nonun:19,Albo,albo.com,unverified (search-engine copy),"web search, 5 Nov 2026: Albo, a Mexican fintech company, not an aid organisation (outside the target; for step G's review) (https://albo.com/)"
 255,unjobs-nonun:37,B Lab,bcorporation.net,"wikidata (name, accepted)","Q16983456: the item is this organisation: B Lab (U.S. non-profit organization); B Lab, the non-profit (not the certification)"
 256,unjobs-nonun:42,Barcelona Institute for Global Health,isglobal.org,"wikidata (name, accepted)","Q30256793: the item is this organisation: Barcelona Institute for Global Health (healthcare organization in Barcelona, Spain)"
 257,unjobs-nonun:53,Blue Ventures,blueventures.org,"wikidata (name, accepted)",Q4929991: the item is this organisation: Blue Ventures (science-led social enterprise that develops approaches for marine conservation)
-258,unjobs-nonun:526,charity: water,,not yet searched,next search batch
-260,unjobs-nonun:138,"DevTech Systems, Inc.",,not yet searched,next search batch
-261,unjobs-nonun:186,Fika,,not yet searched,next search batch
+258,unjobs-nonun:526,charity: water,charitywater.org,unverified (search-engine copy),"web search, 5 Nov 2026: charity: water (https://www.charitywater.org/)"
+260,unjobs-nonun:138,"DevTech Systems, Inc.",devtechsys.com,unverified (search-engine copy),"web search, 5 Nov 2026: DevTech Systems, development consulting firm (https://devtechsys.com/)"
+261,unjobs-nonun:186,Fika,fika.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fika, rural trail bridges, formerly Bridges to Prosperity (https://fika.org/join-us/)"
 263,unjobs-un:49,International Seabed Authority,isa.org.jm,"wikidata (name, accepted)",Q333727: the item is this organisation: International Seabed Authority (Intergovernmental body to regulate mineral-related activities on the seabed)
 264,unjobs-nonun:305,John D. and Catherine T. MacArthur Foundation,macfound.org,"wikidata (name, accepted)",Q1424691: the item is this organisation: John D. and Catherine T. MacArthur Foundation (private foundation (US))
 265,unjobs-nonun:365,Oceana,oceana.org,"wikidata (name, accepted)",Q7076166: the item is this organisation: Oceana (organization); the ocean conservation organisation (not the nightclubs or the singer)
 266,unjobs-un:52,Office of Administration of Justice,,not needed,"hires through the family's careers site, careers.un.org"
 267,unjobs-un:58,Office of Internal Oversight Services,,not needed,"hires through the family's careers site, careers.un.org"
 268,unjobs-un:60,Organization for the Prohibition of Chemical Weapons,opcw.org,"wikidata (name, accepted)",Q842490: the item is this organisation: Organisation for the Prohibition of Chemical Weapons (international organization based in The Hague)
-270,unjobs-nonun:395,ProVeg International,,not yet searched,next search batch
+270,unjobs-nonun:395,ProVeg International,proveg.org,unverified (search-engine copy),"web search, 5 Nov 2026: ProVeg International (https://proveg.org/)"
 271,unjobs-nonun:408,RMI,rmi.org,"wikidata (name, accepted)","Q1795496: the item is this organisation: RMI (USA non-profit think tank); RMI, the US energy think tank (formerly Rocky Mountain Institute)"
-272,unjobs-nonun:444,Smart Freight Centre,,not yet searched,next search batch
-273,unjobs-nonun:455,Sunflower Services,,not yet searched,next search batch
-275,unjobs-un:78,UN Framework Convention on Climate Change,,not yet searched,next search batch
+272,unjobs-nonun:444,Smart Freight Centre,smartfreightcentre.org,unverified (search-engine copy),"web search, 5 Nov 2026: Smart Freight Centre, Dutch nonprofit (https://www.smartfreightcentre.org/en/about-sfc/about-us/)"
+273,unjobs-nonun:455,Sunflower Services,sunflowerservicespbc.com,unverified (search-engine copy),"web search, 5 Nov 2026: Sunflower Services PBC, back-office services for nonprofits (took over Arabella Advisors' operations in 2025); found through a job board's employer page (https://jobs.philanthropy.com/employer/33219e78-2b76-4c8b-9cef-b25d102df361/sunflower-services-pbc)"
+275,unjobs-un:78,UN Framework Convention on Climate Change,unfccc.int,unverified (search-engine copy),"web search, 5 Nov 2026: UNFCCC secretariat, Bonn (https://www.unfccc.int/)"
 276,unjobs-un:50,UN Organisation Stabilization Mission in the DR Congo,,not needed,"hires through the family's careers site, careers.un.org"
 278,unjobs-nonun:511,Women's World Banking,womensworldbanking.org,"wikidata (name, accepted)",Q8031103: the item is this organisation: Women's World Banking (organization)
 280,unjobs-nonun:30,Ashoka,ashoka.org,wikidata (identifier),Q85060 by P1297 51-0255908
 283,unjobs-nonun:329,Mennonite Economic Development Associates,meda.org,"wikidata (name, accepted)","Q30271855: the item is this organisation: Mennonite Economic Development Associates (organization in Waterloo, Canada)"
 285,unjobs-un:3,Association of Southeast Asian Nations,asean.org,"wikidata (name, accepted)",Q7768: the item is this organisation: ASEAN (international organisation of Southeast Asian countries)
-287,unjobs-nonun:122,D-tree,,not yet searched,next search batch
+287,unjobs-nonun:122,D-tree,d-tree.org,unverified (search-engine copy),"web search, 5 Nov 2026: D-tree, digital health nonprofit (https://www.d-tree.org/our-work/)"
 288,unjobs-un:7,Department of Economic and Social Affairs,,not needed,"hires through the family's careers site, careers.un.org"
 289,unjobs-un:10,"Department of Management Strategy, Policy and Compliance",un.org,"wikidata (name, accepted)","Q137441704: the item is this organisation: United Nations Department of Management Strategy, Policy and Compliance (section of the United Nations Secretariat)"
-290,unjobs-nonun:161,Enveritas,,not yet searched,next search batch
+290,unjobs-nonun:161,Enveritas,enveritas.org,unverified (search-engine copy),"web search, 5 Nov 2026: Enveritas, coffee sustainability nonprofit (https://www.enveritas.org/)"
 292,unjobs-nonun:184,Fashion for Good,fashionforgood.com,"wikidata (name, accepted)",Q110995897: the item is this organisation: Fashion for Good (museum in Netherlands); the Fashion for Good initiative (its museum shares the website)
 293,unjobs-nonun:207,Global Alliance for Improved Nutrition,gainhealth.org,wikidata (identifier),Q5570101 by P13305 CH-FDJP-CHE-110347351
-294,unjobs-nonun:226,Greenpeace,,not yet searched,next search batch
-296,unjobs-nonun:251,IGAD Climate Prediction and Applications Centre,,not yet searched,next search batch
+294,unjobs-nonun:226,Greenpeace,greenpeace.org,unverified (search-engine copy),"web search, 5 Nov 2026: Greenpeace International, a section of greenpeace.org (https://www.greenpeace.org/international/)"
+296,unjobs-nonun:251,IGAD Climate Prediction and Applications Centre,icpac.net,unverified (search-engine copy),"web search, 5 Nov 2026: ICPAC, IGAD's climate centre, Nairobi (https://www.icpac.net/)"
 297,unjobs-un:29,International Civil Service Commission,icsc.un.org,"wikidata (name, accepted)",Q25104179: the item is this organisation: International Civil Service Commission (Subsidiary of the United Nations General Assembly)
 299,unjobs-nonun:291,International Refugee Assistance Project,refugeerights.org,"wikidata (name, accepted)",Q30325304: the item is this organisation: International Refugee Assistance Project (US non-profit organization)
 301,unjobs-un:51,Nordic Investment Bank,nib.int,"wikidata (name, accepted)","Q2020649: the item is this organisation: Nordic Investment Bank (the joint international financial institution of Denmark, Finland, Iceland, Norway, and Sweden)"
 302,unjobs-nonun:424,Rockefeller Foundation,rockefellerfoundation.org,"wikidata (name, accepted)",Q862034: the item is this organisation: Rockefeller Foundation (United States-based philanthropic organization)
 303,unjobs-nonun:437,Sea-Watch,sea-watch.org,"wikidata (name, accepted)",Q20850693: the item is this organisation: Sea-Watch (German non-governmental organisation dedicated to rescung refugees in the Mediterranean)
-304,unjobs-un:67,Technology Bank for the Least Developed Countries,,not yet searched,next search batch
-305,unjobs-un:83,UN Institute for Disarmament Research,,not yet searched,next search batch
+304,unjobs-un:67,Technology Bank for the Least Developed Countries,un.org,unverified (search-engine copy),"web search, 5 Nov 2026: Technology Bank for the Least Developed Countries, a section of un.org (hires through careers.un.org) (https://www.un.org/technologybank/en)"
+305,unjobs-un:83,UN Institute for Disarmament Research,unidir.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNIDIR (https://unidir.org/)"
 306,unjobs-nonun:481,United Nations Convention to Combat Desertification,unccd.int,"wikidata (name, accepted)",Q331520: the item is this organisation: United Nations Convention to Combat Desertification (International treaty on environmental protection)
-307,unjobs-nonun:484,University Research Co.,,not yet searched,next search batch
+307,unjobs-nonun:484,University Research Co.,urc-chs.com,unverified (search-engine copy),"web search, 5 Nov 2026: University Research Co. (https://www.urc-chs.com/)"
 309,unjobs-nonun:144,Direct Relief,directrelief.org,wikidata (identifier),Q1227469 by P1297 95-1831116
-311,unjobs-nonun:380,Panorama Global,,not yet searched,next search batch
+311,unjobs-nonun:380,Panorama Global,panoramaglobal.org,unverified (search-engine copy),"web search, 5 Nov 2026: Panorama Global (https://panoramaglobal.org/)"
 312,unjobs-nonun:27,Armed Conflict Location and Event Data Project,acleddata.com,"wikidata (name, accepted)",Q18354074: the item is this organisation: Armed Conflict Location & Event Data Project (American non-governmental organization)
 313,unjobs-nonun:11,Adam Smith International,adamsmithinternational.com,wikidata (identifier),Q132472623 by P13305 GB-COH-2732176
-319,unjobs-nonun:46,Bezos Earth Fund,,not yet searched,next search batch
+319,unjobs-nonun:46,Bezos Earth Fund,bezosearthfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: Bezos Earth Fund (https://www.bezosearthfund.org/)"
 320,unjobs-nonun:49,BirdLife International,birdlife.org,"wikidata (name, accepted)",Q210108: the item is this organisation: BirdLife International (global partnership of conservation organizations that strives to conserve birds)
 321,unjobs-nonun:51,Bloomberg Philanthropies,bloomberg.org,"wikidata (name, accepted)",Q16987920: the item is this organisation: Bloomberg Philanthropies (charitable organization)
-322,unjobs-nonun:54,BlueOrchard Finance Ltd,,not yet searched,next search batch
+322,unjobs-nonun:54,BlueOrchard Finance Ltd,blueorchard.com,unverified (search-engine copy),"web search, 5 Nov 2026: BlueOrchard, impact investment manager (Schroders) (https://www.blueorchard.com/)"
 323,unjobs-nonun:59,C40 Cities,c40.org,"wikidata (name, accepted)",Q485087: the item is this organisation: C40 Cities Climate Leadership Group (group of cities around the world)
 324,unjobs-nonun:101,Climate Analytics,climateanalytics.org,"wikidata (name, accepted)",Q98471481: the item is this organisation: Climate Analytics (non-profit organization focused on climate science and climate policy)
 325,unjobs-nonun:103,Climate Policy Initiative,climatepolicyinitiative.org,"wikidata (name, accepted)",Q55006595: the item is this organisation: Climate Policy Initiative (U.S. non-profit organization.)
 331,unjobs-nonun:160,Energy Innovation,energyinnovation.org,"wikidata (name, accepted)",Q137918445: the item is this organisation: Energy Innovation (US energy and climate policy research group promoting the most effective emission-cutting policies)
-332,unjobs-nonun:163,Environmental Investigation Agency,,not yet searched,next search batch
-333,unjobs-nonun:198,Fòs Feminista,,not yet searched,next search batch
-334,unjobs-nonun:203,"Gender Resources, Inc.",,not yet searched,next search batch
-335,unjobs-nonun:219,Global Partnerships,,not yet searched,next search batch
-336,unjobs-nonun:199,GOPA Consulting Group,,not yet searched,next search batch
+332,unjobs-nonun:163,Environmental Investigation Agency,eia-international.org,unverified (search-engine copy),"web search, 5 Nov 2026: Environmental Investigation Agency (UK); EIA US is eia.org (https://eia-international.org/)"
+333,unjobs-nonun:198,Fòs Feminista,fosfeminista.org,unverified (search-engine copy),"web search, 5 Nov 2026: Fòs Feminista (https://fosfeminista.org/what-we-do/initiatives/)"
+334,unjobs-nonun:203,"Gender Resources, Inc.",genderresources.com,unverified (search-engine copy),"web search, 5 Nov 2026: Gender Resources, Inc.; found through Devex's organisation page (a search result, not read) (https://www.devex.com/organizations/gender-resources-inc-123985)"
+335,unjobs-nonun:219,Global Partnerships,globalpartnerships.org,unverified (search-engine copy),"web search, 5 Nov 2026: Global Partnerships, impact investor, Seattle (https://globalpartnerships.org/)"
+336,unjobs-nonun:199,GOPA Consulting Group,gopa.eu,unverified (search-engine copy),"web search, 5 Nov 2026: GOPA Consulting Group (https://www.gopa.eu/en/)"
 338,unjobs-nonun:260,Institute for Energy Economics and Financial Analysis,ieefa.org,"wikidata (name, accepted)",Q135192960: the item is this organisation: Institute for Energy Economics and Financial Analysis (think tank)
 339,unjobs-nonun:263,Institute for Transportation and Development Policy,itdp.org,"wikidata (name, accepted)",Q6039711: the item is this organisation: Institute for Transportation and Development Policy (organization)
 341,unjobs-nonun:281,International Institute for Strategic Studies,iiss.org,"wikidata (name, accepted)",Q1206709: the item is this organisation: International Institute for Strategic Studies (British research institute (or think tank) in the area of international affairs)
@@ -216,55 +216,55 @@ rank,org_id,name,website,source,detail
 348,unjobs-un:57,Office of Information and Communications Technology,unite.un.org,"wikidata (name, accepted)",Q130533752: the item is this organisation: United Nations Office of Information and Communications Technology (office of the United Nations Secretariat)
 349,unjobs-nonun:534,office-of-the-special-adviser-on-africa,,not needed,"hires through the family's careers site, careers.un.org"
 351,unjobs-nonun:400,Public Health Institute,phi.org,"wikidata (name, accepted)","Q30252845: the item is this organisation: Public Health Institute (healthcare organization in Oakland, United States)"
-352,unjobs-nonun:403,Q2 Impact,,not yet searched,next search batch
-353,unjobs-nonun:539,rand-europe,,not yet searched,next search batch
-355,unjobs-nonun:417,Relief Applications,,not yet searched,next search batch
-356,unjobs-nonun:419,Resolve to Save Lives,,not yet searched,next search batch
-359,unjobs-nonun:430,SALT International,,not yet searched,next search batch
-360,unjobs-nonun:472,Transform Health,,not yet searched,next search batch
+352,unjobs-nonun:403,Q2 Impact,q2impact.com,unverified (search-engine copy),"web search, 5 Nov 2026: Q2 Impact, monitoring and evaluation consultancy (https://www.q2impact.com/about/)"
+353,unjobs-nonun:539,rand-europe,rand.org,unverified (search-engine copy),"web search, 5 Nov 2026: RAND Europe, a section of rand.org (https://www.rand.org/randeurope.html)"
+355,unjobs-nonun:417,Relief Applications,reliefapplications.org,unverified (search-engine copy),"web search, 5 Nov 2026: Relief Applications, humanitarian software (https://reliefapplications.org/)"
+356,unjobs-nonun:419,Resolve to Save Lives,resolvetosavelives.org,unverified (search-engine copy),"web search, 5 Nov 2026: Resolve to Save Lives (https://resolvetosavelives.org/)"
+359,unjobs-nonun:430,SALT International,,none found (searched),"web search, 5 Nov 2026: no organisation of this name found; UNjobs' listing (https://unjobs.org/vacancies/1777680527167, a search result) appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled"
+360,unjobs-nonun:472,Transform Health,transformhealthcoalition.org,unverified (search-engine copy),"web search, 5 Nov 2026: Transform Health coalition (https://transformhealthcoalition.org/)"
 361,unjobs-un:71,UN Assistance Mission in Afghanistan,,not needed,"hires through the family's careers site, careers.un.org"
-362,unjobs-un:72,UN Conference on Trade and Development,,not yet searched,next search batch
+362,unjobs-un:72,UN Conference on Trade and Development,unctad.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNCTAD (UN Trade and Development) (https://unctad.org/)"
 363,unjobs-un:101,United Nations University,unu.edu,"wikidata (name, accepted)",Q492442: the item is this organisation: United Nations University (academic and research arm of the United Nations); the university itself; the other item is its Guimarães unit
-364,unjobs-nonun:479,US Department of State Bureau for International Narcotics and Law Enforcement Affairs,,not yet searched,next search batch
-365,unjobs-nonun:490,Village Capital,,not yet searched,next search batch
+364,unjobs-nonun:479,US Department of State Bureau for International Narcotics and Law Enforcement Affairs,state.gov,unverified (search-engine copy),"web search, 5 Nov 2026: INL, a bureau of the US State Department, a section of state.gov (https://www.state.gov/about-us-bureau-of-international-narcotics-and-law-enforcement-affairs)"
+365,unjobs-nonun:490,Village Capital,vilcap.com,unverified (search-engine copy),"web search, 5 Nov 2026: Village Capital (https://vilcap.com/)"
 366,unjobs-nonun:507,William and Flora Hewlett Foundation (Hewlett Foundation),hewlett.org,wikidata (identifier),Q1288412 by P13305 US-EIN-941655673
 367,unjobs-nonun:513,World Business Council for Sustainable Development,wbcsd.org,"wikidata (name, accepted)",Q677910: the item is this organisation: World Business Council for Sustainable Development (membership organization for companies)
 368,unjobs-un:106,World Trade Organization,wto.org,"wikidata (name, accepted)",Q7825: the item is this organisation: World Trade Organization (intergovernmental organization that intends to supervise and liberalize international trade)
 370,unjobs-nonun:71,Carnegie Endowment,carnegieendowment.org,wikidata (identifier),Q1153595 by P1297 13-0552040
-373,unjobs-nonun:414,RefugePoint,,not yet searched,next search batch
+373,unjobs-nonun:414,RefugePoint,refugepoint.org,unverified (search-engine copy),"web search, 5 Nov 2026: RefugePoint (https://refugepoint.org/)"
 374,unjobs-nonun:270,International Center for Biosaline Agriculture,biosaline.org,"wikidata (name, accepted)","Q25227016: the item is this organisation: International Center for Biosaline Agriculture (international, not-for-profit applied agricultural research center with a unique focus on marginal environment)"
 375,unjobs-nonun:1,350.org,350.org,"wikidata (name, accepted)",Q2091619: the item is this organisation: 350.org (international environmental NGO)
 376,unjobs-nonun:7,Access Now,accessnow.org,"wikidata (name, accepted)",Q4672520: the item is this organisation: Access Now (non-profit organization)
 378,unjobs-nonun:24,American Public Health Association,apha.org,"wikidata (name, accepted)","Q4744758: the item is this organisation: American Public Health Association (Washington, D.C.-based professional organization)"
 383,unjobs-nonun:88,Ceres,ceres.org,"wikidata (name, accepted)","Q2981087: the item is this organisation: Ceres (non-profit organization advocating sustainability); the sustainability non-profit (not the city, the game or the companies)"
-384,unjobs-nonun:98,CitizenLab,,not yet searched,next search batch
-385,unjobs-nonun:106,Comitato Collaborazione Medica,,not yet searched,next search batch
+384,unjobs-nonun:98,CitizenLab,govocal.com,unverified (search-engine copy),"web search, 5 Nov 2026: CitizenLab, renamed Go Vocal in 2024, a civic software company (outside aid; for step G's review) (https://www.govocal.com/citizenlab-becomes-go-vocal)"
+385,unjobs-nonun:106,Comitato Collaborazione Medica,ccm-italia.org,unverified (search-engine copy),"web search, 5 Nov 2026: Comitato Collaborazione Medica, Turin; found through an Italian nonprofit directory (https://italianonprofit.it/scheda-ente/comitato-collaborazione-medica/)"
 387,unjobs-nonun:126,Dalberg Global Development Advisors,dalberg.com,"wikidata (name, accepted)",Q5210246: the item is this organisation: Dalberg Global Development Advisors (policy advisory firm)
 388,unjobs-un:12,Department of Peace Operations,,not needed,"hires through the family's careers site, careers.un.org"
 389,unjobs-nonun:166,Epicentre,epicentre.msf.org,"wikidata (name, accepted)",Q107013885: the item is this organisation: Epicentre (part of Médecins Sans Frontières)
 390,unjobs-un:20,Ethics Office,,not needed,"hires through the family's careers site, careers.un.org"
 393,unjobs-nonun:210,Global Citizen,globalcitizen.org,"wikidata (name, accepted)",Q5570568: the item is this organisation: Global Citizen (organization)
 394,unjobs-nonun:212,Global Energy Monitor,globalenergymonitor.org,"wikidata (name, accepted)",Q65086937: the item is this organisation: Global Energy Monitor (nonprofit tracking fossil fuel and energy infrastructure projects worldwide)
-398,unjobs-nonun:229,HELP Logistics,,not yet searched,next search batch
+398,unjobs-nonun:229,HELP Logistics,help-logistics.org,unverified (search-engine copy),"web search, 5 Nov 2026: HELP Logistics (Kühne Foundation) (https://www.help-logistics.org/)"
 399,unjobs-nonun:529,independent-institution-on-missing-persons-in-the-syrian-arab-republic-iimp,,not needed,"hires through the family's careers site, careers.un.org"
 400,unjobs-un:27,International Court of Justice,icj-cij.org,"wikidata (name, accepted)",Q7801: the item is this organisation: International Court of Justice (primary judicial organ of the United Nations)
 401,unjobs-nonun:274,International Dialogue Centre,kaiciid.org,"wikidata (name, accepted)",Q6324948: the item is this organisation: KAICIID Dialogue Centre (interfaith dialogue international organization); the International Dialogue Centre is KAICIID
 404,unjobs-nonun:298,Internews Network,internews.org,"wikidata (name, accepted)",Q6056118: the item is this organisation: Internews (organization)
 405,unjobs-nonun:303,Japan International Cooperation Agency,jica.go.jp,wikidata (identifier),Q958590 by P13305 XM-DAC-701-8
 406,unjobs-nonun:327,Medicines for Malaria Venture,mmv.org,"wikidata (name, accepted)",Q6806774: the item is this organisation: Medicines for Malaria Venture (organization)
-407,unjobs-nonun:531,myAgro Farms,,not yet searched,next search batch
+407,unjobs-nonun:531,myAgro Farms,myagro.org,unverified (search-engine copy),"web search, 5 Nov 2026: myAgro (https://www.myagro.org/)"
 410,unjobs-un:88,Office of Counter-Terrorism,,not needed,"hires through the family's careers site, careers.un.org"
 411,unjobs-nonun:537,office-of-the-united-nations-ombudsman-and-mediation-services,,not needed,"hires through the family's careers site, careers.un.org"
 413,unjobs-nonun:369,Open Society Foundations,opensocietyfoundations.org,"wikidata (name, accepted)",Q786194: the item is this organisation: Open Society Foundations (international grantmaking network founded by business magnate George Soros)
 414,unjobs-nonun:370,Organization of American States,oas.org,"wikidata (name, accepted)",Q123759: the item is this organisation: Organization of American States (international organization of states in the Americas)
-415,unjobs-nonun:379,Panagora Group,,not yet searched,next search batch
-416,unjobs-nonun:376,PAX sapiens,,not yet searched,next search batch
+415,unjobs-nonun:379,Panagora Group,panagoragroup.net,unverified (search-engine copy),"web search, 5 Nov 2026: Panagora Group (https://panagoragroup.net/)"
+416,unjobs-nonun:376,PAX sapiens,paxsapiens.org,unverified (search-engine copy),"web search, 5 Nov 2026: PAX sapiens (https://paxsapiens.org/)"
 418,unjobs-nonun:388,Peterson Institute for International Economics,piie.com,"wikidata (name, accepted)","Q2981447: the item is this organisation: Peterson Institute for International Economics (think tank based in Washington, DC, USA)"
-420,unjobs-nonun:416,Regional Community Forestry Training Center for Asia and the Pacific,,not yet searched,next search batch
+420,unjobs-nonun:416,Regional Community Forestry Training Center for Asia and the Pacific,recoftc.org,unverified (search-engine copy),"web search, 5 Nov 2026: RECOFTC, Bangkok (https://www.recoftc.org/)"
 421,unjobs-nonun:435,Samaritan's Purse,samaritanspurse.org,"wikidata (name, accepted)",Q3470648: the item is this organisation: Samaritan's Purse (Christian humanitarian aid organization)
-422,unjobs-nonun:433,SEEK Development,,not yet searched,next search batch
+422,unjobs-nonun:433,SEEK Development,seekdevelopment.org,unverified (search-engine copy),"web search, 5 Nov 2026: SEEK Development, Berlin (https://www.seekdevelopment.org/)"
 423,unjobs-nonun:452,"Statistical, Economic and Social Research and Training Centre for Islamic Countries",sesric.org,"wikidata (name, accepted)","Q20988519: the item is this organisation: Statistical, Economic and Social Research and Training Centre for Islamic Countries (subsidiary organ of the Organisation of Islamic Cooperation serving OIC members in the area of statistics)"
-424,unjobs-nonun:460,Systemic Justice,,not yet searched,next search batch
+424,unjobs-nonun:460,Systemic Justice,systemicjustice.ngo,unverified (search-engine copy),"web search, 5 Nov 2026: Systemic Justice, Amsterdam (https://systemicjustice.ngo/)"
 426,unjobs-nonun:473,Transparency International,transparency.org,"wikidata (name, accepted)","Q174240: the item is this organisation: Transparency International (international, non-governmental umbrella organization)"
 429,unjobs-nonun:492,Vizzuality,vizzuality.com,"wikidata (name, accepted)",Q22909667: the item is this organisation: Vizzuality (a science and technology company focused on data visualization)
 440,unjobs-nonun:245,International Center for Agricultural Research in the Dry Areas,icarda.org,"wikidata (name, accepted)",Q601277: the item is this organisation: International Center for Agricultural Research in the Dry Areas (agricultural research institute); the institute itself; the others are its Rabat and Amman offices
@@ -272,9 +272,9 @@ rank,org_id,name,website,source,detail
 442,unjobs-nonun:85,Center for Victims of Torture,cvt.org,wikidata (identifier),Q5059917 by P1297 36-3383933
 444,unjobs-nonun:91,Chatham House,chathamhouse.org,"wikidata (name, accepted)",Q263016: the item is this organisation: Chatham House (international affairs think tank)
 446,unjobs-nonun:238,Henry L. Stimson Center,stimson.org,"wikidata (name, accepted)",Q5724590: the item is this organisation: Henry L. Stimson Center (American think tank)
-447,unjobs-nonun:188,Financing Alliance for Health,,not yet searched,next search batch
-448,unjobs-nonun:440,Shelter For Life International,,not yet searched,next search batch
-453,unjobs-nonun:4,ASEAN Coordinating Centre for Humanitarian Assistance on Disaster Management (AHA Centre),,not yet searched,next search batch
+447,unjobs-nonun:188,Financing Alliance for Health,financingalliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: Financing Alliance for Health, Nairobi (https://financingalliance.org/)"
+448,unjobs-nonun:440,Shelter For Life International,shelter.org,unverified (search-engine copy),"web search, 5 Nov 2026: Shelter For Life International (https://shelter.org/)"
+453,unjobs-nonun:4,ASEAN Coordinating Centre for Humanitarian Assistance on Disaster Management (AHA Centre),ahacentre.org,unverified (search-engine copy),"web search, 5 Nov 2026: AHA Centre, Jakarta (https://ahacentre.org/)"
 454,unjobs-nonun:56,Bruegel,bruegel.org,"wikidata (name, accepted)",Q544706: the item is this organisation: Bruegel (European think tank); the European think tank (not the Belgian festival)
 455,unjobs-nonun:97,Citizen Lab,citizenlab.ca,"wikidata (name, accepted)",Q5122568: the item is this organisation: Citizen Lab (research organization based in Canada)
 456,unjobs-nonun:108,Committee to Protect Journalists,cpj.org,"wikidata (name, accepted)",Q1115813: the item is this organisation: Committee to Protect Journalists (American nonprofit organization)
@@ -283,34 +283,34 @@ rank,org_id,name,website,source,detail
 459,unjobs-un:8,Department for General Assembly and Conference Management,,not needed,"hires through the family's careers site, careers.un.org"
 460,unjobs-nonun:527,department-for-general-assembly-and-conference-management-dcs-nairobi,,not needed,"hires through the family's careers site, careers.un.org"
 462,unjobs-nonun:124,DHIS2,dhis2.org,"wikidata (name, accepted)",Q19698946: the item is this organisation: DHIS2 (District Health Information System 2)
-464,unjobs-nonun:154,Ecologic,,not yet searched,next search batch
-465,unjobs-nonun:149,EFI Foundation,,not yet searched,next search batch
+464,unjobs-nonun:154,Ecologic,ecologic.eu,unverified (search-engine copy),"web search, 5 Nov 2026: Ecologic Institute, Berlin (https://www.ecologic.eu/)"
+465,unjobs-nonun:149,EFI Foundation,efifoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: EFI Foundation, formerly Energy Futures Initiative (https://efifoundation.org/about-us/our-impact/)"
 468,unjobs-un:22,European Forest Institute,efi.int,"wikidata (name, accepted)",Q580400: the item is this organisation: European Forest Institute (organization)
 469,unjobs-nonun:173,European Institute of Innovation and Technology,eit.europa.eu,"wikidata (name, accepted)","Q993120: the item is this organisation: European Institute of Innovation and Technology (research institute, independent EU body)"
 471,unjobs-nonun:182,FLOCERT,flocert.net,"wikidata (name, accepted)",Q986530: the item is this organisation: FLOCert (certification organization)
 472,unjobs-nonun:192,Ford Foundation,fordfoundation.org,"wikidata (name, accepted)",Q1313036: the item is this organisation: Ford Foundation (private foundation based in New York City)
-474,unjobs-nonun:197,Future Advocacy,,not yet searched,next search batch
-478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),,not yet searched,next search batch
-479,unjobs-nonun:235,Heising-Simons Foundation,,not yet searched,next search batch
+474,unjobs-nonun:197,Future Advocacy,futureadvocacy.com,unverified (search-engine copy),"web search, 5 Nov 2026: Future Advocacy, London (https://futureadvocacy.com/who-we-are/)"
+478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),goldstandard.org,unverified (search-engine copy),"web search, 5 Nov 2026: Gold Standard Foundation, Geneva (https://www.goldstandard.org/contact)"
+479,unjobs-nonun:235,Heising-Simons Foundation,hsfoundation.org,unverified (search-engine copy),"web search, 5 Nov 2026: Heising-Simons Foundation (https://www.hsfoundation.org/about/)"
 480,unjobs-nonun:237,Helvetas,helvetas.org,"wikidata (name, accepted)",Q467480: the item is this organisation: HELVETAS Swiss Intercooperation (Swiss international development and humanitarian organization)
-481,unjobs-nonun:246,"ICDDR,B - Centre for Health and Population Research",,not yet searched,next search batch
+481,unjobs-nonun:246,"ICDDR,B - Centre for Health and Population Research",icddrb.org,unverified (search-engine copy),"web search, 5 Nov 2026: icddr,b, Dhaka (https://www.icddrb.org/about-us)"
 482,unjobs-nonun:530,information-and-communications-technology-division,,not needed,"hires through the family's careers site, careers.un.org"
 483,unjobs-un:38,Inter-Parliamentary Union,ipu.org,"wikidata (name, accepted)",Q176815: the item is this organisation: Interparliamentary Union (international organization of national parliaments)
 484,unjobs-nonun:267,International Anti-Corruption Academy,iaca.int,"wikidata (name, accepted)",Q876957: the item is this organisation: International Anti-Corruption Academy (organization)
 485,unjobs-un:25,International Civil Aviation Organization,icao.int,"wikidata (name, accepted)","Q125761: the item is this organisation: International Civil Aviation Organization (specialized agency of the United Nations, coordinates the international civil aviation regulations and policy)"
 488,unjobs-un:48,International Institute for Applied Systems Analysis,iiasa.ac.at,"wikidata (name, accepted)",Q212102: the item is this organisation: International Institute for Applied Systems Analysis (international research organization in Austria)
-489,unjobs-nonun:280,International Institute for Democracy and Electoral Assistance (International IDEA),,not yet searched,next search batch
+489,unjobs-nonun:280,International Institute for Democracy and Electoral Assistance (International IDEA),idea.int,unverified (search-engine copy),"web search, 5 Nov 2026: International IDEA, Stockholm (https://www.idea.int/about-us)"
 490,unjobs-un:39,International Renewable Energy Agency,irena.org,"wikidata (name, accepted)",Q392739: the item is this organisation: International Renewable Energy Agency (international organization)
 491,unjobs-un:40,International Residual Mechanism for Criminal Tribunals,irmct.org,"wikidata (name, accepted)",Q1667632: the item is this organisation: International Residual Mechanism for Criminal Tribunals (international criminal tribunal)
 492,unjobs-nonun:295,International Water Management Institute,iwmi.cgiar.org,"wikidata (name, accepted)",Q868028: the item is this organisation: International Water Management Institute (organization); the institute itself; the others are country offices
 493,unjobs-nonun:311,Landesa,landesa.org,"wikidata (name, accepted)","Q4042590: the item is this organisation: Landesa (nonprofit organization in Seattle, United States)"
-494,unjobs-nonun:314,Laterite,,not yet searched,next search batch
-495,unjobs-nonun:315,Laudato Si Movement,,not yet searched,next search batch
-496,unjobs-nonun:316,Libraries Without Borders,,not yet searched,next search batch
+494,unjobs-nonun:314,Laterite,laterite.com,unverified (search-engine copy),"web search, 5 Nov 2026: Laterite, development research firm (https://www.laterite.com/about/)"
+495,unjobs-nonun:315,Laudato Si Movement,laudatosimovement.org,unverified (search-engine copy),"web search, 5 Nov 2026: Laudato Si' Movement, formerly Global Catholic Climate Movement (https://laudatosimovement.org/gccm-announces-its-new-name-laudato-si-movement/)"
+496,unjobs-nonun:316,Libraries Without Borders,librarieswithoutborders.org,unverified (search-engine copy),"web search, 5 Nov 2026: Libraries Without Borders (Bibliothèques Sans Frontières; French site bibliosansfrontieres.org) (https://www.librarieswithoutborders.org/about-us/)"
 497,unjobs-nonun:321,Malteser International,malteser-international.org,"wikidata (name, accepted)",Q318221: the item is this organisation: Malteser International (organization)
 498,unjobs-nonun:326,Medicines Patent Pool,medicinespatentpool.org,"wikidata (name, accepted)",Q17006726: the item is this organisation: Medicines Patent Pool (organization)
 499,unjobs-nonun:328,Meedan,meedan.com,"wikidata (name, accepted)",Q6807493: the item is this organisation: Meedan ()
-501,unjobs-nonun:336,Mission East,,not yet searched,next search batch
+501,unjobs-nonun:336,Mission East,missioneast.org,unverified (search-engine copy),"web search, 5 Nov 2026: Mission East, Danish NGO (https://missioneast.org/en/we-are-mission-east/)"
 504,unjobs-un:54,Office for Disarmament Affairs,,not needed,"hires through the family's careers site, careers.un.org"
 505,unjobs-un:59,Office of Legal Affairs,,not needed,"hires through the family's careers site, careers.un.org"
 506,unjobs-un:65,Office of the Special Envoy of the Secretary-General on the Great Lakes Region,,not needed,"hires through the family's careers site, careers.un.org"
@@ -322,55 +322,55 @@ rank,org_id,name,website,source,detail
 515,unjobs-nonun:385,Patrick J. McGovern Foundation,mcgovern.org,"wikidata (name, accepted)",Q122189199: the item is this organisation: Patrick J. McGovern Foundation (foundation named after Patrick J. McGovern)
 516,unjobs-nonun:401,Pulitzer Center on Crisis Reporting,pulitzercenter.org,"wikidata (name, accepted)",Q7259349: the item is this organisation: Pulitzer Center on Crisis Reporting (nonprofit news media organization)
 517,unjobs-nonun:405,Quincy Institute for Responsible Statecraft,responsiblestatecraft.org,"wikidata (name, accepted)",Q65053205: the item is this organisation: Quincy Institute for Responsible Statecraft (American think tank)
-518,unjobs-nonun:410,Rainforest Foundation Norway,,not yet searched,next search batch
+518,unjobs-nonun:410,Rainforest Foundation Norway,regnskog.no,unverified (search-engine copy),"web search, 5 Nov 2026: Rainforest Foundation Norway (Regnskogfondet) (https://www.regnskog.no/en/what-we-do/about-us)"
 519,unjobs-nonun:411,Rainforest Foundation US,rainforestfoundation.org,"wikidata (name, accepted)",Q7284878: the item is this organisation: Rainforest Foundation US (non-profit organization based in the U.S.)
 521,unjobs-un:64,Regional Service Centre Entebbe,,not needed,"hires through the family's careers site, careers.un.org"
-522,unjobs-nonun:428,Roundtable on Sustainable Biomaterials,,not yet searched,next search batch
+522,unjobs-nonun:428,Roundtable on Sustainable Biomaterials,rsb.org,unverified (search-engine copy),"web search, 5 Nov 2026: Roundtable on Sustainable Biomaterials, Geneva (https://rsb.org/about-rsb/who-we-are/)"
 524,unjobs-nonun:442,Sight and Life,sightandlife.org,"wikidata (name, accepted)","Q631151: the item is this organisation: Sight and Life (organization in Basel, Switzerland)"
 526,unjobs-nonun:458,Swiss Tropical and Public Health Institute,swisstph.ch,"wikidata (name, accepted)",Q3152651: the item is this organisation: Swiss Tropical and Public Health Institute (health institute)
 528,unjobs-nonun:148,Third Generation Environmentalism,e3g.org,"wikidata (name, accepted)",Q28224706: the item is this organisation: E3G (global climate change think tank (2004-)); Third Generation Environmentalism is E3G
-530,unjobs-un:82,UN Interregional Crime and Justice Research Institute,,not yet searched,next search batch
+530,unjobs-un:82,UN Interregional Crime and Justice Research Institute,unicri.org,unverified (search-engine copy),"web search, 5 Nov 2026: UNICRI, Turin (https://www.unicri.org/institute/about_unicri)"
 531,unjobs-un:87,UN Mine Action Service,,not needed,"hires through the family's careers site, careers.un.org"
 532,unjobs-un:94,UN Office at Vienna,,not needed,"hires through the family's careers site, careers.un.org"
 533,unjobs-un:92,UN Office for Outer Space Affairs,,not needed,"hires through the family's careers site, careers.un.org"
 534,unjobs-un:97,UN Truce Supervision Organization,,not needed,"hires through the family's careers site, careers.un.org"
 535,unjobs-un:99,Universal Postal Union,upu.int,"wikidata (name, accepted)",Q17495: the item is this organisation: Universal Postal Union (specialized agency of the United Nations focused on cooperation within the postal sector)
 537,unjobs-nonun:512,World Bicycle Relief,worldbicyclerelief.org,"wikidata (name, accepted)",Q8035409: the item is this organisation: World Bicycle Relief (non-profit organization specializing in bicycle distribution programs to aid poverty relief in developing countries)
-538,unjobs-nonun:516,World Data Lab,,not yet searched,next search batch
+538,unjobs-nonun:516,World Data Lab,worlddatalab.com,unverified (search-engine copy),"web search, 5 Nov 2026: World Data Lab, Vienna (https://worlddatalab.com/about-us)"
 540,irs:980593375,Gavi Alliance,gavi.org,wikidata (identifier),Q688592 by P1297 98-0593375
 541,irs:061008595,Americares Foundation Inc,americares.org,wikidata (identifier),Q4742473 by P1297 06-1008595
 542,irs:951922279,World Vision,worldvision.org,wikidata (identifier),Q2593851 by P1297 95-1922279
 543,irs:362586390,Map International,map.org,wikidata (identifier),Q17009463 by P1297 36-2586390
 545,irs:060726487,Save the Children Federation Inc,savethechildren.org,wikidata (identifier),Q7428099 by P1297 06-0726487
-546,irs:131685039,Cooperative for Assistance and Relief Everywhere Inc,,not yet searched,next search batch
+546,irs:131685039,Cooperative for Assistance and Relief Everywhere Inc,care.org,unverified (search-engine copy),"web search, 5 Nov 2026: CARE USA (the legal name of EIN 13-1685039) (https://www.care.org/about-us/faqs/)"
 547,irs:133433452,Medecins Sans Frontieres USA Inc,doctorswithoutborders.org,wikidata (identifier),Q50356725 by P1297 13-3433452
 549,irs:131656634,American Jewish Joint Distribution Committee Inc,jdc.org,wikidata (identifier),Q1702533 by P1297 13-1656634; the item is this organisation: American Jewish Joint Distribution Committee (Jewish relief organization based in New York City); the same organisation; jdc.org is its main site (thejoint.org.il is its Israel site)
 550,irs:592174510,Food for the Poor Inc,foodforthepoor.com,wikidata (identifier),Q5465483 by P1297 59-2174510
 551,irs:736108657,Feed the Children Inc,feedthechildren.org,wikidata (identifier),Q5441193 by P1297 73-6108657
 553,seed:21,Habitat for Humanity,habitat.org,wikidata (identifier),Q1192147 by P1297 91-1914868
-554,irs:205704991,Carter Center Collaborative Inc,,not yet searched,next search batch
+554,irs:205704991,Carter Center Collaborative Inc,cartercenter.org,unverified (search-engine copy),"web search, 5 Nov 2026: a supporting entity of The Carter Center, which shares its website; found through Charity Navigator (https://www.charitynavigator.org/ein/205704991)"
 555,irs:481108359,Heart to Heart International Inc,hearttoheart.org,wikidata (identifier),Q5692500 by P1297 48-1108359
 558,irs:135602319,Catholic Medical Mission Board Inc,cmmb.org,wikidata (identifier),Q30255653 by P1297 13-5602319
 562,irs:311348100,Matthew 25 Ministries Inc,m25m.org,wikidata (identifier),Q6789864 by P1297 31-1348100
 563,irs:541668650,Kingsway Charities Inc,kingswaycharities.org,wikidata (identifier),Q54826342 by P1297 54-1668650
 564,irs:262414132,Mercy Ships International,mercyships.fr,wikidata (identifier),Q314703 by P1297 26-2414132
 565,irs:954335462,Childrens Hunger Fund,childrenshungerfund.org,wikidata (identifier),Q5098135 by P1297 95-4335462
-572,irs:520811461,Acdi Voca,,not yet searched,next search batch
+572,irs:520811461,Acdi Voca,acdivoca.org,unverified (search-engine copy),"web search, 5 Nov 2026: ACDI/VOCA (https://acdivoca.org/)"
 574,irs:530242962,Project Hope - the People-To-People Health Foundation Inc,projecthope.org,wikidata (identifier),Q7249127 by P1297 53-0242962
 575,irs:161541024,Rise Against Hunger,riseagainsthunger.org,wikidata (identifier),Q7619722 by P1297 16-1541024
 576,irs:952680390,Food for the Hungry Inc,fh.org,wikidata (identifier),Q5465482 by P1297 95-2680390
-577,irs:237187762,Centro International de Agricultura Tropical Incorporated,,not yet searched,next search batch
-578,uk:1156222,The Ch Foundation (UK),,not yet searched,next search batch
+577,irs:237187762,Centro International de Agricultura Tropical Incorporated,alliancebioversityciat.org,unverified (search-engine copy),"web search, 5 Nov 2026: CIAT's US entity; CIAT merged with Bioversity in 2019 as the Alliance (https://alliancebioversityciat.org/who-we-are/history-alliance)"
+578,uk:1156222,The Ch Foundation (UK),,none found (searched),"web search, 5 Nov 2026: Sir Chris Hohn's grant-making charity; no public website, and the register lists none (https://www.hinchilla.com/funder-directory/the-ch-foundation-uk)"
 580,irs:954453134,Islamic Development & Empowerment in America,irusa.org,wikidata (identifier),Q16997337 by P1297 95-4453134
-582,irs:270165743,Mana Nutritive Aid Products Inc,,not yet searched,next search batch
-583,irs:993025512,Rescue Democracy International - Rdi,,not yet searched,next search batch
+582,irs:270165743,Mana Nutritive Aid Products Inc,mananutrition.org,unverified (search-engine copy),"web search, 5 Nov 2026: MANA Nutrition, RUTF maker; found through Charity Navigator (https://www.charitynavigator.org/ein/270165743)"
+583,irs:993025512,Rescue Democracy International - Rdi,rescuedemocracyintl.org,unverified (search-engine copy),"web search, 5 Nov 2026: Rescue Democracy International, San Diego (https://rescuedemocracyintl.org/)"
 587,irs:223419667,Vital Strategies Inc,theunion.org,wikidata (identifier),Q2096638 by P1297 22-3419667
 588,irs:541722887,International Justice Mission,ijm.org,wikidata (identifier),Q1423565 by P1297 54-1722887
-591,acnc:30157737329,Latter-day Saint Charities Australia,,not yet searched,next search batch
-592,irs:522340908,Arab Gulf Programme for Development,,not yet searched,next search batch
+591,acnc:30157737329,Latter-day Saint Charities Australia,latterdaysaintcharities.org,unverified (search-engine copy),"web search, 5 Nov 2026: the Australian arm of Latter-day Saint Charities, which has no Australian site of its own (https://www.devex.com/organizations/latter-day-saint-charities-177722)"
+592,irs:522340908,Arab Gulf Programme for Development,agfund.org,unverified (search-engine copy),"web search, 5 Nov 2026: AGFUND (Arab Gulf Programme for Development), Riyadh (https://www.agfund.org/en/about/brief)"
 594,irs:112494808,United Palestinian Appeal Inc,upaconnect.org,wikidata (identifier),Q54557116 by P1297 11-2494808
 597,irs:526054268,Pan American Development Foundation Inc,padf.org,"wikidata (name, accepted)",Q7129600: the item is this organisation: Pan American Development Foundation (organization)
-598,irs:810799662,Multifaith Alliance Inc,,not yet searched,next search batch
+598,irs:810799662,Multifaith Alliance Inc,multifaithalliance.org,unverified (search-engine copy),"web search, 5 Nov 2026: Multifaith Alliance, formerly Multifaith Alliance for Syrian Refugees (https://multifaithalliance.org/about)"
 599,irs:346562544,Brothers Brother Foundation,brothersbrother.org,wikidata (identifier),Q54834556 by P1297 34-6562544
 600,irs:521231983,Aga Khan Foundation USA,akfusa.org,wikidata (identifier),Q54828497 by P1297 52-1231983
 608,irs:521662800,United States Association for UNHCR,unrefugees.org,wikidata (identifier),Q54826589 by P1297 52-1662800
