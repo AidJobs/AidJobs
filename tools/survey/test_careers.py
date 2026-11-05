@@ -275,6 +275,41 @@ def test_identifiers_are_written_as_wikidata_writes_them():
     assert ("cra", "127202349") in careers.identifiers(org("a", "x", sources="cra:127202349RR0001"))
 
 
+class FakeSession:
+    def __init__(self, statuses):
+        self.statuses, self.headers, self.calls = list(statuses), {}, 0
+
+    def request(self, *_args, **_kwargs):
+        self.calls += 1
+        status = self.statuses.pop(0)
+        return type("Response", (), {"status_code": status, "content": b"x", "headers": {}})()
+
+
+def requester(tmp_path, statuses, monkeypatch):
+    monkeypatch.setattr(careers.time, "sleep", lambda _s: None)
+    r = careers.Requester(tmp_path / "requests.log", 0.0, "test")
+    r.session = FakeSession(statuses)
+    return r
+
+
+def test_two_refusals_in_a_row_stop_for_the_day_and_a_403_at_once(tmp_path, monkeypatch):
+    r = requester(tmp_path, [503, 206, 503, 503, 206], monkeypatch)
+    assert r.get("u", ok=(206,)).status_code == 206  # one refusal, then answered
+    try:
+        r.get("u", ok=(206,))
+    except SystemExit as stop:
+        assert "for the day" in str(stop) and r.session.calls == 4
+    else:
+        raise AssertionError("two refusals in a row did not stop the run")
+    r = requester(tmp_path, [403, 206], monkeypatch)
+    try:
+        r.get("u", ok=(206,))
+    except SystemExit as stop:
+        assert "403" in str(stop) and r.session.calls == 1
+    else:
+        raise AssertionError("a 403 did not stop the run")
+
+
 def test_unknown_decisions_are_refused():
     try:
         Decisions.read([{"action": "merge", "org_id": "a", "value": "", "confidence": "",

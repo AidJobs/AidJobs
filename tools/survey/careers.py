@@ -8,9 +8,10 @@ Run on the user's machine; CI runs only `build`:
 
 `download` reads Common Crawl's public index files on data.commoncrawl.org (each crawl's
 cluster.idx, then the index blocks it points to, by HTTP Range requests) and Wikidata's query
-service, one request at a time, about one a second for Common Crawl and one every few seconds
-for Wikidata, with an honest identity; every request is logged, errors back off and repeated
-errors stop the run, and everything is kept under tools/survey/raw/ (git-ignored). It is
+service, one request at a time, one every 10 seconds for Common Crawl and every 5 for
+Wikidata, with an honest identity; every request is logged, errors back off, repeated errors
+or two refusals in a row stop the run, a 403 stops it at once, and everything is kept under
+tools/survey/raw/ (git-ignored). It is
 resumable: what is already downloaded is not fetched again. No employer's website and no
 recruitment system's page is contacted (that is step F).
 
@@ -59,6 +60,10 @@ CC_INTERVAL = 10.0       # seconds between Common Crawl requests (the user's dec
 WD_INTERVAL = 5.0
 BACKOFF = (5, 30, 120)
 STOP_AFTER = 3          # consecutive failed requests that stop a run
+# The user's rule of 5 November 2026: a 403 stops at once; two refusals in a row (the server
+# asking to slow down) stop for the day.
+REFUSED = (429, 503)
+STOP_REFUSALS = 2
 FULL_SITE_BLOCKS = 4    # a site in at most this many blocks is read whole, else by careers prefixes
 MAX_RANGE_BLOCKS = 30   # blocks joined into one Range request
 
@@ -404,7 +409,7 @@ class Requester:
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": user_agent})
         self.log, self.base, self.last, self.failures = log, interval, 0.0, 0
-        self.interval = interval
+        self.interval, self.refusals = interval, 0
         log.parent.mkdir(parents=True, exist_ok=True)
 
     def _note(self, status, size, seconds, what, said=""):
@@ -427,10 +432,16 @@ class Requester:
                 self._note(response.status_code, len(body), time.monotonic() - started,
                            f"{what} {url}".strip(), said)
                 if response.status_code in ok:
-                    self.failures = 0
+                    self.failures = self.refusals = 0
                     self.interval = max(self.base, self.interval * 0.8)
                     return response
-                if response.status_code in (429, 503):
+                if response.status_code == 403:
+                    raise SystemExit(f"stopped at once: HTTP 403 ({what})")
+                if response.status_code in REFUSED:
+                    self.refusals += 1
+                    if self.refusals >= STOP_REFUSALS:
+                        raise SystemExit(f"stopped for the day: {self.refusals} refusals in a row"
+                                         f" (HTTP {response.status_code}, {what})")
                     self.interval = min(self.interval * 2, 30.0)  # the server asks to slow down
                 retry_after = response.headers.get("retry-after", "")
                 problem = f"HTTP {response.status_code}"
