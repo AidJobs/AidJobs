@@ -264,7 +264,7 @@ irs,77-0554248,Q50326843,Ekal Vidyalaya Foundation of USA,nonprofit organization
 irs,81-2108637,Q131845603,Q131845603,international NGO from the United States,https://www.dalbergcatalyst.org/
 irs,81-3006634,Q122939919,Clooney Foundation for Justice,American nonprofit organization,https://cfj.org/
 irs,81-4739107,Q16166292,International Consortium of Investigative Journalists,international network of investigative reporters,https://www.icij.org/
-irs,82-1614152,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+irs,82-1614152,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
 irs,84-0430495,Q54813338,Junior Achievement - Rocky Mountain,American nonprofit organization,http://www.jacolorado.org/
 irs,84-1087689,Q55471352,One Child Matters,American nonprofit organization,http://www.onechildmatters.org/
 irs,84-1141078,Q5504383,Friendship Bridge,non-profit organization in the USA,http://www.friendshipbridge.org/
@@ -314,7 +314,7 @@ name,African Agricultural Technology Foundation,Q30267805,African Agricultural T
 name,African Economic Research Consortium,Q30267817,African Economic Research Consortium,"nonprofit organization in Nairobi, Kenya",http://aercafrica.org/
 name,African Fertilizer and Agribusiness Partnership,Q30271555,African Fertilizer and Agribusiness Partnership,"company in Johannesburg, South Africa",http://www.afap-partnership.org/
 name,Aga Khan Development Network,Q107519596,Aga Khan Development Network,"organization in Kabul, Afghanistan",https://www.akdn.org/
-name,Aga Khan Development Network,Q389812,Aga Khan Development Network,"network of private, non-denominational development agencies founded by Aga Khan",https://the.akdn/
+name,Aga Khan Development Network,Q389812,Aga Khan Development Network,"network of private, non-denominational development agencies",https://the.akdn/
 name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/en
 name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/es
 name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/fr
@@ -355,7 +355,7 @@ name,Bancroft Global Development,Q29075579,Bancroft Global Development,security 
 name,Baptist Medical & Dental Mission International,Q54816387,Baptist Medical & Dental Mission International,American nonprofit organization,http://www.bmdmi.org/
 name,Barcelona Institute for Global Health,Q30256793,Barcelona Institute for Global Health,"healthcare organization in Barcelona, Spain",https://www.isglobal.org/
 name,Bezos Earth Fund,Q85746831,Bezos Earth Fund,climate change organization established in 2020,https://thesolutionsproject.org/bezos-earth-fund/
-name,Bill and Melinda Gates Foundation,Q655286,Gates Foundation,private foundation founded by Bill and Melinda Gates,https://www.gatesfoundation.org/
+name,Bill and Melinda Gates Foundation,Q655286,Gates Foundation,private foundation,https://www.gatesfoundation.org/
 name,Binaytara,Q18210219,Binaytara,"United States-based non-profit organization focused on cancer care, continuing medical education, and implementation science research in the fields of hematology and oncology",https://binaytara.org/
 name,Bioversity International,Q864909,Bioversity International,"former global research for development organization, merged with CIAT (Q1054314)",http://www.bioversityinternational.org/
 name,BirdLife International,Q210108,BirdLife International,global partnership of conservation organizations that strives to conserve birds,https://www.birdlife.org/
@@ -417,7 +417,7 @@ name,Ceres,Q30267896,Ceres Nanosciences,"company in Manassas, United States",htt
 name,Ceres,Q5064191,United City F.C.,association football club,https://ceresfootball.com/
 name,Ceres,Q594171,Ceres,"city in Stanislaus County, California, United States",http://www.ci.ceres.ca.us/
 name,Ceres,Q9244,Ceres,Italian comune,https://www.comune.ceres.to.it/
-name,Chan Zuckerberg Initiative,Q21623039,Chan Zuckerberg Initiative,company founded by Marc Zuckerberg and Priscilla Chan,https://chanzuckerberg.com/
+name,Chan Zuckerberg Initiative,Q21623039,Chan Zuckerberg Initiative,company,https://chanzuckerberg.com/
 name,Chatham House,Q263016,Chatham House,international affairs think tank,https://www.chathamhouse.org/
 name,Chicago Council on Global Affairs,Q5095561,Chicago Council on Global Affairs,"foreign affairs think tank in Chicago, Illinois, USA",https://globalaffairs.org/
 name,ChildFund International,Q17189927,ChildFund,children's Fund,http://www.childfund.org/
@@ -472,7 +472,7 @@ name,Direct Relief,Q1227469,Direct Relief,charitable organization,https://www.di
 name,Disability Rights Fund,Q30264715,Disability Rights Fund,"nonprofit organization in Boston, United States",http://www.disabilityrightsfund.org/
 name,Dorcas International Institute of Rhode Island,Q140078907,Dorcas International Institute of Rhode Island,"Support Services for Immigrants, Teen Mothers",https://www.diiri.org/
 name,Dress for Success Worldwide,Q54851174,Dress for Success Worldwide,American nonprofit organization,http://www.dressforsuccess.org/
-name,East-West Center,Q5331041,East–West Center,Organization established by U.S. Congress in Hawaii,http://www.eastwestcenter.org/
+name,East-West Center,Q5331041,East–West Center,Organization,http://www.eastwestcenter.org/
 name,Economic Commission for Latin America and the Caribbean,Q32874,United Nations Economic Commission for Latin America and the Caribbean,United Nations Commission for economic cooperation among its member states,http://www.cepal.org/
 name,Economic and Social Commission for Western Asia,Q1355485,United Nations Economic and Social Commission for Western Asia,United Nations Commission for economic cooperation among its member states,https://www.unescwa.org/
 name,Eden Reforestation Projects,Q25831295,Eden Reforestation Projects,non-governmental organization,http://www.edenprojects.org/
@@ -662,8 +662,8 @@ name,Maisha Meds,Q30268142,Maisha Meds,"healthcare organization in Kisumu, Kenya
 name,Malteser International,Q318221,Malteser International,organization,http://www.malteser-international.org/
 name,Management Sciences for Health,Q21061083,Management Sciences for Health,nonprofit,http://www.msh.org/
 name,Maranatha Volunteers International,Q6754785,Maranatha Volunteers International,non-profit organization in the USA,http://www.maranatha.org/
-name,Maxwell Leadership Foundation,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
-name,Maxwell Leadership Foundation Inc,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+name,Maxwell Leadership Foundation,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+name,Maxwell Leadership Foundation Inc,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
 name,Medical Benevolence Foundation,Q54816519,Medical Benevolence Foundation,American nonprofit organization,https://www.mbfoundation.org/
 name,Medical Bridges,Q54813794,Medical Bridges,American nonprofit organization,http://www.medicalbridges.org/
 name,Medical Teams International,Q30268129,Medical Teams International,"organization in Portland, United States",http://www.medicalteams.org/
@@ -691,7 +691,7 @@ name,Nest,Q141244758,Nest,American nonprofit organization supporting artisan and
 name,Nest,Q3874929,Nest,Finnish neofolk/ambient band,http://koti.mbnet.fi/atolonen/nest/nest.html
 name,Netherland-America Foundation,Q2112673,Netherland-America Foundation,"nonprofit organization in New York, United States",http://thenaf.org/
 name,Neverthirst,Q54862644,Neverthirst,American nonprofit organization,https://www.neverthirstwater.org/
-name,New Development Bank,Q8579145,New Development Bank,multilateral development bank established by the BRICS states,http://www.ndb.int/
+name,New Development Bank,Q8579145,New Development Bank,multilateral development bank,http://www.ndb.int/
 name,New Incentives,Q106170968,New Incentives,Nigerian non-governmental organization,https://www.newincentives.org/
 name,New Israel Fund,Q2776489,New Israel Fund,American non-profit organization,http://www.nif.org/
 name,New Israel Fund,Q2776489,New Israel Fund,American non-profit organization,https://nif.org.il/
@@ -710,7 +710,7 @@ name,Office of Legal Affairs,Q113627281,University of Maryland Office of General
 name,Office of the High Commissioner for Human Rights,Q656812,Office of the High Commissioner for Human Rights,UN department that promotes human rights under international law,https://www.ohchr.org/
 name,One Acre Fund,Q1529217,One Acre Fund,company,http://www.oneacrefund.org/
 name,One Family Fund,Q7072753,One Family Fund,Israeli nonprofit organization,http://onefamilytogether.org.il/
-name,Open Society Foundations,Q786194,Open Society Foundations,international grantmaking network founded by business magnate George Soros,https://opensocietyfoundations.org/
+name,Open Society Foundations,Q786194,Open Society Foundations,international grantmaking network,https://opensocietyfoundations.org/
 name,Operation Smile,Q1323294,Operation Smile,organization,http://www.operationsmile.org/
 name,Opportunity International,Q877991,Opportunity International,American nonprofit organization,http://opportunity.org/
 name,Organisation for Economic Co-operation and Development,Q41550,Organization for Economic Cooperation and Development,intergovernmental economic organization,https://www.oecd.org/

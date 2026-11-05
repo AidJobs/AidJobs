@@ -9,7 +9,7 @@ accept-wikidata,unjobs-un:61,Q81299,,the item is this organisation: Organization
 accept-wikidata,unjobs-nonun:477,Q7863138,,the item is this organisation: U.S. Committee for Refugees and Immigrants (American nonprofit organization)
 accept-wikidata,unjobs-nonun:431,Q133810867,,"the item is this organisation: Scientific Certification Services, Inc. (United States) (company in Emeryville, United States); Scientific Certification Services trades as SCS Global Services (the same website)"
 accept-wikidata,unjobs-un:56,Q656812,,the item is this organisation: Office of the High Commissioner for Human Rights (UN department that promotes human rights under international law)
-accept-wikidata,unjobs-nonun:15,Q389812,,"the item is this organisation: Aga Khan Development Network (network of private, non-denominational development agencies founded by Aga Khan); the network item; the.akdn is its current website"
+accept-wikidata,unjobs-nonun:15,Q389812,,"the item is this organisation: Aga Khan Development Network (network of private, non-denominational development agencies); the network item; the.akdn is its current website"
 accept-wikidata,unjobs-nonun:172,Q672941,,the item is this organisation: European External Action Service (diplomatic service of the European Union)
 accept-wikidata,unjobs-nonun:136,Q462763,,the item is this organisation: Deutsche Gesellschaft für Internationale Zusammenarbeit (German government international aid agency); the agency itself; the other item is its Manila office
 accept-wikidata,unjobs-un:43,Q376150,,the item is this organisation: International Telecommunication Union (specialized agency of the United Nations for information and communication technologies)
@@ -22,7 +22,7 @@ accept-wikidata,unjobs-un:70,Q487883,,the item is this organisation: United Nati
 accept-wikidata,unjobs-nonun:509,Q4053181,,"the item is this organisation: Winrock International (nonprofit organization based in Little Rock, Arkansas, US)"
 accept-wikidata,unjobs-nonun:406,Q861141,,the item is this organisation: RAND Corporation (American research organization); the US organisation; RAND Europe is a separate UNjobs entry
 accept-wikidata,unjobs-nonun:66,Q5013851,,the item is this organisation: CRDF Global (nonprofit organization promoting safety etc. via innovation etc.)
-accept-wikidata,unjobs-nonun:47,Q655286,,the item is this organisation: Gates Foundation (private foundation founded by Bill and Melinda Gates)
+accept-wikidata,unjobs-nonun:47,Q655286,,the item is this organisation: Gates Foundation (private foundation)
 accept-wikidata,unjobs-nonun:48,Q864909,,"the item is this organisation: Bioversity International (former global research for development organization, merged with CIAT (Q1054314)); merged with CIAT (the Alliance); its own website is still listed"
 accept-wikidata,unjobs-nonun:134,Q1185816,,the item is this organisation: Democracy International (); the US elections and governance firm that hires for aid projects (not the German Democracy International)
 accept-wikidata,unjobs-nonun:259,Q391083,,the item is this organisation: Pasteur Institute (French research institute (1887-))
@@ -46,14 +46,14 @@ accept-wikidata,unjobs-un:16,Q32874,,the item is this organisation: United Natio
 accept-wikidata,unjobs-un:24,Q41984,,the item is this organisation: International Atomic Energy Agency (international organisation)
 accept-wikidata,unjobs-nonun:308,Q140351133,,"the item is this organisation: KfW Development Bank (government organization in Frankfurt am Main, Germany)"
 accept-wikidata,unjobs-nonun:363,Q3348656,,the item is this organisation: Ocean Conservancy (non-profit organization in the USA)
-accept-wikidata,unjobs-nonun:153,Q5331041,,the item is this organisation: East–West Center (Organization established by U.S. Congress in Hawaii)
+accept-wikidata,unjobs-nonun:153,Q5331041,,the item is this organisation: East–West Center (Organization)
 accept-wikidata,unjobs-nonun:55,Q929154,,the item is this organisation: Brookings Institution (American think tank)
 accept-wikidata,unjobs-nonun:70,Q131387057,,the item is this organisation: Caribbean Biodiversity Fund ()
 accept-wikidata,unjobs-nonun:272,Q21002457,,the item is this organisation: International Council on Clean Transportation (non-governmental organization for clean transporation)
 accept-wikidata,unjobs-nonun:413,Q22073418,,the item is this organisation: Rare (conservation organization); the conservation organisation (not the news site or the games developer)
 accept-wikidata,unjobs-nonun:438,Q7441664,,the item is this organisation: Search for Common Ground (International non-profit organization)
 accept-wikidata,unjobs-nonun:502,Q326276,,"the item is this organisation: Wellcome Trust (healthcare research charity based in London, United Kingdom)"
-accept-wikidata,unjobs-nonun:62,Q314997,,"the item is this organisation: CBM International (international organization); CBM International (Christian Blind Mission); cbm.de is its German site, cbm.org the international one, to confirm in step F"
+accept-wikidata,unjobs-nonun:62,Q314997,,"the item is this organisation: CBM International (international organization); CBM International (Christian Blind Mission); cbm.de is its German site, cbm.org the international one, to confirm in step F; the UNjobs entry may instead be CBM Global (cbm-global.org), the network that separated from CBM Christoffel-Blindenmission in 2021"
 accept-wikidata,unjobs-nonun:284,Q1666743,,the item is this organisation: International Livestock Research Institute (an international agricultural research institute within the CGIAR – formerly the Consultative Group for International Agricultural Research); the institute itself; the other item is its Addis Ababa office
 accept-wikidata,unjobs-nonun:80,Q5059628,,the item is this organisation: Center for European Policy Analysis (American organization)
 accept-wikidata,unjobs-nonun:112,Q1126934,,the item is this organisation: Conrad N. Hilton Foundation (foundation)
@@ -65,7 +65,7 @@ accept-wikidata,unjobs-nonun:491,Q7930610,,the item is this organisation: Villag
 accept-wikidata,unjobs-un:104,Q177773,,the item is this organisation: World Intellectual Property Organization (specialized UN agency focused on intellectual property protection)
 accept-wikidata,unjobs-nonun:523,Q128433863,,the item is this organisation: Zinc Network (British public relations company)
 accept-wikidata,unjobs-nonun:294,Q6054186,,"the item is this organisation: International Vaccine Institute (independent, nonprofit, international organization)"
-accept-wikidata,unjobs-nonun:89,Q21623039,,the item is this organisation: Chan Zuckerberg Initiative (company founded by Marc Zuckerberg and Priscilla Chan)
+accept-wikidata,unjobs-nonun:89,Q21623039,,the item is this organisation: Chan Zuckerberg Initiative (company)
 accept-wikidata,unjobs-un:18,Q1355485,,the item is this organisation: United Nations Economic and Social Commission for Western Asia (United Nations Commission for economic cooperation among its member states)
 accept-wikidata,unjobs-nonun:162,Q1345899,,"the item is this organisation: Environmental Defense Fund (United States environmental advocacy organization, headquartered in New York City)"
 accept-wikidata,unjobs-nonun:273,Q141669515,,"the item is this organisation: International Development Group (United States) (company in Arlington, United States); the Arlington development consultancy of this name"
@@ -107,7 +107,7 @@ accept-wikidata,unjobs-nonun:260,Q135192960,,the item is this organisation: Inst
 accept-wikidata,unjobs-nonun:263,Q6039711,,the item is this organisation: Institute for Transportation and Development Policy (organization)
 accept-wikidata,unjobs-nonun:281,Q1206709,,the item is this organisation: International Institute for Strategic Studies (British research institute (or think tank) in the area of international affairs)
 accept-wikidata,unjobs-nonun:319,Q942284,,the item is this organisation: Lutheran World Federation (global communion of national and regional Lutheran churches)
-accept-wikidata,unjobs-nonun:354,Q8579145,,the item is this organisation: New Development Bank (multilateral development bank established by the BRICS states)
+accept-wikidata,unjobs-nonun:354,Q8579145,,the item is this organisation: New Development Bank (multilateral development bank)
 accept-wikidata,unjobs-un:57,Q130533752,,the item is this organisation: United Nations Office of Information and Communications Technology (office of the United Nations Secretariat)
 accept-wikidata,unjobs-nonun:400,Q30252845,,"the item is this organisation: Public Health Institute (healthcare organization in Oakland, United States)"
 accept-wikidata,unjobs-un:101,Q492442,,the item is this organisation: United Nations University (academic and research arm of the United Nations); the university itself; the other item is its Guimarães unit
@@ -126,7 +126,7 @@ accept-wikidata,unjobs-un:27,Q7801,,the item is this organisation: International
 accept-wikidata,unjobs-nonun:274,Q6324948,,the item is this organisation: KAICIID Dialogue Centre (interfaith dialogue international organization); the International Dialogue Centre is KAICIID
 accept-wikidata,unjobs-nonun:298,Q6056118,,the item is this organisation: Internews (organization)
 accept-wikidata,unjobs-nonun:327,Q6806774,,the item is this organisation: Medicines for Malaria Venture (organization)
-accept-wikidata,unjobs-nonun:369,Q786194,,the item is this organisation: Open Society Foundations (international grantmaking network founded by business magnate George Soros)
+accept-wikidata,unjobs-nonun:369,Q786194,,the item is this organisation: Open Society Foundations (international grantmaking network)
 accept-wikidata,unjobs-nonun:370,Q123759,,the item is this organisation: Organization of American States (international organization of states in the Americas)
 accept-wikidata,unjobs-nonun:388,Q2981447,,"the item is this organisation: Peterson Institute for International Economics (think tank based in Washington, DC, USA)"
 accept-wikidata,unjobs-nonun:435,Q3470648,,the item is this organisation: Samaritan's Purse (Christian humanitarian aid organization)
@@ -296,7 +296,7 @@ website,acnc:30157737329,latterdaysaintcharities.org,,"web search, 5 Nov 2026: t
 website,irs:522340908,agfund.org,,"web search, 5 Nov 2026: AGFUND (Arab Gulf Programme for Development), Riyadh (https://www.agfund.org/en/about/brief)"
 website,irs:810799662,multifaithalliance.org,,"web search, 5 Nov 2026: Multifaith Alliance, formerly Multifaith Alliance for Syrian Refugees (https://multifaithalliance.org/about)"
 no-website,unjobs-nonun:430,,,"web search, 5 Nov 2026: no organisation of this name found; UNjobs' listing (https://unjobs.org/vacancies/1777680527167, a search result) appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled"
-no-website,uk:1156222,,,"web search, 5 Nov 2026: Sir Chris Hohn's grant-making charity; no public website, and the register lists none (https://www.hinchilla.com/funder-directory/the-ch-foundation-uk)"
+no-website,uk:1156222,,,"web search, 5 Nov 2026: a grant-making charity; no public website, and the register lists none (https://www.hinchilla.com/funder-directory/the-ch-foundation-uk)"
 accept-tenant,unjobs-nonun:341,Workday:msf,medium,"the site name says work-with-msf-ocg, MSF's Operational Centre Geneva, an MSF section's account; UNjobs' MSF listing covers the movement's jobs"
 reject-tenant,unjobs-nonun:341,BambooHR:msfltd,,"abbreviation only; 'MSF Ltd' is a company name, no sign it is Médecins Sans Frontières"
 reject-tenant,unjobs-nonun:341,Greenhouse:msfcareers,,abbreviation only; which organisation 'msfcareers' belongs to is unknown; MSF's own careers pages decide in step F
@@ -313,7 +313,7 @@ accept-tenant,unjobs-nonun:382,Jobvite:pih,low,"abbreviation only, 12 captures; 
 reject-tenant,unjobs-nonun:409,Greenhouse:rti,,abbreviation shared by several companies; RTI International is not known to use Greenhouse
 accept-tenant,unjobs-nonun:96,iCIMS:cwsglobal,medium,the account is the organisation's own website name (cwsglobal.org)
 reject-tenant,unjobs-nonun:96,Workday:cws,,abbreviation shared by many companies; the iCIMS account named after cwsglobal.org is the likely one
-accept-tenant,unjobs-nonun:322,Workday:msh,medium,Management Sciences for Health's external careers site on Workday (site External); unconfirmed (step F)
+accept-tenant,unjobs-nonun:322,Workday:msh,low,"abbreviation only, on a generic site name (External); Management Sciences for Health is a likely owner, unconfirmed (step F)"
 accept-tenant,unjobs-nonun:118,iCIMS:cfr,low,"abbreviation only, 34 captures; the Council on Foreign Relations is the likeliest owner (step F)"
 reject-tenant,unjobs-nonun:118,Workday:cfr,,"its site is 'Buc-careers', not the Council on Foreign Relations"
 accept-tenant,unjobs-nonun:63,Workable:cdp,low,"abbreviation only, 1 capture; CDP Worldwide is a likely owner (step F)"
@@ -347,7 +347,7 @@ accept-tenant,unjobs-nonun:121,BambooHR:cusointernational,low,"full name, 2 capt
 accept-tenant,unjobs-nonun:1,BambooHR:350,low,"350.org's name; a bare number, unconfirmed (step F)"
 accept-tenant,unjobs-nonun:24,Greenhouse:americanpublichealthassociation,medium,full name
 reject-tenant,unjobs-nonun:24,iCIMS:apha,,abbreviation shared by several associations; the Greenhouse account with the full name is the likely one
-reject-tenant,unjobs-nonun:45,Workday:bci,,"its sites (Scholarships_External, BCI_Careers) suggest another 'BCI'; Better Cotton is not known to use Workday"
+reject-tenant,unjobs-nonun:45,Workday:bci,,"BCI was Better Cotton's own former name (Better Cotton Initiative), but this account's sites (Scholarships_External, BCI_Careers) suggest another BCI; Better Cotton is not known to use Workday"
 accept-tenant,unjobs-nonun:58,BambooHR:bhrrc,medium,a distinctive abbreviation (Business and Human Rights Resource Centre)
 reject-tenant,unjobs-nonun:87,Workday:cir,,abbreviation shared by many companies; a small UK NGO is unlikely on Workday
 accept-tenant,unjobs-nonun:171,Workable:eed,low,"abbreviation only, 11 captures; the European Endowment for Democracy is a likely owner (step F)"
@@ -366,7 +366,7 @@ accept-tenant,uk:1154288,BambooHR:humanappeal,medium,"full name, 22 captures"
 website,irs:541460147,operationsmile.org,,"web search, 5 Nov 2026: Global nonprofit providing free cleft surgery and care (https://www.operationsmile.org/)"
 website,irs:522158152,halousa.org,,"web search, 5 Nov 2026: US fundraising arm of The HALO Trust, landmine clearance (https://www.halousa.org/about-us)"
 no-website,cra:118974294RR0001,,,"web search, 5 Nov 2026: none found; OUTSIDE: RENAMED: ex-Jewish Heritage Foundation of Canada; funds Jewish schools; no website (https://www.charityintelligence.ca/charity-details/1050-moral-arc-foundation)"
-website,cra:810540476RR0001,amant.org,,"web search, 5 Nov 2026: OUTSIDE: Flatt family foundation funding Amant contemporary art centre, Brooklyn (https://www.amant.org/about)"
+website,cra:810540476RR0001,amant.org,,"web search, 5 Nov 2026: OUTSIDE: a family foundation funding Amant contemporary art centre, Brooklyn (https://www.amant.org/about)"
 website,irs:363241033,wearealight.org,,"web search, 5 Nov 2026: RENAMED: Alight, formerly American Refugee Committee; humanitarian aid for displaced (https://www.wearealight.org/who-we-are)"
 website,irs:813404708,goodneighbors.org,,"web search, 5 Nov 2026: Global office of Good Neighbors international humanitarian development alliance (https://www.goodneighbors.org/our-structure/)"
 website,irs:521447902,cnfa.org,,"web search, 5 Nov 2026: Cultivating New Frontiers in Agriculture; international agricultural development (https://cnfa.org/)"
@@ -397,7 +397,7 @@ website,irs:872410117,humanappealusa.org,,"web search, 5 Nov 2026: US branch of 
 website,irs:464604398,razomforukraine.org,,"web search, 5 Nov 2026: Razom for Ukraine; humanitarian relief, health, advocacy for Ukraine (https://www.razomforukraine.org/)"
 website,irs:455297608,mwl.org,,"web search, 5 Nov 2026: Humanitarian charity for orphans, widows, refugees in 16 countries (https://mwl.org/about-us/)"
 website,irs:954578963,unto.com,,"web search, 5 Nov 2026: RENAMED: ex-GAiN International; Cru's humanitarian aid ministry (https://unto.com/about-us/)"
-no-website,cra:119229466RR0001,,,"web search, 5 Nov 2026: none found; OUTSIDE: CLOSED: ex-Hofstedter Family Foundation; charity status revoked May 2026 (https://www.civicsproject.org/regions/canada/gazette/d8ba64e2-18d1-4d4e-b935-0bd04b927780)"
+no-website,cra:119229466RR0001,,,"web search, 5 Nov 2026: none found; OUTSIDE: CLOSED: renamed from a family foundation; charity status revoked May 2026 (https://www.civicsproject.org/regions/canada/gazette/d8ba64e2-18d1-4d4e-b935-0bd04b927780)"
 website,irs:922204466,hdfund.org,,"web search, 5 Nov 2026: Michigan Muslim humanitarian charity: relief, orphans, WASH, education (https://hdfund.org/your-questions-answered/)"
 no-website,uk:273425,,,"web search, 5 Nov 2026: none found; OUTSIDE: RENAMED: ex-BAPS Swaminarayan Sanstha; Hindu temple charity, Neasden (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/273425/governance)"
 website,irs:823285688,isocfoundation.org,,"web search, 5 Nov 2026: Internet Society grantmaker for global internet access and inclusion (https://www.isocfoundation.org/)"
@@ -451,7 +451,6 @@ website,irs:463158845,vskfoundation.org,,"web search, 5 Nov 2026: Grantmaker sup
 website,cra:836727644RR0001,natureunited.ca,,"web search, 5 Nov 2026: OUTSIDE: Canadian conservation affiliate of The Nature Conservancy (https://www.natureunited.ca/about-us/faq/)"
 no-website,uk:1064823,,,"web search, 5 Nov 2026: none found; OUTSIDE: UK grant-making trust, mainly domestic social welfare; no website (https://www.bathnes.gov.uk/node/88323)"
 website,irs:980459537,aatf-africa.org,,"web search, 5 Nov 2026: Agricultural technology transfer for smallholder farmers in Sub-Saharan Africa (https://www.aatf-africa.org/)"
-no-website,uk:1078808,,,"web search, 5 Nov 2026: none found; OUTSIDE: small family trust for London/Hampshire projects; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3963694/contact-information)"
 website,irs:520887806,iedconline.org,,"web search, 5 Nov 2026: OUTSIDE: membership association for economic developers, mainly US (https://www.iedconline.org/)"
 website,irs:526054124,culturalinterchange.org,,"web search, 5 Nov 2026: OUTSIDE: grants and loans to educational institutions, Opus Dei-linked (https://www.culturalinterchange.org/)"
 no-website,uk:1147248,,,"web search, 5 Nov 2026: none found; OUTSIDE: UK family grant-making foundation; register lists no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/5027355/contact-information)"
@@ -474,7 +473,7 @@ no-website,cra:896469921RR0001,,,"web search, 5 Nov 2026: none found; OUTSIDE: H
 website,irs:273994158,tovvchesed.com,,"web search, 5 Nov 2026: Food, orphan support and wedding aid for poor families in Israel (https://www.tovvchesed.com/)"
 website,irs:521706852,pyxeraglobal.org,,"web search, 5 Nov 2026: Cross-sector partnerships for global development (formerly Citizens Democracy Corps) (https://www.pyxeraglobal.org/)"
 website,irs:830396815,sanku.com,,"web search, 5 Nov 2026: RENAMED: Project Healthy Children now operates as Sanku; food fortification East Africa (https://sanku.com/our-story/)"
-website,irs:861778799,advancingamericanfreedom.com,,"web search, 5 Nov 2026: OUTSIDE: US conservative policy and advocacy group founded by Mike Pence (https://advancingamericanfreedom.com/)"
+website,irs:861778799,advancingamericanfreedom.com,,"web search, 5 Nov 2026: OUTSIDE: US conservative policy and advocacy group(https://advancingamericanfreedom.com/)"
 website,irs:542092145,themadf.org,,"web search, 5 Nov 2026: OUTSIDE: Tacoma food bank and housing charity, domestic services (https://themadf.org/about/)"
 website,irs:923079413,humanitifoundation.org,,"web search, 5 Nov 2026: Texas humanitarian relief charity: water, food, emergency aid in 31 countries (https://humanitifoundation.org/)"
 website,irs:010732928,usrf.us,,"web search, 5 Nov 2026: Grantmaker for Russian civil society, rule of law, independent media (https://www.usrf.us/)"
@@ -641,7 +640,7 @@ website,cra:135506483RR0001,chw.ca,,"web search, 5 Nov 2026: Canadian Hadassah-W
 website,cra:107988511RR0001,smelaval.org,,"web search, 5 Nov 2026: Quebec Catholic foreign missionary society (https://www.smelaval.org/)"
 website,uk:1137836,fondationparc.ci,,"web search, 5 Nov 2026: UK arm of Ivorian protected-areas conservation trust fund (https://fire.biofin.org/single/fondation-des-parcs-et-reserves-de-c%C3%B4te-d%27ivoire)"
 website,irs:814618222,maishameds.org,,"web search, 5 Nov 2026: Health technology nonprofit for African pharmacies and clinics (https://maishameds.org/)"
-no-website,uk:1097231,,,"web search, 5 Nov 2026: none found; Goodman family grant-making foundation, Ireland and overseas; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3999496/contact-information)"
+no-website,uk:1097231,,,"web search, 5 Nov 2026: none found; a family grant-making foundation, Ireland and overseas; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3999496/contact-information)"
 website,irs:474504533,thenudge.us,,"web search, 5 Nov 2026: US arm of The/Nudge, poverty alleviation in India (https://thenudge.us/)"
 website,irs:562623813,everknown.org,,"web search, 5 Nov 2026: RENAMED: now Everknown, Christian care for vulnerable children worldwide (https://everknown.org/after-20-years-of-impact-orphan-outreach-announces-new-name-everknown/)"
 website,cra:852490200RR0001,healthstandards.org,,"web search, 5 Nov 2026: OUTSIDE: Canadian health care standards and accreditation body (https://healthstandards.org/)"
@@ -661,7 +660,7 @@ website,cra:890666761RR0001,fswc.ca,,"web search, 5 Nov 2026: OUTSIDE: Canadian 
 website,irs:953956136,psr-la.org,,"web search, 5 Nov 2026: OUTSIDE: PSR Los Angeles, environmental health and nuclear advocacy (https://www.psr-la.org/)"
 website,irs:275097190,partnersinfoodsolutions.com,,"web search, 5 Nov 2026: Nonprofit linking food-company volunteers with African food processors (https://www.partnersinfoodsolutions.com/)"
 website,irs:201648411,asiaharvest.org,,"web search, 5 Nov 2026: Christian ministry in Asia: Bibles, evangelists, humanitarian aid funds (https://www.asiaharvest.org/)"
-no-website,uk:220124,,,"web search, 5 Nov 2026: none found; OUTSIDE: Fleming family grant-making trust for UK causes; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/220124)"
+no-website,uk:220124,,,"web search, 5 Nov 2026: none found; OUTSIDE: a family grant-making trust for UK causes; no website (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/220124)"
 website,irs:823705696,missionmutual.org,,"web search, 5 Nov 2026: Backbone support for global Christian mission and ministry alliances (https://missionmutual.org/)"
 website,cra:886093798RR0001,armenianprelacy.ca,,"web search, 5 Nov 2026: OUTSIDE: Armenian Apostolic church prelacy in Canada (https://armenianprelacy.ca/)"
 website,irs:264080644,covaagua.org,,"web search, 5 Nov 2026: Cova (formerly EOS International), safe water in Central America (https://covaagua.org/)"
@@ -697,7 +696,7 @@ website,irs:522094677,afgj.org,,"web search, 5 Nov 2026: US grassroots social an
 website,irs:352374190,thankisraelisoldiers.org,,"web search, 5 Nov 2026: OUTSIDE: Thank Israeli Soldiers, welfare support for IDF soldiers (https://www.guidestar.org/profile/35-2374190)"
 website,irs:450473508,worldsavvy.org,,"web search, 5 Nov 2026: OUTSIDE: US K-12 global competence education nonprofit (https://www.worldsavvy.org/)"
 website,irs:825003065,sitare.org,,"web search, 5 Nov 2026: Education scholarships for underprivileged children in India (https://sitare.org/)"
-no-website,cra:898194170RR0001,,,"web search, 5 Nov 2026: none found; RENAMED: ex Dr. Geoffrey R. Conway Memorial Foundation; Toronto private grant-maker (https://ised-isde.canada.ca/cc/lgcy/fdrlCrpDtls.html?Open=1&corpId=3123669&wbdisable=true)"
+no-website,cra:898194170RR0001,,,"web search, 5 Nov 2026: none found; RENAMED: renamed from a memorial foundation; Toronto private grant-maker (https://ised-isde.canada.ca/cc/lgcy/fdrlCrpDtls.html?Open=1&corpId=3123669&wbdisable=true)"
 website,cra:144489671RR0001,7doigts.com,,"web search, 5 Nov 2026: OUTSIDE: contemporary circus company in Montreal (https://7doigts.com/)"
 website,irs:271493841,groundswellinternational.org,,"web search, 5 Nov 2026: Agroecology network supporting smallholder farmers in the Global South (https://www.groundswellinternational.org/)"
 website,irs:411397062,wellshareinternational.org,,"web search, 5 Nov 2026: Community health worker NGO serving Minnesota and Tanzania (https://wellshareinternational.org/)"
@@ -746,3 +745,13 @@ no-website,uk:294775,,,"web search, 5 Nov 2026: none found; Christian grant-maki
 no-website,oscr:SC046335,,,"web search, 5 Nov 2026: none found; Aberdeen family foundation making Christian and community grants (https://www.oscr.org.uk/about-charities/search-the-register/charity-details?number=SC046335)"
 no-website,uk:1073795,,,"web search, 5 Nov 2026: none found; OUTSIDE: UK trust of Mother Teresa's religious congregation (https://register-of-charities.charitycommission.gov.uk/en/charity-search/-/charity-details/3958915)"
 accept-tenant,unjobs-nonun:438,BambooHR:sfcg,medium,the account is Search for Common Ground's own website name (sfcg.org); the other organisation matches only through a website found by the search
+website,seed:9,nrc.no,,"the Norwegian Refugee Council's international site; Wikidata gave its Norwegian site, flyktninghjelpen.no (the independent review of PR #107)"
+accept-wikidata,uk:1078808,Q120982975,,"the item is this organisation: Calleva Foundation (nonprofit organization in London, United Kingdom); the search found no website, Wikidata gives calleva.org; the search marked it outside the target"
+reject-wikidata,uk:282336,Q124364344,,"a convenience store chain in Croatia, not this UK charity"
+first-wave-exclude,unjobs-nonun:310,,,closed: Land O'Lakes Venture37 stopped work on 30 June 2026 (web search)
+first-wave-exclude,unjobs-nonun:19,,,outside the target: Albo is a Mexican fintech company (web search)
+first-wave-exclude,unjobs-nonun:98,,,"outside the target: CitizenLab, renamed Go Vocal, is a civic software company (web search)"
+first-wave-exclude,unjobs-nonun:430,,,"no such organisation found; UNjobs' listing appears to be The Nature Conservancy's Salt Lake City jobs, mislabelled (web search)"
+first-wave-exclude,uk:1156222,,,a grant-making charity with no website and no careers page to check
+first-wave-exclude,cra:118974294RR0001,,,outside the target: the search marked it OUTSIDE (funds Jewish heritage and schools; no website)
+first-wave-exclude,cra:810540476RR0001,,,outside the target: a family foundation funding a contemporary art centre (web search)

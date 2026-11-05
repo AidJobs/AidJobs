@@ -163,9 +163,11 @@ WAVE_FIELDS = ["rank", "org_id", "name", "group", "unjobs_jobs", "income_usd", "
                "step_e_guess", "step_e_confidence", "step_f_batch"]
 
 # The first wave of employers (the user's decision, 5 November 2026): everything on UNjobs outside
-# the UN system, and the 100 largest organisations by income; the UN system comes later. These
-# are the bodies on UNjobs' UN page that are not part of the UN system.
-OUTSIDE_UN_SYSTEM = {
+# the UN system, development banks included, and the 100 largest organisations by income; the UN
+# system comes later. These are the bodies on UNjobs' UN page in the first wave: the World Bank
+# Group, IFC and IMF are UN specialised agencies and WTO a related organisation, in by the user's
+# decision (development banks; the list the user approved); the rest are outside the UN system.
+UN_PAGE_FIRST_WAVE = {
     "unjobs-un:107",     # World Bank Group
     "unjobs-un:32",      # International Finance Corporation
     "unjobs-un:35",      # International Monetary Fund
@@ -822,6 +824,11 @@ def extract(_args) -> int:
     return 0
 
 
+# People's names are never written (privacy rules); Wikidata's descriptions sometimes name founders.
+FOUNDED_BY = re.compile(r",?\s+(?:founded|established|created|set up|started) by [^,;()]+",
+                        re.IGNORECASE)
+
+
 def wikidata_rows() -> list[dict]:
     rows = {}
     for path in sorted(WD_RAW.glob("*.json")):
@@ -833,9 +840,10 @@ def wikidata_rows() -> list[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
         for b in data["results"]["bindings"]:
             item = b["item"]["value"].rsplit("/", 1)[-1]
+            description = b.get("itemDescription", {}).get("value", "")
             row = {"match": register, "value": b["value"]["value"], "item": item,
                    "label": b.get("itemLabel", {}).get("value", ""),
-                   "description": b.get("itemDescription", {}).get("value", ""),
+                   "description": FOUNDED_BY.sub("", description),
                    "website": strip_query(b.get("site", {}).get("value", ""))}
             rows[(row["match"], row["value"], item, row["website"])] = row
     return [rows[k] for k in sorted(rows)]
@@ -865,6 +873,20 @@ class Decisions:
     wikidata: dict[tuple[str, str], tuple[bool, str, str]] = field(default_factory=dict)
     tenant: dict[tuple[str, str], tuple[bool, str, str]] = field(default_factory=dict)
     reject_page: dict[tuple[str, str], str] = field(default_factory=dict)
+    wave_exclude: dict[str, str] = field(default_factory=dict)
+    used: set = field(default_factory=set)
+
+    def keys(self) -> set:
+        """Every decision, as `used` records it when the build applies one."""
+        return ({("website", o) for o in self.website}
+                | {("no-website", o) for o in self.no_website}
+                | {("wikidata", o, i) for o, i in self.wikidata}
+                | {("tenant", o, t) for o, t in self.tenant}
+                | {("page", o, p) for o, p in self.reject_page}
+                | {("wave", o) for o in self.wave_exclude})
+
+    def orgs(self) -> set:
+        return {k[1] for k in self.keys()}
 
     @classmethod
     def read(cls, rows) -> Decisions:
@@ -884,6 +906,8 @@ class Decisions:
                                                   r["confidence"] or "medium", reason)
             elif action == "reject-page":
                 d.reject_page[(org, value.lower())] = reason
+            elif action == "first-wave-exclude":
+                d.wave_exclude[org] = reason
             else:
                 raise ValueError(f"unknown decision {action!r}")
         return d
@@ -903,6 +927,18 @@ def fill_websites(orgs, wikidata, decisions: Decisions):
         oid, base = o["org_id"], {"rank": o["rank"], "org_id": o["org_id"], "name": o["name"]}
         hits = [w for register, value in identifiers(o) for w in by_value[(register, value)]
                 if w["website"]]
+        names = {n for n in name_variants(o["name"])}
+        named = [w for n in names for w in by_value[("name", n)] if w["website"]]
+        decisions.used |= {("wikidata", oid, w["item"]) for w in hits + named
+                           if (oid, w["item"]) in decisions.wikidata}
+        if oid in decisions.website:
+            # A recorded website wins, also over a single website found by identifier.
+            host, reason = decisions.website[oid]
+            decisions.used.add(("website", oid))
+            source = ("unverified (search-engine copy)" if reason.startswith("web search")
+                      else "decided by the agent")
+            filled.append({**base, "website": host, "source": source, "detail": reason})
+            continue
         hosts = Counter(h for h in (site_host(w["website"]) for w in hits)
                         if h and h not in PLATFORM_HOSTS)
         chosen = [(w, decisions.wikidata[(oid, w["item"])]) for w in hits
@@ -923,15 +959,10 @@ def fill_websites(orgs, wikidata, decisions: Decisions):
             continue
         if len(hosts) > 1:
             items = sorted({f"{w['item']} {site_host(w['website'])}" for w in hits})
-            review.append({**base, "kind": "wikidata: identifiers disagree",
+            one_item = len({w["item"] for w in hits}) == 1
+            review.append({**base, "kind": "wikidata: one item, several websites" if one_item
+                           else "wikidata: identifiers disagree",
                            "detail": "; ".join(items), "reason": "two or more websites"})
-        if oid in decisions.website:
-            host, reason = decisions.website[oid]
-            filled.append({**base, "website": host, "source": "unverified (search-engine copy)",
-                           "detail": reason})
-            continue
-        names = {n for n in name_variants(o["name"])}
-        named = [w for n in names for w in by_value[("name", n)] if w["website"]]
         accepted = [w for w in named if decisions.wikidata.get((oid, w["item"]), (False,))[0]]
         if accepted:
             w = accepted[0]
@@ -949,6 +980,7 @@ def fill_websites(orgs, wikidata, decisions: Decisions):
                                      f"{' '.join(sites)}",
                            "reason": "a match by name alone is never automatic"})
         if oid in decisions.no_website:
+            decisions.used.add(("no-website", oid))
             filled.append({**base, "website": "", "source": "none found (searched)",
                            "detail": decisions.no_website[oid]})
         elif o.get("family") == UN_FAMILY:
@@ -1039,10 +1071,7 @@ def build(_args=None, survey: Path = SURVEY) -> int:
     orgs = scope_rows(survey)
     decisions = Decisions.read(read_csv(survey / "step-e-decisions.csv"))
     known = {o["org_id"] for o in orgs}
-    unknown = sorted({k for k in [*decisions.website, *decisions.no_website,
-                                  *(o for o, _ in decisions.wikidata),
-                                  *(o for o, _ in decisions.tenant),
-                                  *(o for o, _ in decisions.reject_page)] if k not in known})
+    unknown = sorted(decisions.orgs() - known)
     if unknown:
         print(f"decisions name organisations outside the scope: {unknown[:10]}")
         return 1
@@ -1061,8 +1090,10 @@ def build(_args=None, survey: Path = SURVEY) -> int:
         site = websites.get(o["org_id"], "")
         if site and site not in PLATFORM_HOSTS:
             for c in page_candidates(o, site, index.get(site, [])):
-                reason = decisions.reject_page.get((o["org_id"], c["candidate_url"].lower()))
-                if reason is None:
+                key = (o["org_id"], c["candidate_url"].lower())
+                if key in decisions.reject_page:
+                    decisions.used.add(("page", *key))
+                else:
                     candidates[o["org_id"]].append(c)
     un_seen = [r for r in index.get("un.org", []) if r["landing"].lower() == UN_CAREERS]
     for o in orgs:
@@ -1080,6 +1111,10 @@ def build(_args=None, survey: Path = SURVEY) -> int:
     tenant_hits = defaultdict(list)
     for (oid, label), (kind, t) in matches.items():
         tenant_hits[oid].append((label, kind, t))
+    decisions.used |= {("tenant", oid, label.lower()) for oid, label in matches
+                       if (oid, label.lower()) in decisions.tenant}
+    decisions.used |= {("tenant", oid, label.lower()) for label, (_, ids, _) in shared.items()
+                       for oid in ids if (oid, label.lower()) in decisions.tenant}
     for label, (kind, ids, t) in shared.items():
         for oid in ids:
             decided = decisions.tenant.get((oid, label.lower()))
@@ -1123,7 +1158,7 @@ def build(_args=None, survey: Path = SURVEY) -> int:
                     else "low"
             candidates[oid].append({
                 "rank": o["rank"], "org_id": oid, "name": o["name"],
-                "candidate_url": t["example"], "system_guess": system,
+                "candidate_url": board_url(system, t), "system_guess": system,
                 "crawls": t["crawls"], "status": "", "redirect": "",
                 "rule": f"{rule} ({t['captures']} captures)", "confidence": confidence})
     rows = []
@@ -1134,17 +1169,27 @@ def build(_args=None, survey: Path = SURVEY) -> int:
         unique = {}
         for c in found:
             unique.setdefault(c["candidate_url"].lower().rstrip("/"), c)
-        rows += list(unique.values())[:3]
+        kept = list(unique.values())[:3]
+        account = next((c for c in unique.values() if c["rule"].startswith("account")), None)
+        if account and account not in kept:
+            kept.append(account)  # the best recruitment account is never crowded out
+        rows += kept
     review.sort(key=lambda r: (int(r["rank"]), r["kind"], r["detail"]))
     filled.sort(key=lambda r: int(r["rank"]))
+    wave, problems = first_wave(orgs, rows, websites, decisions)
+    unused = sorted(decisions.keys() - decisions.used)
+    problems += [f"decision never applied: {' '.join(k)}" for k in unused]
+    if problems:
+        print("\n".join(problems[:20]))
+        return 1
     _write(survey / "careers-candidates.csv", CANDIDATE_FIELDS, rows)
     _write(survey / "careers-review.csv", REVIEW_FIELDS, review)
     _write(survey / "websites-filled.csv", WEBSITE_FIELDS, filled)
-    wave = first_wave(orgs, rows, websites)
     _write(survey / "first-wave.csv", WAVE_FIELDS, wave)
     for top in (SEARCH_TOP, len(orgs)):
         print(f"top {top}: " + coverage(orgs[:top], rows, websites))
     wave_ids = {w["org_id"] for w in wave}
+    print(f"first wave: {len(decisions.wave_exclude)} excluded by decision")
     print(f"first wave {len(wave)} ({dict(Counter(w['group'] for w in wave))}); step F batch 1: "
           f"{sum(1 for w in wave if w['step_f_batch'] == 1)}; "
           + coverage([o for o in orgs if o["org_id"] in wave_ids], rows, websites))
@@ -1155,8 +1200,8 @@ def build(_args=None, survey: Path = SURVEY) -> int:
 def wave_group(org) -> str:
     """The organisation's first-wave group, or '' for the UN system (a later wave)."""
     kinds = {k.strip() for k in org["kind"].split(";")}
-    if org["org_id"] in OUTSIDE_UN_SYSTEM:
-        return "development bank, fund or other international body"
+    if org["org_id"] in UN_PAGE_FIRST_WAVE:
+        return "development bank or other international body (UN page)"
     if org.get("family") == UN_FAMILY or kinds & {"un-or-intergovernmental",
                                                    "un-secretariat (likely)"}:
         return ""
@@ -1169,18 +1214,31 @@ def wave_group(org) -> str:
     return ""
 
 
-def first_wave(orgs, rows, websites) -> list[dict]:
-    """The first wave in rank order, with step E's best guess and step F's batch."""
+def first_wave(orgs, rows, websites, decisions: Decisions | None = None):
+    """The first wave in rank order, with step E's best guess and step F's batch, and the
+    problems that must stop the build (an unknown id, an organisation in no group)."""
+    excluded = decisions.wave_exclude if decisions else {}
+    ids = {o["org_id"] for o in orgs}
+    on_un_page = any(oid.startswith("unjobs-un:") for oid in ids)
+    problems = [f"UN_PAGE_FIRST_WAVE names an unknown organisation: {oid}"
+                for oid in sorted(UN_PAGE_FIRST_WAVE - ids) if on_un_page]
     best = {}
     for r in rows:
         best.setdefault(r["org_id"], r)
-    income = [o for o in orgs if o["evidence"] == "income"][:WAVE_INCOME_TOP]
+    income = [o for o in orgs if o["evidence"] == "income"
+              and o["org_id"] not in excluded][:WAVE_INCOME_TOP]
     income_ids = {o["org_id"] for o in income}
     by_jobs, by_income = STEP_F_FIRST
     out, hiring_seen, income_seen = [], 0, 0
     for o in orgs:
         group = wave_group(o) or ("INGO member or funder (by income)"
                                   if o["org_id"] in income_ids else "")
+        later = o.get("family") == UN_FAMILY or "un-" in o["kind"]
+        if not group and o["evidence"] == "hiring (UNjobs)" and not later:
+            problems.append(f"in no first-wave group and not UN: {o['org_id']} {o['name']}")
+        if o["org_id"] in excluded:
+            decisions.used.add(("wave", o["org_id"]))
+            continue
         if not group:
             continue
         if o["org_id"] in income_ids:
@@ -1195,7 +1253,31 @@ def first_wave(orgs, rows, websites) -> list[dict]:
                     "website": websites.get(o["org_id"], ""),
                     "step_e_guess": guess.get("candidate_url", ""),
                     "step_e_confidence": guess.get("confidence", ""), "step_f_batch": batch})
-    return out
+    return out, problems
+
+
+def board_url(system: str, tenant: dict) -> str:
+    """The account's own job board, built from the account, so step F can open it:
+    'Greenhouse', 'acme' -> 'https://job-boards.greenhouse.io/acme'."""
+    account, example = tenant["tenant"], tenant["example"]
+    host = urlsplit(example).hostname or ""
+    site = (tenant["sites"].split() or [""])[0]
+    if system == "Workday":
+        path = f"recruiting/{account}/{site}" if host.endswith("myworkdaysite.com") else site
+        return f"https://{host}/{path}".rstrip("/")
+    boards = {
+        "Greenhouse": f"https://job-boards{'.eu' if '.eu.' in host else ''}.greenhouse.io/"
+                      f"{account}",
+        "Lever": f"https://jobs.lever.co/{account}",
+        "Ashby": f"https://jobs.ashbyhq.com/{account}",
+        "SmartRecruiters": f"https://jobs.smartrecruiters.com/{account}",
+        "Jobvite": f"https://jobs.jobvite.com/{account}",
+        "Workable": f"https://apply.workable.com/{account}/",
+        "iCIMS": f"https://careers-{account}.icims.com/jobs",
+    }
+    if system in boards:
+        return boards[system]
+    return f"https://{host}/" if host else example  # accounts named by their own host
 
 
 def coverage(orgs, rows, websites) -> str:

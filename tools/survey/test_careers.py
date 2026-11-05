@@ -273,7 +273,7 @@ def test_wikidata_fills_websites_by_identifier_and_reviews_name_only_matches(tmp
         {"action": "accept-wikidata", "org_id": "b", "value": "Q2", "confidence": "",
          "reason": "the same organisation"},
         {"action": "website", "org_id": "c", "value": "https://www.unknownaid.org/about?x=1",
-         "confidence": "", "reason": "search: Unknown Aid"}])
+         "confidence": "", "reason": "web search: Unknown Aid"}])
     by_org = {f["org_id"]: f for f in filled}
     assert by_org["b"]["website"] == "pih.org"
     assert by_org["c"]["website"] == "unknownaid.org"
@@ -293,6 +293,7 @@ def test_sites_are_read_best_rank_first_and_can_stop_at_a_rank(tmp_path):
 def test_the_first_wave_leaves_the_un_system_for_later(tmp_path, monkeypatch):
     monkeypatch.setattr(careers, "STEP_F_FIRST", (1, 1))
     monkeypatch.setattr(careers, "WAVE_INCOME_TOP", 2)
+    monkeypatch.setattr(careers, "UN_PAGE_FIRST_WAVE", {"unjobs-un:107"})
 
     def hiring(oid, kind, rank, family=""):
         return {**org(oid, oid, rank=rank), "evidence": "hiring (UNjobs)", "kind": kind,
@@ -309,7 +310,75 @@ def test_the_first_wave_leaves_the_un_system_for_later(tmp_path, monkeypatch):
     assert [(w["org_id"], w["step_f_batch"]) for w in wave] == [
         ("unjobs-un:107", "1"), ("unjobs-nonun:1", "2"), ("unjobs-nonun:2", "2"),
         ("irs:1", "1"), ("irs:2", "2")]
-    assert wave[0]["group"] == "development bank, fund or other international body"
+    assert wave[0]["group"] == "development bank or other international body (UN page)"
+
+
+def test_a_wave_exclusion_drops_the_organisation_and_its_batch_place_passes_on(tmp_path,
+                                                                             monkeypatch):
+    monkeypatch.setattr(careers, "STEP_F_FIRST", (1, 0))
+    orgs = [{**org("unjobs-nonun:1", "Closed Aid", rank=1), "evidence": "hiring (UNjobs)",
+             "kind": "non-un"},
+            {**org("unjobs-nonun:2", "Open Aid", rank=2), "evidence": "hiring (UNjobs)",
+             "kind": "non-un"}]
+    build(tmp_path, orgs, decisions=[{"action": "first-wave-exclude", "org_id": "unjobs-nonun:1",
+                                      "value": "", "confidence": "", "reason": "closed"}])
+    wave = careers.read_csv(tmp_path / "first-wave.csv")
+    assert [(w["org_id"], w["step_f_batch"]) for w in wave] == [("unjobs-nonun:2", "1")]
+
+
+def test_a_decision_that_is_never_applied_stops_the_build(tmp_path):
+    orgs = [org("a", "Has A Site", website="hasasite.org")]
+    fields = ["rank", "org_id", "name", "acronym", "family", "kind", "country", "website_domain",
+              "unjobs_jobs", "income_usd", "income_from", "evidence", "sources", "note"]
+    write(tmp_path / "organisations.csv", fields, orgs)
+    for name, f in [("step-e-index.csv", careers.INDEX_FIELDS),
+                    ("step-e-tenants.csv", careers.TENANT_FIELDS),
+                    ("step-e-wikidata.csv", careers.WIKIDATA_FIELDS)]:
+        write(tmp_path / name, f, [])
+    write(tmp_path / "step-e-decisions.csv", careers.DECISION_FIELDS, [
+        {"action": "accept-tenant", "org_id": "a", "value": "Workday:nobody",
+         "confidence": "low", "reason": "x"}])
+    assert careers.build(survey=tmp_path) == 1
+
+
+def test_a_recorded_website_wins_over_one_found_by_identifier(tmp_path):
+    orgs = [org("a", "Norwegian Refugee Council", sources="iati:NO-BRC-977538319")]
+    wikidata = [{"match": "iati", "value": "NO-BRC-977538319", "item": "Q1", "label": "NRC",
+                 "description": "", "website": "https://www.flyktninghjelpen.no/"}]
+    _, _, filled = build(tmp_path, orgs, wikidata=wikidata, decisions=[
+        {"action": "website", "org_id": "a", "value": "nrc.no", "confidence": "",
+         "reason": "the international site"}])
+    assert (filled[0]["website"], filled[0]["source"]) == ("nrc.no", "decided by the agent")
+
+
+def test_accounts_become_boards_that_name_the_account():
+    def t(account, example, sites=""):
+        return {"tenant": account, "example": example, "sites": sites}
+    assert careers.board_url("Workday", t("wfp", "https://wd3.myworkdaysite.com/en-GB/recruiting",
+                                          "job_openings")) \
+        == "https://wd3.myworkdaysite.com/recruiting/wfp/job_openings"
+    assert careers.board_url("Workday", t("msf", "https://msf.wd3.myworkdayjobs.com/x/job",
+                                          "work-with-msf")) \
+        == "https://msf.wd3.myworkdayjobs.com/work-with-msf"
+    assert careers.board_url("Greenhouse", t("givedirectly",
+                                             "https://job-boards.greenhouse.io/embed/job_board")) \
+        == "https://job-boards.greenhouse.io/givedirectly"
+    assert careers.board_url("Workable", t("busara", "https://apply.workable.com/busara/j")) \
+        == "https://apply.workable.com/busara/"
+    assert careers.board_url("BambooHR", t("bhrrc", "https://bhrrc.bamboohr.com/careers/1")) \
+        == "https://bhrrc.bamboohr.com/"
+
+
+def test_repeated_failures_stop_the_run(tmp_path, monkeypatch):
+    r = requester(tmp_path, [500] * 12, monkeypatch)
+    for _ in range(careers.STOP_AFTER - 1):
+        assert r.get("u", ok=(206,)) is None
+    try:
+        r.get("u", ok=(206,))
+    except SystemExit as stop:
+        assert "in a row failed" in str(stop)
+    else:
+        raise AssertionError("repeated failures did not stop the run")
 
 
 def test_identifiers_are_written_as_wikidata_writes_them():
