@@ -1,0 +1,868 @@
+match,value,item,label,description,website
+acnc,16641057338,Q136716789,Q136716789,nonprofit organisation from Australia,
+acnc,30157737329,Q136716873,Q136716873,nonprofit organisation from Australia,
+cra,144489671,Q3230365,The 7 Fingers,organisation in the theatrical field,https://7doigts.com/
+cra,144489671,Q3230365,The 7 Fingers,organisation in the theatrical field,https://7fingers.com/
+iati,CH-FDJP-CHE-110347351,Q5570101,Global Alliance for Improved Nutrition,organization,https://www.gainhealth.org/
+iati,FR-3,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/en
+iati,FR-3,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/es
+iati,FR-3,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/fr
+iati,FR-3,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/pt
+iati,GB-COH-2732176,Q132472623,Q132472623,company from the United Kingdom,https://adamsmithinternational.com/
+iati,NO-BRC-977538319,Q1247077,Norwegian Refugee Council,non-governmental humanitarian organization,https://flyktninghjelpen.no/
+iati,US-DOS-64562614,Q1529217,One Acre Fund,company,http://www.oneacrefund.org/
+iati,US-EIN-042347643,Q30281397,Abt Global,"company in Cambridge, Massachusetts, United States",http://www.abtassociates.com/
+iati,US-EIN-042347643,Q30281397,Abt Global,"company in Cambridge, Massachusetts, United States",https://www.abtglobal.com/
+iati,US-EIN-27-5026293,Q30264715,Disability Rights Fund,"nonprofit organization in Boston, United States",http://www.disabilityrightsfund.org/
+iati,US-EIN-300108263,Q4039485,GlobalGiving,organization,https://www.globalgiving.org/
+iati,US-EIN-54-0536100,Q17189927,ChildFund,children's Fund,http://www.childfund.org/
+iati,US-EIN-81-2108637,Q131845603,Q131845603,international NGO from the United States,https://www.dalbergcatalyst.org/
+iati,US-EIN-84-1166148,Q7973296,Water For People,non-profit organization in the USA,http://www.waterforpeople.org/
+iati,US-EIN-941655673,Q1288412,Hewlett Foundation,American private foundation,https://www.hewlett.org/
+iati,US-IRS-13-5661832,Q7200910,Plan USA,organization,https://www.planusa.org/
+iati,XI-IATI-EBRD,Q488981,European Bank for Reconstruction and Development,international investment bank,https://www.ebrd.com/
+iati,XM-DAC-46004,Q188822,Asian Development Bank,regional development bank,https://adb.org/
+iati,XM-DAC-47080,Q41550,Organization for Economic Cooperation and Development,intergovernmental economic organization,https://www.oecd.org/
+iati,XM-DAC-701-8,Q958590,Japan International Cooperation Agency,governmental agency,http://www.jica.go.jp/
+irs,03-0213226,Q6052366,International Peace Institute,"research and policy institute based in New York, USA",http://www.ipinst.org/
+irs,03-0362926,Q5764990,Himalayan Cataract Project,"other organization in Waterbury, United States",http://www.cureblindness.org/
+irs,03-0391561,Q54556509,Polaris,American nonprofit organization,http://www.polarisproject.org/
+irs,03-0529005,Q54556603,EMpower,American nonprofit organization,http://www.empowerweb.org/
+irs,04-2482188,Q21061083,Management Sciences for Health,nonprofit,http://www.msh.org/
+irs,04-2738794,Q16821462,Peace Development Fund,non-profit organization in the USA,http://www.peacedevelopmentfund.org/
+irs,04-2791159,Q54628358,Grassroots International,American nonprofit organization,http://www.grassrootsonline.org/
+irs,04-3129839,Q54833779,HOPE worldwide,American nonprofit organization,http://www.hopeww.org/
+irs,04-3348171,Q7201055,Planet Aid,American non-profit recycler,https://www.planetaid.org/
+irs,04-3478123,Q7366548,Root Capital,organization,http://www.rootcapital.org/
+irs,04-6186012,Q2495076,Unitarian Universalist Service Committee,organization,http://www.uusc.org/
+irs,05-0258886,Q140078907,Dorcas International Institute of Rhode Island,"Support Services for Immigrants, Teen Mothers",https://www.diiri.org/
+irs,06-0665972,Q54556212,Junior Achievement of Southwest New England,http://jaconn.net,http://www.jaconn.org/
+irs,06-0726487,Q7428099,Save the Children USA,organization,http://www.savethechildren.org/
+irs,06-1008595,Q4742473,AmeriCares,global non-profit organization focused on health and development,http://www.americares.org/
+irs,06-1135999,Q3373086,Haitian Health Foundation,organization,http://www.haitianhealthfoundation.org/
+irs,11-2494808,Q54557116,United Palestinian Appeal,charitable organization,http://upaconnect.org/
+irs,11-3195338,Q54833787,One Israel Fund Ltd.,American nonprofit organization,http://www.oneisraelfund.org/
+irs,11-3579187,Q5098408,Children of Armenia Fund,non-profit organization in the USA,https://www.coaf.org/en/
+irs,11-3579187,Q5098408,Children of Armenia Fund,non-profit organization in the USA,https://www.coaf.org/hy/
+irs,11-3585917,Q54853535,OneFamily,American nonprofit organization,http://www.onefamilytogether.org/
+irs,12-2680572,Q50363511,UNICEF Canada,"nonprofit organization in Toronto, Canada",http://www.unicef.ca/
+irs,13-0552040,Q1153595,Carnegie Endowment for International Peace,Washington-based American think tank,https://carnegieendowment.org/
+irs,13-1623897,Q7713416,The American-Scandinavian Foundation,non-profit organization in the USA,http://www.amscan.org/index.html
+irs,13-1623937,Q5099728,China Institute,New York City-based cultural organization,http://www.chinainstitute.org/
+irs,13-1628168,Q594712,Council on Foreign Relations,American think tank on foreign policy,https://www.cfr.org/
+irs,13-1656634,Q1702533,American Jewish Joint Distribution Committee,Jewish relief organization based in New York City,https://www.jdc.org/
+irs,13-1656634,Q1702533,American Jewish Joint Distribution Committee,Jewish relief organization based in New York City,https://www.thejoint.org.il/
+irs,13-1656647,Q242424,Freedom House,American think tank (est. 1941),https://freedomhouse.org/
+irs,13-1685039,Q124751857,CARE United States,,
+irs,13-1687001,Q7229776,Population Council,health and development research institute in New York,http://www.popcouncil.org/
+irs,13-1760110,Q54557197,UNICEF USA,American nonprofit organization,http://www.unicefusa.org/
+irs,13-1766596,Q4652638,AMG International,non-profit organization in the USA,https://www.amginternational.org/
+irs,13-1845455,Q27718360,IPPF Western Hemisphere Region,non-profit organisation in the USA,http://www.ippfwhr.org/
+irs,13-1867411,Q30286536,Amref Health Africa,"healthcare organization in New York, United States",http://www.amrefusa.org/
+irs,13-2535763,Q288106,ACCION International,non-profit organization in the USA,http://www.accion.org/
+irs,13-2563745,Q954536,Jerusalem Foundation,municipal foundation for the development of Jerusalem,http://www.jerusalemfoundation.org/
+irs,13-2569185,Q4745666,Americas Society,"non-profit organization in New York, New York",http://www.americas-society.org/
+irs,13-2574963,Q6705754,Lutheran World Relief,organization,http://lwr.org/
+irs,13-2907656,Q54848430,CitiHope Relief & Development,American nonprofit organization,http://www.citihope.org/
+irs,13-2961273,Q54675723,Israel Tennis Centers Foundation,American nonprofit organization,
+irs,13-2989216,Q2112673,Netherland-America Foundation,"nonprofit organization in New York, United States",http://thenaf.org/
+irs,13-3041381,Q54834436,Womens International Zionist Organization USA,American nonprofit organization,http://www.wizousa.org/
+irs,13-3115145,Q3528091,Tibet Fund,organization,http://www.tibetfund.org/
+irs,13-3116646,Q3143126,Human Rights First,non-profit organization in the USA,http://www.humanrightsfirst.org/
+irs,13-3145161,Q54675379,The American Committee for the Tel Aviv Foundation,American nonprofit organization,http://www.telavivfoundation.org/
+irs,13-3234632,Q842828,Asia Society,1956 nonprofit organisation in New York City,http://www.asiasociety.org/
+irs,13-3280194,Q53769035,Madre,nonprofit organization,http://www.madre.org/
+irs,13-3392006,Q7662384,Synergos,non-profit organization in the USA,http://www.synergos.org/
+irs,13-3392711,Q54688996,Friends of Israel Disabled Veterans,American nonprofit organization,http://fidv.org/
+irs,13-3433452,Q50356725,Doctors Without Borders US,"nonprofit organization in New York, United States",http://www.doctorswithoutborders.org/
+irs,13-3492792,Q54857451,GOAL USA,American nonprofit organization,http://www.goalglobal.org/
+irs,13-3500609,Q8035905,Rainforest Trust,environmental nonprofit organization in the United States,https://www.rainforesttrust.org/
+irs,13-3568629,Q5449659,Financial Services Volunteer Corps,,http://www.fsvc.org/
+irs,13-3660566,Q3523207,Equality Now,Organisation,https://equalitynow.org/
+irs,13-3706646,Q5508876,Fund for Armenian Relief,non-profit organization in the USA,https://farusa.org/
+irs,13-3712030,Q54631074,"Concern Worldwide US, Inc.",American nonprofit organization,http://www.concernusa.org/
+irs,13-3791391,Q5690411,HealthRight International,organization,http://www.healthright.org/
+irs,13-3836763,Q4677169,Action Without Borders,charities based in New York (state),http://www.idealist.org/
+irs,13-3931449,Q1340293,Endeavor,international nonprofit organization,http://www.endeavor.org/
+irs,13-4040377,Q54851174,Dress for Success Worldwide,American nonprofit organization,http://www.dressforsuccess.org/
+irs,13-4075779,Q145590,Pure Earth,environmental organization,http://www.pureearth.org/
+irs,13-4080201,Q5116734,Church World Service,cooperative humanitarian ministry,http://www.churchworldservice.org/
+irs,13-4131482,Q54632987,BrazilFoundation,http://www.brazilfoundation.org,http://brazilfoundation.org/
+irs,13-4174402,Q5474411,Foundation for Defense of Democracies,think tank and policy institute originally funded by the Abramson Family Foundation,https://www.fdd.org/
+irs,13-5562163,Q50037810,American Leprosy Missions,"nonprofit organization in Greenville, United States",https://www.leprosy.org/
+irs,13-5562271,Q54851235,Kolel Shomre Hachomos of Jerusalem,non-profit organization in the USA,
+irs,13-5562367,Q18208143,United Board for Christian Higher Education in Asia,non-profit organization in the USA,https://unitedboard.org/
+irs,13-5602319,Q30255653,Catholic Medical Mission Board,"nonprofit organization in New York, United States",http://www.cmmb.org/
+irs,13-5631502,Q54857095,AMIT,American nonprofit organization,http://www.amitchildren.org/
+irs,13-5633307,Q2910087,HIAS,Jewish American nonprofit organization providing humanitarian aid and assistance to refugees,https://www.hias.org/
+irs,13-5661832,Q7200910,Plan USA,organization,https://www.planusa.org/
+irs,13-6183605,Q5176998,Counterpart International,organization,https://www.counterpart.org/
+irs,14-1880905,Q22908467,Samaritan's Feet,non-profit organization in the USA,http://www.samaritansfeet.org/
+irs,16-1541024,Q7619722,Stop Hunger Now,organization,https://www.riseagainsthunger.org/
+irs,20-0942434,Q54670065,Baitulmaal AHED,American nonprofit organization,http://www.baitulmaal.org/
+irs,20-1257910,Q6807293,Meds & Food for Kids,organization,http://mfkhaiti.org/
+irs,20-1687786,Q7577952,Spirit of America,American nonprofit organization,https://spiritofamerica.org/
+irs,20-3644749,Q54834635,Good Neighbors USA,American nonprofit organization,http://www.goodneighbors.us/
+irs,20-3668110,Q1529217,One Acre Fund,company,http://www.oneacrefund.org/
+irs,20-5010527,Q54834256,Living Goods,American nonprofit organization,http://livinggoods.org/
+irs,20-5450672,Q141244758,Nest,American nonprofit organization supporting artisan and handcraft businesses,https://www.buildanest.org/
+irs,20-8456741,Q4836319,BRAC USA,"organization in New York, United States",https://www.bracusa.org/
+irs,20-8635797,Q54851522,The Luke Commission,American nonprofit organization,http://www.lukecommission.org/
+irs,20-8827879,Q1218701,The Sentry,International humanitarian organization in the United States,https://thesentry.org/
+irs,22-2584370,Q4064193,American Jewish World Service,nonprofit international development organization,https://ajws.org/
+irs,22-3090463,Q54688950,Friends of Yemin Orde,American nonprofit organization,http://www.yeminorde.org/
+irs,22-3098727,Q164257,Institute for Sustainable Communities,organization,https://sustain.org/
+irs,22-3128648,Q4986385,buildOn,organization,http://www.buildon.org/
+irs,22-3304404,Q54688371,CIS Development Foundation,American nonprofit organization,http://www.cisdevelopmentfoundation.org/who-is-cisdf
+irs,22-3419667,Q2096638,International Union Against Tuberculosis and Lung Disease,organization,http://www.theunion.org/
+irs,23-2836648,Q16984831,Hope International,US nonprofit financial services organization,http://www.hopeinternational.org/
+irs,23-7297770,Q54852289,ReSurge International,http://www.resurge.org/home/home.cfm,
+irs,23-7348277,Q6050178,International Disaster Emergency Service,organization,http://www.ides.org/
+irs,25-1017587,Q3145130,Hospital Albert Schweitzer Haiti,"hospital in Artibonite, Haiti",http://www.hashaiti.org/
+irs,25-1679348,Q6052281,International Orthodox Christian Charities,non-profit organization in the USA,http://www.iocc.org/
+irs,26-2414132,Q314703,Mercy Ships,charitable organization,http://www.mercyships.fr/
+irs,26-3618722,Q7162341,Pencils of Promise,US non-profit organization,http://www.pencilsofpromise.org/
+irs,27-5026293,Q30264715,Disability Rights Fund,"nonprofit organization in Boston, United States",http://www.disabilityrightsfund.org/
+irs,27-5121564,Q5158989,Concordia Summit,annual summit held by the nonprofit organization Concordia to promote private-public partnerships,http://www.concordia.net/
+irs,30-0108263,Q4039485,GlobalGiving,organization,https://www.globalgiving.org/
+irs,30-0181674,Q30271954,WaterAid America,"nonprofit organization in New York, United States",http://www.wateraidamerica.org/
+irs,31-1140515,Q55473023,Kids Alive International,American nonprofit organization,http://www.kidsalive.org/
+irs,31-1348100,Q6789864,Matthew 25: Ministries,organization,http://www.m25m.org/
+irs,31-1591503,Q45134596,Cape Eleuthera Foundation,foundation in United States of America,http://capeeleutherafoundation.org/
+irs,31-1614650,Q54854657,Orphan Grain Train,American nonprofit organization,http://www.ogt.org/
+irs,31-4385042,Q54857517,Junior Achievement of Central Ohio,American nonprofit organization,https://www.juniorachievement.org/web/ja-centraloh
+irs,32-0112278,Q54857527,Water for Good,American nonprofit organization,http://waterforgood.org/
+irs,32-0403737,Q30268068,Empowers Africa,"nonprofit organization in New York, United States",https://empowersafrica.org/
+irs,33-0052976,Q17014069,Plant with Purpose,non-profit organization in the USA,http://www.plantwithpurpose.org/
+irs,33-0412751,Q55803600,International Relief Teams,"U.S.-based nonprofit humanitarian aid organization delivering disaster relief, food, water, and medical aid globally",http://www.irteams.org/
+irs,33-0430285,Q55803603,Children's HopeChest,American nonprofit organization,http://www.hopechest.org/
+irs,34-6562544,Q54834556,Brother's Brother Foundation,American nonprofit organization,http://www.brothersbrother.org/
+irs,35-1019477,Q2462543,Heifer International,organization,https://www.heifer.org/
+irs,35-1902841,Q54857570,Lifesong for Orphans,American nonprofit organization,http://www.lifesongfororphans.org/
+irs,35-1985485,Q54857572,World Hope International,American nonprofit organization,http://www.worldhope.org/
+irs,35-2051932,Q5109127,Christel House International,non-profit organization in the USA,http://www.christelhouse.org/
+irs,36-2170141,Q54857534,Junior Achievement of Chicago,American nonprofit organization,http://www.jachicago.org/
+irs,36-2181969,Q5095561,Chicago Council on Global Affairs,"foreign affairs think tank in Chicago, Illinois, USA",https://globalaffairs.org/
+irs,36-2284267,Q5109902,Christian Medical and Dental Associations,organization,http://cmda.org/
+irs,36-2586390,Q17009463,MAP International,health and relief organization,http://www.map.org/
+irs,36-3241033,Q4744809,Alight,"international nonprofit, nonsectarian organization",http://www.arcrelief.org/
+irs,36-3241033,Q4744809,Alight,"international nonprofit, nonsectarian organization",https://wearealight.org/
+irs,36-3383933,Q5059917,Center for Victims of Torture,non-profit organization in the USA,http://www.cvt.org/
+irs,36-3532234,Q54855631,Global Health Ministries,American nonprofit organization,http://www.ghm.org/
+irs,36-6069820,Q55230266,International Teams,http://www.iteams.us,https://onecollective.org/
+irs,38-1575570,Q8035954,World Medical Relief,non-profit organization in the USA,http://www.worldmedicalrelief.org/
+irs,38-1945104,Q6754785,Maranatha Volunteers International,non-profit organization in the USA,http://www.maranatha.org/
+irs,38-2231279,Q2578143,Seva Foundation,organization,http://www.seva.org/
+irs,38-2635531,Q55230286,Adventist Frontier Missions,American nonprofit organization,http://www.afmonline.org/
+irs,38-2935397,Q55472785,International Youth Foundation,American nonprofit organization,http://www.iyfnet.org/
+irs,38-3213457,Q54624657,World Mission,American nonprofit organization,http://www.worldmission.cc/
+irs,38-3293173,Q55473266,Partners Worldwide,American nonprofit organization,http://www.partnersworldwide.org/
+irs,41-1560297,Q5153390,Common Hope,organization in Minnesota,http://www.commonhope.org/
+irs,41-1601449,Q21015705,Feed My Starving Children,organization,http://fmsc.org/
+irs,41-1627391,Q4943279,Books for Africa,non-profit organization in the USA,http://www.booksforafrica.org/
+irs,41-1989714,Q54833289,American Relief Agency for the Horn of Africa (ARAHA),American nonprofit organization,https://www.araha.org/
+irs,43-1535009,Q55472608,Worldserve International,American nonprofit organization,http://www.worldserveintl.org/
+irs,43-1536498,Q55472606,Mentors International,American nonprofit organization,https://mentorsinternational.org/
+irs,44-6005794,Q945897,Children International,organization,https://www.children.org/
+irs,44-6005794,Q945897,Children International,organization,https://www.children.org/es
+irs,45-0545435,Q54862645,Village Health Works,American nonprofit organization,http://www.villagehealthworks.org/
+irs,45-0594639,Q54862644,Neverthirst,American nonprofit organization,https://www.neverthirstwater.org/
+irs,45-3929881,Q126723191,Mercury One,American charity of Glenn Beck (2011-),https://mercuryone.org/
+irs,46-2695042,Q30271658,Busara Center for Behavioral Economics,"nonprofit organization in Trenton, United States",http://www.busaracenter.org/
+irs,46-4604398,Q18393662,Razom,ukrainian-American human rights organization,
+irs,47-0865426,Q1326235,NumbersUSA,advocacy group,http://www.numbersusa.com/
+irs,47-1686704,Q55472644,Hope 4 Kids International,American nonprofit organization,http://www.hope4kidsinternational.org/
+irs,48-1108359,Q5692500,Heart to Heart International,non-profit organization in the USA,http://www.hearttoheart.org/
+irs,51-0169168,Q1350284,Plan International,international development organization,https://plan-international.org/
+irs,51-0175510,Q30267850,Bread for the World Institute,"nonprofit organization in Washington D.C., United States",http://www.bread.org/
+irs,51-0183054,Q28404159,Christian Relief Fund,non-profit organization in the USA,https://christianrelieffund.org/
+irs,51-0255908,Q85060,Ashoka,non-profit organization,https://www.ashoka.org/
+irs,52-0742294,Q756373,Atlantic Council,American think tank,https://atlanticcouncil.org/
+irs,52-0788947,Q3152799,Institute for Policy Studies,American progressive think tank (founded 1963),http://www.ips-dc.org/
+irs,52-0846183,Q25047905,Global Communities,"nonprofit organization in Silver Spring, United States",http://www.globalcommunities.org/
+irs,52-0848094,Q6971886,Global Ties U.S.,U.S. nonprofit organization,https://www.globaltiesus.org/
+irs,52-0851555,Q2843739,Amnesty International USA,non-profit organization in the USA,http://www.amnestyusa.org/
+irs,52-0954751,Q908779,German Marshall Fund,American think tank,http://www.gmfus.org/
+irs,52-1081455,Q6049050,International Center for Research on Women,organization,http://www.icrw.org/
+irs,52-1136126,Q5440746,Federation for American Immigration Reform,Non-Profit,https://fairus.org/
+irs,52-1211059,Q54862705,Center for Third World Organizing,American nonprofit organization,http://www.ctwo.org/
+irs,52-1231983,Q54828497,"Aga Khan Foundation, USA",American nonprofit organization,http://www.akfusa.org/
+irs,52-1233683,Q380412,Jewish Institute for National Security Affairs,nonprofit organization,http://www.jinsa.org/
+irs,52-1314847,Q290625,Adventist Development and Relief Agency,Adventist Aid agency,http://www.adra.org/
+irs,52-1332702,Q484798,Committee for Accuracy in Middle East Reporting and Analysis,media-monitoring organization,http://camera.org/
+irs,52-1376034,Q1778471,Washington Institute for Near East Policy,"think tank in Washington D.C., United States",http://www.washingtoninstitute.org/
+irs,52-1440944,Q55473451,World Villages for Children,American nonprofit organization,http://www.worldvillages.org/
+irs,52-1501082,Q1053614,Center for Strategic and International Studies,"American think tank in Washington, D.C.",https://www.csis.org/
+irs,52-1555563,Q6019277,India Development and Relief Fund,organization,http://www.idrf.org/
+irs,52-1570071,Q1344041,International Campaign for Tibet,organization,https://liaowangxizang.net/
+irs,52-1570071,Q1344041,International Campaign for Tibet,organization,https://savetibet.de/
+irs,52-1570071,Q1344041,International Campaign for Tibet,organization,https://savetibet.org/
+irs,52-1570071,Q1344041,International Campaign for Tibet,organization,https://www.savetibet.eu/ict-en-francais/
+irs,52-1614093,Q4793157,Armenian Assembly of America,Pro-Armenia lobbyist group in the U.S.,http://www.aaainc.org/
+irs,52-1629060,Q55230295,Global Links,American nonprofit organization,http://www.globallinks.org/
+irs,52-1654284,Q1345905,Environmental Investigation Agency US,US-based 2nd non-profit organization of EIA (1989-),http://www.eia-global.org/
+irs,52-1662800,Q54826589,USA for UNHCR,American nonprofit organization,http://www.unrefugees.org/
+irs,52-1714111,Q54826634,The Korea Society,American nonprofit organization,http://www.koreasociety.org/
+irs,52-1726273,Q463262,American Academy in Berlin,American-German research and cultural institution,https://www.americanacademy.de/
+irs,52-1838756,Q8031394,Women for Women International,non-profit organization in the USA,http://www.womenforwomen.org/
+irs,52-1937154,Q54826495,Focus Humanitarian Assistance USA,American nonprofit organization,https://www.focus-usa.org/
+irs,52-2148976,Q54826501,Sudan Relief Fund,American nonprofit organization,http://www.sudanreliefund.com/
+irs,52-2151557,Q7936762,Vital Voices,organization,http://www.vitalvoices.org/
+irs,52-2289435,Q453521,Nuclear Threat Initiative,American foreign policy think tank,https://www.nti.org/
+irs,53-0173054,Q6971923,National Council of Negro Women,American nonprofit organization,http://www.ncnw.org/
+irs,53-0204608,Q6841337,Middle East Institute,UAE/Saudi-funded think tank based in the US,http://www.mei.edu/
+irs,53-0204608,Q6841337,Middle East Institute,UAE/Saudi-funded think tank based in the US,https://arabic.mei.edu/
+irs,53-0242962,Q7249127,Project HOPE,"healthcare organization in Bethesda, United States",http://www.projecthope.org/
+irs,54-0536100,Q17189927,ChildFund,children's Fund,http://www.childfund.org/
+irs,54-0761510,Q5098275,"Children, Incorporated",non-profit organization in the USA,http://www.childrenincorporated.org/
+irs,54-0907624,Q877991,Opportunity International,American nonprofit organization,http://opportunity.org/
+irs,54-1382657,Q4335257,Operation Blessing International,organization,http://www.ob.org/
+irs,54-1411430,Q54826433,American Freedom Alliance,American nonprofit organization,https://americanfreedomalliance.org/
+irs,54-1637257,Q5169024,Coptic Orphans,non-profit organization in the USA,http://www.copticorphans.org/
+irs,54-1668650,Q54826342,Kingsway Charities,American nonprofit organization,http://www.kingswaycharities.org/
+irs,54-1722887,Q1423565,International Justice Mission,Non-profit organization in the USA,http://www.ijm.org/
+irs,54-1953305,Q54826358,World Pediatric Project,American nonprofit organization,http://www.worldpediatricproject.org/
+irs,54-2033897,Q54826362,Camfed USA,American nonprofit organization,http://www.camfed.org/
+irs,55-0914744,Q131859237,Humanity & Inclusion U.S.,national associations of Handicap International,https://www.hi-us.org/
+irs,56-1704863,Q55230496,Rural Advancement Foundation International-USA,American nonprofit organization,http://www.rafiusa.org/
+irs,56-2125831,Q7101950,Organization for Tropical Studies,non-profit organization in the USA,http://ots.ac.cr/
+irs,57-1116978,Q54624543,Water Mission,American nonprofit organization,http://www.watermission.org/
+irs,58-1647546,Q7312084,Remote Area Medical,nonprofit healthcare organization,https://www.ramusa.org/
+irs,58-1657207,Q54855771,Mustard Seed Communities,American nonprofit organization,http://www.mustardseed.com/
+irs,58-2060131,Q7973231,Water.org,non-profit organization in the USA,http://water.org/
+irs,58-2248383,Q5014716,CURE International,Christian nonprofit organization,https://cure.org/
+irs,58-2433968,Q6804937,MedShare,organization,http://www.medshare.org/
+irs,58-2484257,Q55471598,Amigos for Christ,American nonprofit organization,http://www.amigosforchrist.org/
+irs,59-0972112,Q55472185,Junior Achievement of Central Florida,American nonprofit organization,https://www.juniorachievement.org/web/ja-centralfl/
+irs,59-1098499,Q54821899,Junior Achievement of Tampa Bay,American nonprofit organization,http://jatampabay.org/
+irs,59-2174510,Q5465483,Food for the Poor,an ecumenical Christian nonprofit organization,http://www.foodforthepoor.com/
+irs,59-2339140,Q54821583,Salvadoran American Humanitarian Foundation,American nonprofit organization,http://www.sahf.org/
+irs,59-2672303,Q55472961,"Love A Child, Inc.",American nonprofit organization,http://www.loveachild.com/
+irs,59-3445250,Q54816734,"Watoto Child Care Ministry, Inc.",American nonprofit organization,http://www.watoto.com/
+irs,59-3564329,Q5899656,Hope for Haiti,non-profit organization in the USA,http://www.hopeforhaiti.com/
+irs,61-1555718,Q54816574,Amazima Ministries,American nonprofit organization,https://amazima.org/
+irs,62-1585366,Q55231412,Healing Hands International,American nonprofit organization,http://www.hhi.org/
+irs,62-6046138,Q54816519,Medical Benevolence Foundation,American nonprofit organization,https://www.mbfoundation.org/
+irs,63-0340866,Q54816561,Junior Achievement of Alabama,American nonprofit organization,https://www.juniorachievement.org/web/ja-birmingham/
+irs,64-0811705,Q54816387,Baptist Medical & Dental Mission International,American nonprofit organization,http://www.bmdmi.org/
+irs,65-1229309,Q55457692,NPH USA,American nonprofit organization,http://www.nphusa.org/
+irs,68-0224596,Q6994443,Nepal Youth Foundation,non-profit organization in the USA,http://www.nepalyouthfoundation.org/
+irs,68-0249466,Q55471475,Volunteers for Inter-American Development Assistance,American nonprofit organization,http://vidausa.org/
+irs,71-0982808,Q136431739,Love Justice International,organisation,https://lovejustice.ngo/
+irs,71-0992446,Q1423787,Kiva,micro-loan platform,https://www.kiva.org/
+irs,73-1502797,Q5593623,Grameen Foundation,American nonprofit organization,http://www.grameenfoundation.org/
+irs,73-6108657,Q5441193,Feed the Children,organization,http://www.feedthechildren.org/
+irs,74-1153957,Q54815726,Junior Achievement of Southeast Texas,American nonprofit organization,https://www.juniorachievement.org/web/ja-set
+irs,74-2477089,Q54862824,Rafiki Foundation,American nonprofit organization,http://www.rafikifoundation.org/
+irs,75-3029336,Q30288978,Fund for Global Human Rights,"organization in Washington D.C., United States",http://globalhumanrights.org/
+irs,76-0415986,Q54860802,Faith In Practice,American nonprofit organization,http://faithinpractice.org/
+irs,76-0548161,Q54813794,Medical Bridges,American nonprofit organization,http://www.medicalbridges.org/
+irs,76-0574590,Q54860840,Millennium Relief & Development Services,American nonprofit organization,http://www.mrds.org/
+irs,77-0071852,Q54813895,Thousand Currents,American nonprofit organization,http://www.thousandcurrents.org/
+irs,77-0243475,Q54860831,Assist International,American nonprofit organization,http://www.assistinternational.org/
+irs,77-0554248,Q50326843,Ekal Vidyalaya Foundation of USA,nonprofit organization in the USA,https://www.ekal.org/us
+irs,81-2108637,Q131845603,Q131845603,international NGO from the United States,https://www.dalbergcatalyst.org/
+irs,81-3006634,Q122939919,Clooney Foundation for Justice,American nonprofit organization,https://cfj.org/
+irs,81-4739107,Q16166292,International Consortium of Investigative Journalists,international network of investigative reporters,https://www.icij.org/
+irs,82-1614152,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+irs,84-0430495,Q54813338,Junior Achievement - Rocky Mountain,American nonprofit organization,http://www.jacolorado.org/
+irs,84-1087689,Q55471352,One Child Matters,American nonprofit organization,http://www.onechildmatters.org/
+irs,84-1141078,Q5504383,Friendship Bridge,non-profit organization in the USA,http://www.friendshipbridge.org/
+irs,84-1166148,Q7973296,Water For People,non-profit organization in the USA,http://www.waterforpeople.org/
+irs,84-1369453,Q55467896,Globus Relief,American nonprofit organization,http://www.globusrelief.org/
+irs,84-1671995,Q60740517,The BOMA Project,Bhoopendra Singh,
+irs,86-0184349,Q54812701,Junior Achievement of Arizona,American nonprofit organization,http://www.jaaz.org/
+irs,90-0018359,Q2900848,Jewish Voice for Peace,Jewish American activist organization opposing the Israeli government's occupation of the Palestinian territories and related policies,https://jewishvoiceforpeace.org/
+irs,91-1276578,Q54812389,Agros International,American nonprofit organization,http://www.agros.org/
+irs,91-1914868,Q1192147,Habitat for Humanity,American nonprofit organization known for charitable home construction projects,https://www.habitat.org/
+irs,93-0878944,Q30268129,Medical Teams International,"organization in Portland, United States",http://www.medicalteams.org/
+irs,93-1052909,Q54860864,All God's Children International,American nonprofit organization,http://allgodschildren.org/
+irs,93-1057665,Q7127292,Palestine Children's Relief Fund,non-profit organization in the USA,https://www.pcrf.net/
+irs,94-2443282,Q1169014,The Hunger Project,organization,http://www.thp.org/
+irs,94-2607722,Q2776489,New Israel Fund,American non-profit organization,http://www.nif.org/
+irs,94-2607722,Q2776489,New Israel Fund,American non-profit organization,https://nif.org.il/
+irs,94-2764520,Q7205153,Ploughshares Fund,non-profit organization in the USA,http://www.ploughshares.org/
+irs,94-3074600,Q54834508,Middle East Children's Alliance,American nonprofit organization,http://www.mecaforpeace.org/
+irs,95-1831116,Q1227469,Direct Relief,charitable organization,https://www.directrelief.org/
+irs,95-1922279,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/
+irs,95-1922279,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/chinese/
+irs,95-1922279,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/korean/
+irs,95-2248462,Q7249033,Project Concern International,non-profit organization in the USA,https://www.pciglobal.org/
+irs,95-2680390,Q5465482,Food for the Hungry,American development organization,http://fh.org/
+irs,95-3464287,Q5565859,Giving Children Hope,non-profit organization in the USA,http://www.givingchildrenhope.org/
+irs,95-3551085,Q54622614,English Language Institute/China,American nonprofit organization,http://www.elic.org/
+irs,95-3949646,Q17087816,International Medical Corps,non-profit organization in the USA,https://internationalmedicalcorps.org/
+irs,95-4335462,Q5098135,Children's Hunger Fund,organization,http://childrenshungerfund.org/
+irs,95-4402149,Q54857655,Life for Relief and Development,American nonprofit organization,http://www.lifeusa.org/
+irs,95-4453134,Q16997337,Q16997337,non-profit organization in the USA,http://irusa.org/
+irs,95-4714047,Q54857678,OneSky (Half the Sky Foundation),American nonprofit organization,http://onesky.org/
+irs,98-0115409,Q4543840,Pro Mujer,nonprofit organization,http://promujer.org/
+irs,98-0118876,Q2445375,Tostan,organization,http://www.tostan.org/
+irs,98-0493088,Q3108981,Global Witness,British NGO,https://www.globalwitness.org/
+irs,98-0593375,Q688592,GAVI,Global Alliance for Vaccines and Immunization,https://www.gavi.org/
+name,350.org,Q2091619,350.org,international environmental NGO,http://350.org/
+name,Abdul Latif Jameel Poverty Action Lab,Q774437,Abdul Latif Jameel Poverty Action Lab,global research center working to reduce poverty,https://www.povertyactionlab.org/
+name,Abt Associates,Q30281397,Abt Global,"company in Cambridge, Massachusetts, United States",http://www.abtassociates.com/
+name,Abt Associates,Q30281397,Abt Global,"company in Cambridge, Massachusetts, United States",https://www.abtglobal.com/
+name,Abt Associates,Q30291787,"Schulman, Ronca & Bucuvalas","company in New York, United States",http://www.srbi.com/
+name,Access Now,Q4672520,Access Now,non-profit organization,https://www.accessnow.org/
+name,Acción,Q27941540,Acción,newspaper published in Barcelona (1930-1931),http://hemerotecadigital.bne.es/details.vm
+name,Acción,Q73896689,Acción,open access academic journal,http://www.inder.co.cu/accion/
+name,Adventist Development and Relief Agency International,Q290625,Adventist Development and Relief Agency,Adventist Aid agency,http://www.adra.org/
+name,Adventist Frontier Missions,Q55230286,Adventist Frontier Missions,American nonprofit organization,http://www.afmonline.org/
+name,African Agricultural Technology Foundation,Q30267805,African Agricultural Technology Foundation,"nonprofit organization in Nairobi, Kenya",http://aatf-africa.org/
+name,African Economic Research Consortium,Q30267817,African Economic Research Consortium,"nonprofit organization in Nairobi, Kenya",http://aercafrica.org/
+name,African Fertilizer and Agribusiness Partnership,Q30271555,African Fertilizer and Agribusiness Partnership,"company in Johannesburg, South Africa",http://www.afap-partnership.org/
+name,Aga Khan Development Network,Q107519596,Aga Khan Development Network,"organization in Kabul, Afghanistan",https://www.akdn.org/
+name,Aga Khan Development Network,Q389812,Aga Khan Development Network,"network of private, non-denominational development agencies founded by Aga Khan",https://the.akdn/
+name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/en
+name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/es
+name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/fr
+name,Agence Française de Développement,Q2826643,French Development Agency,international-development financial agency of the French Government,https://www.afd.fr/pt
+name,Agros International,Q54812389,Agros International,American nonprofit organization,http://www.agros.org/
+name,Airlink,Q11850211,Airlink,virtual airline in Finland,http://www.airlink.fi/
+name,Airlink,Q408831,Airlink,Regional airline in South Africa,https://flyairlink.com/
+name,Albo,Q2562601,Deportivo Mandiyú,football club,http://www.textilmandiyu.com/
+name,Albo,Q335697,Anthony Albanese,31st prime minister of Australia,https://anthonyalbanese.com.au/
+name,Alliance for Global Justice,Q129502246,Alliance for Global Justice,non-governmental organisation,https://afgj.org/
+name,American Academy in Berlin,Q463262,American Academy in Berlin,American-German research and cultural institution,https://www.americanacademy.de/
+name,American Jewish Joint Distribution Committee,Q1702533,American Jewish Joint Distribution Committee,Jewish relief organization based in New York City,https://www.jdc.org/
+name,American Jewish Joint Distribution Committee,Q1702533,American Jewish Joint Distribution Committee,Jewish relief organization based in New York City,https://www.thejoint.org.il/
+name,American Jewish World Service,Q4064193,American Jewish World Service,nonprofit international development organization,https://ajws.org/
+name,American Leprosy Missions,Q50037810,American Leprosy Missions,"nonprofit organization in Greenville, United States",https://www.leprosy.org/
+name,American Public Health Association,Q4744758,American Public Health Association,"Washington, D.C.-based professional organization",http://www.apha.org/
+name,Americas Society,Q4745666,Americas Society,"non-profit organization in New York, New York",http://www.americas-society.org/
+name,Amideast,Q4746156,Amideast,,http://www.amideast.org/
+name,Amigos for Christ,Q55471598,Amigos for Christ,American nonprofit organization,http://www.amigosforchrist.org/
+name,Amref Health Africa,Q30286536,Amref Health Africa,"healthcare organization in New York, United States",http://www.amrefusa.org/
+name,Amref Health Africa,Q384103,Amref Health Africa,Non-profit organisation,http://www.amref.org/
+name,Amref Health Africa,Q50357835,Amref Health Africa,"nonprofit organization in Dar es Salaam, Tanzania",http://amref.org/
+name,Armed Conflict Location and Event Data Project,Q18354074,Armed Conflict Location & Event Data Project,American non-governmental organization,https://acleddata.com/
+name,Armenian Assembly of America,Q4793157,Armenian Assembly of America,Pro-Armenia lobbyist group in the U.S.,http://www.aaainc.org/
+name,Article 19,Q61933271,Article 19,"nonprofit organization in São Paulo, Brazil",http://artigo19.org/
+name,Ashoka,Q85060,Ashoka,non-profit organization,https://www.ashoka.org/
+name,Asia Society,Q4806468,Asia Society,1997 Australian nonprofit organisation,http://asiasociety.org/centers/australasia
+name,Asia Society,Q842828,Asia Society,1956 nonprofit organisation in New York City,http://www.asiasociety.org/
+name,Asian Development Bank,Q188822,Asian Development Bank,regional development bank,https://adb.org/
+name,Asian Infrastructure Investment Bank,Q18109843,Asian Infrastructure Investment Bank,international financial institution,https://www.aiib.org/
+name,Aspen Institute,Q457528,Aspen Institute,international nonprofit organization founded in 1950,https://www.aspeninstitute.org/
+name,Assist International,Q54860831,Assist International,American nonprofit organization,http://www.assistinternational.org/
+name,Association of Southeast Asian Nations,Q7768,ASEAN,international organisation of Southeast Asian countries,https://asean.org/
+name,B Lab,Q16243343,B Corporation,private self assessment issued to for-profit companies by B Lab,https://www.bcorporation.net/
+name,B Lab,Q16983456,B Lab,U.S. non-profit organization,https://bcorporation.net/about-b-lab
+name,BRAC USA,Q4836319,BRAC USA,"organization in New York, United States",https://www.bracusa.org/
+name,Bancroft Global Development,Q29075579,Bancroft Global Development,security consulting firms,http://www.bancroftglobal.org/
+name,Baptist Medical & Dental Mission International,Q54816387,Baptist Medical & Dental Mission International,American nonprofit organization,http://www.bmdmi.org/
+name,Barcelona Institute for Global Health,Q30256793,Barcelona Institute for Global Health,"healthcare organization in Barcelona, Spain",https://www.isglobal.org/
+name,Bezos Earth Fund,Q85746831,Bezos Earth Fund,climate change organization established in 2020,https://thesolutionsproject.org/bezos-earth-fund/
+name,Bill and Melinda Gates Foundation,Q655286,Gates Foundation,private foundation founded by Bill and Melinda Gates,https://www.gatesfoundation.org/
+name,Binaytara,Q18210219,Binaytara,"United States-based non-profit organization focused on cancer care, continuing medical education, and implementation science research in the fields of hematology and oncology",https://binaytara.org/
+name,Bioversity International,Q864909,Bioversity International,"former global research for development organization, merged with CIAT (Q1054314)",http://www.bioversityinternational.org/
+name,BirdLife International,Q210108,BirdLife International,global partnership of conservation organizations that strives to conserve birds,https://www.birdlife.org/
+name,Blacksmith Institute,Q145590,Pure Earth,environmental organization,http://www.pureearth.org/
+name,Bloomberg Philanthropies,Q16987920,Bloomberg Philanthropies,charitable organization,https://www.bloomberg.org/
+name,Blue Ventures,Q4929991,Blue Ventures,science-led social enterprise that develops approaches for marine conservation,http://www.blueventures.org/
+name,Books for Africa,Q4943279,Books for Africa,non-profit organization in the USA,http://www.booksforafrica.org/
+name,Bread for the World Institute,Q30267850,Bread for the World Institute,"nonprofit organization in Washington D.C., United States",http://www.bread.org/
+name,Brookings Institution,Q929154,Brookings Institution,American think tank,https://www.brookings.edu/
+name,Bruegel,Q141997219,Bruegel,,http://www.bruegelfeestenwingene.be/
+name,Bruegel,Q544706,Bruegel,European think tank,http://www.bruegel.org/
+name,Buddhist Tzu Chi Medical Foundation,Q10886762,Buddhist Tzu Chi Medical Foundation,hospital network in Taiwan,https://www.tzuchi.com.tw/
+name,Buddhist Tzu Chi Medical Foundation,Q30271023,Buddhist Tzu Chi Medical Foundation,"nonprofit organization in South El Monte, United States",https://tzuchimedical.us/
+name,Building Tomorrow,Q4986512,Building Tomorrow,international social-profit organization,http://www.buildingtomorrow.org/
+name,Busara Center for Behavioral Economics,Q107518001,Busara Center for Behavioral Economics,"nonprofit organization in Nairobi, Kenya",https://www.busaracenter.org/
+name,Busara Center for Behavioral Economics,Q30271658,Busara Center for Behavioral Economics,"nonprofit organization in Trenton, United States",http://www.busaracenter.org/
+name,C40 Cities,Q485087,C40 Cities Climate Leadership Group,group of cities around the world,https://www.c40.org/
+name,CARE,Q106373782,Comfort Women Action for Redress and Education,Human rights group,https://comfortwomenaction.org/
+name,CARE,Q107015686,CARE,neighborhood in Baltimore,https://sites.google.com/site/thecarecommunity/
+name,CARE,Q129902,Capitol Reef National Park,"national park in Utah, United States",https://nps.gov/care
+name,CARE,Q140870507,Irene Levi Sala Care Archaeological Foundation,"nonprofit organization in Jerusalem, Israel",https://www.prehistory.org.il/irene-levi-sala-care-archaeological-foundation-grants-in-aid/
+name,CARE,Q140876478,Climate-Neutral and Resource-Efficient Construction,"facility in Dresden, Germany",https://tu-dresden.de/care
+name,CARE,Q20401488,National Medical Care Co.,,http://www.care.med.sa/
+name,CARE,Q55078863,Centre d'anthropologie religieuse européenne,,https://www.ehess.fr/fr/centre-danthropologie-religieuse-europ%C3%A9enne-care
+name,CARE,Q76612332,CARE – Coordinamento per l’Accesso alle Risorse Elettroniche,organization,http://www.crui-risorselettroniche.it/
+name,CARE,Q96100151,Metro Healthcare Indonesia,Indonesian company,http://www.metrohealthcareindonesia.co.id/
+name,CBM,Q124463667,Ten Media,,https://tentv.es/
+name,CBM,Q135983373,British School of Monteria,"education organization in Montería, Colombia",https://britanicomonteria.edu.co/
+name,CBM,Q15750197,Construction and Building Materials,scientific journal,http://www.sciencedirect.com/science/journal/09500618
+name,CBM,Q15750197,Construction and Building Materials,scientific journal,https://www.journals.elsevier.com/construction-and-building-materials
+name,CBM,Q16496749,Centro Universitário Barão de Mauá,,http://www.baraodemaua.br/
+name,CBM,Q1657653,Columbus Air Force Base,"US Air Force base near Columbus, Mississippi, United States",http://www.columbus.af.mil/
+name,CBM,Q20013983,Severo Ochoa Molecular Biology Center,CSIC Research Center in Madrid (Spain),http://www.cbm.uam.es/joomla-rl/index.php/es/
+name,CBM,Q30281504,Centre de biophysique moléculaire,"Research facility in Orléans, France",http://cbm.cnrs-orleans.fr/
+name,CBM,Q30284460,Cluster in Biomedicine,"company in Trieste, Italy",http://www.cbm.fvg.it/
+name,CBM,Q30292128,Confederation of British Metalforming,"organization in Birmingham, United Kingdom",http://www.britishmetalforming.com/
+name,CBM,Q314997,CBM International,international organization,https://www.cbm.de/
+name,CBM,Q33121986,Concerned Black Men National,"nonprofit organization in Washington D.C., United States",http://cbmnational.org/
+name,CBM,Q9008805,Natural History Museum and Institute,"archive organization in Chiba, Japan",http://www2.chiba-muse.or.jp/NATURAL/
+name,CBM,Q9008805,Natural History Museum and Institute,"archive organization in Chiba, Japan",http://www2.chiba-muse.or.jp/www/NATURAL/contents/1520012705102/
+name,CBM,Q98021943,California Black Media,non-profit organization,https://www.cablackmedia.org/
+name,CGIAR,Q1128401,CGIAR,organization,http://www.cgiar.org/
+name,CNFA,Q21921812,Cercle des Nageurs de Fontainebleau-Avon,Swimming French Club,http://cnfa77.free.fr/
+name,CNFA,Q21921812,Cercle des Nageurs de Fontainebleau-Avon,Swimming French Club,http://www.cnfa-natation.fr/
+name,CRDF Global,Q5013851,CRDF Global,nonprofit organization promoting safety etc. via innovation etc.,https://www.crdfglobal.org/
+name,Canadian Aboriginal AIDS Network,Q30284272,Canadian Aboriginal AIDS Network,"nonprofit organization in Vancouver, Canada",http://www.caan.ca/
+name,Cape Eleuthera Foundation,Q45134596,Cape Eleuthera Foundation,foundation in United States of America,http://capeeleutherafoundation.org/
+name,Caribbean Biodiversity Fund,Q131387057,Caribbean Biodiversity Fund,,https://caribbeanbiodiversityfund.org/resources/ficha-informativa-fondo-caribeno-para-la-biodiversidad/
+name,Catholic Medical Mission Board,Q30255653,Catholic Medical Mission Board,"nonprofit organization in New York, United States",http://www.cmmb.org/
+name,Center for European Policy Analysis,Q5059628,Center for European Policy Analysis,American organization,http://cepa.org/
+name,Center for Strategic and International Studies,Q1053614,Center for Strategic and International Studies,"American think tank in Washington, D.C.",https://www.csis.org/
+name,Center for Third World Organizing,Q54862705,Center for Third World Organizing,American nonprofit organization,http://www.ctwo.org/
+name,Center for Victims of Torture,Q5059917,Center for Victims of Torture,non-profit organization in the USA,http://www.cvt.org/
+name,Ceres,Q107185537,Ceres,social women's fraternity focused on Agriculture,http://ceresfraternity.com/
+name,Ceres,Q11314627,Ceres,Japanese internet company,https://ceres-inc.jp/
+name,Ceres,Q116272286,Ceres,2015 video game,http://www.ceresthegame.com/
+name,Ceres,Q2981087,Ceres,non-profit organization advocating sustainability,https://www.ceres.org/
+name,Ceres,Q30267896,Ceres Nanosciences,"company in Manassas, United States",http://www.ceresnano.com/
+name,Ceres,Q5064191,United City F.C.,association football club,https://ceresfootball.com/
+name,Ceres,Q594171,Ceres,"city in Stanislaus County, California, United States",http://www.ci.ceres.ca.us/
+name,Ceres,Q9244,Ceres,Italian comune,https://www.comune.ceres.to.it/
+name,Chan Zuckerberg Initiative,Q21623039,Chan Zuckerberg Initiative,company founded by Marc Zuckerberg and Priscilla Chan,https://chanzuckerberg.com/
+name,Chatham House,Q263016,Chatham House,international affairs think tank,https://www.chathamhouse.org/
+name,Chicago Council on Global Affairs,Q5095561,Chicago Council on Global Affairs,"foreign affairs think tank in Chicago, Illinois, USA",https://globalaffairs.org/
+name,ChildFund International,Q17189927,ChildFund,children's Fund,http://www.childfund.org/
+name,Children,Q123482191,Barn,Norwegian scholarly periodical,https://tidsskriftetbarn.no/index.php/barn
+name,Children,Q27709994,Children,"scientific journal published in Washington, D.C.",http://bibpurl.oclc.org/web/7797
+name,Children,Q27709994,Children,"scientific journal published in Washington, D.C.",http://hearth.library.cornell.edu/h/hearth/browse/title/4761305.html
+name,Children,Q27726177,Children,scientific journal published by MDPI,http://nbn-resolving.de/urn/resolver.pl
+name,Children,Q27726177,Children,scientific journal published by MDPI,http://www.e-helvetica.nb.admin.ch/directAccess
+name,Children,Q27726177,Children,scientific journal published by MDPI,http://www.mdpi.com/journal/children
+name,Children,Q27726177,Children,scientific journal published by MDPI,https://www.mdpi.com/journal/children
+name,Children,Q495676,Tahar Ben Ammar,Tunisian politician (1889-1985),https://www.taharbenammar.com/
+name,Children,Q779545,The Children,2008 film by Tom Shankland,http://www.thechildrenmovie.com/
+name,Children International,Q945897,Children International,organization,https://www.children.org/
+name,Children International,Q945897,Children International,organization,https://www.children.org/es
+name,Children of Armenia Fund,Q5098408,Children of Armenia Fund,non-profit organization in the USA,https://www.coaf.org/en/
+name,Children of Armenia Fund,Q5098408,Children of Armenia Fund,non-profit organization in the USA,https://www.coaf.org/hy/
+name,Christel House International,Q5109127,Christel House International,non-profit organization in the USA,http://www.christelhouse.org/
+name,Christian Relief Fund,Q28404159,Christian Relief Fund,non-profit organization in the USA,https://christianrelieffund.org/
+name,Christian Relief Services Charities,Q54860102,Christian Relief Services Charities,http://www.crscfamily.org/,http://www.crsc-family.org/
+name,Church World Service,Q5116734,Church World Service,cooperative humanitarian ministry,http://www.churchworldservice.org/
+name,Citizen Lab,Q5122568,Citizen Lab,research organization based in Canada,https://citizenlab.ca/
+name,Clean Air Asia,Q141737204,Clean Air Asia,"international organisation working for better air quality and healthier, more liveable cities across Asia",https://cleanairasia.org/
+name,Climate Analytics,Q98471481,Climate Analytics,non-profit organization focused on climate science and climate policy,https://climateanalytics.org/
+name,Climate Policy Initiative,Q55006595,Climate Policy Initiative,U.S. non-profit organization.,http://climatepolicyinitiative.org/
+name,Clinton Foundation,Q1974620,Clinton Foundation,non-profit organization in the USA,https://www.clintonfoundation.org/
+name,Clinton Foundation,Q50378594,Clinton Foundation,"nonprofit organization in Addis Ababa, Ethiopia",https://www.clintonfoundation.org/
+name,Clinton Foundation,Q61931356,Clinton Foundation,"nonprofit organization in New Delhi, India",https://www.clintonfoundation.org/
+name,Clooney Foundation for Justice,Q122939919,Clooney Foundation for Justice,American nonprofit organization,https://cfj.org/
+name,Committee for Accuracy in Middle East Reporting in America,Q484798,Committee for Accuracy in Middle East Reporting and Analysis,media-monitoring organization,http://camera.org/
+name,Committee to Protect Journalists,Q1115813,Committee to Protect Journalists,American nonprofit organization,https://cpj.org/
+name,Common Hope,Q5153390,Common Hope,organization in Minnesota,http://www.commonhope.org/
+name,Community of Christ,Q625363,Community of Christ,second-largest denomination in the Latter Day Saint movement,http://www.cofchrist.org/
+name,Concordia Summit,Q5158989,Concordia Summit,annual summit held by the nonprofit organization Concordia to promote private-public partnerships,http://www.concordia.net/
+name,Conrad N. Hilton Foundation,Q1126934,Conrad N. Hilton Foundation,foundation,http://www.hiltonfoundation.org/
+name,Cooperative for Assistance and Relief Everywhere,Q30286634,Care Canada,"nonprofit organization in Ottawa, Canada",http://care.ca/
+name,Council of Europe Development Bank,Q611107,Council of Europe Development Bank,international lending institution to promote social cohesion,http://www.coebank.org/
+name,Council of the Baltic Sea States,Q789769,Council of the Baltic Sea States,intergovernmental organization,https://cbss.org/
+name,Council on Foreign Relations,Q594712,Council on Foreign Relations,American think tank on foreign policy,https://www.cfr.org/
+name,Counterpart International,Q5176998,Counterpart International,organization,https://www.counterpart.org/
+name,Cuso International,Q5196227,Cuso International,organization,http://www.cusointernational.org/
+name,DHIS2,Q19698946,DHIS2,District Health Information System 2,https://www.dhis2.org/
+name,Dalberg Global Development Advisors,Q5210246,Dalberg Global Development Advisors,policy advisory firm,http://www.dalberg.com/
+name,DataKind,Q97135421,DataKind,organization,https://www.datakind.org/
+name,Democracy International,Q1185816,Democracy International,,http://www.democracyinternational.com/
+name,"Department of Management Strategy, Policy and Compliance",Q137441704,"United Nations Department of Management Strategy, Policy and Compliance",section of the United Nations Secretariat,https://www.un.org/management/
+name,Department of Operational Support,Q130534067,United Nations Department of Operational Support,organization through UN,https://operationalsupport.un.org/
+name,Deutsche Gesellschaft für Internationale Zusammenarbeit,Q462763,Deutsche Gesellschaft für Internationale Zusammenarbeit,German government international aid agency,http://www.giz.de/
+name,Deutsche Gesellschaft für Internationale Zusammenarbeit,Q50357848,GIZ Office Manila,"GIZ office in Makati City, Philippines",https://www.giz.de/en/worldwide/376.html
+name,Development Gateway,Q5266695,Development Gateway,organization,http://www.developmentgateway.org/
+name,Digital Green,Q17085188,Digital Green,organization,http://www.digitalgreen.org/
+name,Direct Relief,Q1227469,Direct Relief,charitable organization,https://www.directrelief.org/
+name,Disability Rights Fund,Q30264715,Disability Rights Fund,"nonprofit organization in Boston, United States",http://www.disabilityrightsfund.org/
+name,Dorcas International Institute of Rhode Island,Q140078907,Dorcas International Institute of Rhode Island,"Support Services for Immigrants, Teen Mothers",https://www.diiri.org/
+name,Dress for Success Worldwide,Q54851174,Dress for Success Worldwide,American nonprofit organization,http://www.dressforsuccess.org/
+name,East-West Center,Q5331041,East–West Center,Organization established by U.S. Congress in Hawaii,http://www.eastwestcenter.org/
+name,Economic Commission for Latin America and the Caribbean,Q32874,United Nations Economic Commission for Latin America and the Caribbean,United Nations Commission for economic cooperation among its member states,http://www.cepal.org/
+name,Economic and Social Commission for Western Asia,Q1355485,United Nations Economic and Social Commission for Western Asia,United Nations Commission for economic cooperation among its member states,https://www.unescwa.org/
+name,Eden Reforestation Projects,Q25831295,Eden Reforestation Projects,non-governmental organization,http://www.edenprojects.org/
+name,Educate Girls,Q5340835,Educate Girls,educating girl child,https://www.educategirls.ngo/
+name,Ekal Vidyalaya Foundation of USA,Q50326843,Ekal Vidyalaya Foundation of USA,nonprofit organization in the USA,https://www.ekal.org/us
+name,Elizabeth Glaser Pediatric AIDS Foundation,Q16992396,Elizabeth Glaser Pediatric AIDS Foundation,non-profit organization in the USA,http://www.pedaids.org/
+name,Elizabeth Glaser Pediatric AIDS Foundation,Q50804997,Elizabeth Glaser Pediatric AIDS Foundation,"nonprofit organization in Dar es Salaam, Tanzania",http://www.pedaids.org/countries/tanzania
+name,Elizabeth Glaser Pediatric AIDS Foundation,Q50804998,Elizabeth Glaser Pediatric AIDS Foundation,"nonprofit organization in Abidjan, Ivory Coast",http://www.pedaids.org/
+name,Empowers Africa,Q30268068,Empowers Africa,"nonprofit organization in New York, United States",https://empowersafrica.org/
+name,Energy Innovation,Q137918445,Energy Innovation,US energy and climate policy research group promoting the most effective emission-cutting policies,https://energyinnovation.org/
+name,Environmental Defense Fund,Q1345899,Environmental Defense Fund,"United States environmental advocacy organization, headquartered in New York City",http://www.edf.org/
+name,Environmental Investigation Agency,Q1345905,Environmental Investigation Agency US,US-based 2nd non-profit organization of EIA (1989-),http://www.eia-global.org/
+name,Epicentre,Q107013885,Epicentre,part of Médecins Sans Frontières,https://epicentre.msf.org/
+name,Equality Now,Q3523207,Equality Now,Organisation,https://equalitynow.org/
+name,European Bank for Reconstruction and Development,Q488981,European Bank for Reconstruction and Development,international investment bank,https://www.ebrd.com/
+name,European External Action Service,Q672941,European External Action Service,diplomatic service of the European Union,https://eeas.europa.eu/
+name,European External Action Service,Q672941,European External Action Service,diplomatic service of the European Union,https://www.eeas.europa.eu/_fr
+name,European Forest Institute,Q580400,European Forest Institute,organization,https://efi.int/
+name,European Institute of Innovation and Technology,Q993120,European Institute of Innovation and Technology,"research institute, independent EU body",https://www.eit.europa.eu/
+name,FINCA International,Q3079938,FINCA International,Microfinance organization,http://www.finca.org/
+name,FLOCERT,Q986530,FLOCert,certification organization,http://www.flocert.net/
+name,Fashion for Good,Q110995897,Fashion for Good,museum in Netherlands,https://fashionforgood.com/
+name,Federation for American Immigration Reform,Q5440746,Federation for American Immigration Reform,Non-Profit,https://fairus.org/
+name,Feed My Starving Children,Q21015705,Feed My Starving Children,organization,http://fmsc.org/
+name,Feed the Children,Q5441193,Feed the Children,organization,http://www.feedthechildren.org/
+name,Financial Services Volunteer Corps,Q5449659,Financial Services Volunteer Corps,,http://www.fsvc.org/
+name,Food for the Hungry,Q5465482,Food for the Hungry,American development organization,http://fh.org/
+name,Food for the Poor,Q5465483,Food for the Poor,an ecumenical Christian nonprofit organization,http://www.foodforthepoor.com/
+name,Ford Foundation,Q1313036,Ford Foundation,private foundation based in New York City,http://www.fordfoundation.org/
+name,Forest Stewardship Council,Q748367,Forest Stewardship Council,organization promoting and certifying responsible management of forest,http://www.fsc.org/
+name,Freedom Alliance,Q106453721,Freedom Alliance,British political party,https://freedomalliance.co.uk/
+name,Freedom Alliance,Q111858358,Freedom Alliance,political party in Finland,https://vapaudenliitto.fi/
+name,Freedom Alliance,Q54826433,American Freedom Alliance,American nonprofit organization,https://americanfreedomalliance.org/
+name,Freedom House,Q242424,Freedom House,American think tank (est. 1941),https://freedomhouse.org/
+name,Friends of the Orphans,Q5504348,Friends of the Orphans,American nonprofit organization,http://www.nphusa.org/
+name,Friendship Bridge,Q5504383,Friendship Bridge,non-profit organization in the USA,http://www.friendshipbridge.org/
+name,Fuente Latina,Q28980455,Fuente Latina,News agency,https://fuentelatina.org/
+name,Fund for Armenian Relief,Q5508876,Fund for Armenian Relief,non-profit organization in the USA,https://farusa.org/
+name,Fund for Global Human Rights,Q30288978,Fund for Global Human Rights,"organization in Washington D.C., United States",http://globalhumanrights.org/
+name,GiveWell,Q5565607,GiveWell,American charity,https://www.givewell.org/
+name,Giving Children Hope,Q5565859,Giving Children Hope,non-profit organization in the USA,http://www.givingchildrenhope.org/
+name,Gloag Foundation,Q59536645,Gloag Foundation,"nonprofit organization in Perth, United Kingdom",http://www.gloagfoundation.org.uk/
+name,Global Alliance for Improved Nutrition,Q5570101,Global Alliance for Improved Nutrition,organization,https://www.gainhealth.org/
+name,Global Citizen,Q5570568,Global Citizen,organization,https://www.globalcitizen.org/en/
+name,Global Communities,Q25047905,Global Communities,"nonprofit organization in Silver Spring, United States",http://www.globalcommunities.org/
+name,Global Energy Monitor,Q65086937,Global Energy Monitor,nonprofit tracking fossil fuel and energy infrastructure projects worldwide,https://globalenergymonitor.org/
+name,Global Health Ministries,Q54855631,Global Health Ministries,American nonprofit organization,http://www.ghm.org/
+name,Global Links,Q55230295,Global Links,American nonprofit organization,http://www.globallinks.org/
+name,Global Peace Foundation,Q199208,Global Peace Foundation,organization,http://www.globalpeace.org/
+name,Global Witness,Q3108981,Global Witness,British NGO,https://www.globalwitness.org/
+name,GlobalGiving.org,Q4039485,GlobalGiving,organization,https://www.globalgiving.org/
+name,Golden West Humanitarian Foundation,Q5579967,Golden West Humanitarian Foundation,,http://www.goldenwesthf.org/
+name,Good Neighbors USA,Q54834635,Good Neighbors USA,American nonprofit organization,http://www.goodneighbors.us/
+name,Grameen Foundation USA,Q5593623,Grameen Foundation,American nonprofit organization,http://www.grameenfoundation.org/
+name,Grant Foundation,Q30256218,William Thomas Grant Foundation,"nonprofit organization in New York, United States",http://wtgrantfoundation.org/
+name,Grassroots International,Q54628358,Grassroots International,American nonprofit organization,http://www.grassrootsonline.org/
+name,Grey Sisters of the Immaculate Conception,Q3977254,Grey Sisters of the Immaculate Conception,Roman Catholic religious congregation for women,http://www.greysisters.ca/index.html
+name,HIAS,Q2910087,HIAS,Jewish American nonprofit organization providing humanitarian aid and assistance to refugees,https://www.hias.org/
+name,Habitat for Humanity,Q1192147,Habitat for Humanity,American nonprofit organization known for charitable home construction projects,https://www.habitat.org/
+name,Haitian Health Foundation,Q3373086,Haitian Health Foundation,organization,http://www.haitianhealthfoundation.org/
+name,Handicap International,Q1575029,Handicap International,International aid organization with headquarter in France,https://hi.org/
+name,Harvard-Yenching Institute,Q175863,Harvard–Yenching Institute,"organization in Cambridge, United States",http://www.harvard-yenching.org/
+name,Healing Hands International,Q55231412,Healing Hands International,American nonprofit organization,http://www.hhi.org/
+name,Heart to Heart International,Q5692500,Heart to Heart International,non-profit organization in the USA,http://www.hearttoheart.org/
+name,Heifer International,Q2462543,Heifer International,organization,https://www.heifer.org/
+name,Helvetas,Q467480,HELVETAS Swiss Intercooperation,Swiss international development and humanitarian organization,https://www.helvetas.org/
+name,Henry L. Stimson Center,Q5724590,Henry L. Stimson Center,American think tank,http://stimson.org/
+name,Himalayan Cataract Project,Q5764990,Himalayan Cataract Project,"other organization in Waterbury, United States",http://www.cureblindness.org/
+name,Hope 4 Kids International,Q55472644,Hope 4 Kids International,American nonprofit organization,http://www.hope4kidsinternational.org/
+name,Hope International,Q16984831,Hope International,US nonprofit financial services organization,http://www.hopeinternational.org/
+name,Hope International,Q5899312,Hope International,historic Adventism movement,http://www.hopeint.org/
+name,Hope Worldwide,Q30261833,Hope Worldwide,"nonprofit organization in Abidjan, Ivory Coast",https://www.hopeww.org/
+name,Hope for Haiti,Q5899656,Hope for Haiti,non-profit organization in the USA,http://www.hopeforhaiti.com/
+name,Human Appeal,Q108943946,Human Appeal,charity based in Australia,https://www.humanappeal.org.au/
+name,Human Appeal,Q25383518,Human Appeal,British international development and relief charity based in Manchester,https://www.humanappeal.org.uk/
+name,Human Rights First,Q3143126,Human Rights First,non-profit organization in the USA,http://www.humanrightsfirst.org/
+name,ICRISAT,Q108737573,International Crops Research Institute for the Semi-Arid Tropics,"government organization in Nairobi, Kenya",https://www.icrisat.org/tag/kenya/
+name,ICRISAT,Q262250,International Crops Research Institute for the Semi-Arid Tropics,International research organization,http://www.icrisat.org/
+name,India Development and Relief Fund,Q6019277,India Development and Relief Fund,organization,http://www.idrf.org/
+name,Institut Pasteur,Q391083,Pasteur Institute,French research institute (1887-),http://www.pasteur.fr/
+name,Institut Pasteur,Q391083,Pasteur Institute,French research institute (1887-),http://www.pasteur.fr/en
+name,Institute for Energy Economics and Financial Analysis,Q135192960,Institute for Energy Economics and Financial Analysis,think tank,https://ieefa.org/
+name,Institute for Essential Services Reform,Q142024215,Institute for Essential Services Reform,"think tank in Jakarta, Indonesia",https://iesr.or.id/en/
+name,Institute for Policy Studies,Q3152799,Institute for Policy Studies,American progressive think tank (founded 1963),http://www.ips-dc.org/
+name,Institute for Sustainable Communities,Q164257,Institute for Sustainable Communities,organization,https://sustain.org/
+name,Institute for Transportation and Development Policy,Q6039711,Institute for Transportation and Development Policy,organization,http://www.itdp.org/
+name,Insulin for Life USA,Q16986471,Insulin for Life USA,organization,http://www.ifl-usa.org/
+name,Insulin for Life USA,Q16986471,Insulin for Life USA,organization,https://www.insulinforlife.org/
+name,Inter-Parliamentary Union,Q176815,Interparliamentary Union,international organization of national parliaments,https://www.ipu.org/
+name,International Anti-Corruption Academy,Q876957,International Anti-Corruption Academy,organization,http://www.iaca.int/
+name,International Atomic Energy Agency,Q41984,International Atomic Energy Agency,international organisation,https://www.iaea.org/
+name,International Campaign for Tibet,Q1344041,International Campaign for Tibet,organization,https://liaowangxizang.net/
+name,International Campaign for Tibet,Q1344041,International Campaign for Tibet,organization,https://savetibet.de/
+name,International Campaign for Tibet,Q1344041,International Campaign for Tibet,organization,https://savetibet.org/
+name,International Campaign for Tibet,Q1344041,International Campaign for Tibet,organization,https://www.savetibet.eu/ict-en-francais/
+name,International Center for Agricultural Research in the Dry Areas,Q50362982,International Center for Agricultural Research in the Dry Areas,"facility in Rabat, Morocco",http://www.icarda.org/
+name,International Center for Agricultural Research in the Dry Areas,Q50362990,International Center for Agricultural Research in the Dry Areas,"facility in Amman, Jordan",http://www.icarda.cgiar.org/
+name,International Center for Agricultural Research in the Dry Areas,Q601277,International Center for Agricultural Research in the Dry Areas,agricultural research institute,http://www.icarda.org/
+name,International Center for Biosaline Agriculture,Q25227016,International Center for Biosaline Agriculture,"international, not-for-profit applied agricultural research center with a unique focus on marginal environment",http://biosaline.org/
+name,International Center for Research on Women,Q6049050,International Center for Research on Women,organization,http://www.icrw.org/
+name,International Civil Aviation Organization,Q125761,International Civil Aviation Organization,"specialized agency of the United Nations, coordinates the international civil aviation regulations and policy",https://icao.int/
+name,International Civil Service Commission,Q25104179,International Civil Service Commission,Subsidiary of the United Nations General Assembly,https://icsc.un.org/
+name,International Consortium of Investigative Journalists,Q16166292,International Consortium of Investigative Journalists,international network of investigative reporters,https://www.icij.org/
+name,International Council on Clean Transportation,Q21002457,International Council on Clean Transportation,non-governmental organization for clean transporation,http://www.theicct.org/
+name,International Court of Justice,Q7801,International Court of Justice,primary judicial organ of the United Nations,https://icj-cij.org/ar
+name,International Court of Justice,Q7801,International Court of Justice,primary judicial organ of the United Nations,https://icj-cij.org/ch
+name,International Court of Justice,Q7801,International Court of Justice,primary judicial organ of the United Nations,https://icj-cij.org/es
+name,International Court of Justice,Q7801,International Court of Justice,primary judicial organ of the United Nations,https://icj-cij.org/home
+name,International Court of Justice,Q7801,International Court of Justice,primary judicial organ of the United Nations,https://icj-cij.org/ru
+name,International Criminal Court,Q23888160,The International Criminal Court,"2013 film by Michele Gentile, Marcus Vetter",http://www.thecourt-movie.com/
+name,International Criminal Court,Q47488,International Criminal Court,intergovernmental organization and international tribunal,https://icc-cpi.int/
+name,International Criminal Court,Q47488,International Criminal Court,intergovernmental organization and international tribunal,https://www.icc-cpi.int/fr
+name,International Development Group,Q141669515,International Development Group (United States),"company in Arlington, United States",https://www.internationaldevelopmentgroup.com/
+name,International Dialogue Centre,Q6324948,KAICIID Dialogue Centre,interfaith dialogue international organization,http://www.kaiciid.org/
+name,International Disaster Emergency Service,Q6050178,International Disaster Emergency Service,organization,http://www.ides.org/
+name,International Economic Development Council,Q16849140,International Economic Development Council,organization,http://www.iedconline.org/
+name,International Executive Service Corps,Q6050342,International Executive Service Corps,International not-for-profit organization,http://iesc.org/
+name,International Institute for Applied Systems Analysis,Q212102,International Institute for Applied Systems Analysis,international research organization in Austria,http://www.iiasa.ac.at/
+name,International Institute for Strategic Studies,Q1206709,International Institute for Strategic Studies,British research institute (or think tank) in the area of international affairs,https://www.iiss.org/
+name,International Justice Mission,Q1423565,International Justice Mission,Non-profit organization in the USA,http://www.ijm.org/
+name,International Livestock Research Institute,Q1666743,International Livestock Research Institute,an international agricultural research institute within the CGIAR – formerly the Consultative Group for International Agricultural Research,https://www.ilri.org/
+name,International Livestock Research Institute,Q50376942,International Livestock Research Institute,"facility in Addis Ababa, Ethiopia",http://www.ilri.org/
+name,International Maize and Wheat Improvement Center,Q108737267,International Maize and Wheat Improvement Center,"nonprofit organization in Nairobi, Kenya",https://www.cimmyt.org/location/africa/kenya/
+name,International Maize and Wheat Improvement Center,Q108737289,International Maize and Wheat Improvement Center,"nonprofit organization in Addis Ababa, Ethiopia",https://www.cimmyt.org/
+name,International Maize and Wheat Improvement Center,Q108737343,International Maize and Wheat Improvement Center,"nonprofit organization in New Delhi, India",https://www.cimmyt.org/
+name,International Maize and Wheat Improvement Center,Q108737487,International Maize and Wheat Improvement Center,"nonprofit organization in Dhaka, Bangladesh",https://www.cimmyt.org/location/asia/bangladesh/
+name,International Maize and Wheat Improvement Center,Q1666745,International Maize and Wheat Improvement Center,organization in Mexico,http://www.cimmyt.org/
+name,International Maritime Organization,Q201054,International Maritime Organization,specialized UN agency concerned with legal and regulatory aspects of maritime activity,https://www.imo.org/
+name,International Medical Corps,Q17087816,International Medical Corps,non-profit organization in the USA,https://internationalmedicalcorps.org/
+name,International Orthodox Christian Charities,Q6052281,International Orthodox Christian Charities,non-profit organization in the USA,http://www.iocc.org/
+name,International Peace Institute,Q6052366,International Peace Institute,"research and policy institute based in New York, USA",http://www.ipinst.org/
+name,International Planned Parenthood Federation,Q181972,International Planned Parenthood Federation,nonprofit organization that provides sexual and reproductive medical services and information,https://www.ippf.org/
+name,International Planned Parenthood Federation,Q50357035,International Planned Parenthood Federation,"nonprofit organization in Brussels, Belgium",http://www.ippfen.org/
+name,International Refugee Assistance Project,Q30325304,International Refugee Assistance Project,US non-profit organization,http://www.refugeerights.org/
+name,International Relief Teams,Q55803600,International Relief Teams,"U.S.-based nonprofit humanitarian aid organization delivering disaster relief, food, water, and medical aid globally",http://www.irteams.org/
+name,International Renewable Energy Agency,Q392739,International Renewable Energy Agency,international organization,https://www.irena.org/
+name,International Residual Mechanism for Criminal Tribunals,Q1667632,International Residual Mechanism for Criminal Tribunals,international criminal tribunal,http://www.irmct.org/
+name,International Rice Research Institute,Q1204921,International Rice Research Institute,organization,https://www.irri.org/
+name,International Seabed Authority,Q333727,International Seabed Authority,Intergovernmental body to regulate mineral-related activities on the seabed,https://www.isa.org.jm/
+name,International Telecommunication Union,Q376150,International Telecommunication Union,specialized agency of the United Nations for information and communication technologies,https://www.itu.int/
+name,International Telecommunication Union,Q50357832,International Telecommunication Union,"organization in Dakar, Senegal",http://www.itu.int/en/
+name,International Vaccine Institute,Q6054186,International Vaccine Institute,"independent, nonprofit, international organization",https://www.ivi.int/
+name,International Water Management Institute,Q108737258,International Water Management Institute,"facility in Addis Ababa, Ethiopia",https://www.iwmi.cgiar.org/
+name,International Water Management Institute,Q108737429,International Water Management Institute,"facility in Pretoria, South Africa",https://www.iwmi.cgiar.org/
+name,International Water Management Institute,Q868028,International Water Management Institute,organization,https://www.iwmi.cgiar.org/
+name,International Youth Foundation,Q55472785,International Youth Foundation,American nonprofit organization,http://www.iyfnet.org/
+name,Internet Society Foundation,Q118957546,Internet Society Foundation,Funding Agency for internet related initiatives,https://www.isocfoundation.org/
+name,Internews Network,Q6056118,Internews,organization,http://www.internews.org/
+name,Internews Network,Q6056118,Internews,organization,https://www.internews.org/
+name,Iris Global,Q27983232,Iris Global,"Christian organization headquartered in Redding, California",https://www.irisglobal.org/
+name,Islamic Circle of North America,Q6082383,Islamic Circle of North America,Islamic North American organization,http://www.icna.org/
+name,Israel Policy Forum,Q6087138,Israel Policy Forum,American Jewish organization,http://www.israelpolicyforum.org/
+name,Japan International Cooperation Agency,Q958590,Japan International Cooperation Agency,governmental agency,http://www.jica.go.jp/
+name,Jerusalem Foundation,Q954536,Jerusalem Foundation,municipal foundation for the development of Jerusalem,http://www.jerusalemfoundation.org/
+name,Jhpiego,Q6191185,Jhpiego,organization,http://www.jhpiego.org/
+name,John D. and Catherine T. MacArthur Foundation,Q1424691,John D. and Catherine T. MacArthur Foundation,private foundation (US),https://www.macfound.org/
+name,Junior Achievement of Alabama,Q54816561,Junior Achievement of Alabama,American nonprofit organization,https://www.juniorachievement.org/web/ja-birmingham/
+name,Junior Achievement of Arizona,Q54812701,Junior Achievement of Arizona,American nonprofit organization,http://www.jaaz.org/
+name,Junior Achievement of Central Florida,Q55472185,Junior Achievement of Central Florida,American nonprofit organization,https://www.juniorachievement.org/web/ja-centralfl/
+name,Junior Achievement of Central Ohio,Q54857517,Junior Achievement of Central Ohio,American nonprofit organization,https://www.juniorachievement.org/web/ja-centraloh
+name,Junior Achievement of Chicago,Q54857534,Junior Achievement of Chicago,American nonprofit organization,http://www.jachicago.org/
+name,Junior Achievement of Southeast Texas,Q54815726,Junior Achievement of Southeast Texas,American nonprofit organization,https://www.juniorachievement.org/web/ja-set
+name,Junior Achievement of Southwest New England,Q54556212,Junior Achievement of Southwest New England,http://jaconn.net,http://www.jaconn.org/
+name,Junior Achievement of Tampa Bay,Q54821899,Junior Achievement of Tampa Bay,American nonprofit organization,http://jatampabay.org/
+name,Kennan Institute,Q6389513,Kennan Institute for Advanced Russian Studies,"institute for Russia studies, formerly for Sovietology",https://www.wilsoncenter.org/program/kennan-institute
+name,Kepler,Q139254909,Kepler,Artificial intelligence company building verifiable AI,https://kepler.ai/
+name,Kepler,Q17061929,Kepler,"nonprofit higher education program that operates a university campus in Kigali, Rwanda",http://www.kepler.org/
+name,Kepler,Q6393191,Kepler,Lua-based free software project,http://www.keplerproject.org/
+name,KfW Development Bank,Q140351133,KfW Development Bank,"government organization in Frankfurt am Main, Germany",https://www.kfw-entwicklungsbank.de/
+name,Kheyti,Q112133464,Kheyti,Farming Product & Service by Cosmos Green,https://www.kheyti.com/
+name,Kids Alive International,Q55473023,Kids Alive International,American nonprofit organization,http://www.kidsalive.org/
+name,Kingsway Charities,Q54826342,Kingsway Charities,American nonprofit organization,http://www.kingswaycharities.org/
+name,Kiva Microfunds,Q1423787,Kiva,micro-loan platform,https://www.kiva.org/
+name,Korea Society,Q85807672,The Korea Society,American non-profit organization,http://www.koreasociety.org/
+name,Landesa,Q4042590,Landesa,"nonprofit organization in Seattle, United States",https://www.landesa.org/
+name,Life for Relief and Development,Q54857655,Life for Relief and Development,American nonprofit organization,http://www.lifeusa.org/
+name,Lifesong for Orphans,Q54857570,Lifesong for Orphans,American nonprofit organization,http://www.lifesongfororphans.org/
+name,Living Goods,Q54834256,Living Goods,American nonprofit organization,http://livinggoods.org/
+name,Living Goods,Q6659123,Living Goods,non-profit organization,https://livinggoods.org/
+name,Lonia,Q124364344,Lonia,convenience store chain in Croatia,https://lonia.hr/
+name,Lotte and John Hecht Memorial Foundation,Q140351989,Lotte and John Hecht Memorial Foundation,"nonprofit organization in Vancouver, Canada",https://www.hecht.org/
+name,Love Justice International,Q136431739,Love Justice International,organisation,https://lovejustice.ngo/
+name,Lutheran World Federation,Q942284,Lutheran World Federation,global communion of national and regional Lutheran churches,https://www.lutheranworld.org/
+name,Lutheran World Relief,Q6705754,Lutheran World Relief,organization,http://lwr.org/
+name,Madre,Q53769035,Madre,nonprofit organization,http://www.madre.org/
+name,Maisha Meds,Q30268142,Maisha Meds,"healthcare organization in Kisumu, Kenya",http://maishameds.org/
+name,Malteser International,Q318221,Malteser International,organization,http://www.malteser-international.org/
+name,Management Sciences for Health,Q21061083,Management Sciences for Health,nonprofit,http://www.msh.org/
+name,Maranatha Volunteers International,Q6754785,Maranatha Volunteers International,non-profit organization in the USA,http://www.maranatha.org/
+name,Maxwell Leadership Foundation,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+name,Maxwell Leadership Foundation Inc,Q141888379,Maxwell Leadership Foundation,"American nonprofit organization founded by John C. Maxwell, promoting values-based leadership education in schools and communities",https://www.maxwellleadership.org/
+name,Medical Benevolence Foundation,Q54816519,Medical Benevolence Foundation,American nonprofit organization,https://www.mbfoundation.org/
+name,Medical Bridges,Q54813794,Medical Bridges,American nonprofit organization,http://www.medicalbridges.org/
+name,Medical Teams International,Q30268129,Medical Teams International,"organization in Portland, United States",http://www.medicalteams.org/
+name,Medicines Patent Pool,Q17006726,Medicines Patent Pool,organization,https://medicinespatentpool.org/
+name,Medicines for Malaria Venture,Q6806774,Medicines for Malaria Venture,organization,http://www.mmv.org/
+name,Meds & Food for Kids,Q6807293,Meds & Food for Kids,organization,http://mfkhaiti.org/
+name,Meedan,Q6807493,Meedan,,https://meedan.com/
+name,Mennonite Economic Development Associates,Q30271855,Mennonite Economic Development Associates,"organization in Waterloo, Canada",http://meda.org/
+name,Mentors International,Q55472606,Mentors International,American nonprofit organization,https://mentorsinternational.org/
+name,Mercury One,Q126723191,Mercury One,American charity of Glenn Beck (2011-),https://mercuryone.org/
+name,Middle East Institute,Q6841337,Middle East Institute,UAE/Saudi-funded think tank based in the US,http://www.mei.edu/
+name,Middle East Institute,Q6841337,Middle East Institute,UAE/Saudi-funded think tank based in the US,https://arabic.mei.edu/
+name,Milken Institute,Q17090319,Milken Institute,US economic think tank,https://milkeninstitute.org/
+name,Miyamoto International,Q16934150,Miyamoto International,American structural engineering and disaster management firm,http://www.miyamotointernational.com/
+name,Muso,Q115945658,Muso,,https://muso.co.jp/
+name,Mustard Seed Communities,Q54855771,Mustard Seed Communities,American nonprofit organization,http://www.mustardseed.com/
+name,National Council of Negro Women,Q6971923,National Council of Negro Women,American nonprofit organization,http://www.ncnw.org/
+name,Natural Resources Defense Council,Q841895,Natural Resources Defense Council,"non-profit international environmental advocacy group, with its headquarters in New York City",https://www.nrdc.org/
+name,Nepal Youth Foundation,Q6994443,Nepal Youth Foundation,non-profit organization in the USA,http://www.nepalyouthfoundation.org/
+name,Nest,Q107015664,NestJS,progressive app framework for node.js,https://nestjs.com/
+name,Nest,Q115217392,Nest,web interface for the Pijul version control system,https://nest.pijul.com/
+name,Nest,Q122460139,Nest,theatre production,https://leeds2023.co.uk/nest
+name,Nest,Q135441931,Nest,2025 Swiss short film,https://www.lightsonfilm.com/nest.html
+name,Nest,Q141244758,Nest,American nonprofit organization supporting artisan and handcraft businesses,https://www.buildanest.org/
+name,Nest,Q3874929,Nest,Finnish neofolk/ambient band,http://koti.mbnet.fi/atolonen/nest/nest.html
+name,Netherland-America Foundation,Q2112673,Netherland-America Foundation,"nonprofit organization in New York, United States",http://thenaf.org/
+name,Neverthirst,Q54862644,Neverthirst,American nonprofit organization,https://www.neverthirstwater.org/
+name,New Development Bank,Q8579145,New Development Bank,multilateral development bank established by the BRICS states,http://www.ndb.int/
+name,New Incentives,Q106170968,New Incentives,Nigerian non-governmental organization,https://www.newincentives.org/
+name,New Israel Fund,Q2776489,New Israel Fund,American non-profit organization,http://www.nif.org/
+name,New Israel Fund,Q2776489,New Israel Fund,American non-profit organization,https://nif.org.il/
+name,Nordic Investment Bank,Q2020649,Nordic Investment Bank,"the joint international financial institution of Denmark, Finland, Iceland, Norway, and Sweden",http://nib.int/
+name,Nordic Investment Bank,Q3831633,InterPayBank,stock company based in the Republic of Belarus,http://ipaybank.by/
+name,Norwegian Refugee Council,Q1247077,Norwegian Refugee Council,non-governmental humanitarian organization,https://flyktninghjelpen.no/
+name,Nova Ukraine,Q24534517,Nova Ukraine,U.S. nonprofit supporting Ukraine,https://novaukraine.org/
+name,Nuclear Threat Initiative,Q453521,Nuclear Threat Initiative,American foreign policy think tank,https://www.nti.org/
+name,Nudge Foundation,Q60741137,Nudge Foundation,Indian non-profit organization,https://www.thenudge.org/
+name,Ocean Conservancy,Q3348656,Ocean Conservancy,non-profit organization in the USA,https://oceanconservancy.org/
+name,Oceana,Q7076166,Oceana,organization,https://oceana.org/
+name,Oceana,Q7076167,Oceana,chain of nightclubs in the United Kingdom,http://www.oceanaclubs.com/
+name,Oceana,Q77041,Oceana,German singer of German–Martiniquen descent,http://www.oceana-online.de/
+name,Office of Information and Communications Technology,Q130533752,United Nations Office of Information and Communications Technology,office of the United Nations Secretariat,https://unite.un.org/
+name,Office of Legal Affairs,Q113627281,University of Maryland Office of General Counsel,"in-house law firm for the University of Maryland, College Park",https://ogc.umd.edu/
+name,Office of the High Commissioner for Human Rights,Q656812,Office of the High Commissioner for Human Rights,UN department that promotes human rights under international law,https://www.ohchr.org/
+name,One Acre Fund,Q1529217,One Acre Fund,company,http://www.oneacrefund.org/
+name,One Family Fund,Q7072753,One Family Fund,Israeli nonprofit organization,http://onefamilytogether.org.il/
+name,Open Society Foundations,Q786194,Open Society Foundations,international grantmaking network founded by business magnate George Soros,https://opensocietyfoundations.org/
+name,Operation Smile,Q1323294,Operation Smile,organization,http://www.operationsmile.org/
+name,Opportunity International,Q877991,Opportunity International,American nonprofit organization,http://opportunity.org/
+name,Organisation for Economic Co-operation and Development,Q41550,Organization for Economic Cooperation and Development,intergovernmental economic organization,https://www.oecd.org/
+name,Organisation of Eastern Caribbean States,Q392770,Organisation of Eastern Caribbean States,inter-governmental organization,http://www.oecs.org/
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/de/
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/fr
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/it
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/ro/moldova
+name,Organization for Security and Co-operation in Europe,Q81299,Organization for Security and Co-operation in Europe,security-oriented intergovernmental organization,https://www.osce.org/ru
+name,Organization for Tropical Studies,Q7101950,Organization for Tropical Studies,non-profit organization in the USA,http://ots.ac.cr/
+name,Organization for the Prohibition of Chemical Weapons,Q842490,Organisation for the Prohibition of Chemical Weapons,international organization based in The Hague,https://www.opcw.org/
+name,Organization of American States,Q123759,Organization of American States,international organization of states in the Americas,https://www.oas.org/
+name,Orphan Grain Train,Q54854657,Orphan Grain Train,American nonprofit organization,http://www.ogt.org/
+name,Palestinian American Medical Association,Q136798778,Palestinian American Medical Association,,https://pamausa.org/
+name,Pan American Development Foundation,Q7129600,Pan American Development Foundation,organization,http://www.padf.org/
+name,Partners In Health,Q4346050,Partners In Health,non-profit health care organization founded in 1987,https://www.pih.org/
+name,Partners Worldwide,Q55473266,Partners Worldwide,American nonprofit organization,http://www.partnersworldwide.org/
+name,Partners of the Americas,Q7140750,Partners of the Americas,,http://www.partners.net/
+name,Patrick J. McGovern Foundation,Q122189199,Patrick J. McGovern Foundation,foundation named after Patrick J. McGovern,https://www.mcgovern.org/
+name,Peace Development Fund,Q16821462,Peace Development Fund,non-profit organization in the USA,http://www.peacedevelopmentfund.org/
+name,Pencils of Promise,Q7162341,Pencils of Promise,US non-profit organization,http://www.pencilsofpromise.org/
+name,Peterson Institute for International Economics,Q2981447,Peterson Institute for International Economics,"think tank based in Washington, DC, USA",https://www.piie.com/
+name,Pew Charitable Trusts,Q201296,The Pew Charitable Trusts,"American non-profit, non-governmental organization",https://www.pewtrusts.org/
+name,Physicians for Social Responsibility,Q7189668,Physicians for Social Responsibility,non-profit organization in the United States,http://www.psr.org/
+name,Plan International,Q1350284,Plan International,international development organization,https://plan-international.org/
+name,Plan International,Q7200910,Plan USA,organization,https://www.planusa.org/
+name,Plan International USA,Q7200910,Plan USA,organization,https://www.planusa.org/
+name,Planet Aid,Q7201055,Planet Aid,American non-profit recycler,https://www.planetaid.org/
+name,Ploughshares Fund,Q7205153,Ploughshares Fund,non-profit organization in the USA,http://www.ploughshares.org/
+name,Polaris Project,Q7209133,Polaris Project,Non-profit organization,https://polarisproject.org/
+name,Polish-American Freedom Foundation,Q11822918,Polish-American Freedom Foundation,,http://www.pafw.pl/
+name,Population Council,Q7229776,Population Council,health and development research institute in New York,http://www.popcouncil.org/
+name,Pro Mujer,Q4543840,Pro Mujer,nonprofit organization,http://promujer.org/
+name,Project Concern International,Q7249033,Project Concern International,non-profit organization in the USA,https://www.pciglobal.org/
+name,Project Healthy Children,Q25345630,Project Healthy Children,organization,http://projecthealthychildren.com/
+name,Public Health Institute,Q30252845,Public Health Institute,"healthcare organization in Oakland, United States",http://www.phi.org/
+name,Pulitzer Center on Crisis Reporting,Q7259349,Pulitzer Center on Crisis Reporting,nonprofit news media organization,http://www.pulitzercenter.org/
+name,Pure Earth,Q145590,Pure Earth,environmental organization,http://www.pureearth.org/
+name,Qatar Foundation,Q1575900,Qatar Foundation,"semi-private chartered, non-profit organization in Qatar, founded in 1995 by then-emir Sheikh Hamad bin Khalifa Al Thani and his second wife Moza bint Nasser",https://www.qf.org.qa/
+name,Quincy Institute for Responsible Statecraft,Q65053205,Quincy Institute for Responsible Statecraft,American think tank,https://responsiblestatecraft.org/
+name,RAND Corporation,Q50363509,RAND Corporation,"nonprofit organization in Leiden, Netherlands",http://www.rand.org/topics/netherlands.html
+name,RAND Corporation,Q861141,RAND Corporation,American research organization,https://www.rand.org/
+name,RMI,Q1140972,Federico Fellini International Airport,airport in Italy,http://www.riminiairport.com/
+name,RMI,Q115265541,Reinhard Mohn Institute of Management,"Institute at the Faculty of Management, Economics and Society, Witten/Herdecke University",https://www.uni-wh.de/wirtschaft-und-gesellschaft/department-fuer-management-und-unternehmertum-mut/lehrstuehle-professuren-und-institute/reinhard-mohn-institut-fuer-unternehmensfuehrung-rmi/
+name,RMI,Q141195406,Risk Management Institute,"facility in Singapore, Singapore",https://rmi.nus.edu.sg/
+name,RMI,Q1795496,RMI,USA non-profit think tank,https://rmi.org/
+name,RMI,Q18636593,Rand Merchant Insurance Holdings,financial services investment holding company,http://www.rminsurance.co.za/
+name,RMI,Q2126195,Radio Massacre International,British musical group,http://www.radiomassacreinternational.com/
+name,RMI,Q30289997,Reproductive Medicine Institute,"facility in Chicago, United States",http://www.reproductivemedicineinstitute.com/
+name,RMI,Q3932364,Claretian Sisters,Roman Catholic religious congregation for women,http://www.claretiansisters.org/
+name,RMI,Q3932370,Religious of Mary Immaculate,Roman Catholic religious congregation for women,http://www.religiosasmariainmaculada.org/content/fr/
+name,RMI,Q50035344,Regenerative Medicine Institute,"facility in Tijuana, Mexico",http://www.regenerativemedicine.mx/
+name,RMI,Q50035641,Retina Macula Institute,"healthcare organization in Torrance, United States",http://www.retinamaculainstitute.com/
+name,RMI,Q80535,MIDI,electronic musical instrument industry specification,https://www.midi.org/specifications
+name,RTI International,Q7277844,RTI International,"independent, nonprofit research institute, headquartered in Research Triangle Park, NC, US",https://www.rti.org/
+name,Rafiki Foundation,Q54862824,Rafiki Foundation,American nonprofit organization,http://www.rafikifoundation.org/
+name,Rainforest Foundation US,Q7284878,Rainforest Foundation US,non-profit organization based in the U.S.,https://rainforestfoundation.org/
+name,Rainforest Trust,Q8035905,Rainforest Trust,environmental nonprofit organization in the United States,https://www.rainforesttrust.org/
+name,Rare,Q22073418,Rare,conservation organization,http://www.rare.org/
+name,Rare,Q22073418,Rare,conservation organization,https://rare.org/
+name,Rare,Q22908139,Rare,American news and opinion website,http://www.rare.us/
+name,Rare,Q55804296,Rare,American nonprofit organization,http://www.rareconservation.org/
+name,Rare,Q642707,Rare Ltd.,British video game developer,https://www.rare.co.uk/
+name,Relief International,Q7311083,Relief International,non-profit organization,https://www.ri.org/
+name,Remote Area Medical,Q7312084,Remote Area Medical,nonprofit healthcare organization,https://www.ramusa.org/
+name,Resources for the Future,Q7315844,Resources for the Future,"Washington, D.C.-based research institution on environmental, energy and natural resource economics, founded in 1952",http://www.rff.org/
+name,Rockefeller Foundation,Q862034,Rockefeller Foundation,United States-based philanthropic organization,https://www.rockefellerfoundation.org/
+name,Room to Read,Q13920,Room to Read,American non-profit focused on literacy,http://www.roomtoread.org/
+name,Root Capital,Q7366548,Root Capital,organization,http://www.rootcapital.org/
+name,SCS Global Services,Q133810867,"Scientific Certification Services, Inc. (United States)","company in Emeryville, United States",https://www.scsglobalservices.com/
+name,Salvadoran American Humanitarian Foundation,Q54821583,Salvadoran American Humanitarian Foundation,American nonprofit organization,http://www.sahf.org/
+name,Samaritan's Purse,Q3470648,Samaritan's Purse,Christian humanitarian aid organization,https://www.samaritanspurse.org/
+name,Scholars at Risk,Q7432067,Scholars at Risk,network supporting academic freedom,https://www.scholarsatrisk.org/
+name,Sea-Watch,Q20850693,Sea-Watch,German non-governmental organisation dedicated to rescung refugees in the Mediterranean,https://sea-watch.org/
+name,Search for Common Ground,Q7441664,Search for Common Ground,International non-profit organization,https://www.sfcg.org/
+name,Secretariat of the Pacific Community,Q871511,Pacific Community,principal scientific and technical organization in the Pacific region,https://www.spc.int/fr
+name,Seva Foundation,Q2578143,Seva Foundation,organization,http://www.seva.org/
+name,Sight and Life,Q631151,Sight and Life,"organization in Basel, Switzerland",https://sightandlife.org/
+name,"Statistical, Economic and Social Research and Training Centre for Islamic Countries",Q20988519,"Statistical, Economic and Social Research and Training Centre for Islamic Countries",subsidiary organ of the Organisation of Islamic Cooperation serving OIC members in the area of statistics,http://www.sesric.org/
+name,Sudan Relief Fund,Q54826501,Sudan Relief Fund,American nonprofit organization,http://www.sudanreliefund.com/
+name,Surgical Eye Expeditions International,Q7646204,Surgical Eye Expeditions International,organization,http://www.seeintl.org/
+name,Swiss Tropical and Public Health Institute,Q3152651,Swiss Tropical and Public Health Institute,health institute,https://www.swisstph.ch/
+name,Synergos Institute,Q7662384,Synergos,non-profit organization in the USA,http://www.synergos.org/
+name,The Calleva Foundation,Q120982975,Calleva Foundation,"nonprofit organization in London, United Kingdom",https://calleva.org/
+name,Third Generation Environmentalism,Q28224706,E3G,global climate change think tank (2004-),https://www.e3g.org/
+name,Third Generation Environmentalism,Q28224706,E3G,global climate change think tank (2004-),https://www.e3g.org/e3g-auf-deutsch/
+name,Third Generation Environmentalism,Q28224706,E3G,global climate change think tank (2004-),https://www.e3g.org/french-language-hub/
+name,Thousand Currents,Q54813895,Thousand Currents,American nonprofit organization,http://www.thousandcurrents.org/
+name,Tibet Fund,Q3528091,Tibet Fund,organization,http://www.tibetfund.org/
+name,Tostan,Q2445375,Tostan,organization,http://www.tostan.org/
+name,Transparency International,Q174240,Transparency International,"international, non-governmental umbrella organization",https://www.transparency.org/
+name,Tula Foundation,Q36875299,Tula Foundation,"nonprofit organization in Vancouver, Canada",http://tula.org/
+name,U.S. Committee for Refugees and Immigrants,Q7863138,U.S. Committee for Refugees and Immigrants,American nonprofit organization,https://refugees.org/
+name,U.S. Fund for UNICEF,Q7863185,U.S. Fund for UNICEF,non-profit organization in the United States for the United Nation Children's Fund,http://www.unicefusa.org/
+name,Unitarian Universalist Service Committee,Q2495076,Unitarian Universalist Service Committee,organization,http://www.uusc.org/
+name,United Board for Christian Higher Education in Asia,Q18208143,United Board for Christian Higher Education in Asia,non-profit organization in the USA,https://unitedboard.org/
+name,United Nations Convention to Combat Desertification,Q331520,United Nations Convention to Combat Desertification,International treaty on environmental protection,http://unccd.int/
+name,United Nations Human Settlements Programme,Q487883,United Nations Human Settlements Programme,UN agency for human settlements and sustainable urban development,https://unhabitat.org/
+name,United Nations University,Q108737507,United Nations University,"education organization in Guimarães, Portugal",https://egov.unu.edu/
+name,United Nations University,Q492442,United Nations University,academic and research arm of the United Nations,https://unu.edu/
+name,United Nations Volunteers,Q488065,United Nations Volunteers,non-governmental organization (1970-),https://www.unv.org/
+name,United Palestinian Appeal,Q54557116,United Palestinian Appeal,charitable organization,http://upaconnect.org/
+name,Universal Postal Union,Q17495,Universal Postal Union,specialized agency of the United Nations focused on cooperation within the postal sector,https://www.upu.int/
+name,Universal Postal Union,Q17495,Universal Postal Union,specialized agency of the United Nations focused on cooperation within the postal sector,https://www.upu.int/fr
+name,Village Health Works,Q54862645,Village Health Works,American nonprofit organization,http://www.villagehealthworks.org/
+name,VillageReach,Q7930610,VillageReach,organization,http://www.villagereach.org/
+name,Vital Strategies,Q30268388,Vital Strategies,"nonprofit organization in New York, United States",https://www.vitalstrategies.org/
+name,Vital Voices Global Partnership,Q7936762,Vital Voices,organization,http://www.vitalvoices.org/
+name,Vizzuality,Q22909667,Vizzuality,a science and technology company focused on data visualization,https://www.vizzuality.com/
+name,W.K. Kellogg Foundation,Q7945762,W. K. Kellogg Foundation,philanthropic foundation in the United States,http://www.wkkf.org/
+name,Washington Institute for Near East Policy,Q1778471,Washington Institute for Near East Policy,"think tank in Washington D.C., United States",http://www.washingtoninstitute.org/
+name,Water Missions International,Q7973324,Water Missions International,organization,http://www.watermission.org/
+name,Water for Good,Q54857527,Water for Good,American nonprofit organization,http://waterforgood.org/
+name,Water for People,Q7973296,Water For People,non-profit organization in the USA,http://www.waterforpeople.org/
+name,Water.org,Q7973231,Water.org,non-profit organization in the USA,http://water.org/
+name,Wellcome Trust,Q326276,Wellcome Trust,"healthcare research charity based in London, United Kingdom",https://wellcome.org/
+name,West Africa Rice Development Association,Q383924,Africa Rice Center,research center in Ivory Coast,https://www.africarice-fr.org/
+name,West Africa Rice Development Association,Q383924,Africa Rice Center,research center in Ivory Coast,https://www.africarice.org/
+name,Winrock International,Q4053181,Winrock International,"nonprofit organization based in Little Rock, Arkansas, US",http://www.winrock.org/
+name,Women for Afghan Women,Q8031390,Women for Afghan Women,,https://womenforafghanwomen.org/
+name,Women for Women International,Q8031394,Women for Women International,non-profit organization in the USA,http://www.womenforwomen.org/
+name,Women's World Banking,Q8031103,Women's World Banking,organization,http://www.womensworldbanking.org/
+name,World Bicycle Relief,Q8035409,World Bicycle Relief,non-profit organization specializing in bicycle distribution programs to aid poverty relief in developing countries,https://worldbicyclerelief.org/
+name,World Business Council for Sustainable Development,Q677910,World Business Council for Sustainable Development,membership organization for companies,http://www.wbcsd.org/
+name,World Business Council for Sustainable Development,Q677910,World Business Council for Sustainable Development,membership organization for companies,https://www.wbcsd.org/
+name,World Central Kitchen,Q55316399,World Central Kitchen,not-for-profit non-governmental organization,https://wck.org/
+name,World Hope International,Q54857572,World Hope International,American nonprofit organization,http://www.worldhope.org/
+name,World Intellectual Property Organization,Q177773,World Intellectual Property Organization,specialized UN agency focused on intellectual property protection,https://www.wipo.int/
+name,World Medical Relief,Q8035954,World Medical Relief,non-profit organization in the USA,http://www.worldmedicalrelief.org/
+name,World Meteorological Organization,Q170424,World Meteorological Organization,specialized agency of the United Nations for meteorology,https://wmo.int/
+name,World Organisation for Animal Health,Q1058594,World Organisation for Animal Health,intergovernmental organization,https://www.woah.org./
+name,World Trade Organization,Q7825,World Trade Organization,intergovernmental organization that intends to supervise and liberalize international trade,https://wto.org/
+name,World Vision,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/
+name,World Vision,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/chinese/
+name,World Vision,Q2593851,World Vision United States,evangelical organization,https://www.worldvision.org/korean/
+name,World Vision,Q2594001,World Vision International,"Christian humanitarian aid, development, and advocacy organization",https://wvi.org/
+name,World Wildlife Fund,Q117892,WWF International,international non-governmental environmental organization,https://wwf.org/
+name,World Wildlife Fund,Q28974618,Q28974618,,https://www.wwf.or.tz/
+name,World Wildlife Fund,Q50357022,World Wildlife Fund,United States member organization of the WWF conservation network,http://www.worldwildlife.org/
+name,World Wildlife Fund,Q50357022,World Wildlife Fund,United States member organization of the WWF conservation network,https://www.worldwildlife.org/
+name,World Wildlife Fund,Q50357024,Q50357024,"nonprofit organization in Yaoundé, Cameroon",https://cameroon.panda.org/
+name,World Wildlife Fund,Q50357025,Q50357025,"nonprofit organization in Jakarta, Indonesia",https://wwf.id/id
+name,World Wildlife Fund,Q683733,WWF Switzerland,,http://www.wwf.ch/
+name,World Wildlife Fund,Q683733,WWF Switzerland,,https://www.wwf.ch/de
+name,World Wildlife Fund,Q683733,WWF Switzerland,,https://www.wwf.ch/fr
+name,WorldFish,Q1486149,WorldFish,organization,http://www.worldfishcenter.org/
+name,WorldFish,Q50376946,WorldFish,"nonprofit organization in Honiara, Solomon Islands",http://www.worldfishcenter.org/
+name,WorldFish,Q50376947,WorldFish,"nonprofit organization in Zomba, Malawi",http://www.worldfishcenter.org/
+name,WorldFish,Q50376948,WorldFish,"nonprofit organization in Los Baños, Philippines",http://www.worldfishcenter.org/
+name,Worldserve International,Q55472608,Worldserve International,American nonprofit organization,http://www.worldserveintl.org/
+name,Zinc Network,Q128433863,Zinc Network,British public relations company,https://zincnetwork.com/
+uk,1156222,Q141191000,Q141191000,UK charity,
+uk,292199,Q806231,Band Aid,UK supergroup,
+uk,294807,Q141191035,Q141191035,UK charity,
