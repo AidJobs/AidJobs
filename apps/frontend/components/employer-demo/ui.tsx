@@ -38,6 +38,8 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), texta
 export function Dialog({ title, subtitle, onClose, footer, children, wide, half }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean; half?: boolean }) {
   const phone = useIsPhone();
   const card = useRef<HTMLDivElement>(null);
+  // Read before the dialog's own fields can take focus.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)));
   useEffect(() => {
     if (phone) return;
     const onKey = (e: KeyboardEvent) => {
@@ -50,7 +52,6 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
   useEffect(() => {
     const box = card.current;
     if (phone || !box) return;
-    const opener = document.activeElement as HTMLElement | null;
     const focusable = () => [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0);
     if (!box.contains(document.activeElement)) {
       const list = focusable();
@@ -73,9 +74,9 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
     document.addEventListener('keydown', trap);
     return () => {
       document.removeEventListener('keydown', trap);
-      if (opener?.isConnected) opener.focus();
+      if (opener?.isConnected && opener !== document.body) opener.focus();
     };
-  }, [phone]);
+  }, [phone, opener]);
   if (phone) {
     return (
       <BottomSheet title={title} subtitle={subtitle} onClose={onClose} footer={footer} tall={!half}>

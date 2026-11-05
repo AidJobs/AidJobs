@@ -55,7 +55,8 @@ function PlaceDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () 
   /** A place not in the list: the country, time zone, and weekend come from what was typed, never from the previous place. */
   const typed = (text: string) => {
     const { facts: read } = extractFacts(`based in ${text}`, s.today, emptyFacts());
-    setFacts(job.id, { location: read.location || text, country: read.country, iso: read.iso, timezone: read.timezone });
+    const same = PLACES.find((p) => p.country === read.country);
+    setFacts(job.id, { location: read.location || text, country: read.country, iso: read.iso || same?.iso || '', timezone: read.timezone || same?.tz || '' });
   };
   return (
     <Dialog title="Duty station and work arrangement" onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>

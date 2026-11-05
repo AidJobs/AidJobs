@@ -1046,6 +1046,7 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   else if (/\b(warm|friendly|human)\b/.test(t)) tone = 'warm';
   else if (/\b(plain|simple|direct)\b/.test(t)) tone = 'plain';
   if (tone !== ctx.tone) return { sections: rebuild(sections.map((s) => s.key), { ...ctx, tone }), tags: keys, tone, facts, reply: `Rewritten in a ${tone} tone. Sections you edited by hand are unchanged.` };
+  if (/\b(formal|un tone|warm|friendly|human|plain|simple|direct)\b/.test(t)) return { sections, tags: keys, tone, facts, reply: `It is already written in a ${tone} tone.` };
   const lang = LANGUAGES.find((l) => t.includes(l.toLowerCase()));
   if (lang && !facts.languages.includes(lang)) {
     facts = { ...facts, languages: facts.languages.length ? [...facts.languages, lang] : ['English', lang] };
@@ -1072,6 +1073,12 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   if (changed.length) {
     facts = f2;
     return { sections: rebuild(['purpose', 'apply', 'offer', 'languages', 'setting', 'conditions', 'deployment', 'deliverables', 'funding'], { ...ctx, facts }), tags: keys, tone, facts, reply: 'Updated the facts and the sections that mention them.' };
+  }
+  // Only text that reads as content is added; thanks, acknowledgements, and instructions it could not act on change nothing.
+  const said = text.trim();
+  if (/^(thanks?|thank you|ok(ay)?|great|good|nice|perfect|cool|yes|no|sure|fine|got it|looks good)\b[\s!.]*$/i.test(said)) return { sections, tags: keys, tone, facts, reply: 'Ask for any change, or edit the job description directly.' };
+  if (/^(please\s+)?(make|change|rewrite|can|could|would|fix|improve|update|edit|redo|use|turn|set|move|replace)\b/i.test(said) || /\?$/.test(said)) {
+    return { sections, tags: keys, tone, facts, reply: 'I could not tell what to change. Try "shorter", "more formal", "add First weeks", "remove Background", or write the sentence to add.', quick: ['Shorter', 'More formal'] };
   }
   const k = target ?? (keys.includes('purpose') ? 'purpose' : keys[0]);
   const sentence = text.trim().replace(/^./, (c) => c.toUpperCase()).replace(/([^.!?])$/, '$1.');

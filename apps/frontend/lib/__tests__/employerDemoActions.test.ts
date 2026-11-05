@@ -101,6 +101,19 @@ describe('a change to an approved job needs a new approval', () => {
     expect(blocked('job-fin')).toBe(true);
   });
 
+  it('a message or a click that changes nothing keeps the approval', () => {
+    const versions = job('job-fin').versions.length;
+    const text = JSON.stringify(job('job-fin').sections);
+    sendChat('job-fin', 'thanks');
+    sendChat('job-fin', `make it more ${job('job-fin').tone}`);
+    sendChat('job-fin', 'can you make it better?');
+    expect(JSON.stringify(job('job-fin').sections)).toBe(text);
+    setFacts('job-fin', { grade: job('job-fin').facts.grade, contract: job('job-fin').facts.contract });
+    expect(blocked('job-fin')).toBe(false);
+    expect(job('job-fin').status).toBe('approved');
+    expect(job('job-fin').versions.length).toBe(versions);
+  });
+
   it.each([
     ['restoring a version', () => restoreVersion('job-fin', 1)],
     ['moving a section', () => reorderSections('job-fin', [...job('job-fin').tags.filter((k) => ['responsibilities', 'requirements'].includes(k))].reverse())],

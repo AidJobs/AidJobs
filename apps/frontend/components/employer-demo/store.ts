@@ -71,11 +71,12 @@ export function getState(): State {
 
 const sameJobs = (a: DemoJob[], b: DemoJob[]) => a === b || (a.length === b.length && a.every((j, i) => j === b[i]));
 
-export function update(fn: (s: State) => State) {
+/** `background` marks simulated progress (email delivery) that is not the user's change, so it leaves an offered undo in place. */
+export function update(fn: (s: State) => State, background = false) {
   const prev = snapshot();
   let next = fn(prev);
   // An undo puts back a copy of the jobs, so it lasts only until the jobs change in any other way.
-  if (next.notice?.undo && next.notice === prev.notice && !sameJobs(next.jobs, prev.jobs)) next = { ...next, notice: null };
+  if (!background && next.notice?.undo && next.notice === prev.notice && !sameJobs(next.jobs, prev.jobs)) next = { ...next, notice: null };
   current = next;
   save(current);
   listeners.forEach((l) => l());

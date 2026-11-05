@@ -326,6 +326,10 @@ function chatTurn(id: string, text: string) {
   const edit = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today);
   const factsChanged = JSON.stringify(edit.facts) !== JSON.stringify(j.facts);
   const result = factsChanged ? { ...edit, sections: rebuilt(s, { ...j, sections: edit.sections, tags: edit.tags, tone: edit.tone, facts: edit.facts }).sections } : edit;
+  if (JSON.stringify([result.sections, result.tags, result.tone, result.facts]) === JSON.stringify([j.sections, j.tags, j.tone, j.facts])) {
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', result.reply, result.quick)] }));
+    return;
+  }
   updateJob(id, (x) => ({
     ...reopenApproval(x),
     sections: result.sections,
@@ -369,6 +373,8 @@ export function dismissChange(id: string) {
 
 export function setFacts(id: string, patch: Partial<Facts>) {
   if (!ownerOnly()) return;
+  const j = getState().jobs.find((x) => x.id === id);
+  if (j && (Object.keys(patch) as Array<keyof Facts>).every((k) => JSON.stringify(j.facts[k]) === JSON.stringify(patch[k]))) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? withFacts(s, j, { ...j.facts, ...patch }) : j)) }));
 }
 
@@ -628,7 +634,7 @@ export function publish(id: string, o: PublishOptions) {
 function simulateDelivery(id: string) {
   const step = (status: 'sending' | 'sent', delay: number) =>
     setTimeout(() => {
-      updateJob(id, (j) => (j.reach ? { ...j, reach: { ...j.reach, candidates: j.reach.candidates.map((r) => ({ ...r, status })), team: j.reach.team.map((r) => ({ ...r, status })) } } : j));
+      update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id && j.reach ? { ...j, reach: { ...j.reach, candidates: j.reach.candidates.map((r) => ({ ...r, status })), team: j.reach.team.map((r) => ({ ...r, status })) } } : j)) }), true);
     }, delay);
   step('sending', 1200);
   step('sent', 3200);
