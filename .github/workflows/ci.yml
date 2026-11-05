@@ -179,8 +179,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: .
         run: |
-          ruff check tools/survey/dedupe.py tools/survey/test_dedupe.py
-          python -m pytest tools/survey/test_dedupe.py -q -p no:cacheprovider
+          ruff check tools/survey/dedupe.py tools/survey/test_dedupe.py tools/survey/registers.py tools/survey/test_registers.py
+          python -m pytest tools/survey/test_dedupe.py tools/survey/test_registers.py -q -p no:cacheprovider
           python tools/survey/dedupe.py
           git diff --exit-code -- docs/architecture/source-survey/organisations.csv docs/architecture/source-survey/step-d-review.csv
 
@@ -195,6 +195,18 @@ jobs:
           python -m pytest tools/survey/test_careers.py -q -p no:cacheprovider
           python tools/survey/careers.py build
           git diff --exit-code -- docs/architecture/source-survey/careers-candidates.csv docs/architecture/source-survey/careers-review.csv docs/architecture/source-survey/websites-filled.csv docs/architecture/source-survey/first-wave.csv
+
+      # The employer survey's step F: its tests, and the committed confirmed list and systems
+      # summary must be exactly what the committed observations and decisions produce (no
+      # network: the fetch and the extract run only on the user's machine).
+      - name: Survey step F
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: .
+        run: |
+          ruff check tools/survey/confirm.py tools/survey/test_confirm.py
+          python -m pytest tools/survey/test_confirm.py -q -p no:cacheprovider
+          python tools/survey/confirm.py build
+          git diff --exit-code -- docs/architecture/source-survey/step-f-confirmed.csv docs/architecture/source-survey/step-f-systems.csv
 
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
