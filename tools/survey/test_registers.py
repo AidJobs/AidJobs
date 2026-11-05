@@ -78,6 +78,38 @@ def test_scottish_aid_text_reads_aid_abroad_and_not_domestic_work():
     assert not registers.OSCR_AID_TEXT.search("research into cancer")
 
 
+ECHO_HEADER = ("No.                          Partner                                               "
+               "Partner full name                                   Country                      "
+               "Type of Certificate")
+
+
+def _echo_line(number, code, name, country, certificate):
+    return f"{number:<6}{code:<54}{name:<65}{country:<46}{certificate}".rstrip()
+
+
+def test_dg_echo_rows_are_read_by_column_with_wrapped_cells():
+    page = "\n".join([
+        "          List of Non-Governmental Organisations certified as EU Humanitarian partners",
+        ECHO_HEADER, "",
+        _echo_line(" 1", "AADK", "ActionAid Denmark", "DENMARK", "Partner"),
+        _echo_line("10", "ADRA NORGE", "ADVENTIST DEVELOPMENT AND RELIEF AGENCY", "NORWAY", ""),
+        f"{'':<60}{'NORGE':<111}Partner",
+        _echo_line("170", "TROCAIRE-IR", "Trocaire, (IRL)", "IRELAND",
+                   "Potential Programmatic Partner"),
+        "      " + f"{'TWB':<54}{'Translators Without Borders Ireland Company Limited by':<65}IRELAND",
+        _echo_line("171", "", "guarantee", "", "Partner"),
+    ])
+    rows = registers.echo_rows([page])
+    assert [(r["number"], r["partner_code"], r["name"], r["country"], r["certificate"])
+            for r in rows] == [
+        ("1", "AADK", "ActionAid Denmark", "DENMARK", "Partner"),
+        ("10", "ADRA NORGE", "ADVENTIST DEVELOPMENT AND RELIEF AGENCY NORGE", "NORWAY",
+         "Partner"),
+        ("170", "TROCAIRE-IR", "Trocaire", "IRELAND", "Potential Programmatic Partner"),
+        ("171", "TWB", "Translators Without Borders Ireland Company Limited by guarantee",
+         "IRELAND", "Partner")]
+
+
 def test_iati_keeps_aid_publishers_and_drops_academic_and_other():
     assert {"10", "21", "22", "40", "60"} <= registers.IATI_KEEP
     assert not {"80", "90"} & (registers.IATI_KEEP | registers.IATI_REVIEW)

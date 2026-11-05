@@ -305,45 +305,55 @@ rank,org_id,name,candidate_url,system_guess,crawls,status,redirect,rule,confiden
 573,iati:US-EIN-13-3327220,Action Against Hunger USA,https://apply.workable.com/action-against-hunger/,Workable,2026-43,,,"account by decided, decided: the network's name; which Action Against Hunger member uses it is unknown (step F) (14 captures)",low
 584,uk:1154288,Human Appeal,https://humanappeal.bamboohr.com/,BambooHR,2026-43,,,"account by decided, decided: full name, 22 captures (22 captures)",medium
 615,iati:US-EIN-23-7069110,Oxfam America,https://jobs.smartrecruiters.com/oxfamamerica2,SmartRecruiters,2026-43,,,account by full name (1 captures),high
-659,iati:GB-CHC-1098106,Relief International UK,https://www.ri.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
-698,irs:042791159,Grassroots International Inc,https://grassrootsinternational.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
-711,eu:929331127035-69,World Animal Protection,https://worldanimalprotection.pinpointhq.com/,Pinpoint,2026-43,,,account by full name (2 captures),high
-718,cra:119304848RR0001,World University Service of Canada/l'entraide Universitaire Mondiale du Canada,https://wusc.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),low
-724,iati:CA-CC-020387-4,Equality Fund,https://equalityfund.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
-757,iati:GB-CHC-1166956,UK-Med,https://job-boards.greenhouse.io/ukmed,Greenhouse,2026-43,,,account by full name (10 captures),medium
-767,iati:US-EIN-770155782,Global Fund for Women,https://globalfundforwomen.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
-777,acnc:16641057338,Canva Foundation Limited,https://jobs.smartrecruiters.com/canva,SmartRecruiters,2026-43,,,account by website name (26 captures),low
-784,irs:593564329,Hope for Haiti Inc,https://hopeforhaiti.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
-795,iati:US-EIN-37-1552838,GSMA Foundation,https://gsma.wd3.myworkdayjobs.com/External_Careers,Workday,2026-43,,,account by website name (7 captures),low
-804,uk:297540,The Virgin Foundation,https://apply.workable.com/virgin/,Workable,2026-43,,,account by website name (2 captures),medium
-822,uk:1043886,The Fairtrade Foundation,https://fairtradefoundation.teamtailor.com/,Teamtailor,2026-43,,,account by full name (18 captures),high
-829,iati:US-EIN-14-1945286,"The Global Development Incubator, Inc",https://globaldevelopmentincubator1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
-839,uk:1141155,Girl Effect,https://job-boards.greenhouse.io/girleffect,Greenhouse,2026-43,,,account by full name (6 captures),high
-849,irs:770071852,Thousand Currents,https://thousandcurrents.bamboohr.com/,BambooHR,2026-43,,,account by full name (5 captures),high
-876,irs:300181674,Wateraid America Inc,https://wateraidamerica.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
-888,irs:522151557,Vital Voices Global Partnership Inc,https://job-boards.greenhouse.io/vitalvoicesglobalpartnership,Greenhouse,2026-43,,,account by full name (1 captures),high
-892,iati:US-EIN-84-3344516,"Aceli Africa, Inc.",https://jobs.smartrecruiters.com/aceliafrica,SmartRecruiters,2026-43,,,account by full name (2 captures),high
-956,irs:113579187,Children of Armenia Fund Inc,https://coaf.bamboohr.com/,BambooHR,2026-43,,,account by website name (9 captures),low
-1003,irs:521211059,Center for Third World Organizing,https://ctwo.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
-1008,irs:050258886,Dorcas International Institute of Rhode Island Inc,https://diiri.bamboohr.com/,BambooHR,2026-43,,,account by website name (6 captures),low
-1009,cra:118838234RR0001,Cardinal Léger et Ses Oeuvres / Cardinal Léger & His Endeavours,https://jobs.smartrecruiters.com/leger2,SmartRecruiters,2026-43,,,account by website name (1 captures),low
-1022,irs:320112278,Water for Good,https://waterforgood.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
-1024,irs:133660566,Equality Now Inc,https://equalitynow.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
-1069,irs:133931449,Endeavor Global Inc,https://apply.workable.com/endeavor-talent/,Workable,2026-43,,,account by website name (2 captures),medium
-1075,irs:131867411,Amref Health Africa Inc,https://jobs.smartrecruiters.com/amrefhealthafrica4,SmartRecruiters,2026-43,,,account by full name (4 captures),high
-1090,cra:107659427RR0001,Rick Hansen Foundation,https://rickhansenfoundation.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
-1128,iati:US-EIN-84-1648607,Educate!,https://job-boards.greenhouse.io/educate,Greenhouse,2026-43,,,account by full name (9 captures),medium
-1133,iati:US-EIN-13-3287064,InterAction,https://jobs.ashbyhq.com/interaction,Ashby,2026-43,,,account by full name (1 captures),high
-1159,cra:862732815RR0001,Tula Foundation,https://job-boards.greenhouse.io/tula,Greenhouse,2026-43,,,account by website name (3 captures),low
-1189,irs:814109426,Waterequity Inc,https://apply.workable.com/waterequity/,Workable,2026-43,,,account by full name (2 captures),high
-1205,cra:118834878RR0001,CODE,https://job-boards.greenhouse.io/code3,Greenhouse,2026-43,,,account by full name (2 captures),medium
-1263,irs:452275630,Spark Microgrants,https://sparkmicrogrants.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
-1315,irs:943050434,Pacific Institute for Studies in Development Environment and Securi,https://pacinst.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),medium
-1410,irs:200934525,Kepler Inc,https://kepler1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
-1419,irs:814618222,Maisha Meds Inc,https://maishameds.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
-1438,cra:118830983RR0001,Kinvia,https://kinvia.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
-1470,iati:US-EIN-45-5015494,Instiglio,https://job-boards.greenhouse.io/instiglio,Greenhouse,2026-43,,,account by full name (2 captures),high
-1472,irs:562614329,Building Tomorrow Inc,https://buildingtomorrow.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
-1571,acnc:73154390575,Circa Contemporary Circus Ltd,https://circahr.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
-1574,acnc:18084268655,Nossal Institute Limited,https://unimelb.wd105.myworkdayjobs.com/UoM_External_Career,Workday,2026-43,,,account by website name (14 captures),medium
-1588,acnc:16394284169,Destiny Rescue Limited,https://apply.workable.com/destiny-rescue/,Workable,2026-43,,,account by full name (2 captures),high
+656,iati:GB-CHC-1098106,Relief International UK,https://www.ri.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high
+693,irs:042791159,Grassroots International Inc,https://grassrootsinternational.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+706,eu:929331127035-69,World Animal Protection,https://worldanimalprotection.pinpointhq.com/,Pinpoint,2026-43,,,account by full name (2 captures),high
+712,cra:119304848RR0001,World University Service of Canada/l'entraide Universitaire Mondiale du Canada,https://wusc.bamboohr.com/,BambooHR,2026-43,,,account by website name (7 captures),low
+716,iati:CA-CC-020387-4,Equality Fund,https://equalityfund.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+747,iati:GB-CHC-1166956,UK-Med,https://job-boards.greenhouse.io/ukmed,Greenhouse,2026-43,,,account by full name (10 captures),medium
+757,iati:US-EIN-770155782,Global Fund for Women,https://globalfundforwomen.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+766,acnc:16641057338,Canva Foundation Limited,https://jobs.smartrecruiters.com/canva,SmartRecruiters,2026-43,,,account by website name (26 captures),low
+773,irs:593564329,Hope for Haiti Inc,https://hopeforhaiti.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+782,iati:US-EIN-37-1552838,GSMA Foundation,https://gsma.wd3.myworkdayjobs.com/External_Careers,Workday,2026-43,,,account by website name (7 captures),low
+791,uk:297540,The Virgin Foundation,https://apply.workable.com/virgin/,Workable,2026-43,,,account by website name (2 captures),medium
+808,uk:1043886,The Fairtrade Foundation,https://fairtradefoundation.teamtailor.com/,Teamtailor,2026-43,,,account by full name (18 captures),high
+814,iati:US-EIN-14-1945286,"The Global Development Incubator, Inc",https://globaldevelopmentincubator1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+824,uk:1141155,Girl Effect,https://job-boards.greenhouse.io/girleffect,Greenhouse,2026-43,,,account by full name (6 captures),high
+834,irs:770071852,Thousand Currents,https://thousandcurrents.bamboohr.com/,BambooHR,2026-43,,,account by full name (5 captures),high
+859,irs:300181674,Wateraid America Inc,https://wateraidamerica.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+869,irs:522151557,Vital Voices Global Partnership Inc,https://job-boards.greenhouse.io/vitalvoicesglobalpartnership,Greenhouse,2026-43,,,account by full name (1 captures),high
+873,iati:US-EIN-84-3344516,"Aceli Africa, Inc.",https://jobs.smartrecruiters.com/aceliafrica,SmartRecruiters,2026-43,,,account by full name (2 captures),high
+931,irs:113579187,Children of Armenia Fund Inc,https://coaf.bamboohr.com/,BambooHR,2026-43,,,account by website name (9 captures),low
+973,irs:521211059,Center for Third World Organizing,https://ctwo.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
+978,irs:050258886,Dorcas International Institute of Rhode Island Inc,https://diiri.bamboohr.com/,BambooHR,2026-43,,,account by website name (6 captures),low
+979,cra:118838234RR0001,Cardinal Léger et Ses Oeuvres / Cardinal Léger & His Endeavours,https://jobs.smartrecruiters.com/leger2,SmartRecruiters,2026-43,,,account by website name (1 captures),low
+991,irs:320112278,Water for Good,https://waterforgood.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+993,irs:133660566,Equality Now Inc,https://equalitynow.bamboohr.com/,BambooHR,2026-43,,,account by full name (3 captures),high
+1032,irs:133931449,Endeavor Global Inc,https://apply.workable.com/endeavor-talent/,Workable,2026-43,,,account by website name (2 captures),medium
+1038,irs:131867411,Amref Health Africa Inc,https://jobs.smartrecruiters.com/amrefhealthafrica4,SmartRecruiters,2026-43,,,account by full name (4 captures),high
+1051,cra:107659427RR0001,Rick Hansen Foundation,https://rickhansenfoundation.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+1084,iati:US-EIN-84-1648607,Educate!,https://job-boards.greenhouse.io/educate,Greenhouse,2026-43,,,account by full name (9 captures),medium
+1089,iati:US-EIN-13-3287064,InterAction,https://jobs.ashbyhq.com/interaction,Ashby,2026-43,,,account by full name (1 captures),high
+1112,cra:862732815RR0001,Tula Foundation,https://job-boards.greenhouse.io/tula,Greenhouse,2026-43,,,account by website name (3 captures),low
+1142,irs:814109426,Waterequity Inc,https://apply.workable.com/waterequity/,Workable,2026-43,,,account by full name (2 captures),high
+1155,cra:118834878RR0001,CODE,https://job-boards.greenhouse.io/code3,Greenhouse,2026-43,,,account by full name (2 captures),medium
+1207,irs:452275630,Spark Microgrants,https://sparkmicrogrants.bamboohr.com/,BambooHR,2026-43,,,account by full name (7 captures),high
+1255,irs:943050434,Pacific Institute for Studies in Development Environment and Securi,https://pacinst.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),medium
+1339,irs:200934525,Kepler Inc,https://kepler1.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
+1347,irs:814618222,Maisha Meds Inc,https://maishameds.bamboohr.com/,BambooHR,2026-43,,,account by full name (4 captures),high
+1364,cra:118830983RR0001,Kinvia,https://kinvia.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),medium
+1389,iati:US-EIN-45-5015494,Instiglio,https://job-boards.greenhouse.io/instiglio,Greenhouse,2026-43,,,account by full name (2 captures),high
+1391,irs:562614329,Building Tomorrow Inc,https://buildingtomorrow.bamboohr.com/,BambooHR,2026-43,,,account by full name (2 captures),high
+1475,acnc:73154390575,Circa Contemporary Circus Ltd,https://circahr.bamboohr.com/,BambooHR,2026-43,,,account by website name (2 captures),low
+1477,acnc:18084268655,Nossal Institute Limited,https://unimelb.wd105.myworkdayjobs.com/UoM_External_Career,Workday,2026-43,,,account by website name (14 captures),medium
+1491,acnc:16394284169,Destiny Rescue Limited,https://apply.workable.com/destiny-rescue/,Workable,2026-43,,,account by full name (2 captures),high
+2575,eu:70299514465-38,Conservation International Europe,https://samoa.conservation.org/vacancies,own site (system unknown),2026-43,200,,"own site, careers page",high
+2575,eu:70299514465-38,Conservation International Europe,https://japan.conservation.org/about/recruitment,own site (system unknown),2026-43,200,,"own site, careers page",high
+3947,echo:95,International Rescue Committee IRC Deutschland gGmbH,https://www.rescue.org/jobs-syria,own site (system unknown),2026-43,200,,"own site, careers page",high
+3947,echo:95,International Rescue Committee IRC Deutschland gGmbH,https://www.rescue.org/praca-dla-wszystkich,own site (system unknown),2026-43,200,,"own site, careers page",high
+3947,echo:95,International Rescue Committee IRC Deutschland gGmbH,https://airbel.rescue.org/projects/employment-hub,own site (system unknown),2026-43,200,,"own site, careers page",high
+3948,iati:SE-ON-802481-2953,International Rescue Committee Sverige Insamlingsstiftelse,https://www.rescue.org/jobs-syria,own site (system unknown),2026-43,200,,"own site, careers page",high
+3948,iati:SE-ON-802481-2953,International Rescue Committee Sverige Insamlingsstiftelse,https://www.rescue.org/praca-dla-wszystkich,own site (system unknown),2026-43,200,,"own site, careers page",high
+3948,iati:SE-ON-802481-2953,International Rescue Committee Sverige Insamlingsstiftelse,https://airbel.rescue.org/projects/employment-hub,own site (system unknown),2026-43,200,,"own site, careers page",high
+4640,eu:310344150876-09,Plan International EU office,https://jobs.plan-international.org/,own site (system unknown),2026-43,200,,"own site, careers page; 1785 pages below answered",high
+4800,iati:FR-RCS-42956525200054,Relief International France,https://www.ri.org/work-with-us,own site (system unknown),2026-43,200,,"own site, careers page",high

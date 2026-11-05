@@ -210,5 +210,30 @@ def test_the_committed_decisions_name_only_records_that_exist():
     keys = {r.key for r in records}
     named = {*decisions.exclude, *decisions.family, *decisions.name,
              *(k for a, b, _ in decisions.merge for k in (a, b)),
+             *(k for a, b, _ in decisions.link for k in (a, b)),
              *(k for pair in decisions.separate for k in pair)}
     assert named <= keys
+
+
+def test_dg_echo_partners_are_read_with_country_codes_and_join_by_name(tmp_path):
+    path = tmp_path / "echo-partners.csv"
+    path.write_text("number,partner_code,name,country,certificate\n"
+                    "1,AADK,ActionAid Denmark,DENMARK,Partner\n"
+                    "56,CROIX-ROUGE-LU,Aide internationale de la Croix-Rouge,LUXEMBURG,Partner\n",
+                    encoding="utf-8")
+    echo = dedupe.read_echo(path)
+    assert [(r.key, r.country) for r in echo] == [("echo:1", "DK"), ("echo:56", "LU")]
+    assert dedupe.read_echo(tmp_path / "missing.csv") == []
+    groups, _, rows = run([rec("iati:DK-CVR-1", "ActionAid Denmark", "DK"), *echo])
+    assert together(groups, "iati:DK-CVR-1", "echo:1")
+    assert {r["org_id"] for r in rows} == {"iati:DK-CVR-1", "echo:56"}  # echo never anchors
+
+
+def test_a_family_link_puts_differently_named_members_in_one_family():
+    records = [rec("unjobs-nonun:1", "Save the Children", jobs=5), rec("echo:1", "Red Barnet", "DK"),
+               rec("cra:1", "Save the Children Canada", "CA")]
+    decisions = Decisions(link=[("unjobs-nonun:1", "echo:1", "national member"),
+                                ("unjobs-nonun:1", "cra:1", "national member")])
+    groups, _, rows = run(records, decisions)
+    assert not together(groups, "unjobs-nonun:1", "echo:1")
+    assert len({r["family"] for r in rows}) == 1 and rows[0]["family"]

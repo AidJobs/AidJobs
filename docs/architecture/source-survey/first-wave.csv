@@ -104,6 +104,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 124,unjobs-nonun:195,Foundation for Innovative New Diagnostic,"NGO, INGO, consultancy or foundation",15,,finddx.org,,,1
 125,unjobs-nonun:206,GiveWell,"NGO, INGO, consultancy or foundation",15,,givewell.org,https://job-boards.greenhouse.io/givewell,high,1
 126,unjobs-nonun:261,Institute for Essential Services Reform,"NGO, INGO, consultancy or foundation",15,,iesr.or.id,,,1
+127,unjobs-un:31,International Fund for Agricultural Development,development bank or other international body (UN page),15,,ifad.org,,,1
 128,unjobs-un:1,Asian Development Bank,development bank or other international body (UN page),14,,adb.org,https://adb.taleo.net/,medium,1
 129,unjobs-nonun:104,Clinton Foundation,"NGO, INGO, consultancy or foundation",14,,clintonfoundation.org,https://job-boards.greenhouse.io/clintonfoundation,medium,1
 130,unjobs-nonun:215,Global Health Advocacy Incubator,"NGO, INGO, consultancy or foundation",14,,advocacyincubator.org,,,1
@@ -148,7 +149,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 176,unjobs-un:35,International Monetary Fund,development bank or other international body (UN page),10,,imf.org,https://imf.wd5.myworkdayjobs.com/IMF,medium,1
 177,unjobs-nonun:293,International Union for Conservation of Nature,"NGO, INGO, consultancy or foundation",10,,iucn.org,,,1
 179,unjobs-nonun:253,Organizzazione Umanitaria Onlus,"NGO, INGO, consultancy or foundation",10,,intersos.org,,,1
-181,unjobs-nonun:284,International Livestock Research Institute,"NGO, INGO, consultancy or foundation",9,95365000,ilri.org,,,1
+181,unjobs-nonun:284,International Livestock Research Institute,"NGO, INGO, consultancy or foundation",9,95365000,ilri.org,,,2
 182,unjobs-nonun:38,BRAC,"NGO, INGO, consultancy or foundation",9,,brac.net,,,2
 183,unjobs-nonun:80,Center for European Policy Analysis,"NGO, INGO, consultancy or foundation",9,,cepa.org,,,2
 184,unjobs-nonun:112,Conrad N. Hilton Foundation,"NGO, INGO, consultancy or foundation",9,,hiltonfoundation.org,,,2
@@ -202,7 +203,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 241,unjobs-nonun:429,Roundtable on Sustainable Palm Oil,"NGO, INGO, consultancy or foundation",6,,rspo.org,,,2
 242,unjobs-nonun:453,Stockholm Environment Institute,"NGO, INGO, consultancy or foundation",6,,sei.org,,,2
 243,unjobs-nonun:474,Transport and Environment,"NGO, INGO, consultancy or foundation",6,,transportenvironment.org,,,2
-247,unjobs-nonun:503,Welthungerhilfe,"NGO, INGO, consultancy or foundation",6,,welthungerhilfe.de,,,2
+247,unjobs-nonun:503,Welthungerhilfe,"NGO, INGO, consultancy or foundation",6,,welthungerhilfe.de,,,1
 248,unjobs-nonun:521,WorldFish,"NGO, INGO, consultancy or foundation",6,,worldfishcenter.org,https://apply.workable.com/worldfish/,high,2
 249,unjobs-nonun:384,Pathfinder International,"NGO, INGO, consultancy or foundation",5,104896435,pathfinder.org,,,2
 250,unjobs-nonun:482,United Nations Foundation,"NGO, INGO, consultancy or foundation",5,77013346,unfoundation.org,,,2
@@ -288,7 +289,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 343,unjobs-nonun:301,Istituto per la Cooperazione Universitaria,"NGO, INGO, consultancy or foundation",3,,icu.it,,,2
 344,unjobs-nonun:256,ITAD Limited,"NGO, INGO, consultancy or foundation",3,,itad.com,https://itadltd.bamboohr.com/,medium,2
 345,unjobs-nonun:309,Kvinna till Kvinna,"NGO, INGO, consultancy or foundation",3,,kvinnatillkvinna.org,,,2
-346,unjobs-nonun:319,Lutheran World Federation,"NGO, INGO, consultancy or foundation",3,,lutheranworld.org,,,2
+346,unjobs-nonun:319,Lutheran World Federation,"NGO, INGO, consultancy or foundation",3,,lutheranworld.org,,,1
 347,unjobs-nonun:354,New Development Bank,development agency or intergovernmental body,3,,ndb.int,,,2
 350,unjobs-nonun:375,Oxford Policy Management,"NGO, INGO, consultancy or foundation",3,,opml.co.uk,https://careers-opml.icims.com/jobs,low,2
 351,unjobs-nonun:400,Public Health Institute,"NGO, INGO, consultancy or foundation",3,,phi.org,,,2
@@ -325,7 +326,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 387,unjobs-nonun:126,Dalberg Global Development Advisors,"NGO, INGO, consultancy or foundation",2,,dalberg.com,,,2
 389,unjobs-nonun:166,Epicentre,"NGO, INGO, consultancy or foundation",2,,epicentre.msf.org,,,2
 391,unjobs-nonun:171,European Endowment for Democracy,"NGO, INGO, consultancy or foundation",2,,democracyendowment.eu,https://apply.workable.com/eed/,low,2
-392,unjobs-nonun:191,Fondazione CESVI,"NGO, INGO, consultancy or foundation",2,,cesvi.org,,,2
+392,unjobs-nonun:191,Fondazione CESVI,"NGO, INGO, consultancy or foundation",2,,cesvi.org,,,1
 393,unjobs-nonun:210,Global Citizen,"NGO, INGO, consultancy or foundation",2,,globalcitizen.org,https://globalcitizen.bamboohr.com/,high,2
 394,unjobs-nonun:212,Global Energy Monitor,"NGO, INGO, consultancy or foundation",2,,globalenergymonitor.org,https://globalenergymonitor.bamboohr.com/,high,2
 395,unjobs-nonun:213,Global Fishing Watch,"NGO, INGO, consultancy or foundation",2,,globalfishingwatch.org,https://job-boards.greenhouse.io/globalfishingwatch,high,2
@@ -340,7 +341,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 406,unjobs-nonun:327,Medicines for Malaria Venture,"NGO, INGO, consultancy or foundation",2,,mmv.org,,,2
 407,unjobs-nonun:531,myAgro Farms,"NGO, INGO, consultancy or foundation",2,,myagro.org,,,2
 408,unjobs-nonun:352,Netherlands Development Finance Company,development agency or intergovernmental body,2,,fmo.nl,,,2
-409,unjobs-nonun:356,Norwegian Church Aid,"NGO, INGO, consultancy or foundation",2,,kirkensnodhjelp.no,,,2
+409,unjobs-nonun:356,Norwegian Church Aid,"NGO, INGO, consultancy or foundation",2,,kirkensnodhjelp.no,,,1
 412,unjobs-nonun:367,Omidyar Network,"NGO, INGO, consultancy or foundation",2,,omidyar.com,https://job-boards.greenhouse.io/omidyarnetwork,high,2
 413,unjobs-nonun:369,Open Society Foundations,"NGO, INGO, consultancy or foundation",2,,opensocietyfoundations.org,,,2
 414,unjobs-nonun:370,Organization of American States,development agency or intergovernmental body,2,,oas.org,,,2
@@ -356,7 +357,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 424,unjobs-nonun:460,Systemic Justice,"NGO, INGO, consultancy or foundation",2,,systemicjustice.ngo,https://systemicjustice.bamboohr.com/,high,2
 425,unjobs-nonun:466,Textile Exchange,"NGO, INGO, consultancy or foundation",2,,textileexchange.org,https://textileexchange.bamboohr.com/,high,2
 426,unjobs-nonun:473,Transparency International,"NGO, INGO, consultancy or foundation",2,,transparency.org,,,2
-427,unjobs-nonun:476,Trócaire,"NGO, INGO, consultancy or foundation",2,,trocaire.org,https://apply.workable.com/trocaire/,high,2
+427,unjobs-nonun:476,Trócaire,"NGO, INGO, consultancy or foundation",2,,trocaire.org,https://apply.workable.com/trocaire/,high,1
 428,unjobs-nonun:489,Verra,"NGO, INGO, consultancy or foundation",2,,verra.org,https://verra.bamboohr.com/,medium,2
 429,unjobs-nonun:492,Vizzuality,"NGO, INGO, consultancy or foundation",2,,vizzuality.com,https://vizzuality.bamboohr.com/,high,2
 430,unjobs-nonun:504,Westerwelle Foundation,"NGO, INGO, consultancy or foundation",2,,westerwelle-foundation.com,,,2
@@ -407,7 +408,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 477,unjobs-nonun:209,Global Canopy,"NGO, INGO, consultancy or foundation",1,,globalcanopy.org,,,2
 478,unjobs-nonun:223,Gold Standard Foundation (Gold Standard),"NGO, INGO, consultancy or foundation",1,,goldstandard.org,https://goldstandard.bamboohr.com/,medium,2
 479,unjobs-nonun:235,Heising-Simons Foundation,"NGO, INGO, consultancy or foundation",1,,hsfoundation.org,,,2
-480,unjobs-nonun:237,Helvetas,"NGO, INGO, consultancy or foundation",1,,helvetas.org,,,2
+480,unjobs-nonun:237,Helvetas,"NGO, INGO, consultancy or foundation",1,,helvetas.org,,,1
 481,unjobs-nonun:246,"ICDDR,B - Centre for Health and Population Research","NGO, INGO, consultancy or foundation",1,,icddrb.org,,,2
 483,unjobs-un:38,Inter-Parliamentary Union,development bank or other international body (UN page),1,,ipu.org,,,2
 484,unjobs-nonun:267,International Anti-Corruption Academy,development agency or intergovernmental body,1,,iaca.int,,,2
@@ -421,11 +422,11 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 494,unjobs-nonun:314,Laterite,"NGO, INGO, consultancy or foundation",1,,laterite.com,,,2
 495,unjobs-nonun:315,Laudato Si Movement,"NGO, INGO, consultancy or foundation",1,,laudatosimovement.org,,,2
 496,unjobs-nonun:316,Libraries Without Borders,"NGO, INGO, consultancy or foundation",1,,librarieswithoutborders.org,,,2
-497,unjobs-nonun:321,Malteser International,"NGO, INGO, consultancy or foundation",1,,malteser-international.org,,,2
+497,unjobs-nonun:321,Malteser International,"NGO, INGO, consultancy or foundation",1,,malteser-international.org,,,1
 498,unjobs-nonun:326,Medicines Patent Pool,"NGO, INGO, consultancy or foundation",1,,medicinespatentpool.org,,,2
 499,unjobs-nonun:328,Meedan,"NGO, INGO, consultancy or foundation",1,,meedan.com,,,2
 500,unjobs-nonun:334,Minderoo Foundation,"NGO, INGO, consultancy or foundation",1,,minderoo.org,,,2
-501,unjobs-nonun:336,Mission East,"NGO, INGO, consultancy or foundation",1,,missioneast.org,https://missioneast.bamboohr.com/,high,2
+501,unjobs-nonun:336,Mission East,"NGO, INGO, consultancy or foundation",1,,missioneast.org,https://missioneast.bamboohr.com/,high,1
 502,unjobs-nonun:344,National Endowment for Democracy,"NGO, INGO, consultancy or foundation",1,,ned.org,,,2
 503,unjobs-nonun:360,Nutrition International,"NGO, INGO, consultancy or foundation",1,,nutritionintl.org,https://apply.workable.com/nutritionintl/,medium,2
 511,unjobs-nonun:361,ONE Campaign,"NGO, INGO, consultancy or foundation",1,,one.org,,,2
@@ -512,7 +513,7 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 600,irs:521231983,Aga Khan Foundation USA,INGO member or funder (by income),,106705948,akfusa.org,,,2
 601,uk:1000566,The Salvation Army International Trust,INGO member or funder (by income),,104528130,salvationarmy.org,,,2
 602,iati:US-EIN-13-3870223,International Aids Vaccine Initiative,INGO member or funder (by income),,103360669,iavi.org,,,2
-603,seed:17,Tearfund,INGO member or funder (by income),,102552188,tearfund.org,,,2
+603,seed:17,Tearfund,INGO member or funder (by income),,102552188,tearfund.org,,,1
 604,uk:1107385,Depaul International,INGO member or funder (by income),,100355134,int.depaulcharity.org,,,2
 605,irs:541460147,Operation Smile Inc,INGO member or funder (by income),,100175924,operationsmile.org,,,2
 606,cra:100072586RR0001,Aga Khan Foundation Canada/fondation Aga Khan Canada,INGO member or funder (by income),,99677006,akfc.ca,,,2
@@ -522,31 +523,393 @@ rank,org_id,name,group,unjobs_jobs,income_usd,website,step_e_guess,step_e_confid
 610,irs:931057665,Palestine Childrens Relief Fund,INGO member or funder (by income),,94873840,pcrf.net,,,2
 611,cra:821896875RR0001,Islamic Relief - Ir Canada,INGO member or funder (by income),,91887438,islamicreliefcanada.org,,,2
 612,uk:1000851,Amanat Charity Trust,INGO member or funder (by income),,91864157,uwt.org,,,2
-613,seed:16,Christian Aid,INGO member or funder (by income),,91256340,christianaid.org.uk,,,2
+613,seed:16,Christian Aid,INGO member or funder (by income),,91256340,christianaid.org.uk,,,1
 614,iati:US-EIN-300108263,GlobalGiving.org,INGO member or funder (by income),,91098723,globalgiving.org,,,2
 615,iati:US-EIN-23-7069110,Oxfam America,INGO member or funder (by income),,85074205,oxfamamerica.org,https://jobs.smartrecruiters.com/oxfamamerica2,high,2
 616,iati:GB-CHC-285908,World Vision UK,INGO member or funder (by income),,84475019,worldvision.org.uk,,,2
 617,irs:223304404,C I S Development Foundation Inc,INGO member or funder (by income),,82326733,cisdevelopmentfoundation.org,,,2
 618,iati:GB-CHC-292506,CARE International UK,INGO member or funder (by income),,81882755,careinternational.org.uk,,,2
-620,acnc:74068758654,Medecins Sans Frontieres Australia Limited,INGO member or funder (by income),,79781619,msf.org.au,,,2
-621,irs:132907656,Citihope International Inc,INGO member or funder (by income),,79519432,citihope.org,,,2
-622,iati:GB-COH-1364201,Plan International UK,INGO member or funder (by income),,78833208,plan-uk.org,,,2
-624,irs:541382657,Operation Blessing International Relief & Development Corp,INGO member or funder (by income),,78244217,ob.org,,,2
-625,irs:411601449,Feed My Starving Children,INGO member or funder (by income),,77545563,fmsc.org,,,2
-626,irs:200942434,Baitulmaal Inc,INGO member or funder (by income),,77434379,baitulmaal.org,,,2
-627,irs:363241033,ALIGHT,INGO member or funder (by income),,76492994,wearealight.org,,,2
-628,irs:521314847,Adventist Development and Relief Agency International,INGO member or funder (by income),,75928709,adra.org,,,2
-629,irs:930878944,Medical Teams International,INGO member or funder (by income),,74492048,medicalteams.org,,,2
-630,eu:6779772100986-67,Medical Aid for Palestinians,INGO member or funder (by income),,72279111,map.org.uk,,,2
-631,irs:813404708,Good Neighbors Global Partnership Center,INGO member or funder (by income),,72097240,goodneighbors.org,,,2
-632,seed:18,CAFOD,INGO member or funder (by income),,71829220,cafod.org.uk,,,2
-633,irs:132574963,Lutheran World Relief Inc,INGO member or funder (by income),,71718541,lwr.org,,,2
-634,oscr:SC045223,Mary's Meals International Organisation,INGO member or funder (by income),,71170998,marysmeals.org,,,2
-635,irs:521447902,CNFA,INGO member or funder (by income),,70211705,cnfa.org,,,2
-636,irs:520742294,Atlantic Council of the U S Inc,INGO member or funder (by income),,69901633,atlanticcouncil.org,,,2
-637,irs:131656647,Freedom House Inc,INGO member or funder (by income),,69437963,freedomhouse.org,,,2
-638,iati:GB-CHC-1077216,Compassion UK,INGO member or funder (by income),,68030707,compassionuk.org,,,2
-639,irs:262087340,True Sojourners,INGO member or funder (by income),,66770727,truesojourners.org,,,2
-640,acnc:67001692566,Compassion Australia,INGO member or funder (by income),,65732160,compassion.com.au,,,2
-641,irs:133712030,Concern Worldwide U S Inc,INGO member or funder (by income),,65656850,concernusa.org,,,2
-642,irs:592339140,Salvadoran American Humanitarian Foundation Inc,INGO member or funder (by income),,65520408,sahf.org,,,2
+619,acnc:74068758654,Medecins Sans Frontieres Australia Limited,INGO member or funder (by income),,79781619,msf.org.au,,,2
+620,irs:132907656,Citihope International Inc,INGO member or funder (by income),,79519432,citihope.org,,,2
+621,iati:GB-COH-1364201,Plan International UK,INGO member or funder (by income),,78833208,plan-uk.org,,,2
+622,irs:541382657,Operation Blessing International Relief & Development Corp,INGO member or funder (by income),,78244217,ob.org,,,2
+623,irs:411601449,Feed My Starving Children,INGO member or funder (by income),,77545563,fmsc.org,,,2
+624,irs:200942434,Baitulmaal Inc,INGO member or funder (by income),,77434379,baitulmaal.org,,,2
+625,irs:363241033,ALIGHT,INGO member or funder (by income),,76492994,wearealight.org,,,2
+626,irs:521314847,Adventist Development and Relief Agency International,INGO member or funder (by income),,75928709,adra.org,,,2
+627,irs:930878944,Medical Teams International,INGO member or funder (by income),,74492048,medicalteams.org,,,2
+628,eu:6779772100986-67,Medical Aid for Palestinians,INGO member or funder (by income),,72279111,map.org.uk,,,2
+629,irs:813404708,Good Neighbors Global Partnership Center,INGO member or funder (by income),,72097240,goodneighbors.org,,,2
+630,seed:18,CAFOD,INGO member or funder (by income),,71829220,cafod.org.uk,,,1
+631,irs:132574963,Lutheran World Relief Inc,INGO member or funder (by income),,71718541,lwr.org,,,2
+632,oscr:SC045223,Mary's Meals International Organisation,INGO member or funder (by income),,71170998,marysmeals.org,,,2
+633,irs:521447902,CNFA,INGO member or funder (by income),,70211705,cnfa.org,,,2
+634,irs:520742294,Atlantic Council of the U S Inc,INGO member or funder (by income),,69901633,atlanticcouncil.org,,,2
+635,irs:131656647,Freedom House Inc,INGO member or funder (by income),,69437963,freedomhouse.org,,,2
+636,iati:GB-CHC-1077216,Compassion UK,INGO member or funder (by income),,68030707,compassionuk.org,,,2
+637,irs:262087340,True Sojourners,INGO member or funder (by income),,66770727,truesojourners.org,,,2
+638,acnc:67001692566,Compassion Australia,INGO member or funder (by income),,65732160,compassion.com.au,,,2
+639,irs:133712030,Concern Worldwide U S Inc,INGO member or funder (by income),,65656850,concernusa.org,,,2
+640,irs:592339140,Salvadoran American Humanitarian Foundation Inc,INGO member or funder (by income),,65520408,sahf.org,,,2
+697,seed:22,HelpAge International,INGO head office (named by the user),,41055128,helpage.org,,,1
+1660,iati:CH-FDJP-66006990023,ACT Alliance,INGO head office (named by the user),,,actalliance.org,,,1
+1670,seed:14,ActionAid,INGO head office (named by the user),,,actionaid.org,,,1
+1779,seed:24,ALIMA,INGO head office (named by the user),,,alima.ngo,,,1
+2278,seed:19,Caritas,INGO head office (named by the user),,,caritas.org,,,1
+2540,seed:15,Concern Worldwide,INGO head office (named by the user),,,concern.net,,,1
+2593,echo:43,Cooperazione Internazionale,INGO head office (named by the user),,,coopi.org,,,1
+2604,seed:27,Cordaid,INGO head office (named by the user),,,cordaid.org,,,1
+2736,eu:74935891413-11,Diakonie Katastrophenhilfe,INGO head office (named by the user),,,diakonie-katastrophenhilfe.de,,,1
+3277,seed:28,Finn Church Aid,INGO head office (named by the user),,,finnchurchaid.fi,,,1
+3307,eu:37924887335-21,Fondazione AVSI - ETS,INGO head office (named by the user),,,avsi.org,,,1
+4025,echo:64,Johanniter-Unfall-Hilfe E.v.,INGO head office (named by the user),,,johanniter.de,,,1
+4182,iati:AT-ZVR-315688676,Light for the World International,INGO head office (named by the user),,,light-for-the-world.org,,,1
+4259,seed:23,Medair,INGO head office (named by the user),,,relief.medair.org,,,1
+4563,eu:46856801604-90,Oxfam International,INGO head office (named by the user),,,oxfam.org,,,1
+5060,seed:20,SOS Children's Villages,INGO head office (named by the user),,,sos-childrensvillages.org,,,1
+5232,iati:CH-FDJP-CHE107828868,Swisscontact,INGO head office (named by the user),,,swisscontact.org,,,1
+5274,seed:25,Terre des Hommes,INGO head office (named by the user),,,tdh.ch,,,1
+5741,seed:13,World Vision,INGO head office (named by the user),,,wvi.org,,,1
+5820,seed:26,ZOA,INGO head office (named by the user),,,zoa-international.com,,,1
+1624,echo:91,3iS,EU humanitarian partner (DG ECHO),,,3is.org,,,2
+1664,iati:ES-CIF-G81164105,ACTION AGAINST HUNGER SPAIN,EU humanitarian partner (DG ECHO),,,accioncontraelhambre.org,,,2
+1667,eu:0386452104593-02,Action for Migration and Development (METAdrasi),EU humanitarian partner (DG ECHO),,,metadrasi.org,,,2
+1672,iati:DK-CVR-18243717,ActionAid Denmark (Mellemfolkeligt Samvirke),EU humanitarian partner (DG ECHO),,,ms.dk,,,2
+1677,eu:642431418786-58,ActionAid Italia International ETS (AA IT),EU humanitarian partner (DG ECHO),,,actionaid.it,,,2
+1686,iati:DK-CVR-20074035,ADRA Denmark,EU humanitarian partner (DG ECHO),,,adra.dk,,,2
+1687,echo:8,ADRA Deutschland e.V.,EU humanitarian partner (DG ECHO),,,adra.de,,,2
+1688,iati:SE-ON-802539-4035,ADRA Sweden,EU humanitarian partner (DG ECHO),,,adra.se,,,2
+1689,echo:7,"ADRA, o.p.s.",EU humanitarian partner (DG ECHO),,,adra.cz,,,2
+1694,echo:10,Adventist Development and Relief Agency Norge,EU humanitarian partner (DG ECHO),,,adranorge.no,,,2
+1741,eu:880197597422-78,Agronomes et Vétérinaires Sans Frontières,EU humanitarian partner (DG ECHO),,,avsf.org,,,2
+1750,echo:56,Aide internationale de la Croix-Rouge luxembourgeoise A.S.B.L.,EU humanitarian partner (DG ECHO),,,croix-rouge.lu,,,2
+1868,echo:16,Arbeiter-Samariter-Bund Deutschland e.V.,EU humanitarian partner (DG ECHO),,,asb.de,,,2
+1873,echo:15,Arche noVa - Initiative fuer Menschen in Not e.V.,EU humanitarian partner (DG ECHO),,,arche-nova.org,,,2
+1894,echo:4,Asamblea de Cooperacion por la Paz,EU humanitarian partner (DG ECHO),,,acppasamblea.org,,,2
+2048,echo:46,Associazione della Croce Rossa Italiana - OdV,EU humanitarian partner (DG ECHO),,,cri.it,,,2
+2053,echo:100,Associazione Internazionale Volontari Laici- Servizio Di Pace,EU humanitarian partner (DG ECHO),,,lvia.it,,,2
+2057,echo:12,Associazione Italiana per la Solidarietà tra i Popoli,EU humanitarian partner (DG ECHO),,,aispo.org,,,2
+2142,iati:FR-RCS-49962201700014,Bibliothèques Sans Frontières,EU humanitarian partner (DG ECHO),,,bibliosansfrontieres.org,,,2
+2182,echo:21,BRAC International,EU humanitarian partner (DG ECHO),,,bracinternational.org,,,2
+2264,iati:DK-CVR-12921047,CARE Danmark Fonden for Frivillig Ulandsbistand,EU humanitarian partner (DG ECHO),,,care.dk,,,2
+2265,eu:450195951100-88,CARE Deutschland e.V.,EU humanitarian partner (DG ECHO),,,care.de,,,2
+2266,echo:27,Care France,EU humanitarian partner (DG ECHO),,,carefrance.org,,,2
+2270,iati:NL-KVK-41158230,CARE Nederland,EU humanitarian partner (DG ECHO),,,carenederland.org,,,2
+2272,echo:29,Care Norge,EU humanitarian partner (DG ECHO),,,care.no,,,2
+2274,eu:696874316528-26,CARE Österreich,EU humanitarian partner (DG ECHO),,,care.at,,,2
+2280,iati:DK-CVR-29439915,Caritas Denmark,EU humanitarian partner (DG ECHO),,,caritas.dk,,,2
+2281,echo:35,Caritas Espanola,EU humanitarian partner (DG ECHO),,,caritas.es,,,2
+2284,iati:BE-BCE_KBO-0410644946,Caritas International (Belgium),EU humanitarian partner (DG ECHO),,,caritasinternational.be,,,2
+2286,echo:37,Caritas Norge,EU humanitarian partner (DG ECHO),,,caritas.no,,,2
+2289,echo:30,Caritas Österreich,EU humanitarian partner (DG ECHO),,,caritas.at,,,2
+2294,eu:62193811660-44,CBM Christoffel-Blindenmission Christian Blind Mission,EU humanitarian partner (DG ECHO),,,cbm.org,,,2
+2386,echo:32,Charita Ceska Republika,EU humanitarian partner (DG ECHO),,,charita.cz,,,2
+2409,iati:IE-CHY-6998,Christian Aid Ireland,EU humanitarian partner (DG ECHO),,,christianaid.ie,,,2
+2496,iati:IT-CF-97050280581,Comitato Internazionale per lo Sviluppo dei Popoli,EU humanitarian partner (DG ECHO),,,cisp.ngo,,,2
+2537,echo:142,Comunità di S.Egidio ACAP APS,EU humanitarian partner (DG ECHO),,,acap.santegidio.org,,,2
+2629,iati:BE-BCE_KBO-0462132150,Croix-Rouge de Belgique Communauté francophone - Activités internationales ASBL,EU humanitarian partner (DG ECHO),,,croix-rouge.be,,,2
+2630,echo:55,Croix-Rouge Francaise,EU humanitarian partner (DG ECHO),,,croix-rouge.fr,,,2
+2634,echo:53,"Cruz Roja Española, (e)",EU humanitarian partner (DG ECHO),,,cruzroja.es,,,2
+2657,echo:59,Danish Committee for Aid to Afghan Refugees,EU humanitarian partner (DG ECHO),,,dacaar.org,,,2
+2659,iati:DK-CVR-20700211,Danish Red Cross,EU humanitarian partner (DG ECHO),,,rodekors.dk,,,2
+2666,echo:65,Dansk Folkehjælp,EU humanitarian partner (DG ECHO),,,folkehjaelp.dk,,,2
+2712,eu:04903991238-83,Deutscher Caritasverband e. V.,EU humanitarian partner (DG ECHO),,,caritas.de,,,2
+2724,echo:51,Deutsches Rotes Kreuz,EU humanitarian partner (DG ECHO),,,drk.de,,,2
+2735,iati:SE-ON-802017-3517,Diakonia (Sweden),EU humanitarian partner (DG ECHO),,,diakonia.se,,,2
+2768,iati:NL-KVK-41236410,Dorcas Aid International,EU humanitarian partner (DG ECHO),,,dorcas.nl,,,2
+2838,eu:71785808408-70,EMERGENCY LIFE SUPPORT FOR CIVILIAN WAR VICTIMS ONG ETS (EMERGENCY ONG ETS),EU humanitarian partner (DG ECHO),,,emergency.it,,,2
+3218,echo:72,Farmacéuticos Mundi,EU humanitarian partner (DG ECHO),,,farmaceuticosmundi.org,,,2
+3224,echo:107,Federacion De Asociaciones Medicus Mundi Espana,EU humanitarian partner (DG ECHO),,,medicusmundi.es,,,2
+3267,eu:9316178101838-91,Fida International,EU humanitarian partner (DG ECHO),,,fida.fi,,,2
+3315,eu:345101395403-58,Fondazione L'Albero della Vita ETS,EU humanitarian partner (DG ECHO),,,alberodellavita.org,,,2
+3317,eu:6052537100059-17,Fondazione Opera San Francesco Saverio Collegio Universitario Aspiranti Medici Missionari - Medici con l'Africa C.U.A.M.M,EU humanitarian partner (DG ECHO),,,mediciconlafrica.org,,,2
+3320,echo:165,Fondazione Terre des Hommes Italia Onlus,EU humanitarian partner (DG ECHO),,,terredeshommes.it,,,2
+3417,echo:77,Fundacion de Religiosos Para la Salud,EU humanitarian partner (DG ECHO),,,fundacionfrs.es,,,2
+3428,eu:193775197365-82,"Fundación Alianza por los Derechos, la Igualdad y la Solidaridad Internacional (Fundación Alianza)",EU humanitarian partner (DG ECHO),,,actionaid.es,,,2
+3440,echo:67,Fundación Educación y Cooperación - Educo,EU humanitarian partner (DG ECHO),,,educo.org,,,2
+3442,eu:751884797933-94,Fundación Entreculturas - Fe y Alegría,EU humanitarian partner (DG ECHO),,,entreculturas.org,,,2
+3456,eu:485832896306-35,FUNDACIÓN MUNDUBAT,EU humanitarian partner (DG ECHO),,,mundubat.org,,,2
+3465,echo:133,Fundación Plan International España,EU humanitarian partner (DG ECHO),,,plan-international.es,,,2
+3467,eu:578477543677-57,Fundación Pueblo para Pueblo (HUMANA FPP),EU humanitarian partner (DG ECHO),,,humana-spain.org,,,2
+3470,echo:155,Fundación Save The Children,EU humanitarian partner (DG ECHO),,,savethechildren.es,,,2
+3487,echo:124,Fundacja Polskie Centrum Pomocy Międzynarodowej,EU humanitarian partner (DG ECHO),,,pcpm.org.pl,,,2
+3497,echo:85,Fundatia HEKs/EPER Romania,EU humanitarian partner (DG ECHO),,,heks-eper.ro,,,2
+3502,echo:13,Fundação Aga Khan Portugal,EU humanitarian partner (DG ECHO),,,akf.org,,,2
+3553,echo:80,German Doctors e.V.,EU humanitarian partner (DG ECHO),,,german-doctors.de,,,2
+3649,eu:290573497341-07,Groupe de Recherche et d'Echanges Technologiques,EU humanitarian partner (DG ECHO),,,gret.org,,,2
+3680,iati:NL-KVK-41211943,HealthNet TPO,EU humanitarian partner (DG ECHO),,,healthnettpo.org,,,2
+3689,echo:83,Help Code Italia Onlus,EU humanitarian partner (DG ECHO),,,helpcode.org,,,2
+3690,echo:84,Help- Hilfe Zur Selbsthilfe E.v.,EU humanitarian partner (DG ECHO),,,help-ev.de,,,2
+3700,eu:120004038547-60,HIAS Europe,EU humanitarian partner (DG ECHO),,,hiaseurope.org,,,2
+3707,echo:88,Hilfswerk International,EU humanitarian partner (DG ECHO),,,hilfswerk.at,,,2
+3714,echo:148,Hoffnungszeichen / Sign of Hope e.V.,EU humanitarian partner (DG ECHO),,,hoffnungszeichen.de,,,2
+3752,eu:792363292741-49,Hungarian Interchurch Aid,EU humanitarian partner (DG ECHO),,,hia.hu,,,2
+3821,echo:20,Institut Bioforce,EU humanitarian partner (DG ECHO),,,bioforce.org,,,2
+3929,eu:5432179104711-68,International Medical Corps Croatia (IMC Croatia),EU humanitarian partner (DG ECHO),,,internationalmedicalcorps.hr,,,2
+3947,echo:95,International Rescue Committee IRC Deutschland gGmbH,EU humanitarian partner (DG ECHO),,,rescue.org,https://www.rescue.org/jobs-syria,high,2
+4002,echo:96,Islamic Relief Humanitäre Organisation in Deutschland e.V.,EU humanitarian partner (DG ECHO),,,islamicrelief.de,,,2
+4003,echo:94,Islamic Relief Sverige,EU humanitarian partner (DG ECHO),,,islamic-relief.se,,,2
+4038,echo:98,Jugend Eine Welt- Don Bosco Entwicklungszusammenarbeit,EU humanitarian partner (DG ECHO),,,jugendeinewelt.at,,,2
+4110,eu:86799015561-32,La Chaîne de l'Espoir,EU humanitarian partner (DG ECHO),,,chainedelespoir.org,,,2
+4213,echo:99,Läkarmissionen,EU humanitarian partner (DG ECHO),,,lakarmissionen.se,,,2
+4227,echo:164,Magyarországi Terre des hommes Alapitvány,EU humanitarian partner (DG ECHO),,,tdh-europe.org,,,2
+4236,eu:610816794887-34,Malteser Hilfsdienst e.V.,EU humanitarian partner (DG ECHO),,,malteser.de,,,2
+4260,eu:3206326101138-11,MEDAIR e.V.,EU humanitarian partner (DG ECHO),,,de.medair.org,,,2
+4261,iati:BE-BCE_KBO-0460162753,Medecins du Monde Belgique - Dokters van de Wereld Belgïe,EU humanitarian partner (DG ECHO),,,medecinsdumonde.be,,,2
+4267,echo:109,Medico International e.V,EU humanitarian partner (DG ECHO),,,medico.de,,,2
+4268,iati:ES-NIF-G79408852,Medicos del Mundo,EU humanitarian partner (DG ECHO),,,medicosdelmundo.org,,,2
+4339,eu:156808495601-30,Movimiento por la Paz,EU humanitarian partner (DG ECHO),,,mpdl.org,,,2
+4346,echo:70,MTÜ Eesti Pagulasabi,EU humanitarian partner (DG ECHO),,,pagulasabi.ee,,,2
+4347,echo:113,MTÜ Mondo,EU humanitarian partner (DG ECHO),,,mondo.org.ee,,,2
+4364,echo:112,Médecins Sans Frontières,EU humanitarian partner (DG ECHO),,,msf.fr,,,2
+4421,iati:NL-KVK-40409352,Netherlands Red Cross,EU humanitarian partner (DG ECHO),,,rodekruis.nl,,,2
+4461,echo:57,Norges Rode Kors (norwegian Red Cross),EU humanitarian partner (DG ECHO),,,rodekors.no,,,2
+4497,echo:48,Oesterreichisches Rotes Kreuz (croix Rouge),EU humanitarian partner (DG ECHO),,,roteskreuz.at,,,2
+4499,eu:589554140655-40,OEUVRE D'ORIENT,EU humanitarian partner (DG ECHO),,,oeuvre-orient.fr,,,2
+4562,iati:ES-CIF-G-8236803,Oxfam Intermón,EU humanitarian partner (DG ECHO),,,oxfamintermon.org,,,2
+4564,echo:121,Oxfam Italia Onlus Associazione,EU humanitarian partner (DG ECHO),,,oxfamitalia.org,,,2
+4565,iati:BE-BCE_KBO-0408643875,Oxfam Solidarité-Solidariteit,EU humanitarian partner (DG ECHO),,,oxfamsol.be,,,2
+4617,echo:156,Pelastakaa Lapset - Rädda Barnen,EU humanitarian partner (DG ECHO),,,pelastakaalapset.fi,,,2
+4638,iati:BE-BCE_KBO-0425420917,Plan International Belgium,EU humanitarian partner (DG ECHO),,,planinternational.be,,,2
+4639,echo:130,Plan International Deutschland e.V.,EU humanitarian partner (DG ECHO),,,plan.de,,,2
+4641,iati:FI-PRO-1498487-2,Plan International Finland,EU humanitarian partner (DG ECHO),,,plan.fi,,,2
+4642,echo:127,Plan International France,EU humanitarian partner (DG ECHO),,,plan-international.fr,,,2
+4643,iati:NL-KVK-41198890,Plan International Netherlands,EU humanitarian partner (DG ECHO),,,planinternational.nl,,,2
+4644,echo:128,Plan International Norge,EU humanitarian partner (DG ECHO),,,plan-norge.no,,,2
+4645,iati:SE-ON-802404-9150,Plan International Sweden,EU humanitarian partner (DG ECHO),,,plansverige.org,,,2
+4646,iati:IE-CHY-15037,Plan Ireland Charitable Assistance Limited,EU humanitarian partner (DG ECHO),,,plan.ie,,,2
+4648,iati:DK-CVR-20356731,PlanBørnefonden,EU humanitarian partner (DG ECHO),,,planbornefonden.dk,,,2
+4661,iati:SE-ON-252002-6564,"PMU, Pingst ffs",EU humanitarian partner (DG ECHO),,,pmu.se,,,2
+4667,eu:455535696425-87,Polska Akcja Humanitarna,EU humanitarian partner (DG ECHO),,,pah.org.pl,,,2
+4728,iati:NL-KVK-70333564,Prosper Global (NL),EU humanitarian partner (DG ECHO),,,netherlands.mercycorps.org,,,2
+4760,echo:160,Radda Barnens Riksforbund,EU humanitarian partner (DG ECHO),,,raddabarnen.se,,,2
+4785,echo:159,Redd Barna,EU humanitarian partner (DG ECHO),,,reddbarna.no,,,2
+4800,iati:FR-RCS-42956525200054,Relief International France,EU humanitarian partner (DG ECHO),,,ri.org,https://www.ri.org/work-with-us,high,2
+4844,iati:BE-BCE_KBO-0461634084,Rode Kruis-Vlaanderen Internationaal vzw,EU humanitarian partner (DG ECHO),,,rodekruis.be,,,2
+4899,echo:151,Samaritan's Purse e. V.,EU humanitarian partner (DG ECHO),,,die-samariter.org,,,2
+4912,echo:153,Save the Children Deutschland e.V.,EU humanitarian partner (DG ECHO),,,savethechildren.de,,,2
+4913,iati:DK-CVR-63407216,Save the Children DK,EU humanitarian partner (DG ECHO),,,redbarnet.dk,,,2
+4916,echo:157,Save the Children Italia ONLUS,EU humanitarian partner (DG ECHO),,,savethechildren.it,,,2
+4917,iati:NL-KVK-41201463,Save the Children Netherlands,EU humanitarian partner (DG ECHO),,,savethechildren.nl,,,2
+4942,iati:FR-SIRET-77566669600015,Secours Catholique - Caritas France,EU humanitarian partner (DG ECHO),,,secours-catholique.org,,,2
+4943,eu:482366946136-41,Secours Islamique france,EU humanitarian partner (DG ECHO),,,secours-islamique.org,,,2
+4944,echo:152,Secours Populaire Français,EU humanitarian partner (DG ECHO),,,secourspopulaire.fr,,,2
+4953,iati:IE-CHY-6663,Self Help Africa,EU humanitarian partner (DG ECHO),,,selfhelpafrica.org,,,2
+4964,echo:97,Servizio Dei Gesuiti per I Rifugiati,EU humanitarian partner (DG ECHO),,,centroastalli.it,,,2
+5046,echo:145,Solidaridad Internacional Andalucia,EU humanitarian partner (DG ECHO),,,solidaridadandalucia.org,,,2
+5062,iati:NL-KVK-41197577,SOS Children's Villages The Netherlands,EU humanitarian partner (DG ECHO),,,soskinderdorpen.nl,,,2
+5121,eu:831229844235-59,Stichting Dr. Denis Mukwege,EU humanitarian partner (DG ECHO),,,mukwegefoundation.org,,,2
+5154,iati:NL-KVK-41022454,Stichting Red een Kind,EU humanitarian partner (DG ECHO),,,redeenkind.nl,,,2
+5163,iati:NL-KVK-41149486,Stichting Vluchteling,EU humanitarian partner (DG ECHO),,,vluchteling.nl,,,2
+5184,eu:675607793569-29,STOWARZYSZENIE POLSKA MISJA MEDYCZNA,EU humanitarian partner (DG ECHO),,,pmm.org.pl,,,2
+5198,echo:183,Suomen NMKY:n Liitto ry,EU humanitarian partner (DG ECHO),,,ymca.fi,,,2
+5200,echo:78,"Suomen Pakolaisapu ry, Finlands Flyktinghjälp rf",EU humanitarian partner (DG ECHO),,,pakolaisapu.fi,,,2
+5201,echo:54,Suomen Punainen Risti (croix Rouge Finlandaise),EU humanitarian partner (DG ECHO),,,punainenristi.fi,,,2
+5215,echo:45,Svenska kyrkan,EU humanitarian partner (DG ECHO),,,svenskakyrkan.se,,,2
+5226,iati:SE-ON-802002-8711,Swedish Red Cross,EU humanitarian partner (DG ECHO),,,redcross.se,,,2
+5228,echo:163,SWEDO - The Swedish Development Aid Organization,EU humanitarian partner (DG ECHO),,,swedoaid.org,,,2
+5266,iati:NL-KVK-41177385,TEAR fund Nederland,EU humanitarian partner (DG ECHO),,,tearfund.nl,,,2
+5270,echo:172,Telecoms Sans Frontieres,EU humanitarian partner (DG ECHO),,,tsfi.org,,,2
+5275,iati:NL-KVK-41149287,Terre des Hommes Netherlands,EU humanitarian partner (DG ECHO),,,terredeshommes.nl,,,2
+5383,eu:66055258617-28,The Smile of the Child,EU humanitarian partner (DG ECHO),,,hamogelo.gr,,,2
+5406,echo:175,Tierärzte ohne Grenzen e.V.,EU humanitarian partner (DG ECHO),,,togev.de,,,2
+5429,echo:171,Translators Without Borders Ireland Company Limited by guarantee,EU humanitarian partner (DG ECHO),,,clearglobal.org,,,2
+5442,iati:FR-RCS-40885667200030,Triangle Génération Humanitaire,EU humanitarian partner (DG ECHO),,,trianglegh.org,,,2
+5495,echo:173,UN Ponte Per,EU humanitarian partner (DG ECHO),,,unponteper.it,,,2
+5604,iati:BE-BCE_KBO-0442168263,VETERINAIRES SANS FRONTIERES / DIERENARTSEN ZONDER GRENZEN - BELGIUM,EU humanitarian partner (DG ECHO),,,veterinairessansfrontieres.be,,,2
+5625,echo:174,Volontariato Internazionale Per Lo Sviluppo,EU humanitarian partner (DG ECHO),,,volint.it,,,2
+5638,iati:NL-KVK-41215393,War Child Netherlands,EU humanitarian partner (DG ECHO),,,warchild.net,,,2
+5746,iati:DE-CR-RA000209-VR1207,World Vision Germany,EU humanitarian partner (DG ECHO),,,worldvision.de,,,2
+5747,iati:NL-KVK-41179943,World Vision Netherlands,EU humanitarian partner (DG ECHO),,,worldvision.nl,,,2
+5748,echo:181,World Vision Nordic,EU humanitarian partner (DG ECHO),,,worldvision.fi,,,2
+5750,echo:179,World Vision Österreich,EU humanitarian partner (DG ECHO),,,worldvision.at,,,2
+648,irs:520851555,Amnesty International of the USA Inc,national member of a network in the wave,,61167328,amnestyusa.org,,,2
+649,iati:GB-CHC-274467,ActionAid UK,national member of a network in the wave,,60875903,actionaid.org.uk,,,2
+651,iati:GB-CHC-1092236,Concern Worldwide UK,national member of a network in the wave,,58221735,concern.org.uk,,,2
+656,iati:GB-CHC-1098106,Relief International UK,national member of a network in the wave,,55282842,ri.org,https://www.ri.org/work-with-us,high,2
+660,cra:118871516RR0001,Compassion Canada,national member of a network in the wave,,53883739,compassion.ca,,,2
+662,cra:118838333RR0001,CARE Canada,national member of a network in the wave,,53411020,care.ca,,,2
+663,cra:119138527RR0001,The Samaritan's Purse - Canada,national member of a network in the wave,,52868835,samaritanspurse.ca,,,2
+667,iati:US-IRS-13-5661832,Plan International USA,national member of a network in the wave,,51561510,planusa.org,,,2
+669,irs:550914744,Handicap International,national member of a network in the wave,,51320691,hi-us.org,,,2
+686,acnc:46003380890,CARE Australia,national member of a network in the wave,,43653568,care.org.au,,,2
+688,acnc:49004875807,Plan International Australia,national member of a network in the wave,,42557247,plan.org.au,,,2
+699,irs:521257425,Search for Common Ground,national member of a network in the wave,,40907415,sfcg.org,,,2
+709,irs:131845455,International Planned Parenthood Federation,national member of a network in the wave,,37294299,ippfwhr.org,,,2
+710,cra:107958621RR0001,Save the Children Canada/aide À L'Enfance Canada,national member of a network in the wave,,37116996,savethechildren.ca,,,2
+714,irs:872410117,Human Appeal Inc,national member of a network in the wave,,35399389,humanappealusa.org,,,2
+724,iati:GB-CHC-1047501,Action Against Hunger UK,national member of a network in the wave,,33080050,actionagainsthunger.org.uk,,,2
+726,iati:CA-CRA_ACR-119075091,Oxfam-Quebec,national member of a network in the wave,,32787368,oxfam.qc.ca,,,2
+736,cra:129716866RR0001,Oxfam Canada,national member of a network in the wave,,31131486,oxfam.ca,,,2
+739,acnc:90970605069,Caritas Australia Limited,national member of a network in the wave,,30179248,caritas.org.au,,,2
+752,iati:GB-CHC-1051681,Amnesty International UK Section Charitable Trust,national member of a network in the wave,,28778978,amnesty.org.uk,,,2
+760,cra:118950120RR0001,Habitat for Humanity Canada Habitat Pour L'Humanité Canada,national member of a network in the wave,,27075112,habitat.ca,,,2
+771,cra:132056813RR0001,Adra Canada,national member of a network in the wave,,25820883,adra.ca,,,2
+777,cra:119304954RR0001,World Wildlife Fund Canada/fonds Mondial Pour la Nature Canada,national member of a network in the wave,,24954382,wwf.ca,,,2
+783,iati:CA-CRA_ACR-833634678RR0001,Action Against Hunger Canada,national member of a network in the wave,,24129045,actioncontrelafaim.ca,,,2
+796,irs:208456741,BRAC USA Inc,national member of a network in the wave,,22714537,bracusa.org,,,2
+805,acnc:23005326849,CBM Australia Limited,national member of a network in the wave,,21923810,cbm.org.au,,,2
+859,irs:300181674,Wateraid America Inc,national member of a network in the wave,,18473150,wateraidamerica.org,https://wateraidamerica.bamboohr.com/,high,2
+867,acnc:24266240291,Adventist Development and Relief Agency Australia Ltd,national member of a network in the wave,,18092599,adra.org.au,,,2
+871,acnc:61002643852,Greenpeace Australia Pacific Limited,national member of a network in the wave,,17471474,greenpeace.org.au,,,2
+888,iati:CA-CRA_ACR-872374426,War Child Canada,national member of a network in the wave,,16139517,warchild.ca,,,2
+892,cra:840643605RR0001,Operation Smile Canada Foundation,national member of a network in the wave,,16022280,operationsmile.ca,,,2
+894,cra:895647055RR0001,Focus Humanitarian Assistance Canada - Focus Assistance Humanitaire Canada,national member of a network in the wave,,15932282,akdn.org,,,2
+899,cra:888081049RR0001,Medecins du Monde,national member of a network in the wave,,15817631,medecinsdumonde.ca,,,2
+919,acnc:64002806233,Amnesty International Australia,national member of a network in the wave,,14782269,amnesty.org.au,,,2
+928,iati:GB-COH-03147724,Mercy Ships UK Limited,national member of a network in the wave,,14350967,mercyships.org.uk,,,2
+944,iati:GB-CHC-1001349,Samaritan's Purse UK,national member of a network in the wave,,13624442,samaritans-purse.org.uk,,,2
+985,irs:710699939,Heifer International Foundation,national member of a network in the wave,,12249830,myheiferfoundationgiving.org,,,2
+1033,cra:844988659RR0001,Camfed Canada,national member of a network in the wave,,10944516,camfed.org,,,2
+1040,uk:1082565,Handicap International UK,national member of a network in the wave,,10701548,humanity-inclusion.org.uk,,,2
+1043,cra:118785914RR0001,Amnesty International Canadian Section (english Speaking),national member of a network in the wave,,10641789,amnesty.ca,,,2
+1053,irs:260397519,Alima USA Inc,national member of a network in the wave,,10377707,alima.ngo,,,2
+1066,acnc:90002655754,International Fund For Animal Welfare (Australia) Pty Ltd,national member of a network in the wave,,10206109,ifaw.org,,,2
+1067,acnc:82147006639,Islamic Relief Australia,national member of a network in the wave,,10199246,islamicrelief.org.au,,,2
+1097,uk:1091316,Operation Smile United Kingdom,national member of a network in the wave,,9579610,operationsmile.org.uk,,,2
+1115,acnc:99700687141,Wateraid Australia Limited,national member of a network in the wave,,9153597,wateraid.org,,,2
+1139,acnc:30097037922,Mercy Ships Australia Limited,national member of a network in the wave,,8692049,mercyships.org.au,,,2
+1140,uk:1069204,Sos Children's Villages UK,national member of a network in the wave,,8679277,soschildrensvillages.org.uk,,,2
+1164,irs:521654284,Environmental Investigation Agency,national member of a network in the wave,,8343438,eia-global.org,,,2
+1168,acnc:80162895623,Samaritan's Purse Australasia - Operation Christmas Child Ltd,national member of a network in the wave,,8209193,operationchristmaschild.org.au,,,2
+1234,cra:138247259RR0001,SOS Children's Villages Canada / SOS Villages d'enfants Canada,national member of a network in the wave,,7339647,soschildrensvillages.ca,,,2
+1288,irs:133492792,Goal USA Inc,national member of a network in the wave,,6612439,goalglobal.org,,,2
+1300,irs:271337098,Article 19 Inc,national member of a network in the wave,,6502517,article19.org,,,2
+1362,cra:108222191RR0001,Tearfund Canada,national member of a network in the wave,,5828696,tearfund.ca,,,2
+1390,acnc:87001251930,Actionaid Australia,national member of a network in the wave,,5607351,actionaid.org.au,,,2
+1478,cra:834775967RR0001,The Against Malaria Foundation (canada)/ la Fondation Against Malaria (canada),national member of a network in the wave,,4660050,againstmalaria.com,,,2
+1499,iati:GB-CHC-1074937,ADRA-UK,national member of a network in the wave,,4387669,adra.org.uk,,,2
+1517,acnc:29131976004,Habitat for Humanity Australia,national member of a network in the wave,,4209818,habitat.org.au,,,2
+1561,uk:1043641,Habitat for Humanity Great Britain,national member of a network in the wave,,3740174,habitatforhumanity.org.uk,,,2
+1611,oscr:SC050047,African Parks UK,national member of a network in the wave,,3199212,africanparks.org,,,2
+1618,iati:PK-SEC-0080655,(Pakistan),national member of a network in the wave,,,dktinternational.org,,,2
+1671,iati:BD-NAB-0210,ActionAid Bangladesh,national member of a network in the wave,,,actionaidbd.org,,,2
+1673,iati:GH-DSW-3064,ActionAid Ghana,national member of a network in the wave,,,ghana.actionaid.org,,,2
+1674,iati:KE-NCB-OP/218/051/924/84,ACTIONAID INTERNATIONAL KENYA,national member of a network in the wave,,,actionaid.org,,,2
+1675,iati:NP-IRD-301131441,ActionAid International Nepal,national member of a network in the wave,,,nepal.actionaid.org,,,2
+1676,iati:SE-ON-802431-3044,ActionAid International Sweden,national member of a network in the wave,,,actionaid.se,,,2
+1678,iati:RW-RGB-61-RGB-NGO-2017,ActionAid Rwanda,national member of a network in the wave,,,actionaid.org,,,2
+1692,iati:KE-NGC-663,Adventist Development and Relief Agency (ADRA Somalia),national member of a network in the wave,,,adrasom.org,,,2
+1693,eu:84615015169-54,Adventist Development and Relief Agency - EUROPE REGIONAL Office (ADRA-EUROPE),national member of a network in the wave,,,adra.eu,,,2
+1695,iati:NP-IRD-302113730,"Adventist Development and Relief Agency, Nepal",national member of a network in the wave,,,adranepal.org,,,2
+1728,iati:AF-MOE-138,Aga Khan Foundation Afghanistan,national member of a network in the wave,,,akdn.org,,,2
+1783,eu:493858499963-76,ALLIANCE FOR A GREEN REVOLUTION IN AFRICA,national member of a network in the wave,,,agra.org,,,2
+1822,iati:NL-KVK-40530953,Amnesty International The Netherlands,national member of a network in the wave,,,amnesty.nl,,,2
+1898,eu:603232231321-29,Ashoka,national member of a network in the wave,,,ashoka.org,,,2
+1899,iati:KE-NCB-21805120080955572,Ashoka East Africa,national member of a network in the wave,,,ashoka.org,,,2
+1934,eu:621929318922-12,Asociación para la Defensa de la Naturaleza (WWF España),national member of a network in the wave,,,wwf.es,,,2
+2096,iati:SS-RRC-140,AVSI South Sudan,national member of a network in the wave,,,avsi.org,,,2
+2183,iati:GB-CHC-1115482,BRAC UK,national member of a network in the wave,,,braceurope.org,,,2
+2262,iati:BD-NAB-0004,CARE Bangladesh,national member of a network in the wave,,,carebangladesh.org,,,2
+2263,iati:BJ-IFU-5201000673108,CARE BENIN/TOGO,national member of a network in the wave,,,care.org,,,2
+2267,iati:AF-MOE-22,CARE International Afghanistan,national member of a network in the wave,,,careinternational.org,,,2
+2268,iati:XM-OCHA-HPC8568,CARE international foundation Switzerland in Sudan,national member of a network in the wave,,,care-international.org,,,2
+2269,iati:ZW-PVO-15/2003,CARE International in Zimbabwe,national member of a network in the wave,,,carezimbabwe.org,,,2
+2271,iati:NP-IRD-302274734,CARE Nepal,national member of a network in the wave,,,carenepal.org,,,2
+2273,iati:KE-NCB-218/051/9384/74,CARE SOMALIA,national member of a network in the wave,,,care.org,,,2
+2279,eu:873264846937-84,Caritas Africa (CA),national member of a network in the wave,,,caritas-africa.org,,,2
+2282,eu:6082564924-85,Caritas Europa,national member of a network in the wave,,,caritas.eu,,,2
+2283,iati:FI-PRO-139407,Caritas Finland,national member of a network in the wave,,,caritas.fi,,,2
+2285,eu:345232651928-26,Caritas Lebanon,national member of a network in the wave,,,caritas.org.lb,,,2
+2287,eu:034694393502-45,Caritas Polska,national member of a network in the wave,,,caritas.pl,,,2
+2288,iati:RS-APR-17062603,Caritas Serbia,national member of a network in the wave,,,caritas.rs,,,2
+2396,iati:GB-COH-14411359,Chemonics Group UK Ltd,national member of a network in the wave,,,chemonics.com,,,2
+2542,iati:AU-ABN-94642321640,Conciliation Resources Australia,national member of a network in the wave,,,c-r.org,,,2
+2575,eu:70299514465-38,Conservation International Europe,national member of a network in the wave,,,conservation.org,https://samoa.conservation.org/vacancies,high,2
+2615,iati:GB-COH-11373728,Cowater UK Limited,national member of a network in the wave,,,cowater.com,,,2
+2660,eu:394469847966-60,Danish Refugee Council Brussels (DRC Brussels),national member of a network in the wave,,,drc.ngo,,,2
+2765,iati:NL-KVK-40539494,Doctors of the World (NL)/ Dokters van de Wereld,national member of a network in the wave,,,doktersvandewereld.org,,,2
+2766,iati:GB-CHC-1067406,Doctors of the World UK,national member of a network in the wave,,,doctorsoftheworld.org.uk,,,2
+2871,eu:03960197927-62,Environmental Investigation Agency,national member of a network in the wave,,,eia-international.org,,,2
+3063,eu:896045415778-75,European Habitats Forum,national member of a network in the wave,,,iucn.org,,,2
+3290,eu:0115461100540-67,FONDACIONI TERRE DES HOMMES LAUSANNE NE KOSOVE,national member of a network in the wave,,,tdh-kosovo.org,,,2
+3329,iati:GB-CHC-328273,Food for the Hungry UK,national member of a network in the wave,,,uk-fh.org,,,2
+3460,iati:CO-NIT-901269139,Fundación Oxfam Colombia,national member of a network in the wave,,,oxfamcolombia.org,,,2
+3493,eu:070652642912-86,Fundacja WWF Polska (WWF PL),national member of a network in the wave,,,wwf.pl,,,2
+3580,iati:TZ-NNCB-INGO-R1-00149,Global Communities,national member of a network in the wave,,,globalcommunities.org,,,2
+3624,iati:UG-NGO-INTP12912225NB,GOAL Uganda,national member of a network in the wave,,,goalglobal.org,,,2
+3645,eu:9832909575-41,Greenpeace European Unit,national member of a network in the wave,,,greenpeace.org,,,2
+3666,iati:BE-BCE_KBO-0432235661,Handicap International Belgique,national member of a network in the wave,,,handicapinternational.be,,,2
+3685,iati:ZA-NPO-013484,Heifer International South Africa,national member of a network in the wave,,,hpsa.org.za,,,2
+3686,iati:NL-KVK-20093733,Heifer Nederland,national member of a network in the wave,,,heifer.nl,,,2
+3691,iati:UG-RSB-80034880275658,HelpAge Advocacy Network Uganda,national member of a network in the wave,,,helpageadvocacy.org,,,2
+3692,iati:ET-CSA-7632,HelpAge Ethiopia,national member of a network in the wave,,,helpageeth.org,,,2
+3693,iati:IN-MHA-231650010,HelpAge India,national member of a network in the wave,,,helpageindia.org,,,2
+3694,iati:GB-CHC-1128267-8,HelpAge International UK,national member of a network in the wave,,,ageinternational.org.uk,,,2
+3695,iati:MD-IDNO-1022620011229,HelpAge Moldova,national member of a network in the wave,,,helpage.md,,,2
+3696,iati:MZ-MOJ-105040119,HelpAge Mozambique,national member of a network in the wave,,,helpagemoz.org,,,2
+3697,iati:TZ-NNCB-4196,Helpage Tanzania,national member of a network in the wave,,,helpagetan.org,,,2
+3815,iati:SE-ON-802477-9269,Insamlingsstiftelsen Oxfam Sverige,national member of a network in the wave,,,oxfam.se,,,2
+3925,eu:720485238568-09,International Institute for Sustainable Development Europe,national member of a network in the wave,,,iisd.org,,,2
+3948,iati:SE-ON-802481-2953,International Rescue Committee Sverige Insamlingsstiftelse,national member of a network in the wave,,,rescue.org,https://www.rescue.org/jobs-syria,high,2
+3960,eu:03518238467-61,International Union for Conservation of Nature EU Representative Office (IUCN EURO),national member of a network in the wave,,,iucn.org,,,2
+4024,seed:29,Johanniter,national member of a network in the wave,,,johanniter.org,,,2
+4181,iati:BE-BCE_KBO-0460240749,Light For The World Belgium,national member of a network in the wave,,,lightfortheworld.be,,,2
+4216,eu:672886338215-53,"Maailman luonnon säätiö - World Wide Fund for Nature, Suomen rahasto sr (WWF Finland)",national member of a network in the wave,,,wwf.fi,,,2
+4368,eu:773425322899-55,Nadacia Habitat for Humanity International,national member of a network in the wave,,,habitat.org,,,2
+4404,iati:ML-NIF-055000335T,Near East Foundation Mali (NEF Mali),national member of a network in the wave,,,neareast.org,,,2
+4405,iati:GB-CHC-1150993,Near East Foundation UK (NEF UK),national member of a network in the wave,,,neareast.org,,,2
+4457,iati:SS-RRC-004,Nonviolent Peaceforce South Sudan,national member of a network in the wave,,,nonviolentpeaceforce.org,,,2
+4535,iati:ZA-PBO-930040668,Orbis Africa,national member of a network in the wave,,,zaf.orbis.org,,,2
+4536,iati:GB-CHC-1061352,Orbis Charitable Trust,national member of a network in the wave,,,gbr.orbis.org,,,2
+4537,iati:ET-CSA-1063,Orbis Ethiopia,national member of a network in the wave,,,gbr.orbis.org,,,2
+4559,iati:AU-ACNC-18055208636,Oxfam Australia,national member of a network in the wave,,,oxfam.org.au,,,2
+4560,iati:DK-CVR-88136411,Oxfam IBIS,national member of a network in the wave,,,ibis.dk,,,2
+4561,iati:IN-MCA-U74999DL2004NPL131340,Oxfam India,national member of a network in the wave,,,oxfamindia.org,,,2
+4567,eu:961809845865-57,Oxfam-en-Belgique / Oxfam-in-België,national member of a network in the wave,,,oxfam.be,,,2
+4640,eu:310344150876-09,Plan International EU office,national member of a network in the wave,,,plan-international.org,https://jobs.plan-international.org/,high,2
+4729,iati:GB-SC-SC030289,Prosper Global (UK),national member of a network in the wave,,,europe.prosperglobal.org,,,2
+4827,eu:592780699777-45,Restless Development- Zambia,national member of a network in the wave,,,restlessdevelopment.org,,,2
+4898,iati:KH-TIN- K009-100090427,Samaritan's Purse,national member of a network in the wave,,,samaritanspurse.org,,,2
+4911,acnc:99008610035,Save The Children Australia,national member of a network in the wave,,,savethechildren.org.au,,,2
+4914,eu:697362735627-20,Save the Children Europe,national member of a network in the wave,,,savethechildren.net,,,2
+4915,iati:CH-FDJP-CHE-100788251,Save the Children Global Ventures,national member of a network in the wave,,,scgv.org,,,2
+4939,eu:674523946770-36,SDSN Association Paris,national member of a network in the wave,,,unsdsn.org,,,2
+4941,iati:BE-BCE_KBO-0453975341,Search for Common Ground,national member of a network in the wave,,,sfcg.org,,,2
+5047,iati:HK-CR-1494242,Solidaridad South & South-East Asia,national member of a network in the wave,,,solidaridadnetwork.org,,,2
+5048,iati:GH-DSW-5574,Solidaridad West Africa,national member of a network in the wave,,,solidaridadnetwork.org,,,2
+5058,iati:SE-ON-802405-7815,SOS Barnbyar,national member of a network in the wave,,,sos-barnbyar.se,,,2
+5061,iati:KE-NGCB-149,SOS Children's Villages Kenya,national member of a network in the wave,,,soskenya.org,,,2
+5063,iati:UA-EDR-34183275,SOS Children's Villages Ukraine,national member of a network in the wave,,,sos-ukraine.org,,,2
+5070,iati:BE-BCE_KBO-0408628435,SOS Kinderdorpen België / SOS Villages d'Enfants Belgique,national member of a network in the wave,,,sos-kinderdorpen.be,,,2
+5107,iati:NL-KVK-41217595,Stichting ActionAId,national member of a network in the wave,,,actionaid.org,,,2
+5136,iati:NL-KVK-41226182,Stichting Habitat for Humanity Nederland,national member of a network in the wave,,,habitat.nl,,,2
+5267,iati:BE-BCE_KBO-0419872616,Tearfund VZW,national member of a network in the wave,,,tearfund.be,,,2
+5324,iati:GB-CHC-1140288,The Fred Hollows Foundation (UK),national member of a network in the wave,,,hollows.org,,,2
+5362,eu:116042012787-45,THE NATURE CONSERVANCY IN EUROPE gemeinnützige GmbH,national member of a network in the wave,,,nature.org,,,2
+5432,iati:AU-ABN-23068075525,Transparency International Australia,national member of a network in the wave,,,transparency.org.au,,,2
+5433,iati:BD-NAB-1301,Transparency International Bangladesh,national member of a network in the wave,,,ti-bangladesh.org,,,2
+5434,iati:KE-RCO-84486,Transparency International Kenya,national member of a network in the wave,,,tikenya.org,,,2
+5435,eu:501222919-71,Transparency International Liaison Office to the European Union (TI EU),national member of a network in the wave,,,transparency.eu,,,2
+5436,iati:GB-CHC-1112842,Transparency International UK,national member of a network in the wave,,,transparency.org.uk,,,2
+5447,iati:GB-COH-NI21482,Trocaire (Northern Ireland),national member of a network in the wave,,,trocaire.org,,,2
+5491,eu:853065895361-95,Umweltverband WWF Österreich (WWF Österreich),national member of a network in the wave,,,wwf.at,,,2
+5649,iati:SE-ON-802426-1268,WaterAid Sweden,national member of a network in the wave,,,wateraid.se,,,2
+5742,eu:64689102746-48,World Vision Brussels & EU Representation ivzw/aisbl (WV EUREP),national member of a network in the wave,,,wvi.org,,,2
+5743,iati:XM-OCHA-7482,World Vision Central African Republic,national member of a network in the wave,,,wvi.org,,,2
+5744,iati:XI-IATI-WVDRC,World Vision Democratic Republic of Congo,national member of a network in the wave,,,wvi.org,,,2
+5745,iati:ET-CSA-0784,World Vision Ethiopia,national member of a network in the wave,,,wvi.org,,,2
+5749,iati:ZW-PVO-26/79,World Vision Zimbabwe,national member of a network in the wave,,,wvi.org,,,2
+5752,iati:KE-NCB-OP2180511619410357,World Wide Fund for Nature - Kenya,national member of a network in the wave,,,wwfkenya.org,,,2
+5753,eu:552983543802-68,World Wide Fund for Nature - Netherlands (WWF Netherlands),national member of a network in the wave,,,wwf.nl,,,2
+5754,iati:21-PK-WWF,World Wide Fund for Nature - Pakistan,national member of a network in the wave,,,wwfpak.org,,,2
+5755,iati:BE-BCE_KBO-0408656248,World Wide Fund for Nature Belgium,national member of a network in the wave,,,wwf.be,,,2
+5756,iati:DK-CVR-40781218,World Wide Fund for Nature Denmark,national member of a network in the wave,,,wwf.dk,,,2
+5757,iati:ZM-PCR-10102712014,World Wide Fund for Nature Zambia,national member of a network in the wave,,,wwfzm.panda.org,,,2
+5758,iati:BO-NIT-1013209020,"World Wildlife Fund Inc, Bolivia Program Office",national member of a network in the wave,,,wwf.org.bo,,,2
+5766,eu:134926817871-58,WRAP EU (WRAP EU),national member of a network in the wave,,,wrap.ngo,,,2
+5769,eu:733153119242-95,WWF Adria - Udruga za zaštitu prirode i očuvanje biološke raznolikosti (WWF Adria),national member of a network in the wave,,,wwfadria.org,,,2
+5770,eu:031571311716-04,WWF Deutschland,national member of a network in the wave,,,wwf.de,,,2
+5771,eu:1414929419-24,WWF European Policy Programme (WWF EPO),national member of a network in the wave,,,wwf.eu,,,2
+5772,iati:ID-DJP-018321174017000,WWF Indonesia,national member of a network in the wave,,,wwf.id,,,2
+5773,eu:613441393632-29,WWF Italia,national member of a network in the wave,,,wwf.it,,,2
+5774,eu:217676599422-40,WWF Mediterranean (WWF MED),national member of a network in the wave,,,wwfmmi.org,,,2
+5775,iati:PY-RUC-80025907-6,WWF Paraguay,national member of a network in the wave,,,wwf.org.py,,,2
+5776,eu:400884438161-15,WWF Portugal,national member of a network in the wave,,,wwf.pt,,,2
+5777,iati:SE-ON-802005-9823,WWF Sweden,national member of a network in the wave,,,wwf.se,,,2
+5778,iati:TN-RNE-1540791FPN000,WWF Tunisia,national member of a network in the wave,,,wwf.tn,,,2
+5779,iati:BR-CNPJ-26990192000114,WWF-BRASIL,national member of a network in the wave,,,wwf.org.br,,,2
+5780,iati:GB-CHC-1081247,WWF-UK,national member of a network in the wave,,,wwf.org.uk,,,2
+5843,eu:601645244687-08,ΓΙΑΤΡΟΙ ΤΟΥ ΚΟΣΜΟΥ ΕΛΛΗΝΙΚΗ ΑΝΤΙΠΡΟΣΩΠΕΙΑ (MdM - EL),national member of a network in the wave,,,mdmgreece.gr,,,2
+5860,eu:827172316947-35,Παγκόσμιο Ταμείο για τη Φύση - WWF Ελλάς (WWF Greece),national member of a network in the wave,,,wwf.gr,,,2
+5863,eu:854467195770-54,ΦΙΛΑΝΘΡΩΠΙΚΟ ΣΩΜΑΤΕΙΟ ΚΑΡΙΤΑΣ ΕΛΛΑΣ (CARITAS HELLAS),national member of a network in the wave,,,caritas.gr,,,2

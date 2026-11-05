@@ -1,0 +1,185 @@
+number,partner_code,name,country,certificate
+1,AADK,ActionAid Denmark,DENMARK,Partner
+2,ACF-ES,Acción Contra El Hambre,SPAIN,Potential Programmatic Partner
+3,ACF-FR,Action Contre La Faim,FRANCE,Potential Programmatic Partner
+4,ACPP-ES,Asamblea de Cooperacion por la Paz,SPAIN,Partner
+5,ACTED-FR,ACTED,FRANCE,Potential Programmatic Partner
+6,ACTIONAID-IT,ActionAid International Italia onlus,ITALY,Potential Programmatic Partner
+7,ADRA ČESKÁ REPUBLIKA,"ADRA, o.p.s.",CZECH REPUBLIC,Partner
+8,ADRA-DE,ADRA Deutschland e.V.,GERMANY,Partner
+9,ADRA-DK,ADRA Danmark,DENMARK,Partner
+10,ADRA NORGE,ADVENTIST DEVELOPMENT AND RELIEF AGENCY NORGE,NORWAY,Partner
+11,ADRA SVERIGE,ADVENTIST DEVELOPMENT AND RELIEF AGENCY SWEDEN,SWEDEN,Potential Programmatic Partner
+12,AISPO-IT,Associazione Italiana per la Solidarietà tra i Popoli,ITALY,Partner
+13,AKF PRT,Fundação Aga Khan Portugal,PORTUGAL,Partner
+14,ALIMA-FR,The alliance for international medical action,FRANCE,Partner
+15,ARCHE NOVA-DE,Arche noVa - Initiative fuer Menschen in Not e.V.,GERMANY,Partner
+16,ASB-DE,Arbeiter-Samariter-Bund Deutschland e.V.,GERMANY,Partner
+17,AVSF-FR,AGRONOMES ET VETERINAIRES SANS FRONTIERES,FRANCE,Partner
+18,AVSI-IT,FONDAZIONE AVSI,ITALY,Potential Programmatic Partner
+19,AYUDA EN ACCION-ES,Ayuda en Acción,SPAIN,Partner
+20,BIOFORCE-FR,Institut Bioforce,FRANCE,Partner
+21,BRAC NL,BRAC International,NETHERLANDS,Partner
+22,BSF,Bibliothèques sans Frontières,FRANCE,Partner
+23,CAI,Christian Aid Ireland,IRELAND,Potential Programmatic Partner
+24,CARE-AT,Care Österreich,AUSTRIA,Potential Programmatic Partner
+25,CARE-DE,Care Deutschland e.V.,GERMANY,Potential Programmatic Partner
+26,CARE-DK,CARE Danmark - Fonden for frivillig ulandsbistand,DENMARK,Potential Programmatic Partner
+27,CARE-FR,Care France,FRANCE,Potential Programmatic Partner
+28,CARE-NL,Stichting Care Nederland,NETHERLANDS,Potential Programmatic Partner
+29,CARE-NORWAY,Care Norge,NORWAY,Potential Programmatic Partner
+30,CARITAS-AT,Caritas Österreich,AUSTRIA,Partner
+31,CARITAS-BE,Caritas International,BELGIUM,Potential Programmatic Partner
+32,CARITAS-CZ,CHARITA CESKA REPUBLIKA,CZECH REPUBLIC,Partner
+33,CARITAS-DE,DEUTSCHER CARITASVERBAND e.V,GERMANY,Partner
+34,CARITAS-DK,Caritas Denmark,DENMARK,Partner
+35,CARITAS-ES,Caritas Espanola,SPAIN,Partner
+36,CARITAS-FR,CARITAS FRANCE - SECOURS CATHOLIQUE,FRANCE,Partner
+37,CARITAS-NO,Caritas Norge,NORWAY,Partner
+38,CBM,CBM Christoffel-Blindenmission Christian Blind Mission e.V.,GERMANY,Partner
+39,CDE-FR,LA CHAINE DE L'ESPOIR,FRANCE,Partner
+40,CESVI-IT,CESVI Fondazione Onlus,ITALY,Partner
+41,CISP-IT,Comitato Internazionale per lo Sviluppo dei Popoli,ITALY,Partner
+42,CONCERN WORLDWIDE-IR,CONCERN WORLDWIDE,IRELAND,Potential Programmatic Partner
+43,COOPI-IT,Cooperazione Internazionale,ITALY,Potential Programmatic Partner
+44,CORDAID-NL,Stichting CORDAID,NETHERLANDS,Partner
+45,COS-SE,Svenska kyrkan,SWEDEN,Partner
+46,CRI,Associazione della Croce Rossa Italiana - OdV,ITALY,Potential Programmatic Partner
+47,CROIX ROUGE-NL,HET NEDERLANDSE RODE KRUIS,NETHERLANDS,Potential Programmatic Partner
+48,CROIX-ROUGE-AT,OESTERREICHISCHES ROTES KREUZ (CROIX ROUGE),AUSTRIA,Partner
+49,CROIX-ROUGE-BE (SECTION FLAMANDE),VZW RODE-KRUIS VLAANDEREN INTERNATIONAAL,BELGIUM,Potential Programmatic Partner
+50,CROIX-ROUGE-BE (SECTION FRANCOPHONE),CROIX ROUGE DE BELGIQUE - communauté francophone,BELGIUM,Potential Programmatic Partner
+51,CROIX-ROUGE-DE,DEUTSCHES ROTES KREUZ,GERMANY,Potential Programmatic Partner
+52,CROIX-ROUGE-DK,DANSK RODE KORS,DENMARK,Potential Programmatic Partner
+53,CROIX-ROUGE-ES,"CRUZ ROJA ESPAÑOLA, (E)",SPAIN,Potential Programmatic Partner
+54,CROIX-ROUGE-FI,SUOMEN PUNAINEN RISTI (CROIX ROUGE FINLANDAISE),FINLAND,Potential Programmatic Partner
+55,CROIX-ROUGE-FR,CROIX-ROUGE FRANCAISE,FRANCE,Potential Programmatic Partner
+56,CROIX-ROUGE-LU,Aide internationale de la Croix-Rouge luxembourgeoise A.S.B.L.,LUXEMBURG,Potential Programmatic Partner
+57,CROIX-ROUGE-NO,NORGES RODE KORS (NORWEGIAN RED CROSS),NORWAY,Potential Programmatic Partner
+58,CUAMM-IT,Fondazione Opera San Francesco Saverio,ITALY,Partner
+59,DACAAR-DK,Danish Committee for Aid to Afghan Refugees,DENMARK,Potential Programmatic Partner
+60,DAI-NL,Dorcas Aid International,NETHERLANDS,Partner
+61,DANCHURCHAID-DK,FOLKEKIRKENS NODHJAELP,DENMARK,Potential Programmatic Partner
+62,DIAKONIA-SW,DIAKONIA,SWEDEN,Partner
+63,DIAKONIE-DE,Evangelisches Werk für Diakonie und Entwicklung e.V.,GERMANY,Partner
+64,DIE JOHANNITER-DE,JOHANNITER-UNFALL-HILFE E.V.,GERMANY,Partner
+65,DPA-DK,Dansk Folkehjælp,DENMARK,Partner
+66,DRC-DK,DANSK FLYGTNINGEHJAELP,DENMARK,Potential Programmatic Partner
+67,EDUCO-ES,Fundación Educación y Cooperación - Educo,SPAIN,Potential Programmatic Partner
+68,EMERGENCY ONG ETS,EMERGENCY LIFE SUPPORT FOR CIVILIAN WAR VICTIMS ONG ENTE DEL TERZO SETTORE,ITALY,Partner
+69,ENTRECULTURAS-ES,ENTRECULTURAS- FE Y ALEGRIA,SPAIN,Partner
+70,ERC,MTÜ Eesti Pagulasabi,ESTONIA,Potential Programmatic Partner
+71,FADV-IT,Fondazione L'Albero della Vita,ITALY,Partner
+72,FARMACEUTICOS MUNDI-SP,FARMACÉUTICOS MUNDI,SPAIN,Potential Programmatic Partner
+73,FEDERATION HANDICAP-FR,FEDERATION HANDICAP INTERNATIONAL,FRANCE,Potential Programmatic Partner
+74,FIDA-FI,Fida International ry,FINLAND,Partner
+75,FINNCHURCHAID-FI,KIRKON ULKOMAANAPU SR,FINLAND,Partner
+76,FPP,FUNDACION PUEBLO PARA PUEBLO,SPAIN,Potential Programmatic Partner
+77,FRS,FUNDACION DE RELIGIOSOS PARA LA SALUD,SPAIN,Partner
+78,FRC-FL,"Suomen Pakolaisapu ry, Finlands Flyktinghjälp rf",FINLAND,Partner
+79,GAC-DE,DEUTSCHE WELTHUNGERHILFE e.V.,GERMANY,Potential Programmatic Partner
+80,GD,German Doctors e.V.,GERMANY,Partner
+81,GOAL-IR,GOAL,IRELAND,Potential Programmatic Partner
+82,GRET,Groupe de Recherche et d'Echanges Technologiques,FRANCE,Partner
+83,HELPCODE,Help Code Italia Onlus,ITALY,Partner
+84,HELP-DE,HELP- HILFE ZUR SELBSTHILFE E.V.,GERMANY,Partner
+85,HEKS EPER,Fundatia HEKs/EPER Romania,ROMANIA,Partner
+86,HIA-HU,Magyar Ökumenikus Segélyszervezet,HUNGARY,Potential Programmatic Partner
+87,HIAS,HIAS Europe,BELGIUM,Partner
+88,HILFSWERK,HILFSWERK INTERNATIONAL,AUSTRIA,Partner
+89,HNTPO,Stichting HealthNet Transcultural Psychosocial Organization,NETHERLANDS,Partner
+90,IMC Croatia,IMC Croatia - MEĐUNARODNI MEDICINSKI ZBOR HRVATSKA,CROATIA,Potential Programmatic Partner
+91,3iS,3iS,FRANCE,Niche Partner
+92,INSO-NL,International NGO Safety Organisation,NETHERLANDS,Partner
+93,INTERSOS-IT,INTERSOS,ITALY,Partner
+94,IR SWEDEN,Islamic Relief Sverige,SWEDEN,Partner
+95,IRC-DE,International Rescue Committee IRC Deutschland gGmbH,GERMANY,Potential Programmatic Partner
+96,ISLAMIC RELIEF-DE,Islamic Relief Humanitäre Organisation in Deutschland e.V.,GERMANY,Partner
+97,JRS-IT,Servizio Dei Gesuiti per I Rifugiati,ITALY,Partner
+98,Jugend Eine Welt,Jugend Eine Welt- Don Bosco Entwicklungszusammenarbeit,AUSTRIA,Partner
+99,LÄKARMISSIONEN,Läkarmissionen,SWEDEN,Partner
+100,LVIA-IT,ASSOCIAZIONE INTERNAZIONALE VOLONTARI LAICI- SERVIZIO DI PACE,ITALY,Potential Programmatic Partner
+101,MALTESER HILFSDIENST-DE,MALTESER HILFSDIENST e.V.,GERMANY,Partner
+102,PROSPER GLOBAL,Prosper Global,NETHERLANDS,Potential Programmatic Partner
+103,MDM-BE,Médecins Du Monde (BE) - Dokters Van De Wereld,BELGIUM,Partner
+104,MDM-ES,Medicos Del Mundo España,SPAIN,Potential Programmatic Partner
+105,MDM-FR,MEDECINS DU MONDE,FRANCE,Potential Programmatic Partner
+106,MEDAIR-DE,MEDAIR e.V.,GERMANY,Partner
+107,MEDICUS MUNDI-ES,Federacion De Asociaciones Medicus Mundi Espana,SPAIN,Partner
+108,METADRASI-GR,ΜΕΤΑδραση,GREECE,Partner
+109,MI-DE,Medico International e.V,GERMANY,Partner
+110,MISSION OST-DK,Mission Ost Forening,DENMARK,Partner
+111,MPDL-ES,"Movimiento Por la paz, el Desarme y la Libertad",SPAIN,Partner
+112,MSF-FRA,Médecins Sans Frontières,FRANCE,Partner
+113,MTÜ MONDO,MTÜ Mondo,ESTONIA,Niche Partner
+114,MUNDUBAT-ES,Fundación Mundubat,SPAIN,Partner
+115,NCA-NO,Kirkens Nødhjelp,NORWAY,Partner
+116,NPA-NO,Norsk Folkehjelp,NORWAY,Partner
+117,NRC-NO,NORWEGIAN REFUGEE COUNCIL,NORWAY,Potential Programmatic Partner
+118,OEUVRE D’ORIENT,L’Oeuvre d’Orient,FRANCE,Partner
+119,OXFAM-BE,OXFAM-Solidarite(it),BELGIUM,Partner
+120,OXFAM-ES (INTERMON),Fundacion Oxfam Intermon,SPAIN,Potential Programmatic Partner
+121,OXFAM-IT,Oxfam Italia Onlus Associazione,ITALY,Partner
+122,OXFAM-NL (NOVIB),STICHTING OXFAM NOVIB,NETHERLANDS,Potential Programmatic Partner
+123,PAH-PL,Polska Akcja Humanitarna,POLAND,Partner
+124,PCPM,Fundacja Polskie Centrum Pomocy Międzynarodowej,POLAND,Potential Programmatic Partner
+125,PMM,Polska Misja Medyczna,POLAND,Potential Programmatic Partner
+126,PIN-CZ,"ČLOVEK V TÍSNI, O.P.S.",CZECH REPUBLIC,Potential Programmatic Partner
+127,PLAN INTERNATIONAL FRANCE,Plan International France,FRANCE,Potential Programmatic Partner
+128,PLAN INTERNATIONAL NORGE,Plan International Norge,NORWAY,Potential Programmatic Partner
+129,PLAN INTERNATIONAL-BE,Plan International Belgium vzw,BELGIUM,Potential Programmatic Partner
+130,PLAN INTERNATIONAL-DE,Plan International Deutschland e.V.,GERMANY,Potential Programmatic Partner
+131,PLAN INTERNATIONAL-FI,Plan Suomi säätiö,FINLAND,Potential Programmatic Partner
+132,PLAN INTERNATIONAL-IR,Plan Ireland Charitable Assistance,IRELAND,Potential Programmatic Partner
+133,PLAN INTERNATIONAL-SPAIN,Fundación Plan International España,SPAIN,Potential Programmatic Partner
+134,PLAN INTERNATIONAL-SWE,PLAN INTERNATIONAL SVERIGE INSAMLINGSSTIFTELSE,SWEDEN,Potential Programmatic Partner
+135,PLANBØRNEFONDEN,PlanBørnefonden,DENMARK,Potential Programmatic Partner
+136,PLAN-NL,Stichting Plan International Nederland,NETHERLANDS,Potential Programmatic Partner
+137,PMU INTERLIFE-SE,PMU INTERLIFE/PINGST FFS,SWEDEN,Partner
+138,PUI-FR,Premiere Urgence Internationale,FRANCE,Potential Programmatic Partner
+139,RED CROSS-SE,Svenska Röda Korsets Centralstyrelse,SWEDEN,Partner
+140,REK-NL,Stichting Red een Kind,NETHERLANDS,Partner
+141,RI-FR,MRCA/Relief International - France,FRANCE,Potential Programmatic Partner
+142,SANT'EGIDIO,Comunità di S.Egidio ACAP APS,ITALY,Partner
+143,SECOURS ISLAMIQUE -FR,Secours Islamique France,FRANCE,Potential Programmatic Partner
+144,SELF HELP AFRICA (SHA),Gorta-Self Help Africa,IRELAND,Partner
+145,SIA-SP,SOLIDARIDAD INTERNACIONAL ANDALUCIA,SPAIN,Partner
+146,SI-ES,"FUNDACION ALIANZA POR LOS DERECHOS, LA IGUALD Y LA SOLIDARIDAD INTERNACIONAL",SPAIN,Potential Programmatic Partner
+147,SI-FR,SOLIDARITES INTERNATIONAL,FRANCE,Potential Programmatic Partner
+148,SIGN OF HOPE-DE,Hoffnungszeichen / Sign of Hope e.V.,GERMANY,Partner
+149,SOS CHILDREN VILLAGE NL,Stichting Nederlandse Vrienden der SOS Kinderdorpen,NETHERLANDS,Partner
+150,SOS KINDERDORF INT-AT,SOS-KINDERDORF INTERNATIONAL,AUSTRIA,Partner
+151,SP E.V.,Samaritan's Purse e. V.,GERMANY,Partner
+152,SPF-FR,Secours Populaire Français,FRANCE,Partner
+153,STC-DE,Save the Children Deutschland e.V.,GERMANY,Partner
+154,STC-DK,Red Barnet,DENMARK,Potential Programmatic Partner
+155,STC-ES,Fundación Save The Children,SPAIN,Potential Programmatic Partner
+156,STC-FI,Pelastakaa Lapset - Rädda Barnen,FINLAND,Potential Programmatic Partner
+157,STC-IT,Save the Children Italia ONLUS,ITALY,Potential Programmatic Partner
+158,STC-NL,SAVE THE CHILDREN,NETHERLANDS,Potential Programmatic Partner
+159,STC-NO,Redd Barna,NORWAY,Potential Programmatic Partner
+160,STC-SE,Radda Barnens Riksforbund,SWEDEN,Potential Programmatic Partner
+161,Stichting Dr. Denis Mukwege,Stichting Dr. Denis Mukwege,NETHERLANDS,Partner
+162,STICHTING VLUCHTELING-NL,Stichting Vluchteling,NETHERLANDS,Partner
+163,SWEDO,SWEDO - The Swedish Development Aid Organization,SWEDEN,Partner
+164,TDH-HU,Magyarországi Terre des hommes Alapitvány,HUNGARY,Partner
+165,TDH-IT,FONDAZIONE TERRE DES HOMMES ITALIA ONLUS,ITALY,Partner
+166,TDH-NL,Stichting Terre des Hommes Nederland,NETHERLANDS,Partner
+167,TEAR-NL,Stichting TEAR fund Nederland,NETHERLANDS,Partner
+168,The Smile of the Child,The Smile of the Child,GREECE,Partner
+169,TRIANGLE-FR,TRIANGLE Génération Humanitaire,FRANCE,Partner
+170,TROCAIRE-IR,Trocaire,IRELAND,Potential Programmatic Partner
+171,TWB,Translators Without Borders Ireland Company Limited by guarantee,IRELAND,Partner
+172,TSF-FR,TELECOMS SANS FRONTIERES,FRANCE,Niche Partner
+173,UN PONTE PER-IT,UN PONTE PER,ITALY,Potential Programmatic Partner
+174,VIS-IT,VOLONTARIATO INTERNAZIONALE PER LO SVILUPPO,ITALY,Partner
+175,VSF-DE,Tierärzte ohne Grenzen e.V.,GERMANY,Partner
+176,VSF-DZG-BELGIUM,Vétérinaires Sans Frontières Belgique - Dierenartsen Zonder Grenzen België,BELGIUM,Partner
+177,WAR CHILD-NL,Stichting War Child,NETHERLANDS,Partner
+178,WEWORLD - GVC-IT,WeWorld-GVC Onlus,ITALY,Potential Programmatic Partner
+179,WV-AT,World Vision Österreich,AUSTRIA,Partner
+180,WV-DE,WORLD VISION,GERMANY,Partner
+181,WV Nordic,World Vision Nordic,FINLAND,Partner
+182,WV-NL,Stichting World Vision Nederland,NETHERLANDS,Partner
+183,YMCA Finland,Suomen NMKY:n Liitto ry,FINLAND,Partner
+184,ZOA-NL,ZOA,NETHERLANDS,Partner
