@@ -1020,6 +1020,9 @@ function sectionFrom(text: string, keys: string[], format: Format): string | nul
 }
 
 /** Edits asked for in the chat after the first draft. */
+/** Words of thanks and agreement; a short message made only of these changes nothing. */
+const ACKNOWLEDGE = new Set(['ok', 'okay', 'k', 'thanks', 'thank', 'thx', 'you', 'great', 'good', 'nice', 'perfect', 'cool', 'yes', 'no', 'sure', 'fine', 'got', 'it', 'looks', 'look', 'a', 'lot', 'much', 'so', 'very', 'alright', 'awesome', 'brilliant', 'done', 'lovely', 'excellent', 'that', 'thats', "that's", 'all', 'for', 'now']);
+
 export function applyEdit(text: string, keys: string[], sections: Section[], ctx: BuildContext, today: number): ChatResult {
   const t = text.toLowerCase();
   const target = sectionFrom(text, keys, ctx.format);
@@ -1042,11 +1045,16 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
     const next = sections.map((s) => (s.key === k ? { ...s, lines: [...s.lines, ...role.more.filter((m) => !s.lines.includes(`- ${m}`)).map((m) => `- ${m}`)], edited: true } : s));
     return { sections: next, tags: keys, tone, facts, reply: `Added more detail to ${headingFor(k, ctx.format)}.` };
   }
-  if (/\b(formal|un tone)\b/.test(t)) tone = 'formal';
-  else if (/\b(warm|friendly|human)\b/.test(t)) tone = 'warm';
-  else if (/\b(plain|simple|direct)\b/.test(t)) tone = 'plain';
+  // A tone word is a request only when the message asks for a tone ("more formal", "make it warmer"), not inside a sentence such as "two direct reports".
+  const toneAsked = /^(please\s+)?((make|write|rewrite)\s+it\s+)?(more|less|a bit more)?\s*(formal|warm(er)?|friendly|friendlier|plain(er)?|simple(r)?|direct)(\s+tone)?[.!]?$/.test(t.trim()) || /\b(tone|sound)\b/.test(t);
+  if (toneAsked) {
+    if (/\bless formal\b/.test(t)) tone = 'warm';
+    else if (/\b(formal|un tone)\b/.test(t)) tone = 'formal';
+    else if (/\b(warm|warmer|friendly|friendlier|human)\b/.test(t)) tone = 'warm';
+    else if (/\b(plain|plainer|simple|simpler|direct)\b/.test(t)) tone = 'plain';
+  }
   if (tone !== ctx.tone) return { sections: rebuild(sections.map((s) => s.key), { ...ctx, tone }), tags: keys, tone, facts, reply: `Rewritten in a ${tone} tone. Sections you edited by hand are unchanged.` };
-  if (/\b(formal|un tone|warm|friendly|human|plain|simple|direct)\b/.test(t)) return { sections, tags: keys, tone, facts, reply: `It is already written in a ${tone} tone.` };
+  if (toneAsked && /\b(formal|warm|warmer|friendly|friendlier|human|plain|plainer|simple|simpler|direct)\b/.test(t)) return { sections, tags: keys, tone, facts, reply: `It is already written in a ${tone} tone.` };
   const lang = LANGUAGES.find((l) => t.includes(l.toLowerCase()));
   if (lang && !facts.languages.includes(lang)) {
     facts = { ...facts, languages: facts.languages.length ? [...facts.languages, lang] : ['English', lang] };
@@ -1076,8 +1084,14 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   }
   // Only text that reads as content is added; thanks, acknowledgements, and instructions it could not act on change nothing.
   const said = text.trim();
-  if (/^(thanks?|thank you|ok(ay)?|great|good|nice|perfect|cool|yes|no|sure|fine|got it|looks good)\b[\s!.]*$/i.test(said)) return { sections, tags: keys, tone, facts, reply: 'Ask for any change, or edit the job description directly.' };
-  if (/^(please\s+)?(make|change|rewrite|can|could|would|fix|improve|update|edit|redo|use|turn|set|move|replace)\b/i.test(said) || /\?$/.test(said)) {
+  const words = said.toLowerCase().split(/[\s,.!]+/).filter(Boolean);
+  if (words.length && words.length <= 5 && words.every((w) => ACKNOWLEDGE.has(w))) return { sections, tags: keys, tone, facts, reply: 'Ask for any change, or edit the job description directly.' };
+  const asks =
+    /\?$/.test(said) ||
+    /^(please\s+)?(can|could|would|will)\s+you\b/i.test(said) ||
+    /^(please\s+)?(make|change|rewrite|redo|edit|undo|revert|try again|include|mention|add)\b/i.test(said) ||
+    /^(please\s+)?(improve|fix|update|use|move|turn|replace|set)\s+(it|this|that|the\s+(job|text|description|section|title|tone|wording))\b/i.test(said);
+  if (asks) {
     return { sections, tags: keys, tone, facts, reply: 'I could not tell what to change. Try "shorter", "more formal", "add First weeks", "remove Background", or write the sentence to add.', quick: ['Shorter', 'More formal'] };
   }
   const k = target ?? (keys.includes('purpose') ? 'purpose' : keys[0]);

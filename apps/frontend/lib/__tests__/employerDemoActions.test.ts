@@ -5,13 +5,17 @@ import {
   basePattern,
   deleteDraft,
   editSection,
+  extend,
   isApproved,
   markGenuine,
+  overrideApproval,
   reorderSections,
   restoreVersion,
   reviewerDecision,
   saveEditedBase,
   sendChat,
+  settleRemark,
+  setApply,
   setFacts,
   startJob,
   toggleSection,
@@ -125,6 +129,60 @@ describe('a change to an approved job needs a new approval', () => {
   });
 });
 
+describe('only real changes count', () => {
+  it('saving a section unchanged, or choosing the How to apply option already chosen, keeps the approval', () => {
+    const sec = job('job-fin').sections.find((x) => x.key === 'responsibilities')!;
+    editSection('job-fin', 'responsibilities', sec.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n'));
+    setApply('job-fin', { method: job('job-fin').apply.method });
+    expect(blocked('job-fin')).toBe(false);
+    expect(job('job-fin').status).toBe('approved');
+  });
+
+  it('extending the closing date ends the undo of an earlier chat change, so undo cannot bring the old date back', () => {
+    sendChat('job-comms', 'shorten the responsibilities');
+    expect(job('job-comms').lastChange).toBeTruthy();
+    extend('job-comms', 7);
+    expect(job('job-comms').lastChange).toBeUndefined();
+  });
+});
+
+describe('the chat reads what was meant', () => {
+  const lastReply = (id: string) => job(id).chat.slice(-2).map((m) => m.text).join(' ');
+  const text = (id: string) => JSON.stringify(job(id).sections);
+
+  it.each(['ok, thanks', 'great, thank you!', 'no thanks', 'looks great', 'thanks a lot', 'please include something about safeguarding', 'mention the travel to field sites', 'try again', 'can you make it better?'])(
+    '"%s" changes nothing',
+    (said) => {
+      const before = text('job-comms');
+      sendChat('job-comms', said);
+      expect(text('job-comms')).toBe(before);
+    },
+  );
+
+  it.each(['Experience in human rights monitoring is an asset', 'The post has two direct reports', 'Use of KoboToolbox is an asset', 'Set up and run community feedback mechanisms'])('"%s" is added as text, in the same tone', (said) => {
+    const tone = job('job-comms').tone;
+    sendChat('job-comms', said);
+    expect(text('job-comms')).toContain(said);
+    expect(job('job-comms').tone).toBe(tone);
+  });
+
+  it('"more formal" and "make it warmer" change the tone; asking for the tone it has says so', () => {
+    sendChat('job-comms', 'more formal');
+    expect(job('job-comms').tone).toBe('formal');
+    sendChat('job-comms', 'make it more formal');
+    expect(lastReply('job-comms')).toMatch(/already/);
+    sendChat('job-comms', 'make it warmer');
+    expect(job('job-comms').tone).toBe('warm');
+  });
+
+  it('"undo" alone undoes the last change', () => {
+    const before = text('job-comms');
+    sendChat('job-comms', 'shorten the responsibilities');
+    sendChat('job-comms', 'undo');
+    expect(text('job-comms')).toBe(before);
+  });
+});
+
 describe('reviewers comment and decide, but never change the job', () => {
   beforeEach(() => update((s) => ({ ...s, reviewerAs: 'amina' })));
 
@@ -135,6 +193,8 @@ describe('reviewers comment and decide, but never change the job', () => {
     toggleSection('job-fin', 'team');
     setFacts('job-fin', { grade: 'P2' });
     markGenuine('job-fin', 'rule:about:word', 'A reason given by a reviewer');
+    settleRemark('job-fin', 'r1', 'accepted');
+    overrideApproval('job-fin', 'A reviewer cannot override');
     sendChat('job-fin', 'make it shorter');
     deleteDraft('job-fin');
     expect(JSON.stringify(job('job-fin'))).toBe(before);

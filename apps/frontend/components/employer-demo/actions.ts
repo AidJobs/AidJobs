@@ -303,7 +303,7 @@ function chatTurn(id: string, text: string) {
     }));
     return;
   }
-  if (lower === 'undo that') {
+  if (/^(undo|revert)( it| that| (the )?last change)?[.!]?$/.test(lower.trim())) {
     updateJob(id, (x) => {
       if (x.lastChange) return { ...undone(x), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
       const prev = x.versions[x.versions.length - 2];
@@ -380,6 +380,8 @@ export function setFacts(id: string, patch: Partial<Facts>) {
 
 export function setApply(id: string, patch: Partial<ApplySettings>) {
   if (!ownerOnly()) return;
+  const j = getState().jobs.find((x) => x.id === id);
+  if (j && (Object.keys(patch) as Array<keyof ApplySettings>).every((k) => JSON.stringify(j.apply[k]) === JSON.stringify(patch[k]))) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, touched({ ...j, apply: { ...j.apply, ...patch } })) : j)) }));
 }
 
@@ -440,7 +442,9 @@ export function markGenuine(id: string, hitKey: string, reason: string) {
 export function editSection(id: string, key: string, text: string) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
-    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines: text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim()), edited: true } : x));
+    const lines = text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim());
+    if (JSON.stringify(lines) === JSON.stringify(j.sections.find((x) => x.key === key)?.lines)) return j;
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true } : x));
     return { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
   });
 }
@@ -558,6 +562,7 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
 }
 
 export function settleRemark(id: string, remarkId: string, outcome: 'accepted' | 'rejected' | 'resolved') {
+  if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const r = j.review.remarks.find((x) => x.id === remarkId);
     if (!r) return j;
@@ -573,6 +578,7 @@ export function settleRemark(id: string, remarkId: string, outcome: 'accepted' |
 }
 
 export function overrideApproval(id: string, reason: string) {
+  if (!ownerOnly()) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'approved', review: { ...j.review, state: 'approved' }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Approval overridden by the owner: "${reason}"` }] } : j)) }));
 }
 
@@ -645,6 +651,11 @@ function movedDeadline(today: number, current: string, days: number): string {
   return addDays(parseIso(base) + 12 * 3_600_000, days);
 }
 
+/** A new closing date is a change to the job's facts and text, like any other. */
+function extended(s: State, j: DemoJob, deadline: string, what: string): DemoJob {
+  return rebuilt(s, { ...touched(j), facts: { ...j.facts, deadline }, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish, audit: [...j.audit, { at: Date.now(), who: s.me.name, what }] });
+}
+
 export function extend(id: string, days: number) {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
@@ -652,7 +663,7 @@ export function extend(id: string, days: number) {
   const deadline = movedDeadline(s.today, j.facts.deadline, days);
   changeWithUndo(`${j.facts.title}: closing date moved to ${longDate(deadline)}`, (st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? rebuilt(st, { ...x, facts: { ...x.facts, deadline }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)}` }] }) : x)),
+    jobs: st.jobs.map((x) => (x.id === id ? extended(st, x, deadline, `Extended to ${longDate(deadline)}`) : x)),
     inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)),
   }));
 }
@@ -793,7 +804,7 @@ export function runIntent(intent: NonNullable<Intent>): string | null {
       jobs: st.jobs.map((j) => {
         if (!intent.jobIds.includes(j.id)) return j;
         const deadline = movedDeadline(s.today, j.facts.deadline, intent.days ?? 7);
-        return rebuilt(st, { ...j, facts: { ...j.facts, deadline }, audit: [...j.audit, { at: Date.now(), who: st.me.name, what: `Extended to ${longDate(deadline)} from the chat` }] });
+        return extended(st, j, deadline, `Extended to ${longDate(deadline)} from the chat`);
       }),
     }));
     return null;
