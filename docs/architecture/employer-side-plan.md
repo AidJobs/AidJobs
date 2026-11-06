@@ -285,3 +285,60 @@ Then one independent review of the round, its fixes, and the user's look on the 
 - Paid jobs sent to AidJobs job seekers whose job alerts match, once job seekers can opt in to alerts (changes E10).
 - A refund policy beyond "none", and prices by type of organisation.
 - Production needs: the AI decision (E7); Paddle products, packages, and subscriptions; market data from the crawler (counts and dates, within each source's reuse terms); per-channel link tracking; the email set-up (section 9); contract changes, each with its own plan.
+
+## 17. Round 5: Manage jobs (proposed by the agent, 6 November 2026; not yet agreed)
+
+**Status:** a proposal for the user to read. Three decisions are already the user's (below); the scope and what happens when a free job's listing ends are still open. Nothing in this section is built until the user agrees it and has looked at round 4 on the preview. It builds on section 6 (Managing jobs) and keeps its rules: automatic by default with one tap to override, few actions by state, live jobs closed or withdrawn rather than deleted, every action undoable from a notice that stays until dismissed.
+
+### What is there today, and what is missing
+
+- **The list** (Manage jobs) is one flat list of cards with five filters (All, Needs you, Live, Drafts and review, History), each card showing the title, place, plan, status line, and the lifeline, with swipe on phones (right to extend a week, left to close). There is no search, no grouping, and nothing on a card says what to do next.
+- **A job's page** shows the job page preview, Plan, Reach, History, and the public address, with up to seven action buttons in one row (Extend, Close now, Edit, Share, Position filled, Same role another place, Amplify). Section 6 asks for few actions by state.
+- **Scheduled jobs** get the live actions; they cannot be published now, moved to another date, or taken back to a draft.
+- **Withdraw** exists in the data (a closing reason) but has no button.
+- **Editing a live job** marks the public page "Updated", but the employer cannot see what changed since publishing; only the history lists edits.
+- **A free job's listing period** (60 days, plan section 16, decision 1) is shown but not acted on when it ends before the closing date.
+- **After publishing**, the market check, the advert check, language versions, and the field-post notice (section 16, decision 6) cannot be reached: they live only on the publish page.
+- **Closed jobs** show when the public page is removed and the description dropped, but not what candidates now see.
+
+### Decisions
+
+Agreed with the user, 6 November 2026:
+
+1. **Reopen:** a job closed early (Close now), withdrawn, or past its closing date can be reopened within 30 days of closing, at the same address, so links already shared work again. It is labelled in the demo as a proposal, because it is a new lifecycle step that needs a contract decision before production (section 2, "Lifecycle"). A filled position is not reopened; "Hire again" makes a new job.
+2. **No bulk actions** in the list: acting on several jobs at once stays with "Ask AidJobs" on Overview ("extend all Nairobi jobs by a week"), which already confirms before acting.
+3. **Telling invited people about a change:** after an important change to a live amplified job (closing date, pay, duty station, or contract), AidJobs offers to tell the people Reach invited, with the email shown first; never automatic, at most once per change, and each email counts toward the job's 50 Reach emails.
+
+Open, for the user:
+
+4. **Scope:** all three phases below, or phases 1 and 2, or phase 1 only.
+5. **When a free job's 60 days end before its closing date.** The agent recommends: the job leaves AidJobs' lists and search, while its page still opens from links already shared, marked "No longer listed on AidJobs", with the apply button kept (the employer's own application page decides whether applications are still open). Seven days and one day before, a reminder (home briefing and the job's page) offers "Amplify to keep it listed until its closing date" or "Close it now". The other choices: the job closes, as at its closing date; or nothing happens yet.
+
+### Phase 1: the list and the job's page
+
+- **The list, grouped by what needs doing:** Needs you (each with its reason), Live, Scheduled, Drafts and review, and Closed (the last 30 days; older jobs under History). The filter pills become jumps to the groups, each with its count. Live jobs are sorted by closing date, the others by date.
+- **One next step on every card,** chosen by the job's state: Needs you shows the action itself (Publish, Extend, Look at the request, Remind the payer); a live job closing within 7 days shows Extend, otherwise Share; a scheduled job, Publish now; a draft, Continue; a job in review, Remind; a closed job, Reopen (within 30 days, decision 1) or Hire again. Swipe on phones stays, with the same buttons visible.
+- **Search** by title, duty station, or grade, across the groups.
+- **A job's page:** a header with the title, place, plan, status line, and lifeline; **one main action by state** (live: Extend; scheduled: Publish now; draft or review: Continue; closed: Reopen or Hire again); the rest under **More** (Edit, Share, Close now, Position filled, Withdraw, Same role another place, Download a copy, Amplify for a free job).
+- **The page in clear parts, in this order:** Now (what happens next, and when: closes on, listed until, Reach emails waiting, the page removed on, the description dropped on); Job page (the preview, with its language versions); Reach (amplified jobs); Improve (amplified live jobs, phase 3); History. On phones the parts fold, and Now stays open.
+- **Withdraw:** in More, with a short dialog (a reason for the history, never public; optionally tell the people Reach invited, as with Position filled). The public page says "This vacancy has been withdrawn".
+
+### Phase 2: scheduled and live jobs
+
+- **Scheduled jobs:** Publish now, Change the date, and Back to draft. The free allowance follows the rules of section 16 (a free job counts in the month it is used and is never given back): a job scheduled into next month's allowance and published now needs a free job this month, or Amplify; a new date follows the same checks as scheduling (from tomorrow, before the closing date). Reach emails waiting for go-live move with the date; Back to draft keeps them prepared but unsent.
+- **What changed since publishing:** the job keeps a copy of what was published; editing a live job shows a short card, "Changed since publishing: Responsibilities, closing date (30 November → 7 December)", on the job's page, and the public page says "Updated on 8 November". After an important change, the offer of decision 3.
+- **When a free job's listing ends** (decision 5, once the user chooses): the reminders and what happens on the day.
+
+### Phase 3: after publishing, and closed jobs
+
+- **Improve** (amplified live jobs): the "Before you publish" panel, reused for a live job. The market check against today's similar jobs (its fixes change the live job, which then shows "Updated"); the advert check; language versions (added and reviewed as before; a reviewed version appears on the live page at once); and the field-post notice.
+- **What candidates see when a job is closed:** a preview of the closed page, "This position has been filled", "Applications closed on 30 November", or "This vacancy has been withdrawn", with similar open jobs from the labelled sample, and the dates the page is removed (30 days) and the description dropped (90 days, growth plan decision 5).
+- **Reopen** (decision 1): within 30 days of closing, from the job's page or the list, with a new closing date (the same checks as Extend: weekends and public holidays at the duty station). The job keeps its address, its history notes "Reopened", and a free job keeps its original listing period (if that has ended, Reopen offers Amplify). Reach is not re-sent automatically; Invite more is there for an amplified job.
+
+### Out of this round
+
+Statistics and charts (out of the MVP, sections 2 and 5); bulk actions (decision 2); the organisation's role library as its own page (section 6 "organisation memory" stays as today, through Hire again and the chat's suggestions); anything after launch listed in section 16.
+
+### Checks and estimate
+
+As in round 4: type check, lint, the frontend tests with new tests for each rule (including the no-network test walking the new screens), a production build; screens at 1366, 412, 390, and 360 px in light and dark; keyboard use; then one independent review of the round, its fixes, and the user's look on the preview. About 2 to 3 working days for all three phases.
