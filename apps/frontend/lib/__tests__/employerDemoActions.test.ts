@@ -13,6 +13,7 @@ import {
   closeJob,
   canSkipApproval,
   changedSinceLastRound,
+  changesAfterApproval,
   completePayRequest,
   deleteDraft,
   dismissMoment,
@@ -23,6 +24,7 @@ import {
   isApproved,
   markGenuine,
   overrideApproval,
+  overruleChanges,
   publish,
   publishBlock,
   refreshTranslation,
@@ -793,6 +795,44 @@ describe('fixes from the round 4 review', () => {
     update((s) => ({ ...s, today: s.today + 2 * 86_400_000 }));
     expect(completePayRequest('job-fin')).toBe(true);
     expect(job('job-fin').status).toBe('live');
+  });
+});
+
+describe('a request for changes after an approval', () => {
+  const daniel = (decision: 'approved' | 'changes', note = '') => {
+    update((s) => ({ ...s, reviewerAs: 'daniel' }));
+    reviewerDecision('job-fin', decision, note);
+    update((s) => ({ ...s, reviewerAs: null }));
+  };
+
+  it('under "any one reviewer" the approval stands; publishing anyway is recorded, with the reason, and Daniel is told', () => {
+    daniel('changes', 'One more thing');
+    expect(changesAfterApproval(job('job-fin'))).toEqual({ approvers: ['Amina Yusuf'], askers: [{ name: 'Daniel Mwangi', note: 'One more thing' }] });
+    expect(statusLine(getState(), job('job-fin'))).toBe('Approved · Daniel asked for changes');
+    expect(publishBlock(getState(), 'job-fin', { plan: 'free', schedule: null })).toBeNull();
+    overruleChanges('job-fin', 'Minor, fixed in the next round');
+    expect(publish('job-fin', { plan: 'free', schedule: null })).toBe(true);
+    expect(job('job-fin').audit.some((a) => a.what === "Published with Daniel's request for changes still open. Reason: \"Minor, fixed in the next round\"; Daniel told (simulated)")).toBe(true);
+    expect(getState().notice?.text).toBe('Daniel is told it was published with their request for changes open (simulated).');
+  });
+
+  it('with "Any request for changes pauses publishing", the request withdraws the approval until it is dealt with', () => {
+    update((s) => ({ ...s, org: { ...s.org, changesPause: true } }));
+    daniel('changes');
+    expect(job('job-fin').status).toBe('review');
+    expect(publishBlock(getState(), 'job-fin', { plan: 'free', schedule: null })).toBe('Waiting for approval');
+    expect(canSkipApproval(getState(), job('job-fin'))).toBe(true);
+  });
+
+  it('"Publish anyway" lasts only until the job or the answers change', () => {
+    daniel('changes');
+    overruleChanges('job-fin', '');
+    expect(job('job-fin').review.overruled).toBe('');
+    daniel('approved');
+    expect(job('job-fin').review.overruled).toBeUndefined();
+    overruleChanges('job-fin', 'x');
+    editSection('job-fin', 'responsibilities', '- Changed again');
+    expect(job('job-fin').review.overruled).toBeUndefined();
   });
 });
 

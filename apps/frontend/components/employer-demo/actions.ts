@@ -74,7 +74,7 @@ function reopenApproval(j: DemoJob): DemoJob {
   return {
     ...j,
     status: j.status === 'approved' ? 'review' : j.status,
-    review: { ...j.review, state: j.review.state === 'none' ? 'none' : 'open', approvedVersion: undefined, skipped: undefined, reviewers: j.review.reviewers.map((r) => (r.decision === 'approved' ? { ...r, decision: undefined } : r)) },
+    review: { ...j.review, state: j.review.state === 'none' ? 'none' : 'open', approvedVersion: undefined, skipped: undefined, overruled: undefined, reviewers: j.review.reviewers.map((r) => (r.decision === 'approved' ? { ...r, decision: undefined } : r)) },
   };
 }
 
@@ -624,7 +624,7 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
     if (!j) return s;
     const reviewers = j.review.reviewers.map((r) => (r.name === name ? { ...r, decision, note } : r));
     const next: DemoJob = { ...j, review: { ...j.review, reviewers } };
-    const approved = isApproved({ ...next, review: { ...next.review, state: 'open' } });
+    const approved = isApproved({ ...next, review: { ...next.review, state: 'open' } }) && !pausedByChanges(s, next);
     // A late answer on a job already published is recorded for the author; it changes neither the job nor its review state.
     if (isReviewable(j)) {
       // Under "any one reviewer", an approval already given stands; a later request for changes is a note for the author.
@@ -633,6 +633,7 @@ export function reviewerDecision(id: string, decision: 'approved' | 'changes', n
       next.status = approved ? 'approved' : 'review';
       // A reviewer's answer replaces the owner's skip: the job is now approved, or waits again, on its merits.
       next.review.skipped = undefined;
+      next.review.overruled = undefined;
     }
     next.audit = [...j.audit, { at: Date.now(), who: name, what: decision === 'approved' ? `Approved version ${j.versions.length}` : 'Requested changes' }];
     return {
@@ -746,7 +747,7 @@ export function reviewTranslation(id: string, lang: Lang) {
 
 /** Who may publish without approval: only where approval is required, only the owner, and never when the organisation says nobody can skip it. */
 export function canSkipApproval(s: State, j: DemoJob): boolean {
-  return !s.reviewerAs && s.me.role === 'owner' && !s.org.noSkip && approvalRequired(s, j) && !isApproved(j);
+  return !s.reviewerAs && s.me.role === 'owner' && !s.org.noSkip && approvalRequired(s, j) && !approvedFor(s, j);
 }
 
 /** Publishing without approval: the reason is kept in the job's history (never public), and the reviewers asked are told. */
@@ -761,13 +762,48 @@ export function overrideApproval(id: string, reason: string): boolean {
   return true;
 }
 
-/** When a job whose approval was skipped is published: the history says so, and the reviewers asked are told. */
-function skippedOnPublish(x: DemoJob, me: string): { audit: DemoJob['audit']; notice?: string } {
-  if (!x.review.skipped) return { audit: x.audit };
-  const asked = x.review.reviewers.map((r) => r.name.split(' ')[0]);
+/** Under "any one reviewer": the job is approved, and another reviewer has asked for changes. Null otherwise. */
+export function changesAfterApproval(j: DemoJob): { approvers: string[]; askers: Array<{ name: string; note?: string }> } | null {
+  const approvers = j.review.reviewers.filter((r) => r.decision === 'approved').map((r) => r.name);
+  const askers = j.review.reviewers.filter((r) => r.decision === 'changes').map((r) => ({ name: r.name, note: r.note }));
+  return approvers.length && askers.length && isApproved(j) ? { approvers, askers } : null;
+}
+
+/** "Any request for changes pauses publishing": with that setting, an open request withdraws an approval that is required. */
+export function pausedByChanges(s: State, j: DemoJob): boolean {
+  return Boolean(s.org.changesPause) && approvalRequired(s, j) && j.review.reviewers.some((r) => r.decision === 'changes');
+}
+
+/** Approved, as far as publishing is concerned. */
+export function approvedFor(s: State, j: DemoJob): boolean {
+  return isApproved(j) && !pausedByChanges(s, j);
+}
+
+/** "Publish anyway" over a request for changes: the reason (optional) goes into the history when it is published. */
+export function overruleChanges(id: string, reason: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, review: { ...j.review, overruled: reason.trim() } }));
+}
+
+/**
+ * What publishing writes about its review: a skipped approval, or an approval published over a later request for changes. The history
+ * says so, and the reviewers concerned are told.
+ */
+function reviewOnPublish(x: DemoJob, me: string): { audit: DemoJob['audit']; notice?: string } {
+  if (x.review.skipped) {
+    const asked = x.review.reviewers.map((r) => r.name.split(' ')[0]);
+    return {
+      audit: [...x.audit, { at: Date.now(), who: me, what: `Published without approval. Reason: "${x.review.skipped}"${asked.length ? `; ${asked.join(' and ')} told (simulated)` : ''}` }],
+      notice: asked.length ? `${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told it was published without their approval (simulated).` : undefined,
+    };
+  }
+  const open = changesAfterApproval(x);
+  if (!open) return { audit: x.audit };
+  const askers = open.askers.map((a) => a.name.split(' ')[0]).join(' and ');
+  const reason = x.review.overruled ? `. Reason: "${x.review.overruled}"` : '';
   return {
-    audit: [...x.audit, { at: Date.now(), who: me, what: `Published without approval. Reason: "${x.review.skipped}"${asked.length ? `; ${asked.join(' and ')} told (simulated)` : ''}` }],
-    notice: asked.length ? `${asked.join(' and ')} ${asked.length === 1 ? 'is' : 'are'} told it was published without their approval (simulated).` : undefined,
+    audit: [...x.audit, { at: Date.now(), who: me, what: `Published with ${askers}'s request for changes still open${reason}; ${askers} told (simulated)` }],
+    notice: `${askers} ${open.askers.length === 1 ? 'is' : 'are'} told it was published with their request for changes open (simulated).`,
   };
 }
 
@@ -792,7 +828,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs) return 'Only your organisation can publish';
   if (j.status === 'live' || j.status === 'scheduled' || j.status === 'closed') return 'Already published';
-  if (approvalRequired(s, j) && !isApproved(j)) return 'Waiting for approval';
+  if (approvalRequired(s, j) && !approvedFor(s, j)) return 'Waiting for approval';
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
   if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
@@ -827,7 +863,7 @@ export function publish(id: string, o: PublishOptions): boolean {
     const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
       if (x.id !== id) return x;
-      const skipped = skippedOnPublish(x, s.me.name);
+      const skipped = reviewOnPublish(x, s.me.name);
       told = skipped.notice;
       const next: DemoJob = {
         ...x,
@@ -836,7 +872,7 @@ export function publish(id: string, o: PublishOptions): boolean {
         scheduledFor: o.schedule ?? undefined,
         publishedAt: o.schedule ? undefined : Date.now(),
         payRequest: undefined,
-        review: { ...x.review, skipped: undefined },
+        review: { ...x.review, skipped: undefined, overruled: undefined },
         audit: [...skipped.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
       };
       if (o.plan !== 'amplify') return next;
@@ -875,7 +911,7 @@ export function sendReach(id: string, why: string): number {
 export function askToPay(id: string, req: Omit<PayRequest, 'at'>): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
-  if (!j || s.reviewerAs || (approvalRequired(s, j) && !isApproved(j) && j.status !== 'live' && j.status !== 'scheduled')) return false;
+  if (!j || s.reviewerAs || (approvalRequired(s, j) && !approvedFor(s, j) && j.status !== 'live' && j.status !== 'scheduled')) return false;
   update((st) => ({
     ...st,
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, payRequest: { ...req, at: Date.now() }, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Asked ${req.name} to pay ${req.amount} (simulated)` }] } : x)),

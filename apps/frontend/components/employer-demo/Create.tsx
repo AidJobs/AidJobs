@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, History, ListTree, Maximize2, MessagesSquare, Mini
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, deleteDraft, downloadCopy, isApproved, isReviewable, updateBaseFromJob } from './actions';
+import { approvalRequired, approvedFor, deleteDraft, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
@@ -128,7 +128,7 @@ export default function Create({ id }: { id?: string }) {
   const shown: Panel = reviewing && panel === 'chat' ? 'review' : panel;
   const reviewerName = s.team.find((p) => p.id === s.reviewerAs)?.name;
   const reviewBadge = reviewing ? (job.review.reviewers.some((r) => r.name === reviewerName && !r.decision) ? 1 : 0) : job.review.remarks.filter((r) => r.state === 'open').length;
-  const blocked = approvalRequired(s, job) && !isApproved(job);
+  const blocked = approvalRequired(s, job) && !approvedFor(s, job);
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
   const checks = job.sections.length ? openChecks(job, s) : [];

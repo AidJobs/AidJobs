@@ -18,7 +18,7 @@ import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
-import { reorderSections, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
+import { reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
 import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
@@ -534,6 +534,31 @@ describe('employer demo: review panel and Ask to pay', () => {
     shows('Live on AidJobs');
     expect(getState().jobs.find((j) => j.id === 'job-fin')).toMatchObject({ status: 'live', plan: 'amplify' });
     expect(network).toEqual([]);
+  });
+});
+
+describe('employer demo: approved, then a request for changes', () => {
+  it('shows the situation on the publish page and asks before publishing anyway', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true, reviewerAs: 'daniel' }));
+      reviewerDecision('job-fin', 'changes', 'One more thing');
+      update((st) => ({ ...st, reviewerAs: null }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#publish/job-fin');
+    shows('Approved, with a request for changes');
+    shows('Amina approved this version. Daniel then asked for changes: “One more thing”.');
+    click('Publish free');
+    shows('Publish anyway?');
+    const confirm = Array.from(container.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'Publish anyway') as HTMLElement;
+    act(() => confirm.click());
+    shows('Free jobs: the terms');
+    click('I understand · Publish free');
+    shows('Live on AidJobs');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.audit.some((a) => a.what.startsWith("Published with Daniel's request for changes still open"))).toBe(true);
   });
 });
 

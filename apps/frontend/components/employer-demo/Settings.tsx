@@ -217,6 +217,32 @@ function ApprovalSettingView({ org }: { org: Org }) {
           every reviewer
         </button>
       </div>
+      {org.approval !== 'off' && org.approvalRule === 'any' && (
+        <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
+          <input type="checkbox" className="mt-0.5" checked={Boolean(org.changesPause)} onChange={(e) => setOrg({ changesPause: e.target.checked })} />
+          <span className="flex flex-col">
+            <span style={{ fontWeight: 650 }}>Any request for changes pauses publishing</span>
+            <span className="aj-faint">
+              {org.changesPause
+                ? 'A request for changes withdraws the approval until it is dealt with, even if another reviewer approved.'
+                : 'Without it, one approval is enough: a later request for changes is shown to whoever publishes, who decides; publishing anyway is recorded and the reviewer told.'}
+            </span>
+          </span>
+        </label>
+      )}
+      {org.approval !== 'off' && org.approvalRule === 'any' && (
+        <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
+          <input type="checkbox" className="mt-0.5" checked={Boolean(org.changesPause)} onChange={(e) => setOrg({ changesPause: e.target.checked })} />
+          <span className="flex flex-col">
+            <span style={{ fontWeight: 650 }}>Any request for changes pauses publishing</span>
+            <span className="aj-faint">
+              {org.changesPause
+                ? 'A request for changes withdraws the approval until it is dealt with, even if another reviewer approved.'
+                : 'Without it, one approval is enough: a later request for changes is shown to whoever publishes, who decides; publishing anyway is recorded and the reviewer told.'}
+            </span>
+          </span>
+        </label>
+      )}
       {org.approval !== 'off' && (
         <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
           <input type="checkbox" className="mt-0.5" checked={org.noSkip} onChange={(e) => setOrg({ noSkip: e.target.checked })} />

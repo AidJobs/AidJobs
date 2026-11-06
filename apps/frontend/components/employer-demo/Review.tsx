@@ -2,7 +2,7 @@
 
 import { BellRing, Check, Send, UserCheck, X } from 'lucide-react';
 import { useState } from 'react';
-import { addRemark, approvalRequired, changedSinceLastRound, isReviewable, remindReviewers, restoreVersion, reviewerDecision, sendForReview, settleRemark } from './actions';
+import { addRemark, approvalRequired, changedSinceLastRound, changesAfterApproval, isReviewable, remindReviewers, restoreVersion, reviewerDecision, sendForReview, settleRemark } from './actions';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { statusLine } from './Home';
 import { update } from './store';
@@ -183,6 +183,22 @@ export function ReviewSummary({ job, s }: { job: DemoJob; s: State }) {
           </li>
         ))}
       </ul>
+      {changesAfterApproval(job) && isReviewable(job) && (
+        <span className="rounded-xl p-2.5" style={{ background: 'var(--amber-bg)', fontSize: 12.5 }}>
+          {changesAfterApproval(job)
+            ?.askers.map((a) => a.name.split(' ')[0])
+            .join(' and ')}{' '}
+          asked for changes after the approval. Under your rule one approval is enough, so whoever publishes decides; publishing anyway is written in the job&apos;s history, and the reviewer is told.
+        </span>
+      )}
+      {changesAfterApproval(job) && isReviewable(job) && (
+        <span className="rounded-xl p-2.5" style={{ background: 'var(--amber-bg)', fontSize: 12.5 }}>
+          {changesAfterApproval(job)
+            ?.askers.map((a) => a.name.split(' ')[0])
+            .join(' and ')}{' '}
+          asked for changes after the approval. Under your rule one approval is enough, so whoever publishes decides; publishing anyway is written in the job&apos;s history, and the reviewer is told.
+        </span>
+      )}
       {!s.reviewerAs && waiting > 0 && job.review.state === 'open' && (
         <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => remindReviewers(job.id)}>
           <BellRing size={13} strokeWidth={1.8} /> Remind {waiting === 1 ? 'the reviewer' : `the ${waiting} reviewers`} who {waiting === 1 ? 'has' : 'have'} not answered

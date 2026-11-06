@@ -4,7 +4,25 @@ import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2,
 import { useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
-import { acceptFreeTerms, amplifyLive, approvalRequired, askToPay, buy, cancelPayRequest, canSkipApproval, completePayRequest, isApproved, overrideApproval, publish, remindPayer, scheduleBlock, type Paid } from './actions';
+import {
+  acceptFreeTerms,
+  amplifyLive,
+  approvalRequired,
+  approvedFor,
+  askToPay,
+  buy,
+  cancelPayRequest,
+  canSkipApproval,
+  changesAfterApproval,
+  completePayRequest,
+  overrideApproval,
+  overruleChanges,
+  pausedByChanges,
+  publish,
+  remindPayer,
+  scheduleBlock,
+  type Paid,
+} from './actions';
 import {
   BADGE,
   BADGE_TIP,
@@ -319,7 +337,16 @@ export function CommunityButtons({ msg, url, copy }: { msg: string; url: string;
 function ApprovalBlock({ job, s, onSkip }: { job: DemoJob; s: State; onSkip: () => void }) {
   const waiting = job.review.reviewers.filter((r) => !r.decision).map((r) => r.name.split(' ')[0]);
   const why = s.org.approval === 'all' ? 'Your organisation asks for approval on every job.' : 'Your organisation asks for approval on senior roles (P4 and above, and D grades).';
-  const state = job.review.state === 'none' ? 'Send it for review first.' : job.review.state === 'changes' ? 'Changes were requested.' : waiting.length ? `Waiting for ${waiting.join(' and ')}.` : 'Waiting for your reviewers.';
+  const askers = job.review.reviewers.filter((r) => r.decision === 'changes').map((r) => r.name.split(' ')[0]);
+  const state = pausedByChanges(s, job)
+    ? `${askers.join(' and ')} asked for changes, and your organisation pauses publishing until a request for changes is dealt with.`
+    : job.review.state === 'none'
+      ? 'Send it for review first.'
+      : job.review.state === 'changes'
+        ? 'Changes were requested.'
+        : waiting.length
+          ? `Waiting for ${waiting.join(' and ')}.`
+          : 'Waiting for your reviewers.';
   return (
     <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--amber)' }} role="status">
       <div style={{ fontWeight: 650 }}>Approval is required for this job</div>
@@ -337,6 +364,86 @@ function ApprovalBlock({ job, s, onSkip }: { job: DemoJob; s: State; onSkip: () 
         )}
       </div>
     </div>
+  );
+}
+
+const first = (name: string) => name.split(' ')[0];
+
+/** Under "any one reviewer": approved, and someone then asked for changes. The person publishing decides, with the situation in front of them. */
+function ChangesNote({ job, onPublishAnyway }: { job: DemoJob; onPublishAnyway: () => void }) {
+  const open = changesAfterApproval(job);
+  if (!open) return null;
+  const askers = open.askers.map((a) => first(a.name)).join(' and ');
+  const notes = open.askers.filter((a) => a.note).map((a) => a.note as string);
+  const stop = notes.length && /[.!?]$/.test(notes[notes.length - 1]) ? '' : '.';
+  return (
+    <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--amber)' }} role="status">
+      <div style={{ fontWeight: 650 }}>Approved, with a request for changes</div>
+      <span className="aj-muted">
+        {open.approvers.map(first).join(' and ')} approved this version. {askers} then asked for changes
+        {notes.length ? `: ${notes.map((n) => `“${n}”`).join(' ')}` : ''}
+        {stop}
+      </span>
+      <span className="aj-muted">
+        Your rule needs one approval, so it can be published. Look at the request first, or publish anyway: that is written in the job&apos;s history, and {askers} {open.askers.length === 1 ? 'is' : 'are'} told.
+      </span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <button
+          type="button"
+          className="aj-pill"
+          onClick={() => {
+            try {
+              localStorage.setItem('aidjobs.employerDemo.panel', 'review');
+            } catch {
+              /* storage unavailable: the job opens with its usual panel */
+            }
+            go('create', job.id);
+          }}
+        >
+          Look at the request
+        </button>
+        <button type="button" className="aj-text-btn" onClick={onPublishAnyway}>
+          Publish anyway
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OverruleDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const askers = (changesAfterApproval(job)?.askers ?? []).map((a) => first(a.name)).join(' and ');
+  return (
+    <Dialog
+      title="Publish anyway?"
+      subtitle={job.facts.title}
+      onClose={onClose}
+      half
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="aj-ink-btn"
+            onClick={() => {
+              overruleChanges(job.id, reason);
+              onDone();
+            }}
+          >
+            Publish anyway
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <p style={{ margin: 0 }}>
+          {askers} asked for changes after the approval. Publishing now is written in the job&apos;s history, which only your organisation sees, and {askers} {askers.includes(' and ') ? 'are' : 'is'} told.
+        </p>
+        <textarea style={{ ...inputStyle, minHeight: 64 }} value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason (optional)" placeholder="Reason (optional), for example: the change is minor and we will fix it in the next round." />
+      </div>
+    </Dialog>
   );
 }
 
@@ -631,6 +738,7 @@ export default function Publish({ id }: { id?: string }) {
   const [done, setDone] = useState(false);
   const [asking, setAsking] = useState(false);
   const [payerOpen, setPayerOpen] = useState(false);
+  const [overrule, setOverrule] = useState(false);
 
   if (!job) {
     return (
@@ -668,7 +776,7 @@ export default function Publish({ id }: { id?: string }) {
   const single = singlePrice(s);
   const subscribed = Boolean(s.subscription && !s.subscription.cancelled);
   const payKey: PackageKey | 'extra' = pkg === 'one' ? single.key : pkg;
-  const blocked = !upgrade && approvalRequired(s, job) && !isApproved(job);
+  const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
   const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
@@ -702,6 +810,8 @@ export default function Publish({ id }: { id?: string }) {
     else finish(publish(job.id, { plan: 'free', schedule: date }));
   };
   const proceed = () => {
+    const now = getState().jobs.find((x) => x.id === job.id);
+    if (!upgrade && now && changesAfterApproval(now) && now.review.overruled === undefined) return setOverrule(true);
     setFailed(null);
     if (chosen === 'free') publishFree(schedule);
     else if (onHand) finish(upgrade ? amplifyLive(job.id, 'onHand') : publish(job.id, { plan: 'amplify', schedule, paid: 'onHand' }));
@@ -764,6 +874,7 @@ export default function Publish({ id }: { id?: string }) {
 
         <section className="order-1 flex flex-col gap-3 lg:sticky lg:top-4 lg:order-2" aria-label="How to publish">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
+          {!blocked && !upgrade && <ChangesNote job={job} onPublishAnyway={() => setOverrule(true)} />}
           {request && (
             <div className="aj-card flex flex-col gap-2 p-4" style={{ borderColor: 'var(--sage-3)' }} role="status">
               <div style={{ fontWeight: 650 }}>
@@ -972,6 +1083,16 @@ export default function Publish({ id }: { id?: string }) {
             setPayerOpen(false);
             setFailed(null);
             setDone(true);
+          }}
+        />
+      )}
+      {overrule && (
+        <OverruleDialog
+          job={job}
+          onClose={() => setOverrule(false)}
+          onDone={() => {
+            setOverrule(false);
+            proceed();
           }}
         />
       )}

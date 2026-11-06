@@ -54,6 +54,8 @@ export type Org = {
   approvalRule: 'any' | 'all';
   /** "Nobody can skip approval": removes the owner's "Publish without approval". */
   noSkip: boolean;
+  /** "Any request for changes pauses publishing": under "any one reviewer", a later request for changes withdraws the approval. */
+  changesPause?: boolean;
   verified: boolean;
   setupDone: boolean;
   /** The one-time "I understand" for the free terms, given the first time the organisation publishes a free job. */
@@ -129,6 +131,8 @@ export type Review = {
   reminded?: number;
   /** The owner's reason for skipping approval; written to the history as "published without approval" only once it is published. */
   skipped?: string;
+  /** "Publish anyway" over a request for changes that came after the approval: the reason, possibly empty. */
+  overruled?: string;
 };
 
 /** "Ask to pay": the person who holds the card gets a link; the job publishes once they have paid. */

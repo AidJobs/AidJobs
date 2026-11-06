@@ -6,6 +6,7 @@ import DayStrip, { type DayGroup } from '@/components/site/DayStrip';
 import Flag from '@/components/site/Flag';
 import {
   approvalRequired,
+  changesAfterApproval,
   dismissMoment,
   downloadCopy,
   extend,
@@ -43,8 +44,10 @@ export function statusLine(s: State, j: DemoJob): string {
       if (j.review.state === 'changes') return 'Changes requested';
       return `In review · ${yes} of ${j.review.reviewers.length} approved${j.review.due ? ` · due ${shortDate(j.review.due)}` : ''}`;
     }
-    case 'approved':
-      return 'Approved · ready to publish';
+    case 'approved': {
+      const open = changesAfterApproval(j);
+      return open ? `Approved · ${open.askers.map((a) => a.name.split(' ')[0]).join(' and ')} asked for changes` : 'Approved · ready to publish';
+    }
     case 'scheduled':
       return `Scheduled for ${j.scheduledFor ? longDate(j.scheduledFor) : 'later'}`;
     case 'live':
@@ -80,7 +83,11 @@ function briefing(s: State): Brief[] {
         id: `pub-${j.id}`,
         icon: <CheckCircle2 size={16} strokeWidth={1.8} style={{ color: 'var(--sage-7)' }} />,
         title: `${by.join(' and ') || 'Your reviewers'} approved ${j.facts.title}`,
-        body: approvalRequired(s, j) ? 'Approval was required, and it is in. Publish now?' : 'Publish now?',
+        body: changesAfterApproval(j)
+          ? `${changesAfterApproval(j)?.askers.map((a) => a.name.split(' ')[0]).join(' and ')} then asked for changes. Look at the request before you publish.`
+          : approvalRequired(s, j)
+            ? 'Approval was required, and it is in. Publish now?'
+            : 'Publish now?',
         actions: [
           { label: 'Publish', run: () => go('publish', j.id), primary: true },
           { label: 'Open', run: () => go('create', j.id) },
