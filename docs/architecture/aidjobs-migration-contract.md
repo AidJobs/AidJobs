@@ -380,6 +380,13 @@ Enforce a timeout, a redirect limit, and a maximum response size before the body
 
 HTTP and browser rendering are fetch strategies. HTML, RSS, and API are source and extract differences. Do not add a source type only because a page needs Playwright.
 
+**Amendment, decided by the user on 6 November 2026 (Workday's job search; the agent's recommendation after the employer survey, W-31 step F), effective when the user explicitly approves merging this record.** Outbound requests are GET, except one: a Workday reader may send a POST to Workday's public job search, the request each employer's own Workday careers page sends, and nothing else. Its limits:
+- Destination: a host ending in `.myworkdayjobs.com`, path `/wday/cxs/{tenant}/{site}/jobs` only, where `{tenant}` and `{site}` are those of the source's own careers address. Any other host or path, and Workday's other POST requests (for example `/refreshFacet/`, which the hosts' `robots.txt` disallows), stay out.
+- Body: fixed JSON with paging and an empty search only (`limit`, `offset`, `searchText` empty, `appliedFacets` empty), `Content-Type: application/json`. No cookies, credentials, session or CSRF tokens; the honest crawler identity.
+- Through this fetch policy, with every rule above; a redirect answering the POST is not followed (the fetch fails closed). Job details are read with GET (`/wday/cxs/{tenant}/{site}/job/…`).
+- `robots.txt` checked for the job-search path before the POST (none of the 16 Workday hosts the survey read forbids it); a 403, 429 or challenge stops the source, as for every reader; a request budget per host and per source, and a cap on pages per crawl.
+- The fetch policy's support for a request body is its own pull request, a security-boundary change with an independent review; the Workday reader is its own plan and approval in the crawler foundation, after the documented-feed readers (W-38). Any other POST, Oracle's included, needs its own decision.
+
 ---
 
 ## 10. Extract, normalise, validate

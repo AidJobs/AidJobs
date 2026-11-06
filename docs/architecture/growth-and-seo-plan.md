@@ -148,7 +148,7 @@ What stays, as the contract requires (§4): the one scheduler and orchestrator, 
 What changes:
 
 1. **One reader interface.** Each reader returns candidate jobs in the field-contract shape (4.4), whether the listing was read completely, and the expected total. The UNICEF reader and the general reader move behind it with identical output. Readers are chosen by what the page or system shows (Workday, Greenhouse, Clinch…), never by organisation name or by editing a source's address (rule of 19 October 2026).
-2. **Readers per recruitment system**, in the survey's order: Clinch (UNICEF, W-04); Greenhouse, Ashby, and Lever (documented public APIs, cheapest); then Workday, Oracle, SuccessFactors, iCIMS, Jobvite, the UN careers RSS feed, ReliefWeb, and others. Workday and Oracle use undocumented endpoints and come later; Workday's job search is a POST request, which needs its own decision under §9.
+2. **Readers per recruitment system**, in the survey's order: Clinch (UNICEF, W-04); Greenhouse, Ashby, and Lever (documented public APIs, cheapest); then Workday, Oracle, SuccessFactors, iCIMS, Jobvite, the UN careers RSS feed, ReliefWeb, and others. Workday and Oracle use undocumented endpoints and come later; Workday's job search is a POST request, allowed by the user on 6 November 2026 within the limits recorded in contract §9 (its amendment of that date).
 3. **Each reader is tested** with small fixtures from saved responses, and has a canary check that warns when its system's pages or responses change.
 4. **Job pages opened only for new jobs**, within a cap per crawl, together with the observation rule (4.3).
 5. **Completeness for every source:** found against expected, and how many of the required fields each source fills. That fill rate is a quality measure in the admin, not a gate.
@@ -303,7 +303,7 @@ A keep-alive monitor every 5 minutes (UX-08 item 5) was skipped by the user unti
 ## 10. Still open, for later decisions
 
 - W-33: direction updated on 30 October 2026 (ledger W-33): fixed together with the reader interface (W-35), with no separate "plain public JSON" step.
-- Workday's POST search under §9.
+- Workday's POST search under §9: decided by the user on 6 November 2026 (contract §9, amendment of that date).
 - Stage 6 implementation timing.
 - Employer submissions, alerts, and accounts (§2), after launch. The employer side is designed first as a demo that is never merged (W-51, `employer-side-plan.md`, 3 November 2026).
 - Landing-page thresholds, closed-page timings, and the exact heading words, in their steps' plans.
