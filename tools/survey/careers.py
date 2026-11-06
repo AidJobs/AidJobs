@@ -195,9 +195,16 @@ UN_PAGE_FIRST_WAVE = {
     "unjobs-un:48",      # International Institute for Applied Systems Analysis
     "unjobs-un:39",      # International Renewable Energy Agency
     "unjobs-un:62",      # Organisation of Eastern Caribbean States
+    "unjobs-un:31",      # IFAD, moved into the first wave by the user on 6 November 2026
 }
 WAVE_INCOME_TOP = 100   # the largest organisations of the income tier in the first wave
 STEP_F_FIRST = (150, 50)  # step F's first batch: the first wave's top by jobs, and by income
+# The user's decisions of 6 November 2026: INGO networks join the first wave, after the groups
+# above, in this order; the named head offices are all in step F's first batch.
+HQ_GROUP = "INGO head office (named by the user)"
+ECHO_GROUP = "EU humanitarian partner (DG ECHO)"
+MEMBER_GROUP = "national member of a network in the wave"
+ADDED_GROUPS = (HQ_GROUP, ECHO_GROUP, MEMBER_GROUP)
 
 # Wikidata properties for the identifiers the survey holds (checked on 5 November 2026).
 WD_PROPS = {
@@ -874,6 +881,8 @@ class Decisions:
     tenant: dict[tuple[str, str], tuple[bool, str, str]] = field(default_factory=dict)
     reject_page: dict[tuple[str, str], str] = field(default_factory=dict)
     wave_exclude: dict[str, str] = field(default_factory=dict)
+    wave_hq: dict[str, str] = field(default_factory=dict)
+    wave_keep: dict[str, str] = field(default_factory=dict)
     used: set = field(default_factory=set)
 
     def keys(self) -> set:
@@ -883,7 +892,9 @@ class Decisions:
                 | {("wikidata", o, i) for o, i in self.wikidata}
                 | {("tenant", o, t) for o, t in self.tenant}
                 | {("page", o, p) for o, p in self.reject_page}
-                | {("wave", o) for o in self.wave_exclude})
+                | {("wave", o) for o in self.wave_exclude}
+                | {("hq", o) for o in self.wave_hq}
+                | {("keep", o) for o in self.wave_keep})
 
     def orgs(self) -> set:
         return {k[1] for k in self.keys()}
@@ -908,6 +919,10 @@ class Decisions:
                 d.reject_page[(org, value.lower())] = reason
             elif action == "first-wave-exclude":
                 d.wave_exclude[org] = reason
+            elif action == "first-wave-hq":
+                d.wave_hq[org] = reason
+            elif action == "first-wave-keep":
+                d.wave_keep[org] = reason
             else:
                 raise ValueError(f"unknown decision {action!r}")
         return d
@@ -1068,8 +1083,12 @@ def match_tenants(orgs, tenants, websites: dict[str, str]):
 
 
 def build(_args=None, survey: Path = SURVEY) -> int:
-    orgs = scope_rows(survey)
+    everything = read_csv(survey / "organisations.csv")
+    ranked = [r for r in everything if r["evidence"] in SCOPE]
     decisions = Decisions.read(read_csv(survey / "step-e-decisions.csv"))
+    added = added_groups(everything, ranked, decisions)
+    # Unranked ("listed only") organisations enter the build only as first-wave additions.
+    orgs = ranked + [o for o in everything if o["evidence"] not in SCOPE and o["org_id"] in added]
     known = {o["org_id"] for o in orgs}
     unknown = sorted(decisions.orgs() - known)
     if unknown:
@@ -1083,7 +1102,8 @@ def build(_args=None, survey: Path = SURVEY) -> int:
     for r in read_csv(survey / "step-e-index.csv"):
         index[r["site"]].append(r)
     tenants = read_csv(survey / "step-e-tenants.csv")
-    matches, shared = match_tenants(orgs, tenants, websites)
+    # Accounts were matched against the ranked organisations only (step E's scope).
+    matches, shared = match_tenants(ranked, tenants, websites)
     by_org = {o["org_id"]: o for o in orgs}
     candidates = defaultdict(list)
     for o in orgs:
@@ -1176,7 +1196,7 @@ def build(_args=None, survey: Path = SURVEY) -> int:
         rows += kept
     review.sort(key=lambda r: (int(r["rank"]), r["kind"], r["detail"]))
     filled.sort(key=lambda r: int(r["rank"]))
-    wave, problems = first_wave(orgs, rows, websites, decisions)
+    wave, problems = first_wave(orgs, rows, websites, decisions, added)
     unused = sorted(decisions.keys() - decisions.used)
     problems += [f"decision never applied: {' '.join(k)}" for k in unused]
     if problems:
@@ -1186,12 +1206,13 @@ def build(_args=None, survey: Path = SURVEY) -> int:
     _write(survey / "careers-review.csv", REVIEW_FIELDS, review)
     _write(survey / "websites-filled.csv", WEBSITE_FIELDS, filled)
     _write(survey / "first-wave.csv", WAVE_FIELDS, wave)
-    for top in (SEARCH_TOP, len(orgs)):
-        print(f"top {top}: " + coverage(orgs[:top], rows, websites))
+    for top in (SEARCH_TOP, len(ranked)):
+        print(f"top {top}: " + coverage(ranked[:top], rows, websites))
     wave_ids = {w["org_id"] for w in wave}
     print(f"first wave: {len(decisions.wave_exclude)} excluded by decision")
     print(f"first wave {len(wave)} ({dict(Counter(w['group'] for w in wave))}); step F batch 1: "
-          f"{sum(1 for w in wave if w['step_f_batch'] == 1)}; "
+          f"{sum(1 for w in wave if w['step_f_batch'] == 1)}; without a website: "
+          f"{sum(1 for w in wave if not w['website'])}; "
           + coverage([o for o in orgs if o["org_id"] in wave_ids], rows, websites))
     print(f"websites filled: {sum(1 for f in filled if f['website'])}; review rows: {len(review)}")
     return 0
@@ -1214,10 +1235,50 @@ def wave_group(org) -> str:
     return ""
 
 
-def first_wave(orgs, rows, websites, decisions: Decisions | None = None):
-    """The first wave in rank order, with step E's best guess and step F's batch, and the
-    problems that must stop the build (an unknown id, an organisation in no group)."""
-    excluded = decisions.wave_exclude if decisions else {}
+def later_wave(org) -> bool:
+    """The UN system and the UN Secretariat's offices come in a later wave."""
+    return org.get("family") == UN_FAMILY or "un-" in org["kind"]
+
+
+def income_top(orgs, excluded) -> list[dict]:
+    return [o for o in orgs if o["evidence"] == "income" and o["org_id"] not in excluded
+            ][:WAVE_INCOME_TOP]
+
+
+def added_groups(everything, ranked, decisions: Decisions) -> dict[str, str]:
+    """Organisations that join the first wave by the user's decisions of 6 November 2026, with
+    their group: the head offices named by the user, DG ECHO's certified humanitarian NGOs, and
+    every other member of a step D family that has a member in the wave. Also ranked
+    organisations already in a group of their own; their own group comes first."""
+    excluded = decisions.wave_exclude
+    added = {}
+    for o in everything:
+        if o["org_id"] in excluded or later_wave(o):
+            continue
+        if o["org_id"] in decisions.wave_hq:
+            added[o["org_id"]] = HQ_GROUP
+        elif any(s.startswith("echo:") for s in o["sources"].split("; ")):
+            added[o["org_id"]] = ECHO_GROUP
+    wave = {o["org_id"] for o in ranked if wave_group(o)} | set(added)
+    wave |= {o["org_id"] for o in income_top(ranked, excluded)}
+    wave -= set(excluded)  # an excluded organisation brings no network with it
+    families = {o["family"] for o in everything
+                if o["org_id"] in wave and o["family"] and o["family"] != UN_FAMILY}
+    for o in everything:
+        if (o["family"] in families and o["org_id"] not in added
+                and o["org_id"] not in excluded and not later_wave(o)):
+            added[o["org_id"]] = MEMBER_GROUP
+    return added
+
+
+def first_wave(orgs, rows, websites, decisions: Decisions | None = None,
+               added: dict[str, str] | None = None):
+    """The first wave, with step E's best guess and step F's batch, and the problems that must
+    stop the build (an unknown id, an organisation in no group). The groups of 5 November 2026
+    come first, in rank order; then the additions of 6 November 2026, group by group."""
+    decisions = decisions or Decisions()
+    excluded = decisions.wave_exclude
+    added = added or {}
     ids = {o["org_id"] for o in orgs}
     on_un_page = any(oid.startswith("unjobs-un:") for oid in ids)
     problems = [f"UN_PAGE_FIRST_WAVE names an unknown organisation: {oid}"
@@ -1225,34 +1286,44 @@ def first_wave(orgs, rows, websites, decisions: Decisions | None = None):
     best = {}
     for r in rows:
         best.setdefault(r["org_id"], r)
-    income = [o for o in orgs if o["evidence"] == "income"
-              and o["org_id"] not in excluded][:WAVE_INCOME_TOP]
-    income_ids = {o["org_id"] for o in income}
+    income_ids = {o["org_id"] for o in income_top(orgs, excluded)}
     by_jobs, by_income = STEP_F_FIRST
-    out, hiring_seen, income_seen = [], 0, 0
+    out, tier, hiring_seen, income_seen = [], {}, 0, 0
     for o in orgs:
+        oid = o["org_id"]
         group = wave_group(o) or ("INGO member or funder (by income)"
-                                  if o["org_id"] in income_ids else "")
-        later = o.get("family") == UN_FAMILY or "un-" in o["kind"]
-        if not group and o["evidence"] == "hiring (UNjobs)" and not later:
-            problems.append(f"in no first-wave group and not UN: {o['org_id']} {o['name']}")
-        if o["org_id"] in excluded:
-            decisions.used.add(("wave", o["org_id"]))
+                                  if oid in income_ids else "")
+        if not group and o["evidence"] == "hiring (UNjobs)" and not later_wave(o):
+            problems.append(f"in no first-wave group and not UN: {oid} {o['name']}")
+        if oid in excluded:
+            decisions.used.add(("wave", oid))
             continue
+        tier[oid] = 0
+        if not group and oid in added:
+            group = added[oid]
+            tier[oid] = 1 + ADDED_GROUPS.index(group)
         if not group:
             continue
-        if o["org_id"] in income_ids:
+        if oid in income_ids:
             income_seen += 1
             batch = 1 if income_seen <= by_income else 2
-        else:
+        elif tier[oid] == 0:
             hiring_seen += 1
             batch = 1 if hiring_seen <= by_jobs else 2
-        guess = best.get(o["org_id"], {})
-        out.append({"rank": o["rank"], "org_id": o["org_id"], "name": o["name"], "group": group,
+        else:
+            batch = 2
+        if oid in decisions.wave_hq:
+            decisions.used.add(("hq", oid))
+            batch = 1
+        if oid in decisions.wave_keep:
+            decisions.used.add(("keep", oid))
+        guess = best.get(oid, {})
+        out.append({"rank": o["rank"], "org_id": oid, "name": o["name"], "group": group,
                     "unjobs_jobs": o["unjobs_jobs"], "income_usd": o["income_usd"],
-                    "website": websites.get(o["org_id"], ""),
+                    "website": websites.get(oid, ""),
                     "step_e_guess": guess.get("candidate_url", ""),
                     "step_e_confidence": guess.get("confidence", ""), "step_f_batch": batch})
+    out.sort(key=lambda w: tier[w["org_id"]])  # stable: rank order within each tier
     return out, problems
 
 

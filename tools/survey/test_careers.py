@@ -326,6 +326,50 @@ def test_a_wave_exclusion_drops_the_organisation_and_its_batch_place_passes_on(t
     assert [(w["org_id"], w["step_f_batch"]) for w in wave] == [("unjobs-nonun:2", "1")]
 
 
+def test_head_offices_echo_partners_and_network_members_join_after_the_wave(tmp_path,
+                                                                            monkeypatch):
+    monkeypatch.setattr(careers, "STEP_F_FIRST", (1, 0))
+    monkeypatch.setattr(careers, "UN_PAGE_FIRST_WAVE", set())
+
+    def listed(oid, rank, family="", sources="", kind=""):
+        return {**org(oid, oid, rank=rank, sources=sources), "evidence": "listed only",
+                "family": family, "kind": kind}
+    orgs = [{**org("unjobs-nonun:1", "Net Aid", rank=1), "evidence": "hiring (UNjobs)",
+             "kind": "non-un", "family": "Net"},
+            listed("iati:member", 2, family="Net"),
+            listed("echo:5", 3, sources="echo:5"),
+            listed("seed:9", 4),
+            listed("iati:other", 5),
+            listed("echo:6", 6, sources="echo:6", kind="un-or-intergovernmental")]
+    build(tmp_path, orgs, decisions=[
+        {"action": "first-wave-hq", "org_id": "seed:9", "value": "", "confidence": "",
+         "reason": "named by the user"},
+        {"action": "first-wave-keep", "org_id": "unjobs-nonun:1", "value": "", "confidence": "",
+         "reason": "kept"}])
+    wave = careers.read_csv(tmp_path / "first-wave.csv")
+    assert [(w["org_id"], w["group"], w["step_f_batch"]) for w in wave] == [
+        ("unjobs-nonun:1", "NGO, INGO, consultancy or foundation", "1"),
+        ("seed:9", careers.HQ_GROUP, "1"),
+        ("echo:5", careers.ECHO_GROUP, "2"),
+        ("iati:member", careers.MEMBER_GROUP, "2")]
+
+
+def test_a_keep_decision_outside_the_wave_stops_the_build(tmp_path):
+    orgs = [{**org("iati:x", "Listed Aid", website="listed.org"), "evidence": "listed only"},
+            org("irs:1", "Ranked Aid", website="ranked.org")]
+    fields = ["rank", "org_id", "name", "acronym", "family", "kind", "country", "website_domain",
+              "unjobs_jobs", "income_usd", "income_from", "evidence", "sources", "note"]
+    write(tmp_path / "organisations.csv", fields, orgs)
+    for name, f in [("step-e-index.csv", careers.INDEX_FIELDS),
+                    ("step-e-tenants.csv", careers.TENANT_FIELDS),
+                    ("step-e-wikidata.csv", careers.WIKIDATA_FIELDS)]:
+        write(tmp_path / name, f, [])
+    write(tmp_path / "step-e-decisions.csv", careers.DECISION_FIELDS, [
+        {"action": "first-wave-keep", "org_id": "iati:x", "value": "", "confidence": "",
+         "reason": "x"}])
+    assert careers.build(survey=tmp_path) == 1
+
+
 def test_a_decision_that_is_never_applied_stops_the_build(tmp_path):
     orgs = [org("a", "Has A Site", website="hasasite.org")]
     fields = ["rank", "org_id", "name", "acronym", "family", "kind", "country", "website_domain",

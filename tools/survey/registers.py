@@ -1,9 +1,10 @@
 """Employer survey, step B: candidate organisations from public registers (W-31).
 
-Run on the user's machine, never by the backend or CI. Two steps:
+Run on the user's machine, never by the backend or CI:
 
   python tools/survey/registers.py download   # public files into tools/survey/raw/ (git-ignored)
   python tools/survey/registers.py build      # filter them; write the candidate list and counts
+  python tools/survey/registers.py echo       # DG ECHO's certified NGOs (PDF) -> a small CSV
 
 Only public bulk files and IATI's open API are fetched, one at a time, with an honest identity.
 No employer's site is contacted. Each source is read through a fixed list of fields: emails,
@@ -56,7 +57,15 @@ FILES = {
     "cra_web.csv": CRA + "e3567bb5-5d98-44d0-b0e8-9cdd3732c9e4/download/weburl_2024_updated.csv",
     "eu_register.xml": "https://data.europa.eu/data-management/store/api/data/sg/"
                        "01M323JV693WY8VP2989DA0ZR2",
+    # DG ECHO's NGOs certified as EU humanitarian partners, 2021 to 2027 (the list of 9 April
+    # 2026); added for step F's first wave (the user's decision, 6 November 2026).
+    "echo_certified_ngos.pdf": "https://civil-protection-humanitarian-aid.ec.europa.eu/document/"
+                               "download/d57eb909-dca7-4c76-908a-b40d012aa022_en"
+                               "?filename=List+of+certified+NGOs+9.4.2026.pdf",
 }
+ECHO_OUT = "echo-partners.csv"
+ECHO_FIELDS = ["number", "partner_code", "name", "country", "certificate"]
+ECHO_CERTIFICATES = ("Potential Programmatic Partner", "Niche Partner", "Partner")
 IATI_API = "https://dashboard.iatistandard.org/api/reporting-orgs/"
 
 # Income cut-offs per register, in its own currency: the recommended level and the two
@@ -143,7 +152,8 @@ def _fetch(session, url: str, target: Path) -> dict:
         headers = {"last_modified": response.headers.get("last-modified"),
                    "content_type": response.headers.get("content-type")}
     partial.replace(target)
-    return {"url": url, "bytes": target.stat().st_size, "sha256": _sha256(target), **headers}
+    return {"url": url, "bytes": target.stat().st_size, "sha256": _sha256(target), **headers,
+            "fetched_at": datetime.now(UTC).isoformat(timespec="seconds")}
 
 
 def download(_args) -> None:
@@ -192,7 +202,8 @@ def download(_args) -> None:
             "url": IATI_API, "records": len(organisations),
             "sha256": _sha256(RAW / "iati_reporting_orgs.json")}
         print(f"iati_reporting_orgs.json: {len(organisations):,} organisations")
-    manifest["fetched_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+        # The date of the first download (step B); later files carry their own date.
+        manifest["fetched_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     manifest_path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
 
@@ -488,14 +499,80 @@ def build(_args) -> None:
     print(f"candidates at the recommended cut-offs: {len(candidates):,}")
 
 
+# --- DG ECHO's certified humanitarian partners (step F's first wave) ----------------------
+
+_SEGMENT = re.compile(r"\S+(?: \S+)*")  # text separated by two spaces or more is another cell
+_ECHO_COLUMNS = ("Partner full name", "Country", "Type of Certificate")
+
+
+def echo_rows(pages: list[str]) -> list[dict]:
+    """The table's rows from each page's text laid out by column (pypdf's layout mode).
+
+    A cell that wraps continues on the next line, in the same column; a row whose cells wrap
+    can also start a line above its number, after a complete row. The columns are placed from
+    each page's header line."""
+    rows: list[dict] = []
+    for page in pages:
+        starts, pending = None, []
+        for line in page.splitlines():
+            if all(c in line for c in _ECHO_COLUMNS):
+                name, country, certificate = (line.index(c) for c in _ECHO_COLUMNS)
+                starts = (name - 30, country - 15, certificate - 15)
+                continue
+            if starts is None or not line.strip():
+                continue
+            cells = [(m.start(), m.group(0)) for m in _SEGMENT.finditer(line)]
+            number = re.fullmatch(r"\d{1,3}", cells[0][1]) if cells else None
+            if number and cells[0][0] < 6:
+                rows.append({"number": number.group(0), "partner_code": "", "name": "",
+                             "country": "", "certificate": ""})
+                cells, pending = pending + cells[1:], []
+            elif not rows:
+                continue  # the title above the first table
+            elif rows[-1]["certificate"]:
+                pending += cells  # the first line of the next row, above its number
+                continue
+            for start, text in cells:
+                column = ("partner_code" if start < starts[0] else "name" if start < starts[1]
+                          else "country" if start < starts[2] else "certificate")
+                rows[-1][column] = f"{rows[-1][column]} {text}".strip()
+    for row in rows:
+        row["name"] = re.sub(r"\s*\((?:[A-Z]{1,3})\)\s*$", "", row["name"]).strip(" ,")
+        row["country"] = row["country"].upper()
+    return rows
+
+
+def echo(_args) -> int:
+    """Turn the downloaded PDF into source-survey/echo-partners.csv (no network).
+
+    Needs pypdf, which is not a dependency of the backend or CI: run this command from a
+    separate virtual environment with pypdf 6.1.3."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(RAW / "echo_certified_ngos.pdf")
+    rows = echo_rows([p.extract_text(extraction_mode="layout") for p in reader.pages])
+    numbers = [int(r["number"]) for r in rows]
+    problems = [r for r in rows if not (r["name"] and r["country"]
+                                        and r["certificate"] in ECHO_CERTIFICATES)]
+    if numbers != list(range(1, len(rows) + 1)) or problems:
+        print(f"the table did not read cleanly: {problems[:5]}")
+        return 1
+    with (OUT / ECHO_OUT).open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=ECHO_FIELDS, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"{ECHO_OUT}: {len(rows)} certified NGOs")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("download")
     sub.add_parser("build")
+    sub.add_parser("echo")
     args = parser.parse_args()
-    {"download": download, "build": build}[args.command](args)
-    return 0
+    return {"download": download, "build": build, "echo": echo}[args.command](args) or 0
 
 
 if __name__ == "__main__":

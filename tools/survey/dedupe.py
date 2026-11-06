@@ -82,8 +82,10 @@ COUNTRY_WORDS = re.compile(
     r"|korea|new zealand|nz|hong kong|india|kenya|uganda|south africa|europe"
     r"|nl|de|fr|be|ch|se|dk|no|fi|it|es|at|jp|au|ca|ie|gb|eu)$")
 
-# Where a display name is taken from, best first.
-NAME_ORDER = ["seed", "unjobs", "iati", "eu", "uk", "oscr", "acnc", "cra", "irs"]
+# Where a display name is taken from, best first. DG ECHO's list came last (step F), so it never
+# changes an organisation's id.
+NAME_ORDER = ["seed", "unjobs", "iati", "eu", "uk", "oscr", "acnc", "cra", "irs", "echo"]
+ECHO_COUNTRIES = {**EU_COUNTRIES, "LUXEMBURG": "LU"}
 
 LEGAL = re.compile(
     r"\b(the|inc|incorporated|ltd|limited|llc|l\.l\.c|corp|corporation|co|company|plc|cic"
@@ -155,7 +157,7 @@ SMALL_WORDS = {"of", "the", "and", "for", "in", "to", "on", "at", "by", "de", "l
                "et", "y", "a"}
 
 
-CAPITALISED_SOURCES = {"irs", "cra", "uk", "acnc", "oscr"}
+CAPITALISED_SOURCES = {"irs", "cra", "uk", "acnc", "oscr", "echo"}
 
 
 def tidy_case(name: str) -> str:
@@ -204,6 +206,7 @@ class Decisions:
     exclude: dict[str, str] = field(default_factory=dict)
     family: dict[str, str] = field(default_factory=dict)
     name: dict[str, str] = field(default_factory=dict)
+    link: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 # --- reading -----------------------------------------------------------------------------
@@ -255,6 +258,17 @@ def read_seeds(path: Path) -> list[Record]:
             for index, row in enumerate(_rows(path), start=1)]
 
 
+def read_echo(path: Path) -> list[Record]:
+    """DG ECHO's certified humanitarian NGOs (registers.py echo), when the file is there."""
+    if not path.exists():
+        return []
+    return [Record(key=f"echo:{row['number']}", source="echo", name=row["name"],
+                   country=ECHO_COUNTRIES.get(row["country"], row["country"]),
+                   kind="EU humanitarian partner (DG ECHO)",
+                   note=f"DG ECHO certificate: {row['certificate']} ({row['partner_code']})")
+            for row in _rows(path)]
+
+
 def read_decisions(path: Path) -> Decisions:
     decisions = Decisions()
     if not path.exists():
@@ -271,6 +285,8 @@ def read_decisions(path: Path) -> Decisions:
             decisions.family[a] = b
         elif action == "name":
             decisions.name[a] = b
+        elif action == "family-link":
+            decisions.link.append((a, b, reason))
         else:
             raise ValueError(f"unknown action in decisions: {action}")
     return decisions
@@ -434,6 +450,8 @@ def match(records: list[Record], repeats, decisions: Decisions):
     for a, b, reason in decisions.merge:
         if a in by_key and b in by_key:
             groups.join(a, b, f"decided: {reason}")
+    # National members of one network that the rules above did not link (different names).
+    families.extend((a, b) for a, b, _ in decisions.link if a in by_key and b in by_key)
 
     # A UNjobs entry or seed addition whose name is a register name without its country
     # ("Médecins du Monde" and "Medecins du Monde France"): usually the head office.
@@ -625,6 +643,7 @@ def load(survey: Path = SURVEY):
         records += found
         repeats += again
     records += read_seeds(survey / "seed-additions.csv")
+    records += read_echo(survey / "echo-partners.csv")
     return records, repeats, read_decisions(survey / "step-d-decisions.csv")
 
 
@@ -632,6 +651,7 @@ def main() -> int:
     records, repeats, decisions = load()
     unknown = [k for k in [*decisions.exclude, *decisions.family, *decisions.name,
                            *(x for a, b, _ in decisions.merge for x in (a, b)),
+                           *(x for a, b, _ in decisions.link for x in (a, b)),
                            *(x for pair in decisions.separate for x in pair)]
                if k not in {r.key for r in records}]
     if unknown:
