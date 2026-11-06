@@ -37,6 +37,10 @@ type Props = {
   drawerOpen: boolean;
   onCloseDrawer: () => void;
   homeHref: string;
+  /** Expanded width in pixels; the public site uses the default. */
+  width?: number;
+  /** Extra controls at the bottom, beside the theme and accessibility settings. */
+  footer?: (collapsed: boolean) => ReactNode;
 };
 
 function Entry({ entry, collapsed, onAfterSelect }: { entry: MenuEntry; collapsed: boolean; onAfterSelect: () => void }) {
@@ -267,7 +271,8 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
           ))}
       </nav>
 
-      <div className={`flex ${collapsed ? 'flex-col' : ''} items-center gap-1 border-t px-3 py-3 aj-hair`}>
+      {props.footer && <div className={`flex ${collapsed ? 'flex-col' : 'flex-wrap'} items-center gap-1.5 border-t px-3 pt-3 aj-hair`}>{props.footer(collapsed)}</div>}
+      <div className={`flex ${collapsed ? 'flex-col' : ''} items-center gap-1 ${props.footer ? '' : 'border-t'} px-3 py-3 aj-hair`}>
         <ThemeToggle side={collapsed ? 'right' : 'top'} />
         <AccessibilityPanel side={collapsed ? 'right' : 'top'} />
       </div>
@@ -281,7 +286,7 @@ export default function SideMenu(props: Props) {
     <>
       <aside
         className="aj-menu hidden h-full shrink-0 border-r lg:block aj-hair"
-        style={{ width: props.collapsed ? 64 : 248, background: 'var(--surface)', transition: 'width 160ms ease' }}
+        style={{ width: props.collapsed ? 64 : (props.width ?? 248), background: 'var(--surface)', transition: 'width 160ms ease' }}
       >
         <MenuBody props={props} collapsed={props.collapsed} />
       </aside>
