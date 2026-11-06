@@ -1,5 +1,5 @@
 system,organisations,confirmed,jobs_seen,unjobs_jobs,listing_kinds,examples
-own site (system not seen),65,15,209,941,no job links seen 26; needs JavaScript 23; plain page with job links 15; an error page 1,Danish Refugee Council; Palladium Group; Jhpiego
+own site (system not seen),63,15,209,900,no job links seen 26; needs JavaScript 21; plain page with job links 15; an error page 1,Danish Refugee Council; Palladium Group; Jhpiego
 Workday,20,0,0,1225,needs JavaScript 18; links to its listing on Workday 2,International Rescue Committee; Médecins Sans Frontières; Room to Read
 iCIMS,14,2,26,233,needs JavaScript 8; links to its listing on iCIMS 3; plain page with job links 2; not found 1,Clinton Health Access Initiative; RTI International; Church World Service
 BambooHR,12,0,0,117,a sign-in page 6; needs JavaScript 4; the system's own site (the account seems closed) 1; links to its listing on BambooHR 1,IDinsight; CLEAR Global; Precision Development
@@ -16,7 +16,7 @@ Zoho Recruit,3,0,0,33,needs JavaScript 3,Bioversity International; Swaniti Initi
 JazzHR,2,2,41,34,plain page with job links 2,BURN Manufacturing; Last Mile Health
 Breezy,2,2,40,48,plain page with job links 2,Impact Investment Exchange; Map International
 Jobvite,2,1,23,250,plain page with job links 1; blocked 1,Prosper Global (formerly Mercy Corps); IREX International
-UKG UltiPro,2,0,0,13,robots.txt forbids 2,Miyamoto International; Save the Children Federation Inc
+UKG UltiPro,2,0,0,13,not read; robots.txt allows it on the recheck 2,Miyamoto International; Save the Children Federation Inc
 Lever,1,1,39,0,public job feed 1,World Relief Corp of National Association of Evangelicals
 Personio,1,1,14,13,public job feed 1,Technopolis Group
 Paylocity,1,0,0,0,needs JavaScript 1,DKT International

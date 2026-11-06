@@ -393,6 +393,100 @@ def fetch(args) -> int:
     return 0
 
 
+RECHECK_FIELDS = ["org_id", "host", "old_verdict", "new_verdict", "destination_host",
+                  "destination_verdict", "effect"]
+
+
+def recheck_rows(records: list[dict], robots: dict[str, dict]) -> list[dict]:
+    """Each organisation's robots.txt verdict again, with the RFC 9309 matcher: for the address
+    it asked and, after a redirect to another host, for the page it ended on."""
+    rows = []
+    for r in records:
+        host = r["robots"]["host"]
+        new = robots.get(host)
+        verdict = robots_verdict(new["status"], new["text"], r["request_url"]) if new else ""
+        final = (r.get("response") or {}).get("final_url", "")
+        final_host = (urlsplit(final).hostname or "").lower()
+        destination, dest_verdict = "", ""
+        if final_host and final_host != host:
+            destination = final_host
+            d = robots.get(final_host)
+            dest_verdict = robots_verdict(d["status"], d["text"], final) if d else ""
+        old = r["robots"]["verdict"]
+        response = r.get("response") or {}
+        read = (old == "allowed" and response.get("status") == 200
+                and not response.get("bot_protection"))
+        # A destination never checked before counts as RFC 9309 says: a robots.txt that
+        # forbids, refuses or cannot be reached does not allow the page.
+        if read and (verdict == "forbidden" or (destination and dest_verdict != "allowed")):
+            effect = "withdrawn: robots.txt forbids the page read"
+        elif read and not verdict:
+            effect = "not rechecked (no answer)"
+        elif old != "allowed" and verdict == "allowed":
+            effect = "now allowed; the page was not read"
+        else:
+            effect = "unchanged"
+        rows.append({"org_id": r["org_id"], "host": host, "old_verdict": old,
+                     "new_verdict": verdict, "destination_host": destination,
+                     "destination_verdict": dest_verdict, "effect": effect})
+    return rows
+
+
+def recheck(args) -> int:
+    """Ask each host of a batch for its robots.txt again (once), and record the verdicts of the
+    RFC 9309 matcher (the user's approval of 6 November 2026). No page is requested; a page
+    now forbidden is withdrawn and its saved copy deleted."""
+    fetcher = Fetcher(RAW / "robots-recheck.log")
+    records = [json.loads(p.read_text(encoding="utf-8"))
+               for p in sorted((RAW / "orgs").glob("*.json"))]
+    wanted = {t["org_id"] for t in targets(batch=args.batch)}
+    records = [r for r in records if r["org_id"] in wanted]
+    hosts = {}
+    for r in records:
+        hosts.setdefault(r["robots"]["host"], urlsplit(r["request_url"]).scheme or "https")
+        final = (r.get("response") or {}).get("final_url", "")
+        if final:
+            hosts.setdefault((urlsplit(final).hostname or "").lower(), urlsplit(final).scheme)
+    robots: dict[str, dict] = {}
+    refusals: list[tuple[str, str]] = []
+    failures = 0
+    for n, (host, scheme) in enumerate(sorted(hosts.items()), start=1):
+        saved = RAW / "robots-recheck" / f"{safe_name(host)}.json"
+        if saved.exists():
+            robots[host] = json.loads(saved.read_text(encoding="utf-8"))
+            continue
+        if args.offline:  # no answer was kept: the recheck got none
+            robots[host] = {"status": None, "error": "no answer", "text": ""}
+            continue
+        r = fetcher.get(f"{scheme}://{host}/robots.txt", "robots.txt (recheck)")
+        text = r["body"].decode("utf-8", "replace")
+        robots[host] = {"status": r["status"], "error": r["error"],
+                        "text": text if r["status"] == 200 else "",
+                        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds")}
+        if r["status"] is not None:
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            saved.write_text(json.dumps(robots[host]), encoding="utf-8")
+        print(f"{n}/{len(hosts)} {host}: {r['status'] or r['error']}", flush=True)
+        protection = bot_protection(r["status"], r["headers"], text) if r["status"] != 200 else ""
+        refusals, failures = tally(
+            refusals, failures,
+            (host, service_of(protection, r["headers"].get("server", "")))
+            if r["status"] in (401, 403, 429) else None,
+            r["status"] is None and bool(r["error"]))
+        why = run_stop(refusals) or (f"{failures} network failures in a row"
+                                     if failures >= STOP_FAILURES else "")
+        if why:
+            print(f"stopped: {why}")
+            return 1
+    rows = recheck_rows(records, robots)
+    for row in rows:
+        if row["effect"].startswith("withdrawn"):
+            (RAW / "bodies" / f"{safe_name(row['org_id'])}.bin").unlink(missing_ok=True)
+    write(SURVEY / "step-f-robots-recheck.csv", RECHECK_FIELDS, rows)
+    print(dict(Counter(r["effect"] for r in rows)))
+    return 0
+
+
 # --- extract (no network) --------------------------------------------------------------------
 
 HREF = re.compile(r"""(?:href|src|action|data-url)\s*=\s*["']([^"'<>\s]+)["']""", re.IGNORECASE)
@@ -636,6 +730,14 @@ def build(_args=None, survey: Path = SURVEY) -> int:
             if field not in CORRECTABLE:
                 problems.append(f"a correction names an unknown field: {d['value']}")
             corrections[d["org_id"]].append((field, value, d["reason"]))
+    rechecked = read_csv(survey / "step-f-robots-recheck.csv")
+    withdrawn = {r["org_id"]: r for r in rechecked if r["effect"].startswith("withdrawn")}
+    now_allowed = {r["org_id"] for r in rechecked if r["effect"].startswith("now allowed")}
+    for oid in withdrawn:
+        if oid in observed:  # what was read from a page robots.txt forbids is not used
+            observed[oid] = {**observed[oid], "robots": "forbidden", "system": "",
+                             "system_evidence": "", "listing": "", "jobs_seen": "",
+                             "destination_robots": ""}
     rows, by_site = [], defaultdict(list)
     for oid, o in observed.items():
         w = wave.get(oid)
@@ -651,6 +753,17 @@ def build(_args=None, survey: Path = SURVEY) -> int:
                "unjobs_jobs": w["unjobs_jobs"], "bot_protection": o.get("bot_protection", ""),
                "note": (f"redirected to another host, whose robots.txt was "
                         f"{o['destination_robots']}") if o.get("destination_robots") else ""}
+        if oid in now_allowed:
+            row["outcome"] = "not read; robots.txt allows it on the recheck"
+            row["note"] = (f"robots.txt was {o.get('robots')} on 6 Nov 2026 (01:16 to 02:47 IST); "
+                           f"the recheck the same day allows the page; a later run reads it")
+        if oid in withdrawn:
+            dest = withdrawn[oid]["destination_verdict"]
+            where = (f"the redirect's destination ({withdrawn[oid]['destination_host']}, "
+                     f"robots.txt {dest})" if dest not in ("", "allowed")
+                     else "its host's robots.txt")
+            row["note"] = (f"withdrawn on the robots.txt recheck of 6 Nov 2026 (RFC 9309): "
+                           f"{where} does not allow the page read")
         if not row["system"] and feed:
             row["system"] = o["request"][len("feed ("):-1]
         if not row["system"] and page:
@@ -707,6 +820,11 @@ def main() -> int:
     get.add_argument("--limit", type=int, default=None,
                      help="read at most N organisations in this run")
     get.set_defaults(func=fetch)
+    again = commands.add_parser("robots", help="recheck a batch's robots.txt (no pages)")
+    again.add_argument("--batch", type=int, default=1)
+    again.add_argument("--offline", action="store_true",
+                       help="recompute from the robots.txt files kept, with no request")
+    again.set_defaults(func=recheck)
     commands.add_parser("extract").set_defaults(func=extract)
     commands.add_parser("build").set_defaults(func=build)
     args = parser.parse_args()

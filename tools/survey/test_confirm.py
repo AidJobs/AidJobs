@@ -65,6 +65,43 @@ def test_robots_txt_follows_rfc_9309_longest_match_and_wildcards():
                                  "https://x.org/karri%C3%A8re") is False
 
 
+def test_the_recheck_withdraws_pages_robots_txt_forbids(tmp_path):
+    def rec(oid, verdict, final, response=True):
+        return {"org_id": oid, "request_url": "https://x.org/jobs",
+                "robots": {"host": "x.org", "verdict": verdict},
+                "response": {"status": 200, "final_url": final} if response else {}}
+    robots = {"x.org": {"status": 200, "text": "User-agent: *\nAllow: /\nDisallow: /jobs\n"},
+              "y.org": {"status": 200, "text": "User-agent: *\nDisallow: /\n"}}
+    rows = {r["org_id"]: r for r in confirm.recheck_rows([
+        rec("a", "allowed", "https://x.org/jobs"),
+        rec("b", "refused", "", response=False)], robots)}
+    assert rows["a"]["effect"].startswith("withdrawn") and rows["a"]["new_verdict"] == "forbidden"
+    assert rows["b"]["effect"] == "unchanged"
+    robots["x.org"]["text"] = ""
+    moved = confirm.recheck_rows([rec("c", "allowed", "https://y.org/careers")], robots)[0]
+    assert (moved["destination_host"], moved["destination_verdict"]) == ("y.org", "forbidden")
+    assert moved["effect"].startswith("withdrawn")
+    robots["y.org"] = {"status": None, "error": "ConnectError", "text": ""}
+    unreachable = confirm.recheck_rows([rec("e", "allowed", "https://y.org/careers")], robots)[0]
+    assert unreachable["destination_verdict"] == "unreachable"
+    assert unreachable["effect"].startswith("withdrawn")
+    # build: a withdrawn page's findings are not used.
+    write(tmp_path / "first-wave.csv", careers.WAVE_FIELDS, wave_rows())
+    write(tmp_path / "step-f-observations.csv", confirm.OBSERVATION_FIELDS, [
+        {"org_id": "d", "target_url": "https://www.daid.org/jobs", "request": "page",
+         "robots": "allowed", "status": "200", "final_url": "https://www.daid.org/jobs",
+         "system": "own site (system not seen)", "listing": "plain page with job links",
+         "jobs_seen": "4"}])
+    write(tmp_path / "step-f-decisions.csv", confirm.DECISION_FIELDS, [])
+    write(tmp_path / "step-f-robots-recheck.csv", confirm.RECHECK_FIELDS, [
+        {"org_id": "d", "host": "www.daid.org", "old_verdict": "allowed",
+         "new_verdict": "forbidden", "effect": "withdrawn: robots.txt forbids the page read"}])
+    assert confirm.build(survey=tmp_path) == 0
+    row = careers.read_csv(tmp_path / "step-f-confirmed.csv")[0]
+    assert (row["outcome"], row["jobs_seen"], row["listing"]) == ("robots.txt forbids", "", "")
+    assert row["note"].startswith("withdrawn")
+
+
 def test_the_streaks_count_only_requests_made():
     cf = ("a.org", "cloudflare")
     refusals, failures = confirm.tally([], 0, cf, False)
