@@ -15,7 +15,7 @@ import re
 import threading
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, urlparse, urljoin
+from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from contracts.admission import admit_batch, log_admission_rejections
 from contracts.detail_reader import apply_detail_reading, read_detail_page
@@ -41,11 +41,6 @@ logger = logging.getLogger(__name__)
 # is task-local rather than an attribute.
 _SOURCE_FOR_LOGS: contextvars.ContextVar = contextvars.ContextVar("crawl_source_id", default=None)
 _DATEPARSER_LOCK = threading.Lock()
-
-
-def _is_unicef_listing(url: str) -> bool:
-    host = (urlparse(url or '').hostname or '').lower()
-    return host == 'unicef.org' or host.endswith('.unicef.org')
 
 
 def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
@@ -90,10 +85,13 @@ _ISO_TIME = re.compile(r'(?<=\d)T(?=\d)')
 _FOUR_DIGITS = re.compile(r'\d{4}')
 
 
-_UNICEF_PAGE_CAP = 30
-_UNICEF_RETRY_DELAY = 30.0
+_PAGEUP_PAGE_CAP = 30
+# UNICEF's firewall has challenged the seventh request of every crawl since 19 October 2026, so a
+# whole listing must fit in a few requests; its listing answers 100 jobs a page (7 November 2026).
+_PAGEUP_PAGE_ITEMS = 100
+_PAGEUP_RETRY_DELAY = 30.0
 # A refusal or a challenge (202, 429) is never retried; a plain 503 once.
-_UNICEF_RETRY_STATUSES = frozenset({503})
+_PAGEUP_RETRY_STATUSES = frozenset({503})
 _sleep = asyncio.sleep
 
 # Only these response headers are logged. Cookies and authorization never are.
@@ -157,7 +155,7 @@ def _page_number(query: str) -> Optional[int]:
     return int(values[0])
 
 
-def _next_unicef_page(html: str, page_url: str, careers_url: str) -> Optional[str]:
+def _next_listing_page(html: str, page_url: str, careers_url: str) -> Optional[str]:
     """The More Jobs link, only when it stays on the listing path and asks for a later page."""
     link = BeautifulSoup(html, 'html.parser').select_one('a.more-link[href]')
     if link is None:
@@ -177,6 +175,26 @@ def _next_unicef_page(html: str, page_url: str, careers_url: str) -> Optional[st
     if wanted is None or wanted <= current:
         return None
     return target
+
+
+def _resized_listing_page(html: str, careers_url: str) -> Optional[str]:
+    """Page one at the reader's page size, built from the first page's own More Jobs link: its
+    address without `page`, with `page-items` raised. None when there is no such link, it names
+    no page size, or it already asks for as many jobs."""
+    target = _next_listing_page(html, careers_url, careers_url)
+    if target is None:
+        return None
+    parts = urlparse(target)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    sizes = [value for name, value in pairs if name == 'page-items']
+    if len(sizes) != 1 or not sizes[0].isdigit() or int(sizes[0]) >= _PAGEUP_PAGE_ITEMS:
+        return None
+    query = urlencode([
+        (name, str(_PAGEUP_PAGE_ITEMS) if name == 'page-items' else value)
+        for name, value in pairs
+        if name != 'page'
+    ])
+    return urlunparse(parts._replace(query=query))
 
 
 _LISTING_COMPLETE_STOP = 'no More Jobs link'
@@ -212,8 +230,8 @@ class SimpleCrawler:
     Simple crawler that fetches HTML, extracts jobs, and saves to database.
     No complex validation, no repair system - just extract and save.
 
-    Extraction is rule-based: structured data, visible labels, the UNICEF reader, and the
-    general reader. No AI service is called.
+    Extraction is rule-based: structured data, visible labels, the PageUp career-site reader,
+    and the general reader. No AI service is called.
     """
     
     def __init__(self, db_url: str, shadow_mode: bool = False):
@@ -1908,58 +1926,62 @@ class SimpleCrawler:
     async def _listing_jobs(
         self, html: str, careers_url: str
     ) -> Tuple[List[Dict], Optional[Dict]]:
-        """(jobs, listing report). UNICEF listings use the UNICEF reader first; every other
-        source goes to the rule-based reader, with no report.
+        """(jobs, listing report). A page of PageUp career-site job cards is read by that reader,
+        page by page; any other page goes to the rule-based reader, with no report. The reader is
+        chosen by what the page shows, never by its address.
 
         The report is returned, never stored on the crawler: one instance serves concurrent crawls.
         """
-        if _is_unicef_listing(careers_url):
-            try:
-                jobs, report = await self._unicef_listing_jobs(html, careers_url)
-                if jobs:
-                    logger.info(f"UNICEF reader found {len(jobs)} jobs")
-                    return jobs, report
-                logger.info("UNICEF reader returned no jobs, falling back to rule-based")
-            except Exception as e:
-                logger.warning(f"UNICEF reader failed: {e}, falling back to rule-based")
+        try:
+            jobs, report = await self._pageup_listing_jobs(html, careers_url)
+            if jobs:
+                logger.info(f"PageUp career-site reader found {len(jobs)} jobs")
+                return jobs, report
+        except Exception as e:
+            logger.warning(f"PageUp career-site reader failed: {e}, falling back to rule-based")
         return self.extract_jobs_from_html(html, careers_url), None
 
-    async def _unicef_listing_jobs(
+    async def _pageup_listing_jobs(
         self, first_html: str, careers_url: str
     ) -> Tuple[List[Dict], Optional[Dict]]:
-        """Read page one, then follow the More Jobs link page by page. All pages form one batch.
+        """Read page one's job cards, ask for page one again at the reader's page size, then
+        follow the More Jobs links page by page. All pages form one batch. ([], None) when the
+        page shows no job cards; no request is made then.
 
-        A failed later page keeps the jobs already read. Pages after the first use job cards only.
+        A failed later page keeps the jobs already read. Every later page must add new jobs,
+        except the resized page one when it shows jobs and links on (the site kept its own
+        page size).
         Returns the jobs and the walk's report; only a walk that ran out of links is complete.
         """
-        from crawler.plugins.unicef import UNICEFPlugin
-        reader = UNICEFPlugin()
-        jobs = _first_row_per_link(reader.extract(first_html, careers_url).jobs or [])
+        from crawler.plugins.pageup import PageUpListingReader
+        reader = PageUpListingReader()
+        jobs = _first_row_per_link(reader.read_job_cards(first_html, careers_url))
         if not jobs:
             return [], None
         seen = {job.get('apply_url') for job in jobs}
         remaining = _more_jobs_remaining(first_html)
         expected = len(jobs) + remaining if remaining is not None else None
-        page_html, page_url, pages = first_html, careers_url, 1
+        pages = 1
         stop = _LISTING_COMPLETE_STOP
         retry_used = False
-        while True:
-            next_url = _next_unicef_page(page_html, page_url, careers_url)
-            if next_url is None:
-                break
-            if pages >= _UNICEF_PAGE_CAP:
-                stop = f'page cap {_UNICEF_PAGE_CAP}'
+        next_url = _resized_listing_page(first_html, careers_url)
+        resized = next_url is not None
+        if not resized:
+            next_url = _next_listing_page(first_html, careers_url, careers_url)
+        while next_url is not None:
+            if pages >= _PAGEUP_PAGE_CAP:
+                stop = f'page cap {_PAGEUP_PAGE_CAP}'
                 break
             status, page_html, page_stop = await self._fetch_listing_page(next_url)
             retried_here = False
-            if status in _UNICEF_RETRY_STATUSES and not page_stop and not retry_used:
+            if status in _PAGEUP_RETRY_STATUSES and not page_stop and not retry_used:
                 # At most one retry in the whole crawl.
                 retry_used = retried_here = True
                 logger.info(
-                    "UNICEF listing: HTTP %s on %s, retrying once in %ss",
-                    status, next_url, _UNICEF_RETRY_DELAY,
+                    "PageUp listing: HTTP %s on %s, retrying once in %ss",
+                    status, next_url, _PAGEUP_RETRY_DELAY,
                 )
-                await _sleep(_UNICEF_RETRY_DELAY)
+                await _sleep(_PAGEUP_RETRY_DELAY)
                 status, page_html, page_stop = await self._fetch_listing_page(next_url)
             if page_stop:
                 stop = f'{_stop_text(page_stop)} on {next_url}'
@@ -1971,19 +1993,22 @@ class SimpleCrawler:
                 if retried_here:
                     stop += ' after one retry'
                 break
-            page_url = next_url
             pages += 1
-            new_jobs = [
-                job for job in _first_row_per_link(reader.read_job_cards(page_html, page_url))
-                if job.get('apply_url') not in seen
-            ]
-            if not new_jobs:
+            page_jobs = _first_row_per_link(reader.read_job_cards(page_html, next_url))
+            new_jobs = [job for job in page_jobs if job.get('apply_url') not in seen]
+            following = _next_listing_page(page_html, next_url, careers_url)
+            if resized:
+                left = _more_jobs_remaining(page_html)
+                if left is not None and page_jobs:
+                    expected = len(page_jobs) + left
+            if not new_jobs and not (resized and page_jobs and following):
                 stop = f'page {pages} added no new jobs'
                 break
             seen.update(job.get('apply_url') for job in new_jobs)
             jobs.extend(new_jobs)
+            next_url, resized = following, False
         logger.info(
-            "UNICEF listing: %s pages, %s jobs, expected %s, stopped: %s",
+            "PageUp listing: %s pages, %s jobs, expected %s, stopped: %s",
             pages, len(jobs), expected if expected is not None else 'unknown', stop,
         )
         report = {

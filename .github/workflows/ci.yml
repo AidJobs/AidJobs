@@ -98,6 +98,7 @@ jobs:
           app/db_health.py
           app/search_projection.py
           crawler_v2/run_handle.py
+          crawler/plugins
           contracts
           security/admin_auth.py
           app/admin_auth_routes.py

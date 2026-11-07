@@ -1,12 +1,5 @@
 """
-Site readers used by the crawler.
+Listing readers used by the crawler, each chosen by what a page shows.
 
-Only the UNICEF reader is used; the crawler imports it directly.
+Only the PageUp career-site reader exists; the crawler imports it directly.
 """
-
-from .base import ExtractionPlugin, PluginResult
-
-__all__ = [
-    'ExtractionPlugin',
-    'PluginResult',
-]

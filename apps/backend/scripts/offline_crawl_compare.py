@@ -70,6 +70,8 @@ EXTRA_PAGES = {
     "https://jobs.unicef.org/en-us/listing/?page=2&page-items=20": "unicef-pagination/page2.body",
     "https://jobs.unicef.org/en-us/listing/?page=7&page-items=20":
         "unicef-pagination/page7-direct.body",
+    "https://jobs.unicef.org/en-us/listing/?page-items=100":
+        "unicef-pagination/page1-items100.body",
 }
 
 
