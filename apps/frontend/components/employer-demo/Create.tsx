@@ -140,6 +140,7 @@ export default function Create({ id }: { id?: string }) {
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
   const checks = job.sections.length ? openChecks(job, s) : [];
+  const menu = !reviewing && job.status !== 'live' && job.status !== 'closed';
   const setPanel = (p: Panel) => {
     setPanelState(p);
     save(PANEL_KEY, p ?? 'none');
@@ -162,11 +163,12 @@ export default function Create({ id }: { id?: string }) {
           </button>
         </Tip>
       )}
-      {!reviewing && job.status !== 'live' && job.status !== 'closed' && (
+      {menu && (
         <MenuButton
           label="More actions for this job draft"
           trigger={<MoreHorizontal size={15} strokeWidth={1.8} />}
           actions={[
+            ...(phone ? [{ label: 'JD outline', run: () => setSheet('outline') }] : []),
             ...(phone && job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
             ...(phone && job.sections.length && isReviewable(job) ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
@@ -178,7 +180,8 @@ export default function Create({ id }: { id?: string }) {
       {!reviewing && job.sections.length > 0 && isReviewable(job) && (
         <Tip label={blocked ? 'Next: check, send for review (approval is required), and publish' : checks.length ? `Next: check and publish. To look at: ${checks.join('; ')}.` : 'Next: check and publish'} side="bottom">
           <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
-            {phone ? 'Next' : 'Next: check and publish'} <ArrowRight size={13} strokeWidth={2} />
+            {phone ? 'Next' : 'Next: check and publish'}
+            {!phone && <ArrowRight size={13} strokeWidth={2} />}
             {checks.length > 0 && <span className="ej-count-badge">{checks.length}</span>}
           </button>
         </Tip>
@@ -201,7 +204,7 @@ export default function Create({ id }: { id?: string }) {
 
   const docPane = (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-4">
+      <div className="ej-phone-bar flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-4">
         <Tip label="Back" side="bottom">
           <button type="button" className="aj-icon-btn" onClick={() => goBack('create')} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
@@ -209,10 +212,12 @@ export default function Create({ id }: { id?: string }) {
         </Tip>
         {titleLabel}
         {phone ? (
-          <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <button type="button" className="aj-icon-btn" onClick={() => setSheet('outline')} aria-label="JD outline">
-              <ListTree size={15} strokeWidth={1.8} />
-            </button>
+          <span className="ml-auto flex shrink-0 items-center gap-1">
+            {!menu && (
+              <button type="button" className="aj-icon-btn" onClick={() => setSheet('outline')} aria-label="JD outline">
+                <ListTree size={15} strokeWidth={1.8} />
+              </button>
+            )}
             <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('review')} aria-label={reviewBadge ? `Review, ${reviewBadge} waiting` : 'Review'}>
               <UserCheck size={15} strokeWidth={1.8} />
               {reviewBadge ? <span className="ej-rail-badge">{reviewBadge}</span> : null}

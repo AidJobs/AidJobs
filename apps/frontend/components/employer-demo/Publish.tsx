@@ -50,7 +50,7 @@ import {
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
 import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
-import BeforePublish, { checkSummary, type RowKey } from './Checks';
+import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
@@ -977,7 +977,7 @@ export default function Publish({ id }: { id?: string }) {
           </h1>
           {!upgrade && (
             <div className="mt-1.5">
-              <Steps current={2} />
+              <Steps current={reason || checksToLook(job, s, chosen === 'amplify') ? 2 : 3} />
             </div>
           )}
         </div>

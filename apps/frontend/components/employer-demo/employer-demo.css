@@ -322,7 +322,8 @@
     padding: 0 10px;
   }
 
-  .aj-root .ej-jobrow .aj-icon-btn {
+  .aj-root .ej-jobrow .aj-icon-btn,
+  .aj-root .ej-phone-bar .aj-icon-btn {
     width: 34px;
     height: 34px;
   }

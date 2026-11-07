@@ -905,6 +905,30 @@ describe('employer demo: managing jobs', () => {
     expect(window.location.hash).toBe('#home');
   });
 
+  it('on phones the outline sits in the More menu, leaving room for the title; Publish is the current step once nothing is left to check', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = true;
+    render();
+    route('#home');
+    route('#create/job-fin');
+    expect(container.querySelector('button[aria-label="JD outline"]')).toBeNull();
+    act(() => (container.querySelector('button[aria-label="More actions for this job draft"]') as HTMLElement).click());
+    click('JD outline');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('JD outline');
+    phone = false;
+    render();
+    route('#home');
+    route('#publish/job-fin');
+    const step = () => container.querySelector('[aria-label="Steps to publish"] [aria-current="step"]')?.textContent;
+    expect(step()).toContain('Check');
+    act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id !== 'job-fin' ? j : { ...j, sections: j.sections.map((sec) => (sec.key !== 'requirements' ? sec : { ...sec, lines: sec.lines.map((l, i) => (i === 3 ? '- A sound grasp of donor financial rules' : l)) })) })) })));
+    expect(container.querySelector('[aria-label="Where the job stands"]')?.textContent).toContain('checks all clear');
+    expect(step()).toContain('Publish');
+  });
+
   it('a scheduled job in the workspace is done, not sent to Check and publish again', () => {
     act(() => {
       resetDemo();

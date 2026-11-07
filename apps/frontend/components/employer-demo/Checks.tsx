@@ -141,11 +141,13 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
  * Before publishing: the advert check for every job; for Amplify, the market check, the full advert check, language versions, and the
  * field-post notice (employer-side plan, section 16, decision 6). Each point offers a one-tap fix where there is one.
  */
+export function checksToLook(job: DemoJob, s: State, amplify: boolean): number {
+  return basicAdvertCheck(job, s).filter((p) => !p.ok).length + (amplify ? fullAdvertCheck(job, s).points.filter((p) => !p.ok).length : 0);
+}
+
 /** Where the job stands before publishing, in a few words each: for the summary above the main button. */
 export function checkSummary(job: DemoJob, s: State, amplify: boolean): Array<{ key: RowKey; text: string }> {
-  const basic = basicAdvertCheck(job, s);
-  const full = amplify ? fullAdvertCheck(job, s) : null;
-  const toLook = basic.filter((p) => !p.ok).length + (full?.points.filter((p) => !p.ok).length ?? 0);
+  const toLook = checksToLook(job, s, amplify);
   const versions = LANGS.filter((l) => job.translations?.[l.key]);
   return [
     { key: 'advert', text: toLook ? `${toLook} ${toLook === 1 ? 'check' : 'checks'} to look at` : 'checks all clear' },
