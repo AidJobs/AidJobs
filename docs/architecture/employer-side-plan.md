@@ -286,9 +286,11 @@ Then one independent review of the round, its fixes, and the user's look on the 
 - A refund policy beyond "none", and prices by type of organisation.
 - Production needs: the AI decision (E7); Paddle products, packages, and subscriptions; market data from the crawler (counts and dates, within each source's reuse terms); per-channel link tracking; the email set-up (section 9); contract changes, each with its own plan.
 
-## 17. To discuss: a usage allowance, and showing the plans (raised by the user, 7 November 2026; not agreed)
+## 18. To discuss: a usage allowance, and showing the plans (raised by the user, 7 November 2026; not agreed)
 
-Recorded for a later discussion and plan. Nothing here changes section 16 or the demo until the user agrees it.
+Recorded for a later discussion and plan. Nothing here changes section 16 or the demo until the user agrees it. Section 17 is round 5 (Manage jobs), agreed with the user on 6 and 7 November 2026 and kept on `demo/employer` until it is copied here.
+
+**When (the user, 7 November 2026):** the demo round for this section is **round 6, after round 5**, in its own chat, once the points under "To settle in the discussion" are settled. Production follows the employer side's own order: after launch (section 12), with the AI decision (E7), the contract changes in section 2, Paddle, and the email set-up.
 
 ### The user's ideas
 
@@ -383,6 +385,24 @@ Other languages for the same job stay where they are: language versions on the p
 - **The language pill:** its hover text says "This job is written in this language from the start, not translated. Add other languages when you publish." For an organisation working in countries with a supported local language, the pill suggests it once ("Your organisation works in India: Hindi is available").
 - **Set-up and the welcome card:** the organisation chooses its usual job languages during set-up (they become the default for new jobs), and the welcome card says in one line that jobs and the chat work in those languages.
 - **The publish page:** language versions explain the difference: "Your job is in Hindi. Add English or another language as a version."
+
+### AI providers: desk research (7 November 2026, approved by the user; no key, nothing sent to any provider)
+
+Prices and token counts from public pages read on 7 November 2026 (third-party price lists that cite the providers' own pages; Not verified against each provider's page). US dollars per million tokens, input / output:
+
+| Tier | Examples | Price |
+| --- | --- | --- |
+| Small | GPT-6 Luna, Claude Haiku 5.5 | 0.10 / 0.50 |
+| Fast | Gemini 3.8 Flash (introductory until 31 December 2026, then 1.50 / 7.50) | 0.75 / 3.75 |
+| Mid | GPT-6.1 Sol, Claude Sonnet 5.5, Gemini 4 Argon (introductory until 30 November 2026, then 4 / 20) | 2 / 10 |
+| India-focused | Sarvam 105B (10 Indian languages and English; ₹15 / ₹60) | about 0.17 / 0.68 |
+
+- **Cost of one job (the agent's estimate):** about 15 chat turns, the job description sent with each, plus the checks: roughly 120,000 input and 15,000 output tokens. About US$0.02 on a small model, US$0.15 on a fast one, and US$0.25 to 0.40 on a mid-tier one (less with prompt caching). A free organisation's two jobs cost cents a month against US$28.40 for one Amplify job, so the per-job budget (above) protects against misuse rather than everyday cost, and can be generous (three to four times the average).
+- **Languages cost more tokens:** for the same text, Hindi takes about 1.4 to 1.65 times English with OpenAI's tokenizer, 1.2 to 1.4 with Gemini's, and about 2.3 with Claude's; Bengali and Urdu are similar (Claude 2.6 to 2.9); Swahili about 1.7 (OpenAI) to 2.0 (Gemini). Gemini is the most efficient for Indian languages, Claude the least. The per-language budget above follows from this.
+- **Quality:** published benchmarks put the leading models' Hindi and Bengali close to their English, with Swahili, Amharic, and other African and South Asian languages clearly weaker (MuBench and GaoYao, ACL 2026; Artificial Analysis' multilingual index). General benchmarks do not measure job descriptions, so a hands-on test with native readers decides each language.
+- **Data:** OpenAI, Anthropic, and Google do not train on paid API data by default. Each keeps prompts up to about 30 days for abuse monitoring; zero data retention is available on approval (OpenAI, Anthropic) or through Google's Vertex AI. Free tiers are not used. Sarvam's data terms are not yet read.
+
+**The hands-on test, next (needs the user's decisions):** a shortlist (for example GPT-6.1 Sol, Gemini 3.8 Flash and 4 Argon, Claude Sonnet 5.5, Sarvam 105B); about 10 sample job descriptions written by the agent (no real employer or person's data) in English, Hindi, Bengali, Urdu, and Swahili; measured tokens and cost per job, with judged quality (the user for Hindi, native readers for the others). Decisions: which providers; one key or several (one prepaid OpenRouter account gives one key and a hard spending limit, W-14); the spending limit (for example US$10); keys only in the local vault, never in a file or the repository (W-01, W-30); the test script outside the repository or git-ignored.
 
 ### To settle in the discussion
 
