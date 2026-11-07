@@ -26,7 +26,7 @@ If the repository contradicts this plan, stop and propose the smallest amendment
 
 1. One production crawler path and one writer. HTML, RSS, and API use the same admission and persistence contract.
 2. PostgreSQL is authoritative. Meilisearch is derived.
-3. Preserve existing extraction order, identity rules, and the UNICEF reader. Amended on 27 October 2026 by the user's decision (contract §10, ledger W-11 and W-14): the crawler calls no AI service, and the old plugin registry with its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins is removed. None of them ever ran in the current crawler (`SimpleCrawler`, since 4 December 2025). Bringing back AI or another site-specific reader is its own decision, with offline proof first.
+3. Preserve existing extraction order, identity rules, and the UNICEF reader. Amended on 27 October 2026 by the user's decision (contract §10, ledger W-11 and W-14): the crawler calls no AI service, and the old plugin registry with its UNDP, UNESCO, Amnesty, Save the Children, and generic plugins is removed. None of them ever ran in the current crawler (`SimpleCrawler`, since 4 December 2025). Bringing back AI or another site-specific reader is its own decision, with offline proof first. Amended on 8 November 2026 (contract §10, ledger W-04; effective when the user explicitly approves merging that record): the UNICEF reader is now the PageUp career-site reader, chosen by page structure rather than address, with the same card reading.
 4. An incomplete or untrusted crawl must not expire or delete jobs.
 5. Reject junk before persistence. A job-like URL is not enough.
 6. Every server-side fetch follows one outbound-request policy, or it does not run.
@@ -434,6 +434,8 @@ Live check, 18 October 2026 at 09:30 UTC: 20 found, 20 inserted, all with a loca
 The plugin registry cannot be built on `main`: `crawler/plugins/unesco.py` does not compile (`IndentationError`, line 161), and the registry catches only `ImportError`. The UNDP plugin also fails to import. PR #11 imports the UNICEF reader directly. The registry repair is open work, not part of C5. Superseded on 27 October 2026: the registry and its plugins are removed (PR #58, principle 3).
 
 Still open for UNICEF: the crawler reads only page one of the listing (20 jobs), and rows from before the fix have no deadline, so search keeps showing them. See W-02, W-04, and W-06 in the progress ledger.
+
+W-04, built 8 November 2026 as [PR #118](https://github.com/AidJobs/AidJobs/pull/118), not merged (ledger W-04). Paging (PRs #13 and #14) still stopped at page 7, where UNICEF's CloudFront firewall challenges the seventh request. The reader is now the PageUp career-site reader, the platform the saved pages show: it is chosen by the job cards above on any address, and `_is_unicef_listing`, the old fallback strategies, and the plugin base are removed. From the first page's More Jobs link it asks for page one again at `page-items=100` (honoured by UNICEF on 7 November 2026, one approved request), then follows the site's own links, so 273 jobs take five requests counting `robots.txt`. Paging and completeness rules are unchanged; a bigger page that adds no jobs and ends the walk is partial. The offline comparison on the saved pages is identical to `main` except the two UNICEF sources. One manual crawl after the merge, with its pass criteria in the ledger, closes the paging part of W-04.
 
 ### B3. Identity and upsert audit
 
