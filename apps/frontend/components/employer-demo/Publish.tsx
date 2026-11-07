@@ -28,6 +28,7 @@ import {
   BADGE_TIP,
   canGoFree,
   currentMonth,
+  delisted,
   FREE_PER_MONTH,
   firstOfNextMonth,
   freeLeft,
@@ -131,6 +132,12 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           {job.closeReason === 'withdrawn' ? 'This vacancy has been withdrawn' : job.closeReason === 'filled' ? 'This position has been filled' : 'This vacancy has closed'}
         </div>
       )}
+      {delisted(job, s.today) && (
+        <div className="aj-card flex flex-col gap-0.5 p-3" role="status" lang="en" dir="ltr">
+          <span style={{ fontWeight: 650 }}>No longer listed on AidJobs</span>
+          <span className="aj-muted">Applications are still open{job.facts.deadline ? ` until ${longDate(job.facts.deadline)}` : ''}.</span>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <OrgMark name={s.org.name} />
         <span className="aj-muted min-w-0 flex-1 truncate">{s.org.name}</span>
@@ -178,7 +185,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
         ))}
         {job.updatedAfterPublish && !l && (
           <span className="aj-chip" data-tone="sage">
-            Updated
+            {job.editedAt ? `Updated on ${new Date(job.editedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}` : 'Updated'}
           </span>
         )}
       </div>
@@ -772,7 +779,8 @@ export default function Publish({ id }: { id?: string }) {
   const upgrade = published && job.plan === 'free' && !done;
   if (done || (published && !upgrade)) return <Success job={job} s={s} onAmplify={() => setDone(false)} />;
 
-  const chosen: Plan = upgrade ? 'amplify' : plan;
+  const prepaid = Boolean(job.paidFor) && !upgrade;
+  const chosen: Plan = upgrade || prepaid ? 'amplify' : plan;
   const nowMonth = currentMonth(s);
   const month = monthFor(s, schedule);
   const nextFirst = firstOfNextMonth(nowMonth);
@@ -794,7 +802,9 @@ export default function Publish({ id }: { id?: string }) {
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
   const label =
     reason ??
-    (upgrade
+    (prepaid
+      ? `${schedule ? `Amplify and schedule${when}` : 'Amplify and publish'}${inviting} · already paid`
+      : upgrade
       ? `Amplify this job${inviting} · ${onHand ? 'uses 1 package job' : priceLabel(payKey)}`
       : chosen === 'free'
         ? schedule
@@ -821,6 +831,7 @@ export default function Publish({ id }: { id?: string }) {
     if (!upgrade && now && changesAfterApproval(now) && now.review.overruled === undefined) return setOverrule(true);
     setFailed(null);
     if (chosen === 'free') publishFree(schedule);
+    else if (prepaid) finish(publish(job.id, { plan: 'amplify', schedule, paid: 'direct' }));
     else if (onHand) finish(upgrade ? amplifyLive(job.id, 'onHand') : publish(job.id, { plan: 'amplify', schedule, paid: 'onHand' }));
     else setCheckout(payKey);
   };
@@ -947,7 +958,7 @@ export default function Publish({ id }: { id?: string }) {
           )}
 
           <div className="flex flex-col gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Free or Amplify">
-            {!upgrade && (
+            {!upgrade && !prepaid && (
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
                   {counted ? 'This job already counts as one of your free jobs: it was downloaded or sent for review.' : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}`}
@@ -977,7 +988,12 @@ export default function Publish({ id }: { id?: string }) {
                 )}
               </Choice>
             )}
-            <Choice on={chosen === 'amplify'} title="Amplify" price={onHand ? 'Package job' : `${usd(pkg === 'one' ? single.amount : packageOf(pkg).price)}${pkg === 'always' ? ' a month' : ''}`} onSelect={() => setPlan('amplify')} amplified disabled={upgrade}>
+            <Choice on={chosen === 'amplify'} title="Amplify" price={prepaid ? 'Paid' : onHand ? 'Package job' : `${usd(pkg === 'one' ? single.amount : packageOf(pkg).price)}${pkg === 'always' ? ' a month' : ''}`} onSelect={() => setPlan('amplify')} amplified disabled={upgrade || prepaid}>
+                {prepaid && (
+                  <span className="aj-muted" style={{ fontWeight: 600 }}>
+                    Already paid: it was scheduled, then taken back to a draft. Publishing it again costs nothing.
+                  </span>
+                )}
                 {upgrade && (
                   <span className="aj-muted" style={{ fontWeight: 600 }}>
                     Now free, listed until {longDate(listedUntil(job, s.today))}.{' '}
@@ -985,7 +1001,7 @@ export default function Publish({ id }: { id?: string }) {
                   </span>
                 )}
                 <AmplifyIncludes />
-                {onHand ? (
+                {prepaid ? null : onHand ? (
                   <span className="aj-muted" style={{ fontWeight: 600 }}>
                     Uses 1 of your {onHandCount} package {onHandCount === 1 ? 'job' : 'jobs'}
                     {onHand.kind === 'pack' ? `, to use by ${longDate(onHand.pack.ends)}.` : ', for this month of “Always hiring”.'}
@@ -1065,9 +1081,9 @@ export default function Publish({ id }: { id?: string }) {
             {label}
           </button>
           <span className="aj-faint text-center" style={{ fontSize: 11.5 }}>
-            {chosen === 'free' ? 'Nothing to pay.' : onHand ? 'Nothing to pay now: it uses a job you have already paid for.' : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
+            {chosen === 'free' ? 'Nothing to pay.' : prepaid ? 'Nothing to pay: it is already paid for.' : onHand ? 'Nothing to pay now: it uses a job you have already paid for.' : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
           </span>
-          {chosen === 'amplify' && !onHand && !reason && !request && (
+          {chosen === 'amplify' && !prepaid && !onHand && !reason && !request && (
             <div className="flex justify-center">
               <Tip label="For when someone else holds the card, such as finance or your director. They get a link to pay; the job publishes once they have paid, and the receipt goes to them.">
                 <button type="button" className="aj-text-btn" onClick={() => setAsking(true)}>

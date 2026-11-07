@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
 import { daysUntil } from './engine';
-import { BADGE, BADGE_TIP } from './plans';
+import { BADGE, BADGE_TIP, delisted } from './plans';
 import { JobPageLangs } from './Publish';
 import { PUBLIC_SAMPLES } from './sample';
 import { useDemo } from './store';
@@ -49,7 +49,7 @@ function JobCard({ c, highlight, onOpen }: { c: Card; highlight?: boolean; onOpe
 
 function cards(s: State): Card[] {
   const own: Card[] = s.jobs
-    .filter((j) => j.status === 'live' && j.facts.deadline)
+    .filter((j) => j.status === 'live' && j.facts.deadline && !delisted(j, s.today))
     .map((j) => ({ id: j.id, org: s.org.name, title: j.facts.title, place: j.facts.location, iso: j.facts.iso, days: daysUntil(s.today, j.facts.deadline), amplified: j.plan === 'amplify', own: j }));
   return [...own, ...PUBLIC_SAMPLES].sort((a, b) => a.days - b.days);
 }

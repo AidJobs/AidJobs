@@ -631,6 +631,50 @@ describe('employer demo: managing jobs', () => {
     expect(network).toEqual([]);
   });
 
+  it('scheduled jobs, the listing end, and telling invited people, from the menu and the job page', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+      publish('job-fin', { plan: 'amplify', schedule: new Date(getState().today + 3 * 86_400_000).toISOString().slice(0, 10), paid: 'direct' });
+    });
+    phone = false;
+    render();
+    route('#home');
+    shows('Livelihoods Officer: its free listing ends in 5 days');
+    route('#jobs');
+    expect(container.querySelector('#ej-group-scheduled')?.textContent).toContain('Publish now');
+    menu('Finance Officer');
+    click('Change the date');
+    shows('Change the publishing date');
+    click('Cancel');
+    menu('Finance Officer');
+    click('Back to draft');
+    shows('It stays paid for: publishing it again costs nothing.');
+    click('Back to a draft');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.status).toBe('approved');
+
+    route('#jobs/job-liv');
+    shows('Its free listing ends in 5 days');
+    click('Let it leave the list');
+    expect(getState().jobs.find((j) => j.id === 'job-liv')?.listingChoice).toBe('leave');
+
+    route('#jobs/job-cps');
+    click('Extend');
+    click(/^Extend to/);
+    shows('Changed since publishing');
+    click('Tell the 5 people Reach invited');
+    shows('Update: Child Protection Specialist');
+    click('Send to 5 people');
+    expect(getState().jobs.find((j) => j.id === 'job-cps')?.reach?.updates?.[0].count).toBe(5);
+
+    act(() => update((st) => ({ ...st, today: st.today + 6 * 86_400_000 })));
+    route('#public');
+    expect(container.textContent).not.toContain('Livelihoods Officer');
+    route('#public/job-liv');
+    shows('No longer listed on AidJobs');
+    expect(network).toEqual([]);
+  });
+
   it("a job's page is in parts, with one main action and Now first", () => {
     phone = false;
     render();

@@ -29,7 +29,9 @@ function normalise(s0: State): State {
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
     const tags = outlineOrder(j0.tags);
-    const j = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
+    const j1 = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
+    // Saved before jobs kept a copy of what went live: today's text is the starting point for "changed since publishing".
+    const j = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;
     if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;

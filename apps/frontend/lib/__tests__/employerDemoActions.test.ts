@@ -14,8 +14,17 @@ import {
   canSkipApproval,
   changedSinceLastRound,
   changesAfterApproval,
+  backToDraft,
   canDelete,
+  closeAtListingEnd,
   completePayRequest,
+  declineTell,
+  freeNeed,
+  letLeaveList,
+  publishNow,
+  reschedule,
+  rescheduleBlock,
+  tellInvited,
   deleteJob,
   dismissMoment,
   editSection,
@@ -57,7 +66,8 @@ import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } f
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { purgeDeleted } from '../../components/employer-demo/lifecycle';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
-import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
+import { addMonths, canGoFree, currentMonth, delisted, firstOfNextMonth, freeLeft, listedUntil, listingEnd, listingEndsIn, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
+import { changesSince, tellOffer } from '../../components/employer-demo/changes';
 import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -287,6 +297,110 @@ describe('reviewers comment and decide, but never change the job', () => {
     sendChat('job-fin', 'make it shorter');
     expect(deleteJob('job-fin')).toBe(false);
     expect(JSON.stringify(job('job-fin'))).toBe(before);
+  });
+});
+
+describe('managing jobs: scheduled jobs, changes since publishing, the listing end (plan section 17, phase 2)', () => {
+  const DAY = 86_400_000;
+  const tomorrow = () => isoDay(getState().today + DAY);
+  const scheduleAmplified = () => {
+    setReachPlan('job-fin', { candidates: ['a@example.org', 'b@example.org'], team: [], candidateMsg: { subject: 's', body: 'b', closing: 'c' }, teamMsg: { subject: 's', body: 'b', closing: 'c' } });
+    expect(publish('job-fin', { plan: 'amplify', schedule: tomorrow(), paid: 'direct' })).toBe(true);
+  };
+  const freeJobFor = (months: number) => {
+    const id = startJob('Hiring a Shelter Officer in Goma');
+    setFacts(id, { deadline: isoDay(getState().today + (months * 31 + 20) * DAY) });
+    return id;
+  };
+
+  it('Publish now sends the waiting Reach emails and lists the job from today', () => {
+    scheduleAmplified();
+    expect(job('job-fin').reach?.candidates.every((r) => r.status === 'waiting')).toBe(true);
+    expect(publishNow('job-fin')).toBe(true);
+    expect(job('job-fin').status).toBe('live');
+    expect(job('job-fin').scheduledFor).toBeUndefined();
+    expect(job('job-fin').reach?.candidates.some((r) => r.status === 'waiting')).toBe(false);
+    expect(job('job-fin').published?.facts.title).toBe('Finance Officer');
+  });
+
+  it('a free job scheduled into next month needs one of this month\'s free jobs to publish now; next month\'s stays used', () => {
+    const next = firstOfNextMonth(currentMonth(getState()));
+    const a = freeJobFor(2);
+    expect(publish(a, { plan: 'free', schedule: next })).toBe(true);
+    expect(freeNeed(getState(), job(a), currentMonth(getState()))).toBe('use');
+    expect(publishNow(a)).toBe(true);
+    expect(getState().freeUses.filter((u) => u.jobId === a).map((u) => u.month).sort()).toEqual([currentMonth(getState()), next.slice(0, 7)].sort());
+
+    const b = freeJobFor(2);
+    expect(publish(b, { plan: 'free', schedule: next })).toBe(true);
+    expect(freeLeft(getState())).toBe(0);
+    expect(freeNeed(getState(), job(b), currentMonth(getState()))).toBe('none-left');
+    expect(publishNow(b)).toBe(false);
+    expect(job(b).status).toBe('scheduled');
+  });
+
+  it('Change the date keeps the scheduling checks and moves the waiting emails', () => {
+    scheduleAmplified();
+    const later = isoDay(getState().today + 5 * DAY);
+    expect(rescheduleBlock(getState(), job('job-fin'), isoDay(getState().today))).toBe('Choose a date from tomorrow');
+    expect(rescheduleBlock(getState(), job('job-fin'), job('job-fin').facts.deadline)).toBe('It would close before it goes live');
+    expect(reschedule('job-fin', later)).toBe(true);
+    expect(job('job-fin').scheduledFor).toBe(later);
+    expect(job('job-fin').reach?.rounds.at(-1)?.sendsOn).toBe(later);
+  });
+
+  it('Back to draft keeps the Reach emails prepared and the payment: publishing again costs nothing', () => {
+    scheduleAmplified();
+    update((s) => ({ ...s, packs: [{ id: 'p', jobs: 3, left: 2, ends: isoDay(s.today + 30 * DAY), at: s.today }] }));
+    expect(backToDraft('job-fin')).toBe(true);
+    expect(job('job-fin').status).toBe('approved');
+    expect(job('job-fin').paidFor).toBe(true);
+    expect(job('job-fin').reach).toBeNull();
+    expect(job('job-fin').reachPlan?.candidates).toEqual(['a@example.org', 'b@example.org']);
+    expect(publishBlock(getState(), 'job-fin', { plan: 'amplify', schedule: null })).toBeNull();
+    expect(publish('job-fin', { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(true);
+    expect(getState().packs[0].left).toBe(2);
+    expect(job('job-fin').paidFor).toBeUndefined();
+    expect(job('job-fin').reach?.candidates).toHaveLength(2);
+  });
+
+  it('shows what changed since publishing, and offers once to tell the people Reach invited, counting the emails', () => {
+    const used = reachUsed(job('job-cps'));
+    extend('job-cps', 7);
+    expect(job('job-cps').editedAt).toBeTruthy();
+    expect(changesSince(job('job-cps')).map((c) => c.label)).toEqual(['Closing date']);
+    const offer = tellOffer(job('job-cps'));
+    expect(offer?.count).toBe(5);
+    expect(tellInvited('job-cps')).toBe(true);
+    expect(reachUsed(job('job-cps'))).toBe(used + 5);
+    expect(tellOffer(job('job-cps'))).toBeNull();
+    setFacts('job-cps', { location: 'Gulu, Uganda' });
+    expect(tellOffer(job('job-cps'))?.changes.map((c) => c.label)).toEqual(['Duty station']);
+    declineTell('job-cps');
+    expect(tellOffer(job('job-cps'))).toBeNull();
+  });
+
+  it('a free job, or a change that is not important, makes no offer', () => {
+    extend('job-meal', 7);
+    expect(changesSince(job('job-meal')).length).toBeGreaterThan(0);
+    expect(tellOffer(job('job-meal'))).toBeNull();
+    setFacts('job-cps', { grade: 'C2' });
+    expect(tellOffer(job('job-cps'))).toBeNull();
+  });
+
+  it('a free listing ending before the closing date: reminders in the last 7 days, close on the last listed day, or leave the list', () => {
+    const s = getState();
+    expect(listingEndsIn(job('job-liv'), s.today)).toBe(5);
+    expect(needsYou(s, job('job-liv'))).toBe(true);
+    closeAtListingEnd('job-liv');
+    expect(job('job-liv').facts.deadline).toBe(listingEnd(job('job-liv'), getState().today));
+    expect(listingEndsIn(job('job-liv'), getState().today)).toBeNull();
+    undo();
+    letLeaveList('job-liv');
+    expect(listingEndsIn(job('job-liv'), getState().today)).toBeNull();
+    expect(delisted(job('job-liv'), getState().today)).toBe(false);
+    expect(delisted(job('job-liv'), getState().today + 6 * DAY)).toBe(true);
+    expect(statusLine({ ...getState(), today: getState().today + 6 * DAY }, job('job-liv'))).toBe('Live · no longer listed on AidJobs');
   });
 });
 

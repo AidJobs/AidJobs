@@ -131,7 +131,9 @@ function sampleReach(j: DemoJob, today: number): DemoJob {
 }
 
 export function sampleJobs(today: number): DemoJob[] {
-  return sampleList(today).map((j) => (j.id === 'job-cps' ? sampleReach(j, today) : j));
+  return sampleList(today)
+    .map((j) => (j.id === 'job-cps' ? sampleReach(j, today) : j))
+    .map((j) => (j.status === 'live' ? { ...j, published: { facts: j.facts, sections: j.sections, at: j.publishedAt ?? today } } : j));
 }
 
 function sampleList(today: number): DemoJob[] {
@@ -151,6 +153,17 @@ function sampleList(today: number): DemoJob[] {
       publishedAt: lastMonth(today),
       audit: [{ at: lastMonth(today), who: 'Grace Akello', what: 'Published free' }],
     }, ['assessment']),
+    // Free, listed 60 days: its listing ends in 5 days, before it closes in 20 (plan section 17, decision 3).
+    job(today, 'job-liv', 'livelihoods', 'house', { title: 'Livelihoods Officer', location: 'Maiduguri, Nigeria', country: 'Nigeria', iso: 'NG', timezone: 'WAT', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 20), salaryMode: 'scale' }, {
+      status: 'live',
+      plan: 'free',
+      publishedAt: today - 55 * DAY,
+      createdAt: today - 60 * DAY,
+      audit: [
+        { at: today - 60 * DAY, who: SAMPLE_ME.name, what: 'Created' },
+        { at: today - 55 * DAY, who: SAMPLE_ME.name, what: 'Published free' },
+      ],
+    }),
     job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
       status: 'approved',
       review: {
@@ -209,10 +222,11 @@ export function initialState(today: number): State {
     jobs: sampleJobs(today),
     formats: allFormats(),
     inbox: sampleInbox(today),
-    // The Communications Intern was downloaded this month, so one of the month's two free jobs is used; the MEAL Coordinator used last month's.
+    // The Communications Intern was downloaded this month, so one of the month's two free jobs is used; the MEAL Coordinator used last month's, the Livelihoods Officer one in the month it went live.
     freeUses: [
       { jobId: 'job-comms', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) },
       { jobId: 'job-meal', month: monthOf(lastMonth(today), orgZone(SAMPLE_ORG).zone) },
+      { jobId: 'job-liv', month: monthOf(today - 55 * DAY, orgZone(SAMPLE_ORG).zone) },
     ],
     packs: [],
     subscription: null,

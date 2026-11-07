@@ -161,8 +161,11 @@ export type Message = { subject: string; body: string; closing: string };
 /** One sending: at go-live, or "invite more" later. */
 export type ReachRound = { n: number; at: number; why: string; sendsOn?: string };
 
+/** An email telling the people already invited about an important change; it counts toward the job's Reach emails. */
+export type ReachUpdate = { at: number; count: number; what: string };
+
 /** What Reach sent for a job, round by round. Nothing about recipients is ever public. */
-export type ReachRecord = { candidates: Recipient[]; team: Recipient[]; rounds: ReachRound[]; candidateMsg: Message; teamMsg: Message };
+export type ReachRecord = { candidates: Recipient[]; team: Recipient[]; rounds: ReachRound[]; candidateMsg: Message; teamMsg: Message; updates?: ReachUpdate[] };
 
 /** Reach prepared before sending: the people and the two messages, edited in their preview. */
 export type ReachPlan = { candidates: string[]; team: string[]; candidateMsg: Message; teamMsg: Message };
@@ -198,6 +201,8 @@ export type JobStatus = 'draft' | 'review' | 'approved' | 'scheduled' | 'live' |
 
 export type AuditEntry = { at: number; who: string; what: string };
 
+export type Snapshot = { facts: Facts; sections: Section[]; at: number };
+
 export type DemoJob = {
   id: string;
   status: JobStatus;
@@ -227,6 +232,16 @@ export type DemoJob = {
   closedAt?: number;
   closeReason?: 'deadline' | 'early' | 'filled' | 'withdrawn';
   updatedAfterPublish?: boolean;
+  /** When the live job was last changed; the public page says "Updated on" that day. */
+  editedAt?: number;
+  /** The job as it went live, to show what changed since publishing. */
+  published?: Snapshot;
+  /** Important changes the people Reach invited were told about, or the offer declined: never offered twice. */
+  reachTold?: string[];
+  /** "Let it leave the list" when a free job's listing ends before its closing date: no more reminders. */
+  listingChoice?: 'leave';
+  /** A paid job taken back to a draft: publishing it again costs nothing. */
+  paidFor?: boolean;
   /** Language versions of the job page; only reviewed ones are published, and only with Amplify. */
   translations?: Partial<Record<Lang, Translation>>;
   audit: AuditEntry[];

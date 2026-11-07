@@ -1,4 +1,4 @@
-import { addDays, isoDay, longDate, parseIso } from './engine';
+import { addDays, daysUntil, isoDay, longDate, parseIso } from './engine';
 import type { DemoJob, Org, Pack, Plan, State } from './types';
 
 /** Placeholder prices and terms (employer-side plan, section 16). */
@@ -149,11 +149,32 @@ export function rollBilling(s: State): State {
   return { ...s, packs, subscription: sub };
 }
 
+/** The end of the job's listing period, counted from publishing, whatever its closing date. */
+export function listingEnd(j: DemoJob, today: number): string {
+  const start = j.scheduledFor ?? (j.publishedAt ? isoDay(j.publishedAt) : isoDay(today));
+  return addDays(parseIso(start) + 12 * 3_600_000, LISTED_DAYS[j.plan ?? 'free']);
+}
+
 /** The last day a job is listed: its listing period from publishing, or its closing date if that comes first. */
 export function listedUntil(j: DemoJob, today: number): string {
-  const start = j.scheduledFor ?? (j.publishedAt ? isoDay(j.publishedAt) : isoDay(today));
-  const end = addDays(parseIso(start) + 12 * 3_600_000, LISTED_DAYS[j.plan ?? 'free']);
+  const end = listingEnd(j, today);
   return j.facts.deadline && j.facts.deadline < end ? j.facts.deadline : end;
+}
+
+/** A free live job whose listing ends before its closing date: the days left to choose (decision 3), within the last 7; null otherwise. */
+export function listingEndsIn(j: DemoJob, today: number): number | null {
+  if (j.status !== 'live' || j.plan !== 'free' || j.listingChoice === 'leave' || !j.facts.deadline) return null;
+  const end = listingEnd(j, today);
+  if (j.facts.deadline <= end) return null;
+  const left = daysUntil(today, end);
+  return left >= 0 && left <= 7 ? left : null;
+}
+
+/** A free live job past its listing period but still open: out of AidJobs' lists and search, its page still opens from links. */
+export function delisted(j: DemoJob, today: number): boolean {
+  if (j.status !== 'live' || j.plan !== 'free' || !j.facts.deadline) return false;
+  const end = listingEnd(j, today);
+  return j.facts.deadline > end && isoDay(today) > end;
 }
 
 /** "1 December 2026 (Nairobi time)": when the free allowance starts again. */

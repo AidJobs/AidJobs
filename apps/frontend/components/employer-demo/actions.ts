@@ -25,10 +25,11 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, monthFor, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
-import { addRound } from './invites';
+import { changeSummary, tellOffer } from './changes';
+import { addRound, REACH_EMAILS, reachUsed } from './invites';
 import { isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
@@ -82,6 +83,11 @@ function reopenApproval(j: DemoJob): DemoJob {
 /** Any change to a job's content: reopens an approval, and the last chat change can no longer be undone on its own. */
 function touched(j: DemoJob): DemoJob {
   return { ...reopenApproval(j), lastChange: undefined };
+}
+
+/** A change to a live job: the public page says "Updated", with the day. */
+function liveEdit(j: DemoJob): Partial<DemoJob> {
+  return j.status === 'live' ? { updatedAfterPublish: true, editedAt: Date.now() } : {};
 }
 
 /** Reviewers comment and decide; only the job's owner changes it. */
@@ -218,7 +224,7 @@ function answerToText(text: string, ask: ChatMsg['ask']): string {
 function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
   const format = formatOf(s, j.format);
   const tags = j.sections.length ? j.tags : orderSections(Array.from(new Set([...j.tags, ...recommendSections(format, facts)])), format);
-  return touched(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish })));
+  return touched(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, ...liveEdit(j) })));
 }
 
 /** Answers a question with a fact picked in the chat (a place, a date, a contract) and asks the next one. */
@@ -338,7 +344,7 @@ function chatTurn(id: string, text: string) {
     tags: result.tags,
     tone: result.tone,
     facts: result.facts,
-    updatedAfterPublish: x.status === 'live' ? true : x.updatedAfterPublish,
+    ...liveEdit(x),
     versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: text.slice(0, 60), sections: result.sections }],
     chat: [...x.chat, userMsg, msg('ai', result.reply + (hasApproval(x) ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
     lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags, beforeFacts: x.facts, beforeTone: x.tone } : undefined,
@@ -447,7 +453,7 @@ export function editSection(id: string, key: string, text: string) {
     const lines = text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim());
     if (JSON.stringify(lines) === JSON.stringify(j.sections.find((x) => x.key === key)?.lines)) return j;
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true } : x));
-    return { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish };
+    return { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], ...liveEdit(j) };
   });
 }
 
@@ -698,7 +704,7 @@ export function applyFix(id: string, fix: Fix, label: string) {
         return { ...next, versions: [...next.versions, { n: next.versions.length + 1, at: Date.now(), note: label, sections: next.sections }] };
       }
       const sections = x.sections.map((sec) => (sec.key === fix.section ? { ...sec, lines: fix.lines, edited: true } : sec));
-      return { ...touched(x), sections, updatedAfterPublish: x.status === 'live' ? true : x.updatedAfterPublish, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: label, sections }] };
+      return { ...touched(x), sections, ...liveEdit(x), versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: label, sections }] };
     }),
   }));
 }
@@ -834,6 +840,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   if (block) return block;
   if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
   if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
+  if (o.plan === 'amplify' && j.paidFor) return null;
   if (o.plan === 'amplify' && !o.paid) return 'Not paid';
   if (o.plan === 'amplify' && o.paid === 'onHand' && !nextPaidJob(s)) return 'No paid job on hand';
   return null;
@@ -859,9 +866,10 @@ export function publish(id: string, o: PublishOptions): boolean {
   let sending = false;
   let told: string | undefined;
   update((s0) => {
+    const prepaid = o.plan === 'amplify' && Boolean(s0.jobs.find((x) => x.id === id)?.paidFor);
     let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
-    if (o.plan === 'amplify' && o.paid === 'onHand') s = takePaidJob(s);
-    const how = o.plan === 'amplify' ? `Amplified (${o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
+    if (o.plan === 'amplify' && o.paid === 'onHand' && !prepaid) s = takePaidJob(s);
+    const how = o.plan === 'amplify' ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
       if (x.id !== id) return x;
       const skipped = reviewOnPublish(x, s.me.name);
@@ -872,6 +880,8 @@ export function publish(id: string, o: PublishOptions): boolean {
         plan: o.plan,
         scheduledFor: o.schedule ?? undefined,
         publishedAt: o.schedule ? undefined : Date.now(),
+        published: o.schedule ? undefined : { facts: x.facts, sections: x.sections, at: Date.now() },
+        paidFor: undefined,
         payRequest: undefined,
         review: { ...x.review, skipped: undefined, overruled: undefined },
         audit: [...skipped.audit, { at: Date.now(), who: s.me.name, what: `${o.schedule ? `Scheduled for ${longDate(o.schedule)}` : 'Published'}: ${how}` }],
@@ -1011,7 +1021,7 @@ function movedDeadline(today: number, current: string, days: number): string {
 
 /** A new closing date is a change to the job's facts and text, like any other. */
 function extended(s: State, j: DemoJob, deadline: string, what: string): DemoJob {
-  return rebuilt(s, { ...touched(j), facts: { ...j.facts, deadline }, updatedAfterPublish: j.status === 'live' ? true : j.updatedAfterPublish, audit: [...j.audit, { at: Date.now(), who: s.me.name, what }] });
+  return rebuilt(s, { ...touched(j), facts: { ...j.facts, deadline }, ...liveEdit(j), audit: [...j.audit, { at: Date.now(), who: s.me.name, what }] });
 }
 
 export function extend(id: string, days: number) {
@@ -1041,6 +1051,190 @@ export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', t
 
 export function letClose(id: string) {
   update((s) => ({ ...s, inbox: s.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)), notice: { text: 'It will close on its date. Nothing else to do.' } }));
+}
+
+/** Whether the job's free use covers going live in `month`: one counted that month or earlier does; one counted only for a later month does not. */
+export function freeCovers(s: State, j: DemoJob, month: string): boolean {
+  return s.freeUses.some((u) => u.jobId === j.id && u.month <= month);
+}
+
+/**
+ * What a free job needs to go live in `month` (plan section 17, phase 2): nothing, one of that month's free jobs, or Amplify when none is
+ * left. A free job counted for a later month stays counted there: free jobs are never given back.
+ */
+export function freeNeed(s: State, j: DemoJob, month: string): 'none' | 'use' | 'none-left' {
+  if (j.plan !== 'free' || freeCovers(s, j, month)) return 'none';
+  return freeLeft(s, month) > 0 ? 'use' : 'none-left';
+}
+
+function countFree(s: State, j: DemoJob, month: string): State {
+  return freeNeed(s, j, month) === 'use' ? { ...s, freeUses: [...s.freeUses, { jobId: j.id, month }] } : s;
+}
+
+function waitingEmails(j: DemoJob): number {
+  return [...(j.reach?.candidates ?? []), ...(j.reach?.team ?? [])].filter((r) => r.status === 'waiting').length;
+}
+
+/** A scheduled job goes live today: its Reach emails waiting for go-live are sent now, and it is listed from today. */
+export function publishNow(id: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
+  const month = currentMonth(s);
+  const need = freeNeed(s, j, month);
+  if (need === 'none-left') return false;
+  const waiting = waitingEmails(j);
+  const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
+  update((s0) => {
+    const st = countFree(s0, j, month);
+    const queue = (r: Recipient): Recipient => (r.status === 'waiting' ? { ...r, status: 'queued' } : r);
+    return {
+      ...st,
+      jobs: st.jobs.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: 'live',
+              publishedAt: Date.now(),
+              scheduledFor: undefined,
+              published: { facts: x.facts, sections: x.sections, at: Date.now() },
+              reach: x.reach ? { ...x.reach, candidates: x.reach.candidates.map(queue), team: x.reach.team.map(queue), rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: undefined, at: Date.now() } : r)) } : x.reach,
+              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Published now instead of on ${was}${need === 'use' ? "; used one of this month's free jobs" : ''}${waiting ? `; ${waiting} Reach ${waiting === 1 ? 'email' : 'emails'} sent now (simulated)` : ''}` }],
+            }
+          : x,
+      ),
+      notice: { text: `${j.facts.title} is live${waiting ? `; ${waiting} Reach ${waiting === 1 ? 'email is' : 'emails are'} being sent (simulated)` : ''}.` },
+    };
+  });
+  if (waiting) simulateDelivery(id);
+  return true;
+}
+
+/** Why a scheduled job cannot move to `date`: the same checks as scheduling, and a free job of that month when it needs one. */
+export function rescheduleBlock(s: State, j: DemoJob, date: string): string | null {
+  if (!date) return 'Choose a date';
+  if (date === j.scheduledFor) return 'Choose a new date';
+  const block = scheduleBlock(s, j, date);
+  if (block) return block;
+  if (freeNeed(s, j, date.slice(0, 7)) === 'none-left') return `No free job left for ${monthName(date.slice(0, 7))}`;
+  return null;
+}
+
+/** Moves a scheduled job to another date; Reach emails waiting for go-live move with it. */
+export function reschedule(id: string, date: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || j.status !== 'scheduled' || rescheduleBlock(s, j, date)) return false;
+  const need = freeNeed(s, j, date.slice(0, 7));
+  const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
+  update((s0) => {
+    const st = countFree(s0, j, date.slice(0, 7));
+    return {
+      ...st,
+      jobs: st.jobs.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              scheduledFor: date,
+              reach: x.reach ? { ...x.reach, rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: date } : r)) } : x.reach,
+              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Moved from ${was} to ${longDate(date)}${need === 'use' ? `; used one of ${monthName(date.slice(0, 7))}'s free jobs` : ''}` }],
+            }
+          : x,
+      ),
+      notice: { text: `${j.facts.title} now goes live on ${longDate(date)}.` },
+    };
+  });
+  return true;
+}
+
+/** A scheduled job back to a draft: it will not go live; its Reach emails stay prepared, unsent; a paid job stays paid, a free one counted. */
+export function backToDraft(id: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
+  const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => {
+      if (x.id !== id) return x;
+      const r = x.reach;
+      const waiting = (e: Recipient) => e.status === 'waiting';
+      const candidates = r?.candidates.filter(waiting).map((e) => e.email) ?? [];
+      const team = r?.team.filter(waiting).map((e) => e.email) ?? [];
+      const kept = r ? { ...r, candidates: r.candidates.filter((e) => !waiting(e)), team: r.team.filter((e) => !waiting(e)), rounds: r.rounds.filter((n) => !n.sendsOn) } : null;
+      return {
+        ...x,
+        status: hasApproval(x) ? 'approved' : 'draft',
+        plan: x.plan === 'amplify' ? 'amplify' : null,
+        paidFor: x.plan === 'amplify' ? true : undefined,
+        scheduledFor: undefined,
+        reach: kept && (kept.candidates.length || kept.team.length) ? kept : null,
+        reachPlan: r && (candidates.length || team.length) ? { candidates, team, candidateMsg: r.candidateMsg, teamMsg: r.teamMsg } : x.reachPlan,
+        audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Back to a draft; it will not go live on ${was}` }],
+      };
+    }),
+    notice: { text: `${j.facts.title} is back to a draft. It will not go live on ${was}.` },
+  }));
+  return true;
+}
+
+/** Tells the people Reach invited about the latest important change (decision 7): shown first, never automatic, once per change. */
+export function tellInvited(id: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs) return false;
+  const offer = tellOffer(j);
+  if (!offer || offer.count > REACH_EMAILS - reachUsed(j)) return false;
+  const what = changeSummary(offer.changes);
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) =>
+      x.id === id && x.reach
+        ? {
+            ...x,
+            reach: { ...x.reach, updates: [...(x.reach.updates ?? []), { at: Date.now(), count: offer.count, what }] },
+            reachTold: [...(x.reachTold ?? []), offer.key],
+            audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Told the ${offer.count} people Reach invited about the change: ${what} (simulated)` }],
+          }
+        : x,
+    ),
+    notice: { text: `${offer.count} people told about the change (simulated).` },
+  }));
+  return true;
+}
+
+/** "Not now" on that offer: it does not come back for this change. */
+export function declineTell(id: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  const offer = j ? tellOffer(j) : null;
+  if (!offer || !ownerOnly()) return;
+  updateJob(id, (x) => ({ ...x, reachTold: [...(x.reachTold ?? []), offer.key] }));
+}
+
+/** A free job's listing ends before its closing date: it closes on its last listed day instead, for free (decision 3). */
+export function closeAtListingEnd(id: string) {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || !ownerOnly() || j.status !== 'live' || j.plan !== 'free') return;
+  const end = listingEnd(j, s.today);
+  if (!j.facts.deadline || j.facts.deadline <= end) return;
+  changeWithUndo(`${j.facts.title}: now closes on ${longDate(end)}, its last listed day`, (st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? extended(st, x, end, `Closing date moved to ${longDate(end)}, its last listed day`) : x)),
+  }));
+}
+
+/** "Let it leave the list": no more reminders; after its last listed day it leaves AidJobs' lists and search, its page still open from links. */
+export function letLeaveList(id: string) {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || !ownerOnly() || j.plan !== 'free') return;
+  const end = longDate(listingEnd(j, s.today));
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, listingChoice: 'leave', audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Chose to let it leave AidJobs' lists after ${end}; its page stays open from links` }] } : x)),
+    notice: { text: `${j.facts.title} leaves AidJobs' lists after ${end}. Its page still opens from links, with the apply button.` },
+  }));
 }
 
 /** Anyone who can publish deletes drafts and jobs in review; only the owner deletes a scheduled, live, or closed job; reviewers never. */
@@ -1130,6 +1324,11 @@ export function hireAgain(id: string, place?: string): string | null {
     closedAt: undefined,
     closeReason: undefined,
     updatedAfterPublish: false,
+    editedAt: undefined,
+    published: undefined,
+    reachTold: undefined,
+    listingChoice: undefined,
+    paidFor: undefined,
     translations: undefined,
     reachPlan: undefined,
     reachDismissed: undefined,

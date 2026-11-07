@@ -4,13 +4,14 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Trash2 } from 'l
 import { type ReactNode, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { approvedFor, canDelete, closeJob, downloadCopy, extend, hireAgain, isReviewable, remindPayer, remindReviewers, restoreDeleted } from './actions';
-import { addDays, daysUntil, holiday, isoDay, longDate, parseIso, PLACES, weekend } from './engine';
+import { approvedFor, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, restoreDeleted } from './actions';
+import { changesSince, changeSummary, tellOffer } from './changes';
+import { addDays, daysUntil, holiday, isoDay, longDate, parseIso, PLACES, shortDate, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
-import { DeleteDialog, JobMenu, WithdrawDialog } from './JobActions';
+import { BackToDraftDialog, DeleteDialog, JobMenu, PublishNowDialog, RescheduleDialog, TellDialog, WithdrawDialog } from './JobActions';
 import { erasedOn, graceEnds, inGrace, isPublished, KEEP_DELETED_DAYS, PAGE_REMOVED_DAYS, TEXT_DROPPED_DAYS } from './lifecycle';
 import type { MenuAction } from './MenuButton';
-import { BADGE, listedUntil } from './plans';
+import { BADGE, delisted, listedUntil, listingEnd, listingEndsIn } from './plans';
 import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
@@ -185,7 +186,7 @@ function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete';
+type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete' | 'publishNow' | 'reschedule' | 'backToDraft' | 'tell';
 type Open = (job: DemoJob, kind: Kind) => void;
 
 function openReview(job: DemoJob) {
@@ -210,7 +211,10 @@ export function nextStep(s: State, job: DemoJob, open: Open): { label: string; r
   if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => go('publish', job.id) };
   if (job.status === 'review' && job.review.reviewers.some((r) => !r.decision)) return { label: 'Remind', run: () => remindReviewers(job.id) };
   if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => go('create', job.id) };
-  if (job.status === 'scheduled') return { label: 'Open', run: () => go('jobs', job.id) };
+  if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
+  if (job.status === 'live' && tellOffer(job)) return { label: 'Tell invited people', run: () => open(job, 'tell') };
+  if (listingEndsIn(job, s.today) !== null) return { label: 'Choose what happens', run: () => go('jobs', job.id) };
+  if (delisted(job, s.today)) return { label: 'Amplify', run: () => go('publish', job.id) };
   if (job.status === 'live') return left !== null && left <= 7 ? { label: 'Extend', run: () => open(job, 'extend') } : { label: 'Share', run: () => open(job, 'share') };
   return { label: 'Hire again', run: () => hire(job) };
 }
@@ -224,7 +228,15 @@ export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
   if (job.status === 'draft' || job.status === 'review' || job.status === 'approved') {
     return [{ label: 'Continue', run: () => go('create', job.id) }, ...(job.sections.length ? [{ label: 'Send for review', run: () => openReview(job) }, copy] : []), del];
   }
-  if (job.status === 'scheduled') return [{ label: 'Edit', run: () => go('create', job.id) }, del];
+  if (job.status === 'scheduled') {
+    return [
+      { label: 'Publish now', run: () => open(job, 'publishNow') },
+      { label: 'Change the date', run: () => open(job, 'reschedule') },
+      { label: 'Back to draft', run: () => open(job, 'backToDraft') },
+      { label: 'Edit', run: () => go('create', job.id) },
+      del,
+    ];
+  }
   if (job.status === 'live') {
     return [
       { label: 'Extend', run: () => open(job, 'extend') },
@@ -247,6 +259,10 @@ function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: Stat
   if (kind === 'variant') return <VariantDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'share') return <ShareDialog job={job} onClose={onClose} />;
   if (kind === 'withdraw') return <WithdrawDialog job={job} onClose={onClose} />;
+  if (kind === 'publishNow') return <PublishNowDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'reschedule') return <RescheduleDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'backToDraft') return <BackToDraftDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'tell') return <TellDialog job={job} s={s} onClose={onClose} />;
   return <DeleteDialog job={job} s={s} onClose={onClose} onDeleted={onDeleted} />;
 }
 
@@ -371,13 +387,22 @@ function Part({ title, icon, open = false, className = '', children }: { title: 
 const day = (ms: number) => longDate(isoDay(ms));
 
 /** "Now": what happens next to the job, and when. */
-function NowPart({ job, s }: { job: DemoJob; s: State }) {
+function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
+  const changes = job.status === 'live' ? changesSince(job) : [];
+  const offer = job.status === 'live' ? tellOffer(job) : null;
+  const ends = listingEndsIn(job, s.today);
+  const end = listingEnd(job, s.today);
+  const owner = !s.reviewerAs;
   const waiting = [...(job.reach?.candidates ?? []), ...(job.reach?.team ?? [])].filter((r) => r.status === 'waiting').length;
   const lines: string[] = [];
   if (job.status === 'live') {
     if (job.facts.deadline) lines.push(`Closes ${longDate(job.facts.deadline)}${left !== null && left >= 0 ? ` · ${left === 0 ? 'today' : `${left} ${left === 1 ? 'day' : 'days'} left`}` : ''}`);
-    lines.push(`${job.plan === 'amplify' ? `Amplified: featured, “${BADGE}”` : 'Free: standard placement'} · listed until ${longDate(listedUntil(job, s.today))}`);
+    lines.push(
+      delisted(job, s.today)
+        ? `Free: no longer listed on AidJobs since ${longDate(end)}; its page still opens from links, with the apply button`
+        : `${job.plan === 'amplify' ? `Amplified: featured, “${BADGE}”` : 'Free: standard placement'} · listed until ${longDate(listedUntil(job, s.today))}`,
+    );
   } else if (job.status === 'scheduled') {
     lines.push(`Goes live ${job.scheduledFor ? longDate(job.scheduledFor) : 'on its date'}${job.plan === 'amplify' ? ', amplified' : ', free'}`);
     if (waiting) lines.push(`${waiting} Reach ${waiting === 1 ? 'email goes' : 'emails go'} out when it goes live`);
@@ -400,9 +425,40 @@ function NowPart({ job, s }: { job: DemoJob; s: State }) {
           <li key={l}>{l}</li>
         ))}
       </ul>
-      {job.status === 'live' && job.plan === 'free' && !s.reviewerAs && (
+      {ends !== null && (
+        <div className="flex flex-col gap-1.5 rounded-xl p-3" style={{ background: 'var(--amber-bg)' }} role="status">
+          <span style={{ fontWeight: 650 }}>Its free listing ends {ends === 0 ? 'today' : ends === 1 ? 'tomorrow' : `in ${ends} days`}, on {longDate(end)}</span>
+          <span className="aj-muted">It closes on {longDate(job.facts.deadline)}. After {longDate(end)} it leaves AidJobs&apos; lists and search; its page still opens from links, with the apply button.</span>
+          {owner && (
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
+                Amplify: listed until it closes
+              </button>
+              <button type="button" className="aj-pill" onClick={() => closeAtListingEnd(job.id)}>
+                Close on {shortDate(end)}
+              </button>
+              <button type="button" className="aj-pill" onClick={() => letLeaveList(job.id)}>
+                Let it leave the list
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {changes.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-xl p-3" style={{ background: 'var(--surface-2)' }} aria-label="Changed since publishing">
+          <span style={{ fontWeight: 650 }}>Changed since publishing</span>
+          <span className="aj-muted">{changeSummary(changes)}</span>
+          {job.editedAt && <span className="aj-faint">The public page says &ldquo;Updated on {new Date(job.editedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}&rdquo;.</span>}
+          {offer && owner && (
+            <button type="button" className="aj-ink-btn mt-1 self-start" onClick={() => open(job, 'tell')}>
+              Tell the {offer.count} people Reach invited
+            </button>
+          )}
+        </div>
+      )}
+      {job.status === 'live' && job.plan === 'free' && ends === null && owner && (
         <button type="button" className="aj-text-btn self-start" onClick={() => go('publish', job.id)}>
-          Amplify this job
+          {delisted(job, s.today) ? 'Amplify to list it again until it closes' : 'Amplify this job'}
         </button>
       )}
       {isPublished(job) && (
@@ -418,7 +474,7 @@ function NowPart({ job, s }: { job: DemoJob; s: State }) {
 /** The main action on a job's page, by state (plan section 17). */
 function mainAction(job: DemoJob, open: Open): { label: string; run: () => void } {
   if (job.status === 'live') return { label: 'Extend', run: () => open(job, 'extend') };
-  if (job.status === 'scheduled') return { label: 'Edit', run: () => go('create', job.id) };
+  if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
   if (job.status === 'closed') return { label: 'Hire again', run: () => hire(job) };
   return { label: 'Continue', run: () => go('create', job.id) };
 }
@@ -457,7 +513,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
       <Lifeline stage={stageOf(job, job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null)} attention={needsYou(s, job)} />
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]" style={{ gridTemplateRows: 'auto auto 1fr' }}>
         <Part title="Now" open className="lg:col-start-2 lg:row-start-1">
-          <NowPart job={job} s={s} />
+          <NowPart job={job} s={s} open={open} />
         </Part>
         <Part title="Job page" className="lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:p-5">
           <JobPageLangs job={job} s={s} />

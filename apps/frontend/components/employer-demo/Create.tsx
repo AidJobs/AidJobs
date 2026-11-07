@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { approvalRequired, approvedFor, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
+import { changesSince, changeSummary, tellOffer } from './changes';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
@@ -239,6 +240,18 @@ export default function Create({ id }: { id?: string }) {
         </div>
       )}
       <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-3 px-4 py-3 lg:px-6">
+        {job.status === 'live' && changesSince(job).length > 0 && (
+          <div className="aj-card flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2" role="status" aria-label="Changed since publishing">
+            <span className="min-w-0 flex-1">
+              <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
+            </span>
+            {tellOffer(job) && !reviewing && (
+              <button type="button" className="aj-text-btn" onClick={() => go('jobs', job.id)}>
+                Tell the people Reach invited
+              </button>
+            )}
+          </div>
+        )}
         {job.sections.length ? (
           <DocumentView job={job} s={s} onSeeChat={reviewing ? undefined : () => (phone ? setSheet('chat') : setPanel('chat'))} />
         ) : (

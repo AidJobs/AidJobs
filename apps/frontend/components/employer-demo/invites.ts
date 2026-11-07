@@ -35,7 +35,7 @@ export function planFor(job: DemoJob, org: Org): ReachPlan {
 
 /** Emails already used for the job, every round together. */
 export function reachUsed(job: DemoJob): number {
-  return (job.reach?.candidates.length ?? 0) + (job.reach?.team.length ?? 0);
+  return (job.reach?.candidates.length ?? 0) + (job.reach?.team.length ?? 0) + (job.reach?.updates ?? []).reduce((n, u) => n + u.count, 0);
 }
 
 /** Who the next sending goes to: not unsubscribed, not invited before, within the allowance. */
@@ -93,6 +93,7 @@ export function goLive(s: State): State {
       ...j,
       status: 'live' as const,
       publishedAt: parseIso(j.scheduledFor) + 9 * 3_600_000,
+      published: { facts: j.facts, sections: j.sections, at: parseIso(j.scheduledFor) + 9 * 3_600_000 },
       reach: j.reach ? { ...j.reach, candidates: j.reach.candidates.map(sent), team: j.reach.team.map(sent) } : j.reach,
       audit: [...j.audit, { at: s.today, who: 'AidJobs', what: `Went live on ${longDate(j.scheduledFor)}${j.reach?.rounds.some((r) => r.sendsOn) ? '; the Reach emails were sent (simulated)' : ''}` }],
     };

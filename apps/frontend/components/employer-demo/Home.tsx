@@ -7,6 +7,8 @@ import Flag from '@/components/site/Flag';
 import {
   approvalRequired,
   changesAfterApproval,
+  closeAtListingEnd,
+  declineTell,
   dismissMoment,
   downloadCopy,
   extend,
@@ -14,6 +16,7 @@ import {
   isApproved,
   isReviewable,
   letClose,
+  letLeaveList,
   markInbox,
   readIntent,
   remindPayer,
@@ -23,7 +26,8 @@ import {
 } from './actions';
 import Composer from './Composer';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
-import { currentMonth, FREE_PER_MONTH, freeLeft, monthName } from './plans';
+import { changeSummary, tellOffer } from './changes';
+import { currentMonth, delisted, FREE_PER_MONTH, freeLeft, LISTED_DAYS, listingEnd, listingEndsIn, monthName } from './plans';
 import { reachMoment } from './invites';
 import { go, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
@@ -50,8 +54,12 @@ export function statusLine(s: State, j: DemoJob): string {
     }
     case 'scheduled':
       return `Scheduled for ${j.scheduledFor ? longDate(j.scheduledFor) : 'later'}`;
-    case 'live':
+    case 'live': {
+      if (delisted(j, s.today)) return 'Live · no longer listed on AidJobs';
+      const ends = listingEndsIn(j, s.today);
+      if (ends !== null) return `Live · free listing ends ${ends === 0 ? 'today' : ends === 1 ? 'tomorrow' : `in ${ends} days`}`;
       return left === null ? 'Live' : left === 0 ? 'Live · closes today' : left === 1 ? 'Live · closes tomorrow' : `Live · closes in ${left} days`;
+    }
     default: {
       const removal = j.closedAt ? Math.round((j.closedAt + 30 * DAY - s.today) / DAY) : null;
       const why = j.closeReason === 'filled' ? 'Position filled' : j.closeReason === 'withdrawn' ? 'Withdrawn' : j.closeReason === 'early' ? 'Closed early' : 'Closed';
@@ -65,6 +73,7 @@ export function needsYou(s: State, j: DemoJob): boolean {
   if (j.status === 'approved' || (j.review.state === 'changes' && isReviewable(j))) return true;
   if (j.status === 'review' && isApproved(j)) return true;
   if (j.status === 'live' && left !== null && left <= 3 && !s.inbox.some((i) => i.jobId === j.id && i.kind === 'deadline' && i.done)) return true;
+  if (listingEndsIn(j, s.today) !== null || tellOffer(j)) return true;
   return false;
 }
 
@@ -142,6 +151,34 @@ function briefing(s: State): Brief[] {
         actions: [
           { label: 'Remind', run: () => remindPayer(j.id), primary: true },
           { label: 'Open', run: () => go('publish', j.id) },
+        ],
+      });
+    }
+    const ends = listingEndsIn(j, s.today);
+    if (ends !== null) {
+      const end = listingEnd(j, s.today);
+      out.push({
+        id: `list-${j.id}`,
+        icon: <Clock size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />,
+        title: `${j.facts.title}: its free listing ends ${ends === 0 ? 'today' : ends === 1 ? 'tomorrow' : `in ${ends} days`}`,
+        body: `A free job is listed ${LISTED_DAYS.free} days; this one closes on ${longDate(j.facts.deadline)}. Amplify keeps it listed until then, or close it on ${longDate(end)}, or let it leave AidJobs' lists (its page still opens from links).`,
+        actions: [
+          { label: 'Amplify', run: () => go('publish', j.id), primary: true },
+          { label: `Close on ${shortDate(end)}`, run: () => closeAtListingEnd(j.id) },
+          { label: 'Let it leave the list', run: () => letLeaveList(j.id) },
+        ],
+      });
+    }
+    const offer = tellOffer(j);
+    if (offer) {
+      out.push({
+        id: `tell-${j.id}`,
+        icon: <Send size={16} strokeWidth={1.8} style={{ color: 'var(--sage-7)' }} />,
+        title: `Tell the ${offer.count} people Reach invited about the change to ${j.facts.title}?`,
+        body: `${changeSummary(offer.changes)}. You see the email first.`,
+        actions: [
+          { label: 'See the email', run: () => go('jobs', j.id), primary: true },
+          { label: 'Not now', run: () => declineTell(j.id) },
         ],
       });
     }
@@ -235,6 +272,7 @@ export default function Home() {
   const [intent, setIntent] = useState<Intent>(null);
   const [noMatch, setNoMatch] = useState(false);
   const [day, setDay] = useState<string | null>(null);
+  const [allBrief, setAllBrief] = useState(false);
   const items = briefing(s);
   const left = freeLeft(s);
   const month = monthName(currentMonth(s));
@@ -277,7 +315,7 @@ export default function Home() {
 
         {items.length > 0 && (
           <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }} aria-label="Briefing">
-            {items.slice(0, 4).map((b) => (
+            {items.slice(0, allBrief ? items.length : 4).map((b) => (
               <li key={b.id} className="aj-card flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 gap-3">
                   <span className="mt-0.5 shrink-0">{b.icon}</span>
@@ -301,6 +339,13 @@ export default function Home() {
                 </div>
               </li>
             ))}
+            {items.length > 4 && (
+              <li>
+                <button type="button" className="aj-text-btn" aria-expanded={allBrief} onClick={() => setAllBrief(!allBrief)}>
+                  {allBrief ? 'Show fewer' : `Show ${items.length - 4} more`}
+                </button>
+              </li>
+            )}
           </ul>
         )}
 
