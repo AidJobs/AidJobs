@@ -109,9 +109,8 @@ def score_link(link: Tag, base_url: str, source_id: Optional[str] = None) -> Tup
     
     # Reject mailto links
     if is_mailto_link(href):
-        email = href.replace('mailto:', '').strip()
-        logger.info(f"HEURISTICS: rejected mailto link {email} for source {source_id or 'unknown'}")
-        return (0.0, {'reason': 'mailto_link', 'rejected_email': email})
+        logger.info(f"HEURISTICS: rejected a mailto link for source {source_id or 'unknown'}")
+        return (0.0, {'reason': 'mailto_link'})
     
     # Reject blocklisted links
     if is_blocklisted(link_text, href):

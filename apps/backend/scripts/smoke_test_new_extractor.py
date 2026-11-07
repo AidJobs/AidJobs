@@ -18,9 +18,9 @@ from urllib.parse import urlparse
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import httpx
 from bs4 import BeautifulSoup
 
+from contracts.outbound import fetch_url
 from core.rollout_config import get_rollout_config, RolloutConfig
 from pipeline.extractor import Extractor
 from pipeline.integration import PipelineAdapter
@@ -38,13 +38,8 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 async def fetch_page(url: str) -> tuple[int, str]:
     """Fetch HTML page."""
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"},
-                follow_redirects=True
-            )
-            return response.status_code, response.text
+        response = await fetch_url(url, timeout=30.0)
+        return response.status_code, response.text
     except Exception as e:
         logger.error(f"Error fetching {url}: {e}")
         return 0, ""

@@ -16,6 +16,13 @@ bot challenge is recorded and stops that organisation, never bypassed; three ref
 stop the run. Responses are kept under tools/survey/raw/confirm/ (git-ignored); `fetch` is
 resumable.
 
+Since 7 November 2026 (W-34) the fetch policy also checks robots.txt itself, with the survey's
+own name, before every request: the survey's own robots.txt answer serves for that, so a host
+is not asked twice, except once more in a resumed run (the policy keeps answers in memory only);
+and when the page redirects to another host, that host's robots.txt is asked for and obeyed.
+The robots.txt rules and the challenge patterns are the backend's (contracts/robots.py and
+contracts/refusal.py), shared with the crawler.
+
 `extract` and `build` use no network. `extract` keeps, per organisation, only what the survey
 records: hosts and paths (no query strings), statuses, the recruitment system and its evidence,
 how the listing can be read, the number of jobs seen and any bot protection; no page content,
@@ -32,7 +39,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import quote, urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree
 
 from careers import SECOND_LEVEL, read_csv, strip_query, system_of
@@ -41,9 +48,14 @@ HERE = Path(__file__).resolve().parent
 SURVEY = HERE.parents[1] / "docs" / "architecture" / "source-survey"
 BACKEND = HERE.parents[1] / "apps" / "backend"
 RAW = HERE / "raw" / "confirm"
-USER_AGENT = "AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)"
-HEADERS = {"User-Agent": USER_AGENT,
-           "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+sys.path.insert(0, str(BACKEND))
+
+from contracts import robots as shared_robots
+from contracts.outbound import SURVEY_USER_AGENT
+from contracts.refusal import CHALLENGES, REFUSAL_HINTS
+
+USER_AGENT = SURVEY_USER_AGENT  # sent by the fetch policy, not by this tool
+HEADERS = {"Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
            "Accept-Language": "en"}
 
 INTERVAL = 5.0          # seconds between any two requests
@@ -150,81 +162,24 @@ PRODUCT_TOKEN = USER_AGENT.split("/")[0].lower()
 
 
 def robots_rules(text: str, token: str = PRODUCT_TOKEN) -> list[tuple[bool, str]]:
-    """The (allow, pattern) rules that apply to the survey (RFC 9309, section 2.2): every group
-    naming its product token, else every '*' group; consecutive user-agent lines share a group."""
-    groups: list[tuple[set[str], list[tuple[bool, str]]]] = []
-    in_agents = False
-    # Only a rule line ends a run of user-agent lines (Sitemap, Crawl-delay and others do not).
-    for raw in text.lstrip("\ufeff").splitlines():
-        key, sep, value = raw.split("#", 1)[0].partition(":")
-        key, value = key.strip().lower(), value.strip()
-        if not sep:
-            continue
-        if key == "user-agent":
-            if not in_agents:
-                groups.append((set(), []))
-            groups[-1][0].add(value.split("/")[0].strip().lower())
-            in_agents = True
-        elif key in ("allow", "disallow"):
-            in_agents = False
-            if groups and value:
-                groups[-1][1].append((key == "allow", value))
-    mine = [rule for agents, rules in groups if token in agents for rule in rules]
-    if any(token in agents for agents, _ in groups):
-        return mine
-    return [rule for agents, rules in groups if "*" in agents for rule in rules]
-
-
-def _pattern(rule: str) -> re.Pattern:
-    """A path pattern: '*' matches any characters, a final '$' the end of the path. Characters
-    outside ASCII are percent-encoded, as addresses are (RFC 9309, section 2.2.2)."""
-    end = rule.endswith("$")
-    rule = quote(rule[:-1] if end else rule, safe="/?=&*$%:;@+,!~'()#[]")
-    body = re.escape(rule).replace(r"\*", ".*")
-    return re.compile(body + ("$" if end else ""))
+    """The (allow, pattern) rules that apply to the survey (RFC 9309, section 2.2)."""
+    return shared_robots.robots_rules(text, token)
 
 
 def robots_allows(text: str, url: str) -> bool:
     """RFC 9309, section 2.2.2: the longest matching rule wins; on a tie, allow wins."""
-    parts = urlsplit(url)
-    path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
-    if parts.path == "/robots.txt":
-        return True
-    matches = [(len(rule), allow) for allow, rule in robots_rules(text)
-               if _pattern(rule).match(path)]
-    return max(matches)[1] if matches else True
+    return shared_robots.robots_allows(text, url, PRODUCT_TOKEN)
 
 
 def robots_verdict(status: int | None, body: str, url: str) -> str:
     """'allowed', 'forbidden', 'refused' (401, 403, 429) or 'unreachable' (5xx, no answer).
-    RFC 9309: a robots.txt that is not there (other 4xx) allows everything; one that cannot be
-    reached is treated as forbidding everything. RFC 9309 also allows crawling when robots.txt
-    answers 401 or 403; the survey deliberately treats those as a refusal (its plan: a 403
-    stops that organisation)."""
-    if status is None or status >= 500:
-        return "unreachable"
-    if status in (401, 403, 429):
-        return "refused"
-    if status >= 400:
-        return "allowed"
-    if status != 200:
-        return "unreachable"
-    return "allowed" if robots_allows(body, url) else "forbidden"
+    The survey treats a robots.txt answering 401 or 403 as a refusal (its plan: a 403 stops that
+    organisation), as the crawler does."""
+    return shared_robots.robots_verdict(status, body, url, PRODUCT_TOKEN)
 
 
-# Pages that are a challenge, not the page asked for. Normal pages can carry a form's captcha or
-# a protection service's script, so those count only on a refusal (401, 403, 429).
-CHALLENGES = [
-    ("Cloudflare challenge", re.compile(r"<title>\s*(?:just a moment|attention required)"
-                                        r"|cf_chl_opt|window\._cf_chl", re.IGNORECASE)),
-    ("Akamai", re.compile(r"<title>\s*access denied</title>.{0,600}reference #", re.IGNORECASE | re.DOTALL)),
-    ("Imperva", re.compile(r"_incapsula_resource", re.IGNORECASE)),
-    ("DataDome", re.compile(r"captcha-delivery\.com", re.IGNORECASE)),
-    ("PerimeterX", re.compile(r"px-captcha", re.IGNORECASE)),
-    ("AWS WAF", re.compile(r"awswaf\.com|aws-waf-token", re.IGNORECASE)),
-]
-REFUSAL_HINTS = [("captcha", re.compile(r"captcha", re.IGNORECASE)),
-                 ("Cloudflare", re.compile(r"cloudflare", re.IGNORECASE))]
+# CHALLENGES and REFUSAL_HINTS: pages that are a challenge, and hints that count only on a
+# refusal (401, 403, 429); shared with the crawler (contracts/refusal.py).
 
 
 def bot_protection(status: int | None, headers: dict, body: str) -> str:
@@ -280,7 +235,6 @@ class Fetcher:
     """One request at a time through the backend's fetch policy, spaced, logged."""
 
     def __init__(self, log: Path):
-        sys.path.insert(0, str(BACKEND))
         from contracts.outbound import FetchError, fetch_message, fetch_url
 
         self.fetch_url, self.FetchError, self.fetch_message = fetch_url, FetchError, fetch_message
@@ -296,11 +250,12 @@ class Fetcher:
         if wait > 0:
             time.sleep(wait)
         started = self.last = self.hosts[host] = time.monotonic()
+        # policy_robots: the fetch policy checked robots.txt for every hop, redirects included.
         result = {"url": url, "status": None, "final_url": "", "redirects": 0, "headers": {},
-                  "bytes": 0, "error": "", "body": b""}
+                  "bytes": 0, "error": "", "body": b"", "policy_robots": True}
         try:
             response = asyncio.run(self.fetch_url(url, headers=HEADERS, timeout=STEP_TIMEOUT,
-                                                  total_timeout=TOTAL_TIMEOUT))
+                                                  total_timeout=TOTAL_TIMEOUT, identity="survey"))
             kept = ("content-type", "server", "cf-mitigated", "cf-ray", "retry-after")
             result.update(status=response.status_code, final_url=response.url,
                           redirects=response.redirects, bytes=len(response.body),
@@ -635,8 +590,10 @@ def observation(record: dict, body: bytes) -> dict:
            "error": response.get("error") or robots.get("error") or ""}
     final_host = (urlsplit(response.get("final_url", "")).hostname or "").lower()
     if final_host and final_host != robots.get("host"):
-        # The fetch policy follows redirects itself; the destination's robots.txt was not read.
-        row["destination_robots"] = f"not checked ({final_host})"
+        # Before 7 November 2026 the fetch policy followed redirects without reading the
+        # destination's robots.txt; since then it reads and obeys it (policy_robots).
+        checked = response.get("policy_robots")
+        row["destination_robots"] = f"{'allowed' if checked else 'not checked'} ({final_host})"
     vendor = (urlsplit(response.get("final_url", "")).hostname or "").lower() in VENDOR_SITES
     if robots.get("verdict") != "allowed" or response.get("status") != 200 \
             or (row["bot_protection"] and not vendor):

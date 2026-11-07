@@ -215,7 +215,9 @@ def test_the_code_scan_finds_the_tables_it_is_known_to_use():
     assert needs["jobs"] == {"SELECT", "INSERT", "UPDATE", "DELETE"}
     # UPDATE: a takeover locks the row FOR UPDATE.
     assert needs["crawl_locks"] == {"SELECT", "INSERT", "UPDATE", "DELETE"}
-    assert needs["robots_cache"] == {"SELECT", "INSERT", "UPDATE"}  # an upsert
+    # Only the admin reads it since core/robots.py went (W-34); the fetch policy keeps
+    # robots.txt answers in memory.
+    assert needs["robots_cache"] == {"SELECT"}
     assert needs["shortlists"] == {"SELECT"}
     assert "contracts" not in needs  # Python's "from contracts.x import" is not SQL
     assert not any("TRUNCATE" in p for p in needs.values())

@@ -16,6 +16,7 @@ from contracts.admission import admit_batch, extraction_logger_for, log_admissio
 from contracts.outbound import FetchError, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
+from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
@@ -29,7 +30,6 @@ class SimpleRSSCrawler:
     def __init__(self, db_url: str):
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
-        self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -38,12 +38,8 @@ class SimpleRSSCrawler:
     async def fetch_feed(self, url: str) -> feedparser.FeedParserDict:
         """Fetch and parse RSS feed"""
         try:
-            result = await fetch_url(
-                url,
-                headers={"User-Agent": self.user_agent},
-                timeout=float(self.timeout.connect or 30.0),
-            )
-            if result.status_code != 200:
+            result = await fetch_url(url, timeout=float(self.timeout.connect or 30.0))
+            if result.status_code != 200 or refusal(result.status_code, result.headers, result.text):
                 logger.error(f"RSS fetch failed: HTTP {result.status_code}")
                 return None
             return feedparser.parse(result.text)

@@ -323,24 +323,23 @@ def test_head_redirect_stays_head_and_drops_authorization_across_hosts():
             "Authorization": "Bearer auth-token",
             "Proxy-Authorization": "Basic proxy-token",
             "Cookie": "session=cookie-token",
-            "User-Agent": "AidJobs",
         },
     )
     writes = [item[1] for item in events if item[0] == "write" and b"HEAD " in item[1]]
     assert len(writes) == 2
     first = _header_names(writes[0])
     second = _header_names(writes[1])
-    assert {"authorization", "proxy-authorization", "cookie", "user-agent"} <= first
+    assert {"authorization", "proxy-authorization", "cookie", "user-agent", "from"} <= first
     assert b"auth-token" in writes[0]
     assert b"proxy-token" in writes[0]
     assert b"cookie-token" in writes[0]
-    assert b"AidJobs" in writes[0]
+    assert b"AidJobsBot/1.0 (+mailto:aidjobz@gmail.com)" in writes[0]
     assert {"authorization", "proxy-authorization", "cookie"}.isdisjoint(second)
-    assert "user-agent" in second
+    assert {"user-agent", "from"} <= second
     assert b"auth-token" not in writes[1]
     assert b"proxy-token" not in writes[1]
     assert b"cookie-token" not in writes[1]
-    assert b"AidJobs" in writes[1]
+    assert b"AidJobsBot/1.0 (+mailto:aidjobz@gmail.com)" in writes[1]
     assert result.status_code == 200
 
 
@@ -689,7 +688,9 @@ def test_fetch_html_does_not_call_the_browser(monkeypatch):
     assert "BrowserCrawler" not in inspect.getsource(SimpleCrawler.fetch_html)
 
     async def fake_fetch(url, **kwargs):
-        return type("R", (), {"status_code": 200, "text": "javascript required please wait"})()
+        return type(
+            "R", (), {"status_code": 200, "headers": {}, "text": "javascript required please wait"}
+        )()
 
     monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", fake_fetch)
     status, html = asyncio.run(

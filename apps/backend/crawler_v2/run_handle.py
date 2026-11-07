@@ -1,6 +1,11 @@
 """One crawl run, passed explicitly from the orchestrator to a crawler."""
 import asyncio
 
+# Each run spends one request and time budget in the fetch policy; the orchestrator sets it.
+from contracts.outbound import crawl_budget
+
+__all__ = ["RunHandle", "crawl_budget"]
+
 _TOTALS = ("inserted", "updated", "skipped", "failed")
 
 

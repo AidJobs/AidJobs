@@ -19,7 +19,6 @@ from psycopg2.extras import RealDictCursor
 from app.errors import log_failure
 from app.log_safety import current_request_id, redact_exception
 from contracts.outbound import FetchError, fetch_message, fetch_url
-from core.net import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +97,6 @@ class LinkValidator:
     
     def __init__(self, db_url: str):
         self.db_url = db_url
-        self.http_client = HTTPClient()
     
     def _get_db_conn(self):
         """Get database connection"""
@@ -218,10 +216,7 @@ class LinkValidator:
         result = await fetch_url(
             url,
             method="HEAD",
-            headers={
-                'User-Agent': self.http_client.user_agent,
-                'Accept': '*/*'
-            },
+            headers={'Accept': '*/*'},
             timeout=CHECK_TIMEOUT_SECONDS,
             total_timeout=CHECK_TOTAL_SECONDS,
             max_redirects=MAX_REDIRECT_HOPS,
