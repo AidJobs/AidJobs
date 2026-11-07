@@ -15,7 +15,7 @@ export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
   const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
   if (!forward && e.key !== 'ArrowLeft' && e.key !== 'ArrowUp') return;
   const group = e.currentTarget;
-  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled]), [role="tab"]:not([disabled])')].filter((r) => r.closest('[role="radiogroup"], [role="tablist"]') === group);
+  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled])')].filter((r) => r.closest('[role="radiogroup"]') === group);
   const at = radios.indexOf(document.activeElement as HTMLElement);
   if (at < 0) return;
   e.preventDefault();
@@ -81,12 +81,18 @@ export function LegalLine({ year, className = '' }: { year: number; className?: 
   );
 }
 
-/** Where the user is between writing and publishing, 1 Write · 2 Check · 3 Publish; the other steps open their screen. */
-export function Steps({ current, onStep, badge = 0 }: { current: 1 | 2 | 3; onStep?: (n: 1 | 2 | 3) => void; badge?: number }) {
+const STEP_HINTS = ['back to the job description', 'open the checks', 'open the publishing choices'];
+
+/**
+ * Where the user is between writing and publishing, 1 Write · 2 Check · 3 Publish. With `onStep`, the other steps open their screen;
+ * with `all`, the current one is a button too (on the publish page, where Check and Publish are parts of the same screen).
+ */
+export function Steps({ current, onStep, badge = 0, all = false }: { current: 1 | 2 | 3; onStep?: (n: 1 | 2 | 3) => void; badge?: number; all?: boolean }) {
   return (
     <ol className="ej-steps" aria-label="Steps to publish">
       {(['Write', 'Check', 'Publish'] as const).map((label, i) => {
         const n = (i + 1) as 1 | 2 | 3;
+        const name = `${label}${n === 2 && badge > 0 ? `, ${badge} to look at` : ''}: ${STEP_HINTS[i]}`;
         const inner = (
           <>
             <span className="ej-step-n" aria-hidden>
@@ -103,8 +109,8 @@ export function Steps({ current, onStep, badge = 0 }: { current: 1 | 2 | 3; onSt
         );
         return (
           <li key={label}>
-            {onStep && n !== current ? (
-              <button type="button" className="ej-step" data-done={n < current || undefined} onClick={() => onStep(n)}>
+            {onStep && (all || n !== current) ? (
+              <button type="button" className="ej-step" aria-label={name} aria-current={n === current ? 'step' : undefined} data-done={n < current || undefined} onClick={() => onStep(n)}>
                 {inner}
               </button>
             ) : (

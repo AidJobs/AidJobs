@@ -852,6 +852,19 @@ describe('employer demo: managing jobs', () => {
     scroll.mockClear();
     act(() => step('Publish')!.click());
     expect(scroll.mock.instances[0]).toBe(document.getElementById('ej-publish-panel'));
+    expect(document.activeElement?.classList.contains('ej-main-cta')).toBe(true);
+    click('Job page');
+    act(() => step('Check')!.click());
+    act(() => jest.runOnlyPendingTimers());
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Before you publish');
+    const tablist = container.querySelector('[role="tablist"]') as HTMLElement;
+    const key = (k: string) => act(() => tablist.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })));
+    key('ArrowRight');
+    expect(document.activeElement?.textContent).toBe('Job page');
+    key('End');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('When shared');
+    key('Home');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Before you publish');
     act(() => step('Write')!.click());
     expect(window.location.hash).toBe('#create/job-comms');
     route('#create/job-comms');
@@ -866,6 +879,23 @@ describe('employer demo: managing jobs', () => {
     route('#publish/job-comms');
     expect(tabs()).toEqual(['Checks', 'Job page', 'Google', 'Shared']);
     phone = false;
+  });
+
+  it('the Check badge counts as the publish page does when Amplify is the plan, and the steps wait for a job description', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true, jobs: st.jobs.map((j) => (j.id === 'job-comms' ? { ...j, paidFor: true } : j)) }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-comms');
+    const badge = container.querySelector('[aria-label="Steps to publish"] .ej-count-badge')?.textContent ?? '';
+    route('#publish/job-comms');
+    expect(container.querySelector('[aria-label="Where the job stands"]')?.textContent).toContain(`${parseInt(badge, 10)} checks to look at`);
+    act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === 'job-comms' ? { ...j, sections: [] } : j)) })));
+    route('#create/job-comms');
+    expect(container.querySelectorAll('[aria-label="Steps to publish"] button')).toHaveLength(0);
   });
 
   it('edits a language version in the workspace like the English, and marks it reviewed', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2, Clock, Copy, ExternalLink, Flag as FlagIcon, Linkedin, MapPin, MessageCircle, Share2, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
@@ -164,7 +164,7 @@ function FitSticky({ className, label, id, children }: { className: string; labe
     return () => ro.disconnect();
   }, []);
   return (
-    <section ref={ref} id={id} className={`${className} ${tall ? 'ej-tall' : 'lg:sticky lg:top-4'}`} style={{ scrollMarginTop: 16 }} aria-label={label}>
+    <section ref={ref} id={id} tabIndex={id ? -1 : undefined} className={`${className} ${tall ? 'ej-tall' : 'lg:sticky lg:top-4'}`} style={{ scrollMarginTop: 16, outline: 'none' }} aria-label={label}>
       {children}
     </section>
   );
@@ -857,7 +857,7 @@ export default function Publish({ id }: { id?: string }) {
   const [plansOpen, setPlansOpen] = useState(false);
   const [schedule, setSchedule] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('checks');
-  const tabsRef = useRef<HTMLElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const phone = useIsPhone();
   useEffect(() => {
     if (takePart() === 'publish') document.getElementById('ej-publish-panel')?.scrollIntoView?.({ block: 'start' });
@@ -972,8 +972,22 @@ export default function Publish({ id }: { id?: string }) {
   const openTab = (k: Tab) => {
     setTab(k);
     tabsRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    requestAnimationFrame(() => document.getElementById(`ej-tab-${k}`)?.focus({ preventScroll: true }));
   };
-  const showPanel = () => document.getElementById('ej-publish-panel')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  const showPanel = () => {
+    const panel = document.getElementById('ej-publish-panel');
+    panel?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    (panel?.querySelector<HTMLElement>('.ej-main-cta:not(:disabled)') ?? panel)?.focus({ preventScroll: true });
+  };
+  const tabKeys = (e: ReactKeyboardEvent<HTMLElement>) => {
+    const at = tabs.findIndex(([k]) => k === tab);
+    const to = e.key === 'ArrowRight' ? at + 1 : e.key === 'ArrowLeft' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    const [k] = tabs[(to + tabs.length) % tabs.length];
+    setTab(k);
+    document.getElementById(`ej-tab-${k}`)?.focus();
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-6">
@@ -990,7 +1004,7 @@ export default function Publish({ id }: { id?: string }) {
           </h1>
           {!upgrade && (
             <div className="mt-1.5">
-              <Steps current={reason || toLook ? 2 : 3} badge={toLook} onStep={(n) => (n === 1 ? go('create', job.id) : n === 2 ? openTab('checks') : showPanel())} />
+              <Steps current={reason || toLook ? 2 : 3} badge={toLook} all onStep={(n) => (n === 1 ? go('create', job.id) : n === 2 ? openTab('checks') : showPanel())} />
             </div>
           )}
         </div>
@@ -1000,15 +1014,15 @@ export default function Publish({ id }: { id?: string }) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <section ref={tabsRef} className="flex min-w-0 flex-col" style={{ scrollMarginTop: 16 }} aria-label="Check and preview">
-          <div className="ej-tabs" role="tablist" aria-label="Check and preview" onKeyDown={radioKeys}>
+        <div ref={tabsRef} className="flex min-w-0 flex-col" style={{ scrollMarginTop: 16 }}>
+          <div className="ej-tabs" role="tablist" aria-label="Check and preview" onKeyDown={tabKeys}>
             {tabs.map(([k, long, short]) => (
               <button key={k} type="button" role="tab" id={`ej-tab-${k}`} aria-selected={tab === k} aria-controls="ej-tab-panel" tabIndex={tab === k ? 0 : -1} className="ej-tab" onClick={() => setTab(k)}>
                 {phone ? short : long}
               </button>
             ))}
           </div>
-          <div className="aj-card ej-tab-panel" id="ej-tab-panel" role="tabpanel" aria-labelledby={`ej-tab-${tab}`}>
+          <div className="aj-card ej-tab-panel" id="ej-tab-panel" role="tabpanel" tabIndex={0} aria-labelledby={`ej-tab-${tab}`}>
             {tab === 'checks' && <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} open={row} onOpen={setRow} tabbed />}
             {tab === 'page' && (
               <div className="p-4 lg:p-6">
@@ -1026,7 +1040,7 @@ export default function Publish({ id }: { id?: string }) {
               </div>
             )}
           </div>
-        </section>
+        </div>
 
         <FitSticky className="flex flex-col gap-3" label="How to publish" id="ej-publish-panel">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}

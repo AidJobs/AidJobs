@@ -7,7 +7,9 @@ import Tip from '@/components/site/Tip';
 import { approvalRequired, approvedFor, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
 import { changesSince, changeSummary, tellOffer } from './changes';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
-import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
+import { openPoints } from './Checks';
+import { canGoFree } from './plans';
+import { ChatPanel, DocumentView, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
@@ -136,10 +138,9 @@ export default function Create({ id }: { id?: string }) {
   const shown: Panel = reviewing && panel === 'chat' ? 'review' : panel;
   const reviewerName = s.team.find((p) => p.id === s.reviewerAs)?.name;
   const reviewBadge = reviewing ? (job.review.reviewers.some((r) => r.name === reviewerName && !r.decision) ? 1 : 0) : job.review.remarks.filter((r) => r.state === 'open').length;
-  const blocked = approvalRequired(s, job) && !approvedFor(s, job);
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
-  const checks = job.sections.length ? openChecks(job, s) : [];
+  const checks = job.sections.length ? openPoints(job, s, Boolean(job.paidFor) || !canGoFree(s, job.id, null)) : [];
   const menu = !reviewing && job.status !== 'live' && job.status !== 'closed';
   const setPanel = (p: Panel) => {
     setPanelState(p);
@@ -240,7 +241,7 @@ export default function Create({ id }: { id?: string }) {
           <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
             {(phone || !shown) && statusLine(s, job)}
           </span>
-          {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={(n) => (job.sections.length ? goToPart('publish', job.id, n === 3 ? 'publish' : null) : goToTitle())} />}
+          {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => goToPart('publish', job.id, n === 3 ? 'publish' : null) : undefined} />}
         </div>
       )}
       {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (
@@ -280,7 +281,7 @@ export default function Create({ id }: { id?: string }) {
             <span className="aj-section-label" style={{ padding: 0 }}>
               Next: check and publish
             </span>
-            {checks.length > 0 && <span>Still to look at: {checks.join('; ')}.</span>}
+            {checks.length > 0 && <span>Still to look at: {checks.length > 3 ? `${checks.slice(0, 2).join('; ')}; and ${checks.length - 2} more` : checks.join('; ')}.</span>}
             <span className="aj-muted">
               Check your job against similar ones, add language versions, {approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.
             </span>

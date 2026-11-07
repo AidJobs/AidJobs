@@ -141,8 +141,13 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
  * Before publishing: the advert check for every job; for Amplify, the market check, the full advert check, language versions, and the
  * field-post notice (employer-side plan, section 16, decision 6). Each point offers a one-tap fix where there is one.
  */
+/** The advert check's points still to look at, as the publish page lists them; with Amplify, the full check's too. */
+export function openPoints(job: DemoJob, s: State, amplify: boolean): string[] {
+  return [...basicAdvertCheck(job, s), ...(amplify ? fullAdvertCheck(job, s).points : [])].filter((p) => !p.ok).map((p) => p.title);
+}
+
 export function checksToLook(job: DemoJob, s: State, amplify: boolean): number {
-  return basicAdvertCheck(job, s).filter((p) => !p.ok).length + (amplify ? fullAdvertCheck(job, s).points.filter((p) => !p.ok).length : 0);
+  return openPoints(job, s, amplify).length;
 }
 
 /** Where the job stands before publishing, in a few words each: for the summary above the main button. */

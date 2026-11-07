@@ -551,6 +551,7 @@ button.ej-step:hover {
   color: var(--text-2);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -563,7 +564,6 @@ button.ej-step:hover {
   border-color: var(--hair);
   background: var(--surface);
   color: var(--text);
-  font-weight: 600;
 }
 
 .ej-tab-panel {
@@ -1540,8 +1540,13 @@ button.ej-step:hover {
     height: 34px;
   }
 
+  .ej-tabs {
+    padding: 0 6px;
+  }
+
   .ej-tab {
-    padding: 0 11px;
+    padding: 0 10px;
+    font-size: 12.5px;
   }
 
   .aj-root .ej-tap {
