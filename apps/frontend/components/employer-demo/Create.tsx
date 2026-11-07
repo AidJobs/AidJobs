@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, FileText, History, ListTree, Maximize2, MessagesSquare, Minimize2, MoreHorizontal, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, History, ListTree, Maximize2, MessagesSquare, Minimize2, MoreHorizontal, UserCheck, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
@@ -11,11 +11,14 @@ import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
+import { LangDoc, LangSwitch } from './LangDoc';
 import MenuButton from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
-import { go, useDemo } from './store';
+import { go, goBack, useDemo } from './store';
 import Structure from './Structure';
-import { Dialog } from './ui';
+import { LANGS } from './translate';
+import type { Lang } from './types';
+import { Dialog, Steps } from './ui';
 
 const SPLIT_KEY = 'aidjobs.employerDemo.split';
 const PANEL_KEY = 'aidjobs.employerDemo.panel';
@@ -87,6 +90,7 @@ export default function Create({ id }: { id?: string }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [langPick, setDocLang] = useState<Lang | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -128,6 +132,7 @@ export default function Create({ id }: { id?: string }) {
   }
 
   const reviewing = Boolean(s.reviewerAs);
+  const docLang = langPick && job.translations?.[langPick] ? langPick : null;
   const shown: Panel = reviewing && panel === 'chat' ? 'review' : panel;
   const reviewerName = s.team.find((p) => p.id === s.reviewerAs)?.name;
   const reviewBadge = reviewing ? (job.review.reviewers.some((r) => r.name === reviewerName && !r.decision) ? 1 : 0) : job.review.remarks.filter((r) => r.state === 'open').length;
@@ -171,9 +176,9 @@ export default function Create({ id }: { id?: string }) {
         />
       )}
       {!reviewing && job.sections.length > 0 && job.status !== 'live' && (
-        <Tip label={blocked ? 'Approval is required before publishing' : checks.length ? `To look at before publishing: ${checks.join('; ')}.` : 'Nothing to check. Publish free or Amplify.'} side="bottom">
+        <Tip label={blocked ? 'Next: check, send for review (approval is required), and publish' : checks.length ? `Next: check and publish. To look at: ${checks.join('; ')}.` : 'Next: check and publish'} side="bottom">
           <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
-            {blocked ? 'Publish…' : 'Publish'}
+            {phone ? 'Next' : 'Next: check and publish'} <ArrowRight size={13} strokeWidth={2} />
             {checks.length > 0 && <span className="ej-count-badge">{checks.length}</span>}
           </button>
         </Tip>
@@ -197,8 +202,8 @@ export default function Create({ id }: { id?: string }) {
   const docPane = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-4">
-        <Tip label="Back to Create a job" side="bottom">
-          <button type="button" className="aj-icon-btn" onClick={() => go('create')} aria-label="Back to Create a job">
+        <Tip label="Back" side="bottom">
+          <button type="button" className="aj-icon-btn" onClick={() => goBack('create')} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
           </button>
         </Tip>
@@ -234,9 +239,17 @@ export default function Create({ id }: { id?: string }) {
           <FactBar job={job} s={s} />
         </div>
       )}
-      {(phone || !shown) && (
-        <div className="aj-faint shrink-0 px-4 pt-2 lg:px-6" style={{ fontSize: 11 }}>
-          {statusLine(s, job)}
+      {(phone || !shown || (!reviewing && job.status !== 'live' && job.status !== 'closed')) && (
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 lg:px-6">
+          <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
+            {(phone || !shown) && statusLine(s, job)}
+          </span>
+          {!reviewing && job.status !== 'live' && job.status !== 'closed' && <Steps current={1} />}
+        </div>
+      )}
+      {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (
+        <div className="shrink-0 px-3 pt-2 lg:px-5">
+          <LangSwitch job={job} current={docLang} onPick={setDocLang} />
         </div>
       )}
       <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-3 px-4 py-3 lg:px-6">
@@ -252,7 +265,9 @@ export default function Create({ id }: { id?: string }) {
             )}
           </div>
         )}
-        {job.sections.length ? (
+        {job.sections.length && docLang ? (
+          <LangDoc job={job} lang={docLang} readOnly={reviewing} />
+        ) : job.sections.length ? (
           <DocumentView job={job} s={s} onSeeChat={reviewing ? undefined : () => (phone ? setSheet('chat') : setPanel('chat'))} />
         ) : (
           <div className="aj-card flex flex-col gap-2 p-5">
@@ -263,6 +278,20 @@ export default function Create({ id }: { id?: string }) {
               <span className="aj-faint">Add the job title above, or tell AidJobs in the chat.</span>
             </div>
           </div>
+        )}
+        {job.sections.length > 0 && !reviewing && job.status !== 'live' && job.status !== 'closed' && (
+          <section className="aj-card flex flex-col gap-2 p-4" aria-label="Next step">
+            <span className="aj-section-label" style={{ padding: 0 }}>
+              Next: check and publish
+            </span>
+            {checks.length > 0 && <span>Still to look at: {checks.join('; ')}.</span>}
+            <span className="aj-muted">
+              Check your job against similar ones, add language versions, {approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.
+            </span>
+            <button type="button" className="aj-ink-btn self-start" onClick={() => go('publish', job.id)}>
+              Next: check and publish <ArrowRight size={14} strokeWidth={2} />
+            </button>
+          </section>
         )}
       </div>
     </div>

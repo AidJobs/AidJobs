@@ -17,7 +17,7 @@ import type { MenuAction } from './MenuButton';
 import { BADGE, delisted, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn, nextPaidJob, singlePrice, usd } from './plans';
 import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
-import { go, notify, useDemo } from './store';
+import { go, goBack, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
 import { Dialog, HeaderSlot, inputStyle, JobLink, Lifeline, PlanBadge, stageOf } from './ui';
 
@@ -588,7 +588,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 pb-5 lg:px-8 lg:pb-8">
       <div className="top-0 z-10 -mx-4 flex flex-col gap-3 px-4 pb-1 pt-4 aj-hair lg:sticky lg:-mx-8 lg:border-b lg:px-8 lg:pb-3 lg:pt-6" style={{ background: 'var(--page)' }}>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="aj-icon-btn" onClick={() => go('jobs')} aria-label="Back to jobs">
+        <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
           <ArrowLeft size={15} strokeWidth={1.8} />
         </button>
         <div className="min-w-0 flex-1 basis-[220px]">
@@ -670,7 +670,7 @@ function RecentlyDeleted({ s }: { s: State }) {
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex items-center gap-2">
-        <button type="button" className="aj-icon-btn" onClick={() => go('jobs')} aria-label="Back to jobs">
+        <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
           <ArrowLeft size={15} strokeWidth={1.8} />
         </button>
         <h1 className="aj-display aj-h1" style={{ margin: 0 }}>

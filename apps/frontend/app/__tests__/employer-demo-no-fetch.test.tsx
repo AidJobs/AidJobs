@@ -18,7 +18,7 @@ import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
-import { reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
+import { addTranslation, reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
 import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
@@ -774,6 +774,73 @@ describe('employer demo: managing jobs', () => {
     act(() => (container.querySelector('button[aria-label="Close the search"]') as HTMLElement).click());
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Search jobs');
     phone = false;
+  });
+
+  it('from writing to publishing: Back returns where you came from, Next leads to Check and publish, with review and a summary', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#jobs');
+    const openRow = (title: string) => act(() => (Array.from(container.querySelectorAll('.ej-jobrow-main')).find((b) => b.textContent?.includes(title)) as HTMLElement).click());
+    openRow('Finance Officer');
+    expect(window.location.hash).toBe('#create/job-fin');
+    route('#create/job-fin');
+    shows('Next: check and publish');
+    expect(container.querySelector('section[aria-label="Next step"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Steps to publish"] [aria-current="step"]')?.textContent).toContain('Write');
+
+    click(/^Next: check and publish/);
+    route('#publish/job-fin');
+    shows('Check and publish');
+    expect(container.querySelector('[aria-label="Steps to publish"] [aria-current="step"]')?.textContent).toContain('Check');
+    expect(container.querySelector('#ej-row-review')).not.toBeNull();
+    const scroll = jest.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+    const summary = container.querySelector('[aria-label="Where the job stands"]') as HTMLElement;
+    act(() => (Array.from(summary.querySelectorAll('button')).find((b) => /^approved$|review/.test(b.textContent ?? '')) as HTMLElement).click());
+    expect(container.querySelector('#ej-row-review')?.getAttribute('aria-expanded')).toBe('true');
+    act(() => (container.querySelector('#ej-row-languages') as HTMLElement).click());
+    act(() => jest.runOnlyPendingTimers());
+    expect(container.querySelector('#ej-row-languages')?.getAttribute('aria-expanded')).toBe('true');
+
+    act(() => (container.querySelector('button[aria-label="Back"]') as HTMLElement).click());
+    expect(window.location.hash).toBe('#create/job-fin');
+    route('#create/job-fin');
+    act(() => (container.querySelector('button[aria-label="Back"]') as HTMLElement).click());
+    expect(window.location.hash).toBe('#jobs');
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it('edits a language version in the workspace like the English, and marks it reviewed', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+      addTranslation('job-fin', 'fr');
+      addTranslation('job-fin', 'ar');
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-fin');
+    const switcher = container.querySelector('[aria-label="Language of the job description"]') as HTMLElement;
+    act(() => (Array.from(switcher.querySelectorAll('button')).find((b) => b.textContent?.startsWith('Français')) as HTMLElement).click());
+    shows('French version');
+    shows('Edit facts and sections in English');
+    const line = container.querySelector('article[lang="fr"] textarea') as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(line, 'Une ligne revue à la main');
+      line.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(JSON.stringify(getState().jobs.find((j) => j.id === 'job-fin')?.translations?.fr?.sections)).toContain('Une ligne revue à la main');
+    click('Mark as reviewed');
+    expect(getState().jobs.find((j) => j.id === 'job-fin')?.translations?.fr?.reviewed).toBe(true);
+    act(() => (Array.from(switcher.querySelectorAll('button')).find((b) => b.getAttribute('lang') === 'ar') as HTMLElement).click());
+    expect(container.querySelector('article[lang="ar"]')?.getAttribute('dir')).toBe('rtl');
+    expect(network).toEqual([]);
   });
 
   it("a job's page is in parts, with one main action and Now first", () => {

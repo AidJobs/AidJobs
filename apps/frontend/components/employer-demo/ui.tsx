@@ -81,6 +81,22 @@ export function LegalLine({ year, className = '' }: { year: number; className?: 
   );
 }
 
+/** Where the user is between writing and publishing: 1 Write · 2 Check · 3 Publish. */
+export function Steps({ current }: { current: 1 | 2 | 3 }) {
+  return (
+    <ol className="ej-steps" aria-label="Steps to publish">
+      {['Write', 'Check', 'Publish'].map((label, i) => (
+        <li key={label} aria-current={current === i + 1 ? 'step' : undefined} data-done={i + 1 < current || undefined}>
+          <span className="ej-step-n" aria-hidden>
+            {i + 1}
+          </span>
+          {label}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /** The place in the top bar, beside the organisation's name, where a screen can put its own tools. */
 export const HeaderSlotContext = createContext<HTMLElement | null>(null);
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { AlertCircle, BarChart3, CheckCircle2, ChevronDown, FileCheck2, Languages, Lock, Printer } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, ChevronDown, FileCheck2, Languages, Lock, Printer, UserCheck } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, refreshTranslation, removeTranslation, reviewTranslation } from './actions';
+import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, isReviewable, refreshTranslation, remindReviewers, removeTranslation, reviewTranslation } from './actions';
+import { ReviewDialog } from './Review';
 import { shortDate } from './engine';
 import { FlyerDialog } from './Flyer';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, MIN_SIMILAR, type Point } from './market';
@@ -11,7 +12,7 @@ import { LANGS, langOf, stale, totalLines, untranslated } from './translate';
 import type { DemoJob, Lang, State } from './types';
 import { Dialog, inputStyle } from './ui';
 
-type RowKey = 'advert' | 'market' | 'languages' | 'notice';
+export type RowKey = 'advert' | 'market' | 'languages' | 'notice' | 'review';
 
 function PointRow({ p, job, owner }: { p: Point; job: DemoJob; owner: boolean }) {
   return (
@@ -140,8 +141,53 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
  * Before publishing: the advert check for every job; for Amplify, the market check, the full advert check, language versions, and the
  * field-post notice (employer-side plan, section 16, decision 6). Each point offers a one-tap fix where there is one.
  */
-export default function BeforePublish({ job, s, amplify, schedule, url, onChooseAmplify, label = 'Before you publish' }: { job: DemoJob; s: State; amplify: boolean; schedule: string | null; url: string; onChooseAmplify: () => void; label?: string | null }) {
-  const [open, setOpen] = useState<RowKey | null>('advert');
+/** Where the job stands before publishing, in a few words each: for the summary above the main button. */
+export function checkSummary(job: DemoJob, s: State, amplify: boolean): Array<{ key: RowKey; text: string }> {
+  const basic = basicAdvertCheck(job, s);
+  const full = amplify ? fullAdvertCheck(job, s) : null;
+  const toLook = basic.filter((p) => !p.ok).length + (full?.points.filter((p) => !p.ok).length ?? 0);
+  const versions = LANGS.filter((l) => job.translations?.[l.key]);
+  return [
+    { key: 'advert', text: toLook ? `${toLook} ${toLook === 1 ? 'check' : 'checks'} to look at` : 'checks all clear' },
+    ...(isReviewable(job) ? [{ key: 'review' as const, text: reviewText(job, s) }] : []),
+    { key: 'languages', text: !amplify ? 'language versions with Amplify' : versions.length ? `${versions.length} language ${versions.length === 1 ? 'version' : 'versions'}` : 'no language versions' },
+  ];
+}
+
+function reviewText(job: DemoJob, s: State): string {
+  const needed = approvalRequired(s, job);
+  const r = job.review;
+  if (r.state === 'none') return needed ? 'review required, not sent' : 'review optional, not sent';
+  if (r.state === 'changes') return 'changes requested';
+  if (isApproved(job)) return 'approved';
+  return `in review: ${r.reviewers.filter((x) => x.decision === 'approved').length} of ${r.reviewers.length} approved`;
+}
+
+export default function BeforePublish({
+  job,
+  s,
+  amplify,
+  schedule,
+  url,
+  onChooseAmplify,
+  label = 'Before you publish',
+  open: openProp,
+  onOpen,
+}: {
+  job: DemoJob;
+  s: State;
+  amplify: boolean;
+  schedule: string | null;
+  url: string;
+  onChooseAmplify: () => void;
+  label?: string | null;
+  open?: RowKey | null;
+  onOpen?: (k: RowKey | null) => void;
+}) {
+  const [openOwn, setOpenOwn] = useState<RowKey | null>('advert');
+  const open = openProp === undefined ? openOwn : openProp;
+  const setOpen = onOpen ?? setOpenOwn;
+  const [reviewing, setReviewing] = useState(false);
   const [review, setReview] = useState<Lang | null>(null);
   const [flyer, setFlyer] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -238,6 +284,14 @@ export default function BeforePublish({ job, s, amplify, schedule, url, onChoose
       ) : (
         <div className="flex flex-col gap-2">
           <span className="aj-muted">AidJobs drafts each version; you review it before it appears. Each is its own version of the job page, for people reading and searching in that language.</span>
+          {versions.length > 0 && job.status !== 'live' && owner && (
+            <span className="aj-faint">
+              You can also edit each version in the workspace, like the English.{' '}
+              <button type="button" className="aj-text-btn" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
+                Open the workspace
+              </button>
+            </span>
+          )}
           <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {LANGS.map((l) => {
               const t = job.translations?.[l.key];
@@ -286,7 +340,51 @@ export default function BeforePublish({ job, s, amplify, schedule, url, onChoose
         </div>
       ),
     },
+    ...(isReviewable(job) ? [reviewRow()] : []),
   ];
+
+  function reviewRow(): (typeof rows)[number] {
+    const needed = approvalRequired(s, job);
+    const r = job.review;
+    const sent = r.state !== 'none';
+    const waiting = r.reviewers.some((x) => !x.decision);
+    return {
+      key: 'review',
+      icon: <UserCheck size={16} strokeWidth={1.8} />,
+      title: 'Review',
+      summary: reviewText(job, s).replace(/^./, (c) => c.toUpperCase()),
+      tone: (needed && !isApproved(job)) || r.state === 'changes' ? 'tip' : 'ok',
+      body: (
+        <div className="flex flex-col items-start gap-2">
+          <span className="aj-muted">
+            {needed ? 'Your organisation asks for approval before publishing.' : 'Optional: ask colleagues to read it and approve before you publish.'}
+            {sent ? '' : ' They get a private link; they can comment and approve, not change it.'}
+          </span>
+          {sent && (
+            <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
+              {r.reviewers.map((x) => (
+                <li key={x.email}>
+                  {x.name}: {x.decision === 'approved' ? 'approved' : x.decision === 'changes' ? 'asked for changes' : 'not answered yet'}
+                </li>
+              ))}
+            </ul>
+          )}
+          {owner && (
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" className="aj-pill" onClick={() => setReviewing(true)}>
+                <UserCheck size={13} strokeWidth={1.8} /> {sent ? 'Review again' : 'Send for review'}
+              </button>
+              {sent && waiting && (
+                <button type="button" className="aj-text-btn" onClick={() => remindReviewers(job.id)}>
+                  Remind
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    };
+  }
 
   return (
     <section className={label ? 'aj-card flex flex-col p-1.5' : 'flex flex-col'} aria-label={label ?? 'Improve this job'}>
@@ -297,7 +395,19 @@ export default function BeforePublish({ job, s, amplify, schedule, url, onChoose
         const isOpen = open === r.key;
         return (
           <div key={r.key} className="rounded-xl" style={{ background: isOpen ? 'var(--surface-2)' : undefined }}>
-            <button type="button" className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left" style={{ border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer' }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.key)}>
+            <button
+              type="button"
+              id={label ? `ej-row-${r.key}` : undefined}
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left"
+              style={{ border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', scrollMarginTop: 72 }}
+              aria-expanded={isOpen}
+              onClick={(e) => {
+                const head = e.currentTarget;
+                setOpen(isOpen ? null : r.key);
+                // Opening a row closes the one above it, which can carry this row off the top of the screen: bring its heading back.
+                if (!isOpen) requestAnimationFrame(() => head.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+              }}
+            >
               <span className="shrink-0" style={{ color: r.tone === 'locked' ? 'var(--text-3)' : 'var(--sage-7)' }}>
                 {r.icon}
               </span>
@@ -315,6 +425,7 @@ export default function BeforePublish({ job, s, amplify, schedule, url, onChoose
         );
       })}
       {review && <LanguageReview job={job} lang={review} onClose={() => setReview(null)} />}
+      {reviewing && <ReviewDialog job={job} s={s} onClose={() => setReviewing(false)} />}
       {flyer && <FlyerDialog job={job} s={s} url={url} onClose={() => setFlyer(false)} />}
     </section>
   );

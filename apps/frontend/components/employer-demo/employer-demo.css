@@ -438,6 +438,100 @@
   color: var(--text);
 }
 
+/* The steps from writing to publishing: quiet, the current one in sage. */
+.ej-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ej-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ej-steps li + li::before {
+  content: '';
+  width: 14px;
+  height: 1px;
+  margin-right: 1px;
+  background: var(--hair);
+}
+
+.ej-step-n {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.ej-steps li[data-done] {
+  color: var(--text-2);
+}
+
+.ej-steps li[data-done] .ej-step-n {
+  border-color: var(--sage-5);
+  color: var(--sage-8);
+}
+
+.ej-steps li[aria-current] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ej-steps li[aria-current] .ej-step-n {
+  border-color: var(--sage-5);
+  background: var(--sage-2);
+  color: var(--sage-8);
+}
+
+/* A language version edited in place: borderless like the document, a hairline on hover, a sage border on focus (like the chat box). */
+.ej-tr-head,
+.ej-tr-line {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  resize: none;
+  transition: border-color 120ms ease;
+}
+
+.ej-tr-head {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.ej-tr-line {
+  line-height: 1.55;
+}
+
+.ej-tr-head:hover,
+.ej-tr-line:hover {
+  border-color: var(--hair);
+}
+
+.aj-root .ej-tr-head:focus-visible,
+.aj-root .ej-tr-line:focus-visible {
+  border-color: var(--sage-5);
+  outline: none;
+  box-shadow: none;
+}
+
 /* Search: shaped and focused like the chat box, a sage border and no square glow. */
 .ej-search {
   display: flex;

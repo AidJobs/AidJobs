@@ -183,8 +183,25 @@ export function useRoute(): Route {
   return { screen: screen || 'create', id: id || undefined };
 }
 
+/** The screens the user came through, most recent last, so Back returns where they came from (not kept across a reload). */
+const trail: string[] = [];
+
 export function go(screen: string, id?: string) {
   const next = `#${screen}${id ? `/${id}` : ''}`;
-  if (window.location.hash !== next) window.location.hash = next;
+  if (window.location.hash !== next) {
+    trail.push(window.location.hash || '#create');
+    if (trail.length > 30) trail.shift();
+    window.location.hash = next;
+  }
+  window.scrollTo?.(0, 0);
+}
+
+/** Back to the screen the user came from: Manage jobs, Overview, Create a job, or the workspace; `fallback` when there is none. */
+export function goBack(fallback: string, fallbackId?: string) {
+  const here = window.location.hash;
+  let prev = trail.pop();
+  while (prev !== undefined && prev === here) prev = trail.pop();
+  if (prev === undefined) return go(fallback, fallbackId);
+  window.location.hash = prev;
   window.scrollTo?.(0, 0);
 }

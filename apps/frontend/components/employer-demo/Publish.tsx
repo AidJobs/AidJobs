@@ -50,14 +50,14 @@ import {
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
 import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
-import BeforePublish from './Checks';
+import BeforePublish, { checkSummary, type RowKey } from './Checks';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
-import { getState, go, notify, useDemo } from './store';
+import { getState, go, goBack, notify, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
-import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys } from './ui';
+import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys, Steps } from './ui';
 
 export { jobUrl };
 
@@ -851,6 +851,7 @@ export default function Publish({ id }: { id?: string }) {
   const s = useDemo();
   const job = s.jobs.find((j) => j.id === id);
   const [plan, setPlan] = useState<Plan>(() => (job && canGoFree(s, job.id, null) ? 'free' : 'amplify'));
+  const [row, setRow] = useState<RowKey | null>('advert');
   const [pkg, setPkg] = useState<PackageKey>('one');
   const [plansOpen, setPlansOpen] = useState(false);
   const [schedule, setSchedule] = useState<string | null>(null);
@@ -965,24 +966,31 @@ export default function Publish({ id }: { id?: string }) {
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-6">
       <div className="flex items-center gap-2">
         <Tip label={upgrade ? 'Back to the job' : 'Back to the job description'} side="bottom">
-          <button type="button" className="aj-icon-btn" onClick={() => (upgrade ? go('jobs', job.id) : go('create', job.id))} aria-label="Back">
+          <button type="button" className="aj-icon-btn" onClick={() => (upgrade ? goBack('jobs', job.id) : goBack('create', job.id))} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
           </button>
         </Tip>
         <div className="min-w-0 flex-1">
-          <span className="ej-panel-label">{upgrade ? 'Amplify a live free job' : 'Publish'}</span>
+          <span className="ej-panel-label">{upgrade ? 'Amplify a live free job' : 'Check and publish'}</span>
           <h1 className="aj-display aj-h1 truncate" style={{ margin: 0 }}>
             {job.facts.title || 'Untitled job'}
           </h1>
+          {!upgrade && (
+            <div className="mt-1.5">
+              <Steps current={2} />
+            </div>
+          )}
         </div>
         <span className="hidden sm:inline">
           <DemoMark label="Demo · simulated payment, placeholder prices" />
         </span>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
-        <section className="order-2 flex min-w-0 flex-col gap-3 lg:order-1" aria-label="Preview">
-          <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_1fr] lg:items-start">
+        <section className="order-1 flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1" aria-label="Check">
+          <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} open={row} onOpen={setRow} />
+        </section>
+        <section className="order-3 flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-2" aria-label="Preview">
           <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" onKeyDown={radioKeys} aria-label="Preview">
             {views.map(([k, l]) => (
               <button key={k} type="button" role="radio" aria-checked={view === k} data-active={view === k} onClick={() => setView(k)}>
@@ -999,7 +1007,7 @@ export default function Publish({ id }: { id?: string }) {
           {view === 'share' && <ShareCards job={shown} s={s} />}
         </section>
 
-        <FitSticky className="order-1 flex flex-col gap-3 lg:order-2" label="How to publish">
+        <FitSticky className="order-2 flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1" label="How to publish">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
           {!blocked && !upgrade && <ChangesNote job={job} onPublishAnyway={() => setOverrule(true)} />}
           {request && (
@@ -1175,6 +1183,25 @@ export default function Publish({ id }: { id?: string }) {
             </div>
           )}
 
+          {!upgrade && (
+            <p className="aj-faint text-center" style={{ margin: 0, fontSize: 12 }} aria-label="Where the job stands">
+              {checkSummary(job, s, chosen === 'amplify').map((p, i) => (
+                <span key={p.key}>
+                  {i > 0 && ' · '}
+                  <button
+                    type="button"
+                    className="ej-legal-link"
+                    onClick={() => {
+                      setRow(p.key);
+                      requestAnimationFrame(() => document.getElementById(`ej-row-${p.key}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
+                    }}
+                  >
+                    {p.text}
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
           <button type="button" className="aj-ink-btn ej-main-cta w-full justify-center" style={{ minHeight: 44 }} disabled={Boolean(reason)} onClick={proceed}>
             {label}
           </button>
