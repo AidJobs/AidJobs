@@ -42,6 +42,8 @@ _NON_VACANCY_WORDS = frozenset(
         "advertisements",
     }
 )
+# Words of a page about the visitor rather than a job (my-profile, edit-account).
+_PAGE_WORDS = frozenset({"my", "edit", "view", "manage", "your"})
 
 
 def _segments(url: str) -> list[str]:
@@ -90,9 +92,41 @@ def _segment_words(segment: str) -> list[str]:
     return [word.lower() for word in re.split(r"[^A-Za-z0-9]+", spaced) if word]
 
 
+def _title_slug(segment: str) -> bool:
+    """No dot, at least three words joined by hyphens, one of them neither a deny word nor a
+    page word."""
+    if "." in segment:
+        return False
+    words = [word.lower() for word in segment.split("-") if word]
+    return len(words) >= 3 and any(
+        word not in _NON_VACANCY_WORDS and word not in _PAGE_WORDS for word in words
+    )
+
+
+def _title_slug_positions(segments: list[str]) -> set[int]:
+    """The single segment taken for a job's own title slug: the one directly before the first
+    numeric id after a vacancy token if it is a slug, otherwise the one directly after; never
+    the token itself (crawler plan, C3 point 1, amended W-44)."""
+    for index, segment in enumerate(segments):
+        if segment.lower() not in _VACANCY_TOKENS:
+            continue
+        for later in range(index + 1, len(segments)):
+            if _NUMERIC_ID.match(segments[later]):
+                for position in (later - 1, later + 1):
+                    if index < position < len(segments) and _title_slug(segments[position]):
+                        return {position}
+                return set()
+    return set()
+
+
 def _non_vacancy_path(url: str) -> bool:
-    """Membership, profile, account, payment, advertising, and event-submission paths."""
-    for segment in _segments(url):
+    """Membership, profile, account, payment, advertising, and event-submission paths. A job's
+    own title slug next to its id is not read for them."""
+    segments = _segments(url)
+    slugs = _title_slug_positions(segments)
+    for position, segment in enumerate(segments):
+        if position in slugs:
+            continue
         words = _segment_words(segment)
         compact = "".join(words)
         if any(word in _NON_VACANCY_WORDS for word in words):

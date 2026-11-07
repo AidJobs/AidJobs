@@ -481,3 +481,99 @@ def test_each_adapter_admits_once_before_save_and_the_orchestrator_does_not():
     assert 'job[\'record_class\'] = \'job_posting\'' in html
     assert "restrict_to_repeated_detail_templates" not in html
     assert "admit_batch" not in orchestrator
+
+
+# W-44 (crawler plan, C3 point 1, amended 7 November 2026): a job's own title slug next to its
+# id is not read for the deny words. The four links are the real vacancies production rejected
+# (failed_inserts, 22 October to 2 November 2026), with the fields stored for them.
+_TITLE_SLUG_VACANCIES = [
+    {
+        "title": "Partnerships Consultant – Faith-Based and Membership Organisations, UNICEF "
+                 "Private FR & Partnership, Foundations, Rome, Italy, 13.5 months (remote) #596646",
+        "apply_url": _JOB + "596646/partnerships-consultant-faithbased-and-membership-"
+                     "organisations-unicef-private-fr-partnership-foundations-rome-italy-135-"
+                     "months-remote-596646",
+        "location_raw": "Italy",
+        "deadline": "2026-11-10",
+    },
+    {
+        "title": "Consultant to coordinate the development of a Nutrient Profile Model for Lao "
+                 "PDR (remote for 6 months)",
+        "apply_url": _JOB + "596517/consultant-to-coordinate-the-development-of-a-nutrient-"
+                     "profile-model-for-lao-pdr-remote-for-6-months",
+        "location_raw": "Lao People’s Democratic Republic",
+        "deadline": "2026-10-29",
+    },
+    {
+        "title": "Programme Officer (Cash Transfers and Incentive Payments), NO-2, FT, #137768 "
+                 "State of Palestine, Gaza MENA",
+        "apply_url": _JOB + "596580/programme-officer-cash-transfers-and-incentive-payments-"
+                     "no2-ft-137768-state-of-palestine-gaza-mena",
+        "location_raw": "State of Palestine (SoP)",
+        "deadline": "2026-11-09",
+    },
+    {
+        "title": "Programme Manager (Nexus) (Re-advertisement)Myanmar - Taunggyi15 November 2026",
+        "apply_url": "https://jobs.oxfam.org.uk/jobs/vacancy/programme-manager-nexus-re-"
+                     "advertisement-int11906/25191/description/",
+        "location_raw": "Taunggyi, Shan State, Myanmar",
+        "deadline": "2026-11-15",
+        "employment_type": "Fixed Term",
+    },
+]
+
+
+def test_a_jobs_own_title_slug_is_not_read_for_the_deny_words():
+    admitted, rejected = admit_batch([dict(job) for job in _TITLE_SLUG_VACANCIES], "html")
+    assert rejected == []
+    assert _urls(admitted) == [job["apply_url"] for job in _TITLE_SLUG_VACANCIES]
+
+
+def test_a_title_slug_vacancy_still_needs_its_evidence():
+    thin = [{"title": job["title"], "apply_url": job["apply_url"]} for job in _TITLE_SLUG_VACANCIES]
+    admitted, rejected = admit_batch(thin, "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["thin_vacancy"] * 4
+
+
+def test_deny_words_outside_a_title_slug_still_reject():
+    rows = [
+        # Two words, or a page about the visitor, are not a title slug.
+        "https://jobs.example.org/jobs/123/my-profile",
+        "https://jobs.example.org/job/123/edit-profile",
+        "https://jobs.example.org/jobs/vacancy/membership-payments/25191",
+        "https://jobs.example.org/job/123/my-account-view",
+        "https://jobs.example.org/job/123/membership",
+        # A deny word before the vacancy token, or the slug not next to the id.
+        "https://jobs.example.org/membership/job/123/programme-officer-kenya",
+        "https://jobs.example.org/account/jobs/123/finance-officer-nairobi",
+        _JOB + "596646/en/partnerships-consultant-faithbased-and-membership-organisations",
+        # A dotted segment is a page name; a path with no vacancy token and id has no slug.
+        "https://jobs.example.org/vacancies/123/head-of-membership.html",
+        "https://jobs.example.org/careers/head-of-membership-services",
+        "https://www.devnetjobsindia.org/valuemembership.aspx?job_id=304752",
+        # Only one segment is a title slug: a second one next to the id is still read.
+        "https://jobs.example.org/jobs/vacancy/programme-officer-kenya/123/pay-membership-fees",
+        "https://jobs.oxfam.org.uk/jobs/vacancy/programme-manager-nexus-int11906/25191/"
+        "report-this-advertisement/",
+        # Fewer than three words; a slug before the token; case and empty words do not count.
+        "https://jobs.example.org/jobs/123/membership-fees",
+        "https://jobs.example.org/annual-membership-fees/job/123/x",
+        "https://jobs.example.org/job/123/MY-PROFILE-VIEW",
+        "https://jobs.example.org/job/123/my--profile--view",
+        # Words are joined by hyphens only.
+        "https://jobs.example.org/job/123/head_of_membership",
+    ]
+    jobs = [{"title": "Programme Officer", "apply_url": url, "location_raw": "Nairobi",
+             "deadline": "2026-12-01"} for url in rows]
+    admitted, rejected = admit_batch(jobs, "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["non_vacancy_destination"] * len(rows)
+
+
+def test_without_a_vacancy_token_and_id_nothing_is_a_title_slug():
+    job = {"title": "Annual renewal", "apply_url": "https://ngo.example.org/news/2026/"
+           "annual-membership-renewal", "location_raw": "London", "deadline": "2026-12-01"}
+    admitted, rejected = admit_batch([job], "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["non_vacancy_destination"]
