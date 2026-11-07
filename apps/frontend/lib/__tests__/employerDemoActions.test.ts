@@ -21,6 +21,8 @@ import {
   declineTell,
   letLeaveList,
   publishNow,
+  reopen,
+  reopenBlock,
   reschedule,
   rescheduleBlock,
   tellInvited,
@@ -63,7 +65,7 @@ import { article, daysUntil, isoDay, parseIso } from '../../components/employer-
 import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
-import { purgeDeleted } from '../../components/employer-demo/lifecycle';
+import { canReopen, pageRemoved, purgeDeleted } from '../../components/employer-demo/lifecycle';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, delisted, firstOfNextMonth, freeLeft, listedUntil, listingEnd, listingEndsIn, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
 import { changesSince, tellOffer } from '../../components/employer-demo/changes';
@@ -388,6 +390,45 @@ describe('managing jobs: scheduled jobs, changes since publishing, the listing e
     expect(delisted(job('job-liv'), getState().today)).toBe(false);
     expect(delisted(job('job-liv'), getState().today + 6 * DAY)).toBe(true);
     expect(statusLine({ ...getState(), today: getState().today + 6 * DAY }, job('job-liv'))).toBe('Live · no longer listed on AidJobs');
+  });
+});
+
+describe('managing jobs: Reopen within 14 days, and the closed page (plan section 17, phase 3)', () => {
+  const DAY = 86_400_000;
+  const inDays = (n: number) => isoDay(getState().today + n * DAY);
+
+  it('reopens a job closed early, at the same address, without sending Reach again; Undo closes it again', () => {
+    expect(canReopen(job('job-health'), getState().today)).toBe(true);
+    expect(reopenBlock(getState(), job('job-health'), inDays(0))).toBe('Choose a closing date from tomorrow');
+    const reach = job('job-health').reach;
+    expect(reopen('job-health', inDays(14))).toBe(true);
+    expect(job('job-health')).toMatchObject({ status: 'live', closedAt: undefined, closeReason: undefined });
+    expect(job('job-health').facts.deadline).toBe(inDays(14));
+    expect(job('job-health').reach).toEqual(reach);
+    expect(job('job-health').audit.at(-1)?.what).toMatch(/^Reopened, now closing .*Reach was not sent again/);
+    undo();
+    expect(job('job-health').status).toBe('closed');
+  });
+
+  it('a filled position, a job past its 14 days, and reviewers cannot reopen', () => {
+    expect(reopenBlock(getState(), job('job-wash-2026'), inDays(14))).toBe('A filled position uses Hire again');
+    expect(reopenBlock(getState(), job('job-log'), inDays(14))).toBe('Reopen is for the 14 days after closing');
+    update((s) => ({ ...s, reviewerAs: 'amina' }));
+    expect(reopen('job-health', inDays(14))).toBe(false);
+  });
+
+  it('a free job keeps its listing period; once that has ended, it reopens only with Amplify (paid)', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-liv' ? { ...j, status: 'closed', closedAt: s.today - 2 * DAY, closeReason: 'early', publishedAt: s.today - 70 * DAY } : j)) }));
+    expect(reopenBlock(getState(), job('job-liv'), inDays(14))).toBe('Its free listing period has ended');
+    const receipts = getState().receipts.length;
+    expect(reopen('job-liv', inDays(14), true)).toBe(true);
+    expect(job('job-liv')).toMatchObject({ status: 'live', plan: 'amplify' });
+    expect(getState().receipts.length).toBe(receipts + 1);
+  });
+
+  it('the closed page is removed 30 days after closing', () => {
+    expect(pageRemoved(job('job-log'), getState().today)).toBe(false);
+    expect(pageRemoved(job('job-wash-2026'), getState().today)).toBe(true);
   });
 });
 

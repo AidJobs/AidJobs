@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
 import { daysUntil } from './engine';
+import { pageRemoved } from './lifecycle';
 import { BADGE, BADGE_TIP, delisted } from './plans';
 import { JobPageLangs } from './Publish';
 import { PUBLIC_SAMPLES } from './sample';
@@ -61,8 +62,10 @@ export default function Public({ id }: { id?: string }) {
   const all = cards(s);
   const amplified = all.filter((c) => c.amplified);
   const openCard = all.find((c) => c.id === open);
-  const ownOpen = open ? s.jobs.find((j) => j.id === open) : undefined;
-  const gone = Boolean(id && !ownOpen && (s.gone ?? []).includes(id));
+  const own = open ? s.jobs.find((j) => j.id === open) : undefined;
+  const removed = Boolean(own && pageRemoved(own, s.today));
+  const ownOpen = removed ? undefined : own;
+  const gone = removed || Boolean(id && !own && (s.gone ?? []).includes(id));
 
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
@@ -75,7 +78,7 @@ export default function Public({ id }: { id?: string }) {
       {gone && (
         <div className="aj-card flex flex-col gap-1 p-4" role="status">
           <span style={{ fontWeight: 650 }}>This vacancy is no longer available</span>
-          <span className="aj-muted">The employer has removed it. Other open jobs are below.</span>
+          <span className="aj-muted">{removed ? 'It closed more than 30 days ago.' : 'The employer has removed it.'} Other open jobs are below.</span>
         </div>
       )}
       <div className="aj-switch self-start" role="radiogroup" aria-label="View">

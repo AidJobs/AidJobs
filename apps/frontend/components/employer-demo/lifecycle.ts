@@ -24,6 +24,21 @@ export function inGrace(j: DemoJob, today: number): boolean {
   return end !== null && today < end;
 }
 
+/** Reopen (decision 5): within the 14 days, for a job closed early, withdrawn, or past its date; a filled position uses Hire again. */
+export function canReopen(j: DemoJob, today: number): boolean {
+  return inGrace(j, today) && j.closeReason !== 'filled';
+}
+
+/** 30 days after closing the closed page is removed: links then say "This vacancy is no longer available". */
+export function pageRemoved(j: DemoJob, today: number): boolean {
+  return j.status === 'closed' && j.closedAt !== undefined && today >= j.closedAt + PAGE_REMOVED_DAYS * DAY;
+}
+
+/** 90 days after closing the description is dropped; the basic record stays. */
+export function textDropped(j: DemoJob, today: number): boolean {
+  return j.status === 'closed' && j.closedAt !== undefined && today >= j.closedAt + TEXT_DROPPED_DAYS * DAY;
+}
+
 export function erasedOn(at: number): number {
   return at + KEEP_DELETED_DAYS * DAY;
 }

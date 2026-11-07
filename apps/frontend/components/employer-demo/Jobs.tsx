@@ -4,14 +4,15 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Trash2 } from 'l
 import { type ReactNode, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { approvedFor, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, restoreDeleted } from './actions';
+import { approvedFor, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
 import { changesSince, changeSummary, tellOffer } from './changes';
+import BeforePublish from './Checks';
 import { addDays, daysUntil, holiday, isoDay, longDate, parseIso, PLACES, shortDate, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
 import { BackToDraftDialog, DeleteDialog, JobMenu, PublishNowDialog, RescheduleDialog, TellDialog, WithdrawDialog } from './JobActions';
-import { erasedOn, graceEnds, inGrace, isPublished, KEEP_DELETED_DAYS, PAGE_REMOVED_DAYS, TEXT_DROPPED_DAYS } from './lifecycle';
+import { canReopen, erasedOn, graceEnds, inGrace, isPublished, KEEP_DELETED_DAYS, PAGE_REMOVED_DAYS, pageRemoved, TEXT_DROPPED_DAYS, textDropped } from './lifecycle';
 import type { MenuAction } from './MenuButton';
-import { BADGE, delisted, listedUntil, listingEnd, listingEndsIn } from './plans';
+import { BADGE, delisted, listedUntil, listingEnd, listingEndsIn, nextPaidJob, singlePrice, usd } from './plans';
 import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
@@ -20,12 +21,72 @@ import { Dialog, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
 
 const DAY = 86_400_000;
 
-function ExtendDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
-  const base = job.facts.deadline && daysUntil(s.today, job.facts.deadline) >= 0 ? job.facts.deadline : addDays(s.today, 0);
-  const [date, setDate] = useState(addDays(new Date(`${base}T12:00:00`).getTime(), 7));
+/** A closing date on a weekend or a public holiday at the duty station: candidates may expect the working day before. */
+function dateWarnings(job: DemoJob, date: string): string[] {
   const warn: string[] = [];
   if (date && weekend(date)) warn.push(`${longDate(date)} is a weekend`);
   if (date && holiday(date, job.facts.iso)) warn.push(`${longDate(date)} is a public holiday${job.facts.country ? ` in ${job.facts.country}` : ''}`);
+  return warn;
+}
+
+/** Reopen within the 14 days (decision 5): a new closing date, with Extend's checks; a free job keeps its listing period. */
+function ReopenDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
+  const [date, setDate] = useState(addDays(s.today, 14));
+  const ended = job.plan === 'free' && listingEnd(job, s.today) < isoDay(s.today);
+  const block = reopenBlock(s, job, date, ended);
+  const end = listingEnd(job, s.today);
+  return (
+    <Dialog
+      title="Reopen this job?"
+      subtitle={job.facts.title}
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="aj-ink-btn" disabled={Boolean(block)} onClick={() => reopen(job.id, date, ended) && onClose()}>
+            {block ?? (ended ? `Reopen with Amplify · ${nextPaidJob(s) ? 'uses 1 package job' : usd(singlePrice(s).amount)}` : `Reopen until ${longDate(date)}`)}
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p style={{ margin: 0 }}>
+          {job.facts.title} opens again at the same address, with a new closing date. Its history notes &ldquo;Reopened&rdquo;. The people Reach invited are not emailed again.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {[7, 14, 21].map((n) => {
+            const d = addDays(s.today, n);
+            return (
+              <button key={n} type="button" className="aj-pill" data-active={date === d} onClick={() => setDate(d)}>
+                {n / 7} {n === 7 ? 'week' : 'weeks'} from today
+              </button>
+            );
+          })}
+        </div>
+        <input type="date" style={inputStyle} value={date} min={addDays(s.today, 1)} onChange={(e) => setDate(e.target.value)} aria-label="New closing date" />
+        {dateWarnings(job, date).map((w) => (
+          <span key={w} style={{ color: 'var(--amber)' }}>
+            {w}: candidates may expect it to close the working day before.
+          </span>
+        ))}
+        {job.plan === 'free' &&
+          (ended ? (
+            <span style={{ color: 'var(--amber)' }}>Its free listing period ended on {longDate(end)}. Amplify reopens it, listed until its new closing date. Simulated checkout: no card is charged.</span>
+          ) : (
+            <span className="aj-muted">A free job keeps its listing period: listed on AidJobs until {longDate(end)}{date > end ? '; after that its page still opens from links' : ''}.</span>
+          ))}
+        <span className="aj-faint">A proposal in the demo: reopening is a new step in a job&apos;s life, which needs a contract decision before production.</span>
+      </div>
+    </Dialog>
+  );
+}
+
+function ExtendDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
+  const base = job.facts.deadline && daysUntil(s.today, job.facts.deadline) >= 0 ? job.facts.deadline : addDays(s.today, 0);
+  const [date, setDate] = useState(addDays(new Date(`${base}T12:00:00`).getTime(), 7));
+  const warn = dateWarnings(job, date);
   const days = date ? daysUntil(s.today, date) : 0;
   return (
     <Dialog
@@ -186,7 +247,7 @@ function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete' | 'publishNow' | 'reschedule' | 'backToDraft' | 'tell';
+type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete' | 'publishNow' | 'reschedule' | 'backToDraft' | 'tell' | 'reopen';
 type Open = (job: DemoJob, kind: Kind) => void;
 
 function openReview(job: DemoJob) {
@@ -216,6 +277,7 @@ export function nextStep(s: State, job: DemoJob, open: Open): { label: string; r
   if (listingEndsIn(job, s.today) !== null) return { label: 'Choose what happens', run: () => go('jobs', job.id) };
   if (delisted(job, s.today)) return { label: 'Amplify', run: () => go('publish', job.id) };
   if (job.status === 'live') return left !== null && left <= 7 ? { label: 'Extend', run: () => open(job, 'extend') } : { label: 'Share', run: () => open(job, 'share') };
+  if (canReopen(job, s.today)) return { label: 'Reopen', run: () => open(job, 'reopen') };
   return { label: 'Hire again', run: () => hire(job) };
 }
 
@@ -250,7 +312,7 @@ export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
       del,
     ];
   }
-  return [{ label: 'Hire again', run: () => hire(job) }, copy, variant, del];
+  return [...(canReopen(job, s.today) ? [{ label: 'Reopen', run: () => open(job, 'reopen') }] : []), { label: 'Hire again', run: () => hire(job) }, copy, variant, del];
 }
 
 function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: State; kind: Kind; onClose: () => void; onDeleted?: () => void }) {
@@ -263,6 +325,7 @@ function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: Stat
   if (kind === 'reschedule') return <RescheduleDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'backToDraft') return <BackToDraftDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'tell') return <TellDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'reopen') return <ReopenDialog job={job} s={s} onClose={onClose} />;
   return <DeleteDialog job={job} s={s} onClose={onClose} onDeleted={onDeleted} />;
 }
 
@@ -472,17 +535,18 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
 }
 
 /** The main action on a job's page, by state (plan section 17). */
-function mainAction(job: DemoJob, open: Open): { label: string; run: () => void } {
+function mainAction(s: State, job: DemoJob, open: Open): { label: string; run: () => void } {
   if (job.status === 'live') return { label: 'Extend', run: () => open(job, 'extend') };
   if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
-  if (job.status === 'closed') return { label: 'Hire again', run: () => hire(job) };
+  if (job.status === 'closed') return canReopen(job, s.today) ? { label: 'Reopen', run: () => open(job, 'reopen') } : { label: 'Hire again', run: () => hire(job) };
   return { label: 'Continue', run: () => go('create', job.id) };
 }
 
 function JobDetail({ job, s }: { job: DemoJob; s: State }) {
   const [dialog, setDialog] = useState<Kind | null>(null);
   const open: Open = (_j, kind) => setDialog(kind);
-  const main = mainAction(job, open);
+  const main = mainAction(s, job, open);
+  const improve = job.status === 'live' && job.plan === 'amplify';
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex flex-wrap items-center gap-2">
@@ -511,17 +575,39 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
         </div>
       </div>
       <Lifeline stage={stageOf(job, job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null)} attention={needsYou(s, job)} />
-      <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]" style={{ gridTemplateRows: 'auto auto 1fr' }}>
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]" style={{ gridTemplateRows: improve ? 'auto auto auto 1fr' : 'auto auto 1fr' }}>
         <Part title="Now" open className="lg:col-start-2 lg:row-start-1">
           <NowPart job={job} s={s} open={open} />
         </Part>
-        <Part title="Job page" className="lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:p-5">
-          <JobPageLangs job={job} s={s} />
+        <Part title={job.status === 'closed' ? 'What candidates see' : 'Job page'} className={`lg:col-start-1 lg:row-start-1 lg:p-5 ${improve ? 'lg:row-span-4' : 'lg:row-span-3'}`}>
+          {job.status === 'closed' && pageRemoved(job, s.today) && (
+            <span className="aj-muted">
+              The page has been removed: its link now says &ldquo;This vacancy is no longer available&rdquo;.
+              {textDropped(job, s.today) ? ` Its description was dropped ${TEXT_DROPPED_DAYS} days after closing; the basic record stays.` : ' Below is the page as it was.'}
+            </span>
+          )}
+          {textDropped(job, s.today) ? (
+            <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }} aria-label="Basic record">
+              <li>
+                {job.facts.title}, {job.facts.location}
+              </li>
+              {job.publishedAt && <li>Published {day(job.publishedAt)}</li>}
+              {job.closedAt && <li>Closed {day(job.closedAt)}{job.closeReason === 'filled' ? ': position filled' : ''}</li>}
+              <li>{job.plan === 'amplify' ? 'Amplified' : 'Free'}</li>
+            </ul>
+          ) : (
+            <JobPageLangs job={job} s={s} />
+          )}
         </Part>
         <Part title="Reach" className="lg:col-start-2 lg:row-start-2">
           <ReachLog job={job} s={s} onAmplify={() => go('publish', job.id)} />
         </Part>
-        <Part title="History" icon={<History size={12} strokeWidth={2} />} className="lg:col-start-2 lg:row-start-3">
+        {improve && (
+          <Part title="Improve" className="lg:col-start-2 lg:row-start-3">
+            <BeforePublish job={job} s={s} amplify schedule={null} url={jobUrl(job)} onChooseAmplify={() => go('publish', job.id)} label={null} />
+          </Part>
+        )}
+        <Part title="History" icon={<History size={12} strokeWidth={2} />} className={`lg:col-start-2 ${improve ? 'lg:row-start-4' : 'lg:row-start-3'}`}>
           <ol className="flex flex-col gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {[...job.audit].reverse().map((a, i) => (
               <li key={i} className="flex flex-col">

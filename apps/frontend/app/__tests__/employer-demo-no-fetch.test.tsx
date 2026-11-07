@@ -383,7 +383,7 @@ describe('employer demo: phase 4 helpers', () => {
   it('offers a shared pattern of headings as the base JD format, respects Not now, and can forget the base', () => {
     act(() => resetDemo());
     const pattern = basePattern(getState());
-    expect(pattern?.count).toBe(3);
+    expect(pattern?.count).toBe(4);
     expect(pattern?.order.map((o) => o.key)).toContain('assessment');
     act(() => notNowBase(pattern!.sig));
     expect(getState().baseDismissed).toBe(pattern!.sig);
@@ -702,16 +702,54 @@ describe('employer demo: managing jobs', () => {
     route('#home');
     route('#jobs/job-cps');
     const parts = Array.from(container.querySelectorAll('section.aj-card[aria-label]')).map((p) => p.getAttribute('aria-label'));
-    expect(parts).toEqual(['Now', 'Job page', 'Reach', 'History']);
+    expect(parts).toEqual(['Now', 'Job page', 'Reach', 'Improve', 'History']);
     shows('Closes');
     expect(Array.from(container.querySelectorAll('button.aj-ink-btn')).map((b) => b.textContent?.trim())).toContain('Extend');
+    route('#jobs/job-meal');
+    expect(Array.from(container.querySelectorAll('section.aj-card[aria-label]')).map((p) => p.getAttribute('aria-label'))).toEqual(['Now', 'Job page', 'Reach', 'History']);
     phone = true;
     render();
     route('#home');
     route('#jobs/job-cps');
     const toggles = Array.from(container.querySelectorAll('section.aj-card[aria-label] > button[aria-expanded]')).map((b) => b.getAttribute('aria-expanded'));
-    expect(toggles).toEqual(['true', 'false', 'false', 'false']);
+    expect(toggles).toEqual(['true', 'false', 'false', 'false', 'false']);
     phone = false;
+  });
+
+  it('improves a live amplified job, shows what candidates see once closed, and reopens within 14 days', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#jobs/job-cps');
+    click(/^\s*Language versions/);
+    click('Add French');
+    expect(getState().jobs.find((j) => j.id === 'job-cps')?.translations?.fr).toBeTruthy();
+
+    route('#jobs/job-health');
+    expect(container.querySelector('section[aria-label="What candidates see"]')?.textContent).toContain('Applications closed on');
+    shows('Similar open jobs');
+    click('Reopen');
+    shows('Reopen this job?');
+    shows('needs a contract decision before production');
+    click('3 weeks from today');
+    click(/^Reopen until/);
+    const health = getState().jobs.find((j) => j.id === 'job-health');
+    expect(health?.status).toBe('live');
+    expect(health?.audit.at(-1)?.what).toMatch(/^Reopened, now closing/);
+
+    route('#jobs/job-wash-2026');
+    shows('its link now says');
+    shows('Its description was dropped 90 days after closing');
+    route('#jobs/job-log');
+    expect(container.querySelector('section[aria-label="What candidates see"]')?.textContent).toContain('Applications closed on');
+    expect(Array.from(container.querySelectorAll('button.aj-ink-btn')).map((b) => b.textContent?.trim())).toContain('Hire again');
+    route('#public/job-wash-2026');
+    shows('This vacancy is no longer available');
+    expect(network).toEqual([]);
   });
 });
 

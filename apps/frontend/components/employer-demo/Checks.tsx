@@ -140,7 +140,7 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
  * Before publishing: the advert check for every job; for Amplify, the market check, the full advert check, language versions, and the
  * field-post notice (employer-side plan, section 16, decision 6). Each point offers a one-tap fix where there is one.
  */
-export default function BeforePublish({ job, s, amplify, schedule, url, onChooseAmplify }: { job: DemoJob; s: State; amplify: boolean; schedule: string | null; url: string; onChooseAmplify: () => void }) {
+export default function BeforePublish({ job, s, amplify, schedule, url, onChooseAmplify, label = 'Before you publish' }: { job: DemoJob; s: State; amplify: boolean; schedule: string | null; url: string; onChooseAmplify: () => void; label?: string | null }) {
   const [open, setOpen] = useState<RowKey | null>('advert');
   const [review, setReview] = useState<Lang | null>(null);
   const [flyer, setFlyer] = useState(false);
@@ -289,9 +289,10 @@ export default function BeforePublish({ job, s, amplify, schedule, url, onChoose
   ];
 
   return (
-    <section className="aj-card flex flex-col p-1.5" aria-label="Before you publish">
-      <span className="ej-panel-label px-2.5 pb-1 pt-2">Before you publish</span>
-      {owner && approvalRequired(s, job) && isApproved(job) && <span className="aj-faint px-2.5 pb-1">This job is approved: a fix here changes it, so it goes back to its reviewers, as an edit in the job description does.</span>}
+    <section className={label ? 'aj-card flex flex-col p-1.5' : 'flex flex-col'} aria-label={label ?? 'Improve this job'}>
+      {label && <span className="ej-panel-label px-2.5 pb-1 pt-2">{label}</span>}
+      {job.status === 'live' && <span className="aj-faint px-2.5 pb-1">The job is live: a fix changes it at once, and its page says &ldquo;Updated&rdquo;. A reviewed language version appears on its page at once.</span>}
+      {job.status !== 'live' && owner && approvalRequired(s, job) && isApproved(job) && <span className="aj-faint px-2.5 pb-1">This job is approved: a fix here changes it, so it goes back to its reviewers, as an edit in the job description does.</span>}
       {rows.map((r) => {
         const isOpen = open === r.key;
         return (

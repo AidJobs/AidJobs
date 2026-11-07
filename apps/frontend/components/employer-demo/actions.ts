@@ -25,12 +25,12 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, singlePrice, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
 import { addRound, REACH_EMAILS, reachUsed } from './invites';
-import { isPublished } from './lifecycle';
+import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
@@ -1214,6 +1214,43 @@ export function letLeaveList(id: string) {
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, listingChoice: 'leave', audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Chose to let it leave AidJobs' lists after ${end}; its page stays open from links` }] } : x)),
     notice: { text: `${j.facts.title} leaves AidJobs' lists after ${end}. Its page still opens from links, with the apply button.` },
   }));
+}
+
+/** Why a closed job cannot reopen with this closing date; `amplify` reopens a free job whose listing period has ended. */
+export function reopenBlock(s: State, j: DemoJob, deadline: string, amplify = false): string | null {
+  if (s.reviewerAs) return 'Reviewers cannot reopen jobs';
+  if (!canReopen(j, s.today)) return j.closeReason === 'filled' ? 'A filled position uses Hire again' : 'Reopen is for the 14 days after closing';
+  if (!deadline || deadline <= isoDay(s.today)) return 'Choose a closing date from tomorrow';
+  if (amplify) return j.plan === 'free' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  if (j.plan === 'free' && listingEnd(j, s.today) < isoDay(s.today)) return 'Its free listing period has ended';
+  return null;
+}
+
+/**
+ * Reopens a closed job within its 14 days (decision 5, a proposal needing a contract decision before production): same address, a new
+ * closing date, a "Reopened" note in its history. A free job keeps its original listing period; Reach is not sent again.
+ */
+export function reopen(id: string, deadline: string, amplify = false): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || reopenBlock(s, j, deadline, amplify)) return false;
+  const upgrade = amplify && j.plan === 'free';
+  const onHand = upgrade && Boolean(nextPaidJob(s));
+  if (upgrade && !onHand) buy(singlePrice(s).key, j.facts.title);
+  const what = `Reopened, now closing ${longDate(deadline)}${upgrade ? `; amplified (${onHand ? 'a package job' : 'paid'})` : ''}. Reach was not sent again`;
+  const change = (st: State): State => ({
+    ...(onHand ? takePaidJob(st) : st),
+    jobs: st.jobs.map((x) =>
+      x.id === id
+        ? rebuilt(st, { ...x, status: 'live', closedAt: undefined, closeReason: undefined, plan: upgrade ? 'amplify' : x.plan, facts: { ...x.facts, deadline }, updatedAfterPublish: true, editedAt: Date.now(), audit: [...x.audit, { at: Date.now(), who: st.me.name, what }] })
+        : x,
+    ),
+    inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'removal' ? { ...i, done: true } : i)),
+  });
+  const text = `${j.facts.title} is open again until ${longDate(deadline)}, at the same address.`;
+  if (upgrade) update((st) => ({ ...change(st), notice: { text } }));
+  else changeWithUndo(text, change);
+  return true;
 }
 
 /** Anyone who can publish deletes drafts and jobs in review; only the owner deletes a scheduled, live, or closed job; reviewers never. */

@@ -185,6 +185,20 @@ function sampleList(today: number): DemoJob[] {
       ],
     }),
     job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months' }, { status: 'draft' }),
+    // Closed early 4 days ago: still in "Closed", where it can be reopened (plan section 17, decisions 4 and 5).
+    job(today, 'job-health', 'health', 'house', { title: 'Health Officer', location: 'Goma, DR Congo', country: 'DR Congo', iso: 'CD', timezone: 'CAT', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 10), salaryMode: 'scale' }, {
+      status: 'closed',
+      plan: 'amplify',
+      publishedAt: today - 30 * DAY,
+      closedAt: today - 4 * DAY,
+      closeReason: 'early',
+      createdAt: today - 34 * DAY,
+      audit: [
+        { at: today - 34 * DAY, who: SAMPLE_ME.name, what: 'Created' },
+        { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Amplified and published' },
+        { at: today - 4 * DAY, who: SAMPLE_ME.name, what: 'Closed early' },
+      ],
+    }, ['assessment']),
     job(today, 'job-log', 'logistics', 'house', { title: 'Logistics Assistant', location: 'Kampala, Uganda', country: 'Uganda', iso: 'UG', contract: 'Fixed-term', duration: '6 months', deadline: addDays(today, -25) }, {
       status: 'closed',
       plan: 'free',

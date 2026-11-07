@@ -48,6 +48,7 @@ import {
   type PackageKey,
 } from './plans';
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
+import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish from './Checks';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
@@ -119,6 +120,30 @@ async function copyText(text: string, what: string) {
 }
 
 /** The job page as visitors will see it on AidJobs, in English or one of its language versions; `share` adds the share buttons every visitor has. */
+/** What candidates see on a closed job's page (plan section 17, phase 3): why it closed, and similar open jobs from the labelled sample. */
+function ClosedNotice({ job }: { job: DemoJob }) {
+  const similar = [...PUBLIC_SAMPLES].sort((a, b) => Number(b.iso === job.facts.iso) - Number(a.iso === job.facts.iso) || a.days - b.days).slice(0, 3);
+  return (
+    <div className="aj-card flex flex-col gap-2 p-3" role="status" lang="en" dir="ltr">
+      <span style={{ fontWeight: 650 }}>{job.closeReason === 'withdrawn' ? 'This vacancy has been withdrawn' : job.closeReason === 'filled' ? 'This position has been filled' : `Applications closed on ${job.closedAt ? longDate(isoDay(job.closedAt)) : longDate(job.facts.deadline)}`}</span>
+      <span className="aj-muted">
+        Similar open jobs <span className="aj-chip">Sample</span>
+      </span>
+      <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {similar.map((c) => (
+          <li key={c.id} className="flex items-center gap-2">
+            <Flag iso={c.iso} title={c.place} />
+            <span className="min-w-0 flex-1 truncate">
+              <strong>{c.title}</strong> <span className="aj-faint">· {c.org} · {c.place}</span>
+            </span>
+            <span className="aj-faint shrink-0">{c.days}d left</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: State; lang?: Lang; share?: boolean }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   const version = lang ? job.translations?.[lang] : undefined;
@@ -128,11 +153,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : job.facts.arrangement === 'remote' ? term('Remote', l) : '';
   return (
     <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
-      {job.status === 'closed' && (
-        <div className="aj-card p-3" role="status" lang="en" dir="ltr" style={{ fontWeight: 650 }}>
-          {job.closeReason === 'withdrawn' ? 'This vacancy has been withdrawn' : job.closeReason === 'filled' ? 'This position has been filled' : 'This vacancy has closed'}
-        </div>
-      )}
+      {job.status === 'closed' && <ClosedNotice job={job} />}
       {delisted(job, s.today) && (
         <div className="aj-card flex flex-col gap-0.5 p-3" role="status" lang="en" dir="ltr">
           <span style={{ fontWeight: 650 }}>No longer listed on AidJobs</span>
@@ -149,7 +170,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
             </span>
           </Tip>
         )}
-        {job.plan === 'amplify' && (
+        {job.plan === 'amplify' && job.status !== 'closed' && (
           <Tip label={BADGE_TIP}>
             <span className="aj-chip" data-tone="sage" tabIndex={0}>
               <Sparkles size={11} strokeWidth={2} /> {say(BADGE, 'badge')}
@@ -167,10 +188,8 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
         {job.facts.deadline && (
           <div className="flex items-center gap-2">
             <Clock size={14} strokeWidth={1.8} className="aj-faint" />
-            <span>
-              {say('Closes', 'closes')} {localDate(job.facts.deadline, l)}
-            </span>
-            {left !== null && left >= 0 && (
+            <span>{job.status === 'closed' && job.closedAt ? `Closed ${longDate(isoDay(job.closedAt))}` : `${say('Closes', 'closes')} ${localDate(job.facts.deadline, l)}`}</span>
+            {left !== null && left >= 0 && job.status !== 'closed' && (
               <span className="aj-chip" data-tone={left <= 3 ? 'red' : left <= 7 ? 'amber' : undefined}>
                 {left === 0 ? say('Today', 'today') : say(`${left} days left`, 'daysLeft', { n: left })}
               </span>
