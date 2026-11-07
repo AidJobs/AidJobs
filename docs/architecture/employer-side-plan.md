@@ -337,12 +337,23 @@ The details, as the agent suggested them; the user agreed three the same day:
 3. **A registration number** checked against a public register (for example the UK Charity Commission, the US IRS list of tax-exempt organisations, India's NGO Darpan, Kenya's NGO Board), some automatic, others by hand; or an **IATI publisher ID**.
 4. **By hand:** for small NGOs on Gmail or similar, a registration certificate reviewed by AidJobs, slower.
 
+**The user's concern and proposal (7 November 2026):** many smaller NGOs have no domain of their own and use Gmail, and in India and many African countries public records may not be available to check. They need another way: **a referral from someone AidJobs can verify**, explained in the email that asks them to verify.
+
+**The agent's view: vouching, as a fifth way.** It suits the sector: small local NGOs usually work with someone verifiable, as an implementing partner of an INGO or UN agency, a grantee of a donor, or a member of a national NGO network.
+- **How:** the organisation names a person at a verified organisation, by that person's work email. AidJobs emails that person: "[Organisation] says it works with you. Is it a real organisation that hires staff? Yes · No · I don't know". One "Yes" verifies it. The request can be resent or sent to someone else.
+- **Who can vouch:** a person writing from the domain of an organisation verified by email, by a crawled careers site, or by a register (the first three ways), never from Gmail or similar. Organisations verified by vouching cannot vouch for others at first, so chains of vouching cannot grow from one false account.
+- **Limits and accountability:** each organisation vouches for a limited number a year (for example 10). Every vouch is recorded, never public unless the voucher agrees. If a vouched organisation is found to be fraudulent (for example charging candidates fees), its verification is removed, its live Amplify jobs come off, and the voucher's organisation is asked to look again before vouching again.
+- **National networks later:** NGO forums and coordination bodies (for example national NGO councils and humanitarian NGO forums in a country) can be invited as trusted vouchers, with a higher limit.
+- **The note in the email:** the email that asks an organisation to verify lists the ways in plain words, vouching included: "No email at your organisation's own website? Ask a partner organisation you work with to vouch for you; it takes them one click."
+- **The badge:** the same "Verified organisation" whatever the way; the record of how stays internal.
+- **Data:** the voucher's email is a contact detail (growth plan 4.6), so its storage, retention, and deletion are part of the same decision as other employer emails (section 2).
+
 The agent's suggestion: free publishing needs no verification (moderation applies, section 2). For an unverified organisation, the free first Amplify starts at once with the private tools (the market check, the advert check, language versions, the field-post notice), and its public parts (featured placement, the badge) and the Reach emails start when verification completes, which for most is the same minute. The amplification stays reserved until then.
 
 ### To settle in the discussion
 
 - The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
-- Verification: which ways at launch (which registers, whether by hand), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
+- Verification: which ways at launch (which registers, whether by hand, vouching and its limits), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
 - Tokens only, listings only, or both; and what counts if a job uses no AI.
 - The average tokens per job, measured once the AI provider is chosen (E7).
 - How the allowance is shown, and when the notice appears.
