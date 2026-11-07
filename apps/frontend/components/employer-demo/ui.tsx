@@ -1,12 +1,13 @@
 'use client';
 
-import { Sparkles, Undo2, X } from 'lucide-react';
+import { Copy, Sparkles, Undo2, X } from 'lucide-react';
 import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { restoreDeleted } from './actions';
-import { dismissNotice, undo, useDemo } from './store';
+import { jobUrl } from './links';
+import { dismissNotice, notify, undo, useDemo } from './store';
 import type { DemoJob, JobStatus } from './types';
 
 /** Arrow keys move between the options of a radio group and choose the one they land on; nested groups keep their own options. */
@@ -21,6 +22,63 @@ export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
   const next = radios[(at + (forward ? 1 : -1) + radios.length) % radios.length];
   next.focus();
   next.click();
+}
+
+/** A job's public address as a link, opening in a new tab; with `copy`, a small button to copy it. */
+export function JobLink({ job, copy = false, className = '' }: { job: DemoJob; copy?: boolean; className?: string }) {
+  const url = jobUrl(job);
+  const copyIt = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      notify('Link copied');
+    } catch {
+      notify('Copy failed: select the link and copy it yourself');
+    }
+  };
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-1.5 ${className}`}>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="ej-link min-w-0 truncate">
+        {url}
+      </a>
+      {copy && (
+        <button type="button" className="ej-link-copy" onClick={copyIt} aria-label="Copy the link">
+          <Copy size={12} strokeWidth={2} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+const LEGAL: Record<'terms' | 'privacy' | 'about', { title: string; lines: string[] }> = {
+  terms: { title: 'Terms', lines: ['The terms of use for employers and candidates.', 'A placeholder in the demo: the final text comes with the launch pages.'] },
+  privacy: { title: 'Privacy', lines: ['What AidJobs collects and why; candidates apply on the employer’s own site; recruiters’ contact details are not stored.', 'A placeholder in the demo: the final text comes with the launch pages.'] },
+  about: { title: 'About', lines: ['AidJobs lists jobs in humanitarian and development work, from the organisations themselves; how employers opt out or ask for a job to be taken down.', 'A placeholder in the demo: the final text comes with the launch pages.'] },
+};
+
+/** "© 2026 AidJobs. All rights reserved." with Terms, Privacy, and About. */
+export function LegalLine({ year, className = '' }: { year: number; className?: string }) {
+  const [open, setOpen] = useState<keyof typeof LEGAL | null>(null);
+  return (
+    <div className={`aj-faint flex flex-wrap items-center gap-x-2 gap-y-0.5 ${className}`} style={{ fontSize: 11 }}>
+      <span>© {year} AidJobs. All rights reserved.</span>
+      {(Object.keys(LEGAL) as Array<keyof typeof LEGAL>).map((k) => (
+        <button key={k} type="button" className="ej-legal-link" onClick={() => setOpen(k)}>
+          {LEGAL[k].title}
+        </button>
+      ))}
+      {open && (
+        <Dialog title={LEGAL[open].title} subtitle="AidJobs" onClose={() => setOpen(null)} half>
+          <div className="flex flex-col gap-2">
+            {LEGAL[open].lines.map((l) => (
+              <p key={l} className="aj-muted" style={{ margin: 0 }}>
+                {l}
+              </p>
+            ))}
+          </div>
+        </Dialog>
+      )}
+    </div>
+  );
 }
 
 /** The place in the top bar, beside the organisation's name, where a screen can put its own tools. */

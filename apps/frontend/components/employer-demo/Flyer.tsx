@@ -66,7 +66,9 @@ function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; la
         <QrCode text={url} label={`QR code for ${url}`} />
         <div className="flex min-w-0 flex-col gap-1">
           <strong>{say('Scan to read the full job and apply', 'scan')}</strong>
-          <span style={{ wordBreak: 'break-all', fontSize: 12 }}>{url}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all', fontSize: 12, color: 'inherit' }}>
+            {url}
+          </a>
         </div>
       </div>
       <div className="ej-flyer-foot">

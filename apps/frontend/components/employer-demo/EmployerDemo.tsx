@@ -15,7 +15,7 @@ import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
 import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
 import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
-import { DemoMark, Dialog, HeaderSlotContext, NoticeBar } from './ui';
+import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
 /** "View as" and "Reset demo": demo-only controls, at the bottom of the side menu. */
 function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boolean; onReset: () => void; inHeader?: boolean }) {
@@ -162,7 +162,12 @@ export default function EmployerDemo() {
         onCloseDrawer={() => setDrawer(false)}
         homeHref="/employer-demo"
         width={216}
-        footer={(isCollapsed) => <DemoControls collapsed={isCollapsed} onReset={() => setResetting(true)} />}
+        footer={(isCollapsed) => (
+          <>
+            <DemoControls collapsed={isCollapsed} onReset={() => setResetting(true)} />
+            {!isCollapsed && <LegalLine year={new Date(s.today).getFullYear()} className="px-2.5 pt-2" />}
+          </>
+        )}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>

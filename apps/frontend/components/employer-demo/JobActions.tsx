@@ -7,6 +7,7 @@ import { backToDraft, canDelete, closeJob, declineTell, deleteJob, involved, pub
 import { changeSummary, tellOffer } from './changes';
 import { addDays, isoDay, longDate } from './engine';
 import { REACH_EMAILS, reachUsed } from './invites';
+import { jobUrl } from './links';
 import { isPublished, KEEP_DELETED_DAYS } from './lifecycle';
 import MenuButton, { type MenuAction } from './MenuButton';
 import { currentMonth, hasFreeUse, LISTED_DAYS, monthName } from './plans';
@@ -311,9 +312,9 @@ export function TellDialog({ job, s, onClose }: { job: DemoJob; s: State; onClos
             ))}
           </ul>
           <span>The job page has the details:</span>
-          <span className="aj-ink-btn self-start" aria-hidden>
+          <a className="aj-ink-btn self-start" href={jobUrl(job)} target="_blank" rel="noopener noreferrer">
             View Job &amp; Apply
-          </span>
+          </a>
           <span className="aj-muted">Best regards,{'\n'}{s.org.name}</span>
         </div>
         <span className="aj-muted">

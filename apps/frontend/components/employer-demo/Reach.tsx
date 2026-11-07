@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { dismissMoment, sendReach, setReachPlan, setReachReminders } from './actions';
 import { longDate } from './engine';
 import { deliveryText, planCount, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf, SUPPRESSED } from './invites';
+import { jobUrl } from './links';
 import { notify } from './store';
 import type { DemoJob, Message, ReachPlan, State } from './types';
 import { Dialog, radioKeys, RecipientInput } from './ui';
@@ -42,7 +43,9 @@ function EmailEditor({ kind, msg, onChange, job, s, to }: { kind: 'candidate' | 
         </div>
         <textarea className="ej-email-edit w-full" rows={rows(msg.body)} value={msg.body} onChange={(e) => onChange({ ...msg, body: e.target.value })} aria-label={`Text of the ${kind === 'candidate' ? 'invitation' : 'team email'}`} />
         <p>
-          <span className="ej-email-btn">{kind === 'candidate' ? 'View Job & Apply' : 'View Vacancy'}</span>
+          <a className="ej-email-btn" href={jobUrl(job)} target="_blank" rel="noopener noreferrer">
+            {kind === 'candidate' ? 'View Job & Apply' : 'View Vacancy'}
+          </a>
         </p>
         <p style={{ fontSize: 12, color: '#5b6259' }}>
           {job.facts.title} · {job.facts.location}

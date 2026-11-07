@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2, Clock, Copy, ExternalLink, Flag as FlagIcon, Linkedin, MapPin, MessageCircle, Share2, Sparkles } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
 import {
@@ -48,6 +48,7 @@ import {
   type PackageKey,
 } from './plans';
 import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
+import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish from './Checks';
 import { deliveryText, planCount } from './invites';
@@ -56,11 +57,9 @@ import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, notify, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
-import { DemoMark, Dialog, Field, inputStyle, isEmail, OrgMark, radioKeys } from './ui';
+import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys } from './ui';
 
-export function jobUrl(j: DemoJob): string {
-  return `https://aidjobs.app/jobs/${slug(j.facts.title || 'job')}-${j.id.slice(-4)}`;
-}
+export { jobUrl };
 
 export const DEMO_PREFIX = '[Sample from the AidJobs demo, not a real vacancy]';
 
@@ -119,24 +118,30 @@ async function copyText(text: string, what: string) {
   }
 }
 
-/** The job page as visitors will see it on AidJobs, in English or one of its language versions; `share` adds the share buttons every visitor has. */
-/** What candidates see on a closed job's page (plan section 17, phase 3): why it closed, and similar open jobs from the labelled sample. */
+/**
+ * What candidates see on a closed job's page (plan section 17, phase 3): why it closed, and similar open jobs from the labelled sample,
+ * each opening its job page, so a closed link is never a dead end.
+ */
 function ClosedNotice({ job }: { job: DemoJob }) {
   const similar = [...PUBLIC_SAMPLES].sort((a, b) => Number(b.iso === job.facts.iso) - Number(a.iso === job.facts.iso) || a.days - b.days).slice(0, 3);
+  const city = job.facts.location.split(',')[0];
+  const near = city && similar.some((c) => c.iso === job.facts.iso);
   return (
     <div className="aj-card flex flex-col gap-2 p-3" role="status" lang="en" dir="ltr">
       <span style={{ fontWeight: 650 }}>{job.closeReason === 'withdrawn' ? 'This vacancy has been withdrawn' : job.closeReason === 'filled' ? 'This position has been filled' : `Applications closed on ${job.closedAt ? longDate(isoDay(job.closedAt)) : longDate(job.facts.deadline)}`}</span>
       <span className="aj-muted">
-        Similar open jobs <span className="aj-chip">Sample</span>
+        Similar open jobs{near ? ` near ${city}` : ''} <span className="aj-chip">Sample</span>
       </span>
-      <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ul className="flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {similar.map((c) => (
-          <li key={c.id} className="flex items-center gap-2">
-            <Flag iso={c.iso} title={c.place} />
-            <span className="min-w-0 flex-1 truncate">
-              <strong>{c.title}</strong> <span className="aj-faint">· {c.org} · {c.place}</span>
-            </span>
-            <span className="aj-faint shrink-0">{c.days}d left</span>
+          <li key={c.id}>
+            <button type="button" className="ej-similar" onClick={() => go('public', c.id)}>
+              <Flag iso={c.iso} title={c.place} />
+              <span className="min-w-0 flex-1 truncate">
+                <strong>{c.title}</strong> <span className="aj-faint">· {c.org} · {c.place}</span>
+              </span>
+              <span className="aj-faint shrink-0">{c.days}d left</span>
+            </button>
           </li>
         ))}
       </ul>
@@ -144,6 +149,27 @@ function ClosedNotice({ job }: { job: DemoJob }) {
   );
 }
 
+/** The publishing panel stays in view while it fits the screen; when taller, it scrolls with the page and its main button stays pinned at the bottom. */
+function FitSticky({ className, label, children }: { className: string; label: string; children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const [tall, setTall] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    const main = el?.closest('main');
+    if (!el || !main || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setTall(el.offsetHeight > main.clientHeight - 32));
+    ro.observe(el);
+    ro.observe(main);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <section ref={ref} className={`${className} ${tall ? 'ej-tall' : 'lg:sticky lg:top-4'}`} aria-label={label}>
+      {children}
+    </section>
+  );
+}
+
+/** The job page as visitors will see it on AidJobs, in English or one of its language versions; `share` adds the share buttons every visitor has. */
 export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: State; lang?: Lang; share?: boolean }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   const version = lang ? job.translations?.[lang] : undefined;
@@ -151,6 +177,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
   const say = (en: string, key: string, vars: Record<string, string | number> = {}) => (l ? ui(key, l, vars) : en);
   const sections = version ? version.sections : inOutlineOrder(job.sections, job.tags);
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : job.facts.arrangement === 'remote' ? term('Remote', l) : '';
+  const [reporting, setReporting] = useState(false);
   return (
     <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
       {job.status === 'closed' && <ClosedNotice job={job} />}
@@ -235,9 +262,10 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
       <div className="aj-faint flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 aj-hair" style={{ fontSize: 11.5 }}>
         <span>{say(`Published by ${s.org.name}`, 'publishedBy', { org: s.org.name })}</span>
         <span>{job.publishedAt ? say(`Posted ${localDate(isoDay(job.publishedAt))}`, 'posted', { date: localDate(isoDay(job.publishedAt), l) }) : say('Not published yet', 'notPublished')}</span>
-        <span className="inline-flex items-center gap-1">
+        <button type="button" className="ej-legal-link inline-flex items-center gap-1" style={{ textDecoration: 'none' }} onClick={() => setReporting(true)}>
           <FlagIcon size={11} strokeWidth={2} /> {say('Report this job', 'report')}
-        </span>
+        </button>
+        <span lang="en">© {new Date(s.today).getFullYear()} AidJobs</span>
       </div>
       {share && (
         <div className="flex flex-col gap-1.5" lang="en" dir="ltr">
@@ -245,7 +273,66 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           <CommunityButtons msg={shareMessage(job, s.org)} url={jobUrl(job)} copy={copyText} />
         </div>
       )}
+      {reporting && <ReportDialog job={job} onClose={() => setReporting(false)} />}
     </article>
+  );
+}
+
+const REPORT_REASONS = [
+  'It asks for money, or seems like a scam',
+  'It is not a real job',
+  'It is unfair or discriminatory',
+  'The details are wrong',
+  'It is already filled or expired',
+  'Something else',
+];
+
+/** "Report this job" (plan section 17; UX plan UX-27): no account needed; in the demo nothing is sent. */
+function ReportDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  const [reason, setReason] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [email, setEmail] = useState('');
+  const emailOk = !email.trim() || isEmail(email.trim());
+  return (
+    <Dialog
+      title="Report this job"
+      subtitle={job.facts.title}
+      onClose={onClose}
+      half
+      footer={
+        <div className="flex justify-end gap-2" lang="en" dir="ltr">
+          <button type="button" className="aj-pill" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="aj-ink-btn"
+            disabled={!reason || !emailOk}
+            onClick={() => {
+              notify('Thank you. AidJobs reviews every report. (Demo: nothing was sent.)');
+              onClose();
+            }}
+          >
+            Send the report
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-3" lang="en" dir="ltr">
+        <div className="flex flex-col gap-1" role="radiogroup" aria-label="Why are you reporting it?" onKeyDown={radioKeys}>
+          <span style={{ fontWeight: 650 }}>Why are you reporting it?</span>
+          {REPORT_REASONS.map((r) => (
+            <button key={r} type="button" role="radio" aria-checked={reason === r} className="aj-option" data-active={reason === r} onClick={() => setReason(r)}>
+              {r}
+            </button>
+          ))}
+        </div>
+        <textarea style={{ ...inputStyle, minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} aria-label="Anything else we should know (optional)" placeholder="Anything else we should know (optional)" />
+        <input style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email, if you want a reply (optional)" placeholder="Your email, if you want a reply (optional)" inputMode="email" />
+        {!emailOk && <span style={{ color: 'var(--amber)' }}>Check the email address.</span>}
+        <span className="aj-faint">No account needed. The employer is not told who reported it.</span>
+      </div>
+    </Dialog>
   );
 }
 
@@ -579,7 +666,7 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
         {publicLangs(job).length > 0 ? ` In English and ${publicLangs(job).map((k) => langOf(k).label).join(' and ')}.` : ''} In this demo it is published only in this browser.
       </p>
       <div className="aj-card flex items-center gap-2 py-2 pl-3 pr-2">
-        <span className="aj-muted min-w-0 flex-1 truncate">{url}</span>
+        <JobLink job={job} className="flex-1" />
         <button type="button" className="aj-pill shrink-0" onClick={copy}>
           <Copy size={13} strokeWidth={1.8} /> Copy link
         </button>
@@ -908,7 +995,7 @@ export default function Publish({ id }: { id?: string }) {
           {view === 'share' && <ShareCards job={shown} s={s} />}
         </section>
 
-        <section className="order-1 flex flex-col gap-3 lg:sticky lg:top-4 lg:order-2" aria-label="How to publish">
+        <FitSticky className="order-1 flex flex-col gap-3 lg:order-2" label="How to publish">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
           {!blocked && !upgrade && <ChangesNote job={job} onPublishAnyway={() => setOverrule(true)} />}
           {request && (
@@ -1082,7 +1169,7 @@ export default function Publish({ id }: { id?: string }) {
             </div>
           )}
 
-          <button type="button" className="aj-ink-btn w-full justify-center" style={{ minHeight: 44 }} disabled={Boolean(reason)} onClick={proceed}>
+          <button type="button" className="aj-ink-btn ej-main-cta w-full justify-center" style={{ minHeight: 44 }} disabled={Boolean(reason)} onClick={proceed}>
             {label}
           </button>
           <span className="aj-faint text-center" style={{ fontSize: 11.5 }}>
@@ -1097,7 +1184,7 @@ export default function Publish({ id }: { id?: string }) {
               </Tip>
             </div>
           )}
-        </section>
+        </FitSticky>
       </div>
 
       {checkout && <Checkout item={checkoutItem} amount={checkoutAmount} onPaid={() => paid(checkout)} onDeclined={() => failedPay('declined')} onClose={() => failedPay('closed')} />}

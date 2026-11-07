@@ -712,6 +712,42 @@ describe('employer demo: managing jobs', () => {
     expect(network).toEqual([]);
   });
 
+  it('links job addresses, reports a job, shows the legal line, and opens similar jobs from a closed page', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    shows('AidJobs. All rights reserved.');
+    click('Terms');
+    shows('A placeholder in the demo');
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+
+    route('#jobs/job-cps');
+    const link = container.querySelector('a[href^="https://aidjobs.app/jobs/child-protection-specialist"]') as HTMLAnchorElement;
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toContain('noopener');
+    expect(container.querySelector('button[aria-label="Copy the link"]')).not.toBeNull();
+    expect(container.querySelector('[class~="lg:sticky"]')?.textContent).toContain('Child Protection Specialist');
+
+    click(/Report this job/);
+    shows('Why are you reporting it?');
+    const send = () => Array.from(container.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'Send the report') as HTMLButtonElement;
+    expect(send().disabled).toBe(true);
+    click('It is not a real job');
+    expect(send().disabled).toBe(false);
+    act(() => send().click());
+    expect(getState().notice?.text).toMatch(/^Thank you\. AidJobs reviews every report/);
+
+    route('#jobs/job-health');
+    shows('Similar open jobs near Goma');
+    click(/Protection Monitoring Assistant/);
+    expect(window.location.hash).toBe('#public/p3');
+    expect(network).toEqual([]);
+  });
+
   it("a job's page is in parts, with one main action and Now first", () => {
     phone = false;
     render();

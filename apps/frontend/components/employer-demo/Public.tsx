@@ -11,7 +11,7 @@ import { JobPageLangs } from './Publish';
 import { PUBLIC_SAMPLES } from './sample';
 import { useDemo } from './store';
 import type { DemoJob, State } from './types';
-import { DemoMark, Dialog, OrgMark } from './ui';
+import { DemoMark, Dialog, LegalLine, OrgMark } from './ui';
 
 type Card = { id: string; org: string; title: string; place: string; iso: string; days: number; amplified: boolean; own?: DemoJob };
 
@@ -161,6 +161,8 @@ export default function Public({ id }: { id?: string }) {
           </div>
         </section>
       )}
+
+      <LegalLine year={new Date(s.today).getFullYear()} className="border-t pt-3 aj-hair" />
 
       {open && (ownOpen || openCard) && (
         <Dialog title={ownOpen ? ownOpen.facts.title : (openCard?.title ?? '')} subtitle={ownOpen ? s.org.name : openCard?.org} onClose={() => setOpen(null)} wide>

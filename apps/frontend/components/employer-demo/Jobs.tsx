@@ -17,7 +17,7 @@ import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
-import { Dialog, HeaderSlot, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
+import { Dialog, HeaderSlot, inputStyle, JobLink, Lifeline, PlanBadge, stageOf } from './ui';
 
 const DAY = 86_400_000;
 
@@ -231,7 +231,7 @@ function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
     <Dialog title="Share" subtitle={job.facts.title} onClose={onClose} half>
       <div className="flex flex-col gap-3">
         <div className="aj-card flex items-center gap-2 py-2 pl-3 pr-2">
-          <span className="aj-muted min-w-0 flex-1 truncate">{url}</span>
+          <JobLink job={job} className="flex-1" />
           <button type="button" className="aj-pill shrink-0" onClick={copy}>
             <Copy size={13} strokeWidth={1.8} /> Copy link
           </button>
@@ -530,8 +530,9 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
         </button>
       )}
       {isPublished(job) && (
-        <span className="aj-faint inline-flex items-start gap-1" style={{ fontSize: 11.5, wordBreak: 'break-all' }}>
-          <MapPin size={12} strokeWidth={2} className="mt-0.5 shrink-0" /> {jobUrl(job)}
+        <span className="aj-faint flex min-w-0 items-center gap-1" style={{ fontSize: 11.5 }}>
+          <MapPin size={12} strokeWidth={2} className="shrink-0" />
+          <JobLink job={job} copy className="flex-1" />
           <span className="sr-only"> (the address never changes when you edit the text)</span>
         </span>
       )}
@@ -553,7 +554,8 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
   const main = mainAction(s, job, open);
   const improve = job.status === 'live' && job.plan === 'amplify';
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 pb-5 lg:px-8 lg:pb-8">
+      <div className="top-0 z-10 -mx-4 flex flex-col gap-3 px-4 pb-1 pt-4 aj-hair lg:sticky lg:-mx-8 lg:border-b lg:px-8 lg:pb-3 lg:pt-6" style={{ background: 'var(--page)' }}>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="aj-icon-btn" onClick={() => go('jobs')} aria-label="Back to jobs">
           <ArrowLeft size={15} strokeWidth={1.8} />
@@ -580,6 +582,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
         </div>
       </div>
       <Lifeline stage={stageOf(job, job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null)} attention={needsYou(s, job)} />
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]" style={{ gridTemplateRows: improve ? 'auto auto auto 1fr' : 'auto auto 1fr' }}>
         <Part title="Now" open className="lg:col-start-2 lg:row-start-1">
           <NowPart job={job} s={s} open={open} />
