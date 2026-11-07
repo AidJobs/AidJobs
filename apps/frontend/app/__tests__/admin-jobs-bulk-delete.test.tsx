@@ -350,7 +350,7 @@ describe('a copy before deleting (W-48)', () => {
   });
 
   /** Holds the next export reply until `finish` is called. */
-  function slowExport() {
+  function slowExport(answer: (ids: string[]) => ReturnType<typeof reply> = exportOf) {
     let finish: () => void = () => {};
     const released = new Promise<void>((resolve) => {
       finish = resolve;
@@ -358,7 +358,7 @@ describe('a copy before deleting (W-48)', () => {
     exportReply = async (ids) => {
       await released;
       exportReply = exportOf;
-      return exportOf(ids);
+      return answer(ids);
     };
     return async () => {
       finish();
@@ -424,6 +424,19 @@ describe('a copy before deleting (W-48)', () => {
     expect(downloads).toEqual([]);
     expect(button('Soft Delete')).toBeUndefined();
     expect(button('Save copy of 2 jobs')).toBeDefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+  });
+
+  it('ignores a failed copy that answers after the delete type changed', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport(() => reply({ detail: 'Failed to export jobs' }, 500));
+    await click(button('Save copy of 2 jobs'));
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await finishExport();
+
+    expect(notice()).toBe('');
+    expect(downloads).toEqual([]);
+    expect(button('Saving copy...')).toBeUndefined();
     expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
   });
 
