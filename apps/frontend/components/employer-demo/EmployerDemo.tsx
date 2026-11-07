@@ -15,7 +15,7 @@ import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
 import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
 import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
-import { DemoMark, Dialog, NoticeBar } from './ui';
+import { DemoMark, Dialog, HeaderSlotContext, NoticeBar } from './ui';
 
 /** "View as" and "Reset demo": demo-only controls, at the bottom of the side menu. */
 function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boolean; onReset: () => void; inHeader?: boolean }) {
@@ -74,6 +74,7 @@ export default function EmployerDemo() {
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
 
   if (!mounted) {
     return (
@@ -176,7 +177,8 @@ export default function EmployerDemo() {
           <span className="hidden sm:inline">
             <DemoMark />
           </span>
-          <span className="ml-auto flex items-center gap-2 lg:hidden">
+          <div ref={setSlot} className="flex min-w-0 flex-1 items-center justify-end gap-2" />
+          <span className="flex items-center gap-2 lg:hidden">
             <DemoControls collapsed inHeader onReset={() => setResetting(true)} />
           </span>
         </header>
@@ -188,7 +190,9 @@ export default function EmployerDemo() {
             </button>
           </div>
         )}
-        <main className={full ? 'min-h-0 flex-1' : 'aj-scroll min-h-0 flex-1'}>{screen}</main>
+        <main className={full ? 'min-h-0 flex-1' : 'aj-scroll min-h-0 flex-1'}>
+          <HeaderSlotContext.Provider value={slot}>{screen}</HeaderSlotContext.Provider>
+        </main>
       </div>
       <NoticeBar />
       {resetting && (

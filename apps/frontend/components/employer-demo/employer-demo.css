@@ -211,6 +211,179 @@
   transition: transform 160ms ease;
 }
 
+/* Manage jobs: each group one quiet panel, its jobs two-line rows divided by inset hairlines. */
+.ej-joblist {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.ej-jobitem {
+  position: relative;
+}
+
+.ej-jobitem + .ej-jobitem::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 30px;
+  right: 14px;
+  height: 1px;
+  background: var(--hair);
+}
+
+.ej-jobrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.ej-jobrow:hover {
+  background: var(--surface-2);
+}
+
+.ej-jobrow-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px 10px 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ej-jobrow-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.ej-jobrow-dot[data-on] {
+  background: var(--amber);
+}
+
+.aj-root .ej-next {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+.aj-root .ej-jobrow .aj-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+@media (max-width: 640px) {
+  .ej-jobrow-main {
+    gap: 8px;
+    padding-left: 10px;
+  }
+
+  .aj-root .ej-next {
+    padding: 0 9px;
+  }
+}
+
+/* The group shortcuts in the top bar: quiet text, the group in view marked. */
+.ej-jump {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ej-jump:hover {
+  color: var(--text);
+}
+
+.ej-jump[data-active] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ej-jump-count {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* Search: shaped and focused like the chat box, a sage border and no square glow. */
+.ej-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 0;
+  padding: 0 4px 0 11px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: border-color 120ms ease;
+}
+
+.ej-search:focus-within {
+  border-color: var(--sage-5);
+}
+
+.ej-search input {
+  width: 200px;
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.aj-root .ej-search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.ej-search-close {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.ej-search-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .ej-email {
   border: 1px solid var(--hair);
   border-radius: 16px;

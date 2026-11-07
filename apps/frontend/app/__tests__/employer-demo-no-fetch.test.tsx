@@ -589,13 +589,18 @@ describe('employer demo: managing jobs', () => {
     expect(groups).toContain('History');
     expect(container.querySelector('#ej-group-needs')?.textContent).toContain('Child Protection Specialist');
 
-    const search = container.querySelector('input[aria-label="Search jobs"]') as HTMLInputElement;
+    expect(container.querySelector('header nav[aria-label="Jump to"]')?.textContent).toContain('Needs you');
+    expect(container.querySelector('input[aria-label="Search jobs"]')).toBeNull();
+    act(() => (container.querySelector('header button[aria-label="Search jobs"]') as HTMLElement).click());
+    const search = container.querySelector('header input[aria-label="Search jobs"]') as HTMLInputElement;
     type(search, 'kampala');
     shows('Child Protection Specialist');
     expect(container.textContent).not.toContain('MEAL Coordinator');
     type(search, 'nothing like this');
     shows('No job matches');
-    type(search, '');
+    act(() => search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(container.querySelector('input[aria-label="Search jobs"]')).toBeNull();
+    shows('MEAL Coordinator');
 
     menu('MEAL Coordinator');
     click('Withdraw');

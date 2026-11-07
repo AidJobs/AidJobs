@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Trash2 } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Sparkles, Trash2, X } from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
 import { approvedFor, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
@@ -17,7 +17,7 @@ import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
 import type { DemoJob, State } from './types';
-import { Dialog, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
+import { Dialog, HeaderSlot, inputStyle, Lifeline, PlanBadge, stageOf } from './ui';
 
 const DAY = 86_400_000;
 
@@ -267,14 +267,14 @@ function hire(job: DemoJob) {
 /** The one next step on a card (plan section 17): what needs the user first, then what fits the job's state. */
 export function nextStep(s: State, job: DemoJob, open: Open): { label: string; run: () => void } {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
-  if (job.payRequest && job.status !== 'closed') return { label: 'Remind the payer', run: () => remindPayer(job.id) };
-  if (job.review.state === 'changes' && isReviewable(job)) return { label: 'Look at the request', run: () => openReview(job) };
+  if (job.payRequest && job.status !== 'closed') return { label: 'Remind payer', run: () => remindPayer(job.id) };
+  if (job.review.state === 'changes' && isReviewable(job)) return { label: 'See request', run: () => openReview(job) };
   if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => go('publish', job.id) };
   if (job.status === 'review' && job.review.reviewers.some((r) => !r.decision)) return { label: 'Remind', run: () => remindReviewers(job.id) };
   if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => go('create', job.id) };
   if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
-  if (job.status === 'live' && tellOffer(job)) return { label: 'Tell invited people', run: () => open(job, 'tell') };
-  if (listingEndsIn(job, s.today) !== null) return { label: 'Choose what happens', run: () => go('jobs', job.id) };
+  if (job.status === 'live' && tellOffer(job)) return { label: 'Tell invitees', run: () => open(job, 'tell') };
+  if (listingEndsIn(job, s.today) !== null) return { label: 'Choose', run: () => go('jobs', job.id) };
   if (delisted(job, s.today)) return { label: 'Amplify', run: () => go('publish', job.id) };
   if (job.status === 'live') return left !== null && left <= 7 ? { label: 'Extend', run: () => open(job, 'extend') } : { label: 'Share', run: () => open(job, 'share') };
   if (canReopen(job, s.today)) return { label: 'Reopen', run: () => open(job, 'reopen') };
@@ -329,24 +329,24 @@ function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: Stat
   return <DeleteDialog job={job} s={s} onClose={onClose} onDeleted={onDeleted} />;
 }
 
-/** A card that can be swiped on touch screens (right to extend by a week, left to close), with its next step and "⋯" menu. */
+/** One job, two lines tall: title, then place and status; its next step and "⋯" menu. On touch screens a live job swipes: right to extend by a week, left to close. */
 function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
   const swipeable = job.status === 'live' && !s.reviewerAs;
-  const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   const attention = needsYou(s, job);
   const next = nextStep(s, job, open);
+  const city = job.facts.location.split(',')[0];
   return (
-    <li className={dx ? 'relative overflow-hidden rounded-[20px]' : 'relative'}>
+    <li className="ej-jobitem" style={{ overflow: dx ? 'hidden' : undefined }}>
       {swipeable && dx !== 0 && (
-        <div className="absolute inset-0 flex items-center justify-between px-5" style={{ background: dx > 0 ? 'var(--sage-2)' : 'var(--red-bg)', color: dx > 0 ? 'var(--sage-8)' : 'var(--red)', fontWeight: 700 }} aria-hidden>
+        <div className="absolute inset-0 flex items-center justify-between rounded-[14px] px-5" style={{ background: dx > 0 ? 'var(--sage-2)' : 'var(--red-bg)', color: dx > 0 ? 'var(--sage-8)' : 'var(--red)', fontWeight: 700 }} aria-hidden>
           <span>{dx > 0 ? '+1 week' : ''}</span>
           <span>{dx < 0 ? 'Close now' : ''}</span>
         </div>
       )}
       <div
-        className="ej-swipe aj-card relative flex flex-col gap-2 p-3"
+        className="ej-jobrow ej-swipe"
         style={{ transform: dx ? `translateX(${dx}px)` : undefined }}
         onTouchStart={(e) => {
           if (!swipeable) return;
@@ -365,34 +365,32 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
           start.current = null;
         }}
       >
-        <button type="button" className="flex w-full flex-col gap-2 text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }} onClick={() => openJob(job)}>
-          <div className="flex w-full items-center gap-2">
-            <span className="min-w-0 flex-1 truncate" style={{ fontWeight: 650 }}>
-              {job.facts.title || 'Untitled draft'}
-            </span>
-            <PlanBadge plan={job.plan} />
-            {attention && (
-              <span className="aj-chip" data-tone="amber">
-                Needs you
+        <button type="button" className="ej-jobrow-main" onClick={() => openJob(job)}>
+          <span className="ej-jobrow-dot" data-on={attention || undefined} aria-hidden />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate" style={{ fontWeight: 650 }}>
+                {job.facts.title || 'Untitled draft'}
               </span>
-            )}
-          </div>
-          <div className="aj-muted flex w-full items-center gap-2">
-            {job.facts.iso && <Flag iso={job.facts.iso} title={job.facts.country} />}
-            <span className="min-w-0 flex-1 truncate">{job.facts.location}</span>
-            <span className="shrink-0">{statusLine(s, job)}</span>
-          </div>
-          <Lifeline stage={stageOf(job, left)} attention={attention} />
+              {job.plan === 'amplify' && <Sparkles size={12} strokeWidth={2} className="shrink-0" style={{ color: 'var(--sage-7)' }} aria-label="Amplified" />}
+            </span>
+            <span className="aj-faint flex min-w-0 items-center gap-1.5" style={{ fontSize: 12.5 }}>
+              {job.facts.iso && <Flag iso={job.facts.iso} title={job.facts.country} />}
+              <span className="truncate">
+                {city ? `${city} · ` : ''}
+                <span style={{ color: attention ? 'var(--amber)' : undefined }}>{statusLine(s, job).replace(/^Live · /, '')}</span>
+              </span>
+            </span>
+            {attention && <span className="sr-only">Needs you</span>}
+          </span>
         </button>
         {!s.reviewerAs && (
-          <div className="flex items-center gap-1.5">
-            <button type="button" className="aj-pill" style={{ height: 30 }} onClick={next.run}>
+          <span className="flex shrink-0 items-center gap-1">
+            <button type="button" className="aj-pill ej-next" onClick={next.run}>
               {next.label}
             </button>
-            <span className="ml-auto">
-              <JobMenu job={job} actions={menuActions(s, job, open)} />
-            </span>
-          </div>
+            <JobMenu job={job} actions={menuActions(s, job, open)} />
+          </span>
         )}
       </div>
     </li>
@@ -683,48 +681,98 @@ function RecentlyDeleted({ s }: { s: State }) {
   );
 }
 
-export default function Jobs({ id }: { id?: string }) {
-  const s = useDemo();
+type Group = (typeof GROUPS)[number] & { jobs: DemoJob[] };
+
+/** Search: an icon that opens into a field shaped like the chat box; Esc or the cross closes it and clears the search. */
+function SearchToggle({ query, setQuery, openField, setOpenField }: { query: string; setQuery: (q: string) => void; openField: boolean; setOpenField: (o: boolean) => void }) {
+  const close = () => {
+    setQuery('');
+    setOpenField(false);
+  };
+  if (!openField)
+    return (
+      <button type="button" className="aj-icon-btn shrink-0" onClick={() => setOpenField(true)} aria-label="Search jobs">
+        <Search size={15} strokeWidth={1.8} />
+      </button>
+    );
+  return (
+    <label className="ej-search">
+      <Search size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
+      <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && close()} placeholder="Title, duty station, or grade" aria-label="Search jobs" />
+      <button type="button" className="ej-search-close" onClick={close} aria-label="Close the search">
+        <X size={13} strokeWidth={2} />
+      </button>
+    </label>
+  );
+}
+
+/** The groups as shortcuts: one tap scrolls to a group; the one in view is marked. */
+function Jumps({ groups, active }: { groups: Group[]; active: string | null }) {
+  if (groups.length < 2) return null;
+  return (
+    <nav className="aj-no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto" aria-label="Jump to">
+      {groups.map((g) => (
+        <button key={g.key} type="button" className="ej-jump" data-active={active === g.key || undefined} onClick={() => document.getElementById(`ej-group-${g.key}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}>
+          {g.label} <span className="ej-jump-count">{g.jobs.length}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function JobList({ s }: { s: State }) {
+  const phone = useIsPhone();
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [dialog, setDialog] = useState<{ job: DemoJob; kind: Kind } | null>(null);
-  if (id === 'deleted') return <RecentlyDeleted s={s} />;
-  const job = id ? s.jobs.find((j) => j.id === id) : undefined;
-  if (job) return <JobDetail job={job} s={s} />;
+  const [active, setActive] = useState<string | null>(null);
   const open: Open = (j, kind) => setDialog({ job: j, kind });
   const q = query.trim().toLowerCase();
   const found = s.jobs.filter((j) => !q || [j.facts.title, j.facts.location, j.facts.grade].some((x) => x.toLowerCase().includes(q)));
-  const groups = GROUPS.map((g) => ({ ...g, jobs: found.filter((j) => groupOf(s, j) === g.key).sort((a, b) => sortKey(a) - sortKey(b)) })).filter((g) => g.jobs.length);
+  const groups: Group[] = GROUPS.map((g) => ({ ...g, jobs: found.filter((j) => groupOf(s, j) === g.key).sort((a, b) => sortKey(a) - sortKey(b)) })).filter((g) => g.jobs.length);
+  const keys = groups.map((g) => g.key).join();
   const deleted = (s.deleted ?? []).length;
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const seen = new Map<string, boolean>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id.replace('ej-group-', ''), e.isIntersecting);
+        setActive(keys.split(',').find((k) => seen.get(k)) ?? null);
+      },
+      { root: document.querySelector('main'), rootMargin: '0px 0px -55% 0px' },
+    );
+    for (const k of keys.split(',')) {
+      const el = document.getElementById(`ej-group-${k}`);
+      if (el) io.observe(el);
+    }
+    return () => io.disconnect();
+  }, [keys]);
+
+  const search = <SearchToggle query={query} setQuery={setQuery} openField={searching} setOpenField={setSearching} />;
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
-      <div className="flex flex-wrap items-end gap-2">
-        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
-          Jobs
-        </h1>
-        <span className="aj-faint ml-auto hidden sm:inline">On a phone, swipe a live job right to extend it a week, left to close it.</span>
-      </div>
-      <label className="flex items-center gap-2 rounded-2xl border px-3 aj-hair" style={{ background: 'var(--surface)' }}>
-        <Search size={15} strokeWidth={1.8} className="aj-faint shrink-0" />
-        <input className="min-w-0 flex-1" style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', color: 'var(--text)', height: 40 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by title, duty station, or grade" aria-label="Search jobs" />
-      </label>
-      {groups.length > 1 && (
-        <nav className="aj-no-scrollbar flex gap-1.5 overflow-x-auto" aria-label="Jump to">
-          {groups.map((g) => (
-            <button key={g.key} type="button" className="aj-pill shrink-0" onClick={() => document.getElementById(`ej-group-${g.key}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}>
-              {g.label} · {g.jobs.length}
-            </button>
-          ))}
-        </nav>
+    <div className="mx-auto flex w-full max-w-[820px] flex-col gap-6 px-4 pb-10 pt-4 lg:px-8 lg:pt-6">
+      <h1 className="sr-only">Jobs</h1>
+      <HeaderSlot>
+        {!phone && <Jumps groups={groups} active={active} />}
+        {phone ? !searching && search : search}
+      </HeaderSlot>
+      {phone && (searching || groups.length > 1) && (
+        <div className="-mb-2 flex flex-col gap-2">
+          {searching && search}
+          <Jumps groups={groups} active={active} />
+        </div>
       )}
       {groups.length === 0 ? (
-        <div className="aj-card p-6 aj-muted">{q ? `No job matches “${query.trim()}”.` : 'Nothing here.'}</div>
+        <div className="aj-muted py-10 text-center">{q ? `No job matches “${query.trim()}”.` : 'Nothing here yet.'}</div>
       ) : (
         groups.map((g) => (
-          <section key={g.key} id={`ej-group-${g.key}`} className="flex flex-col gap-2" aria-label={g.label} style={{ scrollMarginTop: 12 }}>
-            <h2 className="aj-section-label" style={{ padding: 0, margin: 0 }}>
+          <section key={g.key} id={`ej-group-${g.key}`} className="flex flex-col gap-2" aria-label={g.label} style={{ scrollMarginTop: 16 }}>
+            <h2 className="aj-section-label" style={{ padding: '0 6px', margin: 0 }}>
               {g.label} · {g.jobs.length}
             </h2>
-            <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            <ul className="ej-joblist">
               {g.jobs.map((j) => (
                 <Row key={j.id} job={j} s={s} open={open} />
               ))}
@@ -732,10 +780,21 @@ export default function Jobs({ id }: { id?: string }) {
           </section>
         ))
       )}
-      <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => go('jobs', 'deleted')}>
-        <Trash2 size={13} strokeWidth={1.8} /> Recently deleted{deleted ? ` · ${deleted}` : ''}
-      </button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1.5">
+        <button type="button" className="aj-text-btn inline-flex items-center gap-1" onClick={() => go('jobs', 'deleted')}>
+          <Trash2 size={13} strokeWidth={1.8} /> Recently deleted{deleted ? ` · ${deleted}` : ''}
+        </button>
+        {phone && <span className="aj-faint">Swipe a live job right to extend it a week, left to close it.</span>}
+      </div>
       {dialog && <JobDialog job={dialog.job} s={s} kind={dialog.kind} onClose={() => setDialog(null)} />}
     </div>
   );
+}
+
+export default function Jobs({ id }: { id?: string }) {
+  const s = useDemo();
+  if (id === 'deleted') return <RecentlyDeleted s={s} />;
+  const job = id ? s.jobs.find((j) => j.id === id) : undefined;
+  if (job) return <JobDetail job={job} s={s} />;
+  return <JobList s={s} />;
 }

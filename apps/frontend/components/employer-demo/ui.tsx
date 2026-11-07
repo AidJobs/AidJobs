@@ -1,7 +1,8 @@
 'use client';
 
 import { Sparkles, Undo2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { restoreDeleted } from './actions';
@@ -20,6 +21,15 @@ export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
   const next = radios[(at + (forward ? 1 : -1) + radios.length) % radios.length];
   next.focus();
   next.click();
+}
+
+/** The place in the top bar, beside the organisation's name, where a screen can put its own tools. */
+export const HeaderSlotContext = createContext<HTMLElement | null>(null);
+
+/** Puts a screen's own tools in the top bar (Manage jobs: its group shortcuts and search). */
+export function HeaderSlot({ children }: { children: ReactNode }) {
+  const el = useContext(HeaderSlotContext);
+  return el ? createPortal(children, el) : null;
 }
 
 export function DemoMark({ label = 'Demo · sample data' }: { label?: string }) {
