@@ -496,15 +496,19 @@ def test_only_a_plain_robots_txt_request_skips_the_check(url, method, slept):
 
 
 def test_the_shared_robots_txt_fetch_has_an_overall_limit(monkeypatch):
-    monkeypatch.setattr(outbound, "ROBOTS_OVERALL_SECONDS", 0.1)
+    # Its hops' own limit is set out of reach, so only the overall limit can end the fetch.
+    monkeypatch.setattr(outbound, "ROBOTS_TOTAL_TIMEOUT_SECONDS", 30.0)
+    monkeypatch.setattr(outbound, "ROBOTS_OVERALL_SECONDS", 0.2)
 
     async def run():
         never = asyncio.Event()
         events, world = _world([_robots()], gates={0: never})
+        started = asyncio.get_running_loop().time()
         with pytest.raises(FetchError, match="^robots.txt unreachable$"):
-            await fetch_url("https://jobs.example/a", **world)
+            await asyncio.wait_for(fetch_url("https://jobs.example/a", **world), 5)
+        return asyncio.get_running_loop().time() - started
 
-    asyncio.run(run())
+    assert asyncio.run(run()) < 2
 
 
 def test_waiting_for_robots_txt_is_bounded_by_the_crawls_time():
@@ -778,9 +782,18 @@ def test_a_refusal_on_the_last_job_page_is_reported_too(monkeypatch):
 ])
 def test_a_refused_job_page_is_not_read(answer, monkeypatch):
     crawler = _html_crawler(monkeypatch, answer)
-    row = {"title": "Officer", "apply_url": "https://jobs.example/job/1", "location_raw": "Kabul"}
+    row = {"title": "Officer", "apply_url": "https://jobs.example/job/1"}
     job = asyncio.run(crawler.enrich_job_from_detail_page(dict(row), "https://jobs.example/"))
     assert job == row
+
+
+def test_the_same_job_page_answered_plainly_is_read(monkeypatch):
+    page = FetchResult(200, {}, b"<h1>Officer</h1><span>Location: Mars</span>",
+                       "https://jobs.example/job/1")
+    crawler = _html_crawler(monkeypatch, page)
+    row = {"title": "Officer", "apply_url": "https://jobs.example/job/1"}
+    job = asyncio.run(crawler.enrich_job_from_detail_page(dict(row), "https://jobs.example/"))
+    assert job["location_raw"] == "Mars"
 
 
 @pytest.mark.parametrize("module, reader, call", [
