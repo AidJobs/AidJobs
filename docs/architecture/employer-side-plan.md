@@ -375,9 +375,18 @@ Other languages for the same job stay where they are: language versions on the p
 
 **For later:** a spoken version of the short WhatsApp text, for candidates who read little.
 
+**The user's decisions on the three (7 November 2026):** the chat follows the language typed, and each job has its own language pill, both on the condition that organisations are told plainly that this works; the interface is not translated for now.
+
+**Making it known, the agent's suggestion** (quiet and shown where it is used, as with the plans):
+- **The empty chat box:** a short line under it, "Write in English, Hindi, Swahili or another language; AidJobs answers in the same language", naming the languages of the countries the organisation works in (its profile); and the rotating example placeholders (section 15, item 1.9) include one in such a language.
+- **The first message in another language:** one line in the chat links the two: "You're writing in Hindi. Write this job in Hindi too? · Yes · Keep it in English". The chat's language and the job's language are separate, so it is asked once per job, never assumed.
+- **The language pill:** its hover text says "This job is written in this language from the start, not translated. Add other languages when you publish." For an organisation working in countries with a supported local language, the pill suggests it once ("Your organisation works in India: Hindi is available").
+- **Set-up and the welcome card:** the organisation chooses its usual job languages during set-up (they become the default for new jobs), and the welcome card says in one line that jobs and the chat work in those languages.
+- **The publish page:** language versions explain the difference: "Your job is in Hindi. Add English or another language as a version."
+
 ### To settle in the discussion
 
-- Local languages: the first set and how it is chosen; a job's own language free and versions paid; the interface staying in English at first.
+- Local languages: the first set and how it is chosen; a job's own language free and versions paid; the wording that tells organisations the chat and the jobs work in their languages.
 - The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
 - Verification: which ways at launch (which registers, whether by hand, vouching and its limits), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
 - Tokens only, listings only, or both; and what counts if a job uses no AI.
