@@ -748,6 +748,34 @@ describe('employer demo: managing jobs', () => {
     expect(network).toEqual([]);
   });
 
+  it('Esc closes only the top dialog (the checkout inside Reopen), and closing search on a phone returns focus to its icon', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true, jobs: st.jobs.map((j) => (j.id === 'job-liv' ? { ...j, status: 'closed', closedAt: st.today - 2 * 86_400_000, closeReason: 'early', publishedAt: st.today - 70 * 86_400_000 } : j)) }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#jobs/job-liv');
+    click('Reopen');
+    click(/^Reopen with Amplify/);
+    shows('Simulated · no card is charged');
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(container.textContent).not.toContain('Simulated · no card is charged');
+    shows('Reopen this job?');
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(container.textContent).not.toContain('Reopen this job?');
+
+    phone = true;
+    render();
+    route('#home');
+    route('#jobs');
+    act(() => (container.querySelector('header button[aria-label="Search jobs"]') as HTMLElement).click());
+    act(() => (container.querySelector('button[aria-label="Close the search"]') as HTMLElement).click());
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Search jobs');
+    phone = false;
+  });
+
   it("a job's page is in parts, with one main action and Now first", () => {
     phone = false;
     render();

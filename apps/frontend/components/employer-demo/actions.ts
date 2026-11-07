@@ -32,7 +32,7 @@ import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
-import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
+import type { ApplySettings, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -1206,7 +1206,7 @@ export function declineTell(id: string) {
   const j = getState().jobs.find((x) => x.id === id);
   const offer = j ? tellOffer(j) : null;
   if (!offer || !ownerOnly()) return;
-  updateJob(id, (x) => ({ ...x, reachTold: [...(x.reachTold ?? []), offer.key] }));
+  updateJob(id, (x) => ({ ...x, reachDeclined: [...(x.reachDeclined ?? []), offer.key] }));
 }
 
 /** A free job's listing ends before its closing date: it closes on its last listed day instead, for free (decision 3). */
@@ -1281,6 +1281,14 @@ export function canDelete(s: State, j: DemoJob): string | null {
   return null;
 }
 
+/** Restoring follows the same rule as deleting, judged by what the job was when deleted (a scheduled job is kept as a draft). */
+export function canRestore(s: State, d: DeletedJob): string | null {
+  if (s.reviewerAs) return 'Reviewers cannot restore jobs';
+  const wasPublished = d.was ? d.was === 'scheduled' || d.was === 'live' || d.was === 'closed' : isPublished(d.job);
+  if (wasPublished && s.me.role !== 'owner') return 'Only the owner can restore a job that had been published or scheduled';
+  return null;
+}
+
 /** The people a deletion can be told to, by group. */
 export function involved(s: State, j: DemoJob): { reviewers: string[]; payer: string | null; reach: number; team: string[] } {
   const reviewers = j.review.reviewers.map((r) => r.name);
@@ -1331,7 +1339,7 @@ export function deleteJob(id: string, tell: Tell = {}): boolean {
 export function restoreDeleted(id: string): boolean {
   const s = getState();
   const d = (s.deleted ?? []).find((x) => x.job.id === id);
-  if (!d || canDelete(s, d.job)) return false;
+  if (!d || canRestore(s, d)) return false;
   const title = d.job.facts.title || 'untitled job';
   update((st) => ({
     ...st,
@@ -1371,6 +1379,7 @@ export function hireAgain(id: string, place?: string): string | null {
     editedAt: undefined,
     published: undefined,
     reachTold: undefined,
+    reachDeclined: undefined,
     listingChoice: undefined,
     paidFor: undefined,
     translations: undefined,

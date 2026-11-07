@@ -517,6 +517,24 @@ describe('fixes from the round 5 review', () => {
     expect(readIntent('reopen the logistics assistant')?.kind).toBe('hire');
   });
 
+  it('re-review 2. a declined offer is never quoted as told: the next offer reads from what was really sent', () => {
+    const published = job('job-cps').facts.deadline;
+    extend('job-cps', 7);
+    declineTell('job-cps');
+    expect(tellOffer(job('job-cps'))).toBeNull();
+    extend('job-cps', 7);
+    expect(tellOffer(job('job-cps'))?.changes[0].from).toBe(longDate(published));
+  });
+
+  it('re-review 4. a member cannot restore a job the owner deleted while it was scheduled', () => {
+    schedule('job-fin', { plan: 'amplify', reach: waitingReach() });
+    deleteJob('job-fin');
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
+    expect(restoreDeleted('job-fin')).toBe(false);
+    update((s) => ({ ...s, me: { ...s.me, role: 'owner' } }));
+    expect(restoreDeleted('job-fin')).toBe(true);
+  });
+
   it('18 and 21. a deleted job is erased on the day shown; sample addresses have no double hyphen', () => {
     deleteJob('job-comms');
     update((s) => purgeDeleted({ ...s, today: s.today + 14 * DAY }));

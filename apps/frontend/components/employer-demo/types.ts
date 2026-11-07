@@ -236,8 +236,10 @@ export type DemoJob = {
   editedAt?: number;
   /** The job as it went live, to show what changed since publishing. */
   published?: Snapshot;
-  /** Important changes the people Reach invited were told about, or the offer declined: never offered twice. */
+  /** Important changes the people Reach invited were told about. */
   reachTold?: string[];
+  /** Important changes whose offer was declined ("Not now"): never offered again, and never quoted as told. */
+  reachDeclined?: string[];
   /** "Let it leave the list" when a free job's listing ends before its closing date: no more reminders. */
   listingChoice?: 'leave';
   /** A paid job taken back to a draft: publishing it again costs nothing. */

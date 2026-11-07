@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Sparkles, Trash2
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { approvedFor, buy, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
+import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
 import { invitedCount, reachRoom } from './invites';
 import { Checkout } from './Pricing';
 import { changesSince, changeSummary, tellOffer } from './changes';
@@ -683,7 +683,7 @@ function RecentlyDeleted({ s }: { s: State }) {
       ) : (
         <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {deleted.map((d) => {
-            const block = canDelete(s, d.job);
+            const block = canRestore(s, d);
             return (
               <li key={d.job.id} className="aj-card flex flex-wrap items-center gap-2 p-3">
                 <span className="flex min-w-0 flex-1 flex-col">
@@ -733,10 +733,9 @@ function latestAt(j: DemoJob): number {
 }
 
 /** Search: an icon that opens into a field shaped like the chat box; Esc or the cross closes it and clears the search. */
-function SearchToggle({ query, setQuery, openField, setOpenField }: { query: string; setQuery: (q: string) => void; openField: boolean; setOpenField: (o: boolean) => void }) {
-  const refocus = useRef(false);
+function SearchToggle({ query, setQuery, openField, setOpenField, refocusRef }: { query: string; setQuery: (q: string) => void; openField: boolean; setOpenField: (o: boolean) => void; refocusRef: { current: boolean } }) {
   const close = () => {
-    refocus.current = true;
+    refocusRef.current = true;
     setQuery('');
     setOpenField(false);
   };
@@ -746,8 +745,8 @@ function SearchToggle({ query, setQuery, openField, setOpenField }: { query: str
         type="button"
         className="aj-icon-btn shrink-0"
         ref={(el) => {
-          if (el && refocus.current) {
-            refocus.current = false;
+          if (el && refocusRef.current) {
+            refocusRef.current = false;
             el.focus();
           }
         }}
@@ -785,6 +784,8 @@ function JobList({ s }: { s: State }) {
   const phone = useIsPhone();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
+  // Kept here, not in the search: on phones the open field and the icon are two different places.
+  const refocusRef = useRef(false);
   const [tab, setTab] = useState<TabKey>('all');
   const [dialog, setDialog] = useState<{ job: DemoJob; kind: Kind } | null>(null);
   const open: Open = (j, kind) => setDialog({ job: j, kind });
@@ -800,7 +801,7 @@ function JobList({ s }: { s: State }) {
   const label = q ? `${shown.length} ${shown.length === 1 ? 'job matches' : 'jobs match'} “${query.trim()}”` : (tabs.find((t) => t.key === current)?.label ?? 'All');
   const deleted = (s.deleted ?? []).length;
 
-  const search = <SearchToggle query={query} setQuery={setQuery} openField={searching} setOpenField={setSearching} />;
+  const search = <SearchToggle query={query} setQuery={setQuery} openField={searching} setOpenField={setSearching} refocusRef={refocusRef} />;
   const tabBar = <Tabs tabs={tabs} current={current} onPick={setTab} />;
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-4 px-4 pb-10 pt-4 lg:px-8 lg:pt-6">

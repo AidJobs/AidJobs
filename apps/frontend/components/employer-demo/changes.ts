@@ -50,7 +50,7 @@ const part = (c: Change) => `${c.key}=${c.to}`;
 export function tellOffer(j: DemoJob): { key: string; changes: Change[]; count: number } | null {
   if (j.status !== 'live' || j.plan !== 'amplify' || !j.reach) return null;
   const parts = (j.reachTold ?? []).flatMap((k) => k.split('|'));
-  const done = new Set(parts);
+  const done = new Set([...parts, ...(j.reachDeclined ?? []).flatMap((k) => k.split('|'))]);
   // What they were last told, per fact: a second change reads "told value → new value", not "published value → new value".
   const lastTold = new Map(parts.map((p) => [p.slice(0, p.indexOf('=')), p.slice(p.indexOf('=') + 1)]));
   const changes = changesSince(j)

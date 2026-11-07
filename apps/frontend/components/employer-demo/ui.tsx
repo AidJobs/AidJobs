@@ -117,20 +117,30 @@ export function OrgMark({ name, size = 22 }: { name: string; size?: number }) {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** Open dialogs, the last one on top: Escape and the focus trap belong to the top one only (a checkout opened inside Reopen). */
+const openDialogs: object[] = [];
+
 /** A dialog on wide screens and a bottom sheet on phones. */
 export function Dialog({ title, subtitle, onClose, footer, children, wide, half }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean; half?: boolean }) {
   const phone = useIsPhone();
   const card = useRef<HTMLDivElement>(null);
+  const [self] = useState(() => ({}));
+  useEffect(() => {
+    openDialogs.push(self);
+    return () => {
+      openDialogs.splice(openDialogs.indexOf(self), 1);
+    };
+  }, [self]);
   // Read before the dialog's own fields can take focus.
   const [opener] = useState(() => (typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)));
   useEffect(() => {
     if (phone) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && openDialogs[openDialogs.length - 1] === self) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phone, onClose]);
+  }, [phone, onClose, self]);
   // Focus moves into the dialog, stays there while it is open, and goes back to where it was when it closes.
   useEffect(() => {
     const box = card.current;
@@ -141,7 +151,7 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
       (list.find((el) => el.matches('input, textarea, select')) ?? list.find((el) => el.getAttribute('aria-label') !== 'Close') ?? box).focus();
     }
     const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab' || openDialogs[openDialogs.length - 1] !== self) return;
       const list = focusable();
       if (!list.length) return;
       const first = list[0];
@@ -159,7 +169,7 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
       document.removeEventListener('keydown', trap);
       if (opener?.isConnected && opener !== document.body) opener.focus();
     };
-  }, [phone, opener]);
+  }, [phone, opener, self]);
   if (phone) {
     return (
       <BottomSheet title={title} subtitle={subtitle} onClose={onClose} footer={footer} tall={!half}>
