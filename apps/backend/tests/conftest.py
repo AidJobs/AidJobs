@@ -6,12 +6,23 @@ by request, so for them both are switched off here, from the test side: producti
 switch. Tests marked `politeness` run the real check and spacing, from a clean state.
 
 No test may look up a real name: a lookup fails as an unknown name would, and fails the test.
+Addresses written as numbers, and localhost, are not lookups and pass.
 """
+import ipaddress
 import socket
 
 import pytest
 
 from contracts import outbound
+
+
+def _numeric(name):
+    """An address written as numbers needs no lookup."""
+    try:
+        ipaddress.ip_address(name.split("%", 1)[0])
+    except ValueError:
+        return False
+    return True
 
 
 def _clear_policy_state():
@@ -41,7 +52,7 @@ def _no_real_name_lookups(monkeypatch):
 
     def guarded(host, *args, **kwargs):
         name = host.decode() if isinstance(host, bytes) else str(host or "")
-        if name in ("localhost", "127.0.0.1", "::1", ""):
+        if name in ("localhost", "") or _numeric(name):
             return real(host, *args, **kwargs)
         looked_up.append(name)
         raise socket.gaierror(socket.EAI_NONAME, "real name lookups are not allowed in tests")
