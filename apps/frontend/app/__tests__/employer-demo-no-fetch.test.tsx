@@ -22,6 +22,7 @@ import { reorderSections, reviewerDecision, setReachPlan, toggleSection } from '
 import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
+import { currentMonth } from '@/components/employer-demo/plans';
 import { getState, go, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
@@ -202,12 +203,12 @@ describe('employer demo: never calls the network', () => {
     });
     route(`#publish/${paidId}`);
     shows('Both free jobs for');
-    shows('Schedule free for');
+    shows('create and publish it free then, or Amplify to publish it now');
+    expect(container.textContent).not.toContain('Schedule free for');
     click('Amplify and publish · US$28.40');
     click('Simulate a declined card');
     shows('The card was declined');
     expect(getState().jobs.find((j) => j.id === paidId)?.status).toBe('draft');
-    shows('instead');
     click('Try again');
     click('Pay US$28.40');
     shows('Live on AidJobs');
@@ -672,6 +673,26 @@ describe('employer demo: managing jobs', () => {
     expect(container.textContent).not.toContain('Livelihoods Officer');
     route('#public/job-liv');
     shows('No longer listed on AidJobs');
+    expect(network).toEqual([]);
+  });
+
+  it('a free job given a date next month shows the notice and offers Amplify', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#publish/job-comms');
+    click('Schedule');
+    const [y, m] = currentMonth(getState()).split('-').map(Number);
+    const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-02`;
+    type(container.querySelector('input[aria-label="Publish on"]') as HTMLInputElement, next);
+    shows('A free job goes live in its own month');
+    expect((Array.from(container.querySelectorAll('button')).find((b) => /^A free job goes live within/.test(b.textContent?.trim() ?? '')) as HTMLButtonElement).disabled).toBe(true);
+    click('Choose Amplify');
+    expect(container.textContent).not.toContain('A free job goes live in its own month');
     expect(network).toEqual([]);
   });
 

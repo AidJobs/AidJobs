@@ -19,7 +19,6 @@ import {
   closeAtListingEnd,
   completePayRequest,
   declineTell,
-  freeNeed,
   letLeaveList,
   publishNow,
   reschedule,
@@ -307,12 +306,6 @@ describe('managing jobs: scheduled jobs, changes since publishing, the listing e
     setReachPlan('job-fin', { candidates: ['a@example.org', 'b@example.org'], team: [], candidateMsg: { subject: 's', body: 'b', closing: 'c' }, teamMsg: { subject: 's', body: 'b', closing: 'c' } });
     expect(publish('job-fin', { plan: 'amplify', schedule: tomorrow(), paid: 'direct' })).toBe(true);
   };
-  const freeJobFor = (months: number) => {
-    const id = startJob('Hiring a Shelter Officer in Goma');
-    setFacts(id, { deadline: isoDay(getState().today + (months * 31 + 20) * DAY) });
-    return id;
-  };
-
   it('Publish now sends the waiting Reach emails and lists the job from today', () => {
     scheduleAmplified();
     expect(job('job-fin').reach?.candidates.every((r) => r.status === 'waiting')).toBe(true);
@@ -323,20 +316,14 @@ describe('managing jobs: scheduled jobs, changes since publishing, the listing e
     expect(job('job-fin').published?.facts.title).toBe('Finance Officer');
   });
 
-  it('a free job scheduled into next month needs one of this month\'s free jobs to publish now; next month\'s stays used', () => {
+  it('a scheduled free job cannot be moved into next month; an amplified one can', () => {
     const next = firstOfNextMonth(currentMonth(getState()));
-    const a = freeJobFor(2);
-    expect(publish(a, { plan: 'free', schedule: next })).toBe(true);
-    expect(freeNeed(getState(), job(a), currentMonth(getState()))).toBe('use');
-    expect(publishNow(a)).toBe(true);
-    expect(getState().freeUses.filter((u) => u.jobId === a).map((u) => u.month).sort()).toEqual([currentMonth(getState()), next.slice(0, 7)].sort());
-
-    const b = freeJobFor(2);
-    expect(publish(b, { plan: 'free', schedule: next })).toBe(true);
-    expect(freeLeft(getState())).toBe(0);
-    expect(freeNeed(getState(), job(b), currentMonth(getState()))).toBe('none-left');
-    expect(publishNow(b)).toBe(false);
-    expect(job(b).status).toBe('scheduled');
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-meal' ? { ...j, status: 'scheduled', scheduledFor: isoDay(s.today + DAY), facts: { ...j.facts, deadline: isoDay(s.today + 70 * DAY) } } : j)) }));
+    expect(rescheduleBlock(getState(), job('job-meal'), next)).toMatch(/A free job goes live within/);
+    expect(reschedule('job-meal', next)).toBe(false);
+    scheduleAmplified();
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, facts: { ...j.facts, deadline: isoDay(s.today + 70 * DAY) } } : j)) }));
+    expect(rescheduleBlock(getState(), job('job-fin'), next)).toBeNull();
   });
 
   it('Change the date keeps the scheduling checks and moves the waiting emails', () => {
@@ -485,14 +472,13 @@ describe('free jobs: two a calendar month, counted at first use', () => {
     expect(job(b).status).toBe('draft');
   });
 
-  it('scheduling for the 1st of next month uses that month’s allowance', () => {
-    free(startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks'));
+  it('a free job goes live in its own month: it cannot be scheduled into next month (Amplify can)', () => {
     const b = startJob('Hiring a Driver in Goma, closing in 6 weeks');
     const next = firstOfNextMonth(currentMonth(getState()));
-    expect(canGoFree(getState(), b, next)).toBe(true);
-    expect(free(b, next)).toBe(true);
-    expect(job(b)).toMatchObject({ status: 'scheduled', scheduledFor: next });
-    expect(freeLeft(getState(), next.slice(0, 7))).toBe(1);
+    expect(publishBlock(getState(), b, { plan: 'free', schedule: next })).toMatch(/A free job goes live within/);
+    expect(free(b, next)).toBe(false);
+    expect(job(b).status).toBe('draft');
+    expect(publishBlock(getState(), b, { plan: 'amplify', schedule: next, paid: 'direct' })).toBeNull();
   });
 
   it('a job already counted (downloaded or sent for review) publishes free without counting again', () => {

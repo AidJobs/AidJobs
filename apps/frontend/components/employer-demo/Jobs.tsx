@@ -259,7 +259,7 @@ function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: Stat
   if (kind === 'variant') return <VariantDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'share') return <ShareDialog job={job} onClose={onClose} />;
   if (kind === 'withdraw') return <WithdrawDialog job={job} onClose={onClose} />;
-  if (kind === 'publishNow') return <PublishNowDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'publishNow') return <PublishNowDialog job={job} onClose={onClose} />;
   if (kind === 'reschedule') return <RescheduleDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'backToDraft') return <BackToDraftDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'tell') return <TellDialog job={job} s={s} onClose={onClose} />;

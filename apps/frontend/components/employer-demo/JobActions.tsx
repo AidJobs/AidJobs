@@ -3,7 +3,7 @@
 import { MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
-import { backToDraft, canDelete, closeJob, declineTell, deleteJob, freeNeed, involved, publishNow, reschedule, rescheduleBlock, tellInvited, type Tell } from './actions';
+import { backToDraft, canDelete, closeJob, declineTell, deleteJob, involved, publishNow, reschedule, rescheduleBlock, tellInvited, type Tell } from './actions';
 import { changeSummary, tellOffer } from './changes';
 import { addDays, isoDay, longDate } from './engine';
 import { REACH_EMAILS, reachUsed } from './invites';
@@ -215,48 +215,16 @@ function Footer({ onClose, label, disabled, run }: { onClose: () => void; label:
   );
 }
 
-/** Publishing a scheduled job today (plan section 17, phase 2), with what it costs in free jobs and what Reach sends now. */
-export function PublishNowDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
-  const month = currentMonth(s);
-  const need = freeNeed(s, job, month);
+/** Publishing a scheduled job today (plan section 17, phase 2), with what Reach sends now. */
+export function PublishNowDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   const waiting = waitingFor(job);
-  const counted = s.freeUses.find((u) => u.jobId === job.id)?.month;
   return (
-    <Dialog
-      title="Publish now?"
-      subtitle={job.facts.title}
-      onClose={onClose}
-      half
-      footer={
-        need === 'none-left' ? (
-          <div className="flex justify-end gap-2">
-            <button type="button" className="aj-pill" onClick={onClose}>
-              Keep its date
-            </button>
-            <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
-              Amplify
-            </button>
-          </div>
-        ) : (
-          <Footer onClose={onClose} label="Publish now" run={() => publishNow(job.id) && onClose()} />
-        )
-      }
-    >
+    <Dialog title="Publish now?" subtitle={job.facts.title} onClose={onClose} half footer={<Footer onClose={onClose} label="Publish now" run={() => publishNow(job.id) && onClose()} />}>
       <div className="flex flex-col gap-2">
         <p style={{ margin: 0 }}>
           It goes live today instead of on {job.scheduledFor ? longDate(job.scheduledFor) : 'its date'}, listed {LISTED_DAYS[job.plan ?? 'free']} days from today.
         </p>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} waiting for go-live are sent now (simulated).</span>}
-        {need === 'use' && (
-          <span className="aj-muted">
-            It uses one of {monthName(month)}&apos;s free jobs. The free job counted for {counted ? monthName(counted) : 'its month'} stays used: free jobs are never given back.
-          </span>
-        )}
-        {need === 'none-left' && (
-          <span style={{ color: 'var(--amber)' }}>
-            No free job is left for {monthName(month)}. Amplify it to publish now, or keep its date{counted ? ` in ${monthName(counted)}` : ''}.
-          </span>
-        )}
       </div>
     </Dialog>
   );
@@ -266,7 +234,6 @@ export function PublishNowDialog({ job, s, onClose }: { job: DemoJob; s: State; 
 export function RescheduleDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
   const [date, setDate] = useState(job.scheduledFor ?? addDays(s.today, 1));
   const block = rescheduleBlock(s, job, date);
-  const need = date ? freeNeed(s, job, date.slice(0, 7)) : 'none';
   const waiting = waitingFor(job);
   const max = job.facts.deadline ? addDays(new Date(`${job.facts.deadline}T12:00:00`).getTime(), -1) : undefined;
   return (
@@ -277,10 +244,10 @@ export function RescheduleDialog({ job, s, onClose }: { job: DemoJob; s: State; 
           <input type="date" style={inputStyle} value={date} min={addDays(s.today, 1)} max={max} onChange={(e) => setDate(e.target.value)} />
         </label>
         <span className="aj-muted">
-          From tomorrow{job.facts.deadline ? `, and before it closes on ${longDate(job.facts.deadline)}` : ''}. Today is {longDate(isoDay(s.today))}.
+          From tomorrow{job.facts.deadline ? `, and before it closes on ${longDate(job.facts.deadline)}` : ''}
+          {job.plan === 'free' ? `; a free job goes live within ${monthName(currentMonth(s))}` : ''}. Today is {longDate(isoDay(s.today))}.
         </span>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} waiting for go-live move to the new date.</span>}
-        {need === 'use' && date && <span className="aj-muted">It uses one of {monthName(date.slice(0, 7))}&apos;s free jobs; the one already counted stays used.</span>}
       </div>
     </Dialog>
   );

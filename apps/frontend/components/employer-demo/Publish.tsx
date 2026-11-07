@@ -20,6 +20,7 @@ import {
   pausedByChanges,
   publish,
   remindPayer,
+  freeMonthBlock,
   scheduleBlock,
   type Paid,
 } from './actions';
@@ -794,9 +795,7 @@ export default function Publish({ id }: { id?: string }) {
   const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
-  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
-  /** The 1st of a month is offered for a free job only when the job is still open then. */
-  const freeFrom = (first: string) => canGoFree(s, job.id, first) && !scheduleBlock(s, job, first);
+  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && freeMonthBlock(s, schedule) ? freeMonthBlock(s, schedule) : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
@@ -940,19 +939,6 @@ export default function Publish({ id }: { id?: string }) {
                     Publish free instead
                   </button>
                 )}
-                {!upgrade && !canGoFree(s, job.id, null) && freeFrom(nextFirst) && (
-                  <button
-                    type="button"
-                    className="aj-pill"
-                    onClick={() => {
-                      setFailed(null);
-                      setPlan('free');
-                      setSchedule(nextFirst);
-                    }}
-                  >
-                    Schedule free for {longDate(nextFirst)} instead
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -967,18 +953,7 @@ export default function Publish({ id }: { id?: string }) {
                 {!freeOk && (
                   <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
                     <span>Both free jobs for {monthName(month)} are used.</span>
-                    {freeFrom(firstOfNextMonth(month)) && (
-                      <button
-                        type="button"
-                        className="aj-pill"
-                        onClick={() => {
-                          setPlan('free');
-                          setSchedule(firstOfNextMonth(month));
-                        }}
-                      >
-                        <CalendarClock size={13} strokeWidth={1.8} /> Schedule free for {longDate(firstOfNextMonth(month))}
-                      </button>
-                    )}
+                    <span className="aj-muted">New free jobs come on {longDate(nextFirst)}: create and publish it free then, or Amplify to publish it now.</span>
                   </div>
                 )}
                 {chosen === 'free' && job.facts.deadline && job.facts.deadline > freeUntil && (
@@ -1074,6 +1049,17 @@ export default function Publish({ id }: { id?: string }) {
                 Schedule
               </button>
               {schedule && <input type="date" style={{ ...inputStyle, width: 170, minHeight: 34 }} value={schedule} min={addDays(s.today, 1)} onChange={(e) => setSchedule(e.target.value || null)} aria-label="Publish on" />}
+            </div>
+          )}
+          {!upgrade && chosen === 'free' && freeMonthBlock(s, schedule) && (
+            <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--amber-bg)' }} role="status">
+              <span style={{ fontWeight: 650 }}>A free job goes live in its own month</span>
+              <span className="aj-muted">
+                To publish free in {monthName(month)}, create and publish the job in {monthName(month)}. To schedule it for {longDate(schedule ?? '')} now, choose Amplify.
+              </span>
+              <button type="button" className="aj-pill" onClick={() => setPlan('amplify')}>
+                Choose Amplify
+              </button>
             </div>
           )}
 

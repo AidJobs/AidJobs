@@ -830,6 +830,11 @@ export function scheduleBlock(s: State, j: DemoJob, schedule: string | null): st
   return null;
 }
 
+/** A free job is published in its own month: scheduled for later this month at most (decided by the user, 7 November 2026). */
+export function freeMonthBlock(s: State, schedule: string | null): string | null {
+  return schedule && schedule.slice(0, 7) !== currentMonth(s) ? `A free job goes live within ${monthName(currentMonth(s))}` : null;
+}
+
 /** Whether the job can be published with these options; the reason when it cannot. */
 export function publishBlock(s: State, id: string, o: PublishOptions): string | null {
   const j = s.jobs.find((x) => x.id === id);
@@ -839,6 +844,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
   if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
+  if (o.plan === 'free' && freeMonthBlock(s, o.schedule)) return freeMonthBlock(s, o.schedule);
   if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
   if (o.plan === 'amplify' && j.paidFor) return null;
   if (o.plan === 'amplify' && !o.paid) return 'Not paid';
@@ -1053,24 +1059,6 @@ export function letClose(id: string) {
   update((s) => ({ ...s, inbox: s.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)), notice: { text: 'It will close on its date. Nothing else to do.' } }));
 }
 
-/** Whether the job's free use covers going live in `month`: one counted that month or earlier does; one counted only for a later month does not. */
-export function freeCovers(s: State, j: DemoJob, month: string): boolean {
-  return s.freeUses.some((u) => u.jobId === j.id && u.month <= month);
-}
-
-/**
- * What a free job needs to go live in `month` (plan section 17, phase 2): nothing, one of that month's free jobs, or Amplify when none is
- * left. A free job counted for a later month stays counted there: free jobs are never given back.
- */
-export function freeNeed(s: State, j: DemoJob, month: string): 'none' | 'use' | 'none-left' {
-  if (j.plan !== 'free' || freeCovers(s, j, month)) return 'none';
-  return freeLeft(s, month) > 0 ? 'use' : 'none-left';
-}
-
-function countFree(s: State, j: DemoJob, month: string): State {
-  return freeNeed(s, j, month) === 'use' ? { ...s, freeUses: [...s.freeUses, { jobId: j.id, month }] } : s;
-}
-
 function waitingEmails(j: DemoJob): number {
   return [...(j.reach?.candidates ?? []), ...(j.reach?.team ?? [])].filter((r) => r.status === 'waiting').length;
 }
@@ -1080,13 +1068,9 @@ export function publishNow(id: string): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
-  const month = currentMonth(s);
-  const need = freeNeed(s, j, month);
-  if (need === 'none-left') return false;
   const waiting = waitingEmails(j);
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
-  update((s0) => {
-    const st = countFree(s0, j, month);
+  update((st) => {
     const queue = (r: Recipient): Recipient => (r.status === 'waiting' ? { ...r, status: 'queued' } : r);
     return {
       ...st,
@@ -1099,7 +1083,7 @@ export function publishNow(id: string): boolean {
               scheduledFor: undefined,
               published: { facts: x.facts, sections: x.sections, at: Date.now() },
               reach: x.reach ? { ...x.reach, candidates: x.reach.candidates.map(queue), team: x.reach.team.map(queue), rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: undefined, at: Date.now() } : r)) } : x.reach,
-              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Published now instead of on ${was}${need === 'use' ? "; used one of this month's free jobs" : ''}${waiting ? `; ${waiting} Reach ${waiting === 1 ? 'email' : 'emails'} sent now (simulated)` : ''}` }],
+              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Published now instead of on ${was}${waiting ? `; ${waiting} Reach ${waiting === 1 ? 'email' : 'emails'} sent now (simulated)` : ''}` }],
             }
           : x,
       ),
@@ -1110,14 +1094,11 @@ export function publishNow(id: string): boolean {
   return true;
 }
 
-/** Why a scheduled job cannot move to `date`: the same checks as scheduling, and a free job of that month when it needs one. */
+/** Why a scheduled job cannot move to `date`: the same checks as scheduling; a free job stays within this month. */
 export function rescheduleBlock(s: State, j: DemoJob, date: string): string | null {
   if (!date) return 'Choose a date';
   if (date === j.scheduledFor) return 'Choose a new date';
-  const block = scheduleBlock(s, j, date);
-  if (block) return block;
-  if (freeNeed(s, j, date.slice(0, 7)) === 'none-left') return `No free job left for ${monthName(date.slice(0, 7))}`;
-  return null;
+  return scheduleBlock(s, j, date) ?? (j.plan === 'free' ? freeMonthBlock(s, date) : null);
 }
 
 /** Moves a scheduled job to another date; Reach emails waiting for go-live move with it. */
@@ -1125,10 +1106,8 @@ export function reschedule(id: string, date: string): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled' || rescheduleBlock(s, j, date)) return false;
-  const need = freeNeed(s, j, date.slice(0, 7));
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
-  update((s0) => {
-    const st = countFree(s0, j, date.slice(0, 7));
+  update((st) => {
     return {
       ...st,
       jobs: st.jobs.map((x) =>
@@ -1137,7 +1116,7 @@ export function reschedule(id: string, date: string): boolean {
               ...x,
               scheduledFor: date,
               reach: x.reach ? { ...x.reach, rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: date } : r)) } : x.reach,
-              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Moved from ${was} to ${longDate(date)}${need === 'use' ? `; used one of ${monthName(date.slice(0, 7))}'s free jobs` : ''}` }],
+              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Moved from ${was} to ${longDate(date)}` }],
             }
           : x,
       ),
