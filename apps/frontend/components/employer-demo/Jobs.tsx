@@ -337,6 +337,7 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   const attention = needsYou(s, job);
   const next = nextStep(s, job, open);
   const city = job.facts.location.split(',')[0];
+  const status = statusLine(s, job).replace(/^Live · /, '');
   return (
     <li className="ej-jobitem" style={{ overflow: dx ? 'hidden' : undefined }}>
       {swipeable && dx !== 0 && (
@@ -377,11 +378,17 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
             <span className="aj-faint flex min-w-0 items-center gap-1.5" style={{ fontSize: 12.5 }}>
               {job.facts.iso && <Flag iso={job.facts.iso} title={job.facts.country} />}
               <span className="truncate">
-                {city ? `${city} · ` : ''}
-                <span style={{ color: attention ? 'var(--amber)' : undefined }}>{statusLine(s, job).replace(/^Live · /, '')}</span>
+                {city}
+                <span className="lg:hidden">
+                  {city ? ' · ' : ''}
+                  <span style={{ color: attention ? 'var(--amber)' : undefined }}>{status}</span>
+                </span>
               </span>
             </span>
             {attention && <span className="sr-only">Needs you</span>}
+          </span>
+          <span className="hidden w-[240px] shrink-0 truncate text-right lg:block" style={{ fontSize: 12.5, color: attention ? 'var(--amber)' : 'var(--text-3)' }}>
+            {status}
           </span>
         </button>
         {!s.reviewerAs && (
@@ -681,7 +688,12 @@ function RecentlyDeleted({ s }: { s: State }) {
   );
 }
 
-type Group = (typeof GROUPS)[number] & { jobs: DemoJob[] };
+type TabKey = 'all' | GroupKey;
+
+/** The most recent thing that happened to a job: created, published, edited, or closed. "All" lists jobs by it, newest first. */
+function latestAt(j: DemoJob): number {
+  return Math.max(j.createdAt, j.publishedAt ?? 0, j.editedAt ?? 0, j.closedAt ?? 0);
+}
 
 /** Search: an icon that opens into a field shaped like the chat box; Esc or the cross closes it and clears the search. */
 function SearchToggle({ query, setQuery, openField, setOpenField }: { query: string; setQuery: (q: string) => void; openField: boolean; setOpenField: (o: boolean) => void }) {
@@ -698,7 +710,7 @@ function SearchToggle({ query, setQuery, openField, setOpenField }: { query: str
   return (
     <label className="ej-search">
       <Search size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
-      <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && close()} placeholder="Title, duty station, or grade" aria-label="Search jobs" />
+      <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && close()} placeholder="Search by title, duty station, or grade" aria-label="Search jobs" />
       <button type="button" className="ej-search-close" onClick={close} aria-label="Close the search">
         <X size={13} strokeWidth={2} />
       </button>
@@ -706,14 +718,13 @@ function SearchToggle({ query, setQuery, openField, setOpenField }: { query: str
   );
 }
 
-/** The groups as shortcuts: one tap scrolls to a group; the one in view is marked. */
-function Jumps({ groups, active }: { groups: Group[]; active: string | null }) {
-  if (groups.length < 2) return null;
+/** All, then each group with jobs in it: one list at a time. */
+function Tabs({ tabs, current, onPick }: { tabs: Array<{ key: TabKey; label: string; count: number }>; current: TabKey; onPick: (k: TabKey) => void }) {
   return (
-    <nav className="aj-no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto" aria-label="Jump to">
-      {groups.map((g) => (
-        <button key={g.key} type="button" className="ej-jump" data-active={active === g.key || undefined} onClick={() => document.getElementById(`ej-group-${g.key}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}>
-          {g.label} <span className="ej-jump-count">{g.jobs.length}</span>
+    <nav className="aj-no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto" aria-label="Show">
+      {tabs.map((t) => (
+        <button key={t.key} type="button" className="ej-jump" aria-pressed={current === t.key} data-active={current === t.key || undefined} onClick={() => onPick(t.key)}>
+          {t.label} <span className="ej-jump-count">{t.count}</span>
         </button>
       ))}
     </nav>
@@ -724,62 +735,47 @@ function JobList({ s }: { s: State }) {
   const phone = useIsPhone();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
+  const [tab, setTab] = useState<TabKey>('all');
   const [dialog, setDialog] = useState<{ job: DemoJob; kind: Kind } | null>(null);
-  const [active, setActive] = useState<string | null>(null);
   const open: Open = (j, kind) => setDialog({ job: j, kind });
   const q = query.trim().toLowerCase();
-  const found = s.jobs.filter((j) => !q || [j.facts.title, j.facts.location, j.facts.grade].some((x) => x.toLowerCase().includes(q)));
-  const groups: Group[] = GROUPS.map((g) => ({ ...g, jobs: found.filter((j) => groupOf(s, j) === g.key).sort((a, b) => sortKey(a) - sortKey(b)) })).filter((g) => g.jobs.length);
-  const keys = groups.map((g) => g.key).join();
+  const tabs = [{ key: 'all' as TabKey, label: 'All', count: s.jobs.length }, ...GROUPS.map((g) => ({ key: g.key as TabKey, label: g.label, count: s.jobs.filter((j) => groupOf(s, j) === g.key).length })).filter((t) => t.count)];
+  const current: TabKey = tabs.some((t) => t.key === tab) ? tab : 'all';
+  const byLatest = (a: DemoJob, b: DemoJob) => latestAt(b) - latestAt(a);
+  const shown = q
+    ? s.jobs.filter((j) => [j.facts.title, j.facts.location, j.facts.grade].some((x) => x.toLowerCase().includes(q))).sort(byLatest)
+    : current === 'all'
+      ? [...s.jobs].sort(byLatest)
+      : s.jobs.filter((j) => groupOf(s, j) === current).sort((a, b) => sortKey(a) - sortKey(b));
+  const label = q ? `${shown.length} ${shown.length === 1 ? 'job matches' : 'jobs match'} “${query.trim()}”` : (tabs.find((t) => t.key === current)?.label ?? 'All');
   const deleted = (s.deleted ?? []).length;
 
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const seen = new Map<string, boolean>();
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) seen.set(e.target.id.replace('ej-group-', ''), e.isIntersecting);
-        setActive(keys.split(',').find((k) => seen.get(k)) ?? null);
-      },
-      { root: document.querySelector('main'), rootMargin: '0px 0px -55% 0px' },
-    );
-    for (const k of keys.split(',')) {
-      const el = document.getElementById(`ej-group-${k}`);
-      if (el) io.observe(el);
-    }
-    return () => io.disconnect();
-  }, [keys]);
-
   const search = <SearchToggle query={query} setQuery={setQuery} openField={searching} setOpenField={setSearching} />;
+  const tabBar = <Tabs tabs={tabs} current={current} onPick={setTab} />;
   return (
-    <div className="mx-auto flex w-full max-w-[820px] flex-col gap-6 px-4 pb-10 pt-4 lg:px-8 lg:pt-6">
+    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-4 px-4 pb-10 pt-4 lg:px-8 lg:pt-6">
       <h1 className="sr-only">Jobs</h1>
       <HeaderSlot>
-        {!phone && <Jumps groups={groups} active={active} />}
-        {phone ? !searching && search : search}
+        {!phone && !searching && tabBar}
+        {(!phone || !searching) && search}
       </HeaderSlot>
-      {phone && (searching || groups.length > 1) && (
-        <div className="-mb-2 flex flex-col gap-2">
-          {searching && search}
-          <Jumps groups={groups} active={active} />
-        </div>
-      )}
-      {groups.length === 0 ? (
-        <div className="aj-muted py-10 text-center">{q ? `No job matches “${query.trim()}”.` : 'Nothing here yet.'}</div>
-      ) : (
-        groups.map((g) => (
-          <section key={g.key} id={`ej-group-${g.key}`} className="flex flex-col gap-2" aria-label={g.label} style={{ scrollMarginTop: 16 }}>
-            <h2 className="aj-section-label" style={{ padding: '0 6px', margin: 0 }}>
-              {g.label} · {g.jobs.length}
-            </h2>
-            <ul className="ej-joblist">
-              {g.jobs.map((j) => (
-                <Row key={j.id} job={j} s={s} open={open} />
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+      {phone && <div className="-mt-1">{searching ? search : tabBar}</div>}
+      <section className="flex flex-col gap-2" aria-label={label}>
+        {q && (
+          <h2 className="aj-section-label" style={{ padding: '0 6px', margin: 0 }}>
+            {label}
+          </h2>
+        )}
+        {shown.length === 0 ? (
+          <div className="aj-muted py-10 text-center">{q ? `No job matches “${query.trim()}”.` : 'Nothing here yet.'}</div>
+        ) : (
+          <ul className="ej-joblist" aria-label={label}>
+            {shown.map((j) => (
+              <Row key={j.id} job={j} s={s} open={open} />
+            ))}
+          </ul>
+        )}
+      </section>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1.5">
         <button type="button" className="aj-text-btn inline-flex items-center gap-1" onClick={() => go('jobs', 'deleted')}>
           <Trash2 size={13} strokeWidth={1.8} /> Recently deleted{deleted ? ` · ${deleted}` : ''}

@@ -584,15 +584,24 @@ describe('employer demo: managing jobs', () => {
     render();
     route('#home');
     route('#jobs');
-    const groups = Array.from(container.querySelectorAll('section[id^="ej-group-"]')).map((g) => g.getAttribute('aria-label'));
-    expect(groups[0]).toBe('Needs you');
-    expect(groups).toContain('History');
-    expect(container.querySelector('#ej-group-needs')?.textContent).toContain('Child Protection Specialist');
+    const tabs = () => Array.from(container.querySelectorAll('header nav[aria-label="Show"] button')).map((b) => b.textContent?.replace(/\s*\d+$/, '').trim());
+    expect(tabs()[0]).toBe('All');
+    expect(tabs()).toContain('Needs you');
+    expect(tabs()).toContain('History');
+    const rows = () => Array.from(container.querySelectorAll('.ej-joblist .ej-jobrow-main')).map((b) => b.querySelector('.truncate')?.textContent);
+    expect(rows()).toHaveLength(getState().jobs.length);
+    expect(rows()[0]).toBe('Health Officer');
+    expect(rows().at(-1)).toBe('WASH Programme Manager');
+    const pick = (label: string) => act(() => (Array.from(container.querySelectorAll('header nav[aria-label="Show"] button')).find((b) => b.textContent?.startsWith(label)) as HTMLElement).click());
+    pick('Needs you');
+    expect(rows()).toContain('Child Protection Specialist');
+    expect(rows()).not.toContain('MEAL Coordinator');
+    pick('All');
 
-    expect(container.querySelector('header nav[aria-label="Jump to"]')?.textContent).toContain('Needs you');
     expect(container.querySelector('input[aria-label="Search jobs"]')).toBeNull();
     act(() => (container.querySelector('header button[aria-label="Search jobs"]') as HTMLElement).click());
     const search = container.querySelector('header input[aria-label="Search jobs"]') as HTMLInputElement;
+    expect(container.querySelector('header nav[aria-label="Show"]')).toBeNull();
     type(search, 'kampala');
     shows('Child Protection Specialist');
     expect(container.textContent).not.toContain('MEAL Coordinator');
@@ -600,6 +609,7 @@ describe('employer demo: managing jobs', () => {
     shows('No job matches');
     act(() => search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(container.querySelector('input[aria-label="Search jobs"]')).toBeNull();
+    expect(container.querySelector('header nav[aria-label="Show"]')).not.toBeNull();
     shows('MEAL Coordinator');
 
     menu('MEAL Coordinator');
@@ -648,7 +658,8 @@ describe('employer demo: managing jobs', () => {
     route('#home');
     shows('Livelihoods Officer: its free listing ends in 5 days');
     route('#jobs');
-    expect(container.querySelector('#ej-group-scheduled')?.textContent).toContain('Publish now');
+    act(() => (Array.from(container.querySelectorAll('header nav[aria-label="Show"] button')).find((b) => b.textContent?.startsWith('Scheduled')) as HTMLElement).click());
+    expect(container.querySelector('.ej-joblist')?.textContent).toContain('Publish now');
     menu('Finance Officer');
     click('Change the date');
     shows('Change the publishing date');

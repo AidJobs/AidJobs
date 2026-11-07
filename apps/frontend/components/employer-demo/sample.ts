@@ -142,6 +142,7 @@ function sampleList(today: number): DemoJob[] {
       status: 'live',
       plan: 'amplify',
       publishedAt: today - 26 * DAY,
+      createdAt: today - 30 * DAY,
       audit: [
         { at: today - 30 * DAY, who: SAMPLE_ME.name, what: 'Created' },
         { at: today - 26 * DAY, who: SAMPLE_ME.name, what: 'Amplified and published' },
@@ -151,6 +152,7 @@ function sampleList(today: number): DemoJob[] {
       status: 'live',
       plan: 'free',
       publishedAt: lastMonth(today),
+      createdAt: lastMonth(today) - 3 * DAY,
       audit: [{ at: lastMonth(today), who: 'Grace Akello', what: 'Published free' }],
     }, ['assessment']),
     // Free, listed 60 days: its listing ends in 5 days, before it closes in 20 (plan section 17, decision 3).
@@ -204,6 +206,7 @@ function sampleList(today: number): DemoJob[] {
       plan: 'free',
       publishedAt: today - 55 * DAY,
       closedAt: today - 25 * DAY,
+      createdAt: today - 60 * DAY,
       closeReason: 'deadline',
     }),
     job(today, 'job-wash-2026', 'wash', 'house', { title: 'WASH Programme Manager', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', grade: 'D2', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, -230), salaryMode: 'range', salaryMin: '5,200', salaryMax: '6,300', currency: 'USD' }, {

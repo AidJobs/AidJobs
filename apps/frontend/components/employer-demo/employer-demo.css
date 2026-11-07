@@ -288,6 +288,10 @@
 }
 
 @media (max-width: 640px) {
+  .ej-search {
+    width: 100%;
+  }
+
   .ej-jobrow-main {
     gap: 8px;
     padding-left: 10px;
@@ -336,6 +340,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  width: min(420px, 100%);
   height: 34px;
   min-width: 0;
   padding: 0 4px 0 11px;
@@ -350,7 +355,7 @@
 }
 
 .ej-search input {
-  width: 200px;
+  width: auto;
   min-width: 0;
   flex: 1;
   border: none;
