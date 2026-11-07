@@ -514,6 +514,45 @@ def test_a_later_page_whose_link_is_not_followed_is_partial(monkeypatch):
     assert crawler.report["stop"] == f"More Jobs link not followed on {_PAGE.format(2)}"
 
 
+_HIDDEN_LAST = [
+    pytest.param("/en-us/listing/?page=3&page-items=20", id="with-address"),
+    pytest.param(None, id="without-address"),
+]
+
+
+def _last_page(job_ids, href):
+    if href is None:
+        return _listing_page(job_ids) + '<a class="more-link button">More Jobs 0</a>'
+    return _listing_page(job_ids, href, 0)
+
+
+@pytest.mark.parametrize("href", _HIDDEN_LAST)
+def test_a_more_jobs_link_counting_zero_ends_the_listing(href, monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 1)
+    crawler, asked = _paged_crawler(
+        monkeypatch, {_PAGE.format(2): (200, _last_page(["3"], href))}
+    )
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    assert asked == [_PAGE.format(2)]
+    assert crawler.report == {
+        "pages": 2, "expected": 3, "complete": True, "stop": "no More Jobs link",
+    }
+
+
+@pytest.mark.parametrize("href", _HIDDEN_LAST)
+def test_a_first_page_counting_zero_is_not_asked_again(href, monkeypatch):
+    crawler, asked = _paged_crawler(monkeypatch, {}, page_items=100)
+    assert _read_listing(crawler, _last_page(["1", "2"], href)) == ["1", "2"]
+    assert asked == []
+    assert crawler.report["complete"] is True
+    assert crawler.report["expected"] == 2
+
+
+def test_page_numbers_are_ascii_digits_only():
+    assert simple_crawler_module._page_number("page=%C2%B2") is None
+    assert simple_crawler_module._page_number("page=7") == 7
+
+
 def test_a_more_jobs_button_without_an_address_is_partial(monkeypatch):
     first = _listing_page(["1"]) + '<a class="more-link button">More Jobs 5</a>'
     crawler, asked = _paged_crawler(monkeypatch, {})

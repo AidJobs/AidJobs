@@ -1959,7 +1959,8 @@ class SimpleCrawler:
 
         A failed later page keeps the jobs already read. Every later page must add new jobs,
         except the resized page one when it shows jobs and links on (the site kept its own
-        page size). A More Jobs link that is not followed ends the walk as partial.
+        page size). A More Jobs link that is not followed ends the walk as partial, unless it
+        counts 0 jobs left, which ends the listing.
         Returns the jobs and the walk's report. Only a walk that ran out of links and read at
         least the site's own total is complete: a site that ignores the page size but keeps it
         in its links skips jobs while still running out of links.
@@ -1975,9 +1976,11 @@ class SimpleCrawler:
         pages = 1
         stop = _LISTING_COMPLETE_STOP
         retry_used = False
-        next_url = _resized_listing_page(first_html, careers_url)
+        # The last page may keep its More Jobs link, hidden, counting 0.
+        ends = remaining == 0
+        next_url = None if ends else _resized_listing_page(first_html, careers_url)
         resized = next_url is not None
-        if not resized:
+        if not resized and not ends:
             next_url = _next_listing_page(first_html, careers_url, careers_url)
             if next_url is None and _has_more_link(first_html):
                 stop = f'More Jobs link not followed on {careers_url}'
@@ -2009,9 +2012,10 @@ class SimpleCrawler:
             pages += 1
             page_jobs = _first_row_per_link(reader.read_job_cards(page_html, next_url))
             new_jobs = [job for job in page_jobs if job.get('apply_url') not in seen]
-            following = _next_listing_page(page_html, next_url, careers_url)
+            left = _more_jobs_remaining(page_html)
+            ends = left == 0
+            following = None if ends else _next_listing_page(page_html, next_url, careers_url)
             if resized:
-                left = _more_jobs_remaining(page_html)
                 if left is not None and page_jobs:
                     expected = len(page_jobs) + left
             if not new_jobs and not (resized and page_jobs and following):
@@ -2019,7 +2023,7 @@ class SimpleCrawler:
                 break
             seen.update(job.get('apply_url') for job in new_jobs)
             jobs.extend(new_jobs)
-            if following is None and _has_more_link(page_html):
+            if following is None and not ends and _has_more_link(page_html):
                 stop = f'More Jobs link not followed on {next_url}'
                 break
             next_url, resized = following, False
