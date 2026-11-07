@@ -350,8 +350,34 @@ The details, as the agent suggested them; the user agreed three the same day:
 
 The agent's suggestion: free publishing needs no verification (moderation applies, section 2). For an unverified organisation, the free first Amplify starts at once with the private tools (the market check, the advert check, language versions, the field-post notice), and its public parts (featured placement, the badge) and the Reach emails start when verification completes, which for most is the same minute. The amplification stays reserved until then.
 
+### Local languages (raised by the user, 7 November 2026)
+
+**The user's idea:** add Hindi and a limited number of other major local languages in which jobs are published, for the countries with the most development and NGO work, because local NGOs work with people in local languages, field staff especially. The user asked whether this needs a language menu in the main window and in the chat, whether that is too much, and whether AI can handle it.
+
+**The agent's view.** "Language" means three separate things, and only one needs a control:
+1. **The chat:** no menu. The organisation types in Hindi and AidJobs answers in Hindi, the language detected from what they type.
+2. **The job itself:** one choice per job, "Language: English", as a pill in the workspace's top row with the other facts, changed at any time. The job is written in that language from the start, not translated from English, with its headings, the JD formats' wording, and the commitments in that language; the organisation's own commitment text stays as written unless it adds its own version.
+3. **The interface** (menus and buttons): stays in English at first. Translating it is a large, ongoing piece of work; Hindi first, later, if organisations ask.
+
+Other languages for the same job stay where they are: language versions on the publish page (section 16 decision 6), and the field-post notice and the short WhatsApp version (section 14) in the local language, which is where field staff will read it.
+
+**Can AI handle it:** the leading models write Hindi, Bengali, Urdu, Swahili, and the four existing languages well, and Nepali, Amharic, and Hausa reasonably; quality falls for smaller languages, so each language is tested on real job descriptions before it is offered. Points to design for:
+- the right register: plain words for field roles, not formal or literary Hindi, with common sector terms (PSEA, safeguarding) kept as the sector uses them;
+- the employer reviews every job before publishing, as for language versions now; nothing is published unreviewed;
+- the checks (inclusive language, readability), predictive completion, and fact recognition (dates, places, grades) are built for English first; in other languages they are offered only where tested, and otherwise say so;
+- scripts and direction: fonts for Devanagari, Bengali, and Ge'ez; right to left for Arabic, Urdu, Pashto, and Dari;
+- cost: these scripts use two to three times more tokens than English for the same text, so the per-job budget is set per language and no language is penalised;
+- the public side: each language a version of the job page, marked for search engines (growth plan section 4.5), and the public site able to show it.
+
+**Which languages:** chosen from data, not guessed: where AidJobs' crawled jobs and ReliefWeb's postings concentrate, and the countries with the largest humanitarian and development programmes. Likely candidates beyond French, Arabic, Spanish, and Portuguese: Hindi, Bengali, Urdu, and Swahili first; then Nepali, Amharic, Hausa, Indonesian, Burmese, and Ukrainian; India's regional languages (Marathi, Tamil, Telugu, Odia) later, if organisations ask.
+
+**Free or paid:** writing a job in its own one language is free, because local NGOs are most of the free plan; extra language versions stay part of Amplify.
+
+**For later:** a spoken version of the short WhatsApp text, for candidates who read little.
+
 ### To settle in the discussion
 
+- Local languages: the first set and how it is chosen; a job's own language free and versions paid; the interface staying in English at first.
 - The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
 - Verification: which ways at launch (which registers, whether by hand, vouching and its limits), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
 - Tokens only, listings only, or both; and what counts if a job uses no AI.
