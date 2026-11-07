@@ -965,7 +965,7 @@ export default function Publish({ id }: { id?: string }) {
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-6">
       <div className="flex items-center gap-2">
-        <Tip label={upgrade ? 'Back to the job' : 'Back to the job description'} side="bottom">
+        <Tip label="Back" side="bottom">
           <button type="button" className="aj-icon-btn" onClick={() => (upgrade ? goBack('jobs', job.id) : goBack('create', job.id))} aria-label="Back">
             <ArrowLeft size={15} strokeWidth={1.8} />
           </button>
@@ -1190,7 +1190,7 @@ export default function Publish({ id }: { id?: string }) {
                   {i > 0 && ' · '}
                   <button
                     type="button"
-                    className="ej-legal-link"
+                    className="ej-legal-link ej-tap"
                     onClick={() => {
                       setRow(p.key);
                       requestAnimationFrame(() => document.getElementById(`ej-row-${p.key}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));

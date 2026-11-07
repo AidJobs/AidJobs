@@ -23,15 +23,21 @@ export function LangSwitch({ job, current, onPick }: { job: DemoJob; current: La
       </button>
       {versions.map((l) => (
         <button key={l.key} type="button" role="radio" aria-checked={current === l.key} className="ej-jump" data-active={current === l.key || undefined} onClick={() => onPick(l.key)} lang={l.key}>
-          {l.native} <span className="ej-jump-count">{versionStatus(job, l.key)}</span>
+          {l.native}{' '}
+          <span className="ej-jump-count" lang="en">
+            {versionStatus(job, l.key)}
+          </span>
         </button>
       ))}
     </div>
   );
 }
 
-function rows(text: string): number {
-  return Math.max(1, Math.ceil(text.length / 80));
+/** A line's box grows with its text where the browser cannot size it from the content itself. */
+function fit(el: HTMLTextAreaElement | null) {
+  if (!el || (typeof CSS !== 'undefined' && CSS.supports?.('field-sizing', 'content'))) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight + 2}px`;
 }
 
 /**
@@ -46,14 +52,15 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: L
   const isStale = stale(job, t);
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl p-3" style={{ background: isStale ? 'var(--amber-bg)' : 'var(--surface-2)' }} role="status" lang="en" dir="ltr">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl p-3" style={{ background: isStale ? 'var(--amber-bg)' : 'var(--surface-2)' }} lang="en" dir="ltr">
         <span className="min-w-0 flex-1">
           <strong>
             {info.label} version · {versionStatus(job, lang)}
           </strong>
           <span className="aj-muted">
             {' '}
-            · {left ? `${left} of ${totalLines(t)} lines still in English` : 'every line is in the language'}. Edit facts and sections in English; this version follows.
+            · {left ? `${left} of ${totalLines(t)} lines still in English` : 'every line is in the language'}. {readOnly ? 'Facts and sections follow the English.' : 'Edit facts and sections in English; this version follows.'}
+            {!readOnly && job.status === 'live' && t.reviewed && ' It is on the live job page: an edit takes it off until you mark it as reviewed again.'}
           </span>
         </span>
         {!readOnly && isStale && (
@@ -87,15 +94,29 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: L
                           •
                         </span>
                       )}
-                      <textarea className="ej-tr-line" rows={rows(text)} value={text} readOnly={readOnly} onChange={(e) => editTranslation(job.id, lang, sec.key, i, `${bullet ? '- ' : ''}${e.target.value}`)} aria-label={`${sec.title}, line ${i + 1}`} />
+                      <textarea
+                        ref={(el) => fit(el)}
+                        className="ej-tr-line"
+                        rows={1}
+                        value={text}
+                        readOnly={readOnly}
+                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                        onChange={(e) => {
+                          fit(e.target);
+                          editTranslation(job.id, lang, sec.key, i, `${bullet ? '- ' : ''}${e.target.value.replace(/\s*\n\s*/g, ' ')}`);
+                        }}
+                        aria-label={`${sec.title}, line ${i + 1}`}
+                      />
                     </div>
-                    <span className={`aj-faint px-2 ${bullet ? 'ps-5' : ''}`} style={{ fontSize: 11.5 }} lang="en" dir="ltr">
-                      {english && (
-                        <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }}>
-                          English
-                        </span>
-                      )}
-                      {source.replace(/^- /, '')}
+                    <span className={`aj-faint px-2 ${bullet ? 'ps-5' : ''}`} style={{ fontSize: 11.5 }}>
+                      <span lang="en" dir="ltr">
+                        {english && (
+                          <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }}>
+                            English
+                          </span>
+                        )}
+                        {source.replace(/^- /, '')}
+                      </span>
                     </span>
                   </div>
                 );

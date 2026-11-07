@@ -97,6 +97,7 @@ export function resetDemo() {
     /* nothing to remove */
   }
   current = initialState(startOfDay(Date.now()));
+  trail.length = 0;
   listeners.forEach((l) => l());
 }
 
@@ -196,11 +197,19 @@ export function go(screen: string, id?: string) {
   window.scrollTo?.(0, 0);
 }
 
+/** A screen in the trail that no longer makes sense: its job was deleted, or its publishing page is for a job already published. */
+function gone(hash: string): boolean {
+  const [screen, id] = hash.replace(/^#\/?/, '').split('/');
+  if (!id || !['jobs', 'create', 'studio', 'publish', 'public'].includes(screen)) return false;
+  const job = getState().jobs.find((j) => j.id === id);
+  return !job || (screen === 'publish' && !['draft', 'review', 'approved'].includes(job.status));
+}
+
 /** Back to the screen the user came from: Manage jobs, Overview, Create a job, or the workspace; `fallback` when there is none. */
 export function goBack(fallback: string, fallbackId?: string) {
   const here = window.location.hash;
   let prev = trail.pop();
-  while (prev !== undefined && prev === here) prev = trail.pop();
+  while (prev !== undefined && (prev === here || gone(prev))) prev = trail.pop();
   if (prev === undefined) return go(fallback, fallbackId);
   window.location.hash = prev;
   window.scrollTo?.(0, 0);

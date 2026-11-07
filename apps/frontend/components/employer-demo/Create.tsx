@@ -175,7 +175,7 @@ export default function Create({ id }: { id?: string }) {
           ]}
         />
       )}
-      {!reviewing && job.sections.length > 0 && job.status !== 'live' && (
+      {!reviewing && job.sections.length > 0 && isReviewable(job) && (
         <Tip label={blocked ? 'Next: check, send for review (approval is required), and publish' : checks.length ? `Next: check and publish. To look at: ${checks.join('; ')}.` : 'Next: check and publish'} side="bottom">
           <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
             {phone ? 'Next' : 'Next: check and publish'} <ArrowRight size={13} strokeWidth={2} />
@@ -183,7 +183,7 @@ export default function Create({ id }: { id?: string }) {
           </button>
         </Tip>
       )}
-      {job.status === 'live' && (
+      {(job.status === 'live' || job.status === 'scheduled') && (
         <button type="button" className="ej-soft-btn" onClick={() => go('jobs', job.id)}>
           Done
         </button>
@@ -239,12 +239,12 @@ export default function Create({ id }: { id?: string }) {
           <FactBar job={job} s={s} />
         </div>
       )}
-      {(phone || !shown || (!reviewing && job.status !== 'live' && job.status !== 'closed')) && (
+      {(phone || !shown || (!reviewing && isReviewable(job))) && (
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 lg:px-6">
           <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
             {(phone || !shown) && statusLine(s, job)}
           </span>
-          {!reviewing && job.status !== 'live' && job.status !== 'closed' && <Steps current={1} />}
+          {!reviewing && isReviewable(job) && <Steps current={1} />}
         </div>
       )}
       {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (
@@ -279,7 +279,7 @@ export default function Create({ id }: { id?: string }) {
             </div>
           </div>
         )}
-        {job.sections.length > 0 && !reviewing && job.status !== 'live' && job.status !== 'closed' && (
+        {job.sections.length > 0 && !reviewing && isReviewable(job) && (
           <section className="aj-card flex flex-col gap-2 p-4" aria-label="Next step">
             <span className="aj-section-label" style={{ padding: 0 }}>
               Next: check and publish

@@ -29,7 +29,7 @@ function PointRow({ p, job, owner }: { p: Point; job: DemoJob; owner: boolean })
               </button>
             )}
             {!p.fix && p.section && (
-              <button type="button" className="aj-text-btn" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
+              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
                 Look at it in the job description
               </button>
             )}
@@ -287,7 +287,7 @@ export default function BeforePublish({
           {versions.length > 0 && job.status !== 'live' && owner && (
             <span className="aj-faint">
               You can also edit each version in the workspace, like the English.{' '}
-              <button type="button" className="aj-text-btn" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
+              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
                 Open the workspace
               </button>
             </span>
@@ -371,7 +371,7 @@ export default function BeforePublish({
           )}
           {owner && (
             <div className="flex flex-wrap gap-1.5">
-              <button type="button" className="aj-pill" onClick={() => setReviewing(true)}>
+              <button type="button" className={isApproved(job) ? 'aj-text-btn' : 'aj-pill'} onClick={() => setReviewing(true)}>
                 <UserCheck size={13} strokeWidth={1.8} /> {sent ? 'Review again' : 'Send for review'}
               </button>
               {sent && waiting && (

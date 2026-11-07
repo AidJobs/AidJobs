@@ -517,6 +517,7 @@
 }
 
 .ej-tr-line {
+  field-sizing: content;
   line-height: 1.55;
 }
 
@@ -525,8 +526,8 @@
   border-color: var(--hair);
 }
 
-.aj-root .ej-tr-head:focus-visible,
-.aj-root .ej-tr-line:focus-visible {
+.aj-root:has(.ej-app) input.ej-tr-head:focus-visible,
+.aj-root:has(.ej-app) textarea.ej-tr-line:focus-visible {
   border-color: var(--sage-5);
   outline: none;
   box-shadow: none;
@@ -1457,6 +1458,16 @@
 }
 
 @media (max-width: 640px) {
+  .ej-jump {
+    height: 34px;
+  }
+
+  .aj-root .ej-tap {
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
+  }
+
   .ej-flyer-frame {
     padding: 8px;
   }

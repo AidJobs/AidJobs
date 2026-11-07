@@ -23,7 +23,7 @@ import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
 import { currentMonth } from '@/components/employer-demo/plans';
-import { getState, go, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
+import { getState, go, goBack, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 
 const network: string[] = [];
@@ -841,6 +841,82 @@ describe('employer demo: managing jobs', () => {
     act(() => (Array.from(switcher.querySelectorAll('button')).find((b) => b.getAttribute('lang') === 'ar') as HTMLElement).click());
     expect(container.querySelector('article[lang="ar"]')?.getAttribute('dir')).toBe('rtl');
     expect(network).toEqual([]);
+  });
+
+  it('keeps list markers, marks lines still in English, keeps a line on one line, and shows reviewers the versions read-only', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+      addTranslation('job-fin', 'fr');
+    });
+    const fr = () => getState().jobs.find((j) => j.id === 'job-fin')!.translations!.fr!;
+    const sec = fr().sections.find((x) => x.lines.some((l) => l.startsWith('- ')))!;
+    const at = sec.lines.findIndex((l) => l.startsWith('- '));
+    const english = getState().jobs.find((j) => j.id === 'job-fin')!.sections.find((x) => x.key === sec.key)!.lines[at];
+    act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id !== 'job-fin' ? j : { ...j, translations: { ...j.translations, fr: { ...fr(), sections: fr().sections.map((x) => (x.key !== sec.key ? x : { ...x, lines: x.lines.map((l, i) => (i === at ? english : l)) })) } } })) })));
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-fin');
+    const pickFrench = () => act(() => (Array.from(container.querySelectorAll('[aria-label="Language of the job description"] button')).find((b) => b.textContent?.startsWith('Français')) as HTMLElement).click());
+    pickFrench();
+    const line = container.querySelector(`article[lang="fr"] textarea[aria-label="${sec.title}, line ${at + 1}"]`) as HTMLTextAreaElement;
+    expect(line.value).toBe(english.slice(2));
+    expect(line.closest('div.flex-col')?.textContent).toContain('English');
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(line, 'Une ligne\nrevue');
+      line.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(fr().sections.find((x) => x.key === sec.key)!.lines[at]).toBe('- Une ligne revue');
+
+    act(() => update((st) => ({ ...st, reviewerAs: 'daniel' })));
+    pickFrench();
+    expect(Array.from(container.querySelectorAll('article[lang="fr"] textarea')).every((t) => (t as HTMLTextAreaElement).readOnly)).toBe(true);
+    expect(container.textContent).not.toContain('Mark as reviewed');
+    shows('Facts and sections follow the English');
+    expect(network).toEqual([]);
+  });
+
+  it('Back skips screens that no longer apply, and falls back after a reload', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    act(() => {
+      window.location.hash = '#jobs';
+      go('create', 'job-fin');
+      go('publish', 'job-fin');
+      update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === 'job-fin' ? { ...j, status: 'live' as const } : j)) }));
+      go('jobs', 'job-fin');
+      goBack('jobs');
+    });
+    expect(window.location.hash).toBe('#create/job-fin');
+    act(() => {
+      go('jobs', 'job-comms');
+      update((st) => ({ ...st, jobs: st.jobs.filter((j) => j.id !== 'job-fin') }));
+      goBack('jobs');
+    });
+    expect(window.location.hash).toBe('#jobs');
+    act(() => {
+      go('create', 'job-comms');
+      resetDemo();
+      goBack('home');
+    });
+    expect(window.location.hash).toBe('#home');
+  });
+
+  it('a scheduled job in the workspace is done, not sent to Check and publish again', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true, jobs: st.jobs.map((j) => (j.id === 'job-fin' ? { ...j, status: 'scheduled' as const, scheduledFor: '2099-01-01' } : j)) }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-fin');
+    expect(container.textContent).not.toContain('Next: check and publish');
+    expect(container.querySelector('[aria-label="Steps to publish"]')).toBeNull();
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Done')).toBe(true);
   });
 
   it("a job's page is in parts, with one main action and Now first", () => {
