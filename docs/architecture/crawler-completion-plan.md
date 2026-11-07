@@ -466,6 +466,19 @@ Do not define a trustworthy-crawl policy or a consecutive-missing threshold here
 
 Exit: each rule marked verified or defective. The parked HTML all-row-fail case stays parked.
 
+#### B4 record, 6 November 2026
+
+Read-only, from the repository at `260d11e`, its tests, and the production evidence already in the ledger (W-05); no production query was run. Every rule holds; one defect sits beside rule 2.
+
+1. **`fail` and `failed` increment `consecutive_failures`, reset `consecutive_nochange`, and pause at five: verified** (`orchestrator.py`, `_update_source`; `test_gate5_crawl_run.py`). Only an `active` source is paused, and a manual run of a paused source leaves it paused. Since PR #60 a timed-out run or an expired lock counts one failure; a first interruption counts none, a second in a row one (`test_crawl_ownership.py`, run in CI only, green on `260d11e`).
+2. **`ok` and `warn` clear failures; zero inserts on a healthy crawl are success: verified.** Every status other than `fail` and `failed` counts as success. **Defect, for W-34:** the HTML crawler accepts any 2xx first page (`simple_crawler.py`, "Accept any 2xx status"), so a challenge or empty page served with 202 (as AWS WAF serves UNICEF's page 7) gives `warn`, "No jobs found": failures are cleared and `consecutive_nochange` grows, so a blocked source is crawled less often and never paused. RSS and API require 200.
+3. **Crawl locks, scheduler caps and concurrency: verified** as security stage 2 set them (PR #60): 3 crawls at once per process, up to 20 sources a round every 5 minutes, a 15-minute time limit, a 25-minute lock lifetime, recovery every 5 minutes.
+4. **Missing-job expiry stays disabled: verified.** Nothing changes a job's `status` after its insert: the writer's update refuses `status` and the moderation columns (`contracts/persist.py`), and the only trigger is `jobs_tsv_trigger` (Verified, 26 October 2026).
+5. **A deadline does not hard-delete a job: verified.** `cleanup_expired_jobs` answers `disabled` and the scheduler never calls it (`test_gate1_safety.py`); public search hides a past deadline. `scripts/delete_invalid_jobs.py`, run by hand and on no route, hard-deletes jobs with a zero quality score: recorded for removal.
+6. **A recrawl does not clear administrative suppression: verified** (`contracts/upsert.py`, `seen_again`; `test_gate3_contracts.py`, `test_gate4_persist.py`); the rows hidden on 8 October stayed hidden (Verified).
+
+Recorded for later steps; none changes these rules. The completeness report (`listing_complete`) goes to `extraction_logs` on its own connection, without the run's id, and is written even when every save failed; W-06 needs it on the run (`crawl_logs`, contract §5), written under the run's ownership. `warn` means a partial listing, an empty one, or some failed saves (W-39). The health score counts only `ok` runs, and its recommended frequency replaces the computed one when they differ by more than two days, so UNICEF's partial crawls move it to about 5 days whatever it inserts (W-39). This is consistent with its scheduled run of 4 November 2026, 23:10 UTC, 5.3 days after the manual crawl of 30 October. Resuming a paused source keeps its failure count, so one more failure pauses it again. Restoring a deleted source leaves its jobs suppressed until the admin restores them. Not re-read in production: the stored counters, recent run statuses, and that 4 November UNICEF crawl.
+
 ### B5. Completion record
 
 After B1 is implemented and B2, B3, and B4 are recorded:
