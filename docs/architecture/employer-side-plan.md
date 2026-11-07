@@ -285,3 +285,112 @@ Then one independent review of the round, its fixes, and the user's look on the 
 - Paid jobs sent to AidJobs job seekers whose job alerts match, once job seekers can opt in to alerts (changes E10).
 - A refund policy beyond "none", and prices by type of organisation.
 - Production needs: the AI decision (E7); Paddle products, packages, and subscriptions; market data from the crawler (counts and dates, within each source's reuse terms); per-channel link tracking; the email set-up (section 9); contract changes, each with its own plan.
+
+## 17. To discuss: a usage allowance, and showing the plans (raised by the user, 7 November 2026; not agreed)
+
+Recorded for a later discussion and plan. Nothing here changes section 16 or the demo until the user agrees it.
+
+### The user's ideas
+
+1. **Measure the free plan in tokens.** Estimate the average tokens one job uses, chat included, and give each organisation enough for about 2 free jobs a month; the allowance renews each month. Everything else stays as it is (JD formats, styles, and the rest).
+2. **Stop and offer the plans when the allowance runs out,** as Cursor, ChatGPT, and Claude do: in the chat, or at key places such as publishing, Reach, and Amplify.
+3. **"Upgrade" always visible:** on the main chat window, and in the side menu on the left.
+4. **How paid use is counted after the free allowance:** the existing plans (per job, packs, the subscription), tokens, or a mix.
+
+Why: counting "2 free jobs" has many variables (drafts, chat, uploads, edits), while token use is easy to measure. And the publish page is today the only place an organisation learns what the paid plan does; a new organisation cannot easily tell that it is on a free plan, what the free plan gives, what else exists, or how to get it. The whole design must be minimal and effective, never feel aggressive, and let organisations feel the value of AidJobs, free and more so paid.
+
+### The agent's first view (for the discussion)
+
+- **Count tokens, show outcomes.** Tokens are the right internal measure of AI cost, but they mean nothing to an NGO recruiter and a visible meter makes people ration. Show the allowance as jobs or a simple share ("Free this month: about 1 job's writing help left", or a thin bar), never raw tokens. This keeps section 15's "never a meter" and section 15 F's "one currency".
+- **Two resources, not one.** AI writing costs money; a free listing costs almost nothing but is the value of the free plan. A job pasted or uploaded without the chat uses few tokens, so a token-only limit would allow unlimited free listings. Proposed: the token allowance limits AI help, and the free listings keep their own count (2 a month, section 16 decision 1), or one of the two is chosen deliberately.
+- **A soft stop, never a lost draft.** A notice near 80%; a job already in progress can finish (a small reserve), so nobody is cut off mid-sentence; hand edits, copying, and downloading always stay free; the plans are offered at that moment, with Ask to pay for those who do not hold the card.
+- **Paid use stays per job.** Each paid job carries a generous fair-use AI budget, and the subscription a monthly pool; no token packs for sale unless real use shows a need.
+- **Showing the plans without pushing:** a quiet plan line at the bottom of the side menu ("Free plan · 1 of 2 jobs left · See plans"), opening a plain plans page (Free, Amplify, the packages, the subscription) that also holds the Billing page; one dismissible welcome card on first sign-in stating what the free plan includes and what Amplify adds; Amplify's features shown where they would help, with the organisation's own data ("3 similar jobs close the same week · see the market check"), never as pop-ups or banners.
+- **Possible, against section 16 decision 2 ("free or paid, nothing in between"):** a new organisation's first job amplified free once, so it sees the market check, language versions, and Reach on its own job before deciding. Agreed in principle by the user, below.
+
+### Follow-up, 7 November 2026
+
+**The user's question:** if one job uses the whole month's tokens, the promise of two free jobs is broken. How is that managed?
+
+**The agent's answer:** the promise stays "2 free jobs a month", and the tokens are a fair-use limit **per job**, not one pool for the month, so a heavy first job cannot use up the second.
+- Each free job carries its own AI budget, set at about twice the measured average so almost nobody reaches it. A job's budget starts with its first AI use and stays with that job.
+- A job that reaches its budget is never stuck: the checks and the facts keep working, editing by hand, copying, downloading, and publishing free stay open, and the message offers Amplify for that job ("This job has used its free writing help. Keep editing by hand and publish free, or Amplify it for unlimited help").
+- The second free job still has its full budget.
+- Drafts never published, sent for review, or downloaded use AI without using a free job, so a quiet monthly ceiling for the organisation (about four average jobs' worth) and the existing limit of about 10 open drafts stop misuse; normal use never meets them.
+- This is section 15 F's "fair-use token budget per job description", measured from real use once the AI provider is chosen (E7).
+
+**First job amplified free, once: agreed in principle by the user (7 November 2026),** on the condition that the communication is clear that it happens once and that Amplify afterwards comes with a paid plan. It amends section 16 decision 2 for an organisation's first job only, once the details are agreed. Where it is said:
+- the welcome card ("Your first job is amplified free, once, so you can see what Amplify does");
+- the publish page, on the Amplify choice ("Free for your first job · after this, US$28.40 a job or part of a package");
+- the job's page afterwards, naming what Amplify added (market check, language versions, Reach, featured placement, 100 days);
+- the Billing and plans page ("First job amplified free: used").
+
+The details, as the agent suggested them; the user agreed three the same day:
+- **Free count:** it uses one of that month's two free jobs (agreed).
+- **What it includes:** the same as a paid Amplify job, with the same Reach email allowance (agreed).
+- **Timing:** it is offered on the organisation's first job only; it cannot be saved for later (agreed).
+- **Who:** once per organisation, not per person (open, with verification below).
+
+**Verification, the user's question: how is an organisation verified?** Section 10 lists the ways; the demo already requires it for Amplify (section 16, review of round 4). Verification matters for Amplify because the public badge says "posted directly by a verified organisation", Reach sends email from AidJobs' domain (a spam and reputation risk), fake vacancies that charge candidates fees are a known problem in this sector, and without it one organisation could open several accounts for several free Amplify jobs. The ways, fastest first:
+1. **Email on the organisation's own domain:** a code sent to an address at the organisation's website domain; automatic and instant for most established organisations.
+2. **Claiming a page AidJobs already crawls:** the same domain as the careers site AidJobs knows.
+3. **A registration number** checked against a public register (for example the UK Charity Commission, the US IRS list of tax-exempt organisations, India's NGO Darpan, Kenya's NGO Board), some automatic, others by hand; or an **IATI publisher ID**.
+4. **By hand:** for small NGOs on Gmail or similar, a registration certificate reviewed by AidJobs, slower.
+
+**The user's concern and proposal (7 November 2026):** many smaller NGOs have no domain of their own and use Gmail, and in India and many African countries public records may not be available to check. They need another way: **a referral from someone AidJobs can verify**, explained in the email that asks them to verify.
+
+**The agent's view: vouching, as a fifth way.** It suits the sector: small local NGOs usually work with someone verifiable, as an implementing partner of an INGO or UN agency, a grantee of a donor, or a member of a national NGO network.
+- **How:** the organisation names a person at a verified organisation, by that person's work email. AidJobs emails that person: "[Organisation] says it works with you. Is it a real organisation that hires staff? Yes · No · I don't know". One "Yes" verifies it. The request can be resent or sent to someone else.
+- **Who can vouch:** a person writing from the domain of an organisation verified by email, by a crawled careers site, or by a register (the first three ways), never from Gmail or similar. Organisations verified by vouching cannot vouch for others at first, so chains of vouching cannot grow from one false account.
+- **Limits and accountability:** each organisation vouches for a limited number a year (for example 10). Every vouch is recorded, never public unless the voucher agrees. If a vouched organisation is found to be fraudulent (for example charging candidates fees), its verification is removed, its live Amplify jobs come off, and the voucher's organisation is asked to look again before vouching again.
+- **National networks later:** NGO forums and coordination bodies (for example national NGO councils and humanitarian NGO forums in a country) can be invited as trusted vouchers, with a higher limit.
+- **The note in the email:** the email that asks an organisation to verify lists the ways in plain words, vouching included: "No email at your organisation's own website? Ask a partner organisation you work with to vouch for you; it takes them one click."
+- **The badge:** the same "Verified organisation" whatever the way; the record of how stays internal.
+- **Data:** the voucher's email is a contact detail (growth plan 4.6), so its storage, retention, and deletion are part of the same decision as other employer emails (section 2).
+
+The agent's suggestion: free publishing needs no verification (moderation applies, section 2). For an unverified organisation, the free first Amplify starts at once with the private tools (the market check, the advert check, language versions, the field-post notice), and its public parts (featured placement, the badge) and the Reach emails start when verification completes, which for most is the same minute. The amplification stays reserved until then.
+
+### Local languages (raised by the user, 7 November 2026)
+
+**The user's idea:** add Hindi and a limited number of other major local languages in which jobs are published, for the countries with the most development and NGO work, because local NGOs work with people in local languages, field staff especially. The user asked whether this needs a language menu in the main window and in the chat, whether that is too much, and whether AI can handle it.
+
+**The agent's view.** "Language" means three separate things, and only one needs a control:
+1. **The chat:** no menu. The organisation types in Hindi and AidJobs answers in Hindi, the language detected from what they type.
+2. **The job itself:** one choice per job, "Language: English", as a pill in the workspace's top row with the other facts, changed at any time. The job is written in that language from the start, not translated from English, with its headings, the JD formats' wording, and the commitments in that language; the organisation's own commitment text stays as written unless it adds its own version.
+3. **The interface** (menus and buttons): stays in English at first. Translating it is a large, ongoing piece of work; Hindi first, later, if organisations ask.
+
+Other languages for the same job stay where they are: language versions on the publish page (section 16 decision 6), and the field-post notice and the short WhatsApp version (section 14) in the local language, which is where field staff will read it.
+
+**Can AI handle it:** the leading models write Hindi, Bengali, Urdu, Swahili, and the four existing languages well, and Nepali, Amharic, and Hausa reasonably; quality falls for smaller languages, so each language is tested on real job descriptions before it is offered. Points to design for:
+- the right register: plain words for field roles, not formal or literary Hindi, with common sector terms (PSEA, safeguarding) kept as the sector uses them;
+- the employer reviews every job before publishing, as for language versions now; nothing is published unreviewed;
+- the checks (inclusive language, readability), predictive completion, and fact recognition (dates, places, grades) are built for English first; in other languages they are offered only where tested, and otherwise say so;
+- scripts and direction: fonts for Devanagari, Bengali, and Ge'ez; right to left for Arabic, Urdu, Pashto, and Dari;
+- cost: these scripts use two to three times more tokens than English for the same text, so the per-job budget is set per language and no language is penalised;
+- the public side: each language a version of the job page, marked for search engines (growth plan section 4.5), and the public site able to show it.
+
+**Which languages:** chosen from data, not guessed: where AidJobs' crawled jobs and ReliefWeb's postings concentrate, and the countries with the largest humanitarian and development programmes. Likely candidates beyond French, Arabic, Spanish, and Portuguese: Hindi, Bengali, Urdu, and Swahili first; then Nepali, Amharic, Hausa, Indonesian, Burmese, and Ukrainian; India's regional languages (Marathi, Tamil, Telugu, Odia) later, if organisations ask.
+
+**Free or paid:** writing a job in its own one language is free, because local NGOs are most of the free plan; extra language versions stay part of Amplify.
+
+**For later:** a spoken version of the short WhatsApp text, for candidates who read little.
+
+**The user's decisions on the three (7 November 2026):** the chat follows the language typed, and each job has its own language pill, both on the condition that organisations are told plainly that this works; the interface is not translated for now.
+
+**Making it known, the agent's suggestion** (quiet and shown where it is used, as with the plans):
+- **The empty chat box:** a short line under it, "Write in English, Hindi, Swahili or another language; AidJobs answers in the same language", naming the languages of the countries the organisation works in (its profile); and the rotating example placeholders (section 15, item 1.9) include one in such a language.
+- **The first message in another language:** one line in the chat links the two: "You're writing in Hindi. Write this job in Hindi too? · Yes · Keep it in English". The chat's language and the job's language are separate, so it is asked once per job, never assumed.
+- **The language pill:** its hover text says "This job is written in this language from the start, not translated. Add other languages when you publish." For an organisation working in countries with a supported local language, the pill suggests it once ("Your organisation works in India: Hindi is available").
+- **Set-up and the welcome card:** the organisation chooses its usual job languages during set-up (they become the default for new jobs), and the welcome card says in one line that jobs and the chat work in those languages.
+- **The publish page:** language versions explain the difference: "Your job is in Hindi. Add English or another language as a version."
+
+### To settle in the discussion
+
+- Local languages: the first set and how it is chosen; a job's own language free and versions paid; the wording that tells organisations the chat and the jobs work in their languages.
+- The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
+- Verification: which ways at launch (which registers, whether by hand, vouching and its limits), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
+- Tokens only, listings only, or both; and what counts if a job uses no AI.
+- The average tokens per job, measured once the AI provider is chosen (E7).
+- How the allowance is shown, and when the notice appears.
+- Where the plan line and "See plans" sit in the chat window and the side menu, and what the welcome card says.
+- Then a demo round on `demo/employer`, with its own plan and approval.
