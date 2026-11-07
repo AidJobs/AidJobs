@@ -349,33 +349,97 @@ describe('a copy before deleting (W-48)', () => {
     ]);
   });
 
-  it('does not let a copy saved for a Soft Delete count for a Hard Delete chosen while it was saving', async () => {
-    let finishExport: () => void = () => {};
-    const exportDone = new Promise<void>((resolve) => {
-      finishExport = resolve;
+  /** Holds the next export reply until `finish` is called. */
+  function slowExport() {
+    let finish: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      finish = resolve;
     });
     exportReply = async (ids) => {
-      await exportDone;
+      await released;
+      exportReply = exportOf;
       return exportOf(ids);
     };
+    return async () => {
+      finish();
+      await wait(50);
+    };
+  }
+
+  it('ignores a copy still saving when a Hard Delete is chosen, and asks for a new one', async () => {
     await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
     await click(button('Save copy of 2 jobs'));
     expect(button('Saving copy...')).toBeDefined();
 
     await click(container.querySelector('input[name="deletionType"][value="hard"]'));
     await typeInto(container.querySelector('textarea'), 'duplicates');
     await typeInto(container.querySelector('input[inputmode="numeric"]'), '2');
-    finishExport();
-    await wait(50);
+    await finishExport();
 
-    expect(downloads).toHaveLength(1);
-    expect(downloads[0].fileName).toMatch(/^jobs-before-soft-delete-/);
+    expect(downloads).toEqual([]);
+    expect(notice()).toBe('');
     expect(button('Hard Delete')).toBeUndefined();
     await click(button('Save copy of 2 jobs'));
-    expect(downloads[1].fileName).toMatch(/^jobs-before-hard-delete-/);
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].fileName).toMatch(/^jobs-before-hard-delete-/);
     await click(button('Hard Delete'));
     expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
       { job_ids: ['a', 'b'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
     ]);
+  });
+
+  it('ignores a copy still saving when the Hard Delete reason is edited', async () => {
+    await click(rowCheckbox('a'));
+    await click(byLabel('Delete selected jobs'));
+    await click(saveCopyCheckbox());
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await click(button('Analyze Impact'));
+    await typeInto(container.querySelector('textarea'), 'dup');
+    await typeInto(container.querySelector('input[inputmode="numeric"]'), '1');
+    const finishExport = slowExport();
+    await click(button('Save copy of 1 job'));
+
+    await typeInto(container.querySelector('textarea'), 'duplicates');
+    await finishExport();
+    expect(downloads).toEqual([]);
+    expect(button('Hard Delete')).toBeUndefined();
+
+    await click(button('Save copy of 1 job'));
+    expect(JSON.parse(await readBlob(downloads[0].blob))).toMatchObject({ deletion_type: 'hard', deletion_reason: 'duplicates' });
+    await click(button('Hard Delete'));
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['a'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
+    ]);
+  });
+
+  it('ignores a copy still saving when the box is unticked and ticked again', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
+    await click(button('Save copy of 2 jobs'));
+    await click(saveCopyCheckbox());
+    await click(saveCopyCheckbox());
+    await finishExport();
+
+    expect(downloads).toEqual([]);
+    expect(button('Soft Delete')).toBeUndefined();
+    expect(button('Save copy of 2 jobs')).toBeDefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+  });
+
+  it('ignores a copy still saving when the window is cancelled and opened again', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
+    await click(button('Save copy of 2 jobs'));
+    await click(button('Cancel'));
+    await click(byLabel('Delete selected jobs'));
+    expect(button('Saving copy...')).toBeUndefined();
+    expect(button('Analyze Impact')).toBeDefined();
+
+    await finishExport();
+    expect(downloads).toEqual([]);
+    expect(notice()).toBe('');
+    expect(button('Analyze Impact')).toBeDefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
   });
 });

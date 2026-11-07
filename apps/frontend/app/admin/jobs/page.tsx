@@ -87,7 +87,8 @@ function downloadFile(fileName: string, content: string, type: string) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Some browsers drop the download if its address is revoked straight after the click.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function JobManagementPage() {
@@ -115,6 +116,8 @@ export default function JobManagementPage() {
     deletionReason: string;
   } | null>(null);
   const [savingCopy, setSavingCopy] = useState(false);
+  // Counts copy requests; an export that answers after a newer request or a change is ignored.
+  const copyRequestRef = useRef(0);
   const [deleting, setDeleting] = useState(false);
   const [analyzedIds, setAnalyzedIds] = useState<string[] | null>(null);
   const hasAnalyzed = analyzedIds !== null;
@@ -260,7 +263,7 @@ export default function JobManagementPage() {
       if (data.status === 'ok') {
         setImpactAnalysis(data.data);
         setAnalyzedIds(ids);
-        setSavedCopy(null);
+        forgetCopy();
         setDeleteNotice(null);
         toast.success('Impact analyzed. Review details and click Delete to proceed.');
       } else {
@@ -274,23 +277,33 @@ export default function JobManagementPage() {
     }
   };
 
+  /** Drops the saved copy and any copy still being saved. */
+  const forgetCopy = () => {
+    copyRequestRef.current += 1;
+    setSavedCopy(null);
+    setSavingCopy(false);
+  };
+
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
     setImpactAnalysis(null);
     setAnalyzedIds(null);
-    setSavedCopy(null);
+    forgetCopy();
     setDeleteNotice(null);
   };
 
   const discardSavedCopy = () => {
-    if (savedCopy === null) return;
-    setSavedCopy(null);
-    setDeleteNotice(null);
+    const hadCopy = savedCopy !== null || savingCopy;
+    forgetCopy();
+    if (hadCopy) setDeleteNotice(null);
   };
 
   const saveCopyBeforeDelete = async (ids: string[]) => {
     const requestBody = exportRequest(ids);
     if (!requestBody) return;
+    copyRequestRef.current += 1;
+    const request = copyRequestRef.current;
+    const current = () => copyRequestRef.current === request;
     setSavingCopy(true);
     try {
       const response = await fetch('/api/admin/jobs/export', {
@@ -303,6 +316,7 @@ export default function JobManagementPage() {
         throw new Error(`HTTP ${response.status}`);
       }
       const exported = exportedJobsMatching(await response.json(), ids);
+      if (!current()) return;
       if (!exported) {
         throw new Error('the export did not return exactly the selected jobs');
       }
@@ -314,13 +328,14 @@ export default function JobManagementPage() {
         `A copy of ${n} job${n === 1 ? '' : 's'} was saved as ${copy.fileName}. Nothing has been deleted yet. Check that the file is in your downloads, then press ${deletionType === 'soft' ? 'Soft Delete' : 'Hard Delete'}.`,
       );
     } catch (error) {
+      if (!current()) return;
       console.error('Failed to save a copy before deleting:', error);
       setSavedCopy(null);
       setDeleteNotice(
         `The copy could not be saved (${error instanceof Error ? error.message : 'unknown error'}). Nothing was deleted.`,
       );
     } finally {
-      setSavingCopy(false);
+      if (current()) setSavingCopy(false);
     }
   };
 
@@ -346,7 +361,7 @@ export default function JobManagementPage() {
       setSelectedJobs(new Set(decision.ids));
       setImpactAnalysis(null);
       setAnalyzedIds(null);
-      setSavedCopy(null);
+      forgetCopy();
       setHardConfirmText('');
       setDeleteNotice(decision.message);
       return;
@@ -408,7 +423,7 @@ export default function JobManagementPage() {
         setShowDeleteModal(false);
         setDeletionReason('');
         setExportData(false);
-        setSavedCopy(null);
+        forgetCopy();
         setImpactAnalysis(null);
         setAnalyzedIds(null);
         
@@ -790,7 +805,7 @@ export default function JobManagementPage() {
                       setShowDeleteModal(true);
                       setImpactAnalysis(null);
                       setAnalyzedIds(null);
-                      setSavedCopy(null);
+                      forgetCopy();
                       setDeleteNotice(null);
                     }}
                     className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors group relative"
@@ -1141,7 +1156,7 @@ export default function JobManagementPage() {
                   <div className="flex-1">
                     <span className="text-xs font-medium text-[#1D1D1F]">Save a copy before deleting</span>
                     <p className="text-[11px] text-[#86868B] mt-0.5">
-                      Downloads the selected jobs as a JSON file first. Nothing is deleted until you press Delete again.
+                      Downloads the selected jobs as a JSON file first: a record, not a backup that can be restored. Nothing is deleted until you press Soft Delete or Hard Delete after the copy is saved.
                     </p>
                   </div>
                 </label>
