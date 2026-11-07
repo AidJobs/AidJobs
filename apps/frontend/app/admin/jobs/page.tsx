@@ -5,10 +5,14 @@ import { toast } from 'sonner';
 import { jobsCountScope } from '@/lib/admin/status';
 import { hardDeleteConfirmationMatches } from '@/lib/admin/danger';
 import {
+  copyBeforeDelete,
   decideBulkDelete,
+  exportedJobsMatching,
+  exportRequest,
   hiddenSelectionCount,
   impactAnalysisRequest,
   pruneSelection,
+  sameIds,
   visibleSelection,
 } from '@/lib/admin/bulkDelete';
 import { adminDate, adminDateTime } from '@/lib/dates';
@@ -75,6 +79,17 @@ type ImpactAnalysis = {
   risk_level: 'low' | 'medium' | 'high';
 };
 
+function downloadFile(fileName: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function JobManagementPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +108,13 @@ export default function JobManagementPage() {
   }, [showDeleteModal, deletionType]);
   const [deletionReason, setDeletionReason] = useState('');
   const [exportData, setExportData] = useState(false);
+  const [savedCopy, setSavedCopy] = useState<{
+    ids: string[];
+    fileName: string;
+    deletionType: 'soft' | 'hard';
+    deletionReason: string;
+  } | null>(null);
+  const [savingCopy, setSavingCopy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [analyzedIds, setAnalyzedIds] = useState<string[] | null>(null);
   const hasAnalyzed = analyzedIds !== null;
@@ -122,6 +144,12 @@ export default function JobManagementPage() {
 
   const visibleSelectedIds = useMemo(() => visibleSelection(selectedJobs, jobs.map((j) => j.id)), [selectedJobs, jobs]);
   const hiddenSelectedCount = selectedJobs.size - visibleSelectedIds.length;
+  // A copy saved while the delete type or reason was being changed does not count for the new ones.
+  const savedCopyIds =
+    savedCopy !== null && savedCopy.deletionType === deletionType && savedCopy.deletionReason === deletionReason
+      ? savedCopy.ids
+      : null;
+  const copyPending = exportData && !(savedCopyIds !== null && sameIds(savedCopyIds, visibleSelectedIds));
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -232,6 +260,7 @@ export default function JobManagementPage() {
       if (data.status === 'ok') {
         setImpactAnalysis(data.data);
         setAnalyzedIds(ids);
+        setSavedCopy(null);
         setDeleteNotice(null);
         toast.success('Impact analyzed. Review details and click Delete to proceed.');
       } else {
@@ -249,7 +278,50 @@ export default function JobManagementPage() {
     setShowDeleteModal(false);
     setImpactAnalysis(null);
     setAnalyzedIds(null);
+    setSavedCopy(null);
     setDeleteNotice(null);
+  };
+
+  const discardSavedCopy = () => {
+    if (savedCopy === null) return;
+    setSavedCopy(null);
+    setDeleteNotice(null);
+  };
+
+  const saveCopyBeforeDelete = async (ids: string[]) => {
+    const requestBody = exportRequest(ids);
+    if (!requestBody) return;
+    setSavingCopy(true);
+    try {
+      const response = await fetch('/api/admin/jobs/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const exported = exportedJobsMatching(await response.json(), ids);
+      if (!exported) {
+        throw new Error('the export did not return exactly the selected jobs');
+      }
+      const copy = copyBeforeDelete({ jobs: exported, deletionType, deletionReason, savedAt: new Date() });
+      downloadFile(copy.fileName, copy.content, 'application/json');
+      setSavedCopy({ ids, fileName: copy.fileName, deletionType, deletionReason });
+      const n = ids.length;
+      setDeleteNotice(
+        `A copy of ${n} job${n === 1 ? '' : 's'} was saved as ${copy.fileName}. Nothing has been deleted yet. Check that the file is in your downloads, then press ${deletionType === 'soft' ? 'Soft Delete' : 'Hard Delete'}.`,
+      );
+    } catch (error) {
+      console.error('Failed to save a copy before deleting:', error);
+      setSavedCopy(null);
+      setDeleteNotice(
+        `The copy could not be saved (${error instanceof Error ? error.message : 'unknown error'}). Nothing was deleted.`,
+      );
+    } finally {
+      setSavingCopy(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -261,6 +333,7 @@ export default function JobManagementPage() {
       deletionReason,
       hardConfirmText,
       exportData,
+      savedCopyIds,
       dateFrom: filters.date_from,
       dateTo: filters.date_to,
     });
@@ -273,12 +346,17 @@ export default function JobManagementPage() {
       setSelectedJobs(new Set(decision.ids));
       setImpactAnalysis(null);
       setAnalyzedIds(null);
+      setSavedCopy(null);
       setHardConfirmText('');
       setDeleteNotice(decision.message);
       return;
     }
     if (decision.action === 'blocked') {
       toast.error(decision.message);
+      return;
+    }
+    if (decision.action === 'saveCopy') {
+      await saveCopyBeforeDelete(decision.ids);
       return;
     }
 
@@ -330,6 +408,7 @@ export default function JobManagementPage() {
         setShowDeleteModal(false);
         setDeletionReason('');
         setExportData(false);
+        setSavedCopy(null);
         setImpactAnalysis(null);
         setAnalyzedIds(null);
         
@@ -447,15 +526,11 @@ export default function JobManagementPage() {
 
       const data = await response.json();
       if (data.status === 'ok' && data.data.format === 'json') {
-        const blob = new Blob([JSON.stringify(data.data.jobs, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `jobs-export-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadFile(
+          `jobs-export-${new Date().toISOString().split('T')[0]}.json`,
+          JSON.stringify(data.data.jobs, null, 2),
+          'application/json',
+        );
         toast.success(`Exported ${data.data.count} jobs`);
       }
     } catch (error) {
@@ -715,6 +790,7 @@ export default function JobManagementPage() {
                       setShowDeleteModal(true);
                       setImpactAnalysis(null);
                       setAnalyzedIds(null);
+                      setSavedCopy(null);
                       setDeleteNotice(null);
                     }}
                     className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors group relative"
@@ -985,7 +1061,10 @@ export default function JobManagementPage() {
                       name="deletionType"
                       value="soft"
                       checked={deletionType === 'soft'}
-                      onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
+                      onChange={(e) => {
+                        setDeletionType(e.target.value as 'soft' | 'hard');
+                        discardSavedCopy();
+                      }}
                       className="mr-1.5"
                     />
                     <div>
@@ -999,7 +1078,10 @@ export default function JobManagementPage() {
                       name="deletionType"
                       value="hard"
                       checked={deletionType === 'hard'}
-                      onChange={(e) => setDeletionType(e.target.value as 'soft' | 'hard')}
+                      onChange={(e) => {
+                        setDeletionType(e.target.value as 'soft' | 'hard');
+                        discardSavedCopy();
+                      }}
                       className="mr-1.5"
                     />
                     <div>
@@ -1018,7 +1100,10 @@ export default function JobManagementPage() {
                   </label>
                   <textarea
                     value={deletionReason}
-                    onChange={(e) => setDeletionReason(e.target.value)}
+                    onChange={(e) => {
+                      setDeletionReason(e.target.value);
+                      discardSavedCopy();
+                    }}
                     placeholder="Required for audit trail..."
                     className="w-full px-2.5 py-2 border border-[#D2D2D7] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
                     rows={2}
@@ -1047,12 +1132,17 @@ export default function JobManagementPage() {
                   <input
                     type="checkbox"
                     checked={exportData}
-                    onChange={(e) => setExportData(e.target.checked)}
+                    onChange={(e) => {
+                      setExportData(e.target.checked);
+                      discardSavedCopy();
+                    }}
                     className="w-3.5 h-3.5 text-[#007AFF] border-[#D2D2D7] rounded focus:ring-[#007AFF]"
                   />
                   <div className="flex-1">
-                    <span className="text-xs font-medium text-[#1D1D1F]">Export data before deletion</span>
-                    <p className="text-[11px] text-[#86868B] mt-0.5">Download as JSON</p>
+                    <span className="text-xs font-medium text-[#1D1D1F]">Save a copy before deleting</span>
+                    <p className="text-[11px] text-[#86868B] mt-0.5">
+                      Downloads the selected jobs as a JSON file first. Nothing is deleted until you press Delete again.
+                    </p>
                   </div>
                 </label>
               </div>
@@ -1064,6 +1154,7 @@ export default function JobManagementPage() {
                   disabled={
                     deleting ||
                     loadingImpact ||
+                    savingCopy ||
                     visibleSelectedIds.length === 0 ||
                     (hasAnalyzed &&
                       deletionType === 'hard' &&
@@ -1081,9 +1172,19 @@ export default function JobManagementPage() {
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       Analyzing...
                     </>
+                  ) : savingCopy ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Saving copy...
+                    </>
                   ) : (
                     <>
-                      {hasAnalyzed ? (
+                      {hasAnalyzed && copyPending ? (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          Save copy of {visibleSelectedIds.length} job{visibleSelectedIds.length === 1 ? '' : 's'}
+                        </>
+                      ) : hasAnalyzed ? (
                         <>
                           <Trash2 className="w-3.5 h-3.5" />
                           {deletionType === 'soft' ? 'Soft Delete' : 'Hard Delete'}

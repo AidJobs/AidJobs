@@ -1,5 +1,8 @@
 import {
+  copyBeforeDelete,
   decideBulkDelete,
+  exportedJobsMatching,
+  exportRequest,
   hiddenSelectionCount,
   impactAnalysisRequest,
   pruneSelection,
@@ -19,6 +22,7 @@ function input(overrides: Partial<BulkDeleteInput> = {}): BulkDeleteInput {
     deletionReason: '',
     hardConfirmText: '',
     exportData: false,
+    savedCopyIds: null,
     dateFrom: '',
     dateTo: '',
     ...overrides,
@@ -108,14 +112,14 @@ describe('a press of the delete button', () => {
   });
 
   it('sends exactly the analysed visible jobs, never an organisation or a source', () => {
-    const decision = decideBulkDelete(input({ visibleIds: ['b', 'a'], dateFrom: '2026-10-01', exportData: true }));
+    const decision = decideBulkDelete(input({ visibleIds: ['b', 'a'], dateFrom: '2026-10-01' }));
     expect(decision).toEqual({
       action: 'send',
       body: {
         job_ids: ['b', 'a'],
         date_from: '2026-10-01',
         deletion_type: 'soft',
-        export_data: true,
+        export_data: false,
         dry_run: false,
       },
     });
@@ -141,5 +145,86 @@ describe('a press of the delete button', () => {
     expect(decision.body.job_ids).toHaveLength(2);
     expect(decision.body.deletion_type).toBe('hard');
     expect(decision.body.deletion_reason).toBe('duplicates');
+  });
+});
+
+describe('a copy before deleting (W-48)', () => {
+  it('saves the copy of the analysed jobs first, instead of deleting', () => {
+    expect(decideBulkDelete(input({ exportData: true }))).toEqual({ action: 'saveCopy', ids: ['a', 'b'] });
+  });
+
+  it('deletes only after a copy of exactly these jobs was saved, and never asks the delete to export', () => {
+    expect(decideBulkDelete(input({ exportData: true, savedCopyIds: ['b', 'a'] }))).toEqual({
+      action: 'send',
+      body: { job_ids: ['a', 'b'], deletion_type: 'soft', export_data: false, dry_run: false },
+    });
+    for (const savedCopyIds of [['a'], ['a', 'b', 'c'], ['a', 'c'], []]) {
+      expect(decideBulkDelete(input({ exportData: true, savedCopyIds }))).toEqual({ action: 'saveCopy', ids: ['a', 'b'] });
+    }
+  });
+
+  it('checks the selection and the Hard Delete confirmation before saving a copy', () => {
+    expect(decideBulkDelete(input({ exportData: true, analyzedIds: null })).action).toBe('analyze');
+    expect(decideBulkDelete(input({ exportData: true, analyzedIds: ['a'] })).action).toBe('reconfirm');
+    expect(decideBulkDelete(input({ exportData: true, hiddenCount: 1 })).action).toBe('reconfirm');
+    const hard = { exportData: true, deletionType: 'hard' as const };
+    expect(decideBulkDelete(input({ ...hard, hardConfirmText: '2' })).action).toBe('blocked');
+    expect(decideBulkDelete(input({ ...hard, deletionReason: 'duplicates', hardConfirmText: '3' })).action).toBe('blocked');
+    expect(decideBulkDelete(input({ ...hard, deletionReason: 'duplicates', hardConfirmText: '2' })).action).toBe('saveCopy');
+  });
+
+  it('exports only the listed jobs, each once', () => {
+    expect(exportRequest(['a', 'b', 'a'])).toEqual({ job_ids: ['a', 'b'], format: 'json' });
+    expect(exportRequest([])).toBeNull();
+  });
+
+  it('accepts an export only when it holds exactly the requested jobs', () => {
+    const ok = (ids: string[]) => ({ status: 'ok', data: { format: 'json', count: ids.length, jobs: ids.map((id) => ({ id, title: `Job ${id}` })) } });
+    expect(exportedJobsMatching(ok(['b', 'a']), ['a', 'b'])).toEqual([
+      { id: 'b', title: 'Job b' },
+      { id: 'a', title: 'Job a' },
+    ]);
+    expect(exportedJobsMatching(ok(['a']), ['a', 'b'])).toBeNull();
+    expect(exportedJobsMatching(ok(['a', 'b', 'c']), ['a', 'b'])).toBeNull();
+    expect(exportedJobsMatching(ok(['a', 'a', 'b']), ['a', 'b'])).toBeNull();
+    expect(exportedJobsMatching(ok([]), ['a'])).toBeNull();
+  });
+
+  it('refuses a reply that is not a JSON export', () => {
+    const jobs = [{ id: 'a' }];
+    for (const reply of [
+      null,
+      'ok',
+      { status: 'error', data: { format: 'json', jobs } },
+      { status: 'ok' },
+      { status: 'ok', data: { format: 'csv', content: 'id\na\n', count: 1 } },
+      { status: 'ok', data: { format: 'json', jobs: 'a' } },
+      { status: 'ok', data: { format: 'json', jobs: [{ title: 'no id' }] } },
+      { status: 'ok', data: { format: 'json', jobs: [null] } },
+    ]) {
+      expect(exportedJobsMatching(reply, ['a'])).toBeNull();
+    }
+  });
+
+  it('names the file by the delete type and time, and records what was about to be deleted', () => {
+    const jobs = [{ id: 'a', title: 'Job a' }, { id: 'b', title: 'Job b' }];
+    const copy = copyBeforeDelete({
+      jobs,
+      deletionType: 'hard',
+      deletionReason: '  duplicates ',
+      savedAt: new Date('2026-11-08T01:02:03.456Z'),
+    });
+    expect(copy.fileName).toBe('jobs-before-hard-delete-2026-11-08T01-02-03Z.json');
+    expect(JSON.parse(copy.content)).toEqual({
+      saved_at: '2026-11-08T01:02:03.456Z',
+      deletion_type: 'hard',
+      deletion_reason: 'duplicates',
+      count: 2,
+      jobs,
+    });
+
+    const soft = copyBeforeDelete({ jobs, deletionType: 'soft', deletionReason: '', savedAt: new Date('2026-11-08T01:02:03Z') });
+    expect(soft.fileName).toBe('jobs-before-soft-delete-2026-11-08T01-02-03Z.json');
+    expect(JSON.parse(soft.content).deletion_reason).toBeNull();
   });
 });
