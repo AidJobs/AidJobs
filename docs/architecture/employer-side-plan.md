@@ -285,3 +285,35 @@ Then one independent review of the round, its fixes, and the user's look on the 
 - Paid jobs sent to AidJobs job seekers whose job alerts match, once job seekers can opt in to alerts (changes E10).
 - A refund policy beyond "none", and prices by type of organisation.
 - Production needs: the AI decision (E7); Paddle products, packages, and subscriptions; market data from the crawler (counts and dates, within each source's reuse terms); per-channel link tracking; the email set-up (section 9); contract changes, each with its own plan.
+
+## 17. To discuss: a usage allowance, and showing the plans (raised by the user, 7 November 2026; not agreed)
+
+Recorded for a later discussion and plan. Nothing here changes section 16 or the demo until the user agrees it.
+
+### The user's ideas
+
+1. **Measure the free plan in tokens.** Estimate the average tokens one job uses, chat included, and give each organisation enough for about 2 free jobs a month; the allowance renews each month. Everything else stays as it is (JD formats, styles, and the rest).
+2. **Stop and offer the plans when the allowance runs out,** as Cursor, ChatGPT, and Claude do: in the chat, or at key places such as publishing, Reach, and Amplify.
+3. **"Upgrade" always visible:** on the main chat window, and in the side menu on the left.
+4. **How paid use is counted after the free allowance:** the existing plans (per job, packs, the subscription), tokens, or a mix.
+
+Why: counting "2 free jobs" has many variables (drafts, chat, uploads, edits), while token use is easy to measure. And the publish page is today the only place an organisation learns what the paid plan does; a new organisation cannot easily tell that it is on a free plan, what the free plan gives, what else exists, or how to get it. The whole design must be minimal and effective, never feel aggressive, and let organisations feel the value of AidJobs, free and more so paid.
+
+### The agent's first view (for the discussion)
+
+- **Count tokens, show outcomes.** Tokens are the right internal measure of AI cost, but they mean nothing to an NGO recruiter and a visible meter makes people ration. Show the allowance as jobs or a simple share ("Free this month: about 1 job's writing help left", or a thin bar), never raw tokens. This keeps section 15's "never a meter" and section 15 F's "one currency".
+- **Two resources, not one.** AI writing costs money; a free listing costs almost nothing but is the value of the free plan. A job pasted or uploaded without the chat uses few tokens, so a token-only limit would allow unlimited free listings. Proposed: the token allowance limits AI help, and the free listings keep their own count (2 a month, section 16 decision 1), or one of the two is chosen deliberately.
+- **A soft stop, never a lost draft.** A notice near 80%; a job already in progress can finish (a small reserve), so nobody is cut off mid-sentence; hand edits, copying, and downloading always stay free; the plans are offered at that moment, with Ask to pay for those who do not hold the card.
+- **Paid use stays per job.** Each paid job carries a generous fair-use AI budget, and the subscription a monthly pool; no token packs for sale unless real use shows a need.
+- **Showing the plans without pushing:** a quiet plan line at the bottom of the side menu ("Free plan · 1 of 2 jobs left · See plans"), opening a plain plans page (Free, Amplify, the packages, the subscription) that also holds the Billing page; one dismissible welcome card on first sign-in stating what the free plan includes and what Amplify adds; Amplify's features shown where they would help, with the organisation's own data ("3 similar jobs close the same week · see the market check"), never as pop-ups or banners.
+- **Possible, against section 16 decision 2 ("free or paid, nothing in between"):** a new organisation's first job amplified free once, so it sees the market check, language versions, and Reach on its own job before deciding.
+
+### To settle in the discussion
+
+- Tokens only, listings only, or both; and what counts if a job uses no AI.
+- The average tokens per job, measured once the AI provider is chosen (E7).
+- How the allowance is shown, and when the notice appears.
+- What happens to a job in progress when the allowance runs out.
+- Where the plan line and "See plans" sit in the chat window and the side menu, and what the welcome card says.
+- Whether the first job is amplified free once.
+- Then a demo round on `demo/employer`, with its own plan and approval.
