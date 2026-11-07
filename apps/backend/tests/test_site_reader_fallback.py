@@ -9,8 +9,10 @@ import pytest
 
 from contracts.admission import admit_batch
 from contracts.identity import both_keys
+from contracts.refusal import refusal
 from crawler.plugins.base import PluginResult
 from crawler.plugins.unicef import UNICEFPlugin
+from crawler_v2 import simple_crawler as simple_crawler_module
 from crawler_v2.simple_crawler import (
     SimpleCrawler,
     _html_request_headers,
@@ -143,6 +145,7 @@ def _no_network(crawler, monkeypatch):
         raise AssertionError(f"unexpected fetch of {url}")
 
     monkeypatch.setattr(crawler, "fetch_html", refuse)
+    monkeypatch.setattr(crawler, "_fetch_page", refuse)
     monkeypatch.setattr(crawler, "_fetch_listing_page", refuse)
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
 
@@ -312,7 +315,7 @@ def _saved_unicef_jobs(monkeypatch):
 
     async def unavailable(url, *_args, **_kwargs):
         asked.append(url)
-        return 0, ""
+        return 0, "", ""
 
     monkeypatch.setattr(crawler, "_fetch_listing_page", unavailable)
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
@@ -389,7 +392,8 @@ def _listing_page(job_ids, more_href=None, remaining=None):
 def _paged_crawler(monkeypatch, pages):
     """Serve later listing pages from a map. A list answers successive requests in order.
 
-    Unknown URLs fail the test. Sleeps are recorded on crawler.slept instead of waiting.
+    Unknown URLs fail the test. Sleeps are recorded on crawler.slept instead of waiting. Each
+    answer is (status, html), judged for a refusal as `_fetch_listing_page` judges it.
     """
     crawler = SimpleCrawler("postgresql://example")
     asked = []
@@ -400,7 +404,8 @@ def _paged_crawler(monkeypatch, pages):
         if url not in pages:
             raise AssertionError(f"unexpected fetch of {url}")
         answer = pages[url]
-        return answer.pop(0) if isinstance(answer, list) else answer
+        status, html = answer.pop(0) if isinstance(answer, list) else answer
+        return status, html, refusal(status, {}, html)
 
     async def record_sleep(seconds):
         crawler.slept.append(seconds)
@@ -577,7 +582,7 @@ _P2 = "/en-us/listing/?page=2&page-items=20"
 _P3 = "/en-us/listing/?page=3&page-items=20"
 
 
-def test_pages_are_five_seconds_apart(monkeypatch):
+def test_the_reader_leaves_the_spacing_to_the_fetch_policy(monkeypatch):
     first = _listing_page(["1"], _P2, 2)
     pages = {
         _PAGE.format(2): (200, _listing_page(["2"], _P3, 1)),
@@ -585,54 +590,93 @@ def test_pages_are_five_seconds_apart(monkeypatch):
     }
     crawler, _asked = _paged_crawler(monkeypatch, pages)
     assert _read_listing(crawler, first) == ["1", "2", "3"]
-    assert crawler.slept == [5.0, 5.0]
+    assert crawler.slept == []
 
 
-@pytest.mark.parametrize("status", [202, 429, 503])
-def test_a_retryable_status_is_retried_once_after_thirty_seconds(status, monkeypatch):
+def test_a_plain_503_is_retried_once_after_thirty_seconds(monkeypatch):
     first = _listing_page(["1"], _P2, 1)
-    pages = {_PAGE.format(2): [(status, "challenge"), (200, _listing_page(["2"]))]}
+    pages = {_PAGE.format(2): [(503, "busy"), (200, _listing_page(["2"]))]}
     crawler, asked = _paged_crawler(monkeypatch, pages)
     assert _read_listing(crawler, first) == ["1", "2"]
     assert asked == [_PAGE.format(2), _PAGE.format(2)]
-    assert crawler.slept == [5.0, 30.0]
+    assert crawler.slept == [30.0]
     assert crawler.report["complete"] is True
+
+
+@pytest.mark.parametrize("status, body, stop", [
+    (202, "challenge", "refused: HTTP 202"),
+    (429, "", "refused: HTTP 429"),
+    (403, "", "refused: HTTP 403"),
+    (503, "<title>Just a moment...</title>", "refused: HTTP 503 (Cloudflare challenge)"),
+])
+def test_a_refusal_or_a_challenge_is_never_retried(status, body, stop, monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    crawler, asked = _paged_crawler(monkeypatch, {_PAGE.format(2): [(status, body)]})
+    assert _read_listing(crawler, first) == ["1"]
+    assert asked == [_PAGE.format(2)]
+    assert crawler.slept == []
+    report = crawler.report
+    assert report["complete"] is False
+    assert report["stop"] == f"{stop} on {_PAGE.format(2)}"
+    assert _listing_outcome(1, report)[0] == "warn"
 
 
 def test_a_failed_retry_stops_the_walk_as_partial(monkeypatch):
     first = _listing_page(["1"], _P2, 1)
-    pages = {_PAGE.format(2): [(202, "challenge"), (202, "challenge")]}
+    pages = {_PAGE.format(2): [(503, "busy"), (503, "busy")]}
     crawler, asked = _paged_crawler(monkeypatch, pages)
     assert _read_listing(crawler, first) == ["1"]
     assert asked == [_PAGE.format(2), _PAGE.format(2)]
-    assert crawler.slept == [5.0, 30.0]
+    assert crawler.slept == [30.0]
     report = crawler.report
     assert report["complete"] is False
-    assert report["stop"] == f"HTTP 202 on {_PAGE.format(2)} after one retry"
+    assert report["stop"] == f"HTTP 503 on {_PAGE.format(2)} after one retry"
     assert _listing_outcome(1, report)[0] == "warn"
+
+
+def test_a_retry_answered_with_a_challenge_stops_as_refused(monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    pages = {_PAGE.format(2): [(503, "busy"), (202, "challenge")]}
+    crawler, asked = _paged_crawler(monkeypatch, pages)
+    assert _read_listing(crawler, first) == ["1"]
+    assert asked == [_PAGE.format(2), _PAGE.format(2)]
+    assert crawler.report["stop"] == f"refused: HTTP 202 on {_PAGE.format(2)} after one retry"
 
 
 def test_only_one_retry_is_allowed_in_a_crawl(monkeypatch):
     first = _listing_page(["1"], _P2, 2)
     pages = {
-        _PAGE.format(2): [(202, "challenge"), (200, _listing_page(["2"], _P3, 1))],
+        _PAGE.format(2): [(503, "busy"), (200, _listing_page(["2"], _P3, 1))],
         _PAGE.format(3): (503, "busy"),
     }
     crawler, asked = _paged_crawler(monkeypatch, pages)
     assert _read_listing(crawler, first) == ["1", "2"]
     assert asked == [_PAGE.format(2), _PAGE.format(2), _PAGE.format(3)]
-    assert crawler.slept == [5.0, 30.0, 5.0]
+    assert crawler.slept == [30.0]
     assert crawler.report["stop"] == f"HTTP 503 on {_PAGE.format(3)}"
 
 
-@pytest.mark.parametrize("status", [0, 403, 404, 500])
+@pytest.mark.parametrize("status", [0, 404, 500])
 def test_other_failures_are_not_retried(status, monkeypatch):
     first = _listing_page(["1"], _P2, 1)
     crawler, asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (status, "")})
     assert _read_listing(crawler, first) == ["1"]
     assert asked == [_PAGE.format(2)]
-    assert crawler.slept == [5.0]
+    assert crawler.slept == []
     assert crawler.report["stop"] == f"HTTP {status} on {_PAGE.format(2)}"
+
+
+def test_a_policy_stop_ends_the_walk_in_its_own_words(monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    crawler, asked = _paged_crawler(monkeypatch, {})
+
+    async def forbidden(url, *_args, **_kwargs):
+        asked.append(url)
+        return 0, "", "robots.txt forbids this address"
+
+    monkeypatch.setattr(crawler, "_fetch_listing_page", forbidden)
+    assert _read_listing(crawler, first) == ["1"]
+    assert crawler.report["stop"] == f"robots.txt forbids this address on {_PAGE.format(2)}"
 
 
 def test_only_allowlisted_response_headers_are_logged():
@@ -686,10 +730,11 @@ def test_a_listing_page_failure_logs_safe_diagnostics(monkeypatch, caplog):
     monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", fake_fetch_url)
     crawler = SimpleCrawler("postgresql://example")
     with caplog.at_level("WARNING", logger="crawler_v2.simple_crawler"):
-        status, text = asyncio.run(crawler._fetch_listing_page(_PAGE.format(7)))
+        status, text, stop = asyncio.run(crawler._fetch_listing_page(_PAGE.format(7)))
     assert status == 202
     assert "challenge" in text
-    assert sent == [_html_request_headers(crawler.user_agent)]
+    assert stop == "HTTP 202 (AWS WAF challenge)"
+    assert sent == [_html_request_headers()]
     logged = caplog.text
     assert "HTTP 202" in logged
     assert "x-amzn-waf-action" in logged and "awselb/2.0" in logged
@@ -703,10 +748,10 @@ def test_a_listing_page_exception_is_a_failed_page(monkeypatch):
 
     monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", broken)
     crawler = SimpleCrawler("postgresql://example")
-    assert asyncio.run(crawler._fetch_listing_page(_PAGE.format(2))) == (0, "")
+    assert asyncio.run(crawler._fetch_listing_page(_PAGE.format(2))) == (0, "", "")
 
 
-def test_fetch_html_still_sends_the_same_headers_and_switches_agent_on_403(monkeypatch):
+def test_a_403_is_answered_once_and_never_retried_under_another_name(monkeypatch):
     from contracts.outbound import FetchResult
 
     sent = []
@@ -716,19 +761,23 @@ def test_fetch_html_still_sends_the_same_headers_and_switches_agent_on_403(monke
         status = 403 if len(sent) == 1 else 200
         return FetchResult(status_code=status, headers={}, body=b"<html></html>", url=url)
 
-    async def no_wait(_seconds):
-        return None
-
     monkeypatch.setattr("crawler_v2.simple_crawler.fetch_url", fake_fetch_url)
-    monkeypatch.setattr("crawler_v2.simple_crawler.asyncio.sleep", no_wait)
     crawler = SimpleCrawler("postgresql://example")
-    assert asyncio.run(crawler.fetch_html("https://jobs.example/")) == (200, "<html></html>")
-    assert sent[0] == _html_request_headers(crawler.user_agent, 0)
-    assert sent[0]["User-Agent"] == crawler.user_agent
-    assert sent[1]["User-Agent"].startswith("Mozilla/5.0 (Windows NT 10.0")
-    assert {k: v for k, v in sent[1].items() if k != "User-Agent"} == {
-        k: v for k, v in sent[0].items() if k != "User-Agent"
-    }
+    assert asyncio.run(crawler.fetch_html("https://jobs.example/")) == (403, "<html></html>")
+    assert asyncio.run(crawler._fetch_page("https://jobs.example/")) == (
+        200, "<html></html>", ""
+    )
+    assert len(sent) == 2
+    assert sent[0] == _html_request_headers()
+    assert not {"user-agent", "from"} & {name.lower() for name in sent[0]}
+
+
+def test_the_crawler_asks_like_a_crawler_not_a_browser():
+    headers = {name.lower() for name in _html_request_headers()}
+    assert headers == {"accept", "accept-language", "accept-encoding"}
+    source = Path(simple_crawler_module.__file__).read_text(encoding="utf-8")
+    for imitation in ("Mozilla/", "Chrome/", "Sec-Fetch", "Upgrade-Insecure-Requests"):
+        assert imitation not in source
 
 
 _SAVED_PAGE2 = _ROOT / "unicef-pagination" / "page2.body"

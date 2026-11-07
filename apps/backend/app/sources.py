@@ -653,7 +653,6 @@ async def _policy_head(url: str) -> dict:
         result = await fetch_url(
             url,
             method="HEAD",
-            headers={"User-Agent": "AidJobsBot/1.0 (+contact@aidjobs.app)"},
             timeout=10.0,
             total_timeout=SOURCE_CHECK_TOTAL_SECONDS,
         )

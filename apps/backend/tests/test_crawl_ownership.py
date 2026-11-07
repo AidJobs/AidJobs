@@ -1285,8 +1285,8 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
         crawler.quality_scorer = None
         crawler.geocoder = _HeldGeocoder(geocode_gate)
 
-        async def fetch_html(url, retry_count=0, use_browser=False):
-            return 200, "<html><body>listing</body></html>"
+        async def fetch_page(url):
+            return 200, "<html><body>listing</body></html>", ""
 
         async def unicef_reader(html, url):
             await listing_gate.wait()
@@ -1295,7 +1295,7 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
         async def detail_page(job, base_url):
             return job
 
-        crawler.fetch_html = fetch_html
+        crawler._fetch_page = fetch_page
         crawler._unicef_listing_jobs = unicef_reader
         crawler.extract_jobs_from_html = lambda html, url: [_job(2)]
         crawler.enrich_job_from_detail_page = detail_page

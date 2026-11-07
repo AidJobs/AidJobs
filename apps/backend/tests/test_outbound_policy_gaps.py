@@ -608,7 +608,10 @@ def _writes(events):
 def _crawler_headers():
     from crawler_v2.simple_crawler import _html_request_headers
 
-    return _html_request_headers("AidJobsBot/1.0")
+    return _html_request_headers()
+
+
+IDENTITY = b"AidJobsBot/1.0 (+mailto:aidjobz@gmail.com)"
 
 
 def test_a_redirect_to_another_site_keeps_the_crawler_headers_and_drops_any_other():
@@ -621,9 +624,10 @@ def test_a_redirect_to_another_site_keeps_the_crawler_headers_and_drops_any_othe
     )
     assert result.body == b"board"
     first, second = _writes(events)
-    crawler = {name.lower() for name in _crawler_headers()}
+    crawler = {name.lower() for name in _crawler_headers()} | {"user-agent", "from"}
     assert crawler | {"x-api-key", "authorization", "cookie", "x-custom"} <= _header_names(first)
     assert crawler <= _header_names(second)
+    assert IDENTITY in first and IDENTITY in second
     assert {"x-api-key", "authorization", "cookie", "x-custom"}.isdisjoint(_header_names(second))
     for token in (b"key-token", b"t-token", b"c-token", b"custom-token"):
         assert token in first and token not in second
@@ -638,7 +642,7 @@ def test_a_redirect_within_the_same_origin_keeps_every_header(location):
     events, _result = _run(
         "https://careers.example/jobs",
         [_redirect(location), _response(200, b"ok")],
-        headers={"User-Agent": "AidJobs", "X-Api-Key": "key-token"},
+        headers={"X-Api-Key": "key-token"},
     )
     _first, second = _writes(events)
     assert b"key-token" in second
@@ -653,11 +657,10 @@ def test_a_change_of_scheme_port_or_host_counts_as_another_origin(location):
     events, _result = _run(
         "https://careers.example/jobs",
         [_redirect(location), _response(200, b"ok")],
-        headers={"user-agent": "AidJobs", "Authorization": "Bearer t-token",
-                 "X-Api-Key": "key-token"},
+        headers={"Authorization": "Bearer t-token", "X-Api-Key": "key-token"},
     )
     _first, second = _writes(events)
-    assert b"AidJobs" in second
+    assert IDENTITY in second
     assert b"t-token" not in second and b"key-token" not in second
 
 
@@ -666,7 +669,7 @@ def test_headers_dropped_once_stay_dropped_on_a_later_hop_home():
         "https://careers.example/jobs",
         [_redirect("https://ats.example/x"), _redirect("https://careers.example/back"),
          _response(200, b"ok")],
-        headers={"User-Agent": "AidJobs", "X-Api-Key": "key-token"},
+        headers={"X-Api-Key": "key-token"},
     )
     writes = _writes(events)
     assert len(writes) == 3

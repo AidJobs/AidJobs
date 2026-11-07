@@ -135,10 +135,10 @@ def _html_crawler(error):
 
     crawler = SimpleCrawler("postgresql://example")
 
-    async def fetch_html(url, use_browser=False):
+    async def fetch_page(url):
         raise error
 
-    crawler.fetch_html = fetch_html
+    crawler._fetch_page = fetch_page
     return crawler, {**SOURCE, "source_type": "html"}
 
 
