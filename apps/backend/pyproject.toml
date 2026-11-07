@@ -16,6 +16,9 @@ ignore = []
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "politeness: run the fetch policy's real robots.txt check and host spacing (tests/conftest.py)",
+]
 
 [tool.pyright]
 include = ["**/*.py"]

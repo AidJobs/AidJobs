@@ -19,8 +19,14 @@ from urllib.parse import parse_qs, urlparse, urljoin
 
 from contracts.admission import admit_batch, log_admission_rejections
 from contracts.detail_reader import apply_detail_reading, read_detail_page
-from contracts.outbound import FetchError, fetch_url
+from contracts.outbound import (
+    POLITENESS_STOPS,
+    current_budget,
+    fetch_message,
+    fetch_url,
+)
 from contracts.persist import persist_candidate
+from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
@@ -85,9 +91,9 @@ _FOUR_DIGITS = re.compile(r'\d{4}')
 
 
 _UNICEF_PAGE_CAP = 30
-_UNICEF_PAGE_DELAY = 5.0
 _UNICEF_RETRY_DELAY = 30.0
-_UNICEF_RETRY_STATUSES = frozenset({202, 429, 503})
+# A refusal or a challenge (202, 429) is never retried; a plain 503 once.
+_UNICEF_RETRY_STATUSES = frozenset({503})
 _sleep = asyncio.sleep
 
 # Only these response headers are logged. Cookies and authorization never are.
@@ -107,25 +113,30 @@ _LOGGED_RESPONSE_HEADERS = (
 _TOKEN_LIKE = re.compile(r'[A-Za-z0-9+/=_-]{24,}')
 
 
-def _html_request_headers(user_agent: str, retry_count: int = 0) -> Dict[str, str]:
-    headers = {
-        "User-Agent": user_agent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+def _html_request_headers() -> Dict[str, str]:
+    """What the crawler asks for. The fetch policy adds its identity; nothing imitates a browser."""
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Cache-Control": "max-age=0",
     }
-    if retry_count:
-        headers["User-Agent"] = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )
-    return headers
+
+
+def _policy_stop(reason: Optional[str]) -> str:
+    """A fetch-policy stop's fixed words, or '' for any other failure (reported as HTTP 0)."""
+    return reason if reason in POLITENESS_STOPS else ''
+
+
+def _budget_stop_text(budget) -> str:
+    """Why the crawl's requests stopped, in fixed words: the refusal, or the spent budget."""
+    if budget.refused:
+        return f'refused: {budget.refused}'
+    return budget.stopped()
+
+
+def _stop_text(stop: str) -> str:
+    """A refusal reads 'refused: HTTP 202 (AWS WAF challenge)'; a policy stop is its own words."""
+    return f'refused: {stop}' if stop.startswith('HTTP ') else stop
 
 
 def _logged_headers(headers: Dict[str, str]) -> Dict[str, str]:
@@ -208,7 +219,6 @@ class SimpleCrawler:
     def __init__(self, db_url: str, shadow_mode: bool = False):
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
-        self.user_agent = "Mozilla/5.0 (compatible; AidJobs/1.0; +https://aidjobs.app)"
         self.shadow_mode = shadow_mode
         
         # Check if global heuristics are enabled
@@ -218,13 +228,12 @@ class SimpleCrawler:
         if self.use_global_heuristics:
             try:
                 from core.extraction_heuristics import (
-                    filter_and_score_job_links, normalize_url, extract_contact_info,
+                    filter_and_score_job_links, normalize_url,
                     get_canonical_hash, is_mailto_link
                 )
                 from core.domain_config import get_domain_config
                 self._filter_and_score_job_links = filter_and_score_job_links
                 self._normalize_url = normalize_url
-                self._extract_contact_info = extract_contact_info
                 self._get_canonical_hash = get_canonical_hash
                 self._get_domain_config = get_domain_config
                 self._is_mailto_link = is_mailto_link
@@ -281,35 +290,45 @@ class SimpleCrawler:
         """Get database connection"""
         return psycopg2.connect(self.db_url, connect_timeout=10)
     
+    async def _fetch_page(self, url: str) -> Tuple[int, str, str]:
+        """(status, html, stop). `stop` is why the source stops here, in fixed words: a refusal
+        or challenge, or a fetch-policy stop (robots.txt, budget); '' otherwise. One request: a
+        refusal is never retried under another identity."""
+        try:
+            result = await fetch_url(
+                url, headers=_html_request_headers(), timeout=float(self.timeout.connect or 30.0)
+            )
+        except Exception as exc:
+            reason = fetch_message(exc)
+            stop = _policy_stop(reason)
+            if stop:
+                logger.warning("Not fetched %s: %s", url, stop)
+            else:
+                logger.error("Error fetching %s: %s", url, exc)
+            return 0, "", stop
+        return result.status_code, result.text, refusal(
+            result.status_code, result.headers, result.text
+        )
+
     async def fetch_html(self, url: str, retry_count: int = 0, use_browser: bool = False) -> Tuple[int, str]:
         """Fetch HTML. Browser rendering is not used; the HTTP result is returned."""
-        del use_browser
-        headers = _html_request_headers(self.user_agent, retry_count)
-        try:
-            result = await fetch_url(url, headers=headers, timeout=float(self.timeout.connect or 30.0))
-            if result.status_code == 403 and retry_count < 2:
-                await asyncio.sleep(2)
-                logger.info("Retrying %s with a different User-Agent (attempt %s)", url, retry_count + 1)
-                return await self.fetch_html(url, retry_count + 1)
-            return result.status_code, result.text
-        except FetchError as exc:
-            logger.error("Error fetching %s: %s", url, exc)
-            return 0, ""
-        except Exception as exc:
-            logger.error("Error fetching %s: %s", url, exc)
-            return 0, ""
+        del retry_count, use_browser
+        status, html, _ = await self._fetch_page(url)
+        return status, html
 
-    async def _fetch_listing_page(self, url: str) -> Tuple[int, str]:
-        """One request for a later listing page. A non-200 logs allowlisted headers and an excerpt."""
+    async def _fetch_listing_page(self, url: str) -> Tuple[int, str, str]:
+        """One request for a later listing page: (status, html, stop), as `_fetch_page`.
+        A non-200 logs allowlisted headers and an excerpt."""
         try:
             result = await fetch_url(
                 url,
-                headers=_html_request_headers(self.user_agent),
+                headers=_html_request_headers(),
                 timeout=float(self.timeout.connect or 30.0),
             )
         except Exception as exc:
             logger.warning("Listing page %s failed: %s", url, exc)
-            return 0, ""
+            reason = fetch_message(exc)
+            return 0, "", _policy_stop(reason)
         if result.status_code != 200:
             logger.warning(
                 "Listing page %s returned HTTP %s; headers=%s; body=%r",
@@ -318,7 +337,9 @@ class SimpleCrawler:
                 _logged_headers(result.headers),
                 _response_excerpt(result.text),
             )
-        return result.status_code, result.text
+        return result.status_code, result.text, refusal(
+            result.status_code, result.headers, result.text
+        )
     
     def extract_jobs_from_html(self, html: str, base_url: str) -> List[Dict]:
         """
@@ -698,11 +719,6 @@ class SimpleCrawler:
             domain_config = self._get_domain_config(base_url)
             max_links = domain_config.get('max_links_per_page', 500)
             
-            # Extract contact info (store separately, not as jobs)
-            contact_info = self._extract_contact_info(soup)
-            if contact_info.get('emails') or contact_info.get('phones'):
-                logger.info(f"Extracted contact info: {len(contact_info.get('emails', []))} emails, {len(contact_info.get('phones', []))} phones")
-            
             # Filter and score links using heuristics
             source_id = _SOURCE_FOR_LOGS.get()
             scored_links = self._filter_and_score_job_links(soup, base_url, max_links=max_links, source_id=source_id)
@@ -715,8 +731,7 @@ class SimpleCrawler:
                 
                 # Double-check: reject mailto links even if they passed scoring
                 if hasattr(self, '_is_mailto_link') and self._is_mailto_link(href):
-                    email = href.replace('mailto:', '').strip()
-                    logger.info(f"HEURISTICS: rejected mailto link {email} in post-processing for source {source_id or 'unknown'}")
+                    logger.info(f"HEURISTICS: rejected a mailto link in post-processing for source {source_id or 'unknown'}")
                     continue
                 
                 # Normalize URL
@@ -1672,10 +1687,12 @@ class SimpleCrawler:
             return job
         
         try:
-            # Fetch detail page
-            status, html = await self.fetch_html(job['apply_url'])
-            if status != 200:
-                logger.warning(f"Failed to fetch detail page: {job['apply_url']} (HTTP {status})")
+            # Fetch detail page. A refusal or a challenge is not read: the row keeps its fields.
+            status, html, stop = await self._fetch_page(job['apply_url'])
+            if stop or status != 200:
+                logger.warning(
+                    "Detail page not read: %s (%s)", job['apply_url'], stop or f"HTTP {status}"
+                )
                 return job
             
             soup = BeautifulSoup(html, 'html.parser')
@@ -1933,10 +1950,9 @@ class SimpleCrawler:
             if pages >= _UNICEF_PAGE_CAP:
                 stop = f'page cap {_UNICEF_PAGE_CAP}'
                 break
-            await _sleep(_UNICEF_PAGE_DELAY)
-            status, page_html = await self._fetch_listing_page(next_url)
+            status, page_html, page_stop = await self._fetch_listing_page(next_url)
             retried_here = False
-            if status in _UNICEF_RETRY_STATUSES and not retry_used:
+            if status in _UNICEF_RETRY_STATUSES and not page_stop and not retry_used:
                 # At most one retry in the whole crawl.
                 retry_used = retried_here = True
                 logger.info(
@@ -1944,7 +1960,12 @@ class SimpleCrawler:
                     status, next_url, _UNICEF_RETRY_DELAY,
                 )
                 await _sleep(_UNICEF_RETRY_DELAY)
-                status, page_html = await self._fetch_listing_page(next_url)
+                status, page_html, page_stop = await self._fetch_listing_page(next_url)
+            if page_stop:
+                stop = f'{_stop_text(page_stop)} on {next_url}'
+                if retried_here:
+                    stop += ' after one retry'
+                break
             if status != 200 or not page_html:
                 stop = f'HTTP {status} on {next_url}'
                 if retried_here:
@@ -2023,18 +2044,13 @@ class SimpleCrawler:
         source_type = source.get('source_type', 'html')
         _SOURCE_FOR_LOGS.set(source_id)
         listing_report = None
+        detail_stop = ''
         
         logger.info(f"Crawling {org_name} ({source_type}): {careers_url}")
         
         try:
             if source_type == 'html':
-                # Check if this source needs browser rendering
-                needs_browser = any(indicator in careers_url.lower() for indicator in [
-                    'amnesty.org', 'ultipro.com', 'pageup', 'savethechildren', 'unicef.org'
-                ])
-                
-                # Fetch HTML
-                status, html = await self.fetch_html(careers_url, use_browser=needs_browser)
+                status, html, stop = await self._fetch_page(careers_url)
                 
                 # Store raw HTML (Phase 2)
                 raw_page_id = None
@@ -2043,9 +2059,15 @@ class SimpleCrawler:
                         self._record_raw_page, careers_url, status, html, source_id
                     )
                 
-                # Accept any 2xx status as success (some sites use 202, 204, etc.)
-                if status < 200 or status >= 300:
-                    # Log failed extraction
+                # Only a 200 that is not a challenge is a listing (B4 record, rule 2). Any other
+                # 2xx, a 401, 403 or 429, or a challenge is a refusal: the source stops.
+                if stop or status != 200:
+                    if stop.startswith('HTTP '):
+                        message = f'Refused: {stop}'
+                    elif stop:
+                        message = f'Not fetched: {stop}'
+                    else:
+                        message = f'HTTP {status}'
                     if self.extraction_logger:
                         await asyncio.to_thread(
                             self.extraction_logger.log_extraction,
@@ -2053,12 +2075,12 @@ class SimpleCrawler:
                             status='EMPTY',
                             source_id=source_id,
                             raw_page_id=raw_page_id,
-                            reason=f'HTTP {status}',
+                            reason=message,
                             job_count=0
                         )
                     return {
                         'status': 'failed',
-                        'message': f'HTTP {status}',
+                        'message': message,
                         'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0}
                     }
                 
@@ -2119,21 +2141,32 @@ class SimpleCrawler:
                     else:
                         logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
                     
+                    # The fetch policy spaces requests to one host; a refusal or a spent budget
+                    # ends the job pages, and the rows not opened keep their listing fields.
+                    budget = current_budget()
                     enriched_jobs = []
                     for i, job in enumerate(jobs):
+                        stopped = budget.stopped() if budget is not None else ''
+                        if stopped:
+                            logger.warning(
+                                "Job pages stopped (%s); %s rows keep their listing fields",
+                                stopped, len(jobs) - i,
+                            )
+                            detail_stop = _budget_stop_text(budget)
+                            enriched_jobs.extend(jobs[i:])
+                            break
                         if job.get('apply_url'):
                             try:
                                 enriched_job = await self.enrich_job_from_detail_page(job, careers_url)
                                 enriched_jobs.append(enriched_job)
-                                # Small delay to avoid overwhelming servers (0.3s between requests)
-                                if i < len(jobs) - 1:  # Don't delay after last job
-                                    await asyncio.sleep(0.3)
                             except Exception as e:
                                 logger.warning(f"Error enriching job {job.get('title', 'unknown')}: {e}")
                                 enriched_jobs.append(job)  # Use original job if enrichment fails
                         else:
                             enriched_jobs.append(job)
                     jobs = enriched_jobs
+                    if not detail_stop and budget is not None and budget.refused:
+                        detail_stop = _budget_stop_text(budget)
                 else:
                     if len(jobs) > 50 and not needs_enrichment:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
@@ -2251,8 +2284,13 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
+                crawl_status, crawl_message = _listing_outcome(len(jobs), listing_report)
+                if detail_stop:
+                    # Rows whose job page was not opened may have been rejected as too thin.
+                    crawl_status = 'warn'
+                    crawl_message = f'{crawl_message}; job pages stopped: {detail_stop}'
                 crawl_status, crawl_message = save_failure_outcome(
-                    *_listing_outcome(len(jobs), listing_report), counts
+                    crawl_status, crawl_message, counts
                 )
                 return {
                     'status': crawl_status,

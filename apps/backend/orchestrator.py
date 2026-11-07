@@ -13,7 +13,7 @@ import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
 from app.log_safety import REQUEST_ID, redact_exception, stored_text
-from crawler_v2.run_handle import RunHandle
+from crawler_v2.run_handle import RunHandle, crawl_budget
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
 from crawler_v2.api_crawler import SimpleAPICrawler
@@ -32,6 +32,8 @@ DEFAULT_FREQ_DAYS = {
 GLOBAL_MAX_CONCURRENCY = 3
 SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes
 MAX_SOURCES_PER_RUN = 20
+# After a refusal or a challenge, the next scheduled crawl waits at least this long (W-34).
+REFUSAL_WAIT = timedelta(hours=24)
 
 RECOVERY_INTERVAL_SECONDS = 300
 ORPHAN_RUN_AGE = timedelta(minutes=2)
@@ -437,23 +439,31 @@ class CrawlerOrchestrator:
 
         logger.info(f"[orchestrator] Starting crawl: {source['org_name']} ({url})")
 
-        try:
-            if source_type == 'rss':
-                result = await self.rss_crawler.crawl_source(source, run)
-            elif source_type in ['api', 'json']:
-                result = await self.api_crawler.crawl_source(source, run)
-            else:  # html (default)
-                result = await self.html_crawler.crawl_source(source, run)
-            result['duration_ms'] = int((time.time() - start_time) * 1000)
+        # Every request of the crawl spends this budget; a refusal recorded in it stops the rest.
+        with crawl_budget() as budget:
+            try:
+                if source_type == 'rss':
+                    result = await self.rss_crawler.crawl_source(source, run)
+                elif source_type in ['api', 'json']:
+                    result = await self.api_crawler.crawl_source(source, run)
+                else:  # html (default)
+                    result = await self.html_crawler.crawl_source(source, run)
+                result['duration_ms'] = int((time.time() - start_time) * 1000)
+            except Exception as e:
+                logger.error(f"[orchestrator] Error crawling {url}: {redact_exception(e)}")
+                result = {
+                    'status': 'fail',
+                    'message': stored_text(e, 500),
+                    'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
+                    'duration_ms': int((time.time() - start_time) * 1000),
+                }
+            if budget.refused:
+                result['refused'] = True
+                logger.warning(
+                    "[orchestrator] %s refused the crawl (%s); next run not before 24 hours",
+                    source['org_name'], budget.refused,
+                )
             return result
-        except Exception as e:
-            logger.error(f"[orchestrator] Error crawling {url}: {redact_exception(e)}")
-            return {
-                'status': 'fail',
-                'message': stored_text(e, 500),
-                'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0},
-                'duration_ms': int((time.time() - start_time) * 1000),
-            }
 
     def _lifetime_sql(self) -> str:
         return f"{int(self.lock_lifetime.total_seconds())} seconds"
@@ -624,11 +634,14 @@ class CrawlerOrchestrator:
         """Lock the source and insert the running row. A live lock returns its open run's id."""
         return await asyncio.to_thread(self._begin, source["id"], scheduled)
 
-    def _update_source(self, cur, source_id, *, outcome, run_status, message, counts, health):
+    def _update_source(
+        self, cur, source_id, *, outcome, run_status, message, counts, health, refused=False
+    ):
         """Update the source from its fresh row, under that row's lock. Inside the caller's tx.
 
         outcome: 'success', 'fail', or 'interrupted'. An interruption is counted only when the
-        source's previous run was interrupted too.
+        source's previous run was interrupted too. refused: the source refused or challenged the
+        crawl, so its next scheduled run is at least REFUSAL_WAIT away, whatever else applies.
         """
         cur.execute(
             """
@@ -667,6 +680,8 @@ class CrawlerOrchestrator:
         next_run_at = self.compute_next_run(
             freq_days, org_type, inserted, updated, failures, nochange, health=health,
         )
+        if refused:
+            next_run_at = max(next_run_at, datetime.utcnow() + REFUSAL_WAIT)
         new_status = status
         if failures >= 5 and status == "active":
             new_status = "paused"
@@ -751,6 +766,7 @@ class CrawlerOrchestrator:
                         self._update_source(
                             cur, source_id, outcome=outcome, run_status=terminal_status,
                             message=message, counts=counts, health=health,
+                            refused=bool(result.get("refused")),
                         )
                 conn.commit()
                 return True

@@ -464,11 +464,11 @@ def test_generic_branch_uses_the_reader_and_keeps_unicef_and_undp():
         ),
     }
 
-    async def fake_fetch(url, use_browser=False):
-        return 200, pages[url]
+    async def fake_fetch(url):
+        return 200, pages[url], ""
 
     crawler = SimpleCrawler("postgresql://example")
-    crawler.fetch_html = fake_fetch
+    crawler._fetch_page = fake_fetch
 
     unicef = asyncio.run(
         crawler.enrich_job_from_detail_page(
@@ -504,11 +504,11 @@ def test_generic_branch_uses_the_reader_and_keeps_unicef_and_undp():
 def _enrich_generic(html, **listing):
     from crawler_v2.simple_crawler import SimpleCrawler
 
-    async def fake_fetch(url, use_browser=False):
-        return 200, html
+    async def fake_fetch(url):
+        return 200, html, ""
 
     crawler = SimpleCrawler("postgresql://example")
-    crawler.fetch_html = fake_fetch
+    crawler._fetch_page = fake_fetch
     return asyncio.run(
         crawler.enrich_job_from_detail_page(
             _listing(apply_url="https://careers.icrc.org/job/delegate/1444751333", **listing),
@@ -594,11 +594,11 @@ def test_reader_exception_leaves_the_generic_candidate_unchanged(monkeypatch):
 
     monkeypatch.setattr("crawler_v2.simple_crawler.read_detail_page", broken)
 
-    async def fake_fetch(url, use_browser=False):
-        return 200, "<h1>Role</h1><span>Location: Nairobi</span>"
+    async def fake_fetch(url):
+        return 200, "<h1>Role</h1><span>Location: Nairobi</span>", ""
 
     crawler = SimpleCrawler("postgresql://example")
-    crawler.fetch_html = fake_fetch
+    crawler._fetch_page = fake_fetch
     original = _listing(apply_url="https://example.org/jobs/role/1", location_raw="Geneva")
     updated = asyncio.run(
         crawler.enrich_job_from_detail_page(original, "https://example.org/careers")

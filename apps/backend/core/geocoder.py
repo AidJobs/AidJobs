@@ -12,6 +12,8 @@ from typing import Dict, Optional, Tuple
 import httpx
 import asyncio
 
+from contracts.outbound import user_agent
+
 logger = logging.getLogger(__name__)
 
 # Nominatim's usage policy expects clients to stop when refused.
@@ -105,9 +107,9 @@ class Geocoder:
                         'limit': 1,
                         'addressdetails': 1
                     },
-                    headers={
-                        'User-Agent': 'AidJobs/1.0 (contact@aidjobs.app)'
-                    }
+                    # Outside the fetch policy until the offline country lookup replaces
+                    # Nominatim (ledger W-27); the same identity all the same.
+                    headers={'User-Agent': user_agent()}
                 )
                 
                 self._last_nominatim_request = time.time()
