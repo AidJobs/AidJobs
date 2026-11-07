@@ -306,14 +306,37 @@ Why: counting "2 free jobs" has many variables (drafts, chat, uploads, edits), w
 - **A soft stop, never a lost draft.** A notice near 80%; a job already in progress can finish (a small reserve), so nobody is cut off mid-sentence; hand edits, copying, and downloading always stay free; the plans are offered at that moment, with Ask to pay for those who do not hold the card.
 - **Paid use stays per job.** Each paid job carries a generous fair-use AI budget, and the subscription a monthly pool; no token packs for sale unless real use shows a need.
 - **Showing the plans without pushing:** a quiet plan line at the bottom of the side menu ("Free plan · 1 of 2 jobs left · See plans"), opening a plain plans page (Free, Amplify, the packages, the subscription) that also holds the Billing page; one dismissible welcome card on first sign-in stating what the free plan includes and what Amplify adds; Amplify's features shown where they would help, with the organisation's own data ("3 similar jobs close the same week · see the market check"), never as pop-ups or banners.
-- **Possible, against section 16 decision 2 ("free or paid, nothing in between"):** a new organisation's first job amplified free once, so it sees the market check, language versions, and Reach on its own job before deciding.
+- **Possible, against section 16 decision 2 ("free or paid, nothing in between"):** a new organisation's first job amplified free once, so it sees the market check, language versions, and Reach on its own job before deciding. Agreed in principle by the user, below.
+
+### Follow-up, 7 November 2026
+
+**The user's question:** if one job uses the whole month's tokens, the promise of two free jobs is broken. How is that managed?
+
+**The agent's answer:** the promise stays "2 free jobs a month", and the tokens are a fair-use limit **per job**, not one pool for the month, so a heavy first job cannot use up the second.
+- Each free job carries its own AI budget, set at about twice the measured average so almost nobody reaches it. A job's budget starts with its first AI use and stays with that job.
+- A job that reaches its budget is never stuck: the checks and the facts keep working, editing by hand, copying, downloading, and publishing free stay open, and the message offers Amplify for that job ("This job has used its free writing help. Keep editing by hand and publish free, or Amplify it for unlimited help").
+- The second free job still has its full budget.
+- Drafts never published, sent for review, or downloaded use AI without using a free job, so a quiet monthly ceiling for the organisation (about four average jobs' worth) and the existing limit of about 10 open drafts stop misuse; normal use never meets them.
+- This is section 15 F's "fair-use token budget per job description", measured from real use once the AI provider is chosen (E7).
+
+**First job amplified free, once: agreed in principle by the user (7 November 2026),** on the condition that the communication is clear that it happens once and that Amplify afterwards comes with a paid plan. It amends section 16 decision 2 for an organisation's first job only, once the details are agreed. Where it is said:
+- the welcome card ("Your first job is amplified free, once, so you can see what Amplify does");
+- the publish page, on the Amplify choice ("Free for your first job · after this, US$28.40 a job or part of a package");
+- the job's page afterwards, naming what Amplify added (market check, language versions, Reach, featured placement, 100 days);
+- the Billing and plans page ("First job amplified free: used").
+
+The agent's suggestions for the details:
+- **Who:** once per organisation, not per person, and only for verified organisations, as every Amplify job is.
+- **Free count:** it uses one of that month's two free jobs.
+- **What it includes:** the same as a paid Amplify job, with the same Reach email allowance.
+- **Timing:** it is offered on the organisation's first job only; it cannot be saved for later.
 
 ### To settle in the discussion
 
+- The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
+- The details of the free first Amplify (who, whether it uses a free job, what it includes, whether it can be saved for later), and the exact wording at each place.
 - Tokens only, listings only, or both; and what counts if a job uses no AI.
 - The average tokens per job, measured once the AI provider is chosen (E7).
 - How the allowance is shown, and when the notice appears.
-- What happens to a job in progress when the allowance runs out.
 - Where the plan line and "See plans" sit in the chat window and the side menu, and what the welcome card says.
-- Whether the first job is amplified free once.
 - Then a demo round on `demo/employer`, with its own plan and approval.
