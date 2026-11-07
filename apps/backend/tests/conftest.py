@@ -36,7 +36,7 @@ def _clear_policy_state():
 def _politeness_off_unless_asked(request, monkeypatch):
     _clear_policy_state()
     if request.node.get_closest_marker("politeness") is None:
-        async def no_robots_check(url, identity, budget, net):
+        async def no_robots_check(url, method, identity, budget, net):
             return None
 
         monkeypatch.setattr(outbound, "_robots_gate", no_robots_check)

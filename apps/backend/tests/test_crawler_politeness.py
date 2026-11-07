@@ -454,12 +454,68 @@ def test_the_spacing_holds_across_event_loops(slept):
 
 
 def test_a_failed_request_still_counts_for_the_spacing(slept):
-    events, world = _world([_robots(), httpcore.ConnectError("reset"), _response(200)])
-    with pytest.raises(httpcore.ConnectError):
-        _fetch("https://jobs.example/a", world)
+    events, world = _world([_robots(), _response(200), httpcore.ConnectError("reset"),
+                            _response(200)])
+    _fetch("https://jobs.example/a", world)
+    outbound._last_answer["jobs.example"] -= 1000  # long ago: the failing request does not wait
     slept.clear()
-    _fetch("https://jobs.example/b", world)
+    with pytest.raises(httpcore.ConnectError):
+        _fetch("https://jobs.example/b", world)
+    assert slept == []
+    _fetch("https://jobs.example/c", world)
     assert len(slept) == 1 and slept[0] > 4.5
+
+
+def test_the_robots_txt_table_is_bounded(monkeypatch):
+    monkeypatch.setattr(outbound, "_ROBOTS_ORIGINS_KEPT", 2)
+    for host in ("a.example", "b.example", "c.example"):
+        outbound._remember_robots(("https", host, 443), 200, ALLOW_ALL)
+    assert list(outbound._robots) == [("https", "b.example", 443), ("https", "c.example", 443)]
+
+
+def test_a_callers_failed_or_oversized_robots_txt_is_not_kept(slept):
+    big = _robots("User-agent: *\nDisallow: /\n" + "#" * outbound.ROBOTS_MAX_BYTES)
+    events, world = _world([big, httpcore.ConnectError("reset")])
+    _fetch("https://jobs.example/robots.txt", world, identity="survey")
+    assert ("https", "jobs.example", 443) not in outbound._robots
+    outbound._remember_robots(("https", "jobs.example", 443), 200, ALLOW_ALL)
+    with pytest.raises(httpcore.ConnectError):
+        _fetch("https://jobs.example/robots.txt", world, identity="survey")
+    assert outbound._robots[("https", "jobs.example", 443)].text == ALLOW_ALL
+
+
+@pytest.mark.parametrize("url, method", [
+    ("https://jobs.example/robots.txt?x=1", "GET"),
+    ("https://jobs.example/robots.txt", "HEAD"),
+])
+def test_only_a_plain_robots_txt_request_skips_the_check(url, method, slept):
+    events, world = _world([_robots(), _response(200)])
+    _fetch(url, world, method=method)
+    assert _sent(events)[0] == "GET jobs.example/robots.txt"
+    assert len(_sent(events)) == 2
+
+
+def test_the_shared_robots_txt_fetch_has_an_overall_limit(monkeypatch):
+    monkeypatch.setattr(outbound, "ROBOTS_OVERALL_SECONDS", 0.1)
+
+    async def run():
+        never = asyncio.Event()
+        events, world = _world([_robots()], gates={0: never})
+        with pytest.raises(FetchError, match="^robots.txt unreachable$"):
+            await fetch_url("https://jobs.example/a", **world)
+
+    asyncio.run(run())
+
+
+def test_waiting_for_robots_txt_is_bounded_by_the_crawls_time():
+    async def run():
+        never = asyncio.Event()
+        events, world = _world([_robots()], gates={0: never})
+        with crawl_budget(seconds=0.1):
+            with pytest.raises(FetchError, match="^time budget used up$"):
+                await fetch_url("https://jobs.example/a", **world)
+
+    asyncio.run(run())
 
 
 def test_one_request_at_a_time_per_host():
@@ -683,6 +739,89 @@ def test_a_refusal_ends_the_job_pages(monkeypatch, caplog):
     assert result["counts"]["found"] == 4
     assert "Job pages stopped (stopped after a refusal); 3 rows keep their listing fields" \
         in caplog.text
+    assert result["status"] == "warn"
+    assert result["message"] == "Found 4 jobs; job pages stopped: refused: HTTP 403"
+
+
+def test_a_refusal_on_the_last_job_page_is_reported_too(monkeypatch):
+    page = FetchResult(200, {}, b"<html><body>listing</body></html>", "https://jobs.example/")
+    crawler = _html_crawler(monkeypatch, page)
+    crawler.geocoder = None
+    crawler.quality_scorer = None
+
+    async def listing(html, url):
+        return [{"title": "Officer", "apply_url": "https://jobs.example/job/1/x"}], None
+
+    async def detail(job, base_url):
+        current_budget().refuse("HTTP 429")
+        return job
+
+    monkeypatch.setattr(crawler, "_listing_jobs", listing)
+    monkeypatch.setattr(crawler, "enrich_job_from_detail_page", detail)
+
+    async def crawl():
+        with crawl_budget():
+            return await crawler.crawl_source(dict(_SOURCE), _Run())
+
+    result = asyncio.run(crawl())
+    assert (result["status"], result["message"]) == (
+        "warn", "Found 1 jobs; job pages stopped: refused: HTTP 429"
+    )
+
+
+@pytest.mark.parametrize("answer", [
+    FetchResult(200, {"cf-mitigated": "challenge"},
+                b"<h1>Officer</h1><span>Location: Mars</span>", "https://jobs.example/job/1"),
+    FetchResult(202, {}, b"<h1>Officer</h1><span>Location: Mars</span>",
+                "https://jobs.example/job/1"),
+    FetchError("robots.txt forbids this address"),
+])
+def test_a_refused_job_page_is_not_read(answer, monkeypatch):
+    crawler = _html_crawler(monkeypatch, answer)
+    row = {"title": "Officer", "apply_url": "https://jobs.example/job/1", "location_raw": "Kabul"}
+    job = asyncio.run(crawler.enrich_job_from_detail_page(dict(row), "https://jobs.example/"))
+    assert job == row
+
+
+@pytest.mark.parametrize("module, reader, call", [
+    ("rss_crawler", "SimpleRSSCrawler", "fetch_feed"),
+    ("api_crawler", "SimpleAPICrawler", "fetch_api"),
+])
+def test_a_challenged_feed_is_not_read(module, reader, call, monkeypatch):
+    import importlib
+
+    crawler_module = importlib.import_module(f"crawler_v2.{module}")
+
+    async def challenged(url, **_kwargs):
+        return FetchResult(200, {"x-amzn-waf-action": "challenge"},
+                           b'{"jobs": [{"title": "x"}]}', url)
+
+    monkeypatch.setattr(crawler_module, "fetch_url", challenged)
+    crawler = getattr(crawler_module, reader)("postgresql://unused")
+    assert asyncio.run(getattr(crawler, call)("https://jobs.example/feed")) is None
+
+
+@pytest.mark.parametrize("module, reader", [
+    ("rss_crawler", "SimpleRSSCrawler"), ("api_crawler", "SimpleAPICrawler"),
+])
+def test_a_refused_feed_says_so(module, reader, monkeypatch):
+    import importlib
+
+    crawler_module = importlib.import_module(f"crawler_v2.{module}")
+
+    async def refused(url, **_kwargs):
+        current_budget().refuse("HTTP 403")
+        return FetchResult(403, {}, b"", url)
+
+    monkeypatch.setattr(crawler_module, "fetch_url", refused)
+    crawler = getattr(crawler_module, reader)("postgresql://unused")
+
+    async def crawl():
+        with crawl_budget():
+            return await crawler.crawl_source(dict(_SOURCE, source_type="rss"), _Run())
+
+    result = asyncio.run(crawl())
+    assert (result["status"], result["message"]) == ("failed", "Refused: HTTP 403")
 
 
 # The schedule -------------------------------------------------------------------------------
@@ -737,6 +876,56 @@ def test_a_refused_source_waits_at_least_a_day_after_jitter_and_health(outcome, 
         if not refused:
             assert next_run_at - before < timedelta(hours=6)
         assert params[2] == (1 if outcome == "fail" else 0)
+
+
+class _FinishCursor(_SourceCursor):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def fetchone(self):
+        sql = self.statements[-1][0]
+        if sql.startswith("UPDATE crawl_logs"):
+            return ("run-9",)
+        return super().fetchone()
+
+
+class _FinishConn:
+    def __init__(self):
+        self.cursor_obj = _FinishCursor()
+
+    def cursor(self):
+        return self.cursor_obj
+
+    def commit(self):
+        return None
+
+    def rollback(self):
+        return None
+
+    def close(self):
+        return None
+
+
+@pytest.mark.parametrize("refused", [True, False])
+def test_the_finish_passes_the_refusal_to_the_schedule(refused):
+    orch = _orchestrator()
+    conn = _FinishConn()
+    orch._get_db_conn = lambda: conn
+    orch.health_score = lambda source_id: None
+    orch.compute_next_run = lambda *args, **kwargs: datetime.utcnow() + timedelta(hours=5)
+    result = {"status": "failed", "message": "Refused: HTTP 403", "counts": {},
+              "duration_ms": 1}
+    if refused:
+        result["refused"] = True
+    before = datetime.utcnow()
+    assert asyncio.run(orch.finish_run(dict(_SOURCE), "run-9", result)) is True
+    update = next(params for sql, params in conn.cursor_obj.statements
+                  if sql.startswith("UPDATE sources SET"))
+    waited = update[4] - before
+    assert (waited >= timedelta(hours=24)) is refused
 
 
 def test_the_real_schedule_with_jitter_is_still_floored():

@@ -12,7 +12,7 @@ import httpx
 import psycopg2
 
 from contracts.admission import admit_batch, extraction_logger_for, log_admission_rejections
-from contracts.outbound import FetchError, fetch_url
+from contracts.outbound import FetchError, current_budget, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
 from contracts.refusal import refusal
@@ -307,9 +307,11 @@ class SimpleAPICrawler:
             data = await self.fetch_api(careers_url)
             
             if not data:
+                budget = current_budget()
                 return {
                     'status': 'failed',
-                    'message': 'Failed to fetch API',
+                    'message': (f'Refused: {budget.refused}' if budget is not None
+                                and budget.refused else 'Failed to fetch API'),
                     'counts': {'found': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
                 }
             

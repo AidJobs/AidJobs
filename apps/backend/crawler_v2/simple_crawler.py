@@ -127,6 +127,13 @@ def _policy_stop(reason: Optional[str]) -> str:
     return reason if reason in POLITENESS_STOPS else ''
 
 
+def _budget_stop_text(budget) -> str:
+    """Why the crawl's requests stopped, in fixed words: the refusal, or the spent budget."""
+    if budget.refused:
+        return f'refused: {budget.refused}'
+    return budget.stopped()
+
+
 def _stop_text(stop: str) -> str:
     """A refusal reads 'refused: HTTP 202 (AWS WAF challenge)'; a policy stop is its own words."""
     return f'refused: {stop}' if stop.startswith('HTTP ') else stop
@@ -1680,10 +1687,12 @@ class SimpleCrawler:
             return job
         
         try:
-            # Fetch detail page
-            status, html = await self.fetch_html(job['apply_url'])
-            if status != 200:
-                logger.warning(f"Failed to fetch detail page: {job['apply_url']} (HTTP {status})")
+            # Fetch detail page. A refusal or a challenge is not read: the row keeps its fields.
+            status, html, stop = await self._fetch_page(job['apply_url'])
+            if stop or status != 200:
+                logger.warning(
+                    "Detail page not read: %s (%s)", job['apply_url'], stop or f"HTTP {status}"
+                )
                 return job
             
             soup = BeautifulSoup(html, 'html.parser')
@@ -2035,6 +2044,7 @@ class SimpleCrawler:
         source_type = source.get('source_type', 'html')
         _SOURCE_FOR_LOGS.set(source_id)
         listing_report = None
+        detail_stop = ''
         
         logger.info(f"Crawling {org_name} ({source_type}): {careers_url}")
         
@@ -2142,6 +2152,7 @@ class SimpleCrawler:
                                 "Job pages stopped (%s); %s rows keep their listing fields",
                                 stopped, len(jobs) - i,
                             )
+                            detail_stop = _budget_stop_text(budget)
                             enriched_jobs.extend(jobs[i:])
                             break
                         if job.get('apply_url'):
@@ -2154,6 +2165,8 @@ class SimpleCrawler:
                         else:
                             enriched_jobs.append(job)
                     jobs = enriched_jobs
+                    if not detail_stop and budget is not None and budget.refused:
+                        detail_stop = _budget_stop_text(budget)
                 else:
                     if len(jobs) > 50 and not needs_enrichment:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
@@ -2271,8 +2284,13 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
+                crawl_status, crawl_message = _listing_outcome(len(jobs), listing_report)
+                if detail_stop:
+                    # Rows whose job page was not opened may have been rejected as too thin.
+                    crawl_status = 'warn'
+                    crawl_message = f'{crawl_message}; job pages stopped: {detail_stop}'
                 crawl_status, crawl_message = save_failure_outcome(
-                    *_listing_outcome(len(jobs), listing_report), counts
+                    crawl_status, crawl_message, counts
                 )
                 return {
                     'status': crawl_status,

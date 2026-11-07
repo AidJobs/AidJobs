@@ -66,6 +66,7 @@ ROBOTS_MAX_REDIRECTS = 5
 ROBOTS_MAX_BYTES = 500 * 1024
 ROBOTS_STEP_TIMEOUT_SECONDS = 10.0
 ROBOTS_TOTAL_TIMEOUT_SECONDS = 20.0
+ROBOTS_OVERALL_SECONDS = 60.0
 ROBOTS_KEEP_SECONDS = 24 * 3600.0
 ROBOTS_UNREACHABLE_KEEP_SECONDS = 600.0
 _ROBOTS_ORIGINS_KEPT = 1000
@@ -78,18 +79,12 @@ DNS_TIMEOUT_SECONDS = 10.0
 DNS_WORKERS = 8
 _REDIRECTS = {301, 302, 303, 307, 308}
 # Sent again after a redirect to another origin; any other header (a key, a token) is dropped.
+# The policy's own User-Agent and From are added to every hop.
 _CROSS_ORIGIN_HEADERS = frozenset({
-    "user-agent",
     "accept",
     "accept-language",
     "accept-encoding",
-    "cache-control",
     "connection",
-    "upgrade-insecure-requests",
-    "sec-fetch-dest",
-    "sec-fetch-mode",
-    "sec-fetch-site",
-    "sec-fetch-user",
 })
 _TIMEOUTS = (
     httpcore.ConnectTimeout,
@@ -147,10 +142,6 @@ POLITENESS_STOPS = frozenset({
     "request budget used up",
     "time budget used up",
 })
-_NOT_SENT = frozenset({
-    "stopped after a refusal", "request budget used up", "time budget used up", "host busy",
-})
-
 
 def fetch_message(error: BaseException) -> str | None:
     """A FetchError's message when it is one of the fixed messages above; otherwise None."""
@@ -387,11 +378,14 @@ class _Net:
 
 async def _fetch_robots(origin, identity: str, net: _Net) -> _RobotsAnswer:
     try:
-        result = await _follow(
-            _robots_url(origin), "GET", {"Accept": "text/plain,*/*;q=0.8"}, identity,
-            ROBOTS_STEP_TIMEOUT_SECONDS, ROBOTS_TOTAL_TIMEOUT_SECONDS, ROBOTS_MAX_BYTES,
-            ROBOTS_MAX_REDIRECTS, net, None, check_robots=False,
-        )
+        # Its hops' own time is limited by ROBOTS_TOTAL_TIMEOUT_SECONDS; this bounds the whole
+        # fetch, the waits for the host included.
+        async with asyncio.timeout(ROBOTS_OVERALL_SECONDS):
+            result = await _follow(
+                _robots_url(origin), "GET", {"Accept": "text/plain,*/*;q=0.8"}, identity,
+                ROBOTS_STEP_TIMEOUT_SECONDS, ROBOTS_TOTAL_TIMEOUT_SECONDS, ROBOTS_MAX_BYTES,
+                ROBOTS_MAX_REDIRECTS, net, None, check_robots=False,
+            )
     except Exception:  # noqa: BLE001  any failure to read it, the address policy's included
         return _remember_robots(origin, None, "")
     return _remember_robots(origin, result.status_code, result.text)
@@ -414,12 +408,23 @@ async def _robots_answer(origin, identity: str, budget: CrawlBudget | None, net:
                 del flights[origin]
 
         task.add_done_callback(landed)
-    return await asyncio.shield(task)
+    if budget is None:
+        return await asyncio.shield(task)
+    try:
+        async with asyncio.timeout(max(budget.seconds_left(), 0.0)) as limit:
+            return await asyncio.shield(task)
+    except TimeoutError as exc:
+        if limit.expired():
+            raise FetchError("time budget used up") from exc
+        raise
 
 
-async def _robots_gate(url: str, identity: str, budget: CrawlBudget | None, net: _Net):
-    """Raise unless robots.txt lets `identity` fetch `url`; return its Crawl-delay, if any."""
-    if urlsplit(url).path == "/robots.txt":
+async def _robots_gate(
+    url: str, method: str, identity: str, budget: CrawlBudget | None, net: _Net
+):
+    """Raise unless robots.txt lets `identity` fetch `url`; return its Crawl-delay, if any.
+    Only robots.txt itself, asked for plainly, is not checked against robots.txt."""
+    if _robots_request(url, method):
         return None
     origin = _origin(url)
     answer = _cached_robots(origin) or await _robots_answer(origin, identity, budget, net)
@@ -771,19 +776,13 @@ async def fetch_url(
         dns_timeout,
     )
     budget = _BUDGET.get()
-    try:
-        result = await _follow(
-            url, method, request_headers, identity, timeout, total_timeout, max_bytes,
-            max_redirects, net, budget, check_robots=True,
-        )
-    except FetchError as exc:
-        # A caller's own robots.txt request answers for the policy too (the survey's), so the
-        # host is not asked twice. A request this crawl did not send says nothing about the host.
-        reason = str(exc)
-        if _robots_request(url, method) and reason not in _NOT_SENT:
-            _remember_robots(_origin(url), None, "")
-        raise
-    if _robots_request(url, method):
+    result = await _follow(
+        url, method, request_headers, identity, timeout, total_timeout, max_bytes,
+        max_redirects, net, budget, check_robots=True,
+    )
+    # A caller's own robots.txt answer serves the policy too (the survey's), so the host is not
+    # asked twice; only a real answer within the policy's size limit, never a failure.
+    if _robots_request(url, method) and len(result.body) <= ROBOTS_MAX_BYTES:
         _remember_robots(_origin(url), result.status_code, result.text)
     if budget is not None:
         reason = refusal(
@@ -816,7 +815,9 @@ async def _follow(
         _, host, _, _ = _split(current)
         if budget is not None:
             budget.check()
-        delay = await _robots_gate(current, identity, budget, net) if check_robots else None
+        delay = (
+            await _robots_gate(current, method, identity, budget, net) if check_robots else None
+        )
         if budget is not None:
             budget.take()
         async with _host_slot(host.rstrip(".").lower(), delay, budget):
