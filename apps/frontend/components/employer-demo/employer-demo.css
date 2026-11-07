@@ -478,24 +478,100 @@
   font-weight: 600;
 }
 
-.ej-steps li[data-done] {
+.ej-step {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px 0 5px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.ej-steps .ej-count-badge {
+  margin-left: 1px;
+}
+
+button.ej-step {
+  cursor: pointer;
+}
+
+button.ej-step:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.ej-steps [data-done] {
   color: var(--text-2);
 }
 
-.ej-steps li[data-done] .ej-step-n {
+.ej-steps [data-done] .ej-step-n {
   border-color: var(--sage-5);
   color: var(--sage-8);
 }
 
-.ej-steps li[aria-current] {
+.ej-steps [aria-current] {
   color: var(--text);
   font-weight: 600;
 }
 
-.ej-steps li[aria-current] .ej-step-n {
+.ej-steps [aria-current] .ej-step-n {
   border-color: var(--sage-5);
   background: var(--sage-2);
   color: var(--sage-8);
+}
+
+/* The publish page's views, as browser tabs: the open one joins the card below it; the others are quiet text on the page. */
+.ej-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin-bottom: -1px;
+  padding: 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ej-tab {
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ej-tab:hover {
+  color: var(--text);
+}
+
+.ej-tab[aria-selected='true'] {
+  border-color: var(--hair);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ej-tab-panel {
+  border-top-left-radius: 14px;
+}
+
+.aj-root:has(.ej-app) .ej-tab:focus-visible {
+  outline-offset: -3px;
 }
 
 /* A language version edited in place: borderless like the document, a hairline on hover, a sage border on focus (like the chat box). */
@@ -1459,8 +1535,13 @@
 }
 
 @media (max-width: 640px) {
-  .ej-jump {
+  .ej-jump,
+  .ej-step {
     height: 34px;
+  }
+
+  .ej-tab {
+    padding: 0 11px;
   }
 
   .aj-root .ej-tap {

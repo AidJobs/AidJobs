@@ -15,7 +15,7 @@ export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
   const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
   if (!forward && e.key !== 'ArrowLeft' && e.key !== 'ArrowUp') return;
   const group = e.currentTarget;
-  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled])')].filter((r) => r.closest('[role="radiogroup"]') === group);
+  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled]), [role="tab"]:not([disabled])')].filter((r) => r.closest('[role="radiogroup"], [role="tablist"]') === group);
   const at = radios.indexOf(document.activeElement as HTMLElement);
   if (at < 0) return;
   e.preventDefault();
@@ -81,18 +81,40 @@ export function LegalLine({ year, className = '' }: { year: number; className?: 
   );
 }
 
-/** Where the user is between writing and publishing: 1 Write · 2 Check · 3 Publish. */
-export function Steps({ current }: { current: 1 | 2 | 3 }) {
+/** Where the user is between writing and publishing, 1 Write · 2 Check · 3 Publish; the other steps open their screen. */
+export function Steps({ current, onStep, badge = 0 }: { current: 1 | 2 | 3; onStep?: (n: 1 | 2 | 3) => void; badge?: number }) {
   return (
     <ol className="ej-steps" aria-label="Steps to publish">
-      {['Write', 'Check', 'Publish'].map((label, i) => (
-        <li key={label} aria-current={current === i + 1 ? 'step' : undefined} data-done={i + 1 < current || undefined}>
-          <span className="ej-step-n" aria-hidden>
-            {i + 1}
-          </span>
-          {label}
-        </li>
-      ))}
+      {(['Write', 'Check', 'Publish'] as const).map((label, i) => {
+        const n = (i + 1) as 1 | 2 | 3;
+        const inner = (
+          <>
+            <span className="ej-step-n" aria-hidden>
+              {n}
+            </span>
+            {label}
+            {n === 2 && badge > 0 && (
+              <span className="ej-count-badge">
+                {badge}
+                <span className="sr-only"> to look at</span>
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li key={label}>
+            {onStep && n !== current ? (
+              <button type="button" className="ej-step" data-done={n < current || undefined} onClick={() => onStep(n)}>
+                {inner}
+              </button>
+            ) : (
+              <span className="ej-step" aria-current={n === current ? 'step' : undefined} data-done={n < current || undefined}>
+                {inner}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }

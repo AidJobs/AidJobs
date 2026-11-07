@@ -14,7 +14,7 @@ import { DeleteDialog } from './JobActions';
 import { LangDoc, LangSwitch } from './LangDoc';
 import MenuButton from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
-import { go, goBack, useDemo } from './store';
+import { go, goBack, goToPart, useDemo } from './store';
 import Structure from './Structure';
 import { LANGS } from './translate';
 import type { Lang } from './types';
@@ -177,15 +177,6 @@ export default function Create({ id }: { id?: string }) {
           ]}
         />
       )}
-      {!reviewing && job.sections.length > 0 && isReviewable(job) && (
-        <Tip label={blocked ? 'Next: check, send for review (approval is required), and publish' : checks.length ? `Next: check and publish. To look at: ${checks.join('; ')}.` : 'Next: check and publish'} side="bottom">
-          <button type="button" className="ej-soft-btn" onClick={() => go('publish', job.id)}>
-            {phone ? 'Next' : 'Next: check and publish'}
-            {!phone && <ArrowRight size={13} strokeWidth={2} />}
-            {checks.length > 0 && <span className="ej-count-badge">{checks.length}</span>}
-          </button>
-        </Tip>
-      )}
       {(job.status === 'live' || job.status === 'scheduled') && (
         <button type="button" className="ej-soft-btn" onClick={() => go('jobs', job.id)}>
           Done
@@ -249,7 +240,7 @@ export default function Create({ id }: { id?: string }) {
           <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
             {(phone || !shown) && statusLine(s, job)}
           </span>
-          {!reviewing && isReviewable(job) && <Steps current={1} />}
+          {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={(n) => (job.sections.length ? goToPart('publish', job.id, n === 3 ? 'publish' : null) : goToTitle())} />}
         </div>
       )}
       {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (

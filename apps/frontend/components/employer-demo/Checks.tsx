@@ -175,6 +175,7 @@ export default function BeforePublish({
   label = 'Before you publish',
   open: openProp,
   onOpen,
+  tabbed = false,
 }: {
   job: DemoJob;
   s: State;
@@ -185,6 +186,8 @@ export default function BeforePublish({
   label?: string | null;
   open?: RowKey | null;
   onOpen?: (k: RowKey | null) => void;
+  /** Inside the publish page's tabbed card: the tab is its heading. */
+  tabbed?: boolean;
 }) {
   const [openOwn, setOpenOwn] = useState<RowKey | null>('advert');
   const open = openProp === undefined ? openOwn : openProp;
@@ -389,8 +392,8 @@ export default function BeforePublish({
   }
 
   return (
-    <section className={label ? 'aj-card flex flex-col p-1.5' : 'flex flex-col'} aria-label={label ?? 'Improve this job'}>
-      {label && <span className="ej-panel-label px-2.5 pb-1 pt-2">{label}</span>}
+    <section className={tabbed ? 'flex flex-col p-1.5 pt-2' : label ? 'aj-card flex flex-col p-1.5' : 'flex flex-col'} aria-label={label ?? 'Improve this job'}>
+      {label && !tabbed && <span className="ej-panel-label px-2.5 pb-1 pt-2">{label}</span>}
       {job.status === 'live' && <span className="aj-faint px-2.5 pb-1">The job is live: a fix changes it at once, and its page says &ldquo;Updated&rdquo;. A reviewed language version appears on its page at once.</span>}
       {job.status !== 'live' && owner && approvalRequired(s, job) && isApproved(job) && <span className="aj-faint px-2.5 pb-1">This job is approved: a fix here changes it, so it goes back to its reviewers, as an edit in the job description does.</span>}
       {rows.map((r) => {

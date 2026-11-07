@@ -2,6 +2,7 @@
 
 import { AlertCircle, ArrowLeft, BadgeCheck, CalendarClock, Check, CheckCircle2, Clock, Copy, ExternalLink, Flag as FlagIcon, Linkedin, MapPin, MessageCircle, Share2, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
 import {
@@ -54,7 +55,7 @@ import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
-import { getState, go, goBack, notify, useDemo } from './store';
+import { getState, go, goBack, notify, takePart, useDemo } from './store';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
 import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys, Steps } from './ui';
@@ -150,7 +151,7 @@ function ClosedNotice({ job }: { job: DemoJob }) {
 }
 
 /** The publishing panel stays in view while it fits the screen; when taller, it scrolls with the page and its main button stays pinned at the bottom. */
-function FitSticky({ className, label, children }: { className: string; label: string; children: ReactNode }) {
+function FitSticky({ className, label, id, children }: { className: string; label: string; id?: string; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const [tall, setTall] = useState(false);
   useEffect(() => {
@@ -163,7 +164,7 @@ function FitSticky({ className, label, children }: { className: string; label: s
     return () => ro.disconnect();
   }, []);
   return (
-    <section ref={ref} className={`${className} ${tall ? 'ej-tall' : 'lg:sticky lg:top-4'}`} aria-label={label}>
+    <section ref={ref} id={id} className={`${className} ${tall ? 'ej-tall' : 'lg:sticky lg:top-4'}`} style={{ scrollMarginTop: 16 }} aria-label={label}>
       {children}
     </section>
   );
@@ -844,7 +845,7 @@ function PayerDialog({ job, s, onPaid, onClose }: { job: DemoJob; s: State; onPa
   );
 }
 
-type View = 'page' | 'google' | 'share';
+type Tab = 'checks' | 'page' | 'google' | 'share';
 
 /** The publish panel: the preview beside the choices, and one button that says what happens (employer-side plan, section 16). */
 export default function Publish({ id }: { id?: string }) {
@@ -855,7 +856,12 @@ export default function Publish({ id }: { id?: string }) {
   const [pkg, setPkg] = useState<PackageKey>('one');
   const [plansOpen, setPlansOpen] = useState(false);
   const [schedule, setSchedule] = useState<string | null>(null);
-  const [view, setView] = useState<View>('page');
+  const [tab, setTab] = useState<Tab>('checks');
+  const tabsRef = useRef<HTMLElement>(null);
+  const phone = useIsPhone();
+  useEffect(() => {
+    if (takePart() === 'publish') document.getElementById('ej-publish-panel')?.scrollIntoView?.({ block: 'start' });
+  }, []);
   const [checkout, setCheckout] = useState<PackageKey | 'extra' | null>(null);
   const [failed, setFailed] = useState<null | 'declined' | 'closed'>(null);
   const [terms, setTerms] = useState<{ schedule: string | null } | null>(null);
@@ -956,11 +962,18 @@ export default function Publish({ id }: { id?: string }) {
     setFailed(why);
   };
 
-  const views: Array<[View, string]> = [
-    ['page', 'Job page'],
-    ['google', 'In Google'],
-    ['share', 'When shared'],
+  const tabs: Array<[Tab, string, string]> = [
+    ['checks', 'Before you publish', 'Checks'],
+    ['page', 'Job page', 'Job page'],
+    ['google', 'In Google', 'Google'],
+    ['share', 'When shared', 'Shared'],
   ];
+  const toLook = checksToLook(job, s, chosen === 'amplify');
+  const openTab = (k: Tab) => {
+    setTab(k);
+    tabsRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  };
+  const showPanel = () => document.getElementById('ej-publish-panel')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
 
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-6">
@@ -977,7 +990,7 @@ export default function Publish({ id }: { id?: string }) {
           </h1>
           {!upgrade && (
             <div className="mt-1.5">
-              <Steps current={reason || checksToLook(job, s, chosen === 'amplify') ? 2 : 3} />
+              <Steps current={reason || toLook ? 2 : 3} badge={toLook} onStep={(n) => (n === 1 ? go('create', job.id) : n === 2 ? openTab('checks') : showPanel())} />
             </div>
           )}
         </div>
@@ -986,28 +999,36 @@ export default function Publish({ id }: { id?: string }) {
         </span>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_1fr] lg:items-start">
-        <section className="order-1 flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1" aria-label="Check">
-          <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} open={row} onOpen={setRow} />
-        </section>
-        <section className="order-3 flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-2" aria-label="Preview">
-          <div className="aj-switch self-start" style={{ gridTemplateColumns: 'repeat(3, auto)' }} role="radiogroup" onKeyDown={radioKeys} aria-label="Preview">
-            {views.map(([k, l]) => (
-              <button key={k} type="button" role="radio" aria-checked={view === k} data-active={view === k} onClick={() => setView(k)}>
-                {l}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <section ref={tabsRef} className="flex min-w-0 flex-col" style={{ scrollMarginTop: 16 }} aria-label="Check and preview">
+          <div className="ej-tabs" role="tablist" aria-label="Check and preview" onKeyDown={radioKeys}>
+            {tabs.map(([k, long, short]) => (
+              <button key={k} type="button" role="tab" id={`ej-tab-${k}`} aria-selected={tab === k} aria-controls="ej-tab-panel" tabIndex={tab === k ? 0 : -1} className="ej-tab" onClick={() => setTab(k)}>
+                {phone ? short : long}
               </button>
             ))}
           </div>
-          {view === 'page' && (
-            <div className="aj-card p-4 lg:p-6">
-              <JobPageLangs job={shown} s={s} drafts={chosen === 'amplify'} />
-            </div>
-          )}
-          {view === 'google' && <GooglePreview job={shown} s={s} />}
-          {view === 'share' && <ShareCards job={shown} s={s} />}
+          <div className="aj-card ej-tab-panel" id="ej-tab-panel" role="tabpanel" aria-labelledby={`ej-tab-${tab}`}>
+            {tab === 'checks' && <BeforePublish job={job} s={s} amplify={chosen === 'amplify'} schedule={upgrade ? null : schedule} url={jobUrl(job)} onChooseAmplify={() => setPlan('amplify')} open={row} onOpen={setRow} tabbed />}
+            {tab === 'page' && (
+              <div className="p-4 lg:p-6">
+                <JobPageLangs job={shown} s={s} drafts={chosen === 'amplify'} />
+              </div>
+            )}
+            {tab === 'google' && (
+              <div className="p-3 lg:p-5">
+                <GooglePreview job={shown} s={s} />
+              </div>
+            )}
+            {tab === 'share' && (
+              <div className="p-3 lg:p-5">
+                <ShareCards job={shown} s={s} />
+              </div>
+            )}
+          </div>
         </section>
 
-        <FitSticky className="order-2 flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1" label="How to publish">
+        <FitSticky className="flex flex-col gap-3" label="How to publish" id="ej-publish-panel">
           {blocked && <ApprovalBlock job={job} s={s} onSkip={() => setSkip(true)} />}
           {!blocked && !upgrade && <ChangesNote job={job} onPublishAnyway={() => setOverrule(true)} />}
           {request && (
@@ -1192,6 +1213,7 @@ export default function Publish({ id }: { id?: string }) {
                     type="button"
                     className="ej-legal-link ej-tap"
                     onClick={() => {
+                      setTab('checks');
                       setRow(p.key);
                       requestAnimationFrame(() => document.getElementById(`ej-row-${p.key}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
                     }}

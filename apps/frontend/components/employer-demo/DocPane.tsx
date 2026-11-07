@@ -9,6 +9,7 @@ import { DOCUMENTS } from './apply';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
+import { basicAdvertCheck } from './market';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
@@ -575,10 +576,9 @@ export function ChatPanel({ job, s, autoFocus }: { job: DemoJob; s: State; autoF
   );
 }
 
-/** The job's open checks, for the count on Publish: missing facts, template leftovers, and inclusive-language highlights still open. */
+/** The job's open checks, counted as the publish page's advert check counts them: for the badge on the Check step. */
 export function openChecks(job: DemoJob, s: State): string[] {
-  const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
-  const items = quality(job.sections, job.facts, s.today, live).filter((c) => c.level !== 'ok' && c.level !== 'info').map((c) => c.text);
-  const flags = job.sections.reduce((n, sec) => n + sec.lines.reduce((m, l) => m + findInclusive(l, job.format).filter((h) => !job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]).length, 0), 0);
-  return flags ? [...items, `${flags} inclusive-language ${flags === 1 ? 'highlight' : 'highlights'} to look at`] : items;
+  return basicAdvertCheck(job, s)
+    .filter((p) => !p.ok)
+    .map((p) => p.title);
 }

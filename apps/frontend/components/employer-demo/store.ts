@@ -197,6 +197,20 @@ export function go(screen: string, id?: string) {
   window.scrollTo?.(0, 0);
 }
 
+let part: string | null = null;
+
+/** Opens a screen with one of its parts brought into view, such as the publish panel. */
+export function goToPart(screen: string, id: string, which: string | null) {
+  part = which;
+  go(screen, id);
+}
+
+export function takePart(): string | null {
+  const p = part;
+  part = null;
+  return p;
+}
+
 /** A screen in the trail that no longer makes sense: its job was deleted, or its publishing page is for a job already published. */
 function gone(hash: string): boolean {
   const [screen, id] = hash.replace(/^#\/?/, '').split('/');

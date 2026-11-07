@@ -454,9 +454,13 @@ describe('employer demo: before you publish', () => {
     shows('French version');
     click('Mark as reviewed');
     expect(getState().jobs.find((j) => j.id === 'job-fin')?.translations?.fr?.reviewed).toBe(true);
+    click('Job page');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job page');
+    expect(container.textContent).not.toContain('Field-post notice');
     click(/^Français/);
     shows('Clôture le');
     expect(container.querySelector('article[lang="fr"]')).not.toBeNull();
+    click('Before you publish');
     click(/^Field-post notice/);
     click('Open the notice');
     expect(container.querySelector('svg[aria-label^="QR code for https://aidjobs.app/jobs/finance-officer"]')).not.toBeNull();
@@ -813,6 +817,55 @@ describe('employer demo: managing jobs', () => {
     act(() => (container.querySelector('button[aria-label="Back"]') as HTMLElement).click());
     expect(window.location.hash).toBe('#jobs');
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it('the steps are the way between writing and publishing; the previews are tabs beside the checks', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-comms');
+    const steps = () => container.querySelector('[aria-label="Steps to publish"]') as HTMLElement;
+    const step = (label: string) => Array.from(steps().querySelectorAll('button')).find((b) => b.textContent?.includes(label)) as HTMLElement | undefined;
+    expect(Array.from(container.querySelectorAll('.ej-soft-btn')).some((b) => b.textContent?.startsWith('Next'))).toBe(false);
+    expect(step('Write')).toBeUndefined();
+    const badge = step('Check')?.querySelector('.ej-count-badge')?.textContent ?? '';
+    expect(badge).toMatch(/^\d+ to look at$/);
+    act(() => step('Check')!.click());
+    expect(window.location.hash).toBe('#publish/job-comms');
+    route('#publish/job-comms');
+    expect(container.querySelector('[aria-label="Where the job stands"]')?.textContent).toContain(`${parseInt(badge, 10)} checks to look at`);
+    const scroll = jest.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+    const tabs = () => Array.from(container.querySelectorAll('[role="tablist"] [role="tab"]')).map((t) => t.textContent);
+    expect(tabs()).toEqual(['Before you publish', 'Job page', 'In Google', 'When shared']);
+    click('In Google');
+    expect(container.querySelector('[aria-label="Google result preview"]')).not.toBeNull();
+    expect(container.querySelector('#ej-row-advert')).toBeNull();
+    const summary = container.querySelector('[aria-label="Where the job stands"]') as HTMLElement;
+    act(() => (summary.querySelector('button') as HTMLElement).click());
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Before you publish');
+    expect(container.querySelector('#ej-row-advert')?.getAttribute('aria-expanded')).toBe('true');
+    scroll.mockClear();
+    act(() => step('Publish')!.click());
+    expect(scroll.mock.instances[0]).toBe(document.getElementById('ej-publish-panel'));
+    act(() => step('Write')!.click());
+    expect(window.location.hash).toBe('#create/job-comms');
+    route('#create/job-comms');
+    scroll.mockClear();
+    act(() => step('Publish')!.click());
+    route('#publish/job-comms');
+    expect(scroll.mock.instances).toContain(document.getElementById('ej-publish-panel'));
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    phone = true;
+    render();
+    route('#home');
+    route('#publish/job-comms');
+    expect(tabs()).toEqual(['Checks', 'Job page', 'Google', 'Shared']);
+    phone = false;
   });
 
   it('edits a language version in the workspace like the English, and marks it reviewed', () => {
