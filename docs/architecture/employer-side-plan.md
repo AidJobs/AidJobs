@@ -325,16 +325,24 @@ Why: counting "2 free jobs" has many variables (drafts, chat, uploads, edits), w
 - the job's page afterwards, naming what Amplify added (market check, language versions, Reach, featured placement, 100 days);
 - the Billing and plans page ("First job amplified free: used").
 
-The agent's suggestions for the details:
-- **Who:** once per organisation, not per person, and only for verified organisations, as every Amplify job is.
-- **Free count:** it uses one of that month's two free jobs.
-- **What it includes:** the same as a paid Amplify job, with the same Reach email allowance.
-- **Timing:** it is offered on the organisation's first job only; it cannot be saved for later.
+The details, as the agent suggested them; the user agreed three the same day:
+- **Free count:** it uses one of that month's two free jobs (agreed).
+- **What it includes:** the same as a paid Amplify job, with the same Reach email allowance (agreed).
+- **Timing:** it is offered on the organisation's first job only; it cannot be saved for later (agreed).
+- **Who:** once per organisation, not per person (open, with verification below).
+
+**Verification, the user's question: how is an organisation verified?** Section 10 lists the ways; the demo already requires it for Amplify (section 16, review of round 4). Verification matters for Amplify because the public badge says "posted directly by a verified organisation", Reach sends email from AidJobs' domain (a spam and reputation risk), fake vacancies that charge candidates fees are a known problem in this sector, and without it one organisation could open several accounts for several free Amplify jobs. The ways, fastest first:
+1. **Email on the organisation's own domain:** a code sent to an address at the organisation's website domain; automatic and instant for most established organisations.
+2. **Claiming a page AidJobs already crawls:** the same domain as the careers site AidJobs knows.
+3. **A registration number** checked against a public register (for example the UK Charity Commission, the US IRS list of tax-exempt organisations, India's NGO Darpan, Kenya's NGO Board), some automatic, others by hand; or an **IATI publisher ID**.
+4. **By hand:** for small NGOs on Gmail or similar, a registration certificate reviewed by AidJobs, slower.
+
+The agent's suggestion: free publishing needs no verification (moderation applies, section 2). For an unverified organisation, the free first Amplify starts at once with the private tools (the market check, the advert check, language versions, the field-post notice), and its public parts (featured placement, the badge) and the Reach emails start when verification completes, which for most is the same minute. The amplification stays reserved until then.
 
 ### To settle in the discussion
 
 - The per-job budget, the monthly ceiling, and the wording when a job reaches its budget.
-- The details of the free first Amplify (who, whether it uses a free job, what it includes, whether it can be saved for later), and the exact wording at each place.
+- Verification: which ways at launch (which registers, whether by hand), and whether an unverified organisation gets the private tools of the free first Amplify at once; then the exact wording at each place.
 - Tokens only, listings only, or both; and what counts if a job uses no AI.
 - The average tokens per job, measured once the AI provider is chosen (E7).
 - How the allowance is shown, and when the notice appears.
