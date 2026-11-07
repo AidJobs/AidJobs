@@ -148,11 +148,20 @@ def _response_excerpt(text: str, limit: int = 300) -> str:
     return _TOKEN_LIKE.sub('[redacted]', collapsed)[:limit]
 
 
+def _plain_number(text: str) -> bool:
+    """ASCII digits only: str.isdigit also accepts characters such as '²', which int() refuses."""
+    return text.isascii() and text.isdigit()
+
+
 def _page_number(query: str) -> Optional[int]:
     values = parse_qs(query).get('page') or []
-    if len(values) != 1 or not values[0].isdigit():
+    if len(values) != 1 or not _plain_number(values[0]):
         return None
     return int(values[0])
+
+
+def _has_more_link(html: str) -> bool:
+    return BeautifulSoup(html, 'html.parser').select_one('a.more-link') is not None
 
 
 def _next_listing_page(html: str, page_url: str, careers_url: str) -> Optional[str]:
@@ -187,7 +196,7 @@ def _resized_listing_page(html: str, careers_url: str) -> Optional[str]:
     parts = urlparse(target)
     pairs = parse_qsl(parts.query, keep_blank_values=True)
     sizes = [value for name, value in pairs if name == 'page-items']
-    if len(sizes) != 1 or not sizes[0].isdigit() or int(sizes[0]) >= _PAGEUP_PAGE_ITEMS:
+    if len(sizes) != 1 or not _plain_number(sizes[0]) or int(sizes[0]) >= _PAGEUP_PAGE_ITEMS:
         return None
     query = urlencode([
         (name, str(_PAGEUP_PAGE_ITEMS) if name == 'page-items' else value)
@@ -1950,8 +1959,10 @@ class SimpleCrawler:
 
         A failed later page keeps the jobs already read. Every later page must add new jobs,
         except the resized page one when it shows jobs and links on (the site kept its own
-        page size).
-        Returns the jobs and the walk's report; only a walk that ran out of links is complete.
+        page size). A More Jobs link that is not followed ends the walk as partial.
+        Returns the jobs and the walk's report. Only a walk that ran out of links and read at
+        least the site's own total is complete: a site that ignores the page size but keeps it
+        in its links skips jobs while still running out of links.
         """
         from crawler.plugins.pageup import PageUpListingReader
         reader = PageUpListingReader()
@@ -1968,6 +1979,8 @@ class SimpleCrawler:
         resized = next_url is not None
         if not resized:
             next_url = _next_listing_page(first_html, careers_url, careers_url)
+            if next_url is None and _has_more_link(first_html):
+                stop = f'More Jobs link not followed on {careers_url}'
         while next_url is not None:
             if pages >= _PAGEUP_PAGE_CAP:
                 stop = f'page cap {_PAGEUP_PAGE_CAP}'
@@ -2006,7 +2019,15 @@ class SimpleCrawler:
                 break
             seen.update(job.get('apply_url') for job in new_jobs)
             jobs.extend(new_jobs)
+            if following is None and _has_more_link(page_html):
+                stop = f'More Jobs link not followed on {next_url}'
+                break
             next_url, resized = following, False
+        if stop == _LISTING_COMPLETE_STOP:
+            if expected is None:
+                stop = 'expected total unknown'
+            elif len(jobs) < expected:
+                stop = f'read {len(jobs)} of {expected} jobs'
         logger.info(
             "PageUp listing: %s pages, %s jobs, expected %s, stopped: %s",
             pages, len(jobs), expected if expected is not None else 'unknown', stop,
