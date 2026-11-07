@@ -552,9 +552,26 @@ def test_deny_words_outside_a_title_slug_still_reject():
         "https://jobs.example.org/vacancies/123/head-of-membership.html",
         "https://jobs.example.org/careers/head-of-membership-services",
         "https://www.devnetjobsindia.org/valuemembership.aspx?job_id=304752",
+        # Only one segment is a title slug: a second one next to the id is still read.
+        "https://jobs.example.org/jobs/vacancy/programme-officer-kenya/123/pay-membership-fees",
+        "https://jobs.oxfam.org.uk/jobs/vacancy/programme-manager-nexus-int11906/25191/"
+        "report-this-advertisement/",
+        # Fewer than three words; a slug before the token; case and empty words do not count.
+        "https://jobs.example.org/jobs/123/membership-fees",
+        "https://jobs.example.org/annual-membership-fees/job/123/x",
+        "https://jobs.example.org/job/123/MY-PROFILE-VIEW",
+        "https://jobs.example.org/job/123/my--profile--view",
     ]
     jobs = [{"title": "Programme Officer", "apply_url": url, "location_raw": "Nairobi",
              "deadline": "2026-12-01"} for url in rows]
     admitted, rejected = admit_batch(jobs, "html")
     assert admitted == []
     assert _reasons(rejected) == ["non_vacancy_destination"] * len(rows)
+
+
+def test_without_a_vacancy_token_and_id_nothing_is_a_title_slug():
+    job = {"title": "Annual renewal", "apply_url": "https://ngo.example.org/news/2026/"
+           "annual-membership-renewal", "location_raw": "London", "deadline": "2026-12-01"}
+    admitted, rejected = admit_batch([job], "html")
+    assert admitted == []
+    assert _reasons(rejected) == ["non_vacancy_destination"]

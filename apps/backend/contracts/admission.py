@@ -104,15 +104,18 @@ def _title_slug(segment: str) -> bool:
 
 
 def _title_slug_positions(segments: list[str]) -> set[int]:
-    """Where a job's own title slug may sit: directly before or directly after the first numeric
-    id after a vacancy token, never the token itself (crawler plan, C3 point 1, amended W-44)."""
+    """The single segment taken for a job's own title slug: the one directly before the first
+    numeric id after a vacancy token if it is a slug, otherwise the one directly after; never
+    the token itself (crawler plan, C3 point 1, amended W-44)."""
     for index, segment in enumerate(segments):
         if segment.lower() not in _VACANCY_TOKENS:
             continue
         for later in range(index + 1, len(segments)):
             if _NUMERIC_ID.match(segments[later]):
-                return {p for p in (later - 1, later + 1)
-                        if index < p < len(segments) and _title_slug(segments[p])}
+                for position in (later - 1, later + 1):
+                    if index < position < len(segments) and _title_slug(segments[position]):
+                        return {position}
+                return set()
     return set()
 
 
