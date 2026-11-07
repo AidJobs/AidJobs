@@ -561,6 +561,8 @@ def test_deny_words_outside_a_title_slug_still_reject():
         "https://jobs.example.org/annual-membership-fees/job/123/x",
         "https://jobs.example.org/job/123/MY-PROFILE-VIEW",
         "https://jobs.example.org/job/123/my--profile--view",
+        # Words are joined by hyphens only.
+        "https://jobs.example.org/job/123/head_of_membership",
     ]
     jobs = [{"title": "Programme Officer", "apply_url": url, "location_raw": "Nairobi",
              "deadline": "2026-12-01"} for url in rows]
