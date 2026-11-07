@@ -15,7 +15,7 @@ export default function Billing() {
   const [checkout, setCheckout] = useState<PackageKey | null>(null);
   const month = currentMonth(s);
   const left = freeLeft(s, month);
-  const used = s.freeUses.filter((u) => u.month === month).map((u) => s.jobs.find((j) => j.id === u.jobId)?.facts.title || 'a deleted job draft');
+  const used = s.freeUses.filter((u) => u.month === month).map((u) => (s.jobs.find((j) => j.id === u.jobId) ?? s.deleted?.find((d) => d.job.id === u.jobId)?.job)?.facts.title || 'a deleted job');
   const sub = s.subscription;
   const packs = s.packs.filter((p) => p.left > 0);
   const soon = (ends: string) => {

@@ -62,6 +62,7 @@ export default function Public({ id }: { id?: string }) {
   const amplified = all.filter((c) => c.amplified);
   const openCard = all.find((c) => c.id === open);
   const ownOpen = open ? s.jobs.find((j) => j.id === open) : undefined;
+  const gone = Boolean(id && !ownOpen && (s.gone ?? []).includes(id));
 
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
@@ -71,6 +72,12 @@ export default function Public({ id }: { id?: string }) {
         </h1>
         <DemoMark label="Demo · sample jobs from fictional organisations" />
       </div>
+      {gone && (
+        <div className="aj-card flex flex-col gap-1 p-4" role="status">
+          <span style={{ fontWeight: 650 }}>This vacancy is no longer available</span>
+          <span className="aj-muted">The employer has removed it. Other open jobs are below.</span>
+        </div>
+      )}
       <div className="aj-switch self-start" role="radiogroup" aria-label="View">
         <button type="button" role="radio" aria-checked={tab === 'list'} data-active={tab === 'list'} onClick={() => setTab('list')}>
           Job list

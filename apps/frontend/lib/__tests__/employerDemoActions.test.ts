@@ -14,8 +14,9 @@ import {
   canSkipApproval,
   changedSinceLastRound,
   changesAfterApproval,
+  canDelete,
   completePayRequest,
-  deleteDraft,
+  deleteJob,
   dismissMoment,
   editSection,
   editTranslation,
@@ -33,6 +34,7 @@ import {
   removeTranslation,
   reorderSections,
   restoreVersion,
+  restoreDeleted,
   resumeSubscription,
   reviewerDecision,
   reviewTranslation,
@@ -53,6 +55,7 @@ import { article, daysUntil, isoDay, parseIso } from '../../components/employer-
 import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
+import { purgeDeleted } from '../../components/employer-demo/lifecycle';
 import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, firstOfNextMonth, freeLeft, listedUntil, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
 import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
@@ -68,19 +71,20 @@ beforeEach(() => {
 });
 
 describe('undo never throws away later work', () => {
-  it('a deleted draft comes back while nothing else has changed', () => {
-    deleteDraft('job-comms');
+  it('a deleted draft comes back from Recently deleted', () => {
+    deleteJob('job-comms');
     expect(getState().jobs.some((j) => j.id === 'job-comms')).toBe(false);
-    undo();
+    expect(getState().notice?.restore).toBe('job-comms');
+    expect(restoreDeleted('job-comms')).toBe(true);
     expect(getState().jobs.some((j) => j.id === 'job-comms')).toBe(true);
   });
 
-  it('the undo is withdrawn once another job is created, so the new job is kept', () => {
-    deleteDraft('job-comms');
+  it('restoring a deleted job after creating another keeps the new job', () => {
+    deleteJob('job-comms');
     const id = startJob('We are hiring a Nutrition Officer in Juba');
-    expect(getState().notice?.undo).toBeFalsy();
-    undo();
+    restoreDeleted('job-comms');
     expect(getState().jobs.some((j) => j.id === id)).toBe(true);
+    expect(getState().jobs.some((j) => j.id === 'job-comms')).toBe(true);
   });
 
   it('a later hand edit ends the chance to undo the chat change, and is kept', () => {
@@ -281,8 +285,75 @@ describe('reviewers comment and decide, but never change the job', () => {
     settleRemark('job-fin', 'r1', 'accepted');
     overrideApproval('job-fin', 'A reviewer cannot override');
     sendChat('job-fin', 'make it shorter');
-    deleteDraft('job-fin');
+    expect(deleteJob('job-fin')).toBe(false);
     expect(JSON.stringify(job('job-fin'))).toBe(before);
+  });
+});
+
+describe('managing jobs: delete, restore, erase, withdraw (plan section 17)', () => {
+  const DAY = 86_400_000;
+  const deleted = () => getState().deleted ?? [];
+
+  it('a live job is deleted with its pay request and waiting emails; receipts, the free use, and a public "gone" answer stay', () => {
+    const before = getState().receipts.length;
+    const used = getState().freeUses.filter((u) => u.jobId === 'job-meal').length;
+    const reach = job('job-cps').reach!;
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-meal' ? { ...j, payRequest: { name: 'Finance', email: 'finance@example.org', note: '', key: 'one', amount: '$28.40', item: 'Amplify: MEAL Coordinator', schedule: null, at: s.today }, reach: { ...reach, candidates: [...reach.candidates, { email: 'later@example.org', status: 'waiting', round: 1 }] } } : j)) }));
+    expect(used).toBe(1);
+    expect(deleteJob('job-meal', { reviewers: true, reach: true })).toBe(true);
+    const d = deleted().find((x) => x.job.id === 'job-meal')!;
+    expect(d.job.payRequest).toBeUndefined();
+    expect(d.job.reach?.candidates.some((r) => r.status === 'waiting')).toBe(false);
+    expect(d.told.some((t) => t.includes('Reach invited'))).toBe(true);
+    expect(getState().gone).toContain('job-meal');
+    expect(getState().receipts.length).toBe(before);
+    expect(getState().freeUses.filter((u) => u.jobId === 'job-meal').length).toBe(used);
+    expect(getState().inbox.some((i) => i.jobId === 'job-meal')).toBe(false);
+    expect(getState().activity?.[0].what).toContain('Deleted "MEAL Coordinator"');
+  });
+
+  it('a draft leaves no "gone" answer, since it was never public', () => {
+    deleteJob('job-comms');
+    expect(getState().gone ?? []).not.toContain('job-comms');
+  });
+
+  it('only the owner deletes or restores a published job; a member may delete a draft', () => {
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
+    expect(canDelete(getState(), job('job-cps'))).toMatch(/Only the owner/);
+    expect(deleteJob('job-cps')).toBe(false);
+    expect(deleteJob('job-comms')).toBe(true);
+    update((s) => ({ ...s, me: { ...s.me, role: 'owner' } }));
+    deleteJob('job-cps');
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
+    expect(restoreDeleted('job-cps')).toBe(false);
+  });
+
+  it('a restored job comes back at the same address and stops answering "gone"', () => {
+    deleteJob('job-cps');
+    restoreDeleted('job-cps');
+    expect(job('job-cps').status).toBe('live');
+    expect(getState().gone ?? []).not.toContain('job-cps');
+    expect(deleted().some((x) => x.job.id === 'job-cps')).toBe(false);
+  });
+
+  it('after 14 days a deleted job is erased, leaving one line in the activity log', () => {
+    deleteJob('job-comms');
+    update((s) => purgeDeleted({ ...s, today: s.today + 13 * DAY }));
+    expect(deleted().some((x) => x.job.id === 'job-comms')).toBe(true);
+    update((s) => purgeDeleted({ ...s, today: s.today + 2 * DAY }));
+    expect(deleted().some((x) => x.job.id === 'job-comms')).toBe(false);
+    expect(restoreDeleted('job-comms')).toBe(false);
+    expect(getState().activity?.some((a) => a.what.startsWith('Erased for good: "Communications Intern"'))).toBe(true);
+  });
+
+  it('withdrawing records the reason in the history only; reviewers cannot withdraw', () => {
+    update((s) => ({ ...s, reviewerAs: 'amina' }));
+    closeJob('job-cps', 'withdrawn', false, 'Funding ended');
+    expect(job('job-cps').status).toBe('live');
+    update((s) => ({ ...s, reviewerAs: null }));
+    closeJob('job-cps', 'withdrawn', false, 'Funding ended');
+    expect(job('job-cps').closeReason).toBe('withdrawn');
+    expect(job('job-cps').audit.at(-1)?.what).toContain('Reason: "Funding ended"');
   });
 });
 
@@ -451,7 +522,10 @@ describe('the market check', () => {
 
   it('a deadline that clashes with similar jobs in the same country can be moved to a week without clashes', () => {
     const similar = marketCheck(job('job-fin'), getState(), null).similar.filter((x) => x.iso === 'SS');
-    const busy = similar.map((x) => x.closes).find((d) => similar.filter((x) => Math.abs(daysUntil(parseIso(d), x.closes)) <= 3).length >= 2);
+    const crowded = similar.map((x) => x.closes).filter((d) => similar.filter((x) => Math.abs(daysUntil(parseIso(d), x.closes)) <= 3).length >= 2);
+    expect(crowded.length).toBeGreaterThan(0);
+    const clashOn = (d: string) => marketCheck({ ...job('job-fin'), facts: { ...job('job-fin').facts, deadline: d } }, getState(), null).points.find((p) => p.key === 'clash');
+    const busy = crowded.find((d) => clashOn(d)?.fix);
     expect(busy).toBeTruthy();
     setFacts('job-fin', { deadline: busy! });
     const clash = marketCheck(job('job-fin'), getState(), null).points.find((p) => p.key === 'clash');

@@ -266,8 +266,11 @@ describe('employer demo: never calls the network', () => {
     expect(ownFormats()).toBe(formatsBefore);
     route(`#create/${imported}`);
     act(() => (container.querySelector('[aria-label="More actions for this job draft"]') as HTMLElement).click());
-    click('Delete job draft');
+    click('Delete');
+    shows('Recently deleted for 14 days');
+    click('Delete');
     expect(getState().jobs.some((j) => j.id === imported)).toBe(false);
+    expect(getState().deleted?.some((d) => d.job.id === imported)).toBe(true);
 
     expect(network).toEqual([]);
     expect(document.querySelector('script[src*="paddle"]')).toBeNull();
@@ -495,6 +498,7 @@ describe('employer demo: Reach', () => {
     expect(getState().jobs.find((j) => j.id === 'job-cps')?.reachDismissed).toContain('closing');
     route('#jobs/job-meal');
     shows('Amplify to invite people directly');
+    act(() => (container.querySelector('[aria-label="Actions for MEAL Coordinator"]') as HTMLElement).click());
     click('Share');
     shows('WhatsApp, LinkedIn');
     expect(network).toEqual([]);
@@ -559,6 +563,90 @@ describe('employer demo: approved, then a request for changes', () => {
     click('I understand · Publish free');
     shows('Live on AidJobs');
     expect(getState().jobs.find((j) => j.id === 'job-fin')?.audit.some((a) => a.what.startsWith("Published with Daniel's request for changes still open"))).toBe(true);
+  });
+});
+
+describe('employer demo: managing jobs', () => {
+  const type = (el: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  const menu = (title: string) => act(() => (container.querySelector(`[aria-label="Actions for ${title}"]`) as HTMLElement).click());
+
+  it('groups and searches the list, withdraws and deletes from a card menu, and restores from Recently deleted', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#jobs');
+    const groups = Array.from(container.querySelectorAll('section[id^="ej-group-"]')).map((g) => g.getAttribute('aria-label'));
+    expect(groups[0]).toBe('Needs you');
+    expect(groups).toContain('History');
+    expect(container.querySelector('#ej-group-needs')?.textContent).toContain('Child Protection Specialist');
+
+    const search = container.querySelector('input[aria-label="Search jobs"]') as HTMLInputElement;
+    type(search, 'kampala');
+    shows('Child Protection Specialist');
+    expect(container.textContent).not.toContain('MEAL Coordinator');
+    type(search, 'nothing like this');
+    shows('No job matches');
+    type(search, '');
+
+    menu('MEAL Coordinator');
+    click('Withdraw');
+    shows('Withdraw this vacancy?');
+    click('Withdraw');
+    expect(getState().jobs.find((j) => j.id === 'job-meal')?.closeReason).toBe('withdrawn');
+
+    menu('Communications Intern');
+    click('Delete');
+    shows('Delete “Communications Intern”?');
+    click('Delete');
+    expect(getState().jobs.some((j) => j.id === 'job-comms')).toBe(false);
+
+    menu('Logistics Assistant');
+    click('Delete');
+    const confirm = () => Array.from(container.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'Delete') as HTMLButtonElement;
+    expect(confirm().disabled).toBe(true);
+    type(container.querySelector('[role="dialog"] input:not([type])') as HTMLInputElement, 'Logistics Assistant');
+    expect(confirm().disabled).toBe(false);
+    act(() => confirm().click());
+    expect(getState().gone).toContain('job-log');
+
+    click(/Recently deleted/);
+    expect(window.location.hash).toBe('#jobs/deleted');
+    route('#jobs/deleted');
+    shows('Activity log');
+    shows('Communications Intern');
+    const restore = Array.from(container.querySelectorAll('li button')).find((b) => b.textContent?.trim() === 'Restore' && b.closest('li')?.textContent?.includes('Communications Intern')) as HTMLElement;
+    act(() => restore.click());
+    expect(getState().jobs.some((j) => j.id === 'job-comms')).toBe(true);
+
+    route('#public/job-log');
+    shows('This vacancy is no longer available');
+    expect(network).toEqual([]);
+  });
+
+  it("a job's page is in parts, with one main action and Now first", () => {
+    phone = false;
+    render();
+    route('#home');
+    route('#jobs/job-cps');
+    const parts = Array.from(container.querySelectorAll('section.aj-card[aria-label]')).map((p) => p.getAttribute('aria-label'));
+    expect(parts).toEqual(['Now', 'Job page', 'Reach', 'History']);
+    shows('Closes');
+    expect(Array.from(container.querySelectorAll('button.aj-ink-btn')).map((b) => b.textContent?.trim())).toContain('Extend');
+    phone = true;
+    render();
+    route('#home');
+    route('#jobs/job-cps');
+    const toggles = Array.from(container.querySelectorAll('section.aj-card[aria-label] > button[aria-expanded]')).map((b) => b.getAttribute('aria-expanded'));
+    expect(toggles).toEqual(['true', 'false', 'false', 'false']);
+    phone = false;
   });
 });
 

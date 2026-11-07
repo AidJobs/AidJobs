@@ -126,6 +126,11 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : job.facts.arrangement === 'remote' ? term('Remote', l) : '';
   return (
     <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
+      {job.status === 'closed' && (
+        <div className="aj-card p-3" role="status" lang="en" dir="ltr" style={{ fontWeight: 650 }}>
+          {job.closeReason === 'withdrawn' ? 'This vacancy has been withdrawn' : job.closeReason === 'filled' ? 'This position has been filled' : 'This vacancy has closed'}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <OrgMark name={s.org.name} />
         <span className="aj-muted min-w-0 flex-1 truncate">{s.org.name}</span>
@@ -177,11 +182,13 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           </span>
         )}
       </div>
-      <div>
-        <a className="aj-ink-btn" href={`${s.org.careersUrl}/apply`} target="_blank" rel="noopener noreferrer">
-          {say(`Apply on ${s.org.short}`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
-        </a>
-      </div>
+      {job.status !== 'closed' && (
+        <div>
+          <a className="aj-ink-btn" href={`${s.org.careersUrl}/apply`} target="_blank" rel="noopener noreferrer">
+            {say(`Apply on ${s.org.short}`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
+          </a>
+        </div>
+      )}
       {sections.map((sec) => (
         <section key={sec.key}>
           <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? 'en' : undefined}>{sec.title}</h3>

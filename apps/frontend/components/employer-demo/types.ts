@@ -249,7 +249,14 @@ export type Pack = { id: string; jobs: number; left: number; ends: string; at: n
 /** "Always hiring": a number of jobs each month; unused ones lapse at renewal; cancelled, it runs to the renewal date. */
 export type Subscription = { since: string; renews: string; left: number; cancelled: boolean };
 
-export type Notice = { text: string; undo?: DemoJob[] } | null;
+/** `restore` offers to bring back a job just deleted (it is in Recently deleted). */
+export type Notice = { text: string; undo?: DemoJob[]; restore?: string } | null;
+
+/** A deleted job, restorable for 14 days, then erased (plan section 17, decision 2). */
+export type DeletedJob = { job: DemoJob; at: number; by: string; told: string[] };
+
+/** The organisation's activity log: one line per deletion, restore, or erasure; never public. */
+export type Activity = { at: number; who: string; what: string };
 
 export type State = {
   v: 4;
@@ -270,4 +277,8 @@ export type State = {
   seq: number;
   /** The base JD format pattern the organisation answered "Not now" to; it is offered again only when the pattern grows. */
   baseDismissed?: string;
+  deleted?: DeletedJob[];
+  activity?: Activity[];
+  /** Jobs once published and then deleted: their shared links say "no longer available". */
+  gone?: string[];
 };

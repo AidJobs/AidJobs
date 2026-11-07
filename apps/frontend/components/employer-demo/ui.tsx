@@ -4,6 +4,7 @@ import { Sparkles, Undo2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
+import { restoreDeleted } from './actions';
 import { dismissNotice, undo, useDemo } from './store';
 import type { DemoJob, JobStatus } from './types';
 
@@ -276,6 +277,11 @@ export function NoticeBar() {
         {notice.undo && (
           <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700, cursor: 'pointer' }} onClick={undo}>
             <Undo2 size={13} strokeWidth={2} /> Undo
+          </button>
+        )}
+        {notice.restore && (
+          <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700, cursor: 'pointer' }} onClick={() => notice.restore && restoreDeleted(notice.restore)}>
+            <Undo2 size={13} strokeWidth={2} /> Restore
           </button>
         )}
         <Tip label="Dismiss">

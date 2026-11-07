@@ -1,11 +1,15 @@
 'use client';
 
-import { ArrowLeft, CalendarPlus, CheckCheck, Copy, Download, History, MapPin, Pencil, Repeat2, Share2, Sparkles, Trash2, XCircle } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Trash2 } from 'lucide-react';
+import { type ReactNode, useRef, useState } from 'react';
+import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { closeJob, deleteDraft, downloadCopy, extend, hireAgain } from './actions';
-import { addDays, daysUntil, holiday, longDate, PLACES, weekend } from './engine';
+import { approvedFor, canDelete, closeJob, downloadCopy, extend, hireAgain, isReviewable, remindPayer, remindReviewers, restoreDeleted } from './actions';
+import { addDays, daysUntil, holiday, isoDay, longDate, parseIso, PLACES, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
+import { DeleteDialog, JobMenu, WithdrawDialog } from './JobActions';
+import { erasedOn, graceEnds, inGrace, isPublished, KEEP_DELETED_DAYS, PAGE_REMOVED_DAYS, TEXT_DROPPED_DAYS } from './lifecycle';
+import type { MenuAction } from './MenuButton';
 import { BADGE, listedUntil } from './plans';
 import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
@@ -181,79 +185,81 @@ function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-function Actions({ job, s, onDialog }: { job: DemoJob; s: State; onDialog: (d: 'extend' | 'filled' | 'variant' | 'reshare') => void }) {
-  if (job.status === 'live' || job.status === 'scheduled')
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        <button type="button" className="aj-ink-btn" onClick={() => onDialog('extend')}>
-          <CalendarPlus size={14} strokeWidth={1.8} /> Extend
-        </button>
-        <button type="button" className="aj-pill" onClick={() => closeJob(job.id, 'early')}>
-          <XCircle size={14} strokeWidth={1.8} /> Close now
-        </button>
-        <button type="button" className="aj-pill" onClick={() => go('create', job.id)}>
-          <Pencil size={14} strokeWidth={1.8} /> Edit
-        </button>
-        <button type="button" className="aj-pill" onClick={() => onDialog('reshare')}>
-          <Share2 size={14} strokeWidth={1.8} /> Share
-        </button>
-        <button type="button" className="aj-pill" onClick={() => onDialog('filled')}>
-          <CheckCheck size={14} strokeWidth={1.8} /> Position filled
-        </button>
-        <button type="button" className="aj-pill" onClick={() => onDialog('variant')}>
-          <Copy size={14} strokeWidth={1.8} /> Same role, another place
-        </button>
-        {job.plan === 'free' && (
-          <button type="button" className="aj-pill" onClick={() => go('publish', job.id)}>
-            <Sparkles size={14} strokeWidth={1.8} /> Amplify
-          </button>
-        )}
-      </div>
-    );
-  if (job.status === 'closed')
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          className="aj-ink-btn"
-          onClick={() => {
-            const id = hireAgain(job.id);
-            if (id) go('create', id);
-          }}
-        >
-          <Repeat2 size={14} strokeWidth={1.8} /> Hire again
-        </button>
-        <button type="button" className="aj-pill" onClick={() => downloadCopy(job, s.org.name)}>
-          <Download size={14} strokeWidth={1.8} /> Download a copy
-        </button>
-        <button type="button" className="aj-pill" onClick={() => onDialog('variant')}>
-          <Copy size={14} strokeWidth={1.8} /> Same role, another place
-        </button>
-      </div>
-    );
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      <button type="button" className="aj-ink-btn" onClick={() => go('create', job.id)}>
-        Continue
-      </button>
-      {job.status === 'draft' && (
-        <button type="button" className="aj-pill" onClick={() => deleteDraft(job.id)}>
-          <Trash2 size={14} strokeWidth={1.8} /> Delete draft
-        </button>
-      )}
-    </div>
-  );
+type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete';
+type Open = (job: DemoJob, kind: Kind) => void;
+
+function openReview(job: DemoJob) {
+  try {
+    localStorage.setItem('aidjobs.employerDemo.panel', 'review');
+  } catch {
+    /* storage unavailable: the job opens with its usual panel */
+  }
+  go('create', job.id);
 }
 
-/** A row that can be swiped on touch screens: right to extend by a week, left to close. The same actions are buttons too. */
-function Row({ job, s }: { job: DemoJob; s: State }) {
+function hire(job: DemoJob) {
+  const id = hireAgain(job.id);
+  if (id) go('create', id);
+}
+
+/** The one next step on a card (plan section 17): what needs the user first, then what fits the job's state. */
+export function nextStep(s: State, job: DemoJob, open: Open): { label: string; run: () => void } {
+  const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
+  if (job.payRequest && job.status !== 'closed') return { label: 'Remind the payer', run: () => remindPayer(job.id) };
+  if (job.review.state === 'changes' && isReviewable(job)) return { label: 'Look at the request', run: () => openReview(job) };
+  if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => go('publish', job.id) };
+  if (job.status === 'review' && job.review.reviewers.some((r) => !r.decision)) return { label: 'Remind', run: () => remindReviewers(job.id) };
+  if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => go('create', job.id) };
+  if (job.status === 'scheduled') return { label: 'Open', run: () => go('jobs', job.id) };
+  if (job.status === 'live') return left !== null && left <= 7 ? { label: 'Extend', run: () => open(job, 'extend') } : { label: 'Share', run: () => open(job, 'share') };
+  return { label: 'Hire again', run: () => hire(job) };
+}
+
+/** The "⋯" menu, by state (plan section 17, "The menu, by state"); reviewers get none. */
+export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
+  if (s.reviewerAs) return [];
+  const del: MenuAction = { label: 'Delete', danger: true, run: () => open(job, 'delete') };
+  const copy: MenuAction = { label: 'Download a copy', run: () => downloadCopy(job, s.org.name) };
+  const variant: MenuAction = { label: 'Same role, another place', run: () => open(job, 'variant') };
+  if (job.status === 'draft' || job.status === 'review' || job.status === 'approved') {
+    return [{ label: 'Continue', run: () => go('create', job.id) }, ...(job.sections.length ? [{ label: 'Send for review', run: () => openReview(job) }, copy] : []), del];
+  }
+  if (job.status === 'scheduled') return [{ label: 'Edit', run: () => go('create', job.id) }, del];
+  if (job.status === 'live') {
+    return [
+      { label: 'Extend', run: () => open(job, 'extend') },
+      { label: 'Edit', run: () => go('create', job.id) },
+      { label: 'Share', run: () => open(job, 'share') },
+      ...(job.plan === 'free' ? [{ label: 'Amplify', run: () => go('publish', job.id) }] : []),
+      { label: 'Position filled', run: () => open(job, 'filled') },
+      { label: 'Close now', run: () => closeJob(job.id, 'early') },
+      { label: 'Withdraw', run: () => open(job, 'withdraw') },
+      variant,
+      del,
+    ];
+  }
+  return [{ label: 'Hire again', run: () => hire(job) }, copy, variant, del];
+}
+
+function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: State; kind: Kind; onClose: () => void; onDeleted?: () => void }) {
+  if (kind === 'extend') return <ExtendDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'filled') return <FilledDialog job={job} onClose={onClose} />;
+  if (kind === 'variant') return <VariantDialog job={job} s={s} onClose={onClose} />;
+  if (kind === 'share') return <ShareDialog job={job} onClose={onClose} />;
+  if (kind === 'withdraw') return <WithdrawDialog job={job} onClose={onClose} />;
+  return <DeleteDialog job={job} s={s} onClose={onClose} onDeleted={onDeleted} />;
+}
+
+/** A card that can be swiped on touch screens (right to extend by a week, left to close), with its next step and "⋯" menu. */
+function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
-  const swipeable = job.status === 'live';
+  const swipeable = job.status === 'live' && !s.reviewerAs;
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   const attention = needsYou(s, job);
+  const next = nextStep(s, job, open);
   return (
-    <li className="relative overflow-hidden rounded-[20px]">
+    <li className={dx ? 'relative overflow-hidden rounded-[20px]' : 'relative'}>
       {swipeable && dx !== 0 && (
         <div className="absolute inset-0 flex items-center justify-between px-5" style={{ background: dx > 0 ? 'var(--sage-2)' : 'var(--red-bg)', color: dx > 0 ? 'var(--sage-8)' : 'var(--red)', fontWeight: 700 }} aria-hidden>
           <span>{dx > 0 ? '+1 week' : ''}</span>
@@ -299,14 +305,14 @@ function Row({ job, s }: { job: DemoJob; s: State }) {
           </div>
           <Lifeline stage={stageOf(job, left)} attention={attention} />
         </button>
-        {swipeable && (
-          <div className="flex gap-1.5">
-            <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => extend(job.id, 7)}>
-              +1 week
+        {!s.reviewerAs && (
+          <div className="flex items-center gap-1.5">
+            <button type="button" className="aj-pill" style={{ height: 30 }} onClick={next.run}>
+              {next.label}
             </button>
-            <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => closeJob(job.id, 'early')}>
-              Close now
-            </button>
+            <span className="ml-auto">
+              <JobMenu job={job} actions={menuActions(s, job, open)} />
+            </span>
           </div>
         )}
       </div>
@@ -314,140 +320,280 @@ function Row({ job, s }: { job: DemoJob; s: State }) {
   );
 }
 
-const FILTERS = [
-  { key: 'all', label: 'All' },
+const GROUPS = [
   { key: 'needs', label: 'Needs you' },
   { key: 'live', label: 'Live' },
+  { key: 'scheduled', label: 'Scheduled' },
   { key: 'drafts', label: 'Drafts and review' },
-  { key: 'closed', label: 'History' },
+  { key: 'closed', label: 'Closed' },
+  { key: 'history', label: 'History' },
 ] as const;
 
+type GroupKey = (typeof GROUPS)[number]['key'];
+
+/** Each job in one group, by what it needs: anything waiting for the user first. */
+function groupOf(s: State, j: DemoJob): GroupKey {
+  if (needsYou(s, j) || (j.payRequest && j.status !== 'closed')) return 'needs';
+  if (j.status === 'live') return 'live';
+  if (j.status === 'scheduled') return 'scheduled';
+  if (j.status === 'closed') return inGrace(j, s.today) ? 'closed' : 'history';
+  return 'drafts';
+}
+
+function sortKey(j: DemoJob): number {
+  if (j.status === 'live' && j.facts.deadline) return parseIso(j.facts.deadline);
+  return -(j.closedAt ?? j.publishedAt ?? j.createdAt);
+}
+
+/** One part of a job's page; on phones the parts fold, and "Now" stays open. */
+function Part({ title, icon, open = false, className = '', children }: { title: string; icon?: ReactNode; open?: boolean; className?: string; children: ReactNode }) {
+  const phone = useIsPhone();
+  const [shown, setShown] = useState(open);
+  return (
+    <section className={`aj-card flex flex-col gap-2 p-3 ${className}`} aria-label={title}>
+      {phone ? (
+        <button type="button" className="flex w-full items-center gap-1.5 text-left" style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', font: 'inherit' }} aria-expanded={shown} onClick={() => setShown(!shown)}>
+          <span className="aj-section-label inline-flex flex-1 items-center gap-1" style={{ padding: 0 }}>
+            {icon} {title}
+          </span>
+          <ChevronDown size={15} strokeWidth={1.8} className="aj-faint" style={{ transform: shown ? 'rotate(180deg)' : undefined }} />
+        </button>
+      ) : (
+        <span className="aj-section-label inline-flex items-center gap-1" style={{ padding: 0 }}>
+          {icon} {title}
+        </span>
+      )}
+      {(!phone || shown) && children}
+    </section>
+  );
+}
+
+const day = (ms: number) => longDate(isoDay(ms));
+
+/** "Now": what happens next to the job, and when. */
+function NowPart({ job, s }: { job: DemoJob; s: State }) {
+  const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
+  const waiting = [...(job.reach?.candidates ?? []), ...(job.reach?.team ?? [])].filter((r) => r.status === 'waiting').length;
+  const lines: string[] = [];
+  if (job.status === 'live') {
+    if (job.facts.deadline) lines.push(`Closes ${longDate(job.facts.deadline)}${left !== null && left >= 0 ? ` · ${left === 0 ? 'today' : `${left} ${left === 1 ? 'day' : 'days'} left`}` : ''}`);
+    lines.push(`${job.plan === 'amplify' ? `Amplified: featured, “${BADGE}”` : 'Free: standard placement'} · listed until ${longDate(listedUntil(job, s.today))}`);
+  } else if (job.status === 'scheduled') {
+    lines.push(`Goes live ${job.scheduledFor ? longDate(job.scheduledFor) : 'on its date'}${job.plan === 'amplify' ? ', amplified' : ', free'}`);
+    if (waiting) lines.push(`${waiting} Reach ${waiting === 1 ? 'email goes' : 'emails go'} out when it goes live`);
+  } else if (job.status === 'closed' && job.closedAt !== undefined) {
+    const why = job.closeReason === 'filled' ? 'position filled' : job.closeReason === 'withdrawn' ? 'withdrawn' : job.closeReason === 'early' ? 'closed early' : 'reached its closing date';
+    lines.push(`Closed ${day(job.closedAt)}: ${why}`);
+    const grace = graceEnds(job);
+    lines.push(inGrace(job, s.today) && grace ? `In “Closed” until ${day(grace)}, then it moves to History` : 'In your history');
+    const removed = job.closedAt + PAGE_REMOVED_DAYS * DAY;
+    const dropped = job.closedAt + TEXT_DROPPED_DAYS * DAY;
+    lines.push(s.today < removed ? `Its public page shows “closed” until ${day(removed)}, then it is removed` : 'Its public page has been removed');
+    lines.push(s.today < dropped ? `The job description is dropped on ${day(dropped)}; the basic record stays` : 'The job description has been dropped; the basic record stays');
+  } else {
+    lines.push(`Not published yet · ${statusLine(s, job)}`);
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }}>
+        {lines.map((l) => (
+          <li key={l}>{l}</li>
+        ))}
+      </ul>
+      {job.status === 'live' && job.plan === 'free' && !s.reviewerAs && (
+        <button type="button" className="aj-text-btn self-start" onClick={() => go('publish', job.id)}>
+          Amplify this job
+        </button>
+      )}
+      {isPublished(job) && (
+        <span className="aj-faint inline-flex items-start gap-1" style={{ fontSize: 11.5, wordBreak: 'break-all' }}>
+          <MapPin size={12} strokeWidth={2} className="mt-0.5 shrink-0" /> {jobUrl(job)}
+          <span className="sr-only"> (the address never changes when you edit the text)</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** The main action on a job's page, by state (plan section 17). */
+function mainAction(job: DemoJob, open: Open): { label: string; run: () => void } {
+  if (job.status === 'live') return { label: 'Extend', run: () => open(job, 'extend') };
+  if (job.status === 'scheduled') return { label: 'Edit', run: () => go('create', job.id) };
+  if (job.status === 'closed') return { label: 'Hire again', run: () => hire(job) };
+  return { label: 'Continue', run: () => go('create', job.id) };
+}
+
 function JobDetail({ job, s }: { job: DemoJob; s: State }) {
-  const [dialog, setDialog] = useState<null | 'extend' | 'filled' | 'variant' | 'reshare'>(null);
-  const removal = job.closedAt ? Math.round((job.closedAt + 30 * DAY - s.today) / DAY) : null;
-  const dropped = job.closedAt ? Math.round((job.closedAt + 90 * DAY - s.today) / DAY) : null;
+  const [dialog, setDialog] = useState<Kind | null>(null);
+  const open: Open = (_j, kind) => setDialog(kind);
+  const main = mainAction(job, open);
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="aj-icon-btn" onClick={() => go('jobs')} aria-label="Back to jobs">
+          <ArrowLeft size={15} strokeWidth={1.8} />
+        </button>
+        <div className="min-w-0 flex-1 basis-[220px]">
+          <div className="truncate" style={{ fontWeight: 700, fontSize: 15 }}>
+            {job.facts.title}
+          </div>
+          <div className="aj-faint">
+            {job.facts.location ? `${job.facts.location} · ` : ''}
+            {statusLine(s, job)}
+          </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <PlanBadge plan={job.plan} />
+          {!s.reviewerAs && (
+            <>
+              <button type="button" className="aj-ink-btn" onClick={main.run}>
+                {main.label}
+              </button>
+              <JobMenu job={job} actions={menuActions(s, job, open)} />
+            </>
+          )}
+        </div>
+      </div>
+      <Lifeline stage={stageOf(job, job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null)} attention={needsYou(s, job)} />
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]" style={{ gridTemplateRows: 'auto auto 1fr' }}>
+        <Part title="Now" open className="lg:col-start-2 lg:row-start-1">
+          <NowPart job={job} s={s} />
+        </Part>
+        <Part title="Job page" className="lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:p-5">
+          <JobPageLangs job={job} s={s} />
+        </Part>
+        <Part title="Reach" className="lg:col-start-2 lg:row-start-2">
+          <ReachLog job={job} s={s} onAmplify={() => go('publish', job.id)} />
+        </Part>
+        <Part title="History" icon={<History size={12} strokeWidth={2} />} className="lg:col-start-2 lg:row-start-3">
+          <ol className="flex flex-col gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {[...job.audit].reverse().map((a, i) => (
+              <li key={i} className="flex flex-col">
+                <span>{a.what}</span>
+                <span className="aj-faint" style={{ fontSize: 11 }}>
+                  {a.who} · {new Date(a.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </Part>
+      </div>
+      {dialog && <JobDialog job={job} s={s} kind={dialog} onClose={() => setDialog(null)} onDeleted={() => go('jobs')} />}
+    </div>
+  );
+}
+
+/** Recently deleted: restorable for 14 days, then erased; with the organisation's activity log. */
+function RecentlyDeleted({ s }: { s: State }) {
+  const deleted = s.deleted ?? [];
+  return (
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex items-center gap-2">
         <button type="button" className="aj-icon-btn" onClick={() => go('jobs')} aria-label="Back to jobs">
           <ArrowLeft size={15} strokeWidth={1.8} />
         </button>
-        <div className="min-w-0 flex-1">
-          <div className="truncate" style={{ fontWeight: 700, fontSize: 15 }}>
-            {job.facts.title}
-          </div>
-          <div className="aj-faint">{statusLine(s, job)}</div>
-        </div>
-        <PlanBadge plan={job.plan} />
+        <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
+          Recently deleted
+        </h1>
       </div>
-      <Lifeline stage={stageOf(job, job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null)} attention={needsYou(s, job)} />
-      <Actions job={job} s={s} onDialog={setDialog} />
-      {job.status === 'closed' && removal !== null && (
-        <div className="aj-card flex flex-col gap-1 p-3" role="status">
-          <span style={{ fontWeight: 650 }}>{removal > 0 ? `The public page is removed in ${removal} days` : 'The public page has been removed'}</span>
-          <span className="aj-muted">
-            It shows &ldquo;closed&rdquo; until then. The description is dropped {dropped !== null && dropped > 0 ? `in ${dropped} days` : 'now'} (90 days after closing); the job&apos;s basic record stays in your history. Download a copy if you need one.
-          </span>
-        </div>
-      )}
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="aj-card p-4 lg:p-6">
-          <JobPageLangs job={job} s={s} />
-        </div>
-        <div className="flex flex-col gap-4">
-          {job.plan && job.status !== 'closed' && (
-            <section className="aj-card flex flex-col gap-1 p-3">
-              <span className="aj-section-label" style={{ padding: 0 }}>
-                Plan
-              </span>
-              <span className="aj-muted">
-                {job.plan === 'amplify' ? `Amplified: featured, “${BADGE}”` : 'Free: standard placement'} · listed until {longDate(listedUntil(job, s.today))}
-              </span>
-              {job.plan === 'free' && (
-                <button type="button" className="aj-text-btn self-start" onClick={() => go('publish', job.id)}>
-                  Amplify this job
-                </button>
-              )}
-            </section>
-          )}
-          <section className="aj-card flex flex-col gap-2 p-3">
-            <span className="aj-section-label" style={{ padding: 0 }}>
-              Reach
-            </span>
-            <ReachLog job={job} s={s} onAmplify={() => go('publish', job.id)} />
-          </section>
-          <section className="aj-card flex flex-col gap-2 p-3">
-            <span className="aj-section-label inline-flex items-center gap-1" style={{ padding: 0 }}>
-              <History size={12} strokeWidth={2} /> History
-            </span>
-            <ol className="flex flex-col gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {[...job.audit].reverse().map((a, i) => (
-                <li key={i} className="flex flex-col">
-                  <span>{a.what}</span>
-                  <span className="aj-faint" style={{ fontSize: 11 }}>
-                    {a.who} · {new Date(a.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+      <span className="aj-muted">Deleted jobs can be restored, at the same address, for {KEEP_DELETED_DAYS} days. Then they are erased; receipts and a line in the activity log below stay.</span>
+      {deleted.length === 0 ? (
+        <div className="aj-card aj-muted p-6">Nothing deleted.</div>
+      ) : (
+        <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {deleted.map((d) => {
+            const block = canDelete(s, d.job);
+            return (
+              <li key={d.job.id} className="aj-card flex flex-wrap items-center gap-2 p-3">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span style={{ fontWeight: 650 }}>{d.job.facts.title || 'Untitled job'}</span>
+                  <span className="aj-faint">
+                    Deleted {day(d.at)} by {d.by}
+                    {d.told.length ? `; told ${d.told.join(', ')}` : ''} · erased on {day(erasedOn(d.at))}
                   </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-          <section className="aj-card flex flex-col gap-1 p-3">
-            <span className="aj-section-label inline-flex items-center gap-1" style={{ padding: 0 }}>
-              <MapPin size={12} strokeWidth={2} /> Public address
-            </span>
-            <span className="aj-muted" style={{ wordBreak: 'break-all' }}>
-              {jobUrl(job)}
-            </span>
-            <span className="aj-faint" style={{ fontSize: 11 }}>
-              The address never changes when you edit the text.
-            </span>
-          </section>
-        </div>
-      </div>
-      {dialog === 'extend' && <ExtendDialog job={job} s={s} onClose={() => setDialog(null)} />}
-      {dialog === 'filled' && <FilledDialog job={job} onClose={() => setDialog(null)} />}
-      {dialog === 'variant' && <VariantDialog job={job} s={s} onClose={() => setDialog(null)} />}
-      {dialog === 'reshare' && <ShareDialog job={job} onClose={() => setDialog(null)} />}
+                </span>
+                <button type="button" className="aj-pill" disabled={Boolean(block)} title={block ?? undefined} onClick={() => restoreDeleted(d.job.id)}>
+                  Restore
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <span className="aj-section-label" style={{ padding: 0 }}>
+        Activity log
+      </span>
+      {(s.activity ?? []).length === 0 ? (
+        <span className="aj-faint">Nothing yet.</span>
+      ) : (
+        <ol className="flex flex-col gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {(s.activity ?? []).map((a, i) => (
+            <li key={i} className="flex flex-col">
+              <span>{a.what}</span>
+              <span className="aj-faint" style={{ fontSize: 11 }}>
+                {a.who} · {new Date(a.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
 
 export default function Jobs({ id }: { id?: string }) {
   const s = useDemo();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all');
+  const [query, setQuery] = useState('');
+  const [dialog, setDialog] = useState<{ job: DemoJob; kind: Kind } | null>(null);
+  if (id === 'deleted') return <RecentlyDeleted s={s} />;
   const job = id ? s.jobs.find((j) => j.id === id) : undefined;
   if (job) return <JobDetail job={job} s={s} />;
-  const list = s.jobs.filter((j) => {
-    if (filter === 'needs') return needsYou(s, j);
-    if (filter === 'live') return j.status === 'live' || j.status === 'scheduled';
-    if (filter === 'drafts') return j.status === 'draft' || j.status === 'review' || j.status === 'approved';
-    if (filter === 'closed') return j.status === 'closed';
-    return true;
-  });
+  const open: Open = (j, kind) => setDialog({ job: j, kind });
+  const q = query.trim().toLowerCase();
+  const found = s.jobs.filter((j) => !q || [j.facts.title, j.facts.location, j.facts.grade].some((x) => x.toLowerCase().includes(q)));
+  const groups = GROUPS.map((g) => ({ ...g, jobs: found.filter((j) => groupOf(s, j) === g.key).sort((a, b) => sortKey(a) - sortKey(b)) })).filter((g) => g.jobs.length);
+  const deleted = (s.deleted ?? []).length;
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
-      <div className="flex items-end gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
           Jobs
         </h1>
         <span className="aj-faint ml-auto hidden sm:inline">On a phone, swipe a live job right to extend it a week, left to close it.</span>
       </div>
-      <div className="aj-no-scrollbar flex gap-1.5 overflow-x-auto" role="radiogroup" aria-label="Show">
-        {FILTERS.map((f) => (
-          <button key={f.key} type="button" className="aj-pill shrink-0" data-active={filter === f.key} onClick={() => setFilter(f.key)} role="radio" aria-checked={filter === f.key}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-      {list.length === 0 ? (
-        <div className="aj-card p-6 aj-muted">Nothing here.</div>
-      ) : (
-        <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {list.map((j) => (
-            <Row key={j.id} job={j} s={s} />
+      <label className="flex items-center gap-2 rounded-2xl border px-3 aj-hair" style={{ background: 'var(--surface)' }}>
+        <Search size={15} strokeWidth={1.8} className="aj-faint shrink-0" />
+        <input className="min-w-0 flex-1" style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', color: 'var(--text)', height: 40 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by title, duty station, or grade" aria-label="Search jobs" />
+      </label>
+      {groups.length > 1 && (
+        <nav className="aj-no-scrollbar flex gap-1.5 overflow-x-auto" aria-label="Jump to">
+          {groups.map((g) => (
+            <button key={g.key} type="button" className="aj-pill shrink-0" onClick={() => document.getElementById(`ej-group-${g.key}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })}>
+              {g.label} · {g.jobs.length}
+            </button>
           ))}
-        </ul>
+        </nav>
       )}
+      {groups.length === 0 ? (
+        <div className="aj-card p-6 aj-muted">{q ? `No job matches “${query.trim()}”.` : 'Nothing here.'}</div>
+      ) : (
+        groups.map((g) => (
+          <section key={g.key} id={`ej-group-${g.key}`} className="flex flex-col gap-2" aria-label={g.label} style={{ scrollMarginTop: 12 }}>
+            <h2 className="aj-section-label" style={{ padding: 0, margin: 0 }}>
+              {g.label} · {g.jobs.length}
+            </h2>
+            <ul className="flex flex-col gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {g.jobs.map((j) => (
+                <Row key={j.id} job={j} s={s} open={open} />
+              ))}
+            </ul>
+          </section>
+        ))
+      )}
+      <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => go('jobs', 'deleted')}>
+        <Trash2 size={13} strokeWidth={1.8} /> Recently deleted{deleted ? ` · ${deleted}` : ''}
+      </button>
+      {dialog && <JobDialog job={dialog.job} s={s} kind={dialog.kind} onClose={() => setDialog(null)} />}
     </div>
   );
 }

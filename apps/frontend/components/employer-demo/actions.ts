@@ -29,6 +29,7 @@ import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LI
 import type { Fix } from './market';
 import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
 import { addRound } from './invites';
+import { isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
@@ -1025,11 +1026,13 @@ export function extend(id: string, days: number) {
   }));
 }
 
-export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', tellReach = false) {
+/** Closes a live or scheduled job. `note` (a withdrawal's reason) goes into the job's history, which is never public. */
+export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', tellReach = false, note = '') {
   const j = getState().jobs.find((x) => x.id === id);
-  if (!j) return;
-  const label = reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early';
-  changeWithUndo(`${j.facts.title}: ${label.toLowerCase()}${tellReach ? '; the people it was shared with are told (simulated)' : ''}`, (st) => ({
+  if (!j || !ownerOnly()) return;
+  const label = `${reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early'}${note.trim() ? `. Reason: "${note.trim()}"` : ''}`;
+  const short = reason === 'filled' ? 'position filled' : reason === 'withdrawn' ? 'withdrawn' : 'closed early';
+  changeWithUndo(`${j.facts.title}: ${short}${tellReach ? '; the people it was shared with are told (simulated)' : ''}`, (st) => ({
     ...st,
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'closed', closedAt: st.today, closeReason: reason, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: label }] } : x)),
     inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)),
@@ -1040,12 +1043,67 @@ export function letClose(id: string) {
   update((s) => ({ ...s, inbox: s.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)), notice: { text: 'It will close on its date. Nothing else to do.' } }));
 }
 
-export function deleteDraft(id: string) {
-  if (!ownerOnly()) return;
-  const j = getState().jobs.find((x) => x.id === id);
-  const inReview = j?.status === 'review' || j?.status === 'approved';
-  const what = inReview ? `Withdrawn from review and deleted: ${j?.facts.title || 'untitled'}. Reviewers were told (simulated)` : `Job draft deleted: ${j?.facts.title || 'untitled'}`;
-  changeWithUndo(what, (s) => ({ ...s, jobs: s.jobs.filter((x) => x.id !== id) }));
+/** Anyone who can publish deletes drafts and jobs in review; only the owner deletes a scheduled, live, or closed job; reviewers never. */
+export function canDelete(s: State, j: DemoJob): string | null {
+  if (s.reviewerAs) return 'Reviewers cannot delete jobs';
+  if (isPublished(j) && s.me.role !== 'owner') return 'Only the owner can delete a job that has been published';
+  return null;
+}
+
+/** The people a deletion can be told to, by group. */
+export function involved(s: State, j: DemoJob): { reviewers: string[]; payer: string | null; reach: number; team: string[] } {
+  const reviewers = j.review.reviewers.map((r) => r.name);
+  return {
+    reviewers,
+    payer: j.payRequest?.name ?? null,
+    reach: (j.reach?.candidates.length ?? 0) + (j.reach?.team.length ?? 0),
+    team: s.team.filter((p) => p.id !== s.me.id && !reviewers.includes(p.name)).map((p) => p.name),
+  };
+}
+
+export type Tell = { reviewers?: boolean; payer?: boolean; reach?: boolean; team?: boolean };
+
+/**
+ * Deletes a job at any stage (plan section 17, decision 2). It goes to Recently deleted for 14 days, without its pending payment request,
+ * its emails waiting for go-live, and its inbox items. Receipts and the free job counted for its month stay; a job once published leaves
+ * a "no longer available" answer for links already shared; one line goes into the activity log; the people chosen are told (simulated).
+ */
+export function deleteJob(id: string, tell: Tell = {}): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || canDelete(s, j)) return false;
+  const people = involved(s, j);
+  const told = [...(tell.reviewers ? people.reviewers : []), ...(tell.payer && people.payer ? [people.payer] : []), ...(tell.reach && people.reach ? [`the ${people.reach} people Reach invited`] : []), ...(tell.team ? people.team : [])];
+  const sent = (r: Recipient) => r.status !== 'waiting';
+  const kept: DemoJob = { ...j, payRequest: undefined, reach: j.reach ? { ...j.reach, candidates: j.reach.candidates.filter(sent), team: j.reach.team.filter(sent) } : j.reach };
+  const title = j.facts.title || 'untitled job';
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.filter((x) => x.id !== id),
+    deleted: [{ job: kept, at: Date.now(), by: st.me.name, told }, ...(st.deleted ?? [])],
+    gone: isPublished(j) ? [...new Set([...(st.gone ?? []), id])] : st.gone,
+    activity: [{ at: Date.now(), who: st.me.name, what: `Deleted "${title}"${told.length ? `; told ${told.join(', ')} (simulated)` : ''}` }, ...(st.activity ?? [])],
+    inbox: st.inbox.filter((i) => i.jobId !== id),
+    notice: { text: `Deleted "${title}". It is in Recently deleted for 14 days.`, restore: id },
+  }));
+  return true;
+}
+
+/** Brings back a deleted job, at the same address, within its 14 days. */
+export function restoreDeleted(id: string): boolean {
+  const s = getState();
+  const d = (s.deleted ?? []).find((x) => x.job.id === id);
+  if (!d || canDelete(s, d.job)) return false;
+  const title = d.job.facts.title || 'untitled job';
+  update((st) => ({
+    ...st,
+    jobs: [d.job, ...st.jobs],
+    deleted: (st.deleted ?? []).filter((x) => x.job.id !== id),
+    gone: (st.gone ?? []).filter((x) => x !== id),
+    activity: [{ at: Date.now(), who: st.me.name, what: `Restored "${title}"` }, ...(st.activity ?? [])],
+    notice: { text: `Restored "${title}".` },
+  }));
+  return true;
 }
 
 /** A new draft from an earlier job: same text, fresh dates; optionally for another duty station. */

@@ -366,7 +366,7 @@ As in round 4: type check, lint, the frontend tests with new tests for each rule
 
 ### Build phases (tick when pushed)
 
-- [ ] **Phase 1:** the grouped list with search, the next step and "⋯" menu on every card, the job's page in parts with one main action, Withdraw, Delete with Recently deleted.
+- [x] **Phase 1:** the grouped list with search, the next step and "⋯" menu on every card, the job's page in parts with one main action, Withdraw, Delete with Recently deleted. (Done 7 November 2026. The draft editor's ⋯ menu uses the same Delete dialog; a deleted job's own Undo became Restore, in the notice and on Recently deleted; a closed job's page shows "This vacancy has closed", "This position has been filled", or "This vacancy has been withdrawn", without the Apply button, ahead of phase 3's fuller closed-page preview. A test of the market check that depended on today's date was made date-proof.)
 - [ ] **Phase 2:** scheduled jobs (Publish now, Change the date, Back to draft), what changed since publishing and the offer to tell invited people, the listing end of a free job.
 - [ ] **Phase 3:** Improve after publishing, what candidates see when a job is closed, the 14-day grace period and Reopen.
 

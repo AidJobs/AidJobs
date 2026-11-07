@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import { rollBilling } from './plans';
 import { goLive } from './invites';
+import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
 import { initialState } from './sample';
 import type { DemoJob, State } from './types';
@@ -24,7 +25,7 @@ function save(s: State) {
 
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline; lapses and renews paid jobs. */
 function normalise(s0: State): State {
-  const s = goLive(rollBilling(s0));
+  const s = purgeDeleted(goLive(rollBilling(s0)));
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
     const tags = outlineOrder(j0.tags);

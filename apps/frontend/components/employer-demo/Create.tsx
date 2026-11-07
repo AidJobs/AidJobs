@@ -4,11 +4,12 @@ import { ArrowLeft, FileText, History, ListTree, Maximize2, MessagesSquare, Mini
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, approvedFor, deleteDraft, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
+import { approvalRequired, approvedFor, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ChatPanel, DocumentView, openChecks, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
 import { statusLine } from './Home';
+import { DeleteDialog } from './JobActions';
 import MenuButton from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
 import { go, useDemo } from './store';
@@ -84,6 +85,7 @@ export default function Create({ id }: { id?: string }) {
   const [chatFull, setChatFull] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,18 +165,7 @@ export default function Create({ id }: { id?: string }) {
             ...(phone && job.sections.length && isReviewable(job) ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
             ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
-            ...(job.status === 'draft' || job.status === 'review' || job.status === 'approved'
-              ? [
-                  {
-                    label: job.status === 'draft' ? 'Delete job draft' : 'Withdraw from review and delete',
-                    danger: true,
-                    run: () => {
-                      deleteDraft(job.id);
-                      go('create');
-                    },
-                  },
-                ]
-              : []),
+            { label: 'Delete', danger: true, run: () => setDeleteOpen(true) },
           ]}
         />
       )}
@@ -299,6 +290,7 @@ export default function Create({ id }: { id?: string }) {
         )}
         {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
         {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
+        {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go('create')} />}
       </div>
     );
   }
@@ -378,6 +370,7 @@ export default function Create({ id }: { id?: string }) {
       )}
       {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
       {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
+      {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go('create')} />}
     </div>
   );
 }
