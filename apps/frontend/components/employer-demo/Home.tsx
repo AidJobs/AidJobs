@@ -27,7 +27,7 @@ import {
 import Composer from './Composer';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { changeSummary, tellOffer } from './changes';
-import { currentMonth, delisted, FREE_PER_MONTH, freeLeft, LISTED_DAYS, listingEnd, listingEndsIn, monthName } from './plans';
+import { currentMonth, delisted, FREE_PER_MONTH, freeLeft, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn, monthName } from './plans';
 import { reachMoment } from './invites';
 import { go, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
@@ -161,7 +161,7 @@ function briefing(s: State): Brief[] {
         id: `list-${j.id}`,
         icon: <Clock size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />,
         title: `${j.facts.title}: its free listing ends ${ends === 0 ? 'today' : ends === 1 ? 'tomorrow' : `in ${ends} days`}`,
-        body: `A free job is listed ${LISTED_DAYS.free} days; this one closes on ${longDate(j.facts.deadline)}. Amplify keeps it listed until then, or close it on ${longDate(end)}, or let it leave AidJobs' lists (its page still opens from links).`,
+        body: `A free job is listed ${LISTED_DAYS.free} days; this one closes on ${longDate(j.facts.deadline)}. Amplify keeps it listed until ${listedUntil({ ...j, plan: 'amplify' }, s.today) === j.facts.deadline ? 'then' : longDate(listedUntil({ ...j, plan: 'amplify' }, s.today))}, or close it on ${longDate(end)}, or let it leave AidJobs' lists (its page still opens from links).`,
         actions: [
           { label: 'Amplify', run: () => go('publish', j.id), primary: true },
           { label: `Close on ${shortDate(end)}`, run: () => closeAtListingEnd(j.id) },

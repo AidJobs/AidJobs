@@ -268,7 +268,7 @@ export type Subscription = { since: string; renews: string; left: number; cancel
 export type Notice = { text: string; undo?: DemoJob[]; restore?: string } | null;
 
 /** A deleted job, restorable for 14 days, then erased (plan section 17, decision 2). */
-export type DeletedJob = { job: DemoJob; at: number; by: string; told: string[] };
+export type DeletedJob = { job: DemoJob; at: number; by: string; told: string[]; was?: JobStatus };
 
 /** The organisation's activity log: one line per deletion, restore, or erasure; never public. */
 export type Activity = { at: number; who: string; what: string };

@@ -38,6 +38,16 @@ export function reachUsed(job: DemoJob): number {
   return (job.reach?.candidates.length ?? 0) + (job.reach?.team.length ?? 0) + (job.reach?.updates ?? []).reduce((n, u) => n + u.count, 0);
 }
 
+/** The people Reach has actually emailed for a job, each address once; addresses only waiting for go-live are not counted. */
+export function invitedCount(job: DemoJob): number {
+  return new Set([...(job.reach?.candidates ?? []), ...(job.reach?.team ?? [])].filter((r) => r.status !== 'waiting' && r.status !== 'failed').map((r) => r.email)).size;
+}
+
+/** Reach emails still available to the job: every email counts, invitations and notices alike. */
+export function reachRoom(job: DemoJob): number {
+  return Math.max(0, REACH_EMAILS - reachUsed(job));
+}
+
 /** Who the next sending goes to: not unsubscribed, not invited before, within the allowance. */
 export function recipientsOf(job: DemoJob, plan: ReachPlan): { candidates: string[]; team: string[]; skipped: string[] } {
   const before = new Set([...(job.reach?.candidates ?? []), ...(job.reach?.team ?? [])].map((r) => r.email));

@@ -33,7 +33,7 @@ import {
   FREE_PER_MONTH,
   firstOfNextMonth,
   freeLeft,
-  hasFreeUse,
+  countedFor,
   LISTED_DAYS,
   listedUntil,
   monthFor,
@@ -319,6 +319,9 @@ function ReportDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
       }
     >
       <div className="flex flex-col gap-3" lang="en" dir="ltr">
+        <span className="self-start">
+          <DemoMark label="Simulated · nothing leaves this browser" />
+        </span>
         <div className="flex flex-col gap-1" role="radiogroup" aria-label="Why are you reporting it?" onKeyDown={radioKeys}>
           <span style={{ fontWeight: 650 }}>Why are you reporting it?</span>
           {REPORT_REASONS.map((r) => (
@@ -329,7 +332,7 @@ function ReportDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
         </div>
         <textarea style={{ ...inputStyle, minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} aria-label="Anything else we should know (optional)" placeholder="Anything else we should know (optional)" />
         <input style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Your email, if you want a reply (optional)" placeholder="Your email, if you want a reply (optional)" inputMode="email" />
-        {!emailOk && <span style={{ color: 'var(--amber)' }}>Check the email address.</span>}
+        {!emailOk && <span style={{ color: 'var(--red)' }}>Check the email address.</span>}
         <span className="aj-faint">No account needed. The employer is not told who reported it.</span>
       </div>
     </Dialog>
@@ -891,7 +894,8 @@ export default function Publish({ id }: { id?: string }) {
   const nowMonth = currentMonth(s);
   const month = monthFor(s, schedule);
   const nextFirst = firstOfNextMonth(nowMonth);
-  const counted = hasFreeUse(s, job.id);
+  const counted = countedFor(s, job.id, month);
+  const earlier = counted ? null : (s.freeUses.find((u) => u.jobId === job.id && u.month < month)?.month ?? null);
   const freeOk = canGoFree(s, job.id, schedule);
   const onHand = nextPaidJob(s);
   const onHandCount = paidJobsLeft(s);
@@ -1053,7 +1057,9 @@ export default function Publish({ id }: { id?: string }) {
             {!upgrade && !prepaid && (
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
-                  {counted ? 'This job already counts as one of your free jobs: it was downloaded or sent for review.' : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}`}
+                  {counted
+                    ? `This job already counts as one of ${monthName(month)}'s free jobs: it was downloaded or sent for review.`
+                    : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}${earlier ? `. It counted against ${monthName(earlier)}'s free jobs, which stays used; going live in ${monthName(month)} uses one of ${monthName(month)}'s` : ''}`}
                 </span>
                 <FreeTerms s={s} />
                 {!freeOk && (

@@ -336,8 +336,9 @@ export function PlanBadge({ plan }: { plan: DemoJob['plan'] }) {
 
 /** The single notice at the bottom of the screen. It stays until it is dismissed or replaced; it never times out. */
 export function NoticeBar() {
-  const { notice } = useDemo();
+  const { notice, deleted } = useDemo();
   if (!notice) return null;
+  const restorable = Boolean(notice.restore && (deleted ?? []).some((d) => d.job.id === notice.restore));
   return (
     <div className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3" style={{ bottom: 'max(16px, env(safe-area-inset-bottom))' }}>
       <div className="pointer-events-auto flex max-w-[560px] items-center gap-2 rounded-full px-4 py-2" style={{ background: 'var(--ink)', color: 'var(--on-ink)' }} role="status" aria-live="polite">
@@ -347,7 +348,7 @@ export function NoticeBar() {
             <Undo2 size={13} strokeWidth={2} /> Undo
           </button>
         )}
-        {notice.restore && (
+        {restorable && notice.restore && (
           <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700, cursor: 'pointer' }} onClick={() => notice.restore && restoreDeleted(notice.restore)}>
             <Undo2 size={13} strokeWidth={2} /> Restore
           </button>

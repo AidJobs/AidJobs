@@ -6,7 +6,7 @@ import { goLive } from './invites';
 import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
 import { initialState } from './sample';
-import type { DemoJob, State } from './types';
+import type { DemoJob, Recipient, State } from './types';
 
 /** Everything the demo keeps lives in this browser only, under its own keys, apart from the public site's. */
 export const STORAGE_KEY = 'aidjobs.employerDemo.v4';
@@ -116,13 +116,32 @@ export function changeWithUndo(text: string, fn: (s: State) => State) {
   update((s) => ({ ...fn(s), notice: { text, undo: s.jobs } }));
 }
 
-/** Undo puts the jobs back, except what Reach has already sent: an email cannot be unsent. */
+/**
+ * The Reach record after an undo: everything queued or sent since stays (an email cannot be unsent), and the emails that were only waiting
+ * for go-live, with the date they waited for, come back as they were (Back to draft and Change the date are undone in full).
+ */
+function undoReach(old: DemoJob['reach'], now: DemoJob['reach']): DemoJob['reach'] {
+  if (!old || ![...old.candidates, ...old.team].some((r) => r.status === 'waiting')) return now;
+  const base = now ?? { ...old, candidates: [], team: [], rounds: [] };
+  const back = (was: Recipient[], is: Recipient[]) => {
+    const out = is.filter((r) => r.status !== 'waiting');
+    return [...out, ...was.filter((r) => r.status === 'waiting' && !out.some((x) => x.email === r.email && x.round === r.round))];
+  };
+  return {
+    ...base,
+    candidates: back(old.candidates, base.candidates),
+    team: back(old.team, base.team),
+    rounds: [...old.rounds, ...base.rounds.filter((r) => !old.rounds.some((o) => o.n === r.n))],
+  };
+}
+
+/** Undo puts the jobs back, except what Reach has sent since: an email cannot be unsent. */
 export function undo() {
   update((s) => {
     if (!s.notice?.undo) return s;
     const jobs = s.notice.undo.map((old) => {
       const now = s.jobs.find((j) => j.id === old.id);
-      return now ? { ...old, reach: now.reach } : old;
+      return now ? { ...old, reach: undoReach(old.reach, now.reach) } : old;
     });
     return { ...s, jobs, notice: { text: 'Undone' } };
   });

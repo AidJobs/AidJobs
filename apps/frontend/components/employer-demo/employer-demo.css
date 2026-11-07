@@ -45,6 +45,26 @@
   --ej-ring-soft: color-mix(in srgb, var(--sage-5) 20%, transparent);
 }
 
+/* Native checkboxes and date pickers in the palette and the theme. */
+.aj-root:has(.ej-app) :is(input[type='checkbox'], input[type='radio']) {
+  accent-color: var(--sage-7);
+}
+
+.aj-root[data-theme='dark']:has(.ej-app) {
+  color-scheme: dark;
+}
+
+/* A destructive action (Delete): red, with text that keeps its contrast in both themes. */
+.aj-root .ej-danger-btn {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--on-ink);
+}
+
+.aj-root .ej-danger-btn:disabled {
+  opacity: 0.45;
+}
+
 .aj-root:has(.ej-app) :focus-visible {
   outline: 2px solid var(--ej-ring);
   outline-offset: 2px;
@@ -298,7 +318,13 @@
   }
 
   .aj-root .ej-next {
-    padding: 0 9px;
+    height: 34px;
+    padding: 0 10px;
+  }
+
+  .aj-root .ej-jobrow .aj-icon-btn {
+    width: 34px;
+    height: 34px;
   }
 }
 

@@ -4,15 +4,17 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Sparkles, Trash2
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { approvedFor, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
+import { approvedFor, buy, canDelete, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
+import { invitedCount, reachRoom } from './invites';
+import { Checkout } from './Pricing';
 import { changesSince, changeSummary, tellOffer } from './changes';
 import BeforePublish from './Checks';
 import { addDays, daysUntil, holiday, isoDay, longDate, parseIso, PLACES, shortDate, weekend } from './engine';
 import { needsYou, openJob, statusLine } from './Home';
-import { BackToDraftDialog, DeleteDialog, JobMenu, PublishNowDialog, RescheduleDialog, TellDialog, WithdrawDialog } from './JobActions';
+import { BackToDraftDialog, DeleteDialog, JobMenu, PublishNowDialog, RescheduleDialog, TellDialog, TellInvited, WithdrawDialog } from './JobActions';
 import { canReopen, erasedOn, graceEnds, inGrace, isPublished, KEEP_DELETED_DAYS, PAGE_REMOVED_DAYS, pageRemoved, TEXT_DROPPED_DAYS, textDropped } from './lifecycle';
 import type { MenuAction } from './MenuButton';
-import { BADGE, delisted, listedUntil, listingEnd, listingEndsIn, nextPaidJob, singlePrice, usd } from './plans';
+import { BADGE, delisted, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn, nextPaidJob, singlePrice, usd } from './plans';
 import { JobPageLangs, jobUrl } from './Publish';
 import { ReachLog } from './Reach';
 import { go, notify, useDemo } from './store';
@@ -32,9 +34,19 @@ function dateWarnings(job: DemoJob, date: string): string[] {
 /** Reopen within the 14 days (decision 5): a new closing date, with Extend's checks; a free job keeps its listing period. */
 function ReopenDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
   const [date, setDate] = useState(addDays(s.today, 14));
+  const [paying, setPaying] = useState(false);
+  const [declined, setDeclined] = useState(false);
   const ended = job.plan === 'free' && listingEnd(job, s.today) < isoDay(s.today);
   const block = reopenBlock(s, job, date, ended);
   const end = listingEnd(job, s.today);
+  const ampEnd = listingEnd({ ...job, plan: 'amplify' }, s.today);
+  const price = singlePrice(s);
+  const go = () => {
+    setDeclined(false);
+    if (!ended) return reopen(job.id, date) && onClose();
+    if (nextPaidJob(s)) return reopen(job.id, date, true, 'onHand') && onClose();
+    setPaying(true);
+  };
   return (
     <Dialog
       title="Reopen this job?"
@@ -45,8 +57,8 @@ function ReopenDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
           <button type="button" className="aj-pill" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="aj-ink-btn" disabled={Boolean(block)} onClick={() => reopen(job.id, date, ended) && onClose()}>
-            {block ?? (ended ? `Reopen with Amplify · ${nextPaidJob(s) ? 'uses 1 package job' : usd(singlePrice(s).amount)}` : `Reopen until ${longDate(date)}`)}
+          <button type="button" className="aj-ink-btn" disabled={Boolean(block)} onClick={go}>
+            {block ?? (ended ? `Reopen with Amplify · ${nextPaidJob(s) ? 'uses 1 package job' : usd(price.amount)}` : `Reopen until ${longDate(date)}`)}
           </button>
         </div>
       }
@@ -73,12 +85,32 @@ function ReopenDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
         ))}
         {job.plan === 'free' &&
           (ended ? (
-            <span style={{ color: 'var(--amber)' }}>Its free listing period ended on {longDate(end)}. Amplify reopens it, listed until its new closing date. Simulated checkout: no card is charged.</span>
+            <span style={{ color: 'var(--amber)' }}>
+              Its free listing period ended on {longDate(end)}. Amplify reopens it, listed until {longDate(date && date < ampEnd ? date : ampEnd)}
+              {date > ampEnd ? ` (${LISTED_DAYS.amplify} days from when it was first published)` : ''}.
+            </span>
           ) : (
             <span className="aj-muted">A free job keeps its listing period: listed on AidJobs until {longDate(end)}{date > end ? '; after that its page still opens from links' : ''}.</span>
           ))}
+        {declined && <span style={{ color: 'var(--red)' }}>The card was declined. The job stays closed; nothing was charged. (Simulated.)</span>}
         <span className="aj-faint">A proposal in the demo: reopening is a new step in a job&apos;s life, which needs a contract decision before production.</span>
       </div>
+      {paying && (
+        <Checkout
+          item={`Amplify: ${job.facts.title}`}
+          amount={usd(price.amount)}
+          onPaid={() => {
+            buy(price.key, job.facts.title);
+            setPaying(false);
+            if (reopen(job.id, date, true, 'direct')) onClose();
+          }}
+          onDeclined={() => {
+            setPaying(false);
+            setDeclined(true);
+          }}
+          onClose={() => setPaying(false)}
+        />
+      )}
     </Dialog>
   );
 }
@@ -136,8 +168,8 @@ function ExtendDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
 }
 
 function FilledDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
-  const reached = (job.reach?.candidates.length ?? 0) + (job.reach?.team.length ?? 0);
-  const [tell, setTell] = useState(reached > 0);
+  const reached = invitedCount(job);
+  const [tell, setTell] = useState(reached > 0 && reached <= reachRoom(job));
   return (
     <Dialog
       title="Position filled"
@@ -163,11 +195,7 @@ function FilledDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
     >
       <div className="flex flex-col gap-3">
         <p style={{ margin: 0 }}>The job closes now. Its page says the position is filled, and it leaves search and Google&apos;s job listings.</p>
-        {reached > 0 && (
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={tell} onChange={(e) => setTell(e.target.checked)} /> Tell the {reached} people it was shared with that the role is filled (simulated)
-          </label>
-        )}
+        <TellInvited job={job} checked={tell} onChange={setTell} what="that the role is filled" />
       </div>
     </Dialog>
   );
@@ -337,7 +365,9 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   const attention = needsYou(s, job);
   const next = nextStep(s, job, open);
   const city = job.facts.location.split(',')[0];
-  const status = statusLine(s, job).replace(/^Live · /, '');
+  const status = statusLine(s, job)
+    .replace(/^Live · /, '')
+    .replace(/^./, (c) => c.toUpperCase());
   return (
     <li className="ej-jobitem" style={{ overflow: dx ? 'hidden' : undefined }}>
       {swipeable && dx !== 0 && (
@@ -378,11 +408,11 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
             <span className="aj-faint flex min-w-0 items-center gap-1.5" style={{ fontSize: 12.5 }}>
               {job.facts.iso && <Flag iso={job.facts.iso} title={job.facts.country} />}
               <span className="truncate">
-                {city}
                 <span className="lg:hidden">
-                  {city ? ' · ' : ''}
                   <span style={{ color: attention ? 'var(--amber)' : undefined }}>{status}</span>
+                  {city ? ' · ' : ''}
                 </span>
+                {city}
               </span>
             </span>
             {attention && <span className="sr-only">Needs you</span>}
@@ -426,6 +456,7 @@ function groupOf(s: State, j: DemoJob): GroupKey {
 
 function sortKey(j: DemoJob): number {
   if (j.status === 'live' && j.facts.deadline) return parseIso(j.facts.deadline);
+  if (j.status === 'scheduled' && j.scheduledFor) return parseIso(j.scheduledFor);
   return -(j.closedAt ?? j.publishedAt ?? j.createdAt);
 }
 
@@ -488,7 +519,7 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
   }
   return (
     <div className="flex flex-col gap-2">
-      <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }}>
+      <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
         {lines.map((l) => (
           <li key={l}>{l}</li>
         ))}
@@ -500,7 +531,7 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
           {owner && (
             <div className="flex flex-wrap gap-1.5">
               <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
-                Amplify: listed until it closes
+                Amplify: listed until {shortDate(listedUntil({ ...job, plan: 'amplify' }, s.today))}
               </button>
               <button type="button" className="aj-pill" onClick={() => closeAtListingEnd(job.id)}>
                 Close on {shortDate(end)}
@@ -595,7 +626,7 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
             </span>
           )}
           {textDropped(job, s.today) ? (
-            <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }} aria-label="Basic record">
+            <ul className="aj-muted flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }} aria-label="Basic record">
               <li>
                 {job.facts.title}, {job.facts.location}
               </li>
@@ -660,9 +691,11 @@ function RecentlyDeleted({ s }: { s: State }) {
                   <span className="aj-faint">
                     Deleted {day(d.at)} by {d.by}
                     {d.told.length ? `; told ${d.told.join(', ')}` : ''} · erased on {day(erasedOn(d.at))}
+                    {d.was === 'scheduled' ? ' · comes back as a draft' : ''}
                   </span>
+                  {block && <span className="aj-faint">{block}.</span>}
                 </span>
-                <button type="button" className="aj-pill" disabled={Boolean(block)} title={block ?? undefined} onClick={() => restoreDeleted(d.job.id)}>
+                <button type="button" className="aj-pill" disabled={Boolean(block)} onClick={() => restoreDeleted(d.job.id)}>
                   Restore
                 </button>
               </li>
@@ -695,18 +728,32 @@ type TabKey = 'all' | GroupKey;
 
 /** The most recent thing that happened to a job: created, published, edited, or closed. "All" lists jobs by it, newest first. */
 function latestAt(j: DemoJob): number {
-  return Math.max(j.createdAt, j.publishedAt ?? 0, j.editedAt ?? 0, j.closedAt ?? 0);
+  const draftEdit = j.status === 'draft' || j.status === 'review' || j.status === 'approved' ? (j.versions[j.versions.length - 1]?.at ?? 0) : 0;
+  return Math.max(j.createdAt, j.publishedAt ?? 0, j.editedAt ?? 0, j.closedAt ?? 0, draftEdit);
 }
 
 /** Search: an icon that opens into a field shaped like the chat box; Esc or the cross closes it and clears the search. */
 function SearchToggle({ query, setQuery, openField, setOpenField }: { query: string; setQuery: (q: string) => void; openField: boolean; setOpenField: (o: boolean) => void }) {
+  const refocus = useRef(false);
   const close = () => {
+    refocus.current = true;
     setQuery('');
     setOpenField(false);
   };
   if (!openField)
     return (
-      <button type="button" className="aj-icon-btn shrink-0" onClick={() => setOpenField(true)} aria-label="Search jobs">
+      <button
+        type="button"
+        className="aj-icon-btn shrink-0"
+        ref={(el) => {
+          if (el && refocus.current) {
+            refocus.current = false;
+            el.focus();
+          }
+        }}
+        onClick={() => setOpenField(true)}
+        aria-label="Search jobs"
+      >
         <Search size={15} strokeWidth={1.8} />
       </button>
     );

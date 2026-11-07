@@ -6,14 +6,14 @@ import { useIsPhone } from '@/components/site/BottomSheet';
 import { backToDraft, canDelete, closeJob, declineTell, deleteJob, involved, publishNow, reschedule, rescheduleBlock, tellInvited, type Tell } from './actions';
 import { changeSummary, tellOffer } from './changes';
 import { addDays, isoDay, longDate } from './engine';
-import { REACH_EMAILS, reachUsed } from './invites';
+import { invitedCount, reachRoom } from './invites';
 import { jobUrl } from './links';
 import { isPublished, KEEP_DELETED_DAYS } from './lifecycle';
 import MenuButton, { type MenuAction } from './MenuButton';
 import { currentMonth, hasFreeUse, LISTED_DAYS, monthName } from './plans';
 import { go } from './store';
 import type { DemoJob, State } from './types';
-import { Dialog, inputStyle } from './ui';
+import { DemoMark, Dialog, inputStyle } from './ui';
 
 function jobLabel(job: DemoJob): string {
   const city = job.facts.location.split(',')[0];
@@ -74,16 +74,15 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
     job.payRequest ? `the request to ${job.payRequest.name} to pay ${job.payRequest.amount}` : '',
     job.status === 'live' ? 'the job comes off AidJobs at once' : '',
   ].filter(Boolean);
-  const groups: Array<{ key: keyof Tell; label: string }> = [
+  const groups: Array<{ key: keyof Tell; label: string; off?: boolean }> = [
     ...(people.reviewers.length ? [{ key: 'reviewers' as const, label: `Reviewers: ${people.reviewers.join(', ')}` }] : []),
     ...(people.payer ? [{ key: 'payer' as const, label: `${people.payer}, asked to pay` }] : []),
-    ...(people.reach ? [{ key: 'reach' as const, label: `The ${people.reach} people Reach invited` }] : []),
+    ...(people.reach ? [{ key: 'reach' as const, label: `The ${people.reach} people Reach invited${people.reach > reachRoom(job) ? ` (only ${reachRoom(job)} Reach emails left)` : `: uses ${people.reach} of the job's ${reachRoom(job)} Reach emails left`}`, off: people.reach > reachRoom(job) }] : []),
     ...(people.team.length ? [{ key: 'team' as const, label: `Your team: ${people.team.join(', ')}` }] : []),
   ];
   return (
     <Dialog
       title={`Delete “${title}”?`}
-      subtitle="Simulated · nothing leaves this browser"
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -93,8 +92,7 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
           </button>
           <button
             type="button"
-            className="aj-ink-btn"
-            style={{ background: 'var(--red)', borderColor: 'var(--red)', color: '#fff', opacity: block || !confirmed ? 0.45 : 1 }}
+            className="aj-ink-btn ej-danger-btn"
             disabled={Boolean(block) || !confirmed}
             onClick={() => {
               if (deleteJob(job.id, tell)) {
@@ -109,13 +107,16 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
       }
     >
       <div className="flex flex-col gap-3">
+        <span className="self-start">
+          <DemoMark label="Simulated · nothing leaves this browser" />
+        </span>
         <div className="flex flex-col gap-1">
           <strong>Deleted</strong>
           <span className="aj-muted">Its text, versions, comments and suggestions, language versions, Reach lists and messages, and its history.</span>
         </div>
         <div className="flex flex-col gap-1">
           <strong>Kept</strong>
-          <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18 }}>
+          <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
             <li>Receipts and invoices, which the law requires.</li>
             {freeMonth && hasFreeUse(s, job.id) && <li>The free job it used still counts for {monthName(freeMonth)}.</li>}
             <li>One line in your organisation&apos;s activity log: who deleted it, and when. Never public.</li>
@@ -133,8 +134,8 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
           <fieldset className="flex flex-col gap-1.5" style={{ border: 'none', margin: 0, padding: 0 }}>
             <legend style={{ fontWeight: 650, padding: 0, marginBottom: 4 }}>Tell the people involved</legend>
             {groups.map((g) => (
-              <label key={g.key} className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
-                <input type="checkbox" className="mt-0.5" checked={Boolean(tell[g.key])} onChange={(e) => setTell({ ...tell, [g.key]: e.target.checked })} />
+              <label key={g.key} className="flex items-start gap-2" style={{ cursor: g.off ? 'default' : 'pointer' }}>
+                <input type="checkbox" className="mt-0.5" checked={Boolean(tell[g.key]) && !g.off} disabled={g.off} onChange={(e) => setTell({ ...tell, [g.key]: e.target.checked })} />
                 <span>{g.label}</span>
               </label>
             ))}
@@ -149,15 +150,33 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
             <input style={inputStyle} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
           </label>
         )}
-        <span className="aj-faint">It stays in Recently deleted for {KEEP_DELETED_DAYS} days, where you can restore it; then it is erased.</span>
+        <span className="aj-faint">
+          It stays in Recently deleted for {KEEP_DELETED_DAYS} days, where you can restore it{job.status === 'scheduled' ? ' as a draft, its go-live still cancelled' : ''}; then it is erased.
+        </span>
       </div>
     </Dialog>
   );
 }
 
+/** "Tell the people Reach invited" when a job closes: each notice is a Reach email and counts toward the job's allowance. */
+export function TellInvited({ job, checked, onChange, what }: { job: DemoJob; checked: boolean; onChange: (on: boolean) => void; what: string }) {
+  const count = invitedCount(job);
+  const room = reachRoom(job);
+  if (!count) return null;
+  const short = count > room;
+  return (
+    <label className="flex items-start gap-2">
+      <input type="checkbox" className="mt-0.5" checked={checked && !short} disabled={short} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        Tell the {count} {count === 1 ? 'person' : 'people'} Reach invited {what} (simulated)
+        <span className="aj-faint block">{short ? `Only ${room} Reach emails left for this job.` : `Uses ${count} of the ${room} Reach emails left for this job.`}</span>
+      </span>
+    </label>
+  );
+}
+
 /** Withdrawing a live job: cancelled, not filled. The reason is for the history only. */
 export function WithdrawDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
-  const reached = (job.reach?.candidates.length ?? 0) + (job.reach?.team.length ?? 0);
   const [reason, setReason] = useState('');
   const [tell, setTell] = useState(false);
   return (
@@ -175,7 +194,7 @@ export function WithdrawDialog({ job, onClose }: { job: DemoJob; onClose: () => 
             type="button"
             className="aj-ink-btn"
             onClick={() => {
-              closeJob(job.id, 'withdrawn', tell && reached > 0, reason);
+              closeJob(job.id, 'withdrawn', tell, reason);
               onClose();
             }}
           >
@@ -187,11 +206,7 @@ export function WithdrawDialog({ job, onClose }: { job: DemoJob; onClose: () => 
       <div className="flex flex-col gap-3">
         <p style={{ margin: 0 }}>The job closes now, and its page says &ldquo;This vacancy has been withdrawn&rdquo;. It is not deleted: links already shared keep working.</p>
         <textarea style={{ ...inputStyle, minHeight: 60 }} value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason (optional, for the history)" placeholder="Reason (optional, kept in the job's history only), for example: the funding was not renewed." />
-        {reached > 0 && (
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={tell} onChange={(e) => setTell(e.target.checked)} /> Tell the {reached} people it was shared with (simulated)
-          </label>
-        )}
+        <TellInvited job={job} checked={tell} onChange={setTell} what="that it has been withdrawn" />
       </div>
     </Dialog>
   );
@@ -263,6 +278,7 @@ export function BackToDraftDialog({ job, s, onClose }: { job: DemoJob; s: State;
       <div className="flex flex-col gap-2">
         <p style={{ margin: 0 }}>It will not go live on {job.scheduledFor ? longDate(job.scheduledFor) : 'its date'}. You can edit it and publish it again at any time.</p>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} stay prepared, unsent.</span>}
+        {job.payRequest && <span className="aj-muted">The request to {job.payRequest.name} to pay {job.payRequest.amount} is cancelled.</span>}
         <span className="aj-muted">{job.plan === 'amplify' ? 'It stays paid for: publishing it again costs nothing.' : `The free job it counted stays counted${counted ? ` for ${monthName(counted)}` : ''}.`}</span>
       </div>
     </Dialog>
@@ -273,12 +289,12 @@ export function BackToDraftDialog({ job, s, onClose }: { job: DemoJob; s: State;
 export function TellDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
   const offer = tellOffer(job);
   if (!offer) return null;
-  const room = REACH_EMAILS - reachUsed(job);
+  const room = reachRoom(job);
   const short = offer.count > room;
   return (
     <Dialog
       title="Tell the people Reach invited?"
-      subtitle="Simulated · nothing leaves this browser"
+      subtitle={job.facts.title}
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -300,22 +316,38 @@ export function TellDialog({ job, s, onClose }: { job: DemoJob; s: State; onClos
       }
     >
       <div className="flex flex-col gap-3">
-        <div className="aj-card flex flex-col gap-2 p-3" aria-label="The email">
-          <span className="aj-faint">Subject: Update: {job.facts.title}</span>
-          <span>Hello,</span>
-          <span>{s.org.name} has updated the vacancy {job.facts.title}:</span>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {offer.changes.map((c) => (
-              <li key={c.key}>
-                {c.label}: {c.from} → <strong>{c.to}</strong>
-              </li>
-            ))}
-          </ul>
-          <span>The job page has the details:</span>
-          <a className="aj-ink-btn self-start" href={jobUrl(job)} target="_blank" rel="noopener noreferrer">
-            View Job &amp; Apply
-          </a>
-          <span className="aj-muted">Best regards,{'\n'}{s.org.name}</span>
+        <span className="self-start">
+          <DemoMark label="Simulated · nothing leaves this browser" />
+        </span>
+        <div className="ej-email" aria-label="The email">
+          <div className="ej-email-head">
+            <div>
+              <strong>From:</strong> {s.org.name} via AidJobs &lt;jobs@aidjobs.example.org&gt;
+            </div>
+            <div>
+              <strong>To:</strong> the {offer.count} people already invited, each their own email
+            </div>
+            <div>
+              <strong>Subject:</strong> Update: {job.facts.title}
+            </div>
+          </div>
+          <div className="ej-email-body">
+            <p>Hello,</p>
+            <p>{s.org.name} has updated the vacancy {job.facts.title}:</p>
+            <ul style={{ paddingLeft: 18, listStyle: 'disc' }}>
+              {offer.changes.map((c) => (
+                <li key={c.key}>
+                  {c.label}: {c.from} → <strong>{c.to}</strong>
+                </li>
+              ))}
+            </ul>
+            <p>
+              <a className="ej-email-btn" href={jobUrl(job)} target="_blank" rel="noopener noreferrer">
+                View Job &amp; Apply
+              </a>
+            </p>
+            <p style={{ whiteSpace: 'pre-line' }}>{`Best regards,\n${s.org.name}`}</p>
+          </div>
         </div>
         <span className="aj-muted">
           To the {offer.count} people already invited; it uses {offer.count} of the {room} Reach emails left for this job. Offered once for this change: {changeSummary(offer.changes)}.

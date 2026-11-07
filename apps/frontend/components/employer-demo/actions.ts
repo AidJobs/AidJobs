@@ -25,11 +25,11 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, singlePrice, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import type { Fix } from './market';
-import { changeWithUndo, getState, nextId, notify, update, updateJob } from './store';
+import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
-import { addRound, REACH_EMAILS, reachUsed } from './invites';
+import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import type { ApplySettings, ChatMsg, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
@@ -525,11 +525,13 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
 }
 /**
  * A free job counts the first time it is used (published, sent for review, or downloaded), against the allowance of the month it is used in.
- * Exploring and editing are free; with the month's free jobs used, nothing is counted and the job is paid for or scheduled when it is published.
+ * Exploring and editing are free; with the month's free jobs used, nothing is counted and the job is paid for when it is published.
+ * Publishing needs a count for the month it goes live in (`publishing`); one from an earlier month stays used there and does not carry over.
  */
-function useFree(s: State, id: string, month = currentMonth(s)): State {
+function useFree(s: State, id: string, month = currentMonth(s), publishing = false): State {
   const j = s.jobs.find((x) => x.id === id);
-  if (!j || j.plan === 'amplify' || hasFreeUse(s, id) || freeLeft(s, month) === 0) return s;
+  const counted = publishing ? countedFor(s, id, month) : hasFreeUse(s, id);
+  if (!j || j.plan === 'amplify' || counted || freeLeft(s, month) === 0) return s;
   return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
 }
 
@@ -873,7 +875,7 @@ export function publish(id: string, o: PublishOptions): boolean {
   let told: string | undefined;
   update((s0) => {
     const prepaid = o.plan === 'amplify' && Boolean(s0.jobs.find((x) => x.id === id)?.paidFor);
-    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
+    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule), true) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand' && !prepaid) s = takePaidJob(s);
     const how = o.plan === 'amplify' ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
@@ -1046,11 +1048,26 @@ export function extend(id: string, days: number) {
 export function closeJob(id: string, reason: 'early' | 'filled' | 'withdrawn', tellReach = false, note = '') {
   const j = getState().jobs.find((x) => x.id === id);
   if (!j || !ownerOnly()) return;
-  const label = `${reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early'}${note.trim() ? `. Reason: "${note.trim()}"` : ''}`;
+  // A closing notice is a Reach email like any other: it counts toward the job's allowance, and is sent only when there is room.
+  const count = invitedCount(j);
+  const tell = tellReach && count > 0 && count <= reachRoom(j);
+  const label = `${reason === 'filled' ? 'Position filled' : reason === 'withdrawn' ? 'Withdrawn' : 'Closed early'}${note.trim() ? `. Reason: "${note.trim()}"` : ''}${tell ? `; the ${count} people Reach invited were told (simulated)` : ''}`;
   const short = reason === 'filled' ? 'position filled' : reason === 'withdrawn' ? 'withdrawn' : 'closed early';
-  changeWithUndo(`${j.facts.title}: ${short}${tellReach ? '; the people it was shared with are told (simulated)' : ''}`, (st) => ({
+  changeWithUndo(`${j.facts.title}: ${short}${tell ? `; the ${count} people Reach invited are told (simulated)` : ''}`, (st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? { ...x, status: 'closed', closedAt: st.today, closeReason: reason, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: label }] } : x)),
+    jobs: st.jobs.map((x) =>
+      x.id === id
+        ? {
+            ...x,
+            status: 'closed',
+            closedAt: st.today,
+            closeReason: reason,
+            payRequest: undefined,
+            reach: tell && x.reach ? { ...x.reach, updates: [...(x.reach.updates ?? []), { at: Date.now(), count, what: short }] } : x.reach,
+            audit: [...x.audit, { at: Date.now(), who: st.me.name, what: label }],
+          }
+        : x,
+    ),
     inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'deadline' ? { ...i, done: true } : i)),
   }));
 }
@@ -1107,23 +1124,43 @@ export function reschedule(id: string, date: string): boolean {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled' || rescheduleBlock(s, j, date)) return false;
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
-  update((st) => {
-    return {
-      ...st,
-      jobs: st.jobs.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              scheduledFor: date,
-              reach: x.reach ? { ...x.reach, rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: date } : r)) } : x.reach,
-              audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Moved from ${was} to ${longDate(date)}` }],
-            }
-          : x,
-      ),
-      notice: { text: `${j.facts.title} now goes live on ${longDate(date)}.` },
-    };
-  });
+  changeWithUndo(`${j.facts.title} now goes live on ${longDate(date)}.`, (st) => ({
+    ...st,
+    jobs: st.jobs.map((x) =>
+      x.id === id
+        ? {
+            ...x,
+            scheduledFor: date,
+            reach: x.reach ? { ...x.reach, rounds: x.reach.rounds.map((r) => (r.sendsOn ? { ...r, sendsOn: date } : r)) } : x.reach,
+            audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Moved from ${was} to ${longDate(date)}` }],
+          }
+        : x,
+    ),
+  }));
   return true;
+}
+
+/**
+ * A scheduled job as a draft again: no go-live; the Reach emails waiting for it go back to the prepared list, unsent, and their round is
+ * dropped; a paid job stays paid; an open payment request is cancelled. Used by Back to draft and by restoring a deleted scheduled job.
+ */
+function asDraft(x: DemoJob, who: string, what: string): DemoJob {
+  const r = x.reach;
+  const waiting = (e: Recipient) => e.status === 'waiting';
+  const candidates = r?.candidates.filter(waiting).map((e) => e.email) ?? [];
+  const team = r?.team.filter(waiting).map((e) => e.email) ?? [];
+  const kept = r ? { ...r, candidates: r.candidates.filter((e) => !waiting(e)), team: r.team.filter((e) => !waiting(e)), rounds: r.rounds.filter((n) => !n.sendsOn) } : null;
+  return {
+    ...x,
+    status: hasApproval(x) ? 'approved' : 'draft',
+    plan: x.plan === 'amplify' ? 'amplify' : null,
+    paidFor: x.plan === 'amplify' ? true : undefined,
+    scheduledFor: undefined,
+    reach: kept && (kept.candidates.length || kept.team.length || kept.rounds.length) ? kept : null,
+    reachPlan: r && (candidates.length || team.length) ? { candidates, team, candidateMsg: r.candidateMsg, teamMsg: r.teamMsg } : x.reachPlan,
+    payRequest: undefined,
+    audit: [...x.audit, { at: Date.now(), who, what: `${what}${x.payRequest ? `; the request to ${x.payRequest.name} to pay was cancelled` : ''}` }],
+  };
 }
 
 /** A scheduled job back to a draft: it will not go live; its Reach emails stay prepared, unsent; a paid job stays paid, a free one counted. */
@@ -1132,27 +1169,9 @@ export function backToDraft(id: string): boolean {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
-  update((st) => ({
+  changeWithUndo(`${j.facts.title} is back to a draft. It will not go live on ${was}.`, (st) => ({
     ...st,
-    jobs: st.jobs.map((x) => {
-      if (x.id !== id) return x;
-      const r = x.reach;
-      const waiting = (e: Recipient) => e.status === 'waiting';
-      const candidates = r?.candidates.filter(waiting).map((e) => e.email) ?? [];
-      const team = r?.team.filter(waiting).map((e) => e.email) ?? [];
-      const kept = r ? { ...r, candidates: r.candidates.filter((e) => !waiting(e)), team: r.team.filter((e) => !waiting(e)), rounds: r.rounds.filter((n) => !n.sendsOn) } : null;
-      return {
-        ...x,
-        status: hasApproval(x) ? 'approved' : 'draft',
-        plan: x.plan === 'amplify' ? 'amplify' : null,
-        paidFor: x.plan === 'amplify' ? true : undefined,
-        scheduledFor: undefined,
-        reach: kept && (kept.candidates.length || kept.team.length) ? kept : null,
-        reachPlan: r && (candidates.length || team.length) ? { candidates, team, candidateMsg: r.candidateMsg, teamMsg: r.teamMsg } : x.reachPlan,
-        audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Back to a draft; it will not go live on ${was}` }],
-      };
-    }),
-    notice: { text: `${j.facts.title} is back to a draft. It will not go live on ${was}.` },
+    jobs: st.jobs.map((x) => (x.id === id ? asDraft(x, st.me.name, `Back to a draft; it will not go live on ${was}`) : x)),
   }));
   return true;
 }
@@ -1209,10 +1228,9 @@ export function letLeaveList(id: string) {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || !ownerOnly() || j.plan !== 'free') return;
   const end = longDate(listingEnd(j, s.today));
-  update((st) => ({
+  changeWithUndo(`${j.facts.title} leaves AidJobs' lists after ${end}. Its page still opens from links, with the apply button.`, (st) => ({
     ...st,
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, listingChoice: 'leave', audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Chose to let it leave AidJobs' lists after ${end}; its page stays open from links` }] } : x)),
-    notice: { text: `${j.facts.title} leaves AidJobs' lists after ${end}. Its page still opens from links, with the apply button.` },
   }));
 }
 
@@ -1221,6 +1239,8 @@ export function reopenBlock(s: State, j: DemoJob, deadline: string, amplify = fa
   if (s.reviewerAs) return 'Reviewers cannot reopen jobs';
   if (!canReopen(j, s.today)) return j.closeReason === 'filled' ? 'A filled position uses Hire again' : 'Reopen is for the 14 days after closing';
   if (!deadline || deadline <= isoDay(s.today)) return 'Choose a closing date from tomorrow';
+  // Amplify lists a job for 100 days from when it was first published: once even that has passed, only Hire again publishes it anew.
+  if (listingEnd({ ...j, plan: 'amplify' }, s.today) < isoDay(s.today)) return 'Its listing period has ended: use Hire again';
   if (amplify) return j.plan === 'free' && !s.org.verified ? 'Verify your organisation to amplify' : null;
   if (j.plan === 'free' && listingEnd(j, s.today) < isoDay(s.today)) return 'Its free listing period has ended';
   return null;
@@ -1230,13 +1250,14 @@ export function reopenBlock(s: State, j: DemoJob, deadline: string, amplify = fa
  * Reopens a closed job within its 14 days (decision 5, a proposal needing a contract decision before production): same address, a new
  * closing date, a "Reopened" note in its history. A free job keeps its original listing period; Reach is not sent again.
  */
-export function reopen(id: string, deadline: string, amplify = false): boolean {
+export function reopen(id: string, deadline: string, amplify = false, paid?: Paid): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || reopenBlock(s, j, deadline, amplify)) return false;
   const upgrade = amplify && j.plan === 'free';
-  const onHand = upgrade && Boolean(nextPaidJob(s));
-  if (upgrade && !onHand) buy(singlePrice(s).key, j.facts.title);
+  // Amplifying needs payment: a package job on hand, or paid just now at the simulated checkout (`direct`).
+  if (upgrade && (!paid || (paid === 'onHand' && !nextPaidJob(s)))) return false;
+  const onHand = upgrade && paid === 'onHand';
   const what = `Reopened, now closing ${longDate(deadline)}${upgrade ? `; amplified (${onHand ? 'a package job' : 'paid'})` : ''}. Reach was not sent again`;
   const change = (st: State): State => ({
     ...(onHand ? takePaidJob(st) : st),
@@ -1266,7 +1287,7 @@ export function involved(s: State, j: DemoJob): { reviewers: string[]; payer: st
   return {
     reviewers,
     payer: j.payRequest?.name ?? null,
-    reach: (j.reach?.candidates.length ?? 0) + (j.reach?.team.length ?? 0),
+    reach: invitedCount(j),
     team: s.team.filter((p) => p.id !== s.me.id && !reviewers.includes(p.name)).map((p) => p.name),
   };
 }
@@ -1283,14 +1304,21 @@ export function deleteJob(id: string, tell: Tell = {}): boolean {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || canDelete(s, j)) return false;
   const people = involved(s, j);
+  if (tell.reach && people.reach > reachRoom(j)) tell = { ...tell, reach: false };
   const told = [...(tell.reviewers ? people.reviewers : []), ...(tell.payer && people.payer ? [people.payer] : []), ...(tell.reach && people.reach ? [`the ${people.reach} people Reach invited`] : []), ...(tell.team ? people.team : [])];
+  // A scheduled job is kept as a draft: its go-live is cancelled, and its waiting emails go back to the prepared list, unsent.
   const sent = (r: Recipient) => r.status !== 'waiting';
-  const kept: DemoJob = { ...j, payRequest: undefined, reach: j.reach ? { ...j.reach, candidates: j.reach.candidates.filter(sent), team: j.reach.team.filter(sent) } : j.reach };
+  const base: DemoJob =
+    j.status === 'scheduled'
+      ? asDraft(j, s.me.name, `Deleted while scheduled for ${j.scheduledFor ? longDate(j.scheduledFor) : 'its date'}; its go-live was cancelled`)
+      : { ...j, payRequest: undefined, reach: j.reach ? { ...j.reach, candidates: j.reach.candidates.filter(sent), team: j.reach.team.filter(sent) } : j.reach };
+  const notified = tell.reach && people.reach && base.reach ? { ...base.reach, updates: [...(base.reach.updates ?? []), { at: Date.now(), count: people.reach, what: 'Deleted' }] } : base.reach;
+  const kept: DemoJob = { ...base, reach: notified };
   const title = j.facts.title || 'untitled job';
   update((st) => ({
     ...st,
     jobs: st.jobs.filter((x) => x.id !== id),
-    deleted: [{ job: kept, at: Date.now(), by: st.me.name, told }, ...(st.deleted ?? [])],
+    deleted: [{ job: kept, at: Date.now(), by: st.me.name, told, was: j.status }, ...(st.deleted ?? [])],
     gone: isPublished(j) ? [...new Set([...(st.gone ?? []), id])] : st.gone,
     activity: [{ at: Date.now(), who: st.me.name, what: `Deleted "${title}"${told.length ? `; told ${told.join(', ')} (simulated)` : ''}` }, ...(st.activity ?? [])],
     inbox: st.inbox.filter((i) => i.jobId !== id),
@@ -1310,8 +1338,8 @@ export function restoreDeleted(id: string): boolean {
     jobs: [d.job, ...st.jobs],
     deleted: (st.deleted ?? []).filter((x) => x.job.id !== id),
     gone: (st.gone ?? []).filter((x) => x !== id),
-    activity: [{ at: Date.now(), who: st.me.name, what: `Restored "${title}"` }, ...(st.activity ?? [])],
-    notice: { text: `Restored "${title}".` },
+    activity: [{ at: Date.now(), who: st.me.name, what: `Restored "${title}"${d.was === 'scheduled' ? ' as a draft' : ''}` }, ...(st.activity ?? [])],
+    notice: { text: d.was === 'scheduled' ? `Restored "${title}" as a draft. Its go-live stays cancelled: publish it again when you are ready.` : `Restored "${title}".` },
   }));
   return true;
 }
@@ -1334,7 +1362,7 @@ export function hireAgain(id: string, place?: string): string | null {
     plan: null,
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [msg('ai', place ? `A copy of ${j.facts.title} for ${facts.location}. Check the duty-station details, then publish.` : `Reopened ${j.facts.title} with a new closing date, ${longDate(facts.deadline)}.`)],
+    chat: [msg('ai', place ? `A copy of ${j.facts.title} for ${facts.location}. Check the duty-station details, then publish.` : `A new draft from ${j.facts.title}, with a new closing date, ${longDate(facts.deadline)}.`)],
     createdAt: Date.now(),
     publishedAt: undefined,
     closedAt: undefined,
@@ -1352,9 +1380,9 @@ export function hireAgain(id: string, place?: string): string | null {
     scheduledFor: undefined,
     payRequest: undefined,
     lastChange: undefined,
-    audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Reopened from ${j.facts.title}` }],
+    audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Hired again from ${j.facts.title}` }],
   };
-  copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Reopened', sections: copy.sections }];
+  copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Hired again', sections: copy.sections }];
   update((st) => ({ ...st, jobs: [copy, ...st.jobs] }));
   return nid;
 }
@@ -1396,7 +1424,7 @@ export function removeMember(id: string) {
 }
 
 /** "Ask to act": jobs and an action read from a sentence, always confirmed before anything changes. */
-export type Intent = { kind: 'extend' | 'close' | 'reopen'; days?: number; jobIds: string[]; summary: string } | null;
+export type Intent = { kind: 'extend' | 'close' | 'reopen' | 'hire'; days?: number; jobIds: string[]; summary: string } | null;
 
 export function readIntent(text: string): Intent {
   const s = getState();
@@ -1426,7 +1454,10 @@ export function readIntent(text: string): Intent {
   }
   if (/\b(reopen|hire again|re-open|repost)\b/.test(t)) {
     const jobs = pick(s.jobs.filter((j) => j.status === 'closed'));
-    return jobs.length ? { kind: 'reopen', jobIds: [jobs[0].id], summary: `Reopen ${jobs[0].facts.title} as a new draft` } : null;
+    if (!jobs.length) return null;
+    // "Reopen" is the same job at the same address, within its 14 days; otherwise, or when asked to hire again, a new draft.
+    if (/\b(reopen|re-open)\b/.test(t) && canReopen(jobs[0], s.today)) return { kind: 'reopen', jobIds: [jobs[0].id], summary: `Reopen ${jobs[0].facts.title}: choose its new closing date` };
+    return { kind: 'hire', jobIds: [jobs[0].id], summary: `Hire again for ${jobs[0].facts.title}: a new draft from it` };
   }
   return null;
 }
@@ -1449,6 +1480,10 @@ export function runIntent(intent: NonNullable<Intent>): string | null {
       ...st,
       jobs: st.jobs.map((j) => (intent.jobIds.includes(j.id) ? { ...j, status: 'closed', closedAt: st.today, closeReason: 'early', payRequest: undefined, audit: [...j.audit, { at: Date.now(), who: st.me.name, what: 'Closed early from the chat' }] } : j)),
     }));
+    return null;
+  }
+  if (intent.kind === 'reopen') {
+    go('jobs', intent.jobIds[0]);
     return null;
   }
   return hireAgain(intent.jobIds[0]);

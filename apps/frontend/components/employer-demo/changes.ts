@@ -1,5 +1,6 @@
 /** What changed in a live job since it was published (employer-side plan, section 17, phase 2, and decision 7). */
 import { longDate, salaryText } from './engine';
+import { invitedCount } from './invites';
 import type { DemoJob, Facts, Section } from './types';
 
 export type Change = { key: string; label: string; from?: string; to?: string; important: boolean };
@@ -48,10 +49,15 @@ const part = (c: Change) => `${c.key}=${c.to}`;
  */
 export function tellOffer(j: DemoJob): { key: string; changes: Change[]; count: number } | null {
   if (j.status !== 'live' || j.plan !== 'amplify' || !j.reach) return null;
-  const done = new Set((j.reachTold ?? []).flatMap((k) => k.split('|')));
-  const changes = changesSince(j).filter((c) => c.important && !done.has(part(c)));
+  const parts = (j.reachTold ?? []).flatMap((k) => k.split('|'));
+  const done = new Set(parts);
+  // What they were last told, per fact: a second change reads "told value → new value", not "published value → new value".
+  const lastTold = new Map(parts.map((p) => [p.slice(0, p.indexOf('=')), p.slice(p.indexOf('=') + 1)]));
+  const changes = changesSince(j)
+    .filter((c) => c.important && !done.has(part(c)))
+    .map((c) => (lastTold.has(c.key) ? { ...c, from: lastTold.get(c.key) } : c));
   if (!changes.length) return null;
-  const count = new Set([...j.reach.candidates, ...j.reach.team].filter((r) => r.status === 'sent').map((r) => r.email)).size;
+  const count = invitedCount(j);
   return count ? { key: changes.map(part).join('|'), changes, count } : null;
 }
 

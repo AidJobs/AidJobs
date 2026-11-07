@@ -43,13 +43,14 @@ export function erasedOn(at: number): number {
   return at + KEEP_DELETED_DAYS * DAY;
 }
 
-/** Deleted jobs older than 14 days are erased: only a line in the activity log stays. */
+/** Deleted jobs are erased on the day shown, 14 days after deletion: only a line in the activity log stays. */
 export function purgeDeleted(s: State): State {
-  const old = (s.deleted ?? []).filter((d) => s.today >= erasedOn(d.at));
+  const due = (d: { at: number }) => s.today >= new Date(erasedOn(d.at)).setHours(0, 0, 0, 0);
+  const old = (s.deleted ?? []).filter(due);
   if (!old.length) return s;
   return {
     ...s,
-    deleted: (s.deleted ?? []).filter((d) => s.today < erasedOn(d.at)),
+    deleted: (s.deleted ?? []).filter((d) => !due(d)),
     activity: [...old.map((d) => ({ at: s.today, who: 'AidJobs', what: `Erased for good: "${d.job.facts.title || 'untitled job'}", 14 days after it was deleted` })), ...(s.activity ?? [])],
   };
 }

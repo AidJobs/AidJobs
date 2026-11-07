@@ -116,9 +116,18 @@ export function hasFreeUse(s: State, jobId: string): boolean {
   return s.freeUses.some((u) => u.jobId === jobId);
 }
 
-/** A job can go free if it already counted (sent for review or downloaded), or the month still has a free job. */
+/** Whether the job already counts against `month`'s free jobs (sent for review, downloaded, or published that month). */
+export function countedFor(s: State, jobId: string, month: string): boolean {
+  return s.freeUses.some((u) => u.jobId === jobId && u.month === month);
+}
+
+/**
+ * A free job goes live in its own month (decided by the user, 7 November 2026): it can go free if it already counts against the month it
+ * goes live in, or that month still has a free job. A count from an earlier month does not carry over; it stays used there.
+ */
 export function canGoFree(s: State, jobId: string, schedule: string | null): boolean {
-  return hasFreeUse(s, jobId) || freeLeft(s, monthFor(s, schedule)) > 0;
+  const month = monthFor(s, schedule);
+  return countedFor(s, jobId, month) || freeLeft(s, month) > 0;
 }
 
 /** Paid jobs on hand, the soonest to lapse first: a subscription's jobs for this month, then packs. */

@@ -32,12 +32,14 @@ import {
   editTranslation,
   extend,
   hireAgain,
+  involved,
   isApproved,
   markGenuine,
   overrideApproval,
   overruleChanges,
   publish,
   publishBlock,
+  readIntent,
   refreshTranslation,
   remindPayer,
   remindReviewers,
@@ -61,7 +63,8 @@ import {
   toggleSection,
   undoLastChange,
 } from '../../components/employer-demo/actions';
-import { article, daysUntil, isoDay, parseIso } from '../../components/employer-demo/engine';
+import { article, daysUntil, isoDay, longDate, parseIso } from '../../components/employer-demo/engine';
+import { jobUrl } from '../../components/employer-demo/links';
 import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
@@ -420,15 +423,105 @@ describe('managing jobs: Reopen within 14 days, and the closed page (plan sectio
   it('a free job keeps its listing period; once that has ended, it reopens only with Amplify (paid)', () => {
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-liv' ? { ...j, status: 'closed', closedAt: s.today - 2 * DAY, closeReason: 'early', publishedAt: s.today - 70 * DAY } : j)) }));
     expect(reopenBlock(getState(), job('job-liv'), inDays(14))).toBe('Its free listing period has ended');
+    expect(reopen('job-liv', inDays(14), true)).toBe(false);
     const receipts = getState().receipts.length;
-    expect(reopen('job-liv', inDays(14), true)).toBe(true);
+    buy('one', 'Livelihoods Officer');
+    expect(reopen('job-liv', inDays(14), true, 'direct')).toBe(true);
     expect(job('job-liv')).toMatchObject({ status: 'live', plan: 'amplify' });
     expect(getState().receipts.length).toBe(receipts + 1);
+  });
+
+  it('a job past even Amplify\'s 100 days from first publishing cannot reopen: Hire again instead', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-health' ? { ...j, publishedAt: s.today - 120 * DAY } : j)) }));
+    expect(reopenBlock(getState(), job('job-health'), inDays(14))).toBe('Its listing period has ended: use Hire again');
   });
 
   it('the closed page is removed 30 days after closing', () => {
     expect(pageRemoved(job('job-log'), getState().today)).toBe(false);
     expect(pageRemoved(job('job-wash-2026'), getState().today)).toBe(true);
+  });
+});
+
+describe('fixes from the round 5 review', () => {
+  const DAY = 86_400_000;
+  const prevMonth = () => {
+    const [y, m] = currentMonth(getState()).split('-').map(Number);
+    return `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, '0')}`;
+  };
+  const schedule = (id: string, extra: Partial<ReturnType<typeof job>> = {}) =>
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'scheduled', scheduledFor: isoDay(s.today + DAY), ...extra } : j)) }));
+  const waitingReach = () => ({ candidates: [{ email: 'a@example.org', status: 'waiting' as const, round: 1 }], team: [], rounds: [{ n: 1, at: Date.now(), why: 'At go-live', sendsOn: isoDay(getState().today + DAY) }], candidateMsg: { subject: 's', body: 'b', closing: 'c' }, teamMsg: { subject: 's', body: 'b', closing: 'c' } });
+
+  it('1. a free job counted last month needs one of this month\'s free jobs to go live; last month\'s stays used', () => {
+    update((s) => ({ ...s, freeUses: s.freeUses.map((u) => (u.jobId === 'job-comms' ? { ...u, month: prevMonth() } : u)) }));
+    expect(publish('job-comms', { plan: 'free', schedule: null })).toBe(true);
+    expect(getState().freeUses.filter((u) => u.jobId === 'job-comms').map((u) => u.month).sort()).toEqual([prevMonth(), currentMonth(getState())].sort());
+    const other = startJob('Hiring a Driver in Goma, closing in 3 weeks');
+    update((s) => ({ ...s, freeUses: [...s.freeUses, { jobId: 'x', month: currentMonth(s) }, { jobId: other, month: prevMonth() }] }));
+    expect(publishBlock(getState(), other, { plan: 'free', schedule: null })).toMatch(/No free job left/);
+  });
+
+  it('2. Back to draft cancels an open payment request, so paying it later publishes nothing', () => {
+    schedule('job-fin', { plan: 'free', payRequest: { name: 'Grace Akello', email: 'grace@riverstone.example.org', note: '', key: 'one', amount: 'US$28.40', item: 'Amplify: Finance Officer', schedule: null, at: Date.now() } });
+    expect(backToDraft('job-fin')).toBe(true);
+    expect(job('job-fin').payRequest).toBeUndefined();
+    expect(job('job-fin').audit.at(-1)?.what).toMatch(/request to Grace Akello to pay was cancelled/);
+    expect(completePayRequest('job-fin')).toBe(false);
+    expect(job('job-fin').status).not.toBe('live');
+  });
+
+  it('3. a deleted scheduled job is restored as a draft: no go-live, its emails prepared, no empty round', () => {
+    schedule('job-fin', { plan: 'amplify', reach: waitingReach() });
+    deleteJob('job-fin');
+    restoreDeleted('job-fin');
+    expect(job('job-fin').status).toBe('approved');
+    expect(job('job-fin').scheduledFor).toBeUndefined();
+    expect(job('job-fin').reach).toBeNull();
+    expect(job('job-fin').reachPlan?.candidates).toEqual(['a@example.org']);
+    expect(job('job-fin').paidFor).toBe(true);
+    expect(getState().notice?.text).toMatch(/as a draft/);
+  });
+
+  it('5. invited people are counted once, only when emailed; closing notices count toward the 50, and an offer reads from what was last told', () => {
+    schedule('job-fin', { plan: 'amplify', reach: waitingReach() });
+    expect(involved(getState(), job('job-fin')).reach).toBe(0);
+    const used = reachUsed(job('job-cps'));
+    extend('job-cps', 7);
+    const told = job('job-cps').facts.deadline;
+    tellInvited('job-cps');
+    extend('job-cps', 7);
+    expect(tellOffer(job('job-cps'))?.changes[0].from).toBe(longDate(told));
+    closeJob('job-cps', 'filled', true);
+    expect(reachUsed(job('job-cps'))).toBe(used + 10);
+  });
+
+  it('6. Back to draft and Change the date can be undone in full, waiting emails included', () => {
+    schedule('job-fin', { plan: 'amplify', reach: waitingReach() });
+    backToDraft('job-fin');
+    undo();
+    expect(job('job-fin').status).toBe('scheduled');
+    expect(job('job-fin').reach?.candidates[0].status).toBe('waiting');
+    const was = job('job-fin').scheduledFor;
+    reschedule('job-fin', isoDay(getState().today + 3 * DAY));
+    undo();
+    expect(job('job-fin').scheduledFor).toBe(was);
+    expect(job('job-fin').reach?.rounds[0].sendsOn).toBe(was);
+    letLeaveList('job-liv');
+    undo();
+    expect(job('job-liv').listingChoice).toBeUndefined();
+  });
+
+  it('7. in the chat, "reopen" means the same job within its 14 days; otherwise it is Hire again', () => {
+    expect(readIntent('reopen the health officer')?.kind).toBe('reopen');
+    expect(readIntent('hire again for the logistics assistant')?.kind).toBe('hire');
+    expect(readIntent('reopen the logistics assistant')?.kind).toBe('hire');
+  });
+
+  it('18 and 21. a deleted job is erased on the day shown; sample addresses have no double hyphen', () => {
+    deleteJob('job-comms');
+    update((s) => purgeDeleted({ ...s, today: s.today + 14 * DAY }));
+    expect((getState().deleted ?? []).some((d) => d.job.id === 'job-comms')).toBe(false);
+    expect(jobUrl(job('job-cps'))).toBe('https://aidjobs.app/jobs/child-protection-specialist-cps');
   });
 });
 

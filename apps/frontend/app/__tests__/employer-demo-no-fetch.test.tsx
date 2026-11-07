@@ -590,7 +590,7 @@ describe('employer demo: managing jobs', () => {
     expect(tabs()).toContain('History');
     const rows = () => Array.from(container.querySelectorAll('.ej-joblist .ej-jobrow-main')).map((b) => b.querySelector('.truncate')?.textContent);
     expect(rows()).toHaveLength(getState().jobs.length);
-    expect(rows()[0]).toBe('Health Officer');
+    expect(rows()[0]).toBe('Finance Officer');
     expect(rows().at(-1)).toBe('WASH Programme Manager');
     const pick = (label: string) => act(() => (Array.from(container.querySelectorAll('header nav[aria-label="Show"] button')).find((b) => b.textContent?.startsWith(label)) as HTMLElement).click());
     pick('Needs you');
