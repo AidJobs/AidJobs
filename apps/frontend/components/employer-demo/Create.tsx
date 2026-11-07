@@ -157,13 +157,6 @@ export default function Create({ id }: { id?: string }) {
           </button>
         </Tip>
       )}
-      {!phone && !reviewing && job.sections.length > 0 && isReviewable(job) && (
-        <Tip label={job.review.state === 'none' ? 'Send for review (optional)' : 'Review again'} side="bottom">
-          <button type="button" className="aj-icon-btn" onClick={() => setReviewOpen(true)} aria-label="Send for review">
-            <UserCheck size={15} strokeWidth={1.8} />
-          </button>
-        </Tip>
-      )}
       {menu && (
         <MenuButton
           label="More actions for this job draft"
@@ -171,7 +164,6 @@ export default function Create({ id }: { id?: string }) {
           actions={[
             ...(phone ? [{ label: 'JD outline', run: () => setSheet('outline') }] : []),
             ...(phone && job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
-            ...(phone && job.sections.length && isReviewable(job) ? [{ label: job.review.state === 'none' ? 'Send for review' : 'Review again', run: () => setReviewOpen(true) }] : []),
             ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
             ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
             { label: 'Delete', danger: true, run: () => setDeleteOpen(true) },

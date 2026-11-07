@@ -275,8 +275,15 @@ export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend
     return (
       <div className="flex flex-col gap-3 p-3">
         <p className="aj-muted" style={{ margin: 0 }}>
-          {required ? 'Your organisation asks for approval on this job before it is published.' : 'Review is optional: ask colleagues, or someone outside with a private link, to comment and approve.'}
+          {required ? 'Your organisation asks for approval on this job before it is published.' : 'Review is optional.'}
         </p>
+        {isReviewable(job) && (
+          <ul className="flex flex-col gap-1.5" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
+            <li>Ask colleagues, or someone outside with a private link.</li>
+            <li>They comment, suggest changes, and approve; they cannot change the job.</li>
+            <li>{required ? 'Their answers appear here; you can publish once they approve.' : 'Their answers appear here; publishing does not wait for them.'}</li>
+          </ul>
+        )}
         {!reviewing && job.sections.length > 0 && isReviewable(job) && (
           <button type="button" className="aj-ink-btn self-start" onClick={onSend}>
             <Send size={14} strokeWidth={2} /> Send for review
@@ -356,6 +363,11 @@ export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend
             <Send size={14} strokeWidth={2} /> Send round {job.review.round + 1}
           </button>
         </div>
+      )}
+      {!reviewing && isReviewable(job) && job.review.state !== 'changes' && !job.review.reviewers.some((r) => r.decision === 'changes') && (
+        <button type="button" className="aj-text-btn self-start" onClick={onSend}>
+          <Send size={13} strokeWidth={2} /> Review again
+        </button>
       )}
     </div>
   );

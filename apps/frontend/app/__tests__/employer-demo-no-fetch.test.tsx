@@ -898,6 +898,32 @@ describe('employer demo: managing jobs', () => {
     expect(container.querySelectorAll('[aria-label="Steps to publish"] button')).toHaveLength(0);
   });
 
+  it('review has one place, the Review panel, which explains it before anything is sent', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-comms');
+    expect(container.querySelector('button[aria-label="Send for review"]')).toBeNull();
+    act(() => (Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.replace(/\d/g, '').trim() === 'Review') as HTMLElement).click());
+    shows('Review is optional.');
+    shows('they cannot change the job');
+    click(/Send for review$/);
+    expect(Array.from(document.querySelectorAll('[role="dialog"]')).some((d) => d.textContent?.startsWith('Send for review'))).toBe(true);
+    phone = true;
+    render();
+    route('#home');
+    route('#create/job-comms');
+    act(() => (container.querySelector('button[aria-label="More actions for this job draft"]') as HTMLElement).click());
+    const items = Array.from(container.querySelectorAll('.ej-menu button')).map((b) => b.textContent?.trim());
+    expect(items).toContain('JD outline');
+    expect(items).not.toContain('Send for review');
+    phone = false;
+  });
+
   it('edits a language version in the workspace like the English, and marks it reviewed', () => {
     act(() => {
       resetDemo();
