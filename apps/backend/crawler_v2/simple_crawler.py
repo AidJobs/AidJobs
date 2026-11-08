@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from contracts.admission import admit_batch, log_admission_rejections
+from contracts.countries import read_location
 from contracts.detail_reader import apply_detail_reading, read_detail_page
 from contracts.outbound import (
     POLITENESS_STOPS,
@@ -54,6 +55,25 @@ def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
         seen.add(link)
         kept.append(job)
     return kept
+
+
+def place_job(job: Dict) -> None:
+    """Fill country, code, city and remote from the job's location, offline (no network call).
+
+    A job without a location keeps whatever is stored. A country its reader supplied is kept.
+    """
+    normalized = job.get('location_normalized')
+    normalized = normalized if isinstance(normalized, dict) else {}
+    reading = read_location(job.get('location_raw') or normalized.get('label'))
+    if reading is None:
+        return
+    if not (job.get('country') or job.get('country_iso')):
+        for name in ('country', 'country_iso', 'city'):
+            if not job.get(name):
+                job[name] = reading[name]
+    job['is_remote'] = bool(
+        job.get('is_remote') or reading['is_remote'] or normalized.get('type') == 'remote'
+    )
 
 
 _ISO_DATE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$')
@@ -294,15 +314,6 @@ class SimpleCrawler:
             logger.info("Extraction logger initialized")
         except Exception as e:
             logger.warning(f"Extraction logger not available: {e}")
-        
-        # Initialize geocoder (Phase 4)
-        self.geocoder = None
-        try:
-            from core.geocoder import get_geocoder
-            self.geocoder = get_geocoder()
-            logger.info("Geocoder initialized")
-        except Exception as e:
-            logger.warning(f"Geocoder not available: {e}")
         
         # Initialize quality scorer (Phase 4)
         self.quality_scorer = None
@@ -1487,9 +1498,9 @@ class SimpleCrawler:
                         longitude = job.get('longitude')
                         geocoding_source = job.get('geocoding_source')
                         is_remote = job.get('is_remote', False)
-                        country = job.get('country', '').strip() or None
-                        country_iso = job.get('country_iso', '').strip() or None
-                        city = job.get('city', '').strip() or None
+                        country = (job.get('country') or '').strip() or None
+                        country_iso = (job.get('country_iso') or '').strip() or None
+                        city = (job.get('city') or '').strip() or None
                         
                         # Quality scoring fields (Phase 4)
                         quality_score = job.get('quality_score')
@@ -2222,43 +2233,8 @@ class SimpleCrawler:
                         logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
                     jobs = jobs
                 
-                # Geocode locations (Phase 4) - only for jobs with location but no coordinates
-                if self.geocoder and jobs:
-                    geocoded_count = 0
-                    for job in jobs:
-                        try:
-                            location = job.get('location_raw') or (job.get('location_normalized', {}).get('label') if isinstance(job.get('location_normalized'), dict) else None)
-                            
-                            # Only geocode if we have location but no coordinates
-                            if location and not job.get('latitude') and not job.get('is_remote'):
-                                # Check if already marked as remote
-                                if isinstance(job.get('location_normalized'), dict) and job.get('location_normalized', {}).get('type') == 'remote':
-                                    job['is_remote'] = True
-                                    geocoded_count += 1
-                                else:
-                                    # Geocode the location
-                                    geocoded = await self.geocoder.geocode(location, use_google=False)
-                                    if geocoded:
-                                        job['latitude'] = geocoded.get('latitude')
-                                        job['longitude'] = geocoded.get('longitude')
-                                        job['geocoding_source'] = geocoded.get('source', 'nominatim')
-                                        job['is_remote'] = geocoded.get('is_remote', False)
-                                        
-                                        # Update country/city if geocoding provided better data
-                                        if geocoded.get('country') and not job.get('country'):
-                                            job['country'] = geocoded.get('country')
-                                        if geocoded.get('country_code') and not job.get('country_iso'):
-                                            job['country_iso'] = geocoded.get('country_code')
-                                        if geocoded.get('city') and not job.get('city'):
-                                            job['city'] = geocoded.get('city')
-                                        
-                                        geocoded_count += 1
-                        except Exception as e:
-                            logger.debug(f"Error geocoding job {job.get('title', 'unknown')[:50]}: {e}")
-                            # Continue with original job if geocoding fails
-                    
-                    if geocoded_count > 0:
-                        logger.info(f"Geocoded {geocoded_count} location(s) across {len(jobs)} jobs")
+                for job in jobs:
+                    place_job(job)
                 
                 # Score data quality (Phase 4)
                 if self.quality_scorer and jobs:
