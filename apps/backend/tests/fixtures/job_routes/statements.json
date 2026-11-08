@@ -157,7 +157,7 @@
    ]
   ]
  },
- "delete, organisation, export": {
+ "delete, organisation": {
   "outcome": {
    "data": {
     "deleted_count": 2,
@@ -166,24 +166,7 @@
      "job-2"
     ],
     "deletion_type": "soft",
-    "exported_data": [
-     {
-      "deleted_at": null,
-      "id": "job-1",
-      "org_name": "Org",
-      "source_id": "source-1",
-      "status": "active",
-      "title": "Title job-1"
-     },
-     {
-      "deleted_at": null,
-      "id": "job-2",
-      "org_name": "Org",
-      "source_id": "source-1",
-      "status": "active",
-      "title": "Title job-2"
-     }
-    ],
+    "exported_data": null,
     "message": "Successfully soft-deleted 2 jobs"
    },
    "status": "ok"
@@ -191,12 +174,6 @@
   "statements": [
    [
     "SELECT COUNT(*) as count FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL",
-    [
-     "%Oxfam%"
-    ]
-   ],
-   [
-    "SELECT id::text, title, org_name, apply_url, location_raw, deadline, created_at, fetched_at, source_id::text as source_id FROM jobs WHERE org_name ILIKE %s AND deleted_at IS NULL LIMIT 10000",
     [
      "%Oxfam%"
     ]
