@@ -606,7 +606,7 @@ Approved plan, 23 October 2026:
 
 **Carried out as ledger W-37** from 30 October 2026, in the crawler foundation (`growth-and-seo-plan.md`, section 4.4: full descriptions, three dates, contract type, all locations, salary, remote, language).
 
-**Status:** Not started.
+**Status:** In progress (8 November 2026): W-37 investigated; descriptions and posting dates are stored by its second pull request.
 
 - **Scope:** the crawler stores each job's description and posting date. A crawler-plan item, coordinated with W-09 and the platform readers (W-19).
 - **Depends on:** crawler work resumed.

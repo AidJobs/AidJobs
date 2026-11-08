@@ -715,7 +715,6 @@ class _Run:
 def test_a_refusal_ends_the_job_pages(monkeypatch, caplog):
     page = FetchResult(200, {}, b"<html><body>listing</body></html>", "https://jobs.example/")
     crawler = _html_crawler(monkeypatch, page)
-    crawler.geocoder = None
     crawler.quality_scorer = None
     rows = [{"title": f"Officer {n}", "apply_url": f"https://jobs.example/job/{n}/x"}
             for n in range(1, 5)]
@@ -750,7 +749,6 @@ def test_a_refusal_ends_the_job_pages(monkeypatch, caplog):
 def test_a_refusal_on_the_last_job_page_is_reported_too(monkeypatch):
     page = FetchResult(200, {}, b"<html><body>listing</body></html>", "https://jobs.example/")
     crawler = _html_crawler(monkeypatch, page)
-    crawler.geocoder = None
     crawler.quality_scorer = None
 
     async def listing(html, url):
@@ -1014,9 +1012,10 @@ def test_only_known_third_parties_are_called_outside_the_fetch_policy():
         path.relative_to(BACKEND).as_posix() for path in _production_files()
         if clients.search(path.read_text(encoding="utf-8", errors="replace"))
     }
-    # Nominatim until the offline country lookup (W-27); OpenRouter for the old public search
-    # helpers and the AI modules the crawler no longer calls (contract section 10 amendment).
-    assert found <= {"core/geocoder.py", "app/ai_service.py", "core/ai_extractor.py",
+    # OpenRouter for the old public search helpers and the AI modules the crawler no longer
+    # calls (contract section 10 amendment). Countries are read offline (W-27, W-37).
+    assert found <= {"app/ai_service.py", "core/ai_extractor.py",
                      "core/ai_normalizer.py", "pipeline/ai_fallback.py"}
     assert not (BACKEND / "core" / "net.py").exists()
     assert not (BACKEND / "core" / "robots.py").exists()
+    assert not (BACKEND / "core" / "geocoder.py").exists()

@@ -91,8 +91,8 @@ class DataQualityScorer:
         has_location = bool(location or location_normalized)
         
         if has_location:
-            # Check if geocoded
-            if job.get('latitude') and job.get('longitude'):
+            # Located: coordinates (stored by the old geocoder) or a country read from the location
+            if (job.get('latitude') and job.get('longitude')) or job.get('country_iso'):
                 factors['location'] = 1.0
                 factors['geocoding'] = 1.0
             elif job.get('is_remote'):

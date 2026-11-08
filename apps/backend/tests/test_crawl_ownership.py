@@ -276,7 +276,7 @@ def _orch():
 
 def _crawler(cls=SimpleCrawler):
     crawler = cls(TEST_URL)
-    for name in ("extraction_logger", "html_storage", "geocoder", "quality_scorer"):
+    for name in ("extraction_logger", "html_storage", "quality_scorer"):
         if hasattr(crawler, name):
             setattr(crawler, name, None)
     return crawler
@@ -1261,15 +1261,6 @@ class _RecordingLogger:
         return None
 
 
-class _HeldGeocoder:
-    def __init__(self, gate):
-        self.gate = gate
-
-    async def geocode(self, location, use_google=False):
-        await self.gate.wait()
-        return None
-
-
 def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
     unicef = _add_source("UNICEF", url="https://jobs.unicef.org/en-us/listing/")
     icrc = _add_source("ICRC", url="https://careers.icrc.org/go/Global-Opportunities/8821501/")
@@ -1278,12 +1269,11 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
     async def scenario():
         orch = _orch()
         crawler = orch.html_crawler
-        listing_gate, geocode_gate = asyncio.Event(), asyncio.Event()
+        listing_gate, detail_gate = asyncio.Event(), asyncio.Event()
         logger = _RecordingLogger()
         crawler.extraction_logger = logger
         crawler.html_storage = None
         crawler.quality_scorer = None
-        crawler.geocoder = _HeldGeocoder(geocode_gate)
 
         async def fetch_page(url):
             return 200, "<html><body>listing</body></html>", ""
@@ -1295,6 +1285,7 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
             return [_job(1)], report
 
         async def detail_page(job, base_url):
+            await detail_gate.wait()
             return job
 
         crawler._fetch_page = fetch_page
@@ -1313,7 +1304,7 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
         await asyncio.sleep(0.2)
         listing_gate.set()
         await asyncio.sleep(0.2)
-        geocode_gate.set()
+        detail_gate.set()
         results = await asyncio.wait_for(asyncio.gather(unicef_task, icrc_task), STEP_SECONDS)
         return results, logger.extractions
 
