@@ -110,7 +110,11 @@ def test_several_countries_store_none(location, named):
         ("Congo, Democratic Republic of the", ["CD"]),
         ("Kinshasa, Congo, The Democratic Republic of the", ["CD"]),
         ("Congo, Republic of the", ["CG"]),
-        ("Congo, Dem. Rep.", []),
+        ("Congo, Dem. Rep.", ["CD"]),
+        ("Congo, Federal Something", []),
+        ("Iran, Islamic Rep.", ["IR"]),
+        ("Korea, Rep.", ["KR"]),
+        ("Egypt, Arab Rep.", ["EG"]),
         ("Korea, Republic of", ["KR"]),
         ("Korea, Democratic People's Republic of", ["KP"]),
         ("Iran, Islamic Republic of", ["IR"]),
@@ -126,6 +130,30 @@ def test_several_countries_store_none(location, named):
     ],
 )
 def test_inverted_official_names_are_read_whole(location, named):
+    assert countries_named(location) == named
+
+
+# Found by the re-review: a qualifier that does not complete a known name must not hide the
+# country before it.
+@pytest.mark.parametrize(
+    ("location", "named"),
+    [
+        ("Kenya, United Nations Office at Nairobi", ["KE"]),
+        ("Geneva, Switzerland / United Nations", ["CH"]),
+        ("Nigeria, Federal Capital Territory", ["NG"]),
+        ("United States, State of New York", ["US"]),
+        ("Sudan, State of Khartoum", ["SD"]),
+        ("Kenya, Republic of", ["KE"]),
+        ("Germany, Federal Republic of", ["DE"]),
+        ("Saudi Arabia, Kingdom of", ["SA"]),
+        ("Sudan, Republic of the Sudan", ["SD"]),
+        ("Ethiopia, Federal Democratic Republic of Ethiopia", ["ET"]),
+        ("Somalia / Kenya, United Nations Office at Nairobi", ["SO", "KE"]),
+        ("Uganda, Kenya, Republic of", ["UG", "KE"]),
+        ("Isle of Man", ["IM"]),
+    ],
+)
+def test_a_qualifier_does_not_hide_the_country_before_it(location, named):
     assert countries_named(location) == named
 
 

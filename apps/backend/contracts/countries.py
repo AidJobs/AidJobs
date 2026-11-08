@@ -342,11 +342,18 @@ _SPACES = re.compile(r"\s+")
 # The parts of a location that each may name a country: "Somalia / Nairobi, Kenya".
 _PARTS = re.compile(r"[,/;]")
 # The second half of an inverted official name, "Congo, Democratic Republic of the", compared
-# after name_key. The first half alone ("Congo") would name another country.
+# after name_key and the short forms below.
 _INVERTED = re.compile(
     r"^(?:democratic|islamic|united|plurinational|bolivarian|federated|federal|people's"
-    r"|republic|kingdom|state|states|former|dem\.? rep)\b|\bof(?: the)?$"
+    r"|republic|kingdom|state|states|former)\b|\bof(?: the)?$"
 )
+# Short forms in official lists: "Congo, Dem. Rep.", "Iran, Islamic Rep.".
+_SHORT_FORMS = (
+    (re.compile(r"\bdem\.?\s*rep\b\.?"), "democratic republic of the"),
+    (re.compile(r"\brep\b\.?"), "republic of"),
+)
+# Names that, alone before such a half, may mean another country.
+_AMBIGUOUS_ALONE = frozenset({"congo"})
 # Words that mark a remote job in a location, matched as whole words.
 _REMOTE = re.compile(
     r"\b(?:remote|home[- ]based|work(?:ing)? from home|wfh|telecommut\w*"
@@ -386,20 +393,35 @@ def iso_from_name(name: str) -> str | None:
     return _ISO_BY_NAME.get(name_key(name))
 
 
+def _inverted_half(text: str) -> str | None:
+    """The second half of an inverted name, short forms written out; None if it is not one."""
+    if not text or iso_from_name(text) is not None:
+        return None
+    key = name_key(text)
+    for pattern, full in _SHORT_FORMS:
+        key = pattern.sub(full, key)
+    return key if _INVERTED.search(key) else None
+
+
 def countries_named(location: str | None) -> list[str]:
     """Every country a location names, in order, each once.
 
-    "Congo, Democratic Republic of the" is read as one name, never as "Congo"; an inverted name
-    the table does not know names no country.
+    "Congo, Democratic Republic of the" is read as one name. When the joined name is unknown,
+    each part is read alone ("Kenya, Republic of" is Kenya), except "Congo", which names no
+    country then.
     """
     parts = [part.strip() for part in _PARTS.split(location or "")]
     found: list[str] = []
     index = 0
     while index < len(parts):
         part = parts[index]
-        following = parts[index + 1] if index + 1 < len(parts) else ""
-        if iso_from_name(following) is None and _INVERTED.search(name_key(following)):
-            iso = iso_from_name(f"{following} {part}") or iso_from_name(f"{part} ({following})")
+        half = _inverted_half(parts[index + 1]) if index + 1 < len(parts) else None
+        joined = half and (iso_from_name(f"{half} {part}") or iso_from_name(f"{part} ({half})"))
+        if joined:
+            iso = joined
+            index += 2
+        elif half and name_key(part) in _AMBIGUOUS_ALONE:
+            iso = None
             index += 2
         else:
             iso = iso_from_name(part)
