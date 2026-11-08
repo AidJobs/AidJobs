@@ -349,7 +349,7 @@ _INVERTED = re.compile(
 )
 # Short forms in official lists: "Congo, Dem. Rep.", "Iran, Islamic Rep.".
 _SHORT_FORMS = (
-    (re.compile(r"\bdem\.?\s*rep\b\.?"), "democratic republic of the"),
+    (re.compile(r"\bdem\.?\s*rep\b\.?(?:\s+of(?:\s+the)?)?"), "democratic republic of the"),
     (re.compile(r"\brep\b\.?"), "republic of"),
 )
 # Names that, alone before such a half, may mean another country.
