@@ -112,7 +112,7 @@ const ASK_TEXT: Record<NonNullable<ChatMsg['ask']>, string> = {
   contract: 'What kind of contract is it?',
 };
 
-function missingFacts(f: Facts): Array<NonNullable<ChatMsg['ask']>> {
+export function missingFacts(f: Facts): Array<NonNullable<ChatMsg['ask']>> {
   const out: Array<NonNullable<ChatMsg['ask']>> = [];
   if (!f.title) out.push('title');
   if (!f.location && f.arrangement !== 'remote') out.push('place');
@@ -255,13 +255,27 @@ function isRequest(text: string): boolean {
   return Boolean(toneRequest(text) || lengthRequest(text.toLowerCase()) || UNDO.test(text.toLowerCase().trim()));
 }
 
-export function sendChat(id: string, text: string) {
+/** `focus`: the section open in the window, which a request that names no section is about. */
+export function sendChat(id: string, text: string, focus?: string) {
   if (!ownerOnly()) return;
-  chatTurn(id, text);
+  chatTurn(id, text, focus);
   ensureAsk(id);
 }
 
-function chatTurn(id: string, text: string) {
+/** A request the window answers itself (open the preview, earlier versions): the message and the reply join the conversation. */
+export function chatNote(id: string, said: string, reply: string, quick?: string[]) {
+  if (!ownerOnly()) return;
+  updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), msg('ai', reply, quick)] }));
+  ensureAsk(id);
+}
+
+/** The part open in the window. Moving around changes nothing in the job, so an offered undo stays. */
+export function setPart(id: string, part: string) {
+  if (getState().jobs.find((j) => j.id === id)?.part === part) return;
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, part } : j)) }), true);
+}
+
+function chatTurn(id: string, text: string, focus?: string) {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || !text.trim()) return;
@@ -331,7 +345,7 @@ function chatTurn(id: string, text: string) {
     }));
     return;
   }
-  const edit = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today);
+  const edit = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today, focus);
   const factsChanged = JSON.stringify(edit.facts) !== JSON.stringify(j.facts);
   const result = factsChanged ? { ...edit, sections: rebuilt(s, { ...j, sections: edit.sections, tags: edit.tags, tone: edit.tone, facts: edit.facts }).sections } : edit;
   if (JSON.stringify([result.sections, result.tags, result.tone, result.facts]) === JSON.stringify([j.sections, j.tags, j.tone, j.facts])) {
@@ -447,14 +461,18 @@ export function markGenuine(id: string, hitKey: string, reason: string) {
   updateJob(id, (j) => ({ ...j, genuine: { ...j.genuine, [hitKey]: reason }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `Kept highlighted wording as a genuine requirement: "${reason}"` }] }));
 }
 
-export function editSection(id: string, key: string, text: string) {
+/** `note`: in the window, the chat notices the hand edit and the edited section becomes the part in view. */
+export function editSection(id: string, key: string, text: string, note = false) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const lines = text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim());
     if (JSON.stringify(lines) === JSON.stringify(j.sections.find((x) => x.key === key)?.lines)) return j;
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true } : x));
-    return { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${j.sections.find((x) => x.key === key)?.title ?? key}`, sections }], ...liveEdit(j) };
+    const title = j.sections.find((x) => x.key === key)?.title ?? key;
+    const next: DemoJob = { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
+    return note ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] } : next;
   });
+  if (note) ensureAsk(id);
 }
 
 export function restoreVersion(id: string, n: number) {

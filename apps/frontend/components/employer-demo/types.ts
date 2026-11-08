@@ -247,6 +247,8 @@ export type DemoJob = {
   /** Language versions of the job page; only reviewed ones are published, and only with Amplify. */
   translations?: Partial<Record<Lang, Translation>>;
   audit: AuditEntry[];
+  /** The part open in the window ("s:" and a section, or outline, details, fixed, check, publish); reopening the job returns to it. */
+  part?: string;
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

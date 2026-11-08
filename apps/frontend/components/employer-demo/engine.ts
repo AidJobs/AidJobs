@@ -1057,9 +1057,10 @@ export function lengthRequest(t: string): 'shorter' | 'longer' | null {
 }
 
 /** Edits asked for in the chat after the first draft. */
-export function applyEdit(text: string, keys: string[], sections: Section[], ctx: BuildContext, today: number): ChatResult {
+/** `focus`: the section in view in the window; a request that names no section is about it. */
+export function applyEdit(text: string, keys: string[], sections: Section[], ctx: BuildContext, today: number, focus?: string): ChatResult {
   const t = text.toLowerCase();
-  const target = sectionFrom(text, keys, ctx.format);
+  const target = sectionFrom(text, keys, ctx.format) ?? (focus && keys.includes(focus) ? focus : null);
   const role = roleByKey(ctx.roleKey);
   const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited ? buildSection(s.key, c) : s));
   let tone = ctx.tone;
