@@ -1211,6 +1211,10 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     shows('To add');
     expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job description');
+    click('Skip to the job description');
+    act(() => jest.advanceTimersByTime(50));
+    expect(document.activeElement?.id).toBe('ej-w-panel');
+    expect(line().querySelectorAll('[aria-current="step"]')).toHaveLength(1);
     expect(network).toEqual([]);
   });
 
