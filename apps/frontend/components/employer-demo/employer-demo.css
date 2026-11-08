@@ -1613,3 +1613,252 @@ button.ej-step:hover {
     font-size: 30pt;
   }
 }
+
+/* Round 7: creating a job in one window. The chat on the left; the output panel on the right, with the progress line above it. */
+.ej-w-chat {
+  width: clamp(320px, 34%, 440px);
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.ej-w-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The line scrolls sideways when the sections are open; its ends fade so the parts beyond them show they are there. */
+.ej-line {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 6px 14px;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+
+.ej-line > li {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.ej-line > li + li::before {
+  content: '';
+  width: 8px;
+  height: 1px;
+  margin: 0 2px;
+  background: var(--hair);
+}
+
+.aj-root .ej-line-part {
+  display: inline-flex;
+  max-width: 190px;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ej-line-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aj-root .ej-line-part:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.aj-root .ej-line-part[aria-current] {
+  background: var(--sage-1);
+  color: var(--sage-8);
+}
+
+.ej-line-sub .ej-line-part {
+  font-size: 12px;
+}
+
+.ej-line-mark {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1.5px solid var(--text-3);
+  border-radius: 999px;
+  color: #fff;
+}
+
+.ej-line-part[data-state='done'] .ej-line-mark {
+  border-color: var(--sage-6);
+  background: var(--sage-6);
+}
+
+.ej-line-part[data-state='current'] .ej-line-mark {
+  border-color: var(--sage-6);
+  background: radial-gradient(circle, var(--sage-6) 0 3px, transparent 3.5px);
+}
+
+/* On phones the line is a short list in a sheet. */
+.ej-line-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aj-root .ej-line-list .ej-line-part {
+  width: 100%;
+  max-width: none;
+  height: 40px;
+  padding: 0 12px 0 8px;
+  font-size: 13px;
+}
+
+.ej-line-list .ej-line-sub {
+  padding-left: 18px;
+}
+
+.aj-root .ej-parts-btn {
+  display: inline-flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The output panel's tabs: the open one underlined in sage; the weight stays the same. */
+.ej-w-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 2px;
+  padding: 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.aj-root .ej-w-tab {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.aj-root .ej-w-tab:hover {
+  color: var(--text);
+}
+
+.aj-root .ej-w-tab[aria-selected='true'] {
+  border-bottom-color: var(--sage-6);
+  color: var(--text);
+}
+
+.aj-root:has(.ej-app) .ej-w-tab:focus-visible {
+  outline-offset: -3px;
+}
+
+#ej-w-panel:focus {
+  outline: none;
+}
+
+.ej-part-card {
+  border-color: var(--sage-3);
+}
+
+.ej-doc section[data-current] {
+  box-shadow: inset 3px 0 0 var(--sage-4);
+}
+
+.ej-fact-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ej-fact-rows > li {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr) auto;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.ej-fact-rows > li:last-child {
+  border-bottom: 0;
+}
+
+.ej-fact-rows [data-missing] {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.ej-subject {
+  padding: 0 4px 6px;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ej-reading {
+  animation: ej-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes ej-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ej-reading {
+    animation: none;
+  }
+}
+
+.ej-new-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--amber);
+}

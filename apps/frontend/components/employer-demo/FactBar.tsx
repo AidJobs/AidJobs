@@ -301,6 +301,23 @@ function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
+export type FactKey = PillKey;
+
+/** The job type in a few words: "Job · Fixed-term · Roster". */
+export function typeLabel(f: Facts): string {
+  return [ENGAGEMENTS.find((e) => e.key === f.engagement)?.label.split(' ')[0], f.contract && f.contract !== 'Internship' ? f.contract.replace(' (under a year)', '') : '', f.recruitment === 'roster' ? 'Roster' : f.recruitment === 'proposal' ? 'Proposal' : ''].filter(Boolean).join(' · ');
+}
+
+/** One fact's picker, as a pop-up. */
+export function FactDialog({ which, job, s, onClose }: { which: FactKey; job: DemoJob; s: State; onClose: () => void }) {
+  if (which === 'place') return <PlaceDialog job={job} s={s} onClose={onClose} />;
+  if (which === 'type') return <TypeDialog job={job} onClose={onClose} />;
+  if (which === 'grade') return <GradeDialog job={job} s={s} onClose={onClose} />;
+  if (which === 'closes') return <ClosesDialog job={job} onClose={onClose} />;
+  if (which === 'salary') return <SalaryDialog job={job} s={s} onClose={onClose} />;
+  return <MoreDialog job={job} onClose={onClose} />;
+}
+
 /** `actions`: the job's own actions, listed after the facts that do not fit; with any, the menu shows even when every fact fits. */
 export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: State; actions?: MenuAction[] }) {
   const [open, setOpen] = useState<PillKey | null>(null);
@@ -334,7 +351,7 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
     return () => window.removeEventListener('ej-open-fact', fromSlot);
   }, []);
   const f = job.facts;
-  const type = [ENGAGEMENTS.find((e) => e.key === f.engagement)?.label.split(' ')[0], f.contract && f.contract !== 'Internship' ? f.contract.replace(' (under a year)', '') : '', f.recruitment === 'roster' ? 'Roster' : f.recruitment === 'proposal' ? 'Proposal' : ''].filter(Boolean).join(' · ');
+  const type = typeLabel(f);
   const salary = salaryText(f) || 'Not shown';
   const ro = Boolean(s.reviewerAs);
   const pills: Array<{ key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [

@@ -17,6 +17,9 @@ import UploadDialog from './Upload';
 /** Set when a job starts from this screen, so its workspace opens once with the chat open and focused. */
 export const OPEN_CHAT_KEY = 'aidjobs.employerDemo.openChat';
 
+/** The job just started with Enter: its window opens at once and shows "Reading your role…" before the first replies. */
+export const READING_KEY = 'aidjobs.employerDemo.reading';
+
 /** Short names so the "Add:" pills fit on one line; the full heading shows on hover. */
 const PILL_LABEL: Record<string, string> = {
   offer: 'What we offer',
@@ -89,15 +92,15 @@ export default function CreateEntry() {
     box.current?.focus();
   };
   const send = (v: string) => {
+    const id = startJob(v, fkey, extra);
     try {
-      localStorage.setItem(OPEN_CHAT_KEY, '1');
+      localStorage.setItem(READING_KEY, id);
     } catch {
       /* storage unavailable */
     }
-    const id = startJob(v, fkey, extra);
     setText('');
     setExtra([]);
-    go('create', id);
+    go('job', id);
   };
 
   return (

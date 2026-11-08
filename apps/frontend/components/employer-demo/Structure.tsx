@@ -17,7 +17,8 @@ function scrollToSection(key: string) {
   document.getElementById(`ej-sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: boolean }) {
+/** `hideCommitments`: in the window, the fixed text is its own part on the progress line. */
+export default function Structure({ job, s, hideCommitments }: { job: DemoJob; s: State; bare?: boolean; hideCommitments?: boolean }) {
   const format = formatOf(s, job.format);
   const rec = new Set(recommendSections(format, job.facts));
   const [closed, setClosed] = useState<Record<string, boolean>>({ commitments: true });
@@ -117,6 +118,7 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
             );
           })}
 
+          {!hideCommitments && (
           <section className="flex flex-col gap-1">
             <button type="button" className="ej-group" onClick={() => toggleGroup('commitments')} aria-expanded={!closed.commitments}>
               <ChevronRight size={13} strokeWidth={2.2} style={{ transform: closed.commitments ? 'none' : 'rotate(90deg)', transition: 'transform 120ms ease' }} />
@@ -124,36 +126,43 @@ export default function Structure({ job, s }: { job: DemoJob; s: State; bare?: b
               <span>Commitments</span>
               <span className="ej-count">{job.commitments.length} included</span>
             </button>
-            {!closed.commitments && (
-              <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => {
-                  const t = commitmentText(c.key, s.org, job.facts);
-                  const on = job.commitments.includes(c.key);
-                  return (
-                    <li key={c.key}>
-                      <Tip label={t.text} className="w-full">
-                      <label className="ej-outline-row w-full" style={{ cursor: ro ? 'default' : 'pointer' }}>
-                        <input type="checkbox" checked={on} disabled={ro} onChange={() => toggleCommitment(job.id, c.key)} />
-                        <span className="min-w-0 flex-1 truncate" style={{ fontWeight: on ? 600 : 500, color: on ? 'var(--text)' : 'var(--text-2)' }}>
-                          {c.label}
-                        </span>
-                        {t.locked && <Lock size={11} strokeWidth={2} aria-label="Locked text" />}
-                        <span className="aj-faint" style={{ fontSize: 10.5 }}>
-                          {t.own ? 'yours' : 'starter'}
-                        </span>
-                      </label>
-                      </Tip>
-                    </li>
-                  );
-                })}
-                <li className="aj-faint px-1" style={{ fontSize: 11 }}>
-                  Your own texts are inserted word for word. Starter texts are AidJobs wording based on the IASC principles and sector practice; replace them in Organisation settings.
-                </li>
-              </ul>
-            )}
+            {!closed.commitments && <Commitments job={job} s={s} />}
           </section>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The organisation's fixed text (commitments) for this job, each included or not, with its text on hover. */
+export function Commitments({ job, s }: { job: DemoJob; s: State }) {
+  const ro = Boolean(s.reviewerAs);
+  return (
+    <ul className="flex flex-col gap-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => {
+        const t = commitmentText(c.key, s.org, job.facts);
+        const on = job.commitments.includes(c.key);
+        return (
+          <li key={c.key}>
+            <Tip label={t.text} className="w-full">
+            <label className="ej-outline-row w-full" style={{ cursor: ro ? 'default' : 'pointer' }}>
+              <input type="checkbox" checked={on} disabled={ro} onChange={() => toggleCommitment(job.id, c.key)} />
+              <span className="min-w-0 flex-1 truncate" style={{ fontWeight: on ? 600 : 500, color: on ? 'var(--text)' : 'var(--text-2)' }}>
+                {c.label}
+              </span>
+              {t.locked && <Lock size={11} strokeWidth={2} aria-label="Locked text" />}
+              <span className="aj-faint" style={{ fontSize: 10.5 }}>
+                {t.own ? 'yours' : 'starter'}
+              </span>
+            </label>
+            </Tip>
+          </li>
+        );
+      })}
+      <li className="aj-faint px-1" style={{ fontSize: 11 }}>
+        Your own texts are inserted word for word. Starter texts are AidJobs wording based on the IASC principles and sector practice; replace them in Organisation settings.
+      </li>
+    </ul>
   );
 }

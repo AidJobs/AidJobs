@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { changeWithUndo, getState, resetDemo, update } from '../../components/employer-demo/store';
-import { chatNote, editSection, sendChat, setFacts, setPart, startJob } from '../../components/employer-demo/actions';
+import { chatNote, editSection, sendChat, setFacts, setPart, settleAsk, startJob } from '../../components/employer-demo/actions';
 import { currentPart, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -88,6 +88,17 @@ describe('the window: hand edits and its own replies', () => {
     editSection('job-comms', job('job-comms').tags[1], 'My own words');
     expect(job('job-comms').chat.length).toBe(before);
     expect(job('job-comms').part).toBeUndefined();
+  });
+
+  it('a fact the chat asked for and then set by hand: the chat says so and asks the next question', () => {
+    const id = startJob('We are hiring a Nutrition Officer');
+    expect(job(id).chat.at(-1)?.ask).toBe('place');
+    settleAsk(id);
+    expect(job(id).chat.at(-1)?.ask).toBe('place');
+    setFacts(id, { location: 'Juba, South Sudan', country: 'South Sudan' });
+    settleAsk(id);
+    expect(job(id).chat.at(-2)?.text).toBe('You set the duty station by hand.');
+    expect(job(id).chat.at(-1)?.ask).toBe('deadline');
   });
 
   it('a question waiting for an answer stays open after a note or a reply from the window', () => {

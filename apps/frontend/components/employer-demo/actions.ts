@@ -196,7 +196,7 @@ function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
   const mem = first ? memoryHint(s, j.facts.title) : null;
   if (first) {
     const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : '';
-    if (what) out.push(msg('ai', `Got it: ${what}, in ${formatOf(s, j.format).label}. The job description is taking shape on the left, and fills in as you answer.`));
+    if (what) out.push(msg('ai', `Got it: ${what}, in ${formatOf(s, j.format).label}. The job description is taking shape, and fills in as you answer.`));
     const better = j.facts.title ? suggestTitle(j.facts.title) : null;
     if (better) out.push(msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`]));
     if (mem) out.push(msg('ai', mem, ['Start from last time']));
@@ -267,6 +267,17 @@ export function chatNote(id: string, said: string, reply: string, quick?: string
   if (!ownerOnly()) return;
   updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), msg('ai', reply, quick)] }));
   ensureAsk(id);
+}
+
+const ASK_SET: Record<NonNullable<ChatMsg['ask']>, string> = { title: 'job title', place: 'duty station', deadline: 'closing date', contract: 'contract' };
+
+/** In the window, a fact the chat asked for and then set by hand: the chat says so and goes on to the next question. */
+export function settleAsk(id: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  const last = j?.chat[j.chat.length - 1];
+  if (!j || !ownerOnly() || last?.from !== 'ai' || !last.ask || !answered(last.ask, j.facts)) return;
+  const kind = last.ask;
+  update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === id ? { ...x, chat: [...x.chat, msg('ai', `You set the ${ASK_SET[kind]} by hand.`), ...replyAfterFacts(s, x, false)] } : x)) }));
 }
 
 /** The part open in the window. Moving around changes nothing in the job, so an offered undo stays. */

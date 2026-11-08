@@ -42,6 +42,7 @@ beforeAll(() => {
   Object.defineProperty(window.XMLHttpRequest.prototype, 'open', { configurable: true, value: deny('XMLHttpRequest') });
   Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: deny('sendBeacon') });
   Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: deny('WebSocket') });
+  Object.defineProperty(globalThis, 'EventSource', { configurable: true, value: deny('EventSource') });
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: (q: string) => ({ matches: phone && q.includes('max-width'), media: q, addEventListener: () => {}, removeEventListener: () => {} }),
@@ -149,6 +150,10 @@ describe('employer demo: never calls the network', () => {
       shows('Key areas of accountability');
       route('#create/job-cps');
       expect(container.textContent?.toLowerCase()).toContain('our commitments');
+      route('#job/job-fin');
+      if (p) click('Job');
+      else expect(container.querySelector('nav[aria-label="Parts of this job"]')).not.toBeNull();
+      shows('Key areas of accountability');
       route('#styles');
       shows('UN Secretariat format');
       shows('Local NGO concise');
@@ -1153,6 +1158,230 @@ describe('employer demo: managing jobs', () => {
   });
 });
 
+describe('employer demo: creating a job in one window (round 7, phase 1)', () => {
+  const fresh = () =>
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+  const write = (label: string, text: string, enter = true) => {
+    const ta = container.querySelector(`textarea[aria-label="${label}"]`) as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(ta, text);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    if (enter) act(() => ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
+  const say = (text: string) => write('Message AidJobs about this job', text);
+  const line = () => container.querySelector('nav[aria-label="Parts of this job"]') as HTMLElement;
+  const part = (label: string | RegExp) => {
+    const find = () =>
+      Array.from(document.querySelectorAll('nav[aria-label="Parts of this job"] button')).find((x) => {
+        const t = x.querySelector('.ej-line-label')?.textContent ?? '';
+        return typeof label === 'string' ? t === label : label.test(t);
+      });
+    const closed = document.querySelector('nav[aria-label="Parts of this job"] button[aria-expanded="false"]');
+    if (!find() && closed) act(() => (closed as HTMLElement).click());
+    const b = find();
+    if (!b) throw new Error(`No part "${label}" on the line`);
+    act(() => (b as HTMLElement).click());
+  };
+  const currentLabel = () => line().querySelector('[aria-current="step"] .ej-line-label')?.textContent;
+  const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
+  const byLabel = (label: string) => document.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+
+  it('Enter on the first screen opens the window at once, reading the role, then the chat and the job description beside it', () => {
+    fresh();
+    phone = false;
+    render();
+    route('#create');
+    write('Describe the role', "We're hiring a Nutrition Officer, 12-month fixed-term, closing 30 December 2026");
+    route(window.location.hash);
+    const id = window.location.hash.replace('#job/', '');
+    expect(window.location.hash).toBe(`#job/${id}`);
+    expect(job(id).facts.title).toBe('Nutrition Officer');
+    const status = container.querySelector('[role="status"].ej-reading');
+    expect(status?.textContent).toBe('Reading your role…');
+    expect(container.querySelector('[role="log"]')?.textContent).not.toContain('Where is the job based?');
+    act(() => jest.advanceTimersByTime(1000));
+    expect(container.textContent).not.toContain('Reading your role…');
+    shows('Where is the job based?');
+    expect(currentLabel()).toBe('Details');
+    shows('Duty station');
+    shows('To add');
+    expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job description');
+    expect(network).toEqual([]);
+  });
+
+  it('the line is the way around: a part opens in the panel and becomes the chat subject; what the chat changes comes into view', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    const sections = job(id).sections;
+    const [a, b] = sections.filter((x) => x.key !== 'apply' && x.key !== 'about').map((x) => x.key);
+    const title = (k: string) => sections.find((x) => x.key === k)!.title;
+    part(title(a));
+    expect(job(id).part).toBe(`s:${a}`);
+    expect(currentLabel()).toBe(title(a));
+    expect(container.querySelector('.ej-subject')?.textContent).toBe(`About: ${title(a)}`);
+    expect(container.querySelector(`#ej-sec-${a}`)?.getAttribute('data-current')).toBe('true');
+    const otherBefore = JSON.stringify(job(id).sections.find((x) => x.key === b)?.lines);
+    say('Travels to the camps twice a month');
+    expect(job(id).sections.find((x) => x.key === a)?.lines.at(-1)).toBe('Travels to the camps twice a month.');
+    expect(JSON.stringify(job(id).sections.find((x) => x.key === b)?.lines)).toBe(otherBefore);
+    say(`${title(b)}: reports weekly to the area manager`);
+    expect(job(id).part).toBe(`s:${b}`);
+    expect(currentLabel()).toBe(title(b));
+    expect(document.querySelector('.sr-only[aria-live="polite"]')?.textContent).toContain(`Updated in the job description: ${title(b)}`);
+    route('#jobs');
+    route(`#job/${id}`);
+    expect(currentLabel()).toBe(title(b));
+    const group = Array.from(line().querySelectorAll('button[aria-expanded]'))[0] as HTMLElement;
+    expect(group.getAttribute('aria-expanded')).toBe('true');
+    act(() => group.click());
+    expect(group.getAttribute('aria-expanded')).toBe('false');
+    expect(group.getAttribute('aria-current')).toBe('step');
+  });
+
+  it('every fact, the fixed text, How to apply, and the section order can be set from the line, without the chat', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    act(() => (document.querySelector('.ej-slot') as HTMLElement).click());
+    expect(job(id).part).toBe('details');
+    expect(document.querySelector('[role="dialog"][aria-label="Closing date"]')).not.toBeNull();
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    part('Details');
+    act(() => byLabel('Add closing date').click());
+    const date = document.querySelector('[role="dialog"][aria-label="Closing date"] input[type="date"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(date, '2026-12-30');
+      date.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(job(id).facts.deadline).toBe('2026-12-30');
+    expect(job(id).chat.at(-1)?.ask).toBe('deadline');
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    shows('You set the closing date by hand.');
+    expect(job(id).chat.at(-1)?.ask).toBeUndefined();
+    part('Fixed text');
+    const before = job(id).commitments.length;
+    act(() => (container.querySelector('#ej-part-card input[type="checkbox"]') as HTMLElement).click());
+    expect(job(id).commitments.length).not.toBe(before);
+    part('JD outline');
+    const tags = job(id).tags;
+    const list = Array.from(container.querySelectorAll('#ej-part-card ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
+    act(() => (list?.querySelector('.ej-drag-handle') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(job(id).tags).not.toEqual(tags);
+    expect(job(id).sections.map((x) => x.key)).toEqual(job(id).tags);
+    part(job(id).sections.find((x) => x.key === 'apply')!.title);
+    click('By email');
+    expect(job(id).apply.method).toBe('email');
+    click('Hide');
+    expect(container.querySelector('#ej-part-card')).toBeNull();
+    part('Check');
+    shows('For now, the market check, the full advert check, and language versions are on the Check and publish page.');
+    part('Publish');
+    click('Check and publish');
+    expect(window.location.hash).toBe(`#publish/${id}`);
+    route(window.location.hash);
+    shows('Before you publish');
+  });
+
+  it('opens the preview and language versions as tabs; answers are buttons, disabled once answered; hand edits and requests that do not fit get a reply', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('hiring education speclist in Kampala, closing 30 December 2026, fixed-term');
+      addTranslation(id, 'fr');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    const use = () => Array.from(container.querySelectorAll('[role="log"] button')).find((x) => x.textContent === 'Use "Education Specialist"') as HTMLButtonElement;
+    expect(use().disabled).toBe(false);
+    act(() => use().click());
+    expect(job(id).facts.title).toBe('Education Specialist');
+    expect(use().disabled).toBe(true);
+
+    const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
+    expect(tabs()).toEqual(['Job description', 'Français']);
+    say('show the preview');
+    expect(tabs()).toEqual(['Job description', 'Français', 'Preview']);
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Preview');
+    shows('The preview is open in the panel');
+    click('In Google');
+    expect(container.querySelector('[aria-label="Google result preview"]')).not.toBeNull();
+    act(() => (container.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Français');
+    shows('French version');
+    act(() => (container.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job description');
+
+    const key = job(id).sections[1].key;
+    act(() => byLabel(`Edit ${job(id).sections[1].title}`).click());
+    const area = container.querySelector(`textarea[aria-label="${job(id).sections[1].title} text"]`) as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(area, 'Our own words for this section.');
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    click('Save');
+    expect(job(id).part).toBe(`s:${key}`);
+    shows('by hand');
+
+    say('publish it');
+    shows('For now, publishing is on the Check and publish page.');
+    expect(job(id).status).toBe('draft');
+    click('Earlier workspace');
+    expect(window.location.hash).toBe(`#create/${id}`);
+    route(window.location.hash);
+    expect(container.querySelector('[aria-label="JD outline"], [aria-label="Panels"]')).not.toBeNull();
+    route(`#job/${id}`);
+    click('Open Check and publish');
+    expect(window.location.hash).toBe(`#publish/${id}`);
+  });
+
+  it('on phones the chat fills the screen, the job is one tap away, and the line opens as a short list', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = true;
+    render();
+    route(`#job/${id}`);
+    expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).not.toBeNull();
+    expect(container.querySelector('article[aria-label="Job description"]')).toBeNull();
+    say('make the responsibilities longer');
+    const jobButton = Array.from(container.querySelectorAll('[aria-label="Show"] button')).find((b) => b.textContent?.startsWith('Job')) as HTMLElement;
+    expect(jobButton.textContent).toContain('updated');
+    click(/^Job/);
+    expect(container.querySelector('article[aria-label="Job description"]')).not.toBeNull();
+    expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).toBeNull();
+    expect(container.querySelector('nav[aria-label="Parts of this job"]')).toBeNull();
+    click(/done$/);
+    expect(document.querySelectorAll('nav[aria-label="Parts of this job"] li').length).toBe(job(id).tags.length + 5);
+    part('Details');
+    expect(document.querySelector('nav[aria-label="Parts of this job"]')).toBeNull();
+    expect(job(id).part).toBe('details');
+    shows('Duty station');
+    click('Chat');
+    expect(container.querySelector('.ej-subject')?.textContent).toBe('About: Details');
+    phone = false;
+    expect(network).toEqual([]);
+  });
+});
+
 describe('employer demo: recovery', () => {
   it('shows a way out instead of a blank page when something in the demo fails', () => {
     const Broken = () => {
@@ -1195,6 +1424,8 @@ describe('employer demo: source has no network path', () => {
       expect({ f, api: /['"`]\/api\//.test(src) }).toEqual({ f, api: false });
       expect({ f, lib: /from ['"](axios|swr|@tanstack)/.test(src) }).toEqual({ f, lib: false });
       expect({ f, data: /lib\/site\/loadJobs|lib\/shortlist|PublicSite/.test(src) }).toEqual({ f, data: false });
+      expect({ f, stream: /\bEventSource\b|\bWebSocket\b/.test(src) }).toEqual({ f, stream: false });
+      expect({ f, ai: /from ['"](openai|ai|@ai-sdk\/[\w-]+|@anthropic-ai\/[\w-]+|@google\/(generative-ai|genai)|@mistralai\/[\w-]+|cohere-ai|groq-sdk|ollama|langchain|@langchain\/[\w-]+)['"]/.test(src) }).toEqual({ f, ai: false });
     }
   });
 

@@ -12,7 +12,7 @@ import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } fr
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
-function rich(text: string): ReactNode {
+export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
 }
 
@@ -112,11 +112,19 @@ function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob;
 }
 
 function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  return (
+    <Dialog title="How to apply" subtitle="Writes the section for you" onClose={onClose} wide footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
+      <ApplyFields job={job} />
+    </Dialog>
+  );
+}
+
+/** How to apply: method, documents, and process; the section is written from them. */
+export function ApplyFields({ job }: { job: DemoJob }) {
   const a = job.apply;
   const set = (p: Partial<ApplySettings>) => setApply(job.id, p);
   const toggleDoc = (d: string) => set({ documents: a.documents.includes(d) ? a.documents.filter((x) => x !== d) : [...a.documents, d] });
   return (
-    <Dialog title="How to apply" subtitle="Writes the section for you" onClose={onClose} wide footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Method">
           <div className="flex flex-wrap gap-1.5">
@@ -189,11 +197,12 @@ function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
           <input style={inputStyle} value={a.replyWeeks} onChange={(e) => set({ replyWeeks: e.target.value })} placeholder="e.g. 2" />
         </Field>
       </div>
-    </Dialog>
   );
 }
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat }: { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void }) {
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean };
+
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits }: SectionProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [remark, setRemark] = useState<'comment' | 'suggestion' | null>(null);
@@ -205,7 +214,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat }: { job: DemoJob; 
   const changed = Boolean(job.lastChange?.keys.includes(sec.key));
   const sinceLastRound = reviewing && changedSinceLastRound(job).includes(sec.key);
   return (
-    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
+    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="flex items-center gap-2">
         <h3 style={{ flex: 1 }}>{sec.title}</h3>
         {sinceLastRound && (
@@ -265,7 +274,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat }: { job: DemoJob; 
         <div className="flex flex-col gap-2">
           <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus />
           <div className="flex gap-1.5">
-            <button type="button" className="aj-ink-btn" onClick={() => { editSection(job.id, sec.key, text); setEditing(false); }}>
+            <button type="button" className="aj-ink-btn" onClick={() => { editSection(job.id, sec.key, text, noteEdits); setEditing(false); }}>
               Save
             </button>
             <button type="button" className="aj-pill" onClick={() => setEditing(false)}>
@@ -403,7 +412,8 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
     </>
   );
 }
-export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; onSeeChat?: () => void }) {
+/** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits. */
+export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
   const checks = quality(job.sections, job.facts, s.today, live);
@@ -420,7 +430,7 @@ export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; on
           <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
         {inOutlineOrder(job.sections, job.tags).map((sec) => (
-          <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} />
+          <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} />
         ))}
         {job.commitments.length > 0 && (
           <section className="rounded-2xl px-3 py-2" aria-label="Commitments">
@@ -450,7 +460,7 @@ export function DocumentView({ job, s, onSeeChat }: { job: DemoJob; s: State; on
 }
 
 /** Answers built into AidJobs' question: relevant picks, each with its reason, plus a search or a calendar. Free text in the box works too. */
-function AskAnswer({ job, s, kind, onAnswered }: { job: DemoJob; s: State; kind: NonNullable<ChatMsg['ask']>; onAnswered: () => void }) {
+export function AskAnswer({ job, s, kind, onAnswered }: { job: DemoJob; s: State; kind: NonNullable<ChatMsg['ask']>; onAnswered: () => void }) {
   const [q, setQ] = useState('');
   const [date, setDate] = useState('');
   const min = addDays(s.today, 1);

@@ -214,7 +214,7 @@ export function takePart(): string | null {
 /** A screen in the trail that no longer makes sense: its job was deleted, or its publishing page is for a job already published. */
 function gone(hash: string): boolean {
   const [screen, id] = hash.replace(/^#\/?/, '').split('/');
-  if (!id || !['jobs', 'create', 'studio', 'publish', 'public'].includes(screen)) return false;
+  if (!id || !['jobs', 'create', 'studio', 'job', 'publish', 'public'].includes(screen)) return false;
   const job = getState().jobs.find((j) => j.id === id);
   return !job || (screen === 'publish' && !['draft', 'review', 'approved'].includes(job.status));
 }

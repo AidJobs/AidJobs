@@ -369,7 +369,7 @@ export function JobPageLangs({ job, s, drafts = false, share = false }: { job: D
   );
 }
 
-function GooglePreview({ job, s }: { job: DemoJob; s: State }) {
+export function GooglePreview({ job, s }: { job: DemoJob; s: State }) {
   return (
     <div className="aj-card flex flex-col gap-1 p-4" aria-label="Google result preview">
       <div className="aj-faint" style={{ fontSize: 11 }}>
@@ -394,7 +394,7 @@ function GooglePreview({ job, s }: { job: DemoJob; s: State }) {
   );
 }
 
-function ShareCards({ job, s }: { job: DemoJob; s: State }) {
+export function ShareCards({ job, s }: { job: DemoJob; s: State }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="aj-card flex flex-col gap-2 p-3" aria-label="WhatsApp preview">

@@ -15,6 +15,7 @@ import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
 import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
 import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
+import Window from './Window';
 import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
 /** "View as" and "Reset demo": demo-only controls, at the bottom of the side menu. */
@@ -92,7 +93,7 @@ export default function EmployerDemo() {
     label,
     icon,
     count,
-    active: route.screen === key || (key === 'create' && route.screen === 'publish'),
+    active: route.screen === key || (key === 'create' && (route.screen === 'publish' || route.screen === 'job')),
     onSelect: () => go(key),
   });
   const primary: MenuEntry[] = [
@@ -105,13 +106,16 @@ export default function EmployerDemo() {
     entry('public', 'Your page on AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
   ];
 
-  const workspace = (route.screen === 'create' || route.screen === 'studio') && Boolean(route.id);
+  const workspace = (route.screen === 'create' || route.screen === 'studio' || route.screen === 'job') && Boolean(route.id);
   const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
     case 'create':
     case 'studio':
       screen = <Create key={route.id ?? 'new'} id={route.id} />;
+      break;
+    case 'job':
+      screen = <Window key={route.id} id={route.id} />;
       break;
     case 'publish':
       screen = <Publish key={route.id} id={route.id} />;
