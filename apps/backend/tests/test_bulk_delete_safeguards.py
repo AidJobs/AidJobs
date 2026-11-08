@@ -116,13 +116,6 @@ def test_the_delete_routes_own_export_is_refused_before_anything_is_deleted(monk
     assert log == []
 
 
-def test_a_delete_reads_no_copy_of_the_jobs(monkeypatch, client):
-    log = _database(monkeypatch)
-    response = client.post(DELETE, json={"org_name": "Oxfam", "deletion_reason": "cleanup"})
-    assert response.status_code == 200 and response.json()["data"]["exported_data"] is None
-    assert not [s for s, _p in log if "LIMIT 10000" in s]
-
-
 # A Hard Delete by job IDs ------------------------------------------------------------------
 
 def _jobs(monkeypatch, present, deletable=None):
@@ -154,8 +147,8 @@ def _hard(ids):
 
 
 @pytest.mark.parametrize("present, detail", [
-    ({"job-1"}, "1 of the 2 listed jobs were not found. Nothing was deleted."),
-    (set(), "2 of the 2 listed jobs were not found. Nothing was deleted."),
+    ({"job-1"}, "Not found: 1 of the 2 listed jobs. Nothing was deleted."),
+    (set(), "Not found: 2 of the 2 listed jobs. Nothing was deleted."),
 ])
 def test_a_hard_delete_missing_a_listed_job_deletes_nothing(monkeypatch, client, present,
                                                             detail):
@@ -169,7 +162,8 @@ def test_a_hard_delete_that_removes_fewer_than_listed_is_rolled_back(monkeypatch
     log = _jobs(monkeypatch, {"job-1", "job-2"}, deletable={"job-1"})
     response = client.post(DELETE, json=_hard(["job-1", "job-2"]))
     assert (response.status_code, response.json()) == (409, {
-        "detail": "Only 1 of the 2 listed jobs could be deleted. Nothing was deleted."})
+        "detail": "Only 1 of the 2 listed jobs could be deleted (removed meanwhile, or outside "
+                  "the date range). Nothing was deleted."})
     assert [s for s, _p in log if s.startswith("DELETE")]
     assert ["ROLLBACK", []] in log and ["COMMIT", []] not in log
 

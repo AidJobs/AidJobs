@@ -61,7 +61,8 @@ MAX_JOB_IDS = 200  # the job search's largest page
 
 def check_job_selection(job_ids: Optional[List[str]], org_name: Optional[str] = None,
                         source_id: Optional[str] = None) -> None:
-    """Refuse a job list that is empty, too long, or sent with another target, and two targets.
+    """Refuse an empty or oversized job list, a job list sent with org_name or source_id, and
+    org_name sent with source_id.
 
     An empty list must not fall through to the organisation, the source, or every job."""
     if job_ids is not None:
@@ -403,7 +404,8 @@ async def bulk_delete_jobs(
     if request.export_data:
         raise HTTPException(
             status_code=400,
-            detail="export_data is no longer supported: save a copy with /api/admin/jobs/export before deleting"
+            detail="export_data is no longer supported: "
+                   "save a copy with /api/admin/jobs/export before deleting"
         )
     
     conn = None
@@ -425,9 +427,6 @@ async def bulk_delete_jobs(
         params = []
         
         if request.job_ids:
-            if not isinstance(request.job_ids, list) or len(request.job_ids) == 0:
-                raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
-            
             # Validate job IDs exist and log details
             # Ensure all IDs are strings for consistent comparison
             job_ids_str = [str(jid).strip() for jid in request.job_ids]
@@ -468,10 +467,11 @@ async def bulk_delete_jobs(
             if request.deletion_type == "hard" and not_found:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"{len(not_found)} of the {len(listed)} listed jobs were not found. Nothing was deleted."
+                    detail=f"Not found: {len(not_found)} of the {len(listed)} listed jobs. "
+                           "Nothing was deleted."
                 )
             
-            # Only add to WHERE clause if we have existing jobs (for hard delete, include even deleted ones)
+            # Only a Soft Delete gets here with none found: a Hard Delete was refused above.
             if len(existing_ids) == 0:
                 logger.error(f"[bulk_delete] None of the requested job IDs exist! Cannot proceed with deletion.")
                 return {
@@ -600,9 +600,12 @@ async def bulk_delete_jobs(
             deleted_count = len(deleted_ids)
             if request.job_ids and set(deleted_ids) != set(job_ids_str):
                 _rollback(conn)
+                listed = set(job_ids_str)
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Only {len(set(deleted_ids) & set(job_ids_str))} of the {len(set(job_ids_str))} listed jobs could be deleted. Nothing was deleted."
+                    detail=f"Only {len(set(deleted_ids) & listed)} of the {len(listed)} listed jobs "
+                           "could be deleted (removed meanwhile, or outside the date range). "
+                           "Nothing was deleted."
                 )
             logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs: {deleted_ids[:10]}")
         else:
