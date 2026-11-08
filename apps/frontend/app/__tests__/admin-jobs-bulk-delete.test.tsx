@@ -14,9 +14,13 @@ jest.mock('@/components/DataQualityBadge', () => ({ __esModule: true, default: (
 import JobManagementPage from '../admin/jobs/page';
 
 type Recorded = { url: string; method: string; body: Record<string, unknown> | undefined };
+type Download = { fileName: string; blob: Blob };
 
 let listed: string[];
 let requests: Recorded[];
+let downloads: Download[];
+let log: string[];
+let exportReply: (ids: string[]) => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
 let container: HTMLDivElement;
 let root: Root;
 
@@ -65,6 +69,7 @@ async function fakeBackend(url: string, init?: RequestInit) {
   const method = init?.method ?? 'GET';
   const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
   requests.push({ url, method, body });
+  log.push(`${method} ${url.split('?')[0]}`);
   if (url.startsWith('/api/admin/jobs/search')) {
     return reply({ status: 'ok', data: { items: listed.map(job), total: listed.length, page: 1, size: 50, pages: 1 } });
   }
@@ -76,7 +81,23 @@ async function fakeBackend(url: string, init?: RequestInit) {
     const ids = body?.job_ids as string[];
     return reply({ status: 'ok', data: { deleted_count: ids.length, deleted_ids: ids, message: 'recorded' } });
   }
+  if (url === '/api/admin/jobs/export') {
+    return exportReply(body?.job_ids as string[]);
+  }
   return reply({ detail: 'Not found' }, 404);
+}
+
+function exportOf(ids: string[]) {
+  return reply({ status: 'ok', data: { format: 'json', count: ids.length, jobs: ids.map((id) => ({ id, title: `Job ${id}` })) } });
+}
+
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
 }
 
 async function wait(ms: number) {
@@ -111,8 +132,14 @@ function button(label: string) {
   return Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.trim() === label);
 }
 
+function saveCopyCheckbox() {
+  const label = Array.from(container.querySelectorAll('label')).find((l) => l.textContent?.includes('Save a copy before deleting'));
+  return label?.querySelector('input[type="checkbox"]');
+}
+
 const byLabel = (label: string) => container.querySelector(`[aria-label="${label}"]`);
 const sent = (url: string) => requests.filter((r) => r.url === url).map((r) => r.body);
+const notice = () => container.querySelector('[role="alert"]')?.textContent ?? '';
 
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -122,7 +149,20 @@ beforeEach(async () => {
   mockToasts.length = 0;
   listed = ['a', 'b', 'c'];
   requests = [];
+  downloads = [];
+  log = [];
+  exportReply = exportOf;
   global.fetch = jest.fn(fakeBackend) as unknown as typeof fetch;
+  let lastBlob: Blob | null = null;
+  URL.createObjectURL = jest.fn((blob: Blob) => {
+    lastBlob = blob;
+    return 'blob:test';
+  }) as unknown as typeof URL.createObjectURL;
+  URL.revokeObjectURL = jest.fn() as unknown as typeof URL.revokeObjectURL;
+  jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloads.push({ fileName: this.download, blob: lastBlob! });
+    log.push(`download ${this.download}`);
+  });
 
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -207,5 +247,212 @@ describe('admin bulk delete (W-45)', () => {
     expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
       { job_ids: ['a', 'b'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
     ]);
+  });
+});
+
+describe('a copy before deleting (W-48)', () => {
+  async function analyseWithCopy(ids: string[]) {
+    for (const id of ids) await click(rowCheckbox(id));
+    await click(byLabel('Delete selected jobs'));
+    await click(saveCopyCheckbox());
+    await click(button('Analyze Impact'));
+  }
+
+  it('saves a copy of exactly the analysed jobs as a file before anything is deleted', async () => {
+    await analyseWithCopy(['a', 'b']);
+    await click(button('Save copy of 2 jobs'));
+
+    expect(sent('/api/admin/jobs/export')).toEqual([{ job_ids: ['a', 'b'], format: 'json' }]);
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].fileName).toMatch(/^jobs-before-soft-delete-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.json$/);
+    const saved = JSON.parse(await readBlob(downloads[0].blob));
+    expect(saved).toMatchObject({ deletion_type: 'soft', deletion_reason: null, count: 2 });
+    expect(saved.jobs.map((j: { id: string }) => j.id)).toEqual(['a', 'b']);
+    expect(notice()).toContain(`saved as ${downloads[0].fileName}`);
+    expect(notice()).toContain('Nothing has been deleted yet');
+
+    await click(button('Soft Delete'));
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['a', 'b'], deletion_type: 'soft', export_data: false, dry_run: false },
+    ]);
+    const steps = log.filter((entry) => !entry.startsWith('GET'));
+    expect(steps).toEqual([
+      'POST /api/admin/jobs/impact-analysis',
+      'POST /api/admin/jobs/export',
+      `download ${downloads[0].fileName}`,
+      'POST /api/admin/jobs/delete-bulk',
+    ]);
+  });
+
+  it('deletes nothing when the copy cannot be saved, or holds other jobs', async () => {
+    await analyseWithCopy(['a', 'b']);
+
+    exportReply = () => reply({ detail: 'Failed to export jobs' }, 500);
+    await click(button('Save copy of 2 jobs'));
+    expect(notice()).toContain('Nothing was deleted');
+
+    exportReply = () => exportOf(['a']);
+    await click(button('Save copy of 2 jobs'));
+    expect(notice()).toContain('did not return exactly the selected jobs');
+
+    exportReply = () => exportOf(['a', 'b', 'c']);
+    await click(button('Save copy of 2 jobs'));
+    expect(notice()).toContain('Nothing was deleted');
+
+    expect(downloads).toEqual([]);
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+    expect(button('Soft Delete')).toBeUndefined();
+  });
+
+  it('asks for a new copy when the selection changes after the copy was saved', async () => {
+    await analyseWithCopy(['a', 'b']);
+    await click(button('Save copy of 2 jobs'));
+
+    listed = ['b', 'c'];
+    await click(byLabel('Refresh jobs'));
+    expect(button('Soft Delete')).toBeUndefined();
+    await click(button('Save copy of 1 job'));
+    expect(sent('/api/admin/jobs/export')).toHaveLength(1);
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+    expect(notice()).toContain('Nothing was deleted');
+
+    await click(button('Analyze Impact'));
+    await click(button('Save copy of 1 job'));
+    await click(button('Soft Delete'));
+    expect(sent('/api/admin/jobs/export')).toEqual([
+      { job_ids: ['a', 'b'], format: 'json' },
+      { job_ids: ['b'], format: 'json' },
+    ]);
+    expect(downloads).toHaveLength(2);
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['b'], deletion_type: 'soft', export_data: false, dry_run: false },
+    ]);
+  });
+
+  it('asks for a new copy when the delete type changes, and records the Hard Delete reason', async () => {
+    await analyseWithCopy(['a', 'b']);
+    await click(button('Save copy of 2 jobs'));
+    expect(button('Soft Delete')).toBeDefined();
+
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await typeInto(container.querySelector('textarea'), 'duplicates');
+    await typeInto(container.querySelector('input[inputmode="numeric"]'), '2');
+    expect(button('Hard Delete')).toBeUndefined();
+    await click(button('Save copy of 2 jobs'));
+    expect(downloads[1].fileName).toMatch(/^jobs-before-hard-delete-/);
+    expect(JSON.parse(await readBlob(downloads[1].blob))).toMatchObject({ deletion_type: 'hard', deletion_reason: 'duplicates' });
+
+    await click(button('Hard Delete'));
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['a', 'b'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
+    ]);
+  });
+
+  /** Holds the next export reply until `finish` is called. */
+  function slowExport(answer: (ids: string[]) => ReturnType<typeof reply> = exportOf) {
+    let finish: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    exportReply = async (ids) => {
+      await released;
+      exportReply = exportOf;
+      return answer(ids);
+    };
+    return async () => {
+      finish();
+      await wait(50);
+    };
+  }
+
+  it('ignores a copy still saving when a Hard Delete is chosen, and asks for a new one', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
+    await click(button('Save copy of 2 jobs'));
+    expect(button('Saving copy...')).toBeDefined();
+
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await typeInto(container.querySelector('textarea'), 'duplicates');
+    await typeInto(container.querySelector('input[inputmode="numeric"]'), '2');
+    await finishExport();
+
+    expect(downloads).toEqual([]);
+    expect(notice()).toBe('');
+    expect(button('Hard Delete')).toBeUndefined();
+    await click(button('Save copy of 2 jobs'));
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].fileName).toMatch(/^jobs-before-hard-delete-/);
+    await click(button('Hard Delete'));
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['a', 'b'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
+    ]);
+  });
+
+  it('ignores a copy still saving when the Hard Delete reason is edited', async () => {
+    await click(rowCheckbox('a'));
+    await click(byLabel('Delete selected jobs'));
+    await click(saveCopyCheckbox());
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await click(button('Analyze Impact'));
+    await typeInto(container.querySelector('textarea'), 'dup');
+    await typeInto(container.querySelector('input[inputmode="numeric"]'), '1');
+    const finishExport = slowExport();
+    await click(button('Save copy of 1 job'));
+
+    await typeInto(container.querySelector('textarea'), 'duplicates');
+    await finishExport();
+    expect(downloads).toEqual([]);
+    expect(button('Hard Delete')).toBeUndefined();
+
+    await click(button('Save copy of 1 job'));
+    expect(JSON.parse(await readBlob(downloads[0].blob))).toMatchObject({ deletion_type: 'hard', deletion_reason: 'duplicates' });
+    await click(button('Hard Delete'));
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([
+      { job_ids: ['a'], deletion_type: 'hard', deletion_reason: 'duplicates', export_data: false, dry_run: false },
+    ]);
+  });
+
+  it('ignores a copy still saving when the box is unticked and ticked again', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
+    await click(button('Save copy of 2 jobs'));
+    await click(saveCopyCheckbox());
+    await click(saveCopyCheckbox());
+    await finishExport();
+
+    expect(downloads).toEqual([]);
+    expect(button('Soft Delete')).toBeUndefined();
+    expect(button('Save copy of 2 jobs')).toBeDefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+  });
+
+  it('ignores a failed copy that answers after the delete type changed', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport(() => reply({ detail: 'Failed to export jobs' }, 500));
+    await click(button('Save copy of 2 jobs'));
+    await click(container.querySelector('input[name="deletionType"][value="hard"]'));
+    await finishExport();
+
+    expect(notice()).toBe('');
+    expect(downloads).toEqual([]);
+    expect(button('Saving copy...')).toBeUndefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
+  });
+
+  it('ignores a copy still saving when the window is cancelled and opened again', async () => {
+    await analyseWithCopy(['a', 'b']);
+    const finishExport = slowExport();
+    await click(button('Save copy of 2 jobs'));
+    await click(button('Cancel'));
+    await click(byLabel('Delete selected jobs'));
+    expect(button('Saving copy...')).toBeUndefined();
+    expect(button('Analyze Impact')).toBeDefined();
+
+    await finishExport();
+    expect(downloads).toEqual([]);
+    expect(notice()).toBe('');
+    expect(button('Analyze Impact')).toBeDefined();
+    expect(sent('/api/admin/jobs/delete-bulk')).toEqual([]);
   });
 });
