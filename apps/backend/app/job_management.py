@@ -56,6 +56,27 @@ def describe_check_failure(error: BaseException) -> str:
     return f"{type(error).__name__} ({code})" if code else type(error).__name__
 
 
+MAX_JOB_IDS = 200  # the job search's largest page
+
+
+def check_job_selection(job_ids: Optional[List[str]], org_name: Optional[str] = None,
+                        source_id: Optional[str] = None) -> None:
+    """Refuse an empty or oversized job list, a job list sent with org_name or source_id, and
+    org_name sent with source_id.
+
+    An empty list must not fall through to the organisation, the source, or every job."""
+    if job_ids is not None:
+        if not job_ids:
+            raise HTTPException(status_code=400, detail="job_ids must not be empty")
+        if len(job_ids) > MAX_JOB_IDS:
+            raise HTTPException(status_code=400, detail=f"At most {MAX_JOB_IDS} job IDs at a time")
+        if org_name is not None or source_id is not None:
+            raise HTTPException(status_code=400,
+                                detail="job_ids cannot be combined with org_name or source_id")
+    elif org_name is not None and source_id is not None:
+        raise HTTPException(status_code=400, detail="Send org_name or source_id, not both")
+
+
 def _diagnosis_failed(message: str) -> dict:
     """The diagnose routes' failure answer, in their usual shape; the caller logs the cause."""
     return {
@@ -281,6 +302,7 @@ async def get_deletion_impact(
     """
     Analyze the impact of a potential deletion before executing it.
     """
+    check_job_selection(request.job_ids, request.org_name, request.source_id)
     conn = None
     cursor = None
     try:
@@ -378,6 +400,13 @@ async def bulk_delete_jobs(
     Works even when sources are deleted.
     """
     logger.info(f"[bulk_delete] Received deletion request: type={request.deletion_type}, job_ids={len(request.job_ids) if request.job_ids else 0}, org_name={request.org_name}, source_id={request.source_id}, admin={admin}")
+    check_job_selection(request.job_ids, request.org_name, request.source_id)
+    if request.export_data:
+        raise HTTPException(
+            status_code=400,
+            detail="export_data is no longer supported: "
+                   "save a copy with /api/admin/jobs/export before deleting"
+        )
     
     conn = None
     cursor = None
@@ -398,9 +427,6 @@ async def bulk_delete_jobs(
         params = []
         
         if request.job_ids:
-            if not isinstance(request.job_ids, list) or len(request.job_ids) == 0:
-                raise HTTPException(status_code=400, detail="job_ids must be a non-empty array")
-            
             # Validate job IDs exist and log details
             # Ensure all IDs are strings for consistent comparison
             job_ids_str = [str(jid).strip() for jid in request.job_ids]
@@ -435,7 +461,17 @@ async def bulk_delete_jobs(
                 missing = set(request.job_ids) - set(existing_ids)
                 logger.warning(f"[bulk_delete] {len(missing)} job IDs not found in database: {list(missing)[:5]}")
             
-            # Only add to WHERE clause if we have existing jobs (for hard delete, include even deleted ones)
+            # A Hard Delete removes exactly the listed jobs or nothing.
+            listed = set(job_ids_str)
+            not_found = listed - set(existing_ids)
+            if request.deletion_type == "hard" and not_found:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Not found: {len(not_found)} of the {len(listed)} listed jobs. "
+                           "Nothing was deleted."
+                )
+            
+            # Only a Soft Delete gets here with none found: a Hard Delete was refused above.
             if len(existing_ids) == 0:
                 logger.error(f"[bulk_delete] None of the requested job IDs exist! Cannot proceed with deletion.")
                 return {
@@ -547,19 +583,6 @@ async def bulk_delete_jobs(
                 }
             }
         
-        # Export data if requested
-        exported_data = None
-        if request.export_data:
-            cursor.execute(f"""
-                SELECT id::text, title, org_name, apply_url, location_raw, deadline, 
-                       created_at, fetched_at, source_id::text as source_id
-                FROM jobs
-                {where_clause}
-                LIMIT 10000
-            """, params)
-            exported_jobs = cursor.fetchall()
-            exported_data = [dict(job) for job in exported_jobs]
-        
         # Perform deletion
         if request.deletion_type == "hard":
             if not request.deletion_reason or not request.deletion_reason.strip():
@@ -575,6 +598,15 @@ async def bulk_delete_jobs(
                 raise HTTPException(status_code=400, detail="Cannot hard delete all jobs - filter required")
             deleted_ids = [row['id'] for row in cursor.fetchall()]
             deleted_count = len(deleted_ids)
+            if request.job_ids and set(deleted_ids) != set(job_ids_str):
+                _rollback(conn)
+                listed = set(job_ids_str)
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Only {len(set(deleted_ids) & listed)} of the {len(listed)} listed jobs "
+                           "could be deleted (removed meanwhile, or outside the date range). "
+                           "Nothing was deleted."
+                )
             logger.info(f"[bulk_delete] Hard deleted {deleted_count} jobs: {deleted_ids[:10]}")
         else:
             # Soft delete
@@ -649,7 +681,7 @@ async def bulk_delete_jobs(
                 "deleted_count": deleted_count,
                 "deleted_ids": deleted_ids[:100],  # Limit to first 100 IDs
                 "deletion_type": request.deletion_type,
-                "exported_data": exported_data,
+                "exported_data": None,
                 "message": f"Successfully {request.deletion_type}-deleted {deleted_count} jobs" if deleted_count > 0 else "No jobs were deleted (they may have already been deleted or did not match the filters)"
             }
         }
@@ -682,6 +714,7 @@ async def restore_jobs(
     """
     Restore soft-deleted jobs.
     """
+    check_job_selection(request.job_ids)
     conn = None
     cursor = None
     try:
@@ -732,6 +765,7 @@ async def export_jobs(
     """
     Export jobs to JSON or CSV format.
     """
+    check_job_selection(request.job_ids, request.org_name, request.source_id)
     conn = None
     cursor = None
     try:

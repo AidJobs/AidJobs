@@ -4,7 +4,8 @@ The route walk reuses test_admin_crawler_errors.py's fresh process (production b
 through a dependency override, real sockets and DNS refused); the database driver fails with fake
 connection-string text. The statement record proves the routes send the database exactly what
 `main` sent before this change (recorded from `main` at 130be19 into a fixture), so deleting,
-restoring and exporting are unchanged. No database and no network.
+restoring and exporting are unchanged. W-49 removed the delete route's own export, so the
+organisation delete no longer reads a copy first. No database and no network.
 """
 import asyncio
 import json
@@ -348,8 +349,8 @@ def _cases(jm):
         admin="test-admin")
     yield "delete, ids, dry run", lambda: jm.bulk_delete_jobs(
         bulk(job_ids=["job-1", "job-2"], dry_run=True), admin="test-admin")
-    yield "delete, organisation, export", lambda: jm.bulk_delete_jobs(
-        bulk(org_name="Oxfam", export_data=True, deletion_reason="cleanup"), admin="test-admin")
+    yield "delete, organisation", lambda: jm.bulk_delete_jobs(
+        bulk(org_name="Oxfam", deletion_reason="cleanup"), admin="test-admin")
     yield "delete, source and dates", lambda: jm.bulk_delete_jobs(
         bulk(source_id="source-1", date_from="2026-01-01", date_to="2026-06-30"),
         admin="test-admin")
