@@ -1,4 +1,5 @@
-"""UNICEF listing reader and the general reader. Excerpts only; saved pages are optional."""
+"""The PageUp career-site reader (UNICEF's listing), its paging, and the general reader.
+Excerpts only; saved pages are optional."""
 import asyncio
 import importlib
 import inspect
@@ -10,14 +11,14 @@ import pytest
 from contracts.admission import admit_batch
 from contracts.identity import both_keys
 from contracts.refusal import refusal
-from crawler.plugins.base import PluginResult
-from crawler.plugins.unicef import UNICEFPlugin
+from crawler.plugins.pageup import PageUpListingReader
 from crawler_v2 import simple_crawler as simple_crawler_module
 from crawler_v2.simple_crawler import (
     SimpleCrawler,
     _html_request_headers,
     _listing_outcome,
     _logged_headers,
+    _resized_listing_page,
     _response_excerpt,
 )
 
@@ -98,7 +99,7 @@ def _link(job_id):
 
 
 def test_unicef_cards_read_title_link_location_and_deadline():
-    jobs = UNICEFPlugin().extract(_LISTING, _UNICEF_LISTING).jobs
+    jobs = PageUpListingReader().read_job_cards(_LISTING, _UNICEF_LISTING)
     assert [job["apply_url"] for job in jobs] == [
         _link("588602"),
         _link("588591"),
@@ -116,7 +117,7 @@ def test_unicef_cards_read_title_link_location_and_deadline():
 
 
 def test_unicef_cards_are_admitted_without_inventing_a_location():
-    jobs = UNICEFPlugin().extract(_LISTING, _UNICEF_LISTING).jobs
+    jobs = PageUpListingReader().read_job_cards(_LISTING, _UNICEF_LISTING)
     admitted, rejected = admit_batch([dict(job) for job in jobs], "html")
     assert rejected == []
     assert len(admitted) == 3
@@ -132,8 +133,7 @@ def test_a_page_without_job_cards_produces_no_card_rows():
       Location: Kenya Deadline: 12 Dec 2025
     </article>
     """
-    plugin = UNICEFPlugin()
-    assert plugin._extract_job_cards(plugin.get_soup(html), _UNICEF_LISTING) == []
+    assert PageUpListingReader().read_job_cards(html, _UNICEF_LISTING) == []
 
 
 async def _no_sleep(_seconds):
@@ -165,20 +165,15 @@ def _crawler(monkeypatch, general=None):
     return crawler, sentinel
 
 
-def _unicef_reader_must_not_be_called(monkeypatch):
-    def refuse(*_args, **_kwargs):
-        raise AssertionError("the UNICEF reader was consulted")
-
-    monkeypatch.setattr("crawler.plugins.unicef.UNICEFPlugin.extract", refuse)
-
-
-def _unicef_reader_returns(monkeypatch, outcome):
-    def extract(self, html, base_url, config=None):
+def _pageup_reader_returns(monkeypatch, outcome):
+    def read_job_cards(self, html, base_url):
         if isinstance(outcome, BaseException):
             raise outcome
         return outcome
 
-    monkeypatch.setattr("crawler.plugins.unicef.UNICEFPlugin.extract", extract)
+    monkeypatch.setattr(
+        "crawler.plugins.pageup.PageUpListingReader.read_job_cards", read_job_cards
+    )
 
 
 def test_unicef_uses_its_reader(monkeypatch):
@@ -193,15 +188,36 @@ def test_unicef_uses_its_reader(monkeypatch):
     assert crawler.general_calls == 0
 
 
-def test_other_sources_go_straight_to_the_general_reader(monkeypatch):
-    _unicef_reader_must_not_be_called(monkeypatch)
+def test_job_cards_choose_the_reader_wherever_the_listing_is(monkeypatch):
+    elsewhere = "https://careers.example.org/en-gb/listing/"
+    crawler, sentinel = _crawler(monkeypatch)
+    jobs, report = asyncio.run(crawler._listing_jobs(_LISTING, elsewhere))
+    assert [job["apply_url"] for job in jobs] == [
+        f"https://careers.example.org/en-us/job/{job_id}/slug-{job_id}"
+        for job_id in ("588602", "588591", "588601")
+    ]
+    assert report["complete"] is False
+    assert report["stop"] == "expected total unknown"
+    assert crawler.general_calls == 0
+
+
+def test_a_page_without_job_cards_goes_to_the_general_reader_wherever_it_is(monkeypatch):
+    without_cards = "<html><body><a href='/en-us/job/1/a'>Officer</a></body></html>"
     lookalike = "https://example.org/jobs?next=https://jobs.unicef.org/en-us/listing/"
-    for url in (_ICRC_LISTING, lookalike):
+    for url in (_UNICEF_LISTING, _ICRC_LISTING, lookalike):
         crawler, sentinel = _crawler(monkeypatch)
-        jobs, report = asyncio.run(crawler._listing_jobs(_LISTING, url))
+        jobs, report = asyncio.run(crawler._listing_jobs(without_cards, url))
         assert jobs == sentinel
         assert report is None
         assert crawler.general_calls == 1
+
+
+def test_the_address_check_is_gone():
+    assert not hasattr(simple_crawler_module, "_is_unicef_listing")
+    source = inspect.getsource(SimpleCrawler._listing_jobs)
+    assert "unicef" not in source.lower()
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("crawler.plugins.unicef")
 
 
 def test_the_crawler_calls_no_ai_service_even_with_a_key_set(monkeypatch):
@@ -224,12 +240,12 @@ def test_the_old_plugin_registry_is_gone():
 @pytest.mark.parametrize(
     "plugin_outcome",
     [
-        pytest.param(PluginResult(jobs=[]), id="no-jobs"),
+        pytest.param([], id="no-jobs"),
         pytest.param(RuntimeError("bad page"), id="error"),
     ],
 )
 def test_unicef_reader_failure_falls_back_to_the_general_reader(plugin_outcome, monkeypatch):
-    _unicef_reader_returns(monkeypatch, plugin_outcome)
+    _pageup_reader_returns(monkeypatch, plugin_outcome)
     crawler, sentinel = _crawler(monkeypatch)
     jobs, _report = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert jobs == sentinel
@@ -242,7 +258,7 @@ def test_repeated_links_keep_the_first_row(monkeypatch):
         {"title": "Second wording", "apply_url": _link("1"), "deadline": "2025-12-02"},
         {"title": "Other job", "apply_url": _link("2"), "deadline": "2025-12-03"},
     ]
-    _unicef_reader_returns(monkeypatch, PluginResult(jobs=rows))
+    _pageup_reader_returns(monkeypatch, rows)
     crawler, _sentinel = _crawler(monkeypatch)
     jobs, _report = asyncio.run(crawler._listing_jobs(_LISTING, _UNICEF_LISTING))
     assert [(job["title"], job["apply_url"]) for job in jobs] == [
@@ -306,7 +322,7 @@ _STORED_UNICEF = {
 
 
 def _saved_unicef_jobs(monkeypatch):
-    """Page one of the saved listing. Its More Jobs link is answered with a failed fetch."""
+    """Page one of the saved listing. Asking for it at 100 jobs a page fails."""
     if not _SAVED_UNICEF.is_file():
         pytest.skip("saved UNICEF listing is gitignored")
     html = _SAVED_UNICEF.read_bytes().decode("utf-8")
@@ -320,7 +336,7 @@ def _saved_unicef_jobs(monkeypatch):
     monkeypatch.setattr(crawler, "_fetch_listing_page", unavailable)
     monkeypatch.setattr("crawler_v2.simple_crawler._sleep", _no_sleep)
     jobs, _report = asyncio.run(crawler._listing_jobs(html, _UNICEF_LISTING))
-    assert asked == ["https://jobs.unicef.org/en-us/listing/?page=2&page-items=20"]
+    assert asked == ["https://jobs.unicef.org/en-us/listing/?page-items=100"]
     return jobs
 
 
@@ -358,8 +374,8 @@ def test_saved_unicef_titles_match_the_stored_identities(monkeypatch):
 def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
     if not _SAVED_ICRC.is_file():
         pytest.skip("saved ICRC listing is gitignored")
-    _unicef_reader_must_not_be_called(monkeypatch)
     html = _SAVED_ICRC.read_bytes().decode("utf-8", errors="replace")
+    assert PageUpListingReader().read_job_cards(html, _ICRC_LISTING) == []
     crawler = SimpleCrawler("postgresql://example")
     _no_network(crawler, monkeypatch)
     before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
@@ -389,12 +405,14 @@ def _listing_page(job_ids, more_href=None, remaining=None):
     return f"{_SIGNUP}<div>{cards}{more}</div><div>{cards}{more}</div>"
 
 
-def _paged_crawler(monkeypatch, pages):
+def _paged_crawler(monkeypatch, pages, page_items=20):
     """Serve later listing pages from a map. A list answers successive requests in order.
 
     Unknown URLs fail the test. Sleeps are recorded on crawler.slept instead of waiting. Each
-    answer is (status, html), judged for a refusal as `_fetch_listing_page` judges it.
+    answer is (status, html), judged for a refusal as `_fetch_listing_page` judges it. The
+    reader asks for `page_items` jobs a page; at the listing's own 20 it never asks again.
     """
+    monkeypatch.setattr("crawler_v2.simple_crawler._PAGEUP_PAGE_ITEMS", page_items)
     crawler = SimpleCrawler("postgresql://example")
     asked = []
     crawler.slept = []
@@ -453,7 +471,7 @@ def test_a_page_with_no_new_jobs_stops_the_walk(monkeypatch):
 
 
 def test_the_page_cap_stops_an_endless_listing(monkeypatch):
-    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_CAP", 3)
+    monkeypatch.setattr("crawler_v2.simple_crawler._PAGEUP_PAGE_CAP", 3)
     pages = {
         _PAGE.format(n): (
             200,
@@ -482,6 +500,76 @@ def test_links_that_do_not_lead_to_a_later_listing_page_are_not_followed(href, m
     crawler, asked = _paged_crawler(monkeypatch, {})
     assert _read_listing(crawler, _listing_page(["1"], href, 5)) == ["1"]
     assert asked == []
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == f"More Jobs link not followed on {_UNICEF_LISTING}"
+
+
+def test_a_later_page_whose_link_is_not_followed_is_partial(monkeypatch):
+    first = _listing_page(["1"], _P2, 2)
+    itself = _listing_page(["2"], "/en-us/listing/?page=2&page-items=20", 1)
+    crawler, asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, itself)})
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_PAGE.format(2)]
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == f"More Jobs link not followed on {_PAGE.format(2)}"
+
+
+_HIDDEN_LAST = [
+    pytest.param("/en-us/listing/?page=3&page-items=20", id="with-address"),
+    pytest.param(None, id="without-address"),
+]
+
+
+def _last_page(job_ids, href):
+    if href is None:
+        return _listing_page(job_ids) + '<a class="more-link button">More Jobs 0</a>'
+    return _listing_page(job_ids, href, 0)
+
+
+@pytest.mark.parametrize("href", _HIDDEN_LAST)
+def test_a_more_jobs_link_counting_zero_ends_the_listing(href, monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 1)
+    crawler, asked = _paged_crawler(
+        monkeypatch, {_PAGE.format(2): (200, _last_page(["3"], href))}
+    )
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    assert asked == [_PAGE.format(2)]
+    assert crawler.report == {
+        "pages": 2, "expected": 3, "complete": True, "stop": "no More Jobs link",
+    }
+
+
+@pytest.mark.parametrize("href", _HIDDEN_LAST)
+def test_a_first_page_counting_zero_is_not_asked_again(href, monkeypatch):
+    crawler, asked = _paged_crawler(monkeypatch, {}, page_items=100)
+    assert _read_listing(crawler, _last_page(["1", "2"], href)) == ["1", "2"]
+    assert asked == []
+    assert crawler.report["complete"] is True
+    assert crawler.report["expected"] == 2
+
+
+def test_page_numbers_are_ascii_digits_only():
+    assert simple_crawler_module._page_number("page=%C2%B2") is None
+    assert simple_crawler_module._page_number("page=7") == 7
+
+
+def test_a_more_jobs_button_without_an_address_is_partial(monkeypatch):
+    first = _listing_page(["1"]) + '<a class="more-link button">More Jobs 5</a>'
+    crawler, asked = _paged_crawler(monkeypatch, {})
+    assert _read_listing(crawler, first) == ["1"]
+    assert asked == []
+    assert crawler.report["stop"] == f"More Jobs link not followed on {_UNICEF_LISTING}"
+
+
+def test_a_walk_that_read_fewer_jobs_than_the_site_counts_is_partial(monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 3)
+    crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, _listing_page(["3"]))})
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "read 3 of 5 jobs"
+    assert _listing_outcome(3, crawler.report) == (
+        "warn", "Found 3 jobs; listing partial: 2 pages, expected 5, stopped: read 3 of 5 jobs",
+    )
 
 
 def test_the_signup_link_alone_is_not_pagination(monkeypatch):
@@ -490,12 +578,173 @@ def test_the_signup_link_alone_is_not_pagination(monkeypatch):
     assert asked == []
 
 
-def test_icrc_never_paginates(monkeypatch):
+def test_a_listing_pages_only_through_its_own_address(monkeypatch):
     crawler, _sentinel = _crawler(monkeypatch)
     html = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 5)
     jobs, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
-    assert jobs == _sentinel
-    assert report is None
+    assert [job["apply_url"] for job in jobs] == [
+        "https://careers.icrc.org/en-us/job/1/slug-1"
+    ]
+    assert report["pages"] == 1
+    assert crawler.general_calls == 0
+
+
+# The reader's page size ---------------------------------------------------------------------
+
+_BIG = "https://jobs.unicef.org/en-us/listing/?page-items=100"
+_BIG_PAGE = "https://jobs.unicef.org/en-us/listing/?page={}&page-items=100"
+
+
+def _ids(first, last):
+    return [str(n) for n in range(first, last + 1)]
+
+
+def test_page_one_is_asked_again_at_one_hundred_jobs_a_page(monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 4)
+    pages = {_BIG: (200, _listing_page(_ids(1, 6)))}
+    crawler, asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == _ids(1, 6)
+    assert asked == [_BIG]
+    assert crawler.report == {
+        "pages": 2, "expected": 6, "complete": True, "stop": "no More Jobs link",
+    }
+
+
+def test_a_266_job_listing_takes_three_requests_after_page_one(monkeypatch):
+    first = _listing_page(_ids(1, 20), _P2, 246)
+    pages = {
+        _BIG: (200, _listing_page(_ids(1, 100), "/en-us/listing/?page=2&page-items=100", 166)),
+        _BIG_PAGE.format(2): (
+            200, _listing_page(_ids(101, 200), "/en-us/listing/?page=3&page-items=100", 66),
+        ),
+        _BIG_PAGE.format(3): (200, _listing_page(_ids(201, 266))),
+    }
+    crawler, asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == _ids(1, 266)
+    assert asked == [_BIG, _BIG_PAGE.format(2), _BIG_PAGE.format(3)]
+    assert _listing_outcome(266, crawler.report) == (
+        "ok", "Found 266 jobs; listing complete: 4 pages, expected 266",
+    )
+
+
+def test_the_expected_total_comes_from_the_bigger_page(monkeypatch):
+    first = _listing_page(["1"], _P2, 9)
+    pages = {
+        _BIG: (200, _listing_page(_ids(1, 4), "/en-us/listing/?page=2&page-items=100", 7)),
+        _BIG_PAGE.format(2): (200, _listing_page(_ids(5, 11))),
+    }
+    crawler, _asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == _ids(1, 11)
+    assert crawler.report["expected"] == 11
+
+
+def test_a_site_that_keeps_its_own_page_size_is_still_read_whole(monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 1)
+    pages = {
+        _BIG: (200, _listing_page(["1", "2"], _P2, 1)),
+        _PAGE.format(2): (200, _listing_page(["3"])),
+    }
+    crawler, asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == ["1", "2", "3"]
+    assert asked == [_BIG, _PAGE.format(2)]
+    assert crawler.report["complete"] is True
+
+
+@pytest.mark.parametrize("answer", [
+    pytest.param(_listing_page(["1", "2"]), id="same-jobs-no-link"),
+    pytest.param("<html><body>no cards</body></html>", id="no-cards"),
+    pytest.param("<html><body>no cards<a class='more-link' "
+                 "href='/en-us/listing/?page=2&page-items=20'>More Jobs 5</a></body></html>",
+                 id="no-cards-with-link"),
+])
+def test_a_bigger_page_that_adds_no_jobs_and_ends_the_walk_is_partial(answer, monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 5)
+    crawler, asked = _paged_crawler(monkeypatch, {_BIG: (200, answer)}, page_items=100)
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_BIG]
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "page 2 added no new jobs"
+    assert crawler.report["expected"] == 7
+
+
+def test_a_refused_bigger_page_keeps_page_one_and_is_partial(monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 5)
+    crawler, asked = _paged_crawler(monkeypatch, {_BIG: [(202, "challenge")]}, page_items=100)
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_BIG]
+    assert crawler.slept == []
+    assert crawler.report == {
+        "pages": 1, "expected": 7, "complete": False, "stop": f"refused: HTTP 202 on {_BIG}",
+    }
+
+
+def test_a_plain_503_on_the_bigger_page_is_the_crawls_one_retry(monkeypatch):
+    first = _listing_page(["1"], _P2, 1)
+    pages = {_BIG: [(503, "busy"), (200, _listing_page(["1", "2"]))]}
+    crawler, asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == ["1", "2"]
+    assert asked == [_BIG, _BIG]
+    assert crawler.slept == [30.0]
+
+
+@pytest.mark.parametrize("href", [
+    pytest.param("/en-us/listing/?page=2&page-items=100", id="already-100"),
+    pytest.param("/en-us/listing/?page=2&page-items=250", id="larger"),
+    pytest.param("/en-us/listing/?page=2", id="no-page-size"),
+    pytest.param("/en-us/listing/?page=2&page-items=abc", id="not-a-number"),
+    pytest.param("/en-us/listing/?page=2&page-items=20&page-items=50", id="two-sizes"),
+    pytest.param("/en-us/listing/?page=2&page-items=\u00b2", id="not-an-ascii-number"),
+])
+def test_a_link_that_names_no_smaller_page_size_is_followed_as_it_is(href, monkeypatch):
+    target = "https://jobs.unicef.org" + href
+    crawler, asked = _paged_crawler(
+        monkeypatch, {target: (200, _listing_page(["2"]))}, page_items=100
+    )
+    assert _read_listing(crawler, _listing_page(["1"], href, 1)) == ["1", "2"]
+    assert asked == [target]
+
+
+def test_a_single_page_listing_is_not_asked_again_and_is_not_complete(monkeypatch):
+    crawler, asked = _paged_crawler(monkeypatch, {}, page_items=100)
+    assert _read_listing(crawler, _listing_page(["1", "2"])) == ["1", "2"]
+    assert asked == []
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "expected total unknown"
+
+
+def test_a_site_that_ignores_the_size_but_keeps_it_in_its_links_is_partial(monkeypatch):
+    first = _listing_page(["1", "2"], _P2, 4)
+    pages = {
+        _BIG: (200, _listing_page(["1", "2"], "/en-us/listing/?page=2&page-items=100", 4)),
+        _BIG_PAGE.format(2): (200, _listing_page(["5", "6"])),
+    }
+    crawler, asked = _paged_crawler(monkeypatch, pages, page_items=100)
+    assert _read_listing(crawler, first) == ["1", "2", "5", "6"]
+    assert asked == [_BIG, _BIG_PAGE.format(2)]
+    assert crawler.report["complete"] is False
+    assert crawler.report["stop"] == "read 4 of 6 jobs"
+
+
+@pytest.mark.parametrize("href, expected", [
+    pytest.param(
+        "/en-us/listing/?page=2&page-items=20",
+        "https://jobs.unicef.org/en-us/listing/?page-items=100",
+        id="unicef",
+    ),
+    pytest.param(
+        "/en-us/listing/?location=Kenya&page=2&page-items=20&lang=fr",
+        "https://jobs.unicef.org/en-us/listing/?location=Kenya&page-items=100&lang=fr",
+        id="other-parameters-kept",
+    ),
+    pytest.param("https://evil.example/en-us/listing/?page=2&page-items=20", None, id="other-host"),
+    pytest.param("/en-us/search/?page=2&page-items=20", None, id="other-path"),
+    pytest.param("/en-us/listing/?page=2&page-items=20&subscribe=true", None, id="signup"),
+    pytest.param("/en-us/listing/?page=1&page-items=20", None, id="not-a-later-page"),
+])
+def test_the_bigger_page_is_built_only_from_a_later_listing_page(href, expected, monkeypatch):
+    monkeypatch.setattr("crawler_v2.simple_crawler._PAGEUP_PAGE_ITEMS", 100)
+    html = _listing_page(["1"], href, 5)
+    assert _resized_listing_page(html, _UNICEF_LISTING) == expected
 
 
 def test_a_walk_that_runs_out_of_links_is_complete(monkeypatch):
@@ -538,7 +787,7 @@ def test_a_failed_page_makes_the_crawl_partial(monkeypatch):
 
 
 def test_the_page_cap_and_a_repeated_page_are_partial(monkeypatch):
-    monkeypatch.setattr("crawler_v2.simple_crawler._UNICEF_PAGE_CAP", 2)
+    monkeypatch.setattr("crawler_v2.simple_crawler._PAGEUP_PAGE_CAP", 2)
     first = _listing_page(["1"], "/en-us/listing/?page=2&page-items=20", 9)
     endless = _listing_page(["2"], "/en-us/listing/?page=3&page-items=20", 8)
     crawler, _asked = _paged_crawler(monkeypatch, {_PAGE.format(2): (200, endless)})
@@ -787,7 +1036,7 @@ def test_saved_live_page_two_reads_twenty_admitted_jobs():
     if not _SAVED_PAGE2.is_file():
         pytest.skip("saved UNICEF page two is gitignored")
     html = _SAVED_PAGE2.read_bytes().decode("utf-8")
-    jobs = UNICEFPlugin().read_job_cards(html, _PAGE.format(2))
+    jobs = PageUpListingReader().read_job_cards(html, _PAGE.format(2))
     assert len(jobs) == 20
     assert len({job["apply_url"] for job in jobs}) == 20
     assert all(job.get("location_raw") for job in jobs)
@@ -795,3 +1044,25 @@ def test_saved_live_page_two_reads_twenty_admitted_jobs():
     admitted, rejected = admit_batch([dict(job) for job in jobs], "html")
     assert rejected == []
     assert len(admitted) == 20
+
+
+_SAVED_ITEMS100 = _ROOT / "unicef-pagination" / "page1-items100.body"
+
+
+def test_saved_live_page_at_one_hundred_reads_a_hundred_admitted_jobs_and_links_on(monkeypatch):
+    if not _SAVED_ITEMS100.is_file():
+        pytest.skip("saved UNICEF page at 100 jobs is gitignored")
+    html = _SAVED_ITEMS100.read_bytes().decode("utf-8")
+    jobs = PageUpListingReader().read_job_cards(html, _BIG)
+    assert len({job["apply_url"] for job in jobs}) == len(jobs) == 100
+    assert all(job.get("location_raw") and job.get("deadline") for job in jobs)
+    admitted, rejected = admit_batch([dict(job) for job in jobs], "html")
+    assert rejected == []
+    assert len(admitted) == 100
+    first = _listing_page(["1"], _P2, 272)
+    crawler, asked = _paged_crawler(
+        monkeypatch, {_BIG: (200, html), _BIG_PAGE.format(2): (0, "")}, page_items=100
+    )
+    _read_listing(crawler, first)
+    assert asked == [_BIG, _BIG_PAGE.format(2)]
+    assert crawler.report["expected"] == 100 + 173
