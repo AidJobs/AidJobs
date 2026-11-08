@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-export type MenuAction = { label: string; danger?: boolean; current?: boolean; run: () => void };
+export type MenuAction = { label: string; danger?: boolean; current?: boolean; separator?: boolean; run: () => void };
 
 /** After an option is chosen, focus goes back to the menu's button, unless the option moved it somewhere on purpose. */
 export function refocus(wrap: HTMLElement | null, button: HTMLElement | null) {
@@ -46,9 +46,12 @@ export default function MenuButton({ label, trigger, actions, align = 'right', u
           refocus(wrap.current, button.current);
         }}>
           {actions.map((a) => (
-            <button key={a.label} type="button" className="ej-menu-item" data-danger={a.danger ? 'true' : undefined} aria-current={a.current ? 'true' : undefined} onClick={a.run}>
-              {a.label}
-            </button>
+            <Fragment key={a.label}>
+              {a.separator && <div className="ej-menu-sep" role="separator" />}
+              <button type="button" className="ej-menu-item" data-danger={a.danger ? 'true' : undefined} aria-current={a.current ? 'true' : undefined} onClick={a.run}>
+                {a.label}
+              </button>
+            </Fragment>
           ))}
         </div>
       )}

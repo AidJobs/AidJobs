@@ -266,7 +266,7 @@ describe('employer demo: never calls the network', () => {
     });
     expect(ownFormats()).toBe(formatsBefore);
     route(`#create/${imported}`);
-    act(() => (container.querySelector('[aria-label="More actions for this job draft"]') as HTMLElement).click());
+    act(() => (container.querySelector('[aria-label="More actions for this job draft"], [aria-label="More actions for this job"]') as HTMLElement).click());
     click('Delete');
     shows('Recently deleted for 14 days');
     click('Delete');
@@ -1036,6 +1036,50 @@ describe('employer demo: managing jobs', () => {
     act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id !== 'job-fin' ? j : { ...j, sections: j.sections.map((sec) => (sec.key !== 'requirements' ? sec : { ...sec, lines: sec.lines.map((l, i) => (i === 3 ? '- A sound grasp of donor financial rules' : l)) })) })) })));
     expect(container.querySelector('[aria-label="Where the job stands"]')?.textContent).toContain('checks all clear');
     expect(step()).toContain('Publish');
+  });
+
+  it('with a side panel open, the job actions move to the facts menu and the status stays above the document', () => {
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#home');
+    route('#create/job-comms');
+    if (!container.querySelector('.ej-switch')) act(() => (container.querySelector('nav[aria-label="Panels"] button[aria-label="JD outline"]') as HTMLElement).click());
+    const side = () => container.querySelector('.ej-switch')?.closest('aside') as HTMLElement;
+    const menuItems = () => Array.from(container.querySelectorAll('.ej-menu button')).map((b) => b.textContent?.trim());
+    const openFactsMenu = () => act(() => (container.querySelector('button[aria-label="More actions for this job"]') as HTMLElement).click());
+    expect(side().textContent).not.toContain('Draft');
+    expect(side().querySelector('[aria-label="Earlier versions"], [aria-label="More actions for this job draft"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Earlier versions"]')).toBeNull();
+    expect(Array.from(container.querySelectorAll('span.aj-faint')).some((x) => x.textContent === 'Draft')).toBe(true);
+    expect(side().querySelector('.ej-switch-count')?.textContent).toBe(`· ${getState().jobs.find((j) => j.id === 'job-comms')!.tags.length}`);
+    openFactsMenu();
+    expect(menuItems()).toEqual(['Earlier versions', 'Download a copy', 'Update our base JD format from this job', 'Delete']);
+    click('Earlier versions');
+    expect(Array.from(document.querySelectorAll('[role="dialog"]')).some((d) => d.textContent?.startsWith('Earlier versions'))).toBe(true);
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+
+    act(() => (container.querySelector('button[aria-label="Close this panel"]') as HTMLElement).click());
+    expect(container.querySelector('button[aria-label="Earlier versions"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="More actions for this job draft"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="More actions for this job"]')).toBeNull();
+    expect(Array.from(container.querySelectorAll('span.aj-faint')).some((x) => x.textContent === 'Draft')).toBe(true);
+
+    act(() => (container.querySelector('nav[aria-label="Panels"] button[aria-label="JD outline"]') as HTMLElement).click());
+    route('#create/job-cps');
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Done')).toBe(true);
+    openFactsMenu();
+    expect(menuItems()).toEqual(['Earlier versions']);
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+
+    act(() => update((st) => ({ ...st, reviewerAs: 'daniel' })));
+    route('#create/job-comms');
+    openFactsMenu();
+    expect(menuItems()).toEqual(['Earlier versions']);
+    expect(network).toEqual([]);
   });
 
   it('a scheduled job in the workspace is done, not sent to Check and publish again', () => {

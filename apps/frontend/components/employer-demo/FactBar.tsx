@@ -6,7 +6,7 @@ import Tip from '@/components/site/Tip';
 import { setFacts } from './actions';
 import { arrangementLabel, CONTRACTS, emptyFacts, ENGAGEMENTS, extractFacts, googleType, holiday, longDate, placeOf, PLACES, salarySuggestion, salaryText, SALARY_FACTS, shortDate, weekend } from './engine';
 import type { DemoJob, Facts, SalaryMode, State } from './types';
-import MenuButton from './MenuButton';
+import MenuButton, { type MenuAction } from './MenuButton';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
@@ -301,11 +301,13 @@ function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
+/** `actions`: the job's own actions, listed after the facts that do not fit; with any, the menu shows even when every fact fits. */
+export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: State; actions?: MenuAction[] }) {
   const [open, setOpen] = useState<PillKey | null>(null);
   const [fit, setFit] = useState(6);
   const row = useRef<HTMLDivElement>(null);
   const measure = useRef<HTMLDivElement>(null);
+  const withActions = actions.length > 0;
   useEffect(() => {
     const el = row.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -313,7 +315,7 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
       const widths = Array.from(measure.current?.children ?? []).map((x) => (x as HTMLElement).offsetWidth + 6);
       const room = el.clientWidth;
       const total = widths.reduce((a, w) => a + w, 0);
-      if (total <= room) return setFit(widths.length);
+      if (total <= room - (withActions ? 42 : 0)) return setFit(widths.length);
       let used = 42;
       let n = 0;
       while (n < widths.length && used + widths[n] <= room) used += widths[n++];
@@ -323,7 +325,7 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
     watch.observe(el);
     if (measure.current) watch.observe(measure.current);
     return () => watch.disconnect();
-  }, []);
+  }, [withActions]);
   useEffect(() => {
     const fromSlot = (e: Event) => {
       if (!getState().reviewerAs) setOpen((e as CustomEvent<PillKey>).detail);
@@ -367,11 +369,14 @@ export default function FactBar({ job, s }: { job: DemoJob; s: State }) {
         {pills.slice(0, fit).map((p) => (
           <Pill key={p.key} disabled={ro} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => setOpen(p.key)} />
         ))}
-        {hidden.length > 0 && (
+        {(hidden.length > 0 || withActions) && (
           <MenuButton
-            label={`${hidden.length} more job ${hidden.length === 1 ? 'fact' : 'facts'}`}
-            trigger={<span className="ej-more-facts">+{hidden.length}</span>}
-            actions={hidden.map((p) => ({ label: `${p.label}: ${p.key === 'more' ? 'who can apply, start date, and more' : p.value || 'not set'}`, run: () => !ro && setOpen(p.key) }))}
+            label={hidden.length ? `${hidden.length} more job ${hidden.length === 1 ? 'fact' : 'facts'}${withActions ? ', and more actions for this job' : ''}` : 'More actions for this job'}
+            trigger={hidden.length ? <span className="ej-more-facts">+{hidden.length}</span> : <MoreHorizontal size={15} strokeWidth={1.8} />}
+            actions={[
+              ...hidden.map((p) => ({ label: `${p.label}: ${p.key === 'more' ? 'who can apply, start date, and more' : p.value || 'not set'}`, run: () => !ro && setOpen(p.key) })),
+              ...actions.map((a, i) => (i === 0 && hidden.length ? { ...a, separator: true } : a)),
+            ]}
           />
         )}
       </div>      {open === 'place' && <PlaceDialog job={job} s={s} onClose={() => setOpen(null)} />}

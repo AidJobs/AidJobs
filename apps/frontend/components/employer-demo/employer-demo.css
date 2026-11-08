@@ -1325,12 +1325,23 @@ button.ej-step:hover {
   color: var(--text-2);
   font-size: 12.5px;
   font-weight: 650;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .aj-root .ej-switch-btn[aria-pressed='true'] {
   background: var(--sage-1);
   color: var(--sage-8);
+}
+
+/* A narrow panel keeps the three names on one line: no icons, no section count. */
+.aj-root .ej-switch[data-narrow='true'] .ej-switch-btn {
+  padding: 0 10px;
+}
+
+.ej-switch[data-narrow='true'] .ej-switch-btn > svg,
+.ej-switch[data-narrow='true'] .ej-switch-count {
+  display: none;
 }
 
 /* Light green instead of black for the main action and the selected menu item, which is easier on the eye. */

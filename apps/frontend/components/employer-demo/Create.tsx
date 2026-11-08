@@ -14,7 +14,7 @@ import FactBar from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
 import { LangDoc, LangSwitch } from './LangDoc';
-import MenuButton from './MenuButton';
+import MenuButton, { type MenuAction } from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
 import { go, goBack, goToPart, useDemo } from './store';
 import Structure from './Structure';
@@ -93,7 +93,18 @@ export default function Create({ id }: { id?: string }) {
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [langPick, setDocLang] = useState<Lang | null>(null);
+  const [narrow, setNarrow] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const side = useRef<HTMLElement>(null);
+  const hasSide = !phone && Boolean(job) && panel !== null;
+
+  useEffect(() => {
+    const el = side.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const watch = new ResizeObserver(() => setNarrow(el.clientWidth < 390));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [hasSide]);
 
   useEffect(() => {
     try {
@@ -148,6 +159,19 @@ export default function Create({ id }: { id?: string }) {
   };
   const toggle = (p: 'outline' | 'chat' | 'review') => setPanel(panel === p ? null : p);
 
+  const draftActions: MenuAction[] = menu
+    ? [
+        ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
+        ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
+        { label: 'Delete', danger: true, run: () => setDeleteOpen(true) },
+      ]
+    : [];
+  const versionsAction: MenuAction[] = job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : [];
+  const done = (job.status === 'live' || job.status === 'scheduled') && (
+    <button type="button" className="ej-soft-btn" onClick={() => go('jobs', job.id)}>
+      Done
+    </button>
+  );
   const actions = (
     <>
       {!phone && job.versions.length > 0 && (
@@ -161,20 +185,10 @@ export default function Create({ id }: { id?: string }) {
         <MenuButton
           label="More actions for this job draft"
           trigger={<MoreHorizontal size={15} strokeWidth={1.8} />}
-          actions={[
-            ...(phone ? [{ label: 'JD outline', run: () => setSheet('outline') }] : []),
-            ...(phone && job.versions.length ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
-            ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
-            ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
-            { label: 'Delete', danger: true, run: () => setDeleteOpen(true) },
-          ]}
+          actions={[...(phone ? [{ label: 'JD outline', run: () => setSheet('outline') }, ...versionsAction] : []), ...draftActions]}
         />
       )}
-      {(job.status === 'live' || job.status === 'scheduled') && (
-        <button type="button" className="ej-soft-btn" onClick={() => go('jobs', job.id)}>
-          Done
-        </button>
-      )}
+      {done}
     </>
   );
 
@@ -217,9 +231,9 @@ export default function Create({ id }: { id?: string }) {
         ) : (
           <>
             <div className="min-w-0 flex-1">
-              <FactBar job={job} s={s} />
+              <FactBar job={job} s={s} actions={shown ? [...versionsAction, ...draftActions] : undefined} />
             </div>
-            {!shown && <span className="flex shrink-0 items-center gap-1.5">{actions}</span>}
+            {shown ? done && <span className="flex shrink-0 items-center">{done}</span> : <span className="flex shrink-0 items-center gap-1.5">{actions}</span>}
           </>
         )}
       </div>
@@ -228,14 +242,12 @@ export default function Create({ id }: { id?: string }) {
           <FactBar job={job} s={s} />
         </div>
       )}
-      {(phone || !shown || (!reviewing && isReviewable(job))) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 lg:px-6">
-          <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
-            {(phone || !shown) && statusLine(s, job)}
-          </span>
-          {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => goToPart('publish', job.id, n === 3 ? 'publish' : null) : undefined} />}
-        </div>
-      )}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 lg:px-6">
+        <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
+          {statusLine(s, job)}
+        </span>
+        {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => goToPart('publish', job.id, n === 3 ? 'publish' : null) : undefined} />}
+      </div>
       {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (
         <div className="shrink-0 px-3 pt-2 lg:px-5">
           <LangSwitch job={job} current={docLang} onPick={setDocLang} />
@@ -357,11 +369,11 @@ export default function Create({ id }: { id?: string }) {
               }
             }}
           />
-          <aside className="flex min-h-0 min-w-[300px] flex-1 flex-col border-l aj-hair" style={{ background: 'var(--surface)' }} aria-label={panelName}>
-            <div className="flex shrink-0 items-center gap-1.5 px-3 pt-2.5">
-              <div className="ej-switch" role="group" aria-label="Show">
+          <aside ref={side} className="flex min-h-0 min-w-[300px] flex-1 flex-col border-l aj-hair" style={{ background: 'var(--surface)' }} aria-label={panelName}>
+            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 aj-hair">
+              <div className="ej-switch" data-narrow={narrow} role="group" aria-label="Show">
                 <button type="button" className="ej-switch-btn" aria-pressed={shown === 'outline'} onClick={() => setPanel('outline')}>
-                  <ListTree size={14} strokeWidth={1.8} /> JD outline · {job.tags.length}
+                  <ListTree size={14} strokeWidth={1.8} /> JD outline <span className="ej-switch-count">· {job.tags.length}</span>
                 </button>
                 {!reviewing && (
                   <button type="button" className="ej-switch-btn" aria-pressed={shown === 'chat'} onClick={() => setPanel('chat')}>
@@ -379,12 +391,6 @@ export default function Create({ id }: { id?: string }) {
                   <X size={14} strokeWidth={1.8} />
                 </button>
               </Tip>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 pb-2 pt-2 aj-hair">
-              <span className="aj-faint min-w-0 flex-1 truncate" style={{ fontSize: 11 }}>
-                {statusLine(s, job)}
-              </span>
-              {actions}
             </div>
             <div className={shown === 'review' ? 'aj-scroll min-h-0 flex-1' : 'min-h-0 flex-1'}>
               {showChat ? <ChatPanel job={job} s={s} autoFocus /> : shown === 'review' ? <ReviewPanel job={job} s={s} onSend={() => setReviewOpen(true)} /> : <Structure job={job} s={s} bare />}
