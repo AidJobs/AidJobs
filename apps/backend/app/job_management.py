@@ -401,6 +401,8 @@ async def bulk_delete_jobs(
     """
     logger.info(f"[bulk_delete] Received deletion request: type={request.deletion_type}, job_ids={len(request.job_ids) if request.job_ids else 0}, org_name={request.org_name}, source_id={request.source_id}, admin={admin}")
     check_job_selection(request.job_ids, request.org_name, request.source_id)
+    if request.deletion_type not in ("soft", "hard"):
+        raise HTTPException(status_code=400, detail="deletion_type must be soft or hard")
     if request.export_data:
         raise HTTPException(
             status_code=400,
