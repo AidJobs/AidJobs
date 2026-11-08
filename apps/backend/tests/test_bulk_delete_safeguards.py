@@ -118,10 +118,12 @@ def test_the_delete_routes_own_export_is_refused_before_anything_is_deleted(monk
 
 # The delete type ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("deletion_type", ["HARD", "Hard", "hard ", " soft", "", "delete", "batch"])
+@pytest.mark.parametrize("deletion_type", ["HARD", "Hard", "hard ", " soft", "", "delete", "batch",
+                                           "softly", "hard\u0000"])
 @pytest.mark.parametrize("target", [{"job_ids": ["job-1"]}, {"org_name": "Oxfam"},
+                                    {"source_id": "source-1"},
                                     {"job_ids": ["job-1"], "dry_run": True}],
-                         ids=["ids", "organisation", "dry run"])
+                         ids=["ids", "organisation", "source", "dry run"])
 def test_a_delete_type_other_than_soft_or_hard_is_refused_before_the_database(
         monkeypatch, client, deletion_type, target):
     """Any other value used to run the soft update without its `deleted_at IS NULL` filter,
