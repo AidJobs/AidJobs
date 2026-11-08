@@ -64,15 +64,16 @@ def place_job(job: Dict) -> None:
     """
     normalized = job.get('location_normalized')
     normalized = normalized if isinstance(normalized, dict) else {}
-    reading = read_location(job.get('location_raw') or normalized.get('label'))
+    raw = job.get('location_raw')
+    reading = read_location(raw if isinstance(raw, str) and raw.strip() else normalized.get('label'))
     if reading is None:
         return
     if not (job.get('country') or job.get('country_iso')):
         for name in ('country', 'country_iso', 'city'):
             if not job.get(name):
                 job[name] = reading[name]
-    job['is_remote'] = bool(
-        job.get('is_remote') or reading['is_remote'] or normalized.get('type') == 'remote'
+    job['is_remote'] = (
+        job.get('is_remote') is True or reading['is_remote'] or normalized.get('type') == 'remote'
     )
 
 

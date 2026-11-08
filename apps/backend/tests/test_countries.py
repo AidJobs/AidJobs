@@ -105,6 +105,31 @@ def test_several_countries_store_none(location, named):
 
 
 @pytest.mark.parametrize(
+    ("location", "named"),
+    [
+        ("Congo, Democratic Republic of the", ["CD"]),
+        ("Kinshasa, Congo, The Democratic Republic of the", ["CD"]),
+        ("Congo, Republic of the", ["CG"]),
+        ("Congo, Dem. Rep.", []),
+        ("Korea, Republic of", ["KR"]),
+        ("Korea, Democratic People's Republic of", ["KP"]),
+        ("Iran, Islamic Republic of", ["IR"]),
+        ("Tanzania, United Republic of", ["TZ"]),
+        ("Moldova, Republic of", ["MD"]),
+        ("Bolivia, Plurinational State of", ["BO"]),
+        ("Venezuela, Bolivarian Republic of", ["VE"]),
+        ("Micronesia, Federated States of", ["FM"]),
+        ("London, United Kingdom", ["GB"]),
+        ("Belgium, United Kingdom", ["BE", "GB"]),
+        ("Kenya, United States", ["KE", "US"]),
+        ("Gaza, State of Palestine", ["PS"]),
+    ],
+)
+def test_inverted_official_names_are_read_whole(location, named):
+    assert countries_named(location) == named
+
+
+@pytest.mark.parametrize(
     "location",
     [
         "Global Deployment",
@@ -191,6 +216,80 @@ def test_place_job_reads_a_normalised_location_and_its_remote_type():
     assert (job["country_iso"], job["is_remote"]) == ("KE", True)
 
 
+def test_place_job_prefers_the_location_text_and_skips_a_blank_one():
+    from crawler_v2.simple_crawler import place_job
+
+    job = {"location_raw": "Kenya", "location_normalized": {"label": "Uganda"}}
+    place_job(job)
+    assert job["country_iso"] == "KE"
+    job = {"location_raw": "  ", "location_normalized": {"label": "Uganda"}}
+    place_job(job)
+    assert job["country_iso"] == "UG"
+
+
+def test_place_job_counts_only_a_true_remote_flag():
+    from crawler_v2.simple_crawler import place_job
+
+    job = {"location_raw": "Kenya", "is_remote": "no"}
+    place_job(job)
+    assert job["is_remote"] is False
+
+
+class _Run:
+    def __init__(self):
+        self.saved = []
+
+    async def save(self, save_jobs, jobs, source_id, org_name, **_kwargs):
+        self.saved.extend(dict(job) for job in jobs)
+        return {"inserted": len(jobs), "updated": 0, "skipped": 0, "failed": 0}
+
+
+def test_the_crawl_reads_countries_before_saving(monkeypatch):
+    import asyncio
+
+    from contracts.outbound import FetchResult, crawl_budget
+    from crawler_v2 import simple_crawler
+
+    async def fetch_url(url, **_kwargs):
+        return FetchResult(200, {}, b"<html><body>listing</body></html>", url)
+
+    monkeypatch.setattr(simple_crawler, "fetch_url", fetch_url)
+    crawler = simple_crawler.SimpleCrawler("postgresql://unused")
+    crawler.extraction_logger = None
+    crawler.html_storage = None
+    crawler.quality_scorer = None
+    rows = [
+        {"title": "Officer", "apply_url": "https://jobs.example/job/1/officer",
+         "location_raw": "Democratic Republic of Congo"},
+        {"title": "Adviser", "apply_url": "https://jobs.example/job/2/adviser",
+         "location_raw": "Belize, Guyana"},
+    ]
+
+    async def listing(html, url):
+        return [dict(row) for row in rows], None
+
+    async def detail(job, base_url):
+        return job
+
+    monkeypatch.setattr(crawler, "_listing_jobs", listing)
+    monkeypatch.setattr(crawler, "enrich_job_from_detail_page", detail)
+    run = _Run()
+    source = {"id": "src-1", "org_name": "Example", "careers_url": "https://jobs.example/",
+              "source_type": "html"}
+
+    async def crawl():
+        with crawl_budget():
+            return await crawler.crawl_source(source, run)
+
+    asyncio.run(crawl())
+    saved = {job["title"]: job for job in run.saved}
+    assert (saved["Officer"]["country_iso"], saved["Officer"]["country"]) == ("CD", "DR Congo")
+    assert saved["Adviser"]["country_iso"] is None and saved["Adviser"]["country"] is None
+    for job in run.saved:
+        assert job["city"] is None and job["is_remote"] is False
+        assert "latitude" not in job
+
+
 def test_the_crawler_sends_no_coordinates_and_clears_a_guessed_city(monkeypatch):
     from crawler_v2 import simple_crawler
 
@@ -229,17 +328,40 @@ def test_the_crawler_sends_no_coordinates_and_clears_a_guessed_city(monkeypatch)
     monkeypatch.setattr(simple_crawler, "confirm_running", lambda *args, **kwargs: None)
     monkeypatch.setattr(simple_crawler, "commit_and_schedule", lambda *args, **kwargs: None)
     monkeypatch.setattr(simple_crawler, "persist_candidate", persist)
-    job = {"title": "Officer", "apply_url": "https://example.org/jobs/1",
-           "location_raw": "Italy", "admitted": True}
-    simple_crawler.place_job(job)
-    crawler.save_jobs([job], "src-1", "Example", run_token="run-1")
-    assert len(sent) == 1
-    candidate = sent[0]
-    assert (candidate["country"], candidate["country_iso"], candidate["is_remote"]) == (
-        "Italy", "IT", False)
-    assert "city" in candidate and candidate["city"] is None
-    for name in ("latitude", "longitude", "geocoding_source", "geocoded_at"):
-        assert name not in candidate
+    jobs = [
+        {"title": "Officer", "apply_url": "https://example.org/jobs/1",
+         "location_raw": "Italy", "admitted": True},
+        {"title": "Adviser", "apply_url": "https://example.org/jobs/2",
+         "location_raw": "Belize, Guyana", "admitted": True},
+    ]
+    for job in jobs:
+        simple_crawler.place_job(job)
+    crawler.save_jobs(jobs, "src-1", "Example", run_token="run-1")
+    assert len(sent) == 2
+    one, several = sent
+    assert (one["country"], one["country_iso"], one["is_remote"]) == ("Italy", "IT", False)
+    assert "city" in one and one["city"] is None
+    for name in ("country", "country_iso", "city"):
+        assert name in several and several[name] is None
+    for candidate in sent:
+        for name in ("latitude", "longitude", "geocoding_source", "geocoded_at"):
+            assert name not in candidate
+
+
+def test_a_country_read_offline_scores_as_the_old_coordinates_did():
+    from core.data_quality import DataQualityScorer
+    from crawler_v2.simple_crawler import place_job
+
+    base = {"title": "Programme Officer", "apply_url": "https://example.org/jobs/1",
+            "org_name": "Example", "location_raw": "Kenya"}
+    geocoded = dict(base, latitude=-1.29, longitude=36.82, country="Kenya", country_iso="KE")
+    offline = dict(base)
+    place_job(offline)
+    scorer = DataQualityScorer()
+    assert scorer.score_job(offline) == scorer.score_job(geocoded)
+    several = dict(base, location_raw="Belize, Guyana")
+    place_job(several)
+    assert scorer.score_job(several)["factors"]["geocoding"] == 0.0
 
 
 def _stored(**fields):

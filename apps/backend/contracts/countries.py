@@ -1,8 +1,10 @@
 """The offline country lookup: countries read from a job's location text, with no network call.
 
-The table is the public site's (`apps/frontend/lib/site/countries.ts`), so the crawler and the
-site name a country the same way; tests/test_countries.py fails when the two differ. A change to
-the table is made there first, then here.
+The table is the public site's (`apps/frontend/lib/site/countries.ts`), so a stored code has the
+name the site shows; tests/test_countries.py fails when the two tables differ. A change to the
+table is made there first, then here. The rule differs from the site's fallback for a location
+with no stored code: the site takes the last part that names a country, this stores none when
+several are named.
 """
 from __future__ import annotations
 
@@ -339,6 +341,12 @@ _APOSTROPHES = re.compile(r"[\u2018\u2019\u0060\u00b4]")
 _SPACES = re.compile(r"\s+")
 # The parts of a location that each may name a country: "Somalia / Nairobi, Kenya".
 _PARTS = re.compile(r"[,/;]")
+# The second half of an inverted official name, "Congo, Democratic Republic of the", compared
+# after name_key. The first half alone ("Congo") would name another country.
+_INVERTED = re.compile(
+    r"^(?:democratic|islamic|united|plurinational|bolivarian|federated|federal|people's"
+    r"|republic|kingdom|state|states|former|dem\.? rep)\b|\bof(?: the)?$"
+)
 # Words that mark a remote job in a location, matched as whole words.
 _REMOTE = re.compile(
     r"\b(?:remote|home[- ]based|work(?:ing)? from home|wfh|telecommut\w*"
@@ -379,10 +387,23 @@ def iso_from_name(name: str) -> str | None:
 
 
 def countries_named(location: str | None) -> list[str]:
-    """Every country a location names, in order, each once."""
+    """Every country a location names, in order, each once.
+
+    "Congo, Democratic Republic of the" is read as one name, never as "Congo"; an inverted name
+    the table does not know names no country.
+    """
+    parts = [part.strip() for part in _PARTS.split(location or "")]
     found: list[str] = []
-    for part in _PARTS.split(location or ""):
-        iso = iso_from_name(part)
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        following = parts[index + 1] if index + 1 < len(parts) else ""
+        if iso_from_name(following) is None and _INVERTED.search(name_key(following)):
+            iso = iso_from_name(f"{following} {part}") or iso_from_name(f"{part} ({following})")
+            index += 2
+        else:
+            iso = iso_from_name(part)
+            index += 1
         if iso and iso not in found:
             found.append(iso)
     return found
