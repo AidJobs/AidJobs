@@ -702,18 +702,27 @@
  "restore": {
   "outcome": {
    "data": {
-    "message": "Successfully restored 2 jobs",
-    "restored_count": 2,
+    "message": "Restored 1 job. 2 jobs were not restored: the source is deleted or gone. Add the source again, then restore its jobs.",
+    "not_restored_count": 2,
+    "restored_count": 1,
     "restored_ids": [
-     "job-1",
-     "job-2"
+     "source-1"
     ]
    },
    "status": "ok"
   },
   "statements": [
    [
-    "UPDATE jobs SET deleted_at = NULL, deleted_by = NULL, deletion_reason = NULL WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL RETURNING id::text",
+    "UPDATE jobs SET deleted_at = NULL, deleted_by = NULL, deletion_reason = NULL WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL AND source_id IN ( SELECT s.id FROM sources s JOIN jobs j ON j.source_id = s.id WHERE j.id::text IN (%s,%s) AND s.status IS DISTINCT FROM 'deleted' FOR SHARE OF s ) RETURNING id::text",
+    [
+     "job-1",
+     "job-2",
+     "job-1",
+     "job-2"
+    ]
+   ],
+   [
+    "SELECT COUNT(*) as count FROM jobs WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL",
     [
      "job-1",
      "job-2"

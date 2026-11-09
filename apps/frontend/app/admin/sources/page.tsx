@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminDateTime } from '@/lib/dates';
+import { sourceRowActions } from '@/lib/admin/danger';
 import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle } from 'lucide-react';
 
 type Source = {
@@ -1098,6 +1099,12 @@ export default function AdminSourcesPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex gap-1 flex-wrap">
+                          {!sourceRowActions(source.status).run && (
+                            <span className="text-caption-sm text-[#86868B] self-center" title="A deleted source is restored by adding it again with the same careers URL">
+                              Deleted: add it again to restore
+                            </span>
+                          )}
+                          {sourceRowActions(source.status).run && (
                           <button
                             onClick={() => handleRunNow(source.id)}
                             disabled={runningSourceId === source.id}
@@ -1113,6 +1120,8 @@ export default function AdminSourcesPage() {
                               Run crawl now
                             </span>
                           </button>
+                          )}
+                          {sourceRowActions(source.status).toggle && (
                           <button
                             onClick={() => handleToggleStatus(source)}
                             disabled={togglingSourceId === source.id}
@@ -1130,6 +1139,8 @@ export default function AdminSourcesPage() {
                               {source.status === 'active' ? 'Pause' : 'Resume'}
                             </span>
                           </button>
+                          )}
+                          {sourceRowActions(source.status).edit && (
                           <button
                             onClick={() => openEditModal(source)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] transition-colors relative group"
@@ -1140,6 +1151,7 @@ export default function AdminSourcesPage() {
                               Edit
                             </span>
                           </button>
+                          )}
                           <button
                             onClick={() => handleTestSource(source.id)}
                             disabled={testLoading}

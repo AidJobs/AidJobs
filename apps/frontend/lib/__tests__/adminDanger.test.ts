@@ -7,6 +7,7 @@ import {
   jobCountFrom,
   meiliControlsVisible,
   sourceDangerActions,
+  sourceRowActions,
   type ImpactCount,
 } from '../admin/danger';
 import { MEILI_NOT_CONFIGURED } from '../admin/status';
@@ -45,6 +46,18 @@ describe('source danger actions', () => {
     expect(sourceDangerActions('active')).toEqual({ deleteSource: true, permanentDelete: false });
     expect(sourceDangerActions('paused')).toEqual({ deleteSource: true, permanentDelete: false });
     expect(sourceDangerActions('deleted')).toEqual({ deleteSource: false, permanentDelete: true });
+  });
+});
+
+describe('source row actions', () => {
+  it('offers run, pause or resume, and edit for every source that is not deleted', () => {
+    for (const status of ['active', 'paused', 'pending_validation', null, undefined]) {
+      expect(sourceRowActions(status)).toEqual({ run: true, toggle: true, edit: true });
+    }
+  });
+
+  it('offers none of them for a deleted source', () => {
+    expect(sourceRowActions('deleted')).toEqual({ run: false, toggle: false, edit: false });
   });
 });
 

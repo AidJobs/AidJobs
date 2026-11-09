@@ -34,6 +34,17 @@ DB_NOT_CONFIGURED = "Database not configured"
 DB_SETTINGS_UNREADABLE = "Database settings could not be read"
 # The whole check of one source URL, every redirect included
 SOURCE_CHECK_TOTAL_SECONDS = 20.0
+# What an edit may set. "deleted" is the delete route's, which also hides the source's jobs;
+# "pending_validation", production's default for a new row, is set by no admin action.
+EDITABLE_STATUSES = ("active", "paused")
+DELETED_SOURCE = "This source is deleted. Add it again with the same careers URL to restore it."
+
+
+def live_jobs_message(live: int) -> str:
+    """Why a deleted source cannot be removed yet."""
+    jobs, verb = ("job", "is") if live == 1 else ("jobs", "are")
+    return (f"{live} {jobs} of this source {verb} not deleted. Delete them on the Jobs page, "
+            "then delete the source permanently.")
 
 
 def _connection_params() -> dict:
@@ -396,7 +407,11 @@ def update_source(
     update: SourceUpdate,
     admin: str = Depends(admin_required)
 ):
-    """Update a source."""
+    """Update a source that is not deleted."""
+    if update.status is not None and update.status not in EDITABLE_STATUSES:
+        detail = ("Delete a source with the delete action, which also hides its jobs"
+                  if update.status == "deleted" else "status must be active or paused")
+        raise HTTPException(status_code=400, detail=detail)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
@@ -454,7 +469,7 @@ def update_source(
         sql_query = f"""
             UPDATE sources
             SET {', '.join(updates)}
-            WHERE id::text = %s
+            WHERE id::text = %s AND status IS DISTINCT FROM 'deleted'
             RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                       crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                       parser_hint, time_window, created_at, updated_at
@@ -464,6 +479,9 @@ def update_source(
         updated = cursor.fetchone()
         
         if not updated:
+            cursor.execute("SELECT 1 FROM sources WHERE id::text = %s", (source_id,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=409, detail=DELETED_SOURCE)
             raise HTTPException(status_code=404, detail="Source not found")
         
         conn.commit()
@@ -589,11 +607,13 @@ def permanently_delete_source(
         conn = psycopg2.connect(**conn_params, connect_timeout=5)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # First check if source exists and is deleted
+        # The row lock holds back a crawl's new job (its foreign key check) and a job restore
+        # (FOR SHARE on the source) until this transaction ends, so the count below stays true.
         cursor.execute("""
             SELECT id::text, status
             FROM sources
             WHERE id::text = %s
+            FOR UPDATE
         """, (source_id,))
         
         source = cursor.fetchone()
@@ -603,6 +623,17 @@ def permanently_delete_source(
         
         if source['status'] != 'deleted':
             raise HTTPException(status_code=400, detail="Source must be deleted before permanent deletion. Use DELETE /api/admin/sources/{id} first.")
+        
+        # Removing the row would leave these jobs public with no source, and never expired.
+        cursor.execute("""
+            SELECT COUNT(*) AS live
+            FROM jobs
+            WHERE source_id::text = %s AND deleted_at IS NULL
+        """, (source_id,))
+        live = cursor.fetchone()['live']
+        if live:
+            conn.rollback()
+            raise HTTPException(status_code=409, detail=live_jobs_message(live))
         
         logger.info(f"[sources] Permanently deleting source {source_id}")
         
