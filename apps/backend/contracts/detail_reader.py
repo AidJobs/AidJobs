@@ -99,6 +99,11 @@ def _posting_result(data: dict) -> dict | None:
     return row
 
 
+def posting_locations(value) -> list[str]:
+    """Every location of a JSON-LD jobLocation, as read_detail_page reads them."""
+    return _locations(value)
+
+
 def _locations(value) -> list[str]:
     if isinstance(value, str):
         text = _plain(value)

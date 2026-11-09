@@ -25,7 +25,12 @@ from contracts.captured import (
     posted_day,
 )
 from contracts.countries import read_location
-from contracts.detail_reader import apply_captured_fields, apply_detail_reading, read_detail_fields
+from contracts.detail_reader import (
+    apply_captured_fields,
+    apply_detail_reading,
+    posting_locations,
+    read_detail_fields,
+)
 from contracts.outbound import (
     POLITENESS_STOPS,
     current_budget,
@@ -83,7 +88,7 @@ def place_job(job: Dict) -> None:
     place = job.get('published_place')
     if isinstance(place, dict) and not job.get('city') and job.get('country_iso'):
         own = read_location(place.get('location'))
-        locality = place.get('locality')
+        locality = clean_short_text(place.get('locality'))
         if own is not None and own['country_iso'] == job['country_iso'] and locality:
             job['city'] = locality
     job['is_remote'] = (
@@ -1095,6 +1100,9 @@ class SimpleCrawler:
                 job['location_raw'] = '; '.join(locations)
             else:
                 job['location_raw'] = str(location)
+            published = posting_locations(location)
+            if published:
+                job['locations'] = published
         
         # Extract deadline (try multiple fields)
         deadline_fields = ['validThrough', 'applicationDeadline', 'deadline', 'closingDate', 'expires']
@@ -1117,14 +1125,14 @@ class SimpleCrawler:
                         currency = value.get('currency', '')
                         if amount:
                             job['salary_raw'] = f"{currency} {amount}".strip()
-                    else:
+                    elif isinstance(value, (str, int, float)) and not isinstance(value, bool):
                         job['salary_raw'] = str(value)
                 elif 'minValue' in salary and 'maxValue' in salary:
                     job['salary_raw'] = f"{salary['minValue']} - {salary['maxValue']}"
         
         # Extract description (if available)
-        if 'description' in data:
-            job['description'] = str(data['description']).strip()
+        if isinstance(data.get('description'), str):
+            job['description'] = data['description'].strip()
         
         # Extract employment type
         if 'employmentType' in data:

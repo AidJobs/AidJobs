@@ -105,10 +105,90 @@ def test_dates_amounts_and_references_are_kept(text):
     assert clean_description(text) == text
 
 
-def test_a_long_description_is_capped_at_a_word():
-    text = ("word " * (DESCRIPTION_LIMIT // 5 + 50)).strip()
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Write to jobs @ oxfam.org today.",
+        "Write to jobs@ oxfam.org today.",
+        "Write to jobs at oxfam dot org today.",
+        "Write to (202) 555-0143 today.",
+        "Write to 202-555-0143 today.",
+        "Write to Hotline: 1-800-555-0199 today.",
+        "Write to Contact number: 734 6001 today.",
+        "Write to Contact: 734 60 01 today.",
+        "Write to +44 20 7946\u20130958 today.",
+        "Write to Kenya +254 722 123 456 today.",
+        "Write to Mobile: 0722 123 456 today.",
+        "Write to Tel 734 6001 today.",
+    ],
+)
+def test_more_contact_forms_are_removed(text):
     cleaned = clean_description(text)
-    assert len(cleaned) <= DESCRIPTION_LIMIT
+    assert cleaned.startswith("Write to") and cleaned.endswith("today.")
+    assert CONTACT_REMOVED in cleaned
+    for fragment in ("@", "oxfam", "555", "734", "7946", "0958", "722"):
+        assert fragment not in cleaned
+
+
+def test_contacts_split_by_inline_tags_are_removed():
+    assert clean_description("<p><span>hr</span> @ <span>unicef.org</span></p>") == CONTACT_REMOVED
+
+
+def test_an_extension_goes_with_its_number():
+    assert clean_description("Call +1 202 555 0143 ext. 1234 now") == f"Call {CONTACT_REMOVED} now"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Closing date: 05.12.2026 12:00 GMT",
+        "Deadline: 05.12.2026 (23:59 CET)",
+        "Start date: 01.03.2026 (12 months)",
+        "Phase step 01 (2026-2027)",
+        "The post is mobile. 2026-2027",
+        "Funding of +15 000 000 USD.",
+        "Salary KES 90,000 - 120,000 per month",
+        "Grade P-3, 2 years, 100 000 people",
+        "Fax: 12 34 56",
+        "Account +1 2345 6789 1123 4567 89",
+    ],
+)
+def test_dates_amounts_and_short_numbers_near_phone_words_are_kept(text):
+    assert clean_description(text) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["A" * 20_000, "0" * 20_000, "+1" * 10_000, "a." * 50_000, "a@" * 20_000,
+     "x at y dot " * 10_000, "A" * 400_000],
+)
+def test_hostile_text_is_cleaned_quickly(text):
+    import time
+
+    start = time.perf_counter()
+    clean_description(text)
+    assert time.perf_counter() - start < 3
+
+
+def test_deep_nesting_is_read():
+    assert clean_description("<div>" * 5000 + "deep text" + "</div>" * 5000) == "deep text"
+
+
+def test_forms_and_empty_list_items_leave_nothing():
+    html = "<p>Role</p><form><label>Your e-mail</label><input></form><ul><li> </li></ul>"
+    assert clean_description(html) == "Role"
+
+
+def test_script_text_of_escaped_html_is_not_kept():
+    escaped = "&lt;p&gt;Role&lt;/p&gt;<script>var tracking = 1;</script>"
+    assert clean_description(escaped) == "Role"
+
+
+def test_a_long_description_is_capped_at_a_word():
+    assert DESCRIPTION_LIMIT == 20_000
+    text = ("word " * 4_100).strip()
+    cleaned = clean_description(text)
+    assert len(cleaned) <= 20_000
     assert cleaned.endswith(" …")
     assert cleaned[:-2].split(" ")[-1] == "word"
 
@@ -122,6 +202,15 @@ def test_short_text_is_one_line_as_written():
     assert clean_short_text("x" * 400) == "x" * 300
     assert clean_short_text("  ") is None
     assert clean_short_text(["Fixed Term"]) is None
+
+
+def test_short_text_loses_its_contacts():
+    assert clean_short_text("KES 90,000; queries hr@ngo.org / 0722 123 456") == (
+        f"KES 90,000; queries {CONTACT_REMOVED} / {CONTACT_REMOVED}"
+    )
+    assert clean_locations(["Nairobi, call +254 722 123 456"]) == [
+        f"Nairobi, call {CONTACT_REMOVED}"
+    ]
 
 
 def test_locations_keep_their_order_once_each():
@@ -256,6 +345,19 @@ def test_another_jobs_microdata_lends_no_date_or_description():
     assert fields["posted"] == []
     assert fields["description"] is None
     assert fields["language"] is None
+
+
+def test_a_nested_items_description_and_date_are_not_the_postings():
+    html = (
+        '<div itemscope itemtype="http://schema.org/JobPosting">'
+        '<meta itemprop="title" content="Role"><h1>Role</h1><span>Location: Geneva</span>'
+        '<div itemprop="hiringOrganization" itemscope>'
+        '<meta itemprop="datePosted" content="2026-10-01">'
+        '<span itemprop="description">About the organisation</span></div></div>'
+    )
+    fields = read_detail_fields(html)[1][0]
+    assert fields["posted"] == []
+    assert fields["description"] is None
 
 
 def test_captured_fields_alone_do_not_qualify_a_posting():
@@ -422,6 +524,19 @@ def test_no_city_without_a_matching_published_place(location_raw, place):
     assert row["city"] is None
 
 
+def test_a_city_the_reader_supplied_is_kept():
+    row = _placed(location_raw="Damascus, Syria", city="Aleppo",
+                  published_place={"location": "Damascus, Syria", "locality": "Damascus"})
+    assert row["city"] == "Aleppo"
+
+
+def test_a_published_locality_loses_its_contacts():
+    row = _placed(location_raw="Damascus, Syria",
+                  published_place={"location": "Damascus, Syria",
+                                   "locality": "Damascus hr@ngo.org"})
+    assert row["city"] == f"Damascus {CONTACT_REMOVED}"
+
+
 def test_a_job_without_a_location_gets_no_city():
     row = _placed(published_place={"location": "Damascus, Syria", "locality": "Damascus"})
     assert "city" not in row
@@ -503,6 +618,18 @@ def test_a_listing_row_sends_its_one_location_and_nothing_it_did_not_publish(mon
         assert name not in candidate
 
 
+def test_every_short_field_loses_its_contacts_at_the_save_step(monkeypatch):
+    contact = " hr@ngo.org +254 722 123 456"
+    job = {"title": "Officer", "apply_url": "https://example.org/jobs/4", "admitted": True,
+           "locations": ["Nairobi" + contact], "employment_type": "Fixed term" + contact,
+           "salary_range_text": "KES 90,000" + contact, "advert_language": "en" + contact}
+    [(candidate, _)] = _save(monkeypatch, [job])
+    for name in ("contract_type", "salary_range_text", "advert_language"):
+        assert "@" not in candidate[name] and "722" not in candidate[name], name
+        assert CONTACT_REMOVED in candidate[name], name
+    assert candidate["locations"] == [f"Nairobi {CONTACT_REMOVED} {CONTACT_REMOVED}"]
+
+
 def test_blank_or_future_values_are_not_sent(monkeypatch):
     job = {"title": "Officer", "apply_url": "https://example.org/jobs/3", "admitted": True,
            "description": "<p> </p>", "posted_on": "2999-01-01", "locations": [" "],
@@ -525,6 +652,23 @@ def test_a_listing_salary_and_employment_type_list_are_sent_as_text(monkeypatch)
     [(candidate, _)] = _save(monkeypatch, [posting])
     assert candidate["contract_type"] == "FULL_TIME, TEMPORARY"
     assert candidate["salary_range_text"] == "USD 100"
+
+
+def test_listing_structured_data_gives_real_locations_and_no_object_text(monkeypatch):
+    from crawler_v2.simple_crawler import SimpleCrawler
+
+    posting = SimpleCrawler("postgresql://example")._parse_job_posting(
+        {"title": "Role", "url": "/jobs/10", "validThrough": "2026-12-01",
+         "description": {"text": "not a string"}, "baseSalary": {"value": [1, 2]},
+         "jobLocation": [{"address": {"addressLocality": "Geneva", "addressCountry": "CH"}},
+                         {"name": "Kabul"}]},
+        "https://example.org/",
+    )
+    posting["admitted"] = True
+    [(candidate, _)] = _save(monkeypatch, [posting])
+    assert candidate["locations"] == ["Geneva, CH", "Kabul"]
+    assert "description" not in candidate
+    assert "salary_range_text" not in candidate
 
 
 # --- The writer -----------------------------------------------------------------------------
@@ -575,6 +719,12 @@ def _persist(cursor, **candidate):
 def _writes(cursor):
     return [(sql, params) for sql, params in cursor.statements
             if not sql.lstrip().upper().startswith("SELECT")]
+
+
+def test_every_compared_field_is_loaded():
+    from contracts.upsert import VALIDATED_FIELDS
+
+    assert set(VALIDATED_FIELDS) <= set(LOAD_COLUMNS)
 
 
 def test_a_new_job_is_inserted_with_its_captured_fields():
