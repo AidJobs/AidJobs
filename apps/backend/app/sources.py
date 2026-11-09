@@ -25,6 +25,7 @@ import json
 from app.db_config import db_config
 from app.errors import InternalError, log_failure
 from app.log_safety import current_request_id
+from contracts.models import SOURCE_TYPES
 from contracts.outbound import fetch_message
 from security.admin_auth import admin_required
 
@@ -45,6 +46,15 @@ SOURCE_BUSY = ("This source or its jobs are being changed (a crawl may be saving
 # How long a source delete waits for any lock it needs, such as a crawl's job save in progress,
 # before answering SOURCE_BUSY.
 DELETE_LOCK_TIMEOUT = "10s"
+
+
+SOURCE_TYPE_REFUSED = "source_type must be html, rss or api"
+
+
+def check_source_type(source_type: Optional[str]) -> None:
+    """Refuse a type outside the contract's source types (W-53); None means "unchanged"."""
+    if source_type is not None and source_type not in SOURCE_TYPES:
+        raise HTTPException(status_code=400, detail=SOURCE_TYPE_REFUSED)
 
 
 def live_jobs_message(live: int) -> str:
@@ -290,6 +300,7 @@ def create_source(
     admin: str = Depends(admin_required)
 ):
     """Create a new source with auto-queue (next_run_at=now())."""
+    check_source_type(source.source_type)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
@@ -419,6 +430,7 @@ def update_source(
         detail = ("Delete a source with the delete action, which also hides its jobs"
                   if update.status == "deleted" else "status must be active or paused")
         raise HTTPException(status_code=400, detail=detail)
+    check_source_type(update.source_type)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
@@ -945,9 +957,7 @@ def import_source(
     
     conn_params = _connection_params()
     
-    # Validate source_type
-    if source.source_type not in ["html", "rss", "api"]:
-        raise HTTPException(status_code=400, detail=f"Invalid source_type: {source.source_type}")
+    check_source_type(source.source_type)
     
     # Validate parser_hint for API sources
     if source.source_type == "api" and source.parser_hint:

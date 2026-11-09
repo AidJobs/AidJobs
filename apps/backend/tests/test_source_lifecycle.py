@@ -142,6 +142,61 @@ def test_an_edit_of_a_missing_source_is_still_404(database):
     assert (response.status_code, response.json()) == (404, {"detail": "Source not found"})
 
 
+# A source's type (W-53) --------------------------------------------------------------------
+
+TYPE_REFUSED = "source_type must be html, rss or api"
+BAD_TYPES = ["json", "HTML", "Api", " html", "rss ", "", "xml", "browser", "playwright"]
+
+
+@pytest.mark.parametrize("source_type", BAD_TYPES)
+@pytest.mark.parametrize("method, path", [
+    ("POST", "/api/admin/sources"),
+    ("POST", "/api/admin/sources/import"),
+    ("PATCH", f"/api/admin/sources/{SID}"),
+], ids=["create", "import", "edit"])
+def test_a_type_outside_the_contract_is_refused_before_the_database(
+        database, method, path, source_type):
+    log = database()
+    response = _sources_app().request(
+        method, path, json={"careers_url": "https://example.org/jobs", "source_type": source_type})
+    assert (response.status_code, response.json()) == (400, {"detail": TYPE_REFUSED})
+    assert log == []
+
+
+def test_the_types_are_the_contracts():
+    from contracts.models import SOURCE_TYPES
+
+    assert sources.SOURCE_TYPES is SOURCE_TYPES and SOURCE_TYPES == {"html", "rss", "api"}
+
+
+@pytest.mark.parametrize("source_type", ["html", "rss", "api"])
+def test_each_contract_type_is_accepted_on_create_and_edit(database, source_type):
+    row = {"id": SID, "source_type": source_type}
+    database({"INSERT INTO sources": [row], "UPDATE sources": [row]})
+    client = _sources_app()
+    created = client.post("/api/admin/sources",
+                          json={"careers_url": "https://example.org/jobs",
+                                "source_type": source_type})
+    edited = client.patch(f"/api/admin/sources/{SID}", json={"source_type": source_type})
+    assert created.status_code == 200 and edited.status_code == 200
+
+
+def test_a_create_without_a_type_is_html(database):
+    log = database({"INSERT INTO sources": [{"id": SID, "source_type": "html"}]})
+    response = _sources_app().post("/api/admin/sources",
+                                   json={"careers_url": "https://example.org/jobs"})
+    assert response.status_code == 200
+    assert any(s.startswith("INSERT INTO sources") for s in log)
+
+
+def test_an_edit_without_a_type_leaves_it_unchanged(database):
+    log = database({"UPDATE sources": [{"id": SID}]})
+    response = _sources_app().patch(f"/api/admin/sources/{SID}", json={"org_name": "Renamed"})
+    assert response.status_code == 200
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "source_type" not in update.split(" WHERE")[0].split("RETURNING")[0]
+
+
 # A permanent delete ------------------------------------------------------------------------
 
 def _deleted_source(live, running=False):
@@ -339,7 +394,9 @@ def test_a_refused_save_is_still_lost_ownership_for_its_callers():
 # The migration file ------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name", ["w52_sources_status_check.sql",
-                                  "w52_sources_status_check_rollback.sql"])
+                                  "w52_sources_status_check_rollback.sql",
+                                  "w53_sources_type_check.sql",
+                                  "w53_sources_type_check_rollback.sql"])
 def test_each_migration_file_is_one_transaction_with_its_timeouts(name):
     from pathlib import Path
 

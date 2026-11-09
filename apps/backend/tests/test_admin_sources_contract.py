@@ -144,7 +144,9 @@ def test_permanent_deletion_of_an_active_source_is_still_400(database):
 
 
 @pytest.mark.parametrize("payload, detail", [
-    ({"careers_url": "https://example.org/x", "source_type": "xml"}, "Invalid source_type: xml"),
+    # W-53: the same refusal as the create and edit routes, without repeating the value.
+    ({"careers_url": "https://example.org/x", "source_type": "xml"},
+     "source_type must be html, rss or api"),
     ({"careers_url": "https://example.org/x", "source_type": "api", "parser_hint": "{not json"},
      "Invalid JSON in parser_hint"),
 ])

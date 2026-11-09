@@ -1,10 +1,11 @@
-"""W-52 against real PostgreSQL: the source lifecycle rules, their locks, and the migration.
+"""W-52 and W-53 against real PostgreSQL: the source lifecycle rules, their locks, and the
+two migrations on sources.
 
 Runs where tests/test_crawl_ownership.py runs, in the same pytest process and with the same
 guards, imported from it: only a local database whose name ends in _test, no production
 variable, Python sockets to loopback only, and every psycopg2 connection checked. In CI the routes
 connect as aidjobs_app with only the grants in infra/roles/02_grants.sql, as in production; the
-migration runs as postgres, as the user runs it in Supabase's SQL editor.
+migrations run as postgres, as the user runs them in Supabase's SQL editor.
 """
 import asyncio
 import threading
@@ -34,11 +35,38 @@ from tests.test_crawl_ownership import (  # noqa: F401
 from tests.test_crawl_ownership import _job as _candidate
 
 MIGRATIONS = Path(__file__).resolve().parents[3] / "infra" / "migrations"
-MIGRATION = (MIGRATIONS / "w52_sources_status_check.sql").read_text(encoding="utf-8")
-ROLLBACK = (MIGRATIONS / "w52_sources_status_check_rollback.sql").read_text(encoding="utf-8")
-ALLOWED = ("active", "paused", "deleted", "pending_validation")
-DEFINITION = ("CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'deleted'::text, "
-              "'pending_validation'::text])))")
+class Rule:
+    """One migration on sources: the column it limits, and values to test it with."""
+
+    def __init__(self, stem, column, constraint, allowed, refused, broken, other_rule, default,
+                 definition):
+        self.migration = (MIGRATIONS / f"{stem}.sql").read_text(encoding="utf-8")
+        self.rollback = (MIGRATIONS / f"{stem}_rollback.sql").read_text(encoding="utf-8")
+        self.column, self.constraint = column, constraint
+        self.allowed, self.refused, self.broken = allowed, refused, broken
+        self.other_rule, self.default, self.definition = other_rule, default, definition
+
+
+RULES = {
+    "status (W-52)": Rule(
+        "w52_sources_status_check", "status", "sources_status_allowed",
+        allowed=("active", "paused", "deleted", "pending_validation"),
+        refused=("Deleted", "paused ", " active", "ACTIVE", "", "archived"),
+        broken=("Deleted", "paused ", None),
+        other_rule="CHECK (status IN ('active', 'paused'))",
+        default="pending_validation",
+        definition="CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, "
+                   "'deleted'::text, 'pending_validation'::text])))"),
+    "type (W-53)": Rule(
+        "w53_sources_type_check", "source_type", "sources_type_allowed",
+        allowed=("html", "rss", "api"),
+        refused=("json", "HTML", " html", "rss ", "", "xml", "browser"),
+        broken=("json", "HTML", None),
+        other_rule="CHECK (source_type IN ('html'))",
+        default="html",
+        definition="CHECK ((source_type = ANY (ARRAY['html'::text, 'rss'::text, "
+                   "'api'::text])))"),
+}
 
 
 @pytest.fixture
@@ -435,24 +463,37 @@ def test_an_edit_pauses_and_resumes(routes, start, to):
     assert _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))[0][0] == to
 
 
-# The migration -----------------------------------------------------------------------------
+# The migrations ----------------------------------------------------------------------------
 
-@pytest.fixture
-def migration(db):  # noqa: F811
-    """Each test starts without the rule and ends without it."""
-    _sql(ROLLBACK)
-    yield
-    _sql(ROLLBACK)
+def _undo_all():
+    for each in RULES.values():
+        _sql(each.rollback)
 
 
-def _state():
+@pytest.fixture(params=list(RULES), ids=list(RULES))
+def rule(request, db):  # noqa: F811
+    """Each test starts without either rule and ends without them."""
+    _undo_all()
+    yield RULES[request.param]
+    _undo_all()
+
+
+def _state(rule):
     constraint = _sql(
         "SELECT convalidated, pg_get_constraintdef(oid) FROM pg_constraint "
-        "WHERE conrelid = 'public.sources'::regclass AND conname = 'sources_status_allowed'")
+        "WHERE conrelid = 'public.sources'::regclass AND conname = %s", (rule.constraint,))
     nullable = _sql(
         "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'public' "
-        "AND table_name = 'sources' AND column_name = 'status'")[0][0]
+        "AND table_name = 'sources' AND column_name = %s", (rule.column,))[0][0]
     return (constraint[0] if constraint else None), nullable
+
+
+def _set(rule, source_id, value):
+    _sql(f"UPDATE sources SET {rule.column} = %s WHERE id = %s", (value, source_id))
+
+
+def _value(rule, source_id):
+    return _sql(f"SELECT {rule.column} FROM sources WHERE id = %s", (source_id,))[0][0]
 
 
 def _run_file(text):
@@ -466,77 +507,92 @@ def _run_file(text):
         conn.close()
 
 
-def test_without_the_migration_any_status_is_stored(migration):
+def test_without_the_migration_any_value_is_stored(rule):
     source = _add_source("Example")
-    _sql("UPDATE sources SET status = 'Deleted' WHERE id = %s", (source["id"],))
-    _sql("UPDATE sources SET status = NULL WHERE id = %s", (source["id"],))
-    assert _state() == (None, "YES")
+    _set(rule, source["id"], rule.broken[0])
+    _set(rule, source["id"], None)
+    assert _state(rule) == (None, "YES")
 
 
-def test_the_migration_allows_only_the_four_statuses_and_never_none(migration):
+def test_the_migration_allows_only_its_values_and_never_none(rule):
     source = _add_source("Example")
-    _run_file(MIGRATION)
-    assert _state() == ((True, DEFINITION), "NO")
-    for status in ALLOWED:
-        _sql("UPDATE sources SET status = %s WHERE id = %s", (status, source["id"]))
-    for status in ("Deleted", "paused ", " active", "ACTIVE", "", "archived"):
+    _run_file(rule.migration)
+    assert _state(rule) == ((True, rule.definition), "NO")
+    for value in rule.allowed:
+        _set(rule, source["id"], value)
+    for value in rule.refused:
         with pytest.raises(psycopg2.errors.CheckViolation):
-            _sql("UPDATE sources SET status = %s WHERE id = %s", (status, source["id"]))
+            _set(rule, source["id"], value)
     with pytest.raises(psycopg2.errors.NotNullViolation):
-        _sql("UPDATE sources SET status = NULL WHERE id = %s", (source["id"],))
+        _set(rule, source["id"], None)
     with pytest.raises(psycopg2.errors.CheckViolation):
-        _add_source("Other", status="Active")
-    # A row added without a status takes production's default, which the rule allows.
+        _sql(f"INSERT INTO sources (careers_url, {rule.column}) VALUES (%s, %s)",
+             ("https://other.example.org/jobs", rule.refused[0]))
+    # A row added without a value takes production's default, which the rule allows.
     _sql("INSERT INTO sources (careers_url) VALUES ('https://default.example.org/jobs')")
-    assert _sql("SELECT status FROM sources WHERE careers_url = "
-                "'https://default.example.org/jobs'")[0][0] == "pending_validation"
+    assert _sql(f"SELECT {rule.column} FROM sources WHERE careers_url = "
+                "'https://default.example.org/jobs'")[0][0] == rule.default
 
 
-def test_the_migration_runs_again_without_change(migration):
+def test_the_migration_runs_again_without_change(rule):
     _add_source("Example")
-    _run_file(MIGRATION)
-    _run_file(MIGRATION)
-    assert _state() == ((True, DEFINITION), "NO")
+    _run_file(rule.migration)
+    _run_file(rule.migration)
+    assert _state(rule) == ((True, rule.definition), "NO")
 
 
-@pytest.mark.parametrize("bad", ["Deleted", "paused ", None])
-def test_the_migration_stops_and_changes_nothing_when_a_row_breaks_the_rule(migration, bad):
+@pytest.mark.parametrize("which", [0, 1, 2], ids=["first", "second", "none"])
+def test_the_migration_stops_and_changes_nothing_when_a_row_breaks_the_rule(rule, which):
+    bad = rule.broken[which]
     source = _add_source("Example")
-    _sql("UPDATE sources SET status = %s WHERE id = %s", (bad, source["id"]))
+    _set(rule, source["id"], bad)
     with pytest.raises(psycopg2.errors.RaiseException, match="nothing was changed"):
-        _run_file(MIGRATION)
-    assert _state() == (None, "YES")
-    assert _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))[0][0] == bad
+        _run_file(rule.migration)
+    assert _state(rule) == (None, "YES")
+    assert _value(rule, source["id"]) == bad
 
 
-def test_the_migration_stops_when_the_name_has_another_rule(migration):
-    _sql("ALTER TABLE sources ADD CONSTRAINT sources_status_allowed "
-         "CHECK (status IN ('active', 'paused'))")
+def test_the_migration_stops_when_the_name_has_another_rule(rule):
+    _sql(f"ALTER TABLE sources ADD CONSTRAINT {rule.constraint} {rule.other_rule}")
     with pytest.raises(psycopg2.errors.RaiseException, match="another definition"):
-        _run_file(MIGRATION)
-    constraint, nullable = _state()
-    assert "pending_validation" not in constraint[1] and nullable == "YES"
+        _run_file(rule.migration)
+    constraint, nullable = _state(rule)
+    assert constraint[1] != rule.definition and nullable == "YES"
 
 
-def test_the_migration_stops_within_seconds_while_a_crawl_writes(migration):
+def test_the_migration_stops_within_seconds_while_a_crawl_writes(rule):
     source = _add_source("Example")
     writer = _held("UPDATE sources SET last_crawl_status = 'ok' WHERE id = %s", (source["id"],))
     try:
         started = time.monotonic()
         with pytest.raises(psycopg2.errors.LockNotAvailable):
-            _run_file(MIGRATION)
+            _run_file(rule.migration)
         assert time.monotonic() - started < 15
     finally:
         writer.rollback()
         writer.close()
-    assert _state() == (None, "YES")
+    assert _state(rule) == (None, "YES")
 
 
-def test_the_rollback_undoes_the_migration_and_runs_again(migration):
+def test_the_rollback_undoes_the_migration_and_runs_again(rule):
     _add_source("Example")
-    _run_file(MIGRATION)
-    _run_file(ROLLBACK)
-    _run_file(ROLLBACK)
-    assert _state() == (None, "YES")
-    _run_file(MIGRATION)
-    assert _state() == ((True, DEFINITION), "NO")
+    _run_file(rule.migration)
+    _run_file(rule.rollback)
+    _run_file(rule.rollback)
+    assert _state(rule) == (None, "YES")
+    _run_file(rule.migration)
+    assert _state(rule) == ((True, rule.definition), "NO")
+
+
+@pytest.mark.parametrize("order", [["status (W-52)", "type (W-53)"],
+                                   ["type (W-53)", "status (W-52)"]], ids=["52-53", "53-52"])
+def test_the_two_migrations_apply_in_either_order(db, order):  # noqa: F811
+    _undo_all()
+    try:
+        _add_source("Example")
+        for name in order:
+            _run_file(RULES[name].migration)
+        for each in RULES.values():
+            assert _state(each) == ((True, each.definition), "NO")
+    finally:
+        _undo_all()
