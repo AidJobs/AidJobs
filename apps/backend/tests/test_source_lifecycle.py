@@ -8,6 +8,7 @@ network. tests/test_source_lifecycle_db.py runs the same rules against PostgreSQ
 import asyncio
 
 import psycopg2
+import psycopg2.errors
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -23,8 +24,9 @@ WRITES = ("UPDATE", "DELETE", "INSERT")
 class Recorder:
     """A connection and cursor in one. `answers` maps a SQL fragment to the rows it returns."""
 
-    def __init__(self, answers):
+    def __init__(self, answers, fail_on=None):
         self.answers = answers
+        self.fail_on = fail_on or {}
         self.log = []
         self.last = ""
         self.rowcount = 0
@@ -41,6 +43,9 @@ class Recorder:
     def execute(self, sql, params=None):
         self.last = " ".join(sql.split())
         self.log.append(self.last)
+        for fragment, error in self.fail_on.items():
+            if fragment in self.last:
+                raise error
 
     def _rows(self):
         for fragment, rows in self.answers.items():
@@ -72,8 +77,8 @@ def _writes(log):
 @pytest.fixture
 def database(monkeypatch):
     """Point the sources routes at a Recorder answering `answers`; returns its statement log."""
-    def configure(answers=None):
-        recorder = Recorder(answers or {})
+    def configure(answers=None, fail_on=None):
+        recorder = Recorder(answers or {}, fail_on)
         monkeypatch.setattr(sources.db_config, "get_connection_params", lambda: {"host": "x"})
         monkeypatch.setattr(psycopg2, "connect", lambda *a, **k: recorder)
         return recorder.log
@@ -186,9 +191,19 @@ def test_a_source_delete_locks_the_source_before_hiding_its_jobs(database):
                     "RETURNING id::text": [{"id": SID}]})
     response = _sources_app().delete(f"/api/admin/sources/{SID}")
     assert response.status_code == 200
-    assert log[0] == "SELECT id::text, org_name FROM sources WHERE id::text = %s FOR UPDATE"
+    assert log[0] == "SET LOCAL lock_timeout = %s"
+    assert log[1] == "SELECT id::text, org_name FROM sources WHERE id::text = %s FOR UPDATE"
     assert [s.split(" SET")[0] for s in _writes(log)] == [
         "UPDATE sources", "UPDATE jobs", "COMMIT"]
+
+
+def test_a_source_delete_that_waits_too_long_for_a_save_deletes_nothing(database):
+    log = database(fail_on={"FOR UPDATE": psycopg2.errors.LockNotAvailable("lock timeout")})
+    response = _sources_app().delete(f"/api/admin/sources/{SID}")
+    assert (response.status_code, response.json()) == (409, {
+        "detail": "A crawl is saving jobs for this source. Nothing was deleted; try again in a "
+                  "minute."})
+    assert _writes(log) == [] and log[-1] == "ROLLBACK"
 
 
 # A crawl by hand ---------------------------------------------------------------------------

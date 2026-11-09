@@ -422,6 +422,9 @@ class CrawlerOrchestrator:
     # Crawl runs. Rows are always locked in one order: run rows (crawl_logs), then the lock
     # row (crawl_locks), then the source row, then job rows. Acquire is the one exception:
     # its new run row cannot be contended, because no other transaction knows it exists.
+    # A job save first holds the source row FOR KEY SHARE (W-52), which conflicts only with a
+    # source delete's FOR UPDATE, never with the FOR NO KEY UPDATE taken here, so that earlier
+    # lock adds no deadlock (contracts/run_ownership.py).
     # Ownership of a run is checked on its crawl_logs row, never assumed from the lock.
     # ------------------------------------------------------------------
 
@@ -660,7 +663,9 @@ class CrawlerOrchestrator:
         inserted = counts.get("inserted", 0) or 0
         updated = counts.get("updated", 0) or 0
 
-        if outcome == "interrupted" and last_status != "interrupted":
+        # A deleted source is not crawled again (W-52): its last run is recorded, but not as a
+        # failure, so a source added again keeps the counts it had when it was deleted.
+        if (outcome == "interrupted" and last_status != "interrupted") or status == "deleted":
             cur.execute(
                 """
                 UPDATE sources SET last_crawl_status = %s, last_crawl_message = %s,

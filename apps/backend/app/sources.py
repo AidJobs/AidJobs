@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 try:
     import psycopg2
+    from psycopg2 import errors as psycopg2_errors
     from psycopg2.extras import RealDictCursor
 except ImportError:
     psycopg2 = None
@@ -39,6 +40,9 @@ SOURCE_CHECK_TOTAL_SECONDS = 20.0
 EDITABLE_STATUSES = ("active", "paused")
 DELETED_SOURCE = "This source is deleted. Add it again with the same careers URL to restore it."
 RUN_IN_PROGRESS = "A crawl of this source is still running. Try again after it ends."
+SOURCE_BUSY = "A crawl is saving jobs for this source. Nothing was deleted; try again in a minute."
+# How long a source delete waits for a crawl's job save in progress before answering SOURCE_BUSY.
+DELETE_LOCK_TIMEOUT = "10s"
 
 
 def live_jobs_message(live: int) -> str:
@@ -534,6 +538,7 @@ def delete_source(
         
         # FOR UPDATE waits for a crawl's job save in progress (it holds this row FOR KEY SHARE),
         # so the job update below sees its jobs; a later save then refuses the deleted source.
+        cursor.execute("SET LOCAL lock_timeout = %s", (DELETE_LOCK_TIMEOUT,))
         cursor.execute("""
             SELECT id::text, org_name
             FROM sources
@@ -580,6 +585,10 @@ def delete_source(
         
     except HTTPException:
         raise
+    except psycopg2_errors.LockNotAvailable:
+        conn.rollback()
+        logger.warning("[sources] Delete of source %r waited too long for a job save", source_id)
+        raise HTTPException(status_code=409, detail=SOURCE_BUSY)
     except Exception as e:
         if conn:
             conn.rollback()

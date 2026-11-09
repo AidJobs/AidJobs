@@ -274,9 +274,9 @@ def test_a_restore_under_a_source_without_a_status_goes_through(routes):
 
 # A crawl and a source delete ---------------------------------------------------------------
 
-def test_a_crawl_saves_nothing_once_its_source_is_deleted(routes):
+def test_a_crawl_saves_nothing_once_its_source_is_deleted_and_is_not_counted(routes):
     sources, _jm = routes
-    source = _add_source("Example")
+    source = _add_source("Example", failures=4)
     orch = _orch()
     run_id, started = orch._begin(source["id"], False)
     assert started
@@ -286,6 +286,73 @@ def test_a_crawl_saves_nothing_once_its_source_is_deleted(routes):
     assert _sql("SELECT count(*) FROM jobs WHERE source_id = %s", (source["id"],))[0][0] == 0
     failed = {"status": "failed", "message": SOURCE_DELETED_MESSAGE, "counts": {}}
     assert orch._finish(source["id"], run_id, failed, mode="normal", health=None) is True
+    assert _sql("SELECT status, consecutive_failures, last_crawl_status FROM sources "
+                "WHERE id = %s", (source["id"],))[0] == ("deleted", 4, "failed")
+    assert _sql("SELECT status FROM crawl_logs WHERE id = %s", (run_id,))[0][0] == "failed"
+
+
+def test_a_source_delete_gives_up_on_a_long_save_and_changes_nothing(routes, monkeypatch):
+    sources, _jm = routes
+    monkeypatch.setattr(sources, "DELETE_LOCK_TIMEOUT", "1s")
+    source = _add_source("Example")
+    live = _add_job(source["id"])
+    before = [_row("sources", source["id"]), _row("jobs", live)]
+    holder = psycopg2.connect(TEST_URL)
+    holder.cursor().execute(SOURCE_LIVE_SQL, (source["id"],))
+    try:
+        delete, outcome = _in_thread(
+            lambda: sources.delete_source(None, source["id"], admin="test-admin"))
+        delete.join(10)
+        assert not delete.is_alive(), "the source delete did not give up on the save"
+    finally:
+        holder.rollback()
+        holder.close()
+    assert isinstance(outcome.get("error"), HTTPException), outcome
+    assert outcome["error"].status_code == 409
+    assert [_row("sources", source["id"]), _row("jobs", live)] == before
+
+
+def test_a_permanent_delete_goes_ahead_while_another_source_is_crawled(routes):
+    sources, _jm = routes
+    other = _add_source("Other")
+    _sql("INSERT INTO crawl_logs (source_id, status) VALUES (%s, 'running')", (other["id"],))
+    source = _add_source("Gone", status="deleted")
+    _add_job(source["id"], deleted=True)
+    answer = sources.permanently_delete_source(None, source["id"], admin="test-admin")
+    assert answer["status"] == "ok" and _row("sources", source["id"]) is None
+
+
+def test_a_finish_is_not_held_back_by_a_waiting_save_and_a_queued_source_delete(routes):
+    """The finish holds the run row; the save holds the source FOR KEY SHARE and waits for the
+    run row; the source delete queues FOR UPDATE behind the save. The finish's FOR NO KEY UPDATE
+    on the source must still be granted at once, or the three would deadlock."""
+    from contracts.run_ownership import OwnershipLost
+
+    sources, _jm = routes
+    source = _add_source("Example")
+    run_id, _started = _orch()._begin(source["id"], False)
+    finisher = _held("UPDATE crawl_logs SET message = 'finishing' WHERE id = %s", (run_id,))
+    save, saved = _in_thread(lambda: _crawler().save_jobs(
+        [_candidate(1)], source["id"], "Example", run_token=run_id))
+    delete = None
+    try:
+        assert _waits(save), "the save did not wait for the run row"
+        delete, deleted = _in_thread(
+            lambda: sources.delete_source(None, source["id"], admin="test-admin"))
+        assert _waits(delete), "the source delete did not wait for the save"
+        cur = finisher.cursor()
+        cur.execute("SET LOCAL lock_timeout = '3s'")
+        cur.execute("SELECT 1 FROM sources WHERE id = %s FOR NO KEY UPDATE", (source["id"],))
+        cur.execute("UPDATE crawl_logs SET status = 'ok' WHERE id = %s", (run_id,))
+        finisher.commit()
+    finally:
+        finisher.close()
+    save.join(30)
+    delete.join(30)
+    assert isinstance(saved.get("error"), OwnershipLost), saved
+    assert "error" not in deleted, deleted.get("error")
+    assert _sql("SELECT count(*) FROM jobs WHERE source_id = %s AND deleted_at IS NULL",
+                (source["id"],))[0][0] == 0
     assert _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))[0][0] == "deleted"
 
 
