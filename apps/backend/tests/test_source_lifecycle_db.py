@@ -103,9 +103,20 @@ def _in_thread(call):
     return thread, outcome
 
 
-def _waits(thread, seconds=1.5):
-    thread.join(seconds)
-    return thread.is_alive()
+def _waits(thread, query_text, seconds=5.0):
+    """True once the thread's statement containing `query_text` is waiting on a lock in
+    PostgreSQL, and the thread has not finished; False when it finishes or never waits."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline and thread.is_alive():
+        waiting = _sql(
+            "SELECT count(*) FROM pg_stat_activity "
+            "WHERE wait_event_type = 'Lock' AND position(%s in query) > 0",
+            (query_text,),
+        )[0][0]
+        if waiting:
+            return thread.is_alive()
+        time.sleep(0.05)
+    return False
 
 
 # The routes --------------------------------------------------------------------------------
@@ -161,7 +172,7 @@ def test_a_restore_waits_for_a_permanent_delete_and_brings_nothing_back(routes):
     holder = _held("SELECT 1 FROM sources WHERE id = %s FOR UPDATE", (source["id"],))
     thread, outcome = _in_thread(lambda: _restore(jm, [hidden]))
     try:
-        assert _waits(thread), "the restore did not wait for the lock on its source"
+        assert _waits(thread, "FOR SHARE OF s"), "the restore did not wait for its source"
         holder.cursor().execute("DELETE FROM sources WHERE id = %s", (source["id"],))
         holder.commit()
     finally:
@@ -179,7 +190,7 @@ def test_a_restore_waits_for_a_source_delete_and_brings_nothing_back(routes):
     holder = _held("UPDATE sources SET status = 'deleted' WHERE id = %s", (source["id"],))
     thread, outcome = _in_thread(lambda: _restore(jm, [hidden]))
     try:
-        assert _waits(thread), "the restore did not wait for the source being deleted"
+        assert _waits(thread, "FOR SHARE OF s"), "the restore did not wait for the delete"
         holder.commit()
     finally:
         holder.close()
@@ -226,7 +237,7 @@ def test_a_permanent_delete_waits_for_a_new_job_of_its_source_and_then_refuses(r
     thread, outcome = _in_thread(
         lambda: sources.permanently_delete_source(None, source["id"], admin="test-admin"))
     try:
-        assert _waits(thread), "the permanent delete did not wait for the new job"
+        assert _waits(thread, "id::text, status"), "the delete did not wait for the new job"
         holder.commit()
     finally:
         holder.close()
@@ -336,13 +347,14 @@ def test_a_finish_is_not_held_back_by_a_waiting_save_and_a_queued_source_delete(
         [_candidate(1)], source["id"], "Example", run_token=run_id))
     delete = None
     try:
-        assert _waits(save), "the save did not wait for the run row"
+        assert _waits(save, "FROM crawl_logs"), "the save did not wait for the run row"
         delete, deleted = _in_thread(
             lambda: sources.delete_source(None, source["id"], admin="test-admin"))
-        assert _waits(delete), "the source delete did not wait for the save"
+        assert _waits(delete, "id::text, org_name"), "the source delete did not wait for the save"
         cur = finisher.cursor()
         cur.execute("SET LOCAL lock_timeout = '3s'")
-        cur.execute("SELECT 1 FROM sources WHERE id = %s FOR NO KEY UPDATE", (source["id"],))
+        _orch()._update_source(cur, source["id"], outcome="success", run_status="ok",
+                               message="Found 1 jobs", counts={}, health=None)
         cur.execute("UPDATE crawl_logs SET status = 'ok' WHERE id = %s", (run_id,))
         finisher.commit()
     finally:
@@ -365,7 +377,7 @@ def test_a_save_waits_for_a_source_delete_in_progress_and_saves_nothing(routes):
     thread, outcome = _in_thread(
         lambda: _crawler().save_jobs([_candidate(1)], source["id"], "Example", run_token=run_id))
     try:
-        assert _waits(thread), "the save did not wait for the source delete"
+        assert _waits(thread, "FOR KEY SHARE"), "the save did not wait for the source delete"
         holder.commit()
     finally:
         holder.close()
@@ -386,7 +398,7 @@ def test_a_source_delete_waits_for_a_save_in_progress_and_hides_its_jobs(routes)
     thread, outcome = _in_thread(
         lambda: sources.delete_source(None, source["id"], admin="test-admin"))
     try:
-        assert _waits(thread), "the source delete did not wait for the save in progress"
+        assert _waits(thread, "id::text, org_name"), "the delete did not wait for the save"
         holder.commit()
     finally:
         holder.close()
@@ -404,10 +416,8 @@ def test_a_save_lock_does_not_hold_back_a_finish_or_a_takeover(routes):
         try:
             with conn.cursor() as cur:
                 cur.execute("SET lock_timeout = '1s'")
-                cur.execute("SELECT 1 FROM sources WHERE id = %s FOR NO KEY UPDATE",
-                            (source["id"],))
-                cur.execute("UPDATE sources SET last_crawl_status = 'ok' WHERE id = %s",
-                            (source["id"],))
+                _orch()._update_source(cur, source["id"], outcome="fail", run_status="fail",
+                                       message="Timed out", counts={}, health=None)
         finally:
             conn.rollback()
             conn.close()

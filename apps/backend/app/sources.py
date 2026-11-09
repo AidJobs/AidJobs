@@ -40,8 +40,10 @@ SOURCE_CHECK_TOTAL_SECONDS = 20.0
 EDITABLE_STATUSES = ("active", "paused")
 DELETED_SOURCE = "This source is deleted. Add it again with the same careers URL to restore it."
 RUN_IN_PROGRESS = "A crawl of this source is still running. Try again after it ends."
-SOURCE_BUSY = "A crawl is saving jobs for this source. Nothing was deleted; try again in a minute."
-# How long a source delete waits for a crawl's job save in progress before answering SOURCE_BUSY.
+SOURCE_BUSY = ("This source or its jobs are being changed (a crawl may be saving jobs). "
+               "Nothing was deleted; try again in a minute.")
+# How long a source delete waits for any lock it needs, such as a crawl's job save in progress,
+# before answering SOURCE_BUSY.
 DELETE_LOCK_TIMEOUT = "10s"
 
 
@@ -587,7 +589,7 @@ def delete_source(
         raise
     except psycopg2_errors.LockNotAvailable:
         conn.rollback()
-        logger.warning("[sources] Delete of source %r waited too long for a job save", source_id)
+        logger.warning("[sources] Delete of source %r waited too long for a lock", source_id)
         raise HTTPException(status_code=409, detail=SOURCE_BUSY)
     except Exception as e:
         if conn:

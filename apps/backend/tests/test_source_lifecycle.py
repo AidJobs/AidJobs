@@ -201,8 +201,8 @@ def test_a_source_delete_that_waits_too_long_for_a_save_deletes_nothing(database
     log = database(fail_on={"FOR UPDATE": psycopg2.errors.LockNotAvailable("lock timeout")})
     response = _sources_app().delete(f"/api/admin/sources/{SID}")
     assert (response.status_code, response.json()) == (409, {
-        "detail": "A crawl is saving jobs for this source. Nothing was deleted; try again in a "
-                  "minute."})
+        "detail": "This source or its jobs are being changed (a crawl may be saving jobs). "
+                  "Nothing was deleted; try again in a minute."})
     assert _writes(log) == [] and log[-1] == "ROLLBACK"
 
 
