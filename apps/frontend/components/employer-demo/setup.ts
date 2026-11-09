@@ -117,6 +117,7 @@ export const SDG_NAMES: Record<number, string> = {
 
 /** Words in the job title, first, then the role's sector: one main goal and at most two more. */
 const SDG_WORDS: Array<[RegExp, number[]]> = [
+  [/\besg\b|\be&s\b|environmental and social|safeguards (specialist|officer|adviser|advisor)|sustainability/i, [12, 13, 16]],
   [/\bwash\b|water|sanitation|hygiene/i, [6, 3]],
   [/nutrition|food security|\bfood\b|hunger/i, [2, 3]],
   [/health|medical|nurse|doctor|midwi|epidemiolog|\bhiv\b|malaria/i, [3]],
@@ -135,6 +136,7 @@ const SDG_SECTOR: Record<string, number[]> = {
   Education: [4],
   'Climate and environment': [13],
   'Livelihoods and food security': [2, 1, 8],
+  'ESG and environmental and social safeguards': [12, 13, 16],
 };
 
 /** The goals the job serves, read by rules; none when no goal is clear (a finance or HR post, for example). */

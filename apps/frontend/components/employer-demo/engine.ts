@@ -53,6 +53,7 @@ export const COMMITMENTS: Array<{ key: string; label: string; hint: string }> = 
   { key: 'dataprot', label: 'Data protection', hint: "How applicants' data is handled" },
   { key: 'righttowork', label: 'Right to work', hint: 'Work authorisation for the country' },
   { key: 'unconsiderations', label: 'UN considerations', hint: 'For UN entities' },
+  { key: 'esr', label: 'Environmental and social responsibility', hint: 'How the organisation manages its environmental and social impact (ESG)' },
 ];
 
 const DOC_ORDER = SECTIONS.map((s) => s.key);
@@ -365,6 +366,26 @@ export const ROLE_FAMILIES: RoleFamily[] = [
     learning: ['NGO communications', 'Ethical storytelling'],
   },
   {
+    key: 'esg',
+    title: 'ESG and Safeguards Specialist',
+    words: ['esg', 'e&s', 'environmental and social', 'safeguards specialist', 'safeguards officer', 'esia', 'esms', 'sustainability'],
+    sector: 'ESG and environmental and social safeguards',
+    sdg: 12,
+    resp: [
+      'Apply the environmental and social standards the funding requires (such as the World Bank ESF or the IFC Performance Standards) across the portfolio',
+      'Screen projects and partners for environmental and social risk, and agree the actions that manage it',
+      'Prepare and review environmental and social impact assessments and management plans',
+      'Set up grievance mechanisms and stakeholder engagement with affected communities',
+      'Monitor compliance in the field and report to management and funders',
+    ],
+    more: ['Train staff and partners on the standards', 'Track ESG indicators and contribute to sustainability reporting'],
+    essential: ['Degree in environmental science, social science, or a related field', 'Experience applying environmental and social safeguards or ESG frameworks'],
+    desirable: ['Knowledge of the World Bank ESF, the IFC Performance Standards, or equivalent', 'Experience with development finance institutions'],
+    comp: ['Balances risk and delivery', 'Explains standards clearly', 'Works well with communities and authorities'],
+    deliverables: ['Environmental and social risk screening', 'Environmental and social management plan', 'Monitoring report with recommendations'],
+    learning: ['How environmental and social standards are applied', 'Risk screening in the field'],
+  },
+  {
     key: 'climate',
     title: 'Climate Resilience Adviser',
     words: ['climate', 'environment', 'resilience', 'adaptation'],
@@ -571,7 +592,9 @@ export function detectRole(text: string): { role: RoleFamily | null; engagement:
   if (/\bconsult(ant|ancy)\b|terms of reference|\btor\b/.test(t)) engagement = 'consultancy';
   else if (/\bintern(ship)?\b|\bfellow(ship)?\b/.test(t)) engagement = 'internship';
   else if (/\bvolunteer\b/.test(t)) engagement = 'volunteer';
-  const role = ROLE_FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => t.includes(w))) ?? ROLE_FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => t.includes(w))) ?? null;
+  // ESG's phrases are the most specific ("environmental and social safeguards"), so they are read before child protection's "safeguard".
+  const esg = ROLE_FAMILIES.find((f) => f.key === 'esg' && f.words.some((w) => t.includes(w)));
+  const role = esg ?? ROLE_FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => t.includes(w))) ?? ROLE_FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => t.includes(w))) ?? null;
   return { role, engagement };
 }
 
@@ -827,6 +850,8 @@ export function starterCommitment(key: string, org: Org, f: Facts): string {
       return 'If you need any adjustment at any stage of the process, tell us and we will make it.';
     case 'dataprot':
       return 'We use your application only to assess it for this role and delete it when it is no longer needed.';
+    case 'esr':
+      return `${name} manages the environmental and social impact of its work: it reduces its footprint, respects the rights of the communities it works with, and expects staff and partners to do the same.`;
     case 'righttowork':
       return `Applicants must have the right to work in ${f.country || 'the country of the post'}.`;
     case 'unconsiderations':

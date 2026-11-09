@@ -11,7 +11,7 @@ import BasePrompt from './BasePrompt';
 import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
 
-const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response'];
+const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response', 'ESG and environmental and social safeguards'];
 const VOICES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
 const ORG_TYPES: Array<{ key: OrgType; label: string }> = [
   { key: 'ingo', label: 'International NGO' },

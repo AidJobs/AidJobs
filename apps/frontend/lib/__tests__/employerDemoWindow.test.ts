@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { changeWithUndo, getState, resetDemo, update } from '../../components/employer-demo/store';
 import { applyTemplate, chatNote, chooseStyle, editSection, formatOf, sendChat, setFacts, setPart, setSdgs, settleAsk, startJob } from '../../components/employer-demo/actions';
 import { currentPart, lineFit, onLine, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
+import { COMMITMENTS, commitmentText } from '../../components/employer-demo/engine';
 import { describeStyle, inferSdgs, proposedStyle, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -203,5 +204,16 @@ describe('the window, revised: "+N" keeps every part within reach', () => {
     expect(shown).toHaveLength(4);
     expect(shown.at(-1)?.key).toBe(last);
     expect(shown.length + more.length).toBe(parts.length);
+  });
+});
+
+describe("ESG: a sector and role family, and a fixed text (the user's decision, 9 November 2026)", () => {
+  it('reads an ESG or safeguards role, with its sector and goals, and offers the environmental and social responsibility text', () => {
+    const id = startJob('We are hiring an Environmental and Social Safeguards Specialist in Nairobi');
+    expect(job(id).family).toBe('esg');
+    expect(sdgsOf(job(id))).toEqual([12, 13, 16]);
+    expect(job(id).sections.find((x) => x.key === 'responsibilities')?.lines.join(' ')).toContain('environmental and social');
+    expect(COMMITMENTS.some((c) => c.key === 'esr')).toBe(true);
+    expect(commitmentText('esr', getState().org, job(id).facts).text).toContain('environmental and social impact');
   });
 });
