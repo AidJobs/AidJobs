@@ -120,14 +120,30 @@ def test_dates_amounts_and_references_are_kept(text):
         "Write to Kenya +254 722 123 456 today.",
         "Write to Mobile: 0722 123 456 today.",
         "Write to Tel 734 6001 today.",
+        "Write to Contact 734 6001 today.",
+        "Write to 01.45.68.10.00 today.",
+        "Write to +33 (0)1.45.68.10.00 today.",
+        "Write to 022.730.21.11 today.",
+        "Write to +41 22 730.21.11 today.",
+        "Write to Fax: +41 (22) 734-60-01 today.",
+        "Write to +44-20-7946-0958 today.",
+        "Write to +254-20-123-4567 today.",
+        "Write to +91-11-2345-6789 today.",
+        "Write to 0044 20 7946 0958 today.",
     ],
 )
 def test_more_contact_forms_are_removed(text):
     cleaned = clean_description(text)
     assert cleaned.startswith("Write to") and cleaned.endswith("today.")
     assert CONTACT_REMOVED in cleaned
-    for fragment in ("@", "oxfam", "555", "734", "7946", "0958", "722"):
+    for fragment in ("@", "oxfam", "555", "734", "7946", "0958", "722", "68.10", "730",
+                     "2345", "123-4567"):
         assert fragment not in cleaned
+
+
+def test_a_long_local_part_loses_its_address():
+    cleaned = clean_description("Write to " + "x" * 70 + "@example.org today.")
+    assert "@" not in cleaned and "example" not in cleaned
 
 
 def test_contacts_split_by_inline_tags_are_removed():
@@ -151,6 +167,12 @@ def test_an_extension_goes_with_its_number():
         "Grade P-3, 2 years, 100 000 people",
         "Fax: 12 34 56",
         "Account +1 2345 6789 1123 4567 89",
+        "Salary USD 100 000 - 120 000 per annum",
+        "Budget of USD 250 000 2026-2027",
+        "Office hours between 08:00 and 17:00 (0800 1700).",
+        "Contact: 01.03.2026 (12 months)",
+        "Call: 2026-2027 programme",
+        "Closing 01-12-2026 17:00",
     ],
 )
 def test_dates_amounts_and_short_numbers_near_phone_words_are_kept(text):
@@ -211,6 +233,7 @@ def test_short_text_loses_its_contacts():
     assert clean_locations(["Nairobi, call +254 722 123 456"]) == [
         f"Nairobi, call {CONTACT_REMOVED}"
     ]
+    assert clean_short_text("USD 100 000 - 120 000") == "USD 100 000 - 120 000"
 
 
 def test_locations_keep_their_order_once_each():
@@ -628,6 +651,13 @@ def test_every_short_field_loses_its_contacts_at_the_save_step(monkeypatch):
         assert "@" not in candidate[name] and "722" not in candidate[name], name
         assert CONTACT_REMOVED in candidate[name], name
     assert candidate["locations"] == [f"Nairobi {CONTACT_REMOVED} {CONTACT_REMOVED}"]
+
+
+def test_the_listing_location_sent_as_locations_is_cleaned(monkeypatch):
+    job = {"title": "Officer", "apply_url": "https://example.org/jobs/5", "admitted": True,
+           "location_raw": "Nairobi\x00 hr@ngo.org"}
+    [(candidate, _)] = _save(monkeypatch, [job])
+    assert candidate["locations"] == [f"Nairobi {CONTACT_REMOVED}"]
 
 
 def test_blank_or_future_values_are_not_sent(monkeypatch):

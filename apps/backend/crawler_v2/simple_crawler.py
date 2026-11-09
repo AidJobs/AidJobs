@@ -1622,7 +1622,7 @@ class SimpleCrawler:
                             candidate["posted_on"] = posted_on
                         locations = clean_locations(job.get("locations"))
                         if locations is None and location:
-                            locations = [location]
+                            locations = clean_locations([location])
                         if locations:
                             candidate["locations"] = locations
                         for field_name, published in (
