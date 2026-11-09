@@ -27,6 +27,7 @@ class Recorder:
         self.answers = answers
         self.log = []
         self.last = ""
+        self.rowcount = 0
 
     def cursor(self, cursor_factory=None):
         return self
@@ -138,9 +139,19 @@ def test_an_edit_of_a_missing_source_is_still_404(database):
 
 # A permanent delete ------------------------------------------------------------------------
 
-def _deleted_source(live):
+def _deleted_source(live, running=False):
     return {"FOR UPDATE": [{"id": SID, "status": "deleted"}],
+            "status = 'running'": [{"?column?": 1}] if running else [],
             "deleted_at IS NULL": [{"live": live}]}
+
+
+def test_a_permanent_delete_while_a_run_is_running_deletes_nothing(database):
+    log = database(_deleted_source(0, running=True))
+    response = _sources_app().delete(f"/api/admin/sources/{SID}/permanent")
+    assert (response.status_code, response.json()) == (
+        409, {"detail": "A crawl of this source is still running. Try again after it ends."})
+    assert _writes(log) == []
+    assert log[-1] == "ROLLBACK"
 
 
 @pytest.mark.parametrize("live, detail", [
@@ -162,10 +173,22 @@ def test_a_permanent_delete_locks_the_source_then_counts_then_deletes(database):
     response = _sources_app().delete(f"/api/admin/sources/{SID}/permanent")
     assert response.status_code == 200
     assert log[0].startswith("SELECT id::text, status FROM sources WHERE id::text = %s FOR UPDATE")
-    assert log[1] == ("SELECT COUNT(*) AS live FROM jobs WHERE source_id::text = %s "
+    assert log[1] == ("SELECT 1 FROM crawl_logs WHERE source_id::text = %s "
+                      "AND status = 'running' LIMIT 1")
+    assert log[2] == ("SELECT COUNT(*) AS live FROM jobs WHERE source_id::text = %s "
                       "AND deleted_at IS NULL")
     assert [s.split(" WHERE")[0] for s in _writes(log)] == [
         "DELETE FROM crawl_logs", "DELETE FROM crawl_locks", "DELETE FROM sources", "COMMIT"]
+
+
+def test_a_source_delete_locks_the_source_before_hiding_its_jobs(database):
+    log = database({"FROM sources": [{"id": SID, "org_name": "Example"}],
+                    "RETURNING id::text": [{"id": SID}]})
+    response = _sources_app().delete(f"/api/admin/sources/{SID}")
+    assert response.status_code == 200
+    assert log[0] == "SELECT id::text, org_name FROM sources WHERE id::text = %s FOR UPDATE"
+    assert [s.split(" SET")[0] for s in _writes(log)] == [
+        "UPDATE sources", "UPDATE jobs", "COMMIT"]
 
 
 # A crawl by hand ---------------------------------------------------------------------------
@@ -210,11 +233,12 @@ def test_any_other_source_may_be_crawled_by_hand(monkeypatch, status):
 
 # A job restore -----------------------------------------------------------------------------
 
-def _restore(monkeypatch, restored, still_deleted):
+def _restore(monkeypatch, restored, still_deleted, removed=0):
     from app import job_management as jm
 
     recorder = Recorder({"RETURNING id::text": [{"id": i} for i in restored],
-                         "SELECT COUNT(*) as count": [{"count": still_deleted}]})
+                         "SELECT COUNT(*) as count": [{"count": still_deleted,
+                                                       "removed": removed}]})
     monkeypatch.setattr(jm.db_config, "get_connection_params", lambda: {"host": "x"})
     monkeypatch.setattr(jm.psycopg2, "connect", lambda *a, **k: recorder)
     outcome = asyncio.run(jm.restore_jobs(jm.RestoreRequest(job_ids=["job-1", "job-2"]),
@@ -231,15 +255,18 @@ def test_a_restore_brings_back_only_jobs_of_a_source_that_is_not_deleted(monkeyp
             ) in update
 
 
-@pytest.mark.parametrize("restored, still_deleted, message", [
-    (["job-1"], 1, "Restored 1 job. 1 job was not restored: the source is deleted or gone. "
-                   "Add the source again, then restore its jobs."),
-    ([], 2, "Restored 0 jobs. 2 jobs were not restored: the source is deleted or gone. "
-            "Add the source again, then restore its jobs."),
+@pytest.mark.parametrize("restored, still_deleted, removed, message", [
+    (["job-1"], 1, 0, "Restored 1 job. 1 job not restored: the source is deleted. "
+                      "Add the source again, then restore its jobs."),
+    ([], 2, 2, "Restored 0 jobs. 2 jobs cannot be restored: the source was deleted "
+               "permanently."),
+    (["job-1"], 3, 1, "Restored 1 job. 2 jobs not restored: the source is deleted. Add the "
+                      "source again, then restore its jobs. 1 job cannot be restored: the "
+                      "source was deleted permanently."),
 ])
 def test_a_restore_says_how_many_jobs_it_left_deleted(monkeypatch, restored, still_deleted,
-                                                      message):
-    data, _log = _restore(monkeypatch, restored, still_deleted)
+                                                      removed, message):
+    data, _log = _restore(monkeypatch, restored, still_deleted, removed)
     assert data["restored_count"] == len(restored)
     assert data["not_restored_count"] == still_deleted
     assert data["message"] == message
@@ -250,3 +277,62 @@ def test_a_full_restore_keeps_its_message(monkeypatch):
     assert data["not_restored_count"] == 0
     assert data["message"] == "Successfully restored 2 jobs"
     assert log[-1] == "COMMIT"
+
+
+# A crawl's job save ------------------------------------------------------------------------
+
+class _SaveCursor:
+    def __init__(self, source_row, run_row=(1,)):
+        self.rows = {"FROM sources": source_row, "FROM crawl_logs": run_row}
+        self.log = []
+
+    def execute(self, sql, params=None):
+        self.log.append(" ".join(sql.split()))
+
+    def fetchone(self):
+        last = self.log[-1]
+        return next((row for key, row in self.rows.items() if key in last), None)
+
+
+@pytest.mark.parametrize("source_row", [("deleted",), None], ids=["deleted", "removed"])
+def test_a_save_refuses_a_deleted_or_removed_source_before_the_run_row(source_row):
+    from contracts.run_ownership import SOURCE_DELETED_MESSAGE, SourceDeleted, confirm_running
+
+    cursor = _SaveCursor(source_row)
+    with pytest.raises(SourceDeleted, match=SOURCE_DELETED_MESSAGE):
+        confirm_running(cursor, "run-1", SID)
+    assert not [s for s in cursor.log if "crawl_logs" in s]
+
+
+@pytest.mark.parametrize("status", ["active", "paused", "pending_validation"])
+def test_a_save_locks_its_source_with_key_share_then_its_run_row(status):
+    from contracts.run_ownership import confirm_running
+
+    cursor = _SaveCursor((status,))
+    confirm_running(cursor, "run-1", SID)
+    assert cursor.log[1] == "SELECT status FROM sources WHERE id = %s FOR KEY SHARE"
+    assert cursor.log[2] == ("SELECT 1 FROM crawl_logs WHERE id = %s AND source_id = %s "
+                             "AND status = 'running' FOR SHARE")
+
+
+def test_a_refused_save_is_still_lost_ownership_for_its_callers():
+    from contracts.run_ownership import OwnershipLost, SourceDeleted
+
+    assert issubclass(SourceDeleted, OwnershipLost)
+
+
+# The migration file ------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", ["w52_sources_status_check.sql",
+                                  "w52_sources_status_check_rollback.sql"])
+def test_each_migration_file_is_one_transaction_with_its_timeouts(name):
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[3] / "infra" / "migrations" / name).read_text(
+        encoding="utf-8")
+    statements = [line for line in text.splitlines() if line and not line.startswith("--")]
+    assert statements[0] == "BEGIN;"
+    assert statements[1:3] == ["SET LOCAL lock_timeout = '5s';",
+                               "SET LOCAL statement_timeout = '60s';"]
+    assert statements[-1] == "COMMIT;"
+    assert text.count("BEGIN;") == 1 and text.count("COMMIT;") == 1

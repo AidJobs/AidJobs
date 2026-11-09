@@ -702,7 +702,7 @@
  "restore": {
   "outcome": {
    "data": {
-    "message": "Restored 1 job. 2 jobs were not restored: the source is deleted or gone. Add the source again, then restore its jobs.",
+    "message": "Restored 1 job. 2 jobs not restored: the source is deleted. Add the source again, then restore its jobs.",
     "not_restored_count": 2,
     "restored_count": 1,
     "restored_ids": [
@@ -722,7 +722,7 @@
     ]
    ],
    [
-    "SELECT COUNT(*) as count FROM jobs WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL",
+    "SELECT COUNT(*) as count, COUNT(*) FILTER (WHERE source_id IS NULL) as removed FROM jobs WHERE id::text IN (%s,%s) AND deleted_at IS NOT NULL",
     [
      "job-1",
      "job-2"

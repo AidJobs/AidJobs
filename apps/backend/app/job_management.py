@@ -77,6 +77,10 @@ def check_job_selection(job_ids: Optional[List[str]], org_name: Optional[str] = 
         raise HTTPException(status_code=400, detail="Send org_name or source_id, not both")
 
 
+def _jobs_text(n: int) -> str:
+    return f"{n} job{'' if n == 1 else 's'}"
+
+
 def _diagnosis_failed(message: str) -> dict:
     """The diagnose routes' failure answer, in their usual shape; the caller logs the cause."""
     return {
@@ -744,20 +748,26 @@ async def restore_jobs(
         restored_ids = [row['id'] for row in cursor.fetchall()]
         restored_count = len(restored_ids)
         
+        # Still deleted: under a deleted source, or with none (its source was deleted permanently).
         cursor.execute(f"""
-            SELECT COUNT(*) as count FROM jobs
+            SELECT COUNT(*) as count, COUNT(*) FILTER (WHERE source_id IS NULL) as removed
+            FROM jobs
             WHERE id::text IN ({placeholders}) AND deleted_at IS NOT NULL
         """, request.job_ids)
-        not_restored = cursor.fetchone()['count']
+        left = cursor.fetchone()
+        not_restored, removed = left['count'], left['removed']
         
         conn.commit()
         
         message = f"Successfully restored {restored_count} jobs"
         if not_restored:
-            restored_text = f"{restored_count} job{'' if restored_count == 1 else 's'}"
-            left_text = f"{not_restored} job{' was' if not_restored == 1 else 's were'}"
-            message = (f"Restored {restored_text}. {left_text} not restored: the source is deleted "
-                       "or gone. Add the source again, then restore its jobs.")
+            message = f"Restored {_jobs_text(restored_count)}."
+            if not_restored - removed:
+                message += (f" {_jobs_text(not_restored - removed)} not restored: the source is "
+                            "deleted. Add the source again, then restore its jobs.")
+            if removed:
+                message += (f" {_jobs_text(removed)} cannot be restored: the source was deleted "
+                            "permanently.")
         return {
             "status": "ok",
             "data": {

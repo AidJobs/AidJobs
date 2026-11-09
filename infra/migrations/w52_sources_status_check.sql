@@ -8,10 +8,11 @@
 --   - a source's status is outside the four values, or empty (the query at the end lists them);
 --   - a constraint of the same name exists with another definition;
 --   - it waits more than 5 seconds for the table (a crawl is writing): run it again later.
+-- If it stops with an error, run ROLLBACK; before anything else in the same editor session.
 --
--- Production, read-only, 9 November 2026: 3 sources, all 'active'; no rule on sources.status
--- besides the primary key; default 'pending_validation'; empty (NULL) allowed. The default is
--- kept: a row added without a status is then one no scheduler crawls.
+-- Production, read-only, 9 November 2026: 3 sources, all 'active'; sources.status is text, with
+-- no rule besides the primary key, default 'pending_validation', and empty (NULL) allowed. The
+-- default is kept: a row added without a status is then one no scheduler crawls.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -28,18 +29,17 @@ BEGIN
         RAISE EXCEPTION 'W-52: % source(s) have a status outside active, paused, deleted and pending_validation, or none; nothing was changed', outside;
     END IF;
 
-    SELECT replace(pg_get_constraintdef(oid), ' NOT VALID', '') INTO existing
+    SELECT pg_get_constraintdef(oid) INTO existing
     FROM pg_constraint
     WHERE conrelid = 'public.sources'::regclass AND conname = 'sources_status_allowed';
     IF existing IS NULL THEN
         ALTER TABLE public.sources ADD CONSTRAINT sources_status_allowed
-            CHECK (status IN ('active', 'paused', 'deleted', 'pending_validation')) NOT VALID;
+            CHECK (status IN ('active', 'paused', 'deleted', 'pending_validation'));
     ELSIF existing <> 'CHECK ((status = ANY (ARRAY[''active''::text, ''paused''::text, ''deleted''::text, ''pending_validation''::text])))' THEN
         RAISE EXCEPTION 'W-52: sources_status_allowed exists with another definition (%); nothing was changed', existing;
     END IF;
 END $$;
 
-ALTER TABLE public.sources VALIDATE CONSTRAINT sources_status_allowed;
 -- The check alone lets NULL through: NULL IN (...) is not false.
 ALTER TABLE public.sources ALTER COLUMN status SET NOT NULL;
 

@@ -18,8 +18,20 @@ import psycopg2.extensions
 import pytest
 from fastapi import HTTPException
 
+from contracts.run_ownership import SOURCE_DELETED_MESSAGE, SOURCE_LIVE_SQL, SourceDeleted
+
 # `db` and `schema` are its fixtures; pytest finds them by these names.
-from tests.test_crawl_ownership import ADMIN_URL, TEST_URL, _add_source, _sql, db, schema  # noqa: F401
+from tests.test_crawl_ownership import (  # noqa: F401
+    ADMIN_URL,
+    TEST_URL,
+    _add_source,
+    _crawler,
+    _orch,
+    _sql,
+    db,
+    schema,
+)
+from tests.test_crawl_ownership import _job as _candidate
 
 MIGRATIONS = Path(__file__).resolve().parents[3] / "infra" / "migrations"
 MIGRATION = (MIGRATIONS / "w52_sources_status_check.sql").read_text(encoding="utf-8")
@@ -201,6 +213,140 @@ def test_an_edit_of_a_deleted_source_changes_nothing(routes):
                               admin="test-admin")
     assert refused.value.status_code == 409
     assert _row("sources", source["id"]) == before
+
+
+def test_a_permanent_delete_waits_for_a_new_job_of_its_source_and_then_refuses(routes):
+    sources, _jm = routes
+    source = _add_source("Gone", status="deleted")
+    holder = psycopg2.connect(ADMIN_URL)
+    cur = holder.cursor()
+    cur.execute("INSERT INTO jobs (source_id, title, canonical_hash) "
+                "VALUES (%s, 'New', 'hash-new') RETURNING id", (source["id"],))
+    job_id = str(cur.fetchone()[0])
+    thread, outcome = _in_thread(
+        lambda: sources.permanently_delete_source(None, source["id"], admin="test-admin"))
+    try:
+        assert _waits(thread), "the permanent delete did not wait for the new job"
+        holder.commit()
+    finally:
+        holder.close()
+    thread.join(10)
+    assert isinstance(outcome.get("error"), HTTPException), outcome
+    assert outcome["error"].status_code == 409
+    assert _row("sources", source["id"]) is not None
+    assert _job(job_id) == {"source_id": source["id"], "deleted": False}
+
+
+def test_a_permanent_delete_while_a_run_is_running_changes_nothing(routes):
+    sources, _jm = routes
+    source = _add_source("Gone", status="deleted")
+    hidden = _add_job(source["id"], deleted=True)
+    _sql("INSERT INTO crawl_logs (source_id, status) VALUES (%s, 'running')", (source["id"],))
+    before = [_row("sources", source["id"]), _row("jobs", hidden),
+              _sql("SELECT count(*) FROM crawl_logs WHERE source_id = %s", (source["id"],))]
+    with pytest.raises(HTTPException) as refused:
+        sources.permanently_delete_source(None, source["id"], admin="test-admin")
+    assert refused.value.status_code == 409
+    assert [_row("sources", source["id"]), _row("jobs", hidden),
+            _sql("SELECT count(*) FROM crawl_logs WHERE source_id = %s",
+                 (source["id"],))] == before
+
+
+def test_a_restore_of_a_job_whose_source_was_deleted_permanently(routes):
+    sources, jm = routes
+    source = _add_source("Gone", status="deleted")
+    hidden = _add_job(source["id"], deleted=True)
+    sources.permanently_delete_source(None, source["id"], admin="test-admin")
+    data = _restore(jm, [hidden])
+    assert (data["restored_count"], data["not_restored_count"]) == (0, 1)
+    assert data["message"] == ("Restored 0 jobs. 1 job cannot be restored: the source was "
+                               "deleted permanently.")
+    assert _job(hidden) == {"source_id": None, "deleted": True}
+
+
+def test_a_restore_under_a_source_without_a_status_goes_through(routes):
+    _sources, jm = routes
+    source = _add_source("Old")
+    _sql("UPDATE sources SET status = NULL WHERE id = %s", (source["id"],))
+    hidden = _add_job(source["id"], deleted=True)
+    assert _restore(jm, [hidden])["restored_count"] == 1
+
+
+# A crawl and a source delete ---------------------------------------------------------------
+
+def test_a_crawl_saves_nothing_once_its_source_is_deleted(routes):
+    sources, _jm = routes
+    source = _add_source("Example")
+    orch = _orch()
+    run_id, started = orch._begin(source["id"], False)
+    assert started
+    sources.delete_source(None, source["id"], admin="test-admin")
+    with pytest.raises(SourceDeleted, match=SOURCE_DELETED_MESSAGE):
+        _crawler().save_jobs([_candidate(1)], source["id"], "Example", run_token=run_id)
+    assert _sql("SELECT count(*) FROM jobs WHERE source_id = %s", (source["id"],))[0][0] == 0
+    failed = {"status": "failed", "message": SOURCE_DELETED_MESSAGE, "counts": {}}
+    assert orch._finish(source["id"], run_id, failed, mode="normal", health=None) is True
+    assert _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))[0][0] == "deleted"
+
+
+def test_a_save_waits_for_a_source_delete_in_progress_and_saves_nothing(routes):
+    source = _add_source("Example")
+    run_id, _started = _orch()._begin(source["id"], False)
+    holder = _held("SELECT 1 FROM sources WHERE id = %s FOR UPDATE", (source["id"],))
+    holder.cursor().execute("UPDATE sources SET status = 'deleted' WHERE id = %s",
+                            (source["id"],))
+    thread, outcome = _in_thread(
+        lambda: _crawler().save_jobs([_candidate(1)], source["id"], "Example", run_token=run_id))
+    try:
+        assert _waits(thread), "the save did not wait for the source delete"
+        holder.commit()
+    finally:
+        holder.close()
+    thread.join(30)
+    assert isinstance(outcome.get("error"), SourceDeleted), outcome
+    assert _sql("SELECT count(*) FROM jobs WHERE source_id = %s", (source["id"],))[0][0] == 0
+
+
+def test_a_source_delete_waits_for_a_save_in_progress_and_hides_its_jobs(routes):
+    sources, _jm = routes
+    source = _add_source("Example")
+    holder = psycopg2.connect(TEST_URL)
+    cur = holder.cursor()
+    cur.execute(SOURCE_LIVE_SQL, (source["id"],))
+    cur.execute("INSERT INTO jobs (source_id, title, canonical_hash) "
+                "VALUES (%s, 'Saved', 'hash-saved') RETURNING id", (source["id"],))
+    job_id = str(cur.fetchone()[0])
+    thread, outcome = _in_thread(
+        lambda: sources.delete_source(None, source["id"], admin="test-admin"))
+    try:
+        assert _waits(thread), "the source delete did not wait for the save in progress"
+        holder.commit()
+    finally:
+        holder.close()
+    thread.join(10)
+    assert "error" not in outcome, outcome.get("error")
+    assert _job(job_id) == {"source_id": source["id"], "deleted": True}
+
+
+def test_a_save_lock_does_not_hold_back_a_finish_or_a_takeover(routes):
+    source = _add_source("Example")
+    holder = psycopg2.connect(TEST_URL)
+    holder.cursor().execute(SOURCE_LIVE_SQL, (source["id"],))
+    try:
+        conn = psycopg2.connect(ADMIN_URL)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SET lock_timeout = '1s'")
+                cur.execute("SELECT 1 FROM sources WHERE id = %s FOR NO KEY UPDATE",
+                            (source["id"],))
+                cur.execute("UPDATE sources SET last_crawl_status = 'ok' WHERE id = %s",
+                            (source["id"],))
+        finally:
+            conn.rollback()
+            conn.close()
+    finally:
+        holder.rollback()
+        holder.close()
 
 
 @pytest.mark.parametrize("start, to", [("active", "paused"), ("paused", "active"),

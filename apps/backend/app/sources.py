@@ -38,6 +38,7 @@ SOURCE_CHECK_TOTAL_SECONDS = 20.0
 # "pending_validation", production's default for a new row, is set by no admin action.
 EDITABLE_STATUSES = ("active", "paused")
 DELETED_SOURCE = "This source is deleted. Add it again with the same careers URL to restore it."
+RUN_IN_PROGRESS = "A crawl of this source is still running. Try again after it ends."
 
 
 def live_jobs_message(live: int) -> str:
@@ -531,11 +532,13 @@ def delete_source(
         
         logger.info(f"[sources] Deleting source {source_id}")
         
-        # First check if source exists
+        # FOR UPDATE waits for a crawl's job save in progress (it holds this row FOR KEY SHARE),
+        # so the job update below sees its jobs; a later save then refuses the deleted source.
         cursor.execute("""
             SELECT id::text, org_name
             FROM sources
             WHERE id::text = %s
+            FOR UPDATE
         """, (source_id,))
         
         source = cursor.fetchone()
@@ -623,6 +626,17 @@ def permanently_delete_source(
         
         if source['status'] != 'deleted':
             raise HTTPException(status_code=400, detail="Source must be deleted before permanent deletion. Use DELETE /api/admin/sources/{id} first.")
+        
+        # A run's finish locks its run row, then this source row: deleting the run rows under
+        # this lock would deadlock with it. The recovery ends a stale running row on its own.
+        cursor.execute("""
+            SELECT 1 FROM crawl_logs
+            WHERE source_id::text = %s AND status = 'running'
+            LIMIT 1
+        """, (source_id,))
+        if cursor.fetchone():
+            conn.rollback()
+            raise HTTPException(status_code=409, detail=RUN_IN_PROGRESS)
         
         # Removing the row would leave these jobs public with no source, and never expired.
         cursor.execute("""
