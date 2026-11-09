@@ -85,6 +85,12 @@ def test_validated_field_set_is_named():
         "city",
         "is_remote",
         "deadline",
+        "description",
+        "posted_on",
+        "locations",
+        "contract_type",
+        "salary_range_text",
+        "advert_language",
     )
     assert "canonical_hash" in UNCHANGED_ON_MATCH
     assert "deleted_at" in UNCHANGED_ON_MATCH

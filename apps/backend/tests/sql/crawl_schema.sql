@@ -171,6 +171,11 @@ CREATE TABLE public.jobs (
     "quality_issues" text[],
     "needs_review" boolean DEFAULT false,
     "quality_scored_at" timestamp with time zone,
+    -- Added by infra/migrations/w37_captured_fields.sql (W-37).
+    "description" text,
+    "posted_on" date,
+    "locations" text[],
+    "advert_language" text,
     CONSTRAINT "jobs_canonical_hash_key" UNIQUE (canonical_hash),
     CONSTRAINT "jobs_pkey" PRIMARY KEY (id),
     CONSTRAINT "jobs_source_id_fkey" FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL
