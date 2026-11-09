@@ -516,6 +516,10 @@ After the first preview the user found that the window skipped the first decisio
 - **Tests:** the no-network test allows only the demo's own route; tests with a stand-in model check that actions are checked and applied, that unknown or unsafe actions are refused, and that the fallback works; the source scan still refuses AI SDKs in the browser code.
 - **Order:** built after phase 1, revised; then the rest of phase 2 is written for the AI chat.
 
+**Done before the build (9 November 2026):** the user set both keys in Vercel (Preview only, the `demo/employer` branch, marked sensitive), step by step with the agent, copying each from the vault to the clipboard without showing it; they take effect from the next deployment. The keys belong to the mantle-only test user. Locally the dev server gets them from the vault into its own process only, as `ai-test/run.ps1` does for the test scripts.
+
+**Open with the user:** whether a job whose goal cannot be read from the role (a finance or HR post) falls back to the organisation's own SDGs; until then it shows none.
+
 ### To settle on the preview
 
 The chat's wording and its suggestions for each template; how the line shows 12 or more parts (likely the sections grouped as one entry that opens out).
