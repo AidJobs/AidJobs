@@ -60,6 +60,8 @@ export type Org = {
   setupDone: boolean;
   /** The one-time "I understand" for the free terms, given the first time the organisation publishes a free job. */
   freeTermsAccepted: boolean;
+  /** The writing style was kept for every job from the chat, so it is not offered again. */
+  styleKept?: boolean;
 };
 
 export type Engagement = 'job' | 'consultancy' | 'internship' | 'volunteer';
@@ -249,6 +251,12 @@ export type DemoJob = {
   audit: AuditEntry[];
   /** The part open in the window ("s:" and a section, or outline, details, fixed, check, publish); reopening the job returns to it. */
   part?: string;
+  /** A job started in the window waits for its template, then its writing style, before anything is written. */
+  setup?: 'template' | 'style';
+  /** The writing style, as the chips of Organisation settings. */
+  style?: string[];
+  /** The goals the job serves, when corrected by hand; otherwise read from the role by rules. */
+  sdgs?: number[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

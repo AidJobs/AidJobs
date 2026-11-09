@@ -62,8 +62,10 @@ const Composer = forwardRef<
     onPasteLong?: (text: string) => void;
     /** Called when a file is dropped on the box. */
     onFile?: (file: File) => void;
+    /** A height chosen by dragging the box's edge; the text still grows it beyond that. */
+    minHeight?: number;
   }
->(function Composer({ value, onChange, onSend, suggestion, placeholder, label, autoFocus, compact, large, tools, readiness, marks, onPasteLong, onFile }, handle) {
+>(function Composer({ value, onChange, onSend, suggestion, placeholder, label, autoFocus, compact, large, tools, readiness, marks, onPasteLong, onFile, minHeight = 0 }, handle) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const layer = useRef<HTMLDivElement>(null);
   const ghost = useRef<HTMLDivElement>(null);
@@ -76,8 +78,8 @@ const Composer = forwardRef<
     const ta = ref.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    const max = Math.round(window.innerHeight * (compact ? 0.4 : 0.5));
-    ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+    const max = Math.max(minHeight, Math.round(window.innerHeight * (compact ? 0.4 : 0.5)));
+    ta.style.height = `${Math.max(minHeight, Math.min(ta.scrollHeight, max))}px`;
     ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
     for (const el of [layer.current, ghost.current]) {
       if (!el) continue;

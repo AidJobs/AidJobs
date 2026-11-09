@@ -18,7 +18,7 @@ import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
 import { emptyFacts } from '@/components/employer-demo/engine';
-import { addTranslation, reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
+import { addTranslation, formatOf, reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
 import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
@@ -1190,7 +1190,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
   const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
   const byLabel = (label: string) => document.querySelector(`[aria-label="${label}"]`) as HTMLElement;
 
-  it('Enter on the first screen opens the window at once, reading the role, then the chat and the job description beside it', () => {
+  it('Enter opens the window at once; the chat asks for the template first, the panel stays empty, and nothing is written until the template and the style are chosen', () => {
     fresh();
     phone = false;
     render();
@@ -1200,21 +1200,87 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     const id = window.location.hash.replace('#job/', '');
     expect(window.location.hash).toBe(`#job/${id}`);
     expect(job(id).facts.title).toBe('Nutrition Officer');
-    const status = container.querySelector('[role="status"].ej-reading');
-    expect(status?.textContent).toBe('Reading your role…');
-    expect(container.querySelector('[role="log"]')?.textContent).not.toContain('Where is the job based?');
+    expect(container.querySelector('[role="status"].ej-reading')?.textContent).toBe('Reading your role…');
     act(() => jest.advanceTimersByTime(1000));
     expect(container.textContent).not.toContain('Reading your role…');
+    shows('First, the template.');
+    expect(container.textContent).not.toContain('Where is the job based?');
+    shows('Your job description appears here once the template is chosen.');
+    expect(container.querySelector('article[aria-label="Job description"]')).toBeNull();
+    const format = formatOf(getState(), job(id).format);
+    expect(currentLabel()).toBe(format.label);
+    expect(container.querySelector('.ej-w-head .ej-w-title')?.textContent).toBe('Nutrition Officer');
+    expect(container.querySelector('.ej-w-head .ej-w-status')?.textContent).toMatch(/^Draft/);
+    expect(container.querySelector('.ej-w-head nav[aria-label="Parts of this job"]')).not.toBeNull();
+    expect(container.querySelector('[role="tab"]')).toBeNull();
+    expect(container.querySelector('.ej-line-mark')).toBeNull();
+    click(`Use ${format.label}`);
+    expect(job(id).setup).toBe('style');
+    shows('How should it sound?');
+    expect(container.querySelector('[aria-label$=": its sections"]')).not.toBeNull();
+    click('Yes, write it that way');
+    expect(job(id).setup).toBeUndefined();
+    expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
+    shows('Here is the first draft, written');
     shows('Where is the job based?');
     expect(currentLabel()).toBe('Details');
-    shows('Duty station');
     shows('To add');
-    expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
-    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job description');
     click('Skip to the job description');
     act(() => jest.advanceTimersByTime(50));
     expect(document.activeElement?.id).toBe('ej-w-panel');
     expect(line().querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+    expect(network).toEqual([]);
+  });
+
+  it('the template panel: the job-type sentence, live headings in the job description panel, and Create your own', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    click('Show me others');
+    const panel = () => container.querySelector('section.ej-float') as HTMLElement;
+    expect(panel().getAttribute('aria-label')).toBe('Choose a template');
+    expect(container.querySelector('article[aria-label$=": its sections"]')).not.toBeNull();
+    const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
+    act(() => (Array.from(panel().querySelectorAll('.ej-template-card')).find((b) => b.textContent?.startsWith(un.label)) as HTMLElement).click());
+    expect(container.querySelector(`article[aria-label="${un.label}: its sections"]`)).not.toBeNull();
+    act(() => byLabel('Engagement: job. Change it').click());
+    click('Consultancy');
+    expect(job(id).facts.engagement).toBe('consultancy');
+    shows('Consultancies list deliverables and a timeline');
+    expect(job(id).sections).toEqual([]);
+    act(() => (Array.from(panel().querySelectorAll('[role="tab"]')).find((t) => t.textContent === 'Create your own') as HTMLElement).click());
+    const name = panel().querySelector('input[placeholder^="For example"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(name, 'Riverstone consultancies');
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const firstHeading = panel().querySelector('.ej-heading-input') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(firstHeading, 'Who we are');
+      firstHeading.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    shows('Who we are');
+    act(() => (panel().querySelector('[aria-label^="Add "]') as HTMLElement).click());
+    click('Use Riverstone consultancies');
+    const made = getState().formats.find((f) => f.label === 'Riverstone consultancies')!;
+    expect(made.order[0].heading).toBe('Who we are');
+    expect(job(id).format).toBe(made.key);
+    expect([...job(id).tags].sort()).toEqual(made.order.map((o) => o.key).sort());
+    expect(job(id).setup).toBe('style');
+    expect(container.querySelector('section.ej-float')).toBeNull();
+    say('warm, and short sentences');
+    expect(job(id).sections[0].title).toBe('Who we are');
+    expect(job(id).style).toContain('Short sentences');
+    part('Riverstone consultancies');
+    expect(panel().getAttribute('aria-label')).toBe('Template: Riverstone consultancies');
+    expect(panel().querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("This job's sections");
+    act(() => byLabel('Close the template panel').click());
+    expect(container.querySelector('section.ej-float')).toBeNull();
     expect(network).toEqual([]);
   });
 
@@ -1246,11 +1312,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     route('#jobs');
     route(`#job/${id}`);
     expect(currentLabel()).toBe(title(b));
-    const group = Array.from(line().querySelectorAll('button[aria-expanded]'))[0] as HTMLElement;
-    expect(group.getAttribute('aria-expanded')).toBe('true');
-    act(() => group.click());
-    expect(group.getAttribute('aria-expanded')).toBe('false');
-    expect(group.getAttribute('aria-current')).toBe('step');
+    const labels = Array.from(line().querySelectorAll('ol:not([aria-hidden]) .ej-line-label')).map((x) => x.textContent);
+    expect(labels).toEqual([formatOf(getState(), job(id).format).label, ...job(id).tags.map((k) => title(k)), 'Details', 'Fixed text', 'Check', 'Publish']);
+    expect(line().querySelector('button[aria-expanded]')).toBeNull();
   });
 
   it('every fact, the fixed text, How to apply, and the section order can be set from the line, without the chat', () => {
@@ -1282,9 +1346,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     const before = job(id).commitments.length;
     act(() => (container.querySelector('#ej-part-card input[type="checkbox"]') as HTMLElement).click());
     expect(job(id).commitments.length).not.toBe(before);
-    part('JD outline');
+    part(formatOf(getState(), job(id).format).label);
     const tags = job(id).tags;
-    const list = Array.from(container.querySelectorAll('#ej-part-card ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
+    const list = Array.from(container.querySelectorAll('section.ej-float ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
     act(() => (list?.querySelector('.ej-drag-handle') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
     expect(job(id).tags).not.toEqual(tags);
     expect(job(id).sections.map((x) => x.key)).toEqual(job(id).tags);
@@ -1383,6 +1447,75 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('.ej-subject')?.textContent).toBe('About: Details');
     phone = false;
     expect(network).toEqual([]);
+  });
+
+  it('on phones the template is chosen in the job description itself: a slim question line, the headings, and a strip of cards', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    });
+    phone = true;
+    render();
+    route(`#job/${id}`);
+    shows('First, the template.');
+    click('Create my own');
+    expect(container.querySelector('button[aria-label="Open the chat"]')?.textContent).toContain("Let's build it");
+    const cards = () => Array.from(container.querySelectorAll('[aria-label="Templates"] [role="radio"]'));
+    expect(cards().at(-1)?.getAttribute('aria-checked')).toBe('true');
+    expect(container.querySelector('.ej-heading-input')).not.toBeNull();
+    const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
+    act(() => (cards().find((c) => c.textContent?.startsWith(un.label)) as HTMLElement).click());
+    expect(container.querySelector(`article[aria-label="${un.label}: its sections"]`)).not.toBeNull();
+    click(`Use ${un.label}`);
+    expect(job(id).format).toBe(un.key);
+    expect(job(id).setup).toBe('style');
+    expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).not.toBeNull();
+    shows('How should it sound?');
+    phone = false;
+  });
+
+  it('the chat and the job description share the width as dragged, and the message box grows or shrinks from its grip', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    const split = byLabel('Resize the chat and the job description');
+    const before = Number(split.getAttribute('aria-valuenow'));
+    act(() => split.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    expect(Number(byLabel('Resize the chat and the job description').getAttribute('aria-valuenow'))).toBe(before + 24);
+    expect(localStorage.getItem('aidjobs.employerDemo.windowSplit')).toBe(String(before + 24));
+    const grip = () => byLabel('Resize the message box');
+    act(() => grip().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })));
+    act(() => grip().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })));
+    expect(Number(grip().getAttribute('aria-valuenow'))).toBe(92);
+    expect((container.querySelector('textarea[aria-label="Message AidJobs about this job"]') as HTMLTextAreaElement).style.height).toBe('92px');
+    act(() => grip().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+    expect(Number(grip().getAttribute('aria-valuenow'))).toBe(0);
+  });
+
+  it('SDGs: read from the role, shown in Details and on the job page, and corrected by hand', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a WASH Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    part('Details');
+    shows('SDG 6 Clean water and sanitation · SDG 3 Good health and well-being');
+    act(() => byLabel('Change the SDGs').click());
+    click('SDG 3 · Good health and well-being');
+    click('SDG 13 · Climate action');
+    expect(job(id).sdgs).toEqual([6, 13]);
+    click('Done');
+    say('show the preview');
+    expect(container.querySelector('[aria-label="Sustainable Development Goals"]')?.textContent).toBe('SDG 6 · Clean water and sanitationSDG 13 · Climate action');
   });
 });
 

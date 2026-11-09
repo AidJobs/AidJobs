@@ -1,10 +1,10 @@
 'use client';
 
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Eye, FileText, History, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { canDelete, chatNote, downloadCopy, isReviewable, sendChat, setPart, settleAsk } from './actions';
+import { applyFormat, applyTemplate, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, sendChat, setPart, setSdgs, settleAsk } from './actions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
@@ -15,12 +15,15 @@ import { FactDialog, typeLabel, type FactKey } from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
 import { LangDoc } from './LangDoc';
-import { currentPart, hasFields, partsOf, sectionOf, type Part } from './parts';
+import MenuButton from './MenuButton';
+import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part } from './parts';
 import { canGoFree } from './plans';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
+import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
 import { go, goBack, useDemo } from './store';
 import Structure, { Commitments } from './Structure';
+import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { LANGS } from './translate';
 import type { DemoJob, Lang, State } from './types';
 import { Dialog, radioKeys } from './ui';
@@ -32,8 +35,12 @@ const DOWNLOAD = /^(please\s+)?(download|export)\b/;
 const DELETE = /^(please\s+)?(delete|discard) (this|the) (job|draft|job draft)\b/;
 const PUBLISH = /^(please\s+)?(publish|post it|go live|schedule)\b/;
 const REVIEW = /^(please\s+)?(send|submit|ask)\b.*\breview/;
+const OWN = /\b(own|scratch|myself|build|custom)\b/i;
+const OTHERS = /\b(other|others|more|show|options|different|alternatives?|else)\b/i;
 const OPEN_PUBLISH = 'Open Check and publish';
 const OPEN_EARLIER = 'Open the earlier workspace';
+const SPLIT_KEY = 'aidjobs.employerDemo.windowSplit';
+const BOX_KEY = 'aidjobs.employerDemo.chatBox';
 
 type PreviewView = 'page' | 'google' | 'share';
 
@@ -45,78 +52,89 @@ function readingNow(id?: string): boolean {
   }
 }
 
+function readNumber(key: string, fallback: number): number {
+  try {
+    const v = Number(localStorage.getItem(key));
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function save(key: string, v: number) {
+  try {
+    localStorage.setItem(key, String(Math.round(v)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function scrollToId(id: string) {
   requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
 }
 
-/** A part's mark on the line: a tick when done, a dot when current, an empty ring still to do. */
-function Mark({ state }: { state: 'done' | 'current' | 'todo' }) {
-  return <span className="ej-line-mark" aria-hidden>{state === 'done' ? <Check size={9} strokeWidth={3.2} /> : null}</span>;
+/** A message as one plain line, for the phone's slim question line. */
+function plain(text: string): string {
+  return text.replace(/\*\*/g, '').replace(/\s*\n+\s*/g, ' ');
 }
 
-function PartButton({ part, current, onGo, wide }: { part: Part; current: boolean; onGo: (k: string) => void; wide?: boolean }) {
+function PartButton({ part, current, onGo }: { part: Part; current: boolean; onGo: (k: string) => void }) {
   const state = current ? 'current' : part.done ? 'done' : 'todo';
   const button = (
     <button type="button" className="ej-line-part" data-state={state} aria-current={current ? 'step' : undefined} onClick={() => onGo(part.key)}>
-      <Mark state={state} />
       <span className="ej-line-label">{part.label}</span>
       <span className="sr-only">{part.done ? ', done' : ', to do'}</span>
     </button>
   );
-  return wide || part.label.length < 22 ? button : <Tip label={part.label} side="bottom">{button}</Tip>;
+  return part.label.length < 22 ? button : <Tip label={part.label} side="bottom">{button}</Tip>;
 }
 
 /**
- * The progress line, above the output panel: every part of the job, done, current, or to do. It is also the way around: a part opens in
- * the panel and becomes the chat's subject. The sections are one entry that opens out, so the line stays short.
+ * The progress line, in the header row: every part of the job, current, done, or to do, starting with the template's name. Whatever
+ * does not fit goes into "+N", so nothing is out of sight; the part in view always stays on the line.
  */
-function ProgressLine({ parts, current, onGo }: { parts: Part[]; current: string; onGo: (k: string) => void }) {
-  const sections = parts.filter((p) => p.section);
-  const inSections = Boolean(sectionOf(current));
-  const [open, setOpen] = useState(inSections);
-  const [seen, setSeen] = useState(current);
-  const list = useRef<HTMLOListElement>(null);
-  if (seen !== current) {
-    setSeen(current);
-    if (inSections) setOpen(true);
-  }
+function HeaderLine({ parts, current, onGo }: { parts: Part[]; current: string; onGo: (k: string) => void }) {
+  const row = useRef<HTMLDivElement>(null);
+  const measure = useRef<HTMLOListElement>(null);
+  const [fit, setFit] = useState(parts.length);
+  const sig = parts.map((p) => p.label).join('|');
   useEffect(() => {
-    list.current?.querySelector('[aria-current]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-  }, [current, open]);
-  const done = sections.filter((p) => p.done).length;
-  const groupCurrent = inSections && !open;
+    const el = row.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const count = () => setFit(lineFit(Array.from(measure.current?.children ?? []).map((x) => (x as HTMLElement).offsetWidth + 4), el.clientWidth));
+    const watch = new ResizeObserver(count);
+    watch.observe(el);
+    if (measure.current) watch.observe(measure.current);
+    return () => watch.disconnect();
+  }, [sig]);
+  const { shown, more: hidden } = onLine(parts, fit, current);
   return (
-    <nav className="min-w-0 flex-1" aria-label="Parts of this job">
-      <ol ref={list} className="ej-line">
-        {parts
-          .filter((p) => !p.section)
-          .flatMap((p) => {
-            const item = (
-              <li key={p.key}>
-                <PartButton part={p} current={p.key === current} onGo={onGo} />
-              </li>
-            );
-            if (p.key !== 'outline' || !sections.length) return [item];
-            return [
-              item,
-              <li key="sections">
-                <button type="button" className="ej-line-part" data-state={groupCurrent ? 'current' : done === sections.length ? 'done' : 'todo'} aria-current={groupCurrent ? 'step' : undefined} aria-expanded={open} onClick={() => setOpen(!open)}>
-                  <ChevronRight size={13} strokeWidth={2.2} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 120ms ease' }} aria-hidden />
-                  <span className="ej-line-label">Sections</span>
-                  <span className="ej-jump-count">
-                    {done} of {sections.length}
-                  </span>
-                </button>
-              </li>,
-              ...(open
-                ? sections.map((sec) => (
-                    <li key={sec.key} className="ej-line-sub">
-                      <PartButton part={sec} current={sec.key === current} onGo={onGo} />
-                    </li>
-                  ))
-                : []),
-            ];
-          })}
+    <nav ref={row} className="ej-line-wrap" aria-label="Parts of this job">
+      <ol ref={measure} className="ej-line ej-measure" aria-hidden inert>
+        {parts.map((p) => (
+          <li key={p.key}>
+            <span className="ej-line-part">
+              <span className="ej-line-label">{p.label}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <ol className="ej-line">
+        {shown.map((p) => (
+          <li key={p.key}>
+            <PartButton part={p} current={p.key === current} onGo={onGo} />
+          </li>
+        ))}
+        {hidden.length > 0 && (
+          <li>
+            <MenuButton
+              label={`${hidden.length} more ${hidden.length === 1 ? 'part' : 'parts'} of this job`}
+              className="ej-line-more"
+              trigger={<>+{hidden.length}</>}
+              actions={hidden.map((p) => ({ label: `${p.label} · ${p.done ? 'done' : 'to do'}`, current: p.key === current, run: () => onGo(p.key) }))}
+            />
+          </li>
+        )}
       </ol>
     </nav>
   );
@@ -129,7 +147,7 @@ function PartsList({ parts, current, onGo }: { parts: Part[]; current: string; o
       <ol className="ej-line-list">
         {parts.map((p) => (
           <li key={p.key} className={p.section ? 'ej-line-sub' : undefined}>
-            <PartButton part={p} current={p.key === current} onGo={onGo} wide />
+            <PartButton part={p} current={p.key === current} onGo={onGo} />
           </li>
         ))}
       </ol>
@@ -139,7 +157,7 @@ function PartsList({ parts, current, onGo }: { parts: Part[]; current: string; o
 
 type TabDef = { key: string; label: string; lang?: string };
 
-/** The output panel's tabs: the job description always; a language version, or the preview, only when there is one to show. */
+/** The output panel's tabs, shown only when there is a second view: a language version, or the preview. */
 function PanelTabs({ tabs, active, onPick }: { tabs: TabDef[]; active: string; onPick: (k: string) => void }) {
   const keys = (e: ReactKeyboardEvent<HTMLElement>) => {
     const at = tabs.findIndex((t) => t.key === active);
@@ -161,17 +179,21 @@ function PanelTabs({ tabs, active, onPick }: { tabs: TabDef[]; active: string; o
   );
 }
 
-function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: FactKey) => void }) {
+type RowKey = FactKey | 'title' | 'sdgs';
+
+function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowKey) => void }) {
   const f = job.facts;
   const ro = Boolean(s.reviewerAs);
   const more = [f.eligibility !== 'anyone' ? { nationals: 'Nationals only', internal: 'Internal candidates only', righttowork: 'Right to work needed' }[f.eligibility] : '', f.languages.join(', '), Number(f.positions) > 1 ? `${f.positions} positions` : '', f.donor].filter(Boolean).join(' · ');
-  const rows: Array<{ key: FactKey | 'title'; label: string; value: string; missing?: boolean; hint?: string }> = [
+  const goals = sdgsOf(job);
+  const rows: Array<{ key: RowKey; label: string; value: string; missing?: boolean; hint?: string }> = [
     { key: 'title', label: 'Job title', value: f.title, missing: !f.title },
     { key: 'place', label: 'Duty station', value: f.location ? `${f.location} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
     { key: 'type', label: 'Job type', value: typeLabel(f), missing: !f.contract && f.engagement === 'job' },
     { key: 'grade', label: 'Grade or band', value: f.grade },
     { key: 'closes', label: 'Closing date', value: f.deadline ? `${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}` : ''}` : '', missing: !f.deadline },
     { key: 'salary', label: 'Salary', value: salaryText(f) || 'Not shown' },
+    { key: 'sdgs', label: 'SDGs', value: goals.map((g) => `SDG ${g} ${SDG_NAMES[g]}`).join(' · '), hint: 'None: no goal is clear from the role' },
     { key: 'more', label: 'More details', value: more, hint: 'Who can apply, languages, positions, donor' },
   ];
   return (
@@ -187,7 +209,7 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: Fact
             className="aj-pill"
             style={{ height: 30 }}
             disabled={ro}
-            aria-label={`${r.value ? 'Change' : 'Add'} ${r.label.toLowerCase()}`}
+            aria-label={`${r.value ? 'Change' : 'Add'} ${r.label === 'SDGs' ? 'the SDGs' : r.label.toLowerCase()}`}
             onClick={() => {
               if (r.key !== 'title') return onFact(r.key);
               const el = document.getElementById('ej-title-edit');
@@ -203,13 +225,48 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: Fact
   );
 }
 
+/** The goals the job serves: read from the role by rules, corrected here; at most three. */
+function SdgDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  const goals = sdgsOf(job);
+  const toggle = (g: number) => setSdgs(job.id, goals.includes(g) ? goals.filter((x) => x !== g) : goals.length >= 3 ? goals : [...goals, g].sort((a, b) => a - b));
+  const read = inferSdgs(job);
+  return (
+    <Dialog
+      title="SDGs this job serves"
+      subtitle="Up to three"
+      onClose={onClose}
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" className="aj-text-btn" onClick={() => setSdgs(job.id, null)}>
+            Read them from the role{read.length ? ` (SDG ${read.join(', ')})` : ''}
+          </button>
+          <button type="button" className="aj-ink-btn" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-wrap gap-1.5">
+        {Object.entries(SDG_NAMES).map(([k, name]) => {
+          const g = Number(k);
+          const on = goals.includes(g);
+          return (
+            <button key={g} type="button" className="ej-tag" data-on={on} aria-pressed={on} disabled={!on && goals.length >= 3} onClick={() => toggle(g)}>
+              SDG {g} · {name}
+            </button>
+          );
+        })}
+      </div>
+    </Dialog>
+  );
+}
+
 /** A part's own fields, in the panel above the job description, so it can be set without the chat. */
-function PartFields({ part, job, s, onClose, onFact, onPreview }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: FactKey) => void; onPreview: () => void }) {
+function PartFields({ part, job, s, onClose, onFact, onPreview }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; onPreview: () => void }) {
   const amplify = Boolean(job.paidFor) || !canGoFree(s, job.id, null);
   const points = job.sections.length ? openPoints(job, s, amplify) : [];
   const reviewable = isReviewable(job);
   const head: Record<string, [string, string]> = {
-    outline: ['JD outline', 'The JD format, and the sections in their order'],
     details: ['Details', 'The facts the job description and Google use'],
     fixed: ['Fixed text', "Your organisation's commitments, word for word"],
     check: ['Check', 'Clarity, inclusive language, placeholders, and dates'],
@@ -218,8 +275,7 @@ function PartFields({ part, job, s, onClose, onFact, onPreview }: { part: string
   };
   const [title, hint] = head[part] ?? ['', ''];
   let body: ReactNode = null;
-  if (part === 'outline') body = <Structure job={job} s={s} bare hideCommitments />;
-  else if (part === 'details') body = <FactRows job={job} s={s} onFact={onFact} />;
+  if (part === 'details') body = <FactRows job={job} s={s} onFact={onFact} />;
   else if (part === 'fixed') body = <Commitments job={job} s={s} />;
   else if (part === 's:apply') body = <ApplyFields job={job} />;
   else if (part === 'check')
@@ -307,10 +363,48 @@ function PreviewPanel({ job, s, onClose }: { job: DemoJob; s: State; onClose: ()
   );
 }
 
+/** The grip above the message box: dragged up or down (or the arrow keys) to make the box taller or shorter; a double-click resets it. */
+function BoxGrip({ height, onChange }: { height: number; onChange: (h: number) => void }) {
+  const drag = useRef<{ y: number; h: number } | null>(null);
+  const max = () => Math.round((typeof window === 'undefined' ? 800 : window.innerHeight) * 0.6);
+  const set = (h: number) => onChange(h <= 40 ? 0 : Math.min(max(), Math.round(h)));
+  return (
+    <div
+      className="ej-box-grip"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize the message box"
+      aria-valuenow={height}
+      aria-valuemin={0}
+      aria-valuemax={max()}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        const box = e.currentTarget.parentElement?.querySelector('textarea');
+        drag.current = { y: e.clientY, h: height || box?.offsetHeight || 44 };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+      }}
+      onPointerMove={(e) => drag.current && set(drag.current.h + (drag.current.y - e.clientY))}
+      onPointerUp={() => {
+        drag.current = null;
+      }}
+      onDoubleClick={() => onChange(0)}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        set((height || 44) + (e.key === 'ArrowUp' ? 24 : -24));
+      }}
+    >
+      <span aria-hidden />
+    </div>
+  );
+}
+
 /** The guide: the whole conversation, answers inside the questions, and the box, with the part in view as its subject. */
 function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean }) {
   const [text, setText] = useState('');
-  const box = useRef<ComposerHandle>(null);
+  const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
+  const input = useRef<ComposerHandle>(null);
   const end = useRef<HTMLDivElement>(null);
   const firstUser = job.chat.findIndex((m) => m.from === 'user');
   const shown = reading ? job.chat.slice(0, firstUser + 1) : job.chat;
@@ -327,7 +421,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
         Skip to the job description
       </button>
       <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-2 px-4 py-3" role="log" aria-label="Conversation with AidJobs" aria-live="polite">
-        {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or open a part above it.</p>}
+        {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or open a part of it.</p>}
         {shown.map((m, i) => (
           <div key={m.id} className="ej-bubble" data-from={m.from}>
             {rich(m.text)}
@@ -340,7 +434,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
                 ))}
               </div>
             )}
-            {m.from === 'ai' && m === last && m.ask && !reviewing && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => box.current?.focus(), 0)} />}
+            {m.from === 'ai' && m === last && m.ask && !reviewing && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
           </div>
         ))}
         {reading && (
@@ -350,9 +444,9 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
         )}
         <div ref={end} />
       </div>
-      <div className="shrink-0 border-t px-3 py-2.5 aj-hair">
+      <div className="shrink-0 border-t px-3 pb-2.5 aj-hair">
         {reviewing ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 pt-2.5">
             <span className="aj-muted">You are looking as a reviewer. For now, comments and approval are in the earlier workspace.</span>
             <button type="button" className="aj-pill self-start" onClick={() => go('create', job.id)}>
               {OPEN_EARLIER}
@@ -360,11 +454,18 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
           </div>
         ) : (
           <>
+            <BoxGrip
+              height={box}
+              onChange={(h) => {
+                setBox(h);
+                save(BOX_KEY, h);
+              }}
+            />
             <div className="ej-subject" aria-live="polite">
               About: <strong>{subject}</strong>
             </div>
             <Composer
-              ref={box}
+              ref={input}
               value={text}
               onChange={setText}
               onSend={(v) => {
@@ -372,10 +473,11 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
                 setText('');
               }}
               suggestion={completeText(text, own)}
-              placeholder={last?.ask ? 'Answer here, or pick above' : `Ask about ${subject}, or anything else`}
+              placeholder={job.setup === 'template' ? 'Answer here, or choose a template' : last?.ask ? 'Answer here, or pick above' : `Ask about ${subject}, or anything else`}
               label="Message AidJobs about this job"
               compact
               autoFocus={autoFocus}
+              minHeight={box}
             />
           </>
         )}
@@ -386,7 +488,8 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
 
 /**
  * Creating a job in one window (employer-side plan, section 19): the chat guides and does the work; the output panel shows the result,
- * with the progress line above it as the way around; each part's fields open in the panel, so nothing depends on the chat alone.
+ * with the progress line in the header row as the way around. A new job waits for its template (chosen in the chat, in the template
+ * panel, or on a phone in the job description itself) and its style before anything is written.
  */
 export default function Window({ id }: { id?: string }) {
   const s = useDemo();
@@ -397,12 +500,18 @@ export default function Window({ id }: { id?: string }) {
   const [tab, setTab] = useState('doc');
   const [preview, setPreview] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
-  const [fact, setFact] = useState<FactKey | null>(null);
+  const [fact, setFact] = useState<RowKey | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
   const [unseen, setUnseen] = useState(false);
   const [said, setSaid] = useState('');
+  const [pick, setPick] = useState<Pick | null>(null);
+  const [chatW, setChatW] = useState(() => readNumber(SPLIT_KEY, 400));
+  const [dragging, setDragging] = useState(false);
+  const [body, setBody] = useState({ w: 0, h: 0 });
+  const bodyRef = useRef<HTMLDivElement>(null);
   const changeKey = job?.lastChange?.keys.length ? `${job.versions.length}:${job.lastChange.keys.join()}` : '';
   const lastMsg = job?.chat[job.chat.length - 1];
   const askId = lastMsg?.from === 'ai' && lastMsg.ask ? lastMsg.id : '';
@@ -428,6 +537,32 @@ export default function Window({ id }: { id?: string }) {
     const t = setTimeout(() => setReading(false), 900);
     return () => clearTimeout(t);
   }, [reading]);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const watch = new ResizeObserver(() => setBody({ w: el.clientWidth, h: el.clientHeight }));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [phone]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => {
+      const b = bodyRef.current?.getBoundingClientRect();
+      if (!b) return;
+      const w = Math.min(Math.max(300, e.clientX - b.left), Math.max(300, b.width - 420));
+      setChatW(w);
+      save(SPLIT_KEY, w);
+    };
+    const up = () => setDragging(false);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+  }, [dragging]);
 
   // A placeholder in the text ("[Closing date]") opens that fact's picker.
   useEffect(() => {
@@ -468,22 +603,43 @@ export default function Window({ id }: { id?: string }) {
   const reviewing = Boolean(s.reviewerAs);
   const parts = partsOf(job, s);
   const current = currentPart(job, s, parts);
-  const currentLabel = parts.find((p) => p.key === current)?.label ?? 'the job';
+  const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = LANGS.filter((l) => job.translations?.[l.key]);
   const tabs: TabDef[] = [{ key: 'doc', label: 'Job description' }, ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })), ...(preview ? [{ key: 'preview', label: 'Preview' }] : [])];
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
-  const card = !reviewing && hasFields(current) && hidden !== current;
+  const card = !reviewing && !job.setup && hasFields(current) && hidden !== current;
+  const previewing = Boolean(job.setup) || (pick !== null && pick.tab !== 'sections');
 
+  const openPick = (t: Pick['tab']) => {
+    setPick(startPick(s, job, t));
+    if (phone) setView('job');
+  };
   const goPart = (key: string) => {
     settleAsk(job.id);
+    setPartsOpen(false);
+    if (key === 'outline') {
+      if (phone && !job.setup) return setOutlineOpen(true);
+      return openPick(job.setup ? 'templates' : 'sections');
+    }
     setPart(job.id, key);
     setTab('doc');
     setHidden(null);
-    setPartsOpen(false);
     if (phone) setView('job');
     const sec = sectionOf(key);
     scrollToId(sec && key !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');
+  };
+  const applyPick = () => {
+    if (!pick) return;
+    const wasSetup = Boolean(job.setup);
+    if (pick.tab === 'own') {
+      const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)));
+      if (wasSetup) applyTemplate(job.id, key, undefined, pick.order.map((o) => o.key));
+      else applyFormat(job.id, key);
+    } else if (wasSetup) applyTemplate(job.id, pick.key);
+    else applyFormat(job.id, pick.key);
+    setPick(null);
+    if (phone) setView(wasSetup ? 'chat' : 'job');
   };
   const openPreview = () => {
     setPreview(true);
@@ -499,7 +655,11 @@ export default function Window({ id }: { id?: string }) {
     const t = text.toLowerCase().trim();
     if (t === OPEN_PUBLISH.toLowerCase()) return go('publish', job.id);
     if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
-    if (PREVIEW.test(t)) {
+    if (job.setup === 'template' && !/^use /i.test(t)) {
+      if (OWN.test(t)) openPick('own');
+      else if (OTHERS.test(t)) openPick('templates');
+    }
+    if (PREVIEW.test(t) && !job.setup) {
       openPreview();
       return chatNote(job.id, text, 'The preview is open in the panel: the job page, how it shows in Google, and how it looks when shared.');
     }
@@ -521,22 +681,45 @@ export default function Window({ id }: { id?: string }) {
     sendChat(job.id, text, focus ?? undefined);
   };
 
-  const fields = card && (
-    <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={setFact} onPreview={openPreview} />
-  );
-  const doc = (
+  const pickOrder = pick ? previewOrder(s, job, pick) : null;
+  const headings = (() => {
+    if (pick && pickOrder && pick.tab !== 'sections') {
+      const name = pick.tab === 'own' ? pick.name.trim() || 'Your template' : formatOf(s, pick.key).label;
+      return <HeadingsPreview order={pickOrder} title={name} note={`${pickOrder.length} sections · about ${wordsFor(pickOrder.length)} words · ${job.setup ? 'choose Use in the template panel to start writing' : 'choose Change to use it; text you edited is kept where its section stays'}`} />;
+    }
+    if (job.setup === 'style') {
+      const format = formatOf(s, job.format);
+      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: format.order.find((o) => o.key === k)?.heading ?? k }))} title={format.label} note="Choose in the chat how it should sound; then it is written in these sections." />;
+    }
+    return (
+      <div className="aj-card flex flex-col items-center gap-3 p-8 text-center aj-muted">
+        <FileText size={22} strokeWidth={1.5} />
+        {reading ? 'Reading your role…' : 'Your job description appears here once the template is chosen.'}
+        {!reading && !reviewing && (
+          <div className="flex flex-wrap justify-center gap-1.5">
+            <button type="button" className="aj-pill" onClick={() => openPick('templates')}>
+              Browse templates
+            </button>
+            <button type="button" className="aj-pill" onClick={() => openPick('own')}>
+              Create your own
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  })();
+
+  const doc = previewing ? (
+    headings
+  ) : (
     <div className="flex flex-col gap-3">
-      {fields}
+      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} onPreview={openPreview} />}
       {job.status === 'live' && changesSince(job).length > 0 && (
         <div className="aj-card px-3 py-2" role="status" aria-label="Changed since publishing">
           <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
         </div>
       )}
-      {reading ? (
-        <div className="aj-card ej-reading flex items-center gap-2 p-5 aj-muted" aria-hidden>
-          <FileText size={18} strokeWidth={1.5} /> Reading your role…
-        </div>
-      ) : job.sections.length ? (
+      {job.sections.length ? (
         <DocumentView job={job} s={s} current={focus} noteEdits onSeeChat={phone ? () => setView('chat') : undefined} />
       ) : (
         <div className="aj-card flex flex-col gap-2 p-5">
@@ -551,7 +734,7 @@ export default function Window({ id }: { id?: string }) {
   );
   const lang = active.startsWith('lang:') ? (active.slice(5) as Lang) : null;
   const panel = (
-    <div id="ej-w-panel" className="aj-scroll min-h-0 flex-1 px-3 py-3 lg:px-5" role="tabpanel" aria-labelledby={`ej-wtab-${active}`} tabIndex={-1}>
+    <div id="ej-w-panel" className="aj-scroll min-h-0 flex-1 px-3 py-3 lg:px-5" role={tabs.length > 1 ? 'tabpanel' : 'region'} aria-labelledby={tabs.length > 1 ? `ej-wtab-${active}` : undefined} aria-label={tabs.length > 1 ? undefined : 'Job description'} tabIndex={-1}>
       {active === 'preview' ? (
         <PreviewPanel
           job={job}
@@ -568,9 +751,9 @@ export default function Window({ id }: { id?: string }) {
       )}
     </div>
   );
-  const tools = (
+  const tools = !job.setup && (
     <span className="flex shrink-0 items-center gap-1">
-      {!preview && (
+      {!preview && job.sections.length > 0 && (
         <Tip label="Preview: the job page, in Google, and when shared" side="bottom">
           <button type="button" className="aj-icon-btn" style={{ width: 30, height: 30 }} onClick={openPreview} aria-label="Preview">
             <Eye size={14} strokeWidth={1.8} />
@@ -587,57 +770,30 @@ export default function Window({ id }: { id?: string }) {
     </span>
   );
   const chat = <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} />;
-  const head = (
-    <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-4">
-      <Tip label="Back" side="bottom">
-        <button type="button" className="aj-icon-btn" onClick={() => goBack('create')} aria-label="Back">
-          <ArrowLeft size={15} strokeWidth={1.8} />
-        </button>
-      </Tip>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <h1 className="ej-w-title">{job.facts.title || 'Untitled job'}</h1>
-        <span className="aj-faint truncate" style={{ fontSize: 11 }}>
+  const titleBox = (
+    <span className="ej-w-titlebox">
+      <h1 className="ej-w-title">{job.facts.title || 'Untitled job'}</h1>
+      <Tip label={statusLine(s, job)} side="bottom" className="min-w-0">
+        <span className="ej-w-status" tabIndex={0}>
           {statusLine(s, job)}
         </span>
-      </span>
-      {phone ? (
-        <div className="ej-switch shrink-0" role="group" aria-label="Show">
-          <button type="button" className="ej-switch-btn" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>
-            Chat
-          </button>
-          <button
-            type="button"
-            className="ej-switch-btn"
-            aria-pressed={view === 'job'}
-            onClick={() => {
-              setView('job');
-              setUnseen(false);
-            }}
-          >
-            Job
-            {unseen && view !== 'job' ? (
-              <>
-                <span className="ej-new-dot" aria-hidden />
-                <span className="sr-only">, updated</span>
-              </>
-            ) : null}
-          </button>
-        </div>
-      ) : (
-        <Tip label="The workspace before this round, kept until this window has everything" side="bottom">
-          <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => go('create', job.id)}>
-            Earlier workspace
-          </button>
-        </Tip>
-      )}
-    </div>
+      </Tip>
+    </span>
+  );
+  const back = (
+    <Tip label="Back" side="bottom">
+      <button type="button" className="aj-icon-btn" onClick={() => goBack('create')} aria-label="Back">
+        <ArrowLeft size={15} strokeWidth={1.8} />
+      </button>
+    </Tip>
   );
   const overlays = (
     <>
       <div className="sr-only" aria-live="polite">
         {said}
       </div>
-      {fact && (
+      {fact === 'sdgs' && <SdgDialog job={job} onClose={() => setFact(null)} />}
+      {fact && fact !== 'sdgs' && fact !== 'title' && (
         <FactDialog
           which={fact}
           job={job}
@@ -654,11 +810,40 @@ export default function Window({ id }: { id?: string }) {
   );
 
   if (phone) {
+    const question = reading ? 'Reading your role…' : plain([...job.chat].reverse().find((m) => m.from === 'ai')?.text ?? 'Choose a template');
+    const choosing = pick !== null && pick.tab !== 'sections';
     return (
       <div className="flex h-full min-h-0 flex-col">
-        {head}
+        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair">
+          {back}
+          {titleBox}
+          <div className="ej-switch shrink-0" role="group" aria-label="Show">
+            <button type="button" className="ej-switch-btn" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>
+              Chat
+            </button>
+            <button
+              type="button"
+              className="ej-switch-btn"
+              aria-pressed={view === 'job'}
+              onClick={() => {
+                setView('job');
+                setUnseen(false);
+              }}
+            >
+              Job
+              {unseen && view !== 'job' ? (
+                <>
+                  <span className="ej-new-dot" aria-hidden />
+                  <span className="sr-only">, updated</span>
+                </>
+              ) : null}
+            </button>
+          </div>
+        </div>
         {view === 'chat' ? (
           <div className="min-h-0 flex-1">{chat}</div>
+        ) : choosing && pick ? (
+          <PhoneTemplate job={job} s={s} pick={pick} setPick={setPick} onApply={applyPick} onChat={() => setView('chat')} onCancel={job.setup ? undefined : () => setPick(null)} question={question} />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 aj-hair">
@@ -684,6 +869,23 @@ export default function Window({ id }: { id?: string }) {
             <PartsList parts={parts} current={current} onGo={goPart} />
           </Dialog>
         )}
+        {outlineOpen && (
+          <Dialog title={formatOf(s, job.format).label} subtitle="This job's sections" onClose={() => setOutlineOpen(false)} half>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                className="aj-pill self-start"
+                onClick={() => {
+                  setOutlineOpen(false);
+                  openPick('templates');
+                }}
+              >
+                Change the template
+              </button>
+              <Structure job={job} s={s} bare hideCommitments />
+            </div>
+          </Dialog>
+        )}
         {overlays}
       </div>
     );
@@ -691,21 +893,63 @@ export default function Window({ id }: { id?: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {head}
-      <div className="flex min-h-0 flex-1">
-        <section className="ej-w-chat flex min-h-0 flex-col border-r aj-hair" aria-label="Chat with AidJobs">
+      <div className="ej-w-head">
+        {back}
+        {titleBox}
+        <HeaderLine parts={parts} current={current} onGo={goPart} />
+        {tools}
+        <Tip label="The workspace before this round, kept until this window has everything" side="bottom">
+          <button type="button" className="aj-text-btn shrink-0" style={{ height: 30 }} onClick={() => go('create', job.id)}>
+            Earlier workspace
+          </button>
+        </Tip>
+      </div>
+      <div ref={bodyRef} className="relative flex min-h-0 flex-1" style={{ userSelect: dragging ? 'none' : undefined }}>
+        <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label="Chat with AidJobs">
           {chat}
         </section>
+        <div
+          className="aj-divider"
+          data-dragging={dragging}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the chat and the job description"
+          aria-valuenow={Math.round(chatW)}
+          aria-valuemin={300}
+          aria-valuemax={Math.max(300, body.w - 420)}
+          tabIndex={0}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            const w = Math.min(Math.max(300, chatW + (e.key === 'ArrowLeft' ? -24 : 24)), Math.max(300, (body.w || 1200) - 420));
+            setChatW(w);
+            save(SPLIT_KEY, w);
+          }}
+        />
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="The job">
-          <div className="flex shrink-0 items-center gap-2 border-b px-3 aj-hair">
-            <ProgressLine parts={parts} current={current} onGo={goPart} />
-          </div>
-          <div className="flex shrink-0 items-end gap-2 border-b pe-3 aj-hair">
-            <PanelTabs tabs={tabs} active={active} onPick={setTab} />
-            <span className="ml-auto pb-1">{tools}</span>
-          </div>
+          {tabs.length > 1 && (
+            <div className="shrink-0 border-b aj-hair">
+              <PanelTabs tabs={tabs} active={active} onPick={setTab} />
+            </div>
+          )}
           {panel}
         </section>
+        {pick && (
+          <TemplatePanel
+            job={job}
+            s={s}
+            pick={pick}
+            setPick={setPick}
+            onApply={applyPick}
+            onClose={() => setPick(null)}
+            bounds={{ w: body.w || 1200, h: body.h || 700 }}
+            start={{ x: 12, y: Math.round((body.h || 700) * 0.24), w: Math.min(460, Math.max(340, chatW - 24)), h: Math.round((body.h || 700) * 0.76) - 12 }}
+          />
+        )}
       </div>
       {overlays}
     </div>

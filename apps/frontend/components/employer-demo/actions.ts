@@ -9,6 +9,7 @@ import {
   buildSections,
   daysUntil,
   emptyFacts,
+  ENGAGEMENTS,
   extractFacts,
   FORMAT_FOR_TYPE,
   headingFor,
@@ -32,6 +33,7 @@ import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
+import { describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, wordsFor } from './setup';
 import type { ApplySettings, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
@@ -136,14 +138,14 @@ function answered(kind: NonNullable<ChatMsg['ask']>, f: Facts): boolean {
 function ensureAsk(id: string) {
   updateJob(id, (x) => {
     const last = x.chat[x.chat.length - 1];
-    if (last?.from === 'ai' && last.ask) return x;
+    if (x.setup || (last?.from === 'ai' && last.ask)) return x;
     const ask = nextAsk(x.facts);
     return ask.length ? { ...x, chat: [...x.chat, ...ask] } : x;
   });
 }
 /** The live draft: once the role is known, the job description is written straight away and fills in as facts arrive. */
 function withLiveDraft(s: State, j: DemoJob): DemoJob {
-  if (j.sections.length || !j.facts.title || j.tags.length < 3) return j;
+  if (j.setup || j.sections.length || !j.facts.title || j.tags.length < 3) return j;
   const sections = buildSections(j.tags, ctxFor(s, j));
   return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
 }
@@ -177,18 +179,147 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
   };
 }
 
-/** Starts a job conversation from the first message. Returns the new job's id. */
-export function startJob(text: string, formatKey?: string, extra: string[] = []): string {
+/**
+ * Starts a job conversation from the first message. Returns the new job's id. `inWindow`: the job waits for its template and style, and
+ * the chat asks for the template first (section 19, phase 1 revised).
+ */
+export function startJob(text: string, formatKey?: string, extra: string[] = [], inWindow = false): string {
   const s = getState();
   const id = nextId('job');
-  const { facts, role } = extractFacts(text, s.today);
+  const { facts, role, engagement } = extractFacts(text, s.today);
   if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
+  if (inWindow) {
+    const waiting: DemoJob = { ...job, setup: 'template' };
+    waiting.chat = [msg('user', text), ...templateQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
+    update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
+    return id;
+  }
   const live = withLiveDraft(s, job);
   live.chat = [msg('user', text), ...replyAfterFacts(s, live, true)];
   update((st) => ({ ...st, jobs: [live, ...st.jobs] }));
   return id;
+}
+
+const STYLE_QUICK = ['Yes, write it that way', 'More formal', 'Shorter sentences'];
+const KEEP_QUICK = ['Keep it for all jobs', 'Just this job'];
+
+/** The first question in the window: which template, with the recommendation and its reason; the job type read so far. */
+function templateQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
+  const rec = recommendation(s, j.format);
+  const format = formatOf(s, rec.key);
+  const count = orderSections(recommendSections(format, j.facts), format).length;
+  const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'a new job';
+  const type = `${ENGAGEMENTS.find((e) => e.key === j.facts.engagement)?.label.toLowerCase() ?? 'job'}${j.facts.contract ? `, ${j.facts.contract.toLowerCase()}` : ''}`;
+  const out: ChatMsg[] = [];
+  const better = j.facts.title ? suggestTitle(j.facts.title) : null;
+  if (better) out.push(msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`]));
+  out.push(
+    msg(
+      'ai',
+      `Got it: ${what}. I read it as a ${type}${typeClear ? '' : ", though I couldn't tell the contract: tap it in the sentence at the top of the template panel, or tell me"}.\n\nFirst, the template. I'd use **${format.label}**, ${rec.reason}: ${count} sections for this job, about ${wordsFor(count)} words. Shall I use it, or would you like to see others or create your own?`,
+      [`Use ${format.label}`, 'Show me others', 'Create my own'],
+    ),
+  );
+  return out;
+}
+
+/** "How should it sound?", asked once the template is chosen and before anything is written. */
+function styleQuestion(s: State): string {
+  const style = proposedStyle(s);
+  return `How should it sound? ${s.org.voice.length ? 'Your organisation writes' : 'Organisations like yours usually write'} ${describeStyle(style)}. Shall I write it that way, or differently?`;
+}
+
+/** Puts the chosen template on a job that is waiting for one, and asks for the style. `tags`: the sections of a template the user built. */
+export function applyTemplate(id: string, formatKey: string, said?: string, tags?: string[]) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const format = formatOf(s, formatKey);
+      const keys = outlineOrder(tags ?? orderSections(recommendSections(format, j.facts), format));
+      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), part: undefined };
+      const user = said ? [msg('user', said)] : [];
+      if (!j.setup) return j;
+      return { ...next, setup: 'style', chat: [...j.chat, ...user, msg('ai', `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`, STYLE_QUICK)] };
+    }),
+  }));
+}
+
+/** The style is chosen: the first draft is written in it, and the fact questions begin. */
+export function chooseStyle(id: string, style: string[], said?: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const written = withLiveDraft(s, { ...j, style, tone: toneOf(style), setup: undefined });
+      const offer = !s.org.styleKept;
+      const reply = written.sections.length ? `Here is the first draft, written ${describeStyle(style)}.` : `I'll write it ${describeStyle(style)} as soon as I know the job title.`;
+      return {
+        ...written,
+        part: written.sections.length ? `s:${written.tags[0]}` : undefined,
+        chat: [...j.chat, ...(said ? [msg('user', said)] : []), msg('ai', `${reply}${offer ? ' Shall I keep this style for all your jobs?' : ''}`, offer ? KEEP_QUICK : undefined), ...nextAsk(written.facts)],
+      };
+    }),
+  }));
+}
+
+/** The goals a job serves, corrected by hand (at most three); `null` goes back to reading them from the role. */
+export function setSdgs(id: string, sdgs: number[] | null) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined }));
+}
+
+/** A template matched by name in a message: "use the UN one", "INGO role profile". */
+function templateIn(s: State, text: string): string | null {
+  const t = text.toLowerCase().replace(/^use\s+/, '').replace(/[.!?]$/, '').trim();
+  const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
+  const exact = usable.find((f) => f.label.toLowerCase() === t);
+  if (exact) return exact.key;
+  const words = t.split(/[\s-]+/).filter((w) => w.length > 1 && !['the', 'one', 'format', 'template', 'please', 'a', 'an', 'it'].includes(w));
+  if (!words.length) return null;
+  const hit = usable.find((f) => words.every((w) => f.label.toLowerCase().includes(w)));
+  return hit?.key ?? null;
+}
+
+const YES = /^(yes|yep|yeah|ok|okay|sure|fine|go ahead|sounds good|use it|that one|do it|please do|perfect|great)\b/i;
+
+/** A message while the job waits for its template or its style. Returns true when it was handled. */
+function setupTurn(s: State, j: DemoJob, text: string): boolean {
+  const userMsg = msg('user', text);
+  const say = (reply: string, quick?: string[]) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', reply, quick)] }));
+  if (j.setup === 'template') {
+    const rec = recommendation(s, j.format);
+    if (/\b(own|scratch|myself|build|custom)\b/i.test(text)) {
+      say("Let's build it: give it a name, then add, remove, rename, and order the sections. They show in the job description as you go; choose \"Use\" when it looks right.");
+      return true;
+    }
+    const named = templateIn(s, text);
+    if (named) {
+      applyTemplate(j.id, named, text);
+      return true;
+    }
+    if (YES.test(text.trim())) {
+      applyTemplate(j.id, rec.key, text);
+      return true;
+    }
+    if (/\b(other|others|more|show|options|different|alternatives?|else)\b/i.test(text)) {
+      const list = rec.others.map((k) => formatOf(s, k));
+      say(`Close matches: ${list.map((f) => `**${f.label}** (${f.usedBy.toLowerCase()})`).join('; ')}. All of them are in the template panel, by family, each with its sections.`, list.map((f) => `Use ${f.label}`));
+      return true;
+    }
+    say(`Which template shall I use? I'd suggest **${formatOf(s, rec.key).label}**, or pick one in the template panel, or create your own.`, [`Use ${formatOf(s, rec.key).label}`, 'Show me others', 'Create my own']);
+    return true;
+  }
+  if (j.setup === 'style') {
+    const style = YES.test(text.trim()) ? proposedStyle(s) : styleFromReply(proposedStyle(s), text);
+    chooseStyle(j.id, style, text);
+    return true;
+  }
+  return false;
 }
 
 function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
@@ -299,6 +430,16 @@ function chatTurn(id: string, text: string, focus?: string) {
     update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...withFacts(st, x, { ...x.facts, title: use[1] }), chat: [...x.chat, userMsg, msg('ai', `The title is now **${use[1]}**.`)] } : x)) }));
     return;
   }
+  if (text.trim() === KEEP_QUICK[0] && j.style) {
+    const style = j.style;
+    update((st) => ({ ...st, org: { ...st.org, voice: style, styleKept: true }, jobs: st.jobs.map((x) => (x.id === id ? { ...x, chat: [...x.chat, userMsg, msg('ai', 'Kept: every new job starts in this style. You can change it in Organisation settings.')] } : x)) }));
+    return;
+  }
+  if (text.trim() === KEEP_QUICK[1]) {
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', 'Fine: this job only.')] }));
+    return;
+  }
+  if (setupTurn(s, j, text)) return;
   if (lower === 'start from last time') {
     const past = s.jobs.find((x) => x.status === 'closed' && x.facts.title.toLowerCase() === j.facts.title.toLowerCase());
     if (past) {

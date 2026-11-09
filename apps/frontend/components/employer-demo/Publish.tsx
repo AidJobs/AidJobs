@@ -56,6 +56,7 @@ import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, goBack, notify, takePart, useDemo } from './store';
+import { SDG_NAMES, sdgsOf } from './setup';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
 import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys, Steps } from './ui';
@@ -237,6 +238,15 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           </span>
         )}
       </div>
+      {sdgsOf(job).length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Sustainable Development Goals" lang="en">
+          {sdgsOf(job).map((g) => (
+            <span key={g} className="aj-chip" data-tone="sage">
+              SDG {g} · {SDG_NAMES[g]}
+            </span>
+          ))}
+        </div>
+      )}
       {job.status !== 'closed' && (
         <div>
           <a className="aj-ink-btn" href={`${s.org.careersUrl}/apply`} target="_blank" rel="noopener noreferrer">

@@ -11,7 +11,7 @@ export function refocus(wrap: HTMLElement | null, button: HTMLElement | null) {
 }
 
 /** A button that opens a short list of actions on click; Escape or a click outside closes it. */
-export default function MenuButton({ label, trigger, actions, align = 'right', up = false }: { label: string; trigger: ReactNode; actions: MenuAction[]; align?: 'left' | 'right'; up?: boolean }) {
+export default function MenuButton({ label, trigger, actions, align = 'right', up = false, className = 'aj-icon-btn' }: { label: string; trigger: ReactNode; actions: MenuAction[]; align?: 'left' | 'right'; up?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -37,7 +37,7 @@ export default function MenuButton({ label, trigger, actions, align = 'right', u
 
   return (
     <div ref={wrap} className="relative flex">
-      <button ref={button} type="button" className="aj-icon-btn" aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
+      <button ref={button} type="button" className={className} aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
         {trigger}
       </button>
       {open && (

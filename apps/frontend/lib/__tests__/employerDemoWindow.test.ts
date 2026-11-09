@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { changeWithUndo, getState, resetDemo, update } from '../../components/employer-demo/store';
-import { chatNote, editSection, sendChat, setFacts, setPart, settleAsk, startJob } from '../../components/employer-demo/actions';
-import { currentPart, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
+import { applyTemplate, chatNote, chooseStyle, editSection, formatOf, sendChat, setFacts, setPart, setSdgs, settleAsk, startJob } from '../../components/employer-demo/actions';
+import { currentPart, lineFit, onLine, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
+import { describeStyle, inferSdgs, proposedStyle, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const lines = (id: string, key: string) => job(id).sections.find((x) => x.key === key)?.lines;
@@ -108,5 +109,99 @@ describe('the window: hand edits and its own replies', () => {
     expect(job(id).chat.at(-1)?.ask).toBe('place');
     chatNote(id, 'show the preview', 'The preview is open.');
     expect(job(id).chat.at(-1)?.ask).toBe('place');
+  });
+});
+
+describe('the window, revised: the template comes first, then the style, then the writing', () => {
+  it('a job started in the window waits for its template: nothing is written and no fact is asked yet', () => {
+    const id = startJob('We are hiring a Nutrition Officer, 12-month fixed-term', undefined, [], true);
+    expect(job(id).setup).toBe('template');
+    expect(job(id).sections).toEqual([]);
+    expect(job(id).chat.at(-1)?.text).toContain('First, the template');
+    expect(job(id).chat.at(-1)?.quick?.[0]).toMatch(/^Use /);
+    expect(job(id).chat.some((m) => m.ask)).toBe(false);
+    expect(currentPart(job(id), getState())).toBe('outline');
+    expect(partsOf(job(id), getState())[0].label).toBe(formatOf(getState(), job(id).format).label);
+    sendChat(id, 'it is based in Juba');
+    expect(job(id).setup).toBe('template');
+    expect(job(id).chat.some((m) => m.ask)).toBe(false);
+  });
+
+  it('the template is named in plain words, offered with others, or accepted with a yes; then the style is asked', () => {
+    const others = startJob('We are hiring a Nutrition Officer', undefined, [], true);
+    sendChat(others, 'show me some others');
+    expect(job(others).setup).toBe('template');
+    expect(job(others).chat.at(-1)?.quick?.length).toBe(3);
+    const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
+    sendChat(others, 'use the UN Secretariat one');
+    expect(job(others).format).toBe(un.key);
+    expect(job(others).setup).toBe('style');
+    expect(job(others).chat.at(-1)?.text).toContain('How should it sound?');
+    const yes = startJob('We are hiring a Nutrition Officer', undefined, [], true);
+    sendChat(yes, 'yes please');
+    expect(job(yes).setup).toBe('style');
+  });
+
+  it('the style is taken from any reply; the first draft is written in it, the facts are asked, and keeping it fills in the organisation', () => {
+    const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
+    applyTemplate(id, job(id).format);
+    sendChat(id, 'more formal please, and short sentences');
+    expect(job(id).setup).toBeUndefined();
+    expect(job(id).style).toContain('Formal');
+    expect(job(id).style).toContain('Short sentences');
+    expect(job(id).style).not.toContain('Warm');
+    expect(job(id).tone).toBe('formal');
+    expect(job(id).sections.length).toBeGreaterThan(2);
+    expect(job(id).chat.at(-1)?.ask).toBe('place');
+    expect(job(id).chat.at(-2)?.quick).toEqual(['Keep it for all jobs', 'Just this job']);
+    sendChat(id, 'Keep it for all jobs');
+    expect(getState().org.voice).toEqual(job(id).style);
+    expect(getState().org.styleKept).toBe(true);
+    const next = startJob('We are hiring a Health Officer', undefined, [], true);
+    applyTemplate(next, job(next).format);
+    chooseStyle(next, proposedStyle(getState()));
+    expect(job(next).chat.some((m) => m.quick?.includes('Keep it for all jobs'))).toBe(false);
+  });
+
+  it('a template the user built is applied with exactly its sections', () => {
+    const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
+    applyTemplate(id, job(id).format, undefined, ['apply', 'about', 'responsibilities']);
+    expect(job(id).tags).toEqual(['about', 'responsibilities', 'apply']);
+  });
+
+  it('reads the style in words, and turns it into the writer’s tone', () => {
+    expect(describeStyle(['Warm', 'Plain English', 'Speaks as "we"', 'Uses "you"'])).toBe('warmly, in plain English and speaking as "we" to "you"');
+    expect(styleFromReply(['Warm', 'Plain English'], 'make it more professional')).toEqual(['Formal', 'Plain English']);
+    expect(toneOf(['Plain English'])).toBe('plain');
+    expect(toneOf(['Warm', 'Formal'])).toBe('formal');
+  });
+});
+
+describe('the window, revised: SDGs on every job where they can be identified', () => {
+  it('reads one main goal and at most two more from the title or the sector, and none when no goal is clear', () => {
+    const wash = startJob('We are hiring a WASH Officer in Juba');
+    expect(inferSdgs(job(wash))).toEqual([6, 3]);
+    const edu = startJob('We are hiring an Education Specialist in Kampala');
+    expect(inferSdgs(job(edu))).toEqual([4]);
+    const fin = startJob('We are hiring a Finance Officer in Kampala');
+    expect(inferSdgs(job(fin))).toEqual([]);
+    setSdgs(fin, [17, 1, 2, 3]);
+    expect(sdgsOf(job(fin))).toEqual([17, 1, 2]);
+    setSdgs(fin, null);
+    expect(sdgsOf(job(fin))).toEqual([]);
+  });
+});
+
+describe('the window, revised: "+N" keeps every part within reach', () => {
+  it('shows the parts that fit, keeps room for +N, and keeps the part in view on the line', () => {
+    const parts = partsOf(job('job-comms'), getState());
+    expect(lineFit(parts.map(() => 100), 10_000)).toBe(parts.length);
+    const fit = lineFit(parts.map(() => 100), 452);
+    expect(fit).toBe(4);
+    const last = parts[parts.length - 1].key;
+    const { shown, more } = onLine(parts, fit, last);
+    expect(shown).toHaveLength(4);
+    expect(shown.at(-1)?.key).toBe(last);
+    expect(shown.length + more.length).toBe(parts.length);
   });
 });

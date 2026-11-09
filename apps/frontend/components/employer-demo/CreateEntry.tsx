@@ -92,7 +92,7 @@ export default function CreateEntry() {
     box.current?.focus();
   };
   const send = (v: string) => {
-    const id = startJob(v, fkey, extra);
+    const id = startJob(v, fkey, extra, true);
     try {
       localStorage.setItem(READING_KEY, id);
     } catch {
