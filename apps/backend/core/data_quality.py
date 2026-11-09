@@ -60,7 +60,7 @@ class DataQualityScorer:
         total_score = 0.0
         
         # Title (required)
-        title = job.get('title', '').strip()
+        title = (job.get('title') or '').strip()
         if title and len(title) >= 5:
             factors['title'] = 1.0
         elif title:
@@ -73,7 +73,7 @@ class DataQualityScorer:
         total_score += factors['title'] * self.FIELD_WEIGHTS['title']
         
         # Apply URL (required)
-        apply_url = job.get('apply_url', '').strip()
+        apply_url = (job.get('apply_url') or '').strip()
         if apply_url and (apply_url.startswith('http://') or apply_url.startswith('https://')):
             factors['apply_url'] = 1.0
         elif apply_url:
@@ -86,13 +86,13 @@ class DataQualityScorer:
         total_score += factors['apply_url'] * self.FIELD_WEIGHTS['apply_url']
         
         # Location
-        location = job.get('location_raw', '').strip()
+        location = (job.get('location_raw') or '').strip()
         location_normalized = job.get('location_normalized')
         has_location = bool(location or location_normalized)
         
         if has_location:
-            # Check if geocoded
-            if job.get('latitude') and job.get('longitude'):
+            # Located: coordinates (stored by the old geocoder) or a country read from the location
+            if (job.get('latitude') and job.get('longitude')) or job.get('country_iso'):
                 factors['location'] = 1.0
                 factors['geocoding'] = 1.0
             elif job.get('is_remote'):
@@ -127,7 +127,7 @@ class DataQualityScorer:
         total_score += factors['deadline'] * self.FIELD_WEIGHTS['deadline']
         
         # Description
-        description = job.get('description_snippet', '').strip()
+        description = (job.get('description_snippet') or '').strip()
         if description and len(description) >= 50:
             factors['description'] = 1.0
         elif description:
@@ -139,7 +139,7 @@ class DataQualityScorer:
         total_score += factors['description'] * self.FIELD_WEIGHTS['description']
         
         # Organization name
-        org_name = job.get('org_name', '').strip()
+        org_name = (job.get('org_name') or '').strip()
         if org_name:
             factors['org_name'] = 1.0
         else:
@@ -173,11 +173,10 @@ class DataQualityScorer:
         
         if deadline and isinstance(deadline, str):
             try:
-                from datetime import datetime
                 parsed = datetime.strptime(deadline, '%Y-%m-%d')
                 if parsed.date() < date.today():
                     issues.append('Deadline in the past')
-            except:
+            except ValueError:
                 pass
         
         return {
