@@ -469,12 +469,23 @@ def test_the_finish_reads_the_fresh_source_row_not_the_callers_copy():
     assert params[2] == 4
 
 
-@pytest.mark.parametrize("status", ["paused", "deleted", "pending_validation"])
+@pytest.mark.parametrize("status", ["paused", "pending_validation"])
 @pytest.mark.parametrize("outcome", ["ok", "fail"])
 def test_only_active_becomes_paused_and_no_other_status_changes(status, outcome):
     _finished, statements, _conn = _finish(outcome, source_row=_source_row(status, failures=4))
     _sql, params = _source_update(statements)
     assert params[5] == status
+
+
+@pytest.mark.parametrize("outcome", ["ok", "fail"])
+def test_a_deleted_source_records_its_last_run_but_no_count_or_schedule(outcome):
+    """W-52: a run of a source deleted meanwhile is not counted, so adding it again keeps the
+    counts it had; its status, schedule and counters are left as they are."""
+    _finished, statements, _conn = _finish(outcome, source_row=_source_row("deleted", failures=4))
+    sql, params = _source_update(statements)
+    assert params == (outcome, "nope", "src-1")
+    assert "consecutive_failures" not in sql and "next_run_at" not in sql
+    assert "status = %s" not in sql.replace("last_crawl_status = %s", "")
 
 
 def test_a_first_interruption_is_recorded_but_not_counted():

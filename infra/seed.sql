@@ -4,7 +4,7 @@
 -- Insert sample sources (job boards to crawl)
 INSERT INTO sources (org_name, careers_url, source_type, status, crawl_frequency_days, last_crawl_status)
 VALUES
-    ('United Nations Development Programme', 'https://careers.undp.org/cj_api/jobs', 'json', 'active', 1, 'success'),
+    ('United Nations Development Programme', 'https://careers.undp.org/cj_api/jobs', 'api', 'active', 1, 'success'),
     ('Médecins Sans Frontières', 'https://www.msf.org/careers', 'html', 'active', 2, 'success'),
     ('Global Partnership for Education', 'https://www.globalpartnership.org/careers', 'html', 'pending_validation', 3, NULL)
 ON CONFLICT DO NOTHING;

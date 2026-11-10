@@ -116,6 +116,44 @@ def test_the_delete_routes_own_export_is_refused_before_anything_is_deleted(monk
     assert log == []
 
 
+# The delete type ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("deletion_type", ["HARD", "Hard", "hard ", " soft", "", "delete", "batch",
+                                           "softly", "hard\u0000"])
+@pytest.mark.parametrize("target", [{"job_ids": ["job-1"]}, {"org_name": "Oxfam"},
+                                    {"source_id": "source-1"},
+                                    {"job_ids": ["job-1"], "dry_run": True}],
+                         ids=["ids", "organisation", "source", "dry run"])
+def test_a_delete_type_other_than_soft_or_hard_is_refused_before_the_database(
+        monkeypatch, client, deletion_type, target):
+    """Any other value used to run the soft update without its `deleted_at IS NULL` filter,
+    skipping the Hard Delete's reason and exact count, and to report a "<value>-delete"."""
+    log = _database(monkeypatch)
+    response = client.post(DELETE, json={**target, "deletion_type": deletion_type,
+                                         "deletion_reason": "cleanup"})
+    assert (response.status_code, response.json()) == (
+        400, {"detail": "deletion_type must be soft or hard"})
+    assert log == []
+
+
+@pytest.mark.parametrize("deletion_type", [None, 1, True, ["hard"]])
+def test_a_delete_type_that_is_not_text_is_refused_before_the_database(
+        monkeypatch, client, deletion_type):
+    log = _database(monkeypatch)
+    response = client.post(DELETE, json={"job_ids": ["job-1"], "deletion_type": deletion_type})
+    assert response.status_code == 422
+    assert log == []
+
+
+def test_a_delete_without_a_type_soft_deletes_only_jobs_not_yet_deleted(monkeypatch, client):
+    log = _database(monkeypatch)
+    response = client.post(DELETE, json={"job_ids": ["job-1"]})
+    assert response.status_code == 200
+    assert response.json()["data"]["deletion_type"] == "soft"
+    updates = [s for s, _p in log if s.startswith("UPDATE jobs")]
+    assert len(updates) == 1 and updates[0].endswith("AND deleted_at IS NULL RETURNING id::text")
+
+
 # A Hard Delete by job IDs ------------------------------------------------------------------
 
 def _jobs(monkeypatch, present, deletable=None):
