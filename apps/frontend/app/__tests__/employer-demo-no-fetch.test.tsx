@@ -25,11 +25,17 @@ import DemoRecovery from '@/components/employer-demo/Recover';
 import { currentMonth } from '@/components/employer-demo/plans';
 import { getState, go, goBack, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
+import { AI_ROUTE, resetAi } from '@/components/employer-demo/ai';
 
 const network: string[] = [];
 let container: HTMLDivElement;
 let root: Root;
 let phone = false;
+
+/** The demo's own AI route is the one address allowed; it answers as the stand-in says (by default, that the AI is off). */
+type Answer = { status: number; body: unknown };
+let aiRoute: (method: string, body: string) => Answer | Promise<Answer> = (method) => (method === 'GET' ? { status: 200, body: { ai: false } } : { status: 503, body: { error: 'off' } });
+const aiCalls: Array<{ method: string; body: string }> = [];
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -38,7 +44,15 @@ beforeAll(() => {
     network.push(what);
     throw new Error(`The employer demo must not use the network: ${what}`);
   };
-  Object.defineProperty(globalThis, 'fetch', { configurable: true, value: jest.fn(deny('fetch')) });
+  const fetchStub = async (url: unknown, init?: { method?: string; body?: unknown }) => {
+    if (url !== AI_ROUTE) return deny(`fetch ${String(url)}`)();
+    const method = init?.method ?? 'GET';
+    const body = typeof init?.body === 'string' ? init.body : '';
+    aiCalls.push({ method, body });
+    const a = await aiRoute(method, body);
+    return { ok: a.status >= 200 && a.status < 300, status: a.status, json: async () => a.body };
+  };
+  Object.defineProperty(globalThis, 'fetch', { configurable: true, value: jest.fn(fetchStub) });
   Object.defineProperty(window.XMLHttpRequest.prototype, 'open', { configurable: true, value: deny('XMLHttpRequest') });
   Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: deny('sendBeacon') });
   Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: deny('WebSocket') });
@@ -1552,18 +1566,136 @@ describe('employer demo: asking the chat to act', () => {
   });
 });
 
+describe('employer demo: the AI chat, with a stand-in model on its own route', () => {
+  type Sent = { message: string; first: boolean; context: { stage: string; job: { sections: Array<{ key: string; fixed: boolean }> }; recommendation: { key: string } } };
+  const flush = () =>
+    act(async () => {
+      for (let i = 0; i < 30; i++) await Promise.resolve();
+    });
+  const write = (label: string, text: string) => {
+    const ta = container.querySelector(`textarea[aria-label="${label}"]`) as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(ta, text);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
+  const say = (text: string) => write('Message AidJobs about this job', text);
+  const posts = () => aiCalls.filter((c) => c.method === 'POST').map((c) => JSON.parse(c.body) as Sent);
+  const stage = { failNext: false };
+  const model = (method: string, body: string): Answer => {
+    if (method === 'GET') return { status: 200, body: { ai: true } };
+    if (stage.failNext) {
+      stage.failNext = false;
+      return { status: 502, body: { error: 'failed' } };
+    }
+    const { first, context } = JSON.parse(body) as Sent;
+    if (first) return { status: 200, body: { reply: 'A nutrition role in Juba: I would use your usual template. Shall I?', actions: [{ type: 'ask', quick: ['Yes, use it'] }] } };
+    if (context.stage === 'template') return { status: 200, body: { reply: 'Done. How should it sound: warm and plain?', actions: [{ type: 'use_template', template: context.recommendation.key }] } };
+    if (context.stage === 'style') {
+      const writes = context.job.sections.filter((x) => !x.fixed).map((x) => ({ type: 'write_section', section: x.key, lines: [`Written by the stand-in model for ${x.key}.`] }));
+      return { status: 200, body: { reply: 'Here is the first draft. Keep this style for every job?', actions: [{ type: 'set_style', style: ['Warm', 'Plain English'] }, ...writes, { type: 'write_section', section: 'apply', lines: ['Send your CV to jobs@invented.example'] }, { type: 'ask', quick: ['Keep it for all jobs', 'Just this job'] }] } };
+    }
+    return { status: 200, body: { reply: 'Kept for every job.', actions: [{ type: 'keep_style', all: true }] } };
+  };
+
+  afterAll(() => {
+    aiRoute = (method) => (method === 'GET' ? { status: 200, body: { ai: false } } : { status: 503, body: { error: 'off' } });
+    resetAi();
+  });
+
+  it('the AI writes the replies and the draft; the demo applies its actions, refuses what is not allowed, and falls back to the rules quietly', async () => {
+    aiCalls.length = 0;
+    aiRoute = model;
+    resetAi();
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+    phone = false;
+    render();
+    route('#create');
+    await flush();
+    write('Describe the role', "We're hiring a Nutrition Officer in Juba, closing 30 December 2026");
+    route(window.location.hash);
+    const id = window.location.hash.replace('#job/', '');
+    const job = () => getState().jobs.find((j) => j.id === id)!;
+    shows('Reading your role…');
+    await flush();
+    act(() => jest.advanceTimersByTime(1000));
+    await flush();
+    expect(container.textContent).not.toContain('Reading your role…');
+    shows('A nutrition role in Juba');
+    expect(container.textContent).not.toContain('First, the template.');
+    expect(posts()[0]).toMatchObject({ first: true, message: "We're hiring a Nutrition Officer in Juba, closing 30 December 2026", context: { stage: 'template' } });
+    shows('Messages go to an AI provider (Amazon Bedrock). Use sample details only.');
+
+    say('Yes, use it');
+    shows('Thinking…');
+    await flush();
+    expect(container.textContent).not.toContain('Thinking…');
+    expect(job().setup).toBe('style');
+    shows('How should it sound: warm and plain?');
+
+    say('Warm and plain, please');
+    await flush();
+    expect(job().setup).toBeUndefined();
+    const written = job().sections.filter((x) => x.ai);
+    expect(written.length).toBe(job().sections.filter((x) => x.key !== 'about' && x.key !== 'apply').length);
+    expect(job().sections.find((x) => x.key === 'apply')?.lines.join(' ')).not.toContain('invented.example');
+    shows('Written by the stand-in model for');
+    shows('Not done:');
+    shows('written from your settings');
+    expect(job().chat.filter((m) => m.ai).map((m) => m.text.slice(0, 20))).toEqual(['A nutrition role in ', 'Done. How should it ', 'Here is the first dr']);
+    expect(job().chat.some((m) => /First, the template\.|Here is the first draft, written|How should it sound\? /.test(m.text))).toBe(false);
+
+    click('Keep it for all jobs');
+    await flush();
+    expect(posts().at(-1)?.message).toBe('Keep it for all jobs');
+    expect(getState().org.styleKept).toBe(true);
+
+    stage.failNext = true;
+    say('shorter');
+    await flush();
+    shows("The AI could not answer just now, so the demo's own rules did.");
+    expect(job().chat.at(-1)?.ai).toBeUndefined();
+    expect(network).toEqual([]);
+  });
+});
+
+const AI_SDK = /from ['"](openai|ai|@ai-sdk\/[\w-]+|@anthropic-ai\/[\w-]+|@google\/(generative-ai|genai)|@mistralai\/[\w-]+|cohere-ai|groq-sdk|ollama|langchain|@langchain\/[\w-]+)['"]/;
+
 describe('employer demo: source has no network path', () => {
-  it('no demo file calls fetch, an AidJobs API path, or a request library', () => {
+  it('no demo file calls fetch, an AidJobs API path, or a request library, except the AI chat, which reaches only its own route', () => {
     const dir = join(__dirname, '..', '..', 'components', 'employer-demo');
     for (const f of readdirSync(dir)) {
       const src = readFileSync(join(dir, f), 'utf8');
-      expect({ f, fetch: /\bfetch\s*\(/.test(src) }).toEqual({ f, fetch: false });
       expect({ f, api: /['"`]\/api\//.test(src) }).toEqual({ f, api: false });
+      if (f === 'ai.ts') {
+        expect(AI_ROUTE).toBe('/employer-demo/chat');
+        expect(src.match(/['"`]\/[\w-]+\/[^'"`\s]*['"`]/g)).toEqual([`'${AI_ROUTE}'`]);
+        expect(src.match(/\bfetch\s*\(([^,]+),/g)).toEqual(['fetch(AI_ROUTE,', 'fetch(AI_ROUTE,']);
+      } else {
+        expect({ f, fetch: /\bfetch\s*\(/.test(src) }).toEqual({ f, fetch: false });
+      }
       expect({ f, lib: /from ['"](axios|swr|@tanstack)/.test(src) }).toEqual({ f, lib: false });
       expect({ f, data: /lib\/site\/loadJobs|lib\/shortlist|PublicSite/.test(src) }).toEqual({ f, data: false });
       expect({ f, stream: /\bEventSource\b|\bWebSocket\b/.test(src) }).toEqual({ f, stream: false });
-      expect({ f, ai: /from ['"](openai|ai|@ai-sdk\/[\w-]+|@anthropic-ai\/[\w-]+|@google\/(generative-ai|genai)|@mistralai\/[\w-]+|cohere-ai|groq-sdk|ollama|langchain|@langchain\/[\w-]+)['"]/.test(src) }).toEqual({ f, ai: false });
+      expect({ f, ai: AI_SDK.test(src) }).toEqual({ f, ai: false });
     }
+  });
+
+  it('the AI route signs its own requests: no AI or AWS package on either side, and the model is reached only at Bedrock', () => {
+    const server = [join(__dirname, '..', 'employer-demo', 'chat', 'route.ts'), ...['model.ts', 'sigv4.ts'].map((f) => join(__dirname, '..', '..', 'lib', 'employerDemoAi', f))];
+    for (const f of server) {
+      const src = readFileSync(f, 'utf8');
+      expect({ f, ai: AI_SDK.test(src), aws: /from ['"](@aws-sdk\/[\w-]+|aws-sdk|aws4|@smithy\/[\w-]+)['"]/.test(src) }).toEqual({ f, ai: false, aws: false });
+      expect({ f, urls: (src.match(/https:\/\/[^\s'"`]+/g) ?? []).filter((u) => !u.startsWith('https://bedrock-mantle.')) }).toEqual({ f, urls: [] });
+      expect({ f, logsText: /console\.\w+\([^)]*\b(message|content|context|body|raw)\b/.test(src) }).toEqual({ f, logsText: false });
+    }
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    expect(deps.filter((d) => /^(@aws-sdk\/|aws-sdk$|aws4$|openai$|ai$|@ai-sdk\/)/.test(d))).toEqual([]);
   });
 
   it('the page fixes "do not index" in its own layout', () => {

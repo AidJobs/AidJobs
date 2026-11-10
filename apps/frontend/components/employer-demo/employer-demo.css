@@ -1867,6 +1867,13 @@ button.ej-step:hover {
   white-space: nowrap;
 }
 
+.ej-ai-note {
+  padding: 4px 4px 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .ej-reading {
   animation: ej-breathe 1.4s ease-in-out infinite;
 }

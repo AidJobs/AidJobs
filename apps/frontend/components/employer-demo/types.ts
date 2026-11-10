@@ -103,9 +103,11 @@ export type Facts = {
   keyPersonnel: boolean;
 };
 
-export type Section = { key: string; title: string; lines: string[]; edited?: boolean };
+/** `ai`: written by the AI chat; like a hand edit, it is kept when the facts change rather than rebuilt by the rules. */
+export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean };
 
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract' };
+/** `ai`: a reply written by the AI chat, so its answer buttons go back to the AI; the rules' own answers go to the rules. */
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract'; ai?: boolean };
 
 export type Remark = {
   id: string;
@@ -257,6 +259,8 @@ export type DemoJob = {
   style?: string[];
   /** The goals the job serves, when corrected by hand; otherwise read from the role by rules. */
   sdgs?: number[];
+  /** Headings renamed for this job only, by section; kept when the rules rebuild a section, cleared when the template changes. */
+  renamed?: Record<string, string>;
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

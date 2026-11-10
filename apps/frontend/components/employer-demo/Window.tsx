@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { applyFormat, applyTemplate, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, sendChat, setPart, setSdgs, settleAsk } from './actions';
+import { aiOn, askAi, probeAi, useAi } from './ai';
+import type { OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
@@ -21,7 +23,7 @@ import { canGoFree } from './plans';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
-import { go, goBack, useDemo } from './store';
+import { getState, go, goBack, useDemo } from './store';
 import Structure, { Commitments } from './Structure';
 import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { LANGS } from './translate';
@@ -400,17 +402,24 @@ function BoxGrip({ height, onChange }: { height: number; onChange: (h: number) =
   );
 }
 
-/** The guide: the whole conversation, answers inside the questions, and the box, with the part in view as its subject. */
+/**
+ * The guide: the whole conversation, answers inside the questions, and the box, with the part in view as its subject. With the AI on,
+ * a message waits in the conversation while the AI thinks, and a note says where messages go.
+ */
 function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean }) {
   const [text, setText] = useState('');
   const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
   const input = useRef<ComposerHandle>(null);
   const end = useRef<HTMLDivElement>(null);
+  const ai = useAi();
+  const waiting = ai.pending[job.id];
+  const thinking = Boolean(waiting) && !waiting?.first;
+  const busy = Boolean(waiting) || reading;
   const firstUser = job.chat.findIndex((m) => m.from === 'user');
   const shown = reading ? job.chat.slice(0, firstUser + 1) : job.chat;
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
-  }, [shown.length]);
+  }, [shown.length, thinking]);
   const reviewing = Boolean(s.reviewerAs);
   const lastUser = shown.map((m) => m.from).lastIndexOf('user');
   const last = shown[shown.length - 1];
@@ -428,19 +437,29 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
             {m.from === 'ai' && m.quick && m.quick.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {m.quick.map((q) => (
-                  <button key={q} type="button" className="aj-pill" style={{ height: 30 }} disabled={i < lastUser || reviewing} onClick={() => onSend(q)}>
+                  <button key={q} type="button" className="aj-pill" style={{ height: 30 }} disabled={i < lastUser || reviewing || busy} onClick={() => onSend(q)}>
                     {q}
                   </button>
                 ))}
               </div>
             )}
-            {m.from === 'ai' && m === last && m.ask && !reviewing && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
+            {m.from === 'ai' && m === last && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
           </div>
         ))}
         {reading && (
           <div className="ej-bubble ej-reading" data-from="ai" role="status">
             Reading your role…
           </div>
+        )}
+        {thinking && (
+          <>
+            <div className="ej-bubble" data-from="user">
+              {waiting?.text}
+            </div>
+            <div className="ej-bubble ej-reading" data-from="ai" role="status">
+              Thinking…
+            </div>
+          </>
         )}
         <div ref={end} />
       </div>
@@ -464,11 +483,17 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
             <div className="ej-subject" aria-live="polite">
               About: <strong>{subject}</strong>
             </div>
+            {ai.fallback[job.id] && (
+              <p className="ej-ai-note m-0" role="status">
+                {ai.fallback[job.id]}
+              </p>
+            )}
             <Composer
               ref={input}
               value={text}
               onChange={setText}
               onSend={(v) => {
+                if (busy) return;
                 onSend(v);
                 setText('');
               }}
@@ -479,6 +504,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
               autoFocus={autoFocus}
               minHeight={box}
             />
+            {ai.status === 'on' && <p className="ej-ai-note m-0">Messages go to an AI provider (Amazon Bedrock). Use sample details only.</p>}
           </>
         )}
       </div>
@@ -493,8 +519,23 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
  */
 export default function Window({ id }: { id?: string }) {
   const s = useDemo();
+  if (!id || !s.jobs.some((j) => j.id === id)) {
+    return (
+      <div className="mx-auto max-w-[560px] p-6">
+        <p className="aj-muted">This job is not in the demo any more.</p>
+        <button type="button" className="aj-ink-btn" onClick={() => go('create')}>
+          Create a job
+        </button>
+      </div>
+    );
+  }
+  return <JobWindow id={id} />;
+}
+
+function JobWindow({ id }: { id: string }) {
+  const s = useDemo();
   const phone = useIsPhone();
-  const job = id ? s.jobs.find((j) => j.id === id) : undefined;
+  const job = s.jobs.find((j) => j.id === id) as DemoJob;
   const [reading, setReading] = useState(() => readingNow(id));
   const [view, setView] = useState<'chat' | 'job'>('chat');
   const [tab, setTab] = useState('doc');
@@ -527,16 +568,37 @@ export default function Window({ id }: { id?: string }) {
     }
   }
 
+  const openRef = useRef<(t: OpenTarget) => void>(() => {});
+
+  // "Reading your role…" shows for at least a moment; with the AI on, until the AI has written the first reply in place of the rules'.
   useEffect(() => {
-    if (!reading) return;
+    if (!reading || !id) return;
     try {
       localStorage.removeItem(READING_KEY);
     } catch {
       /* storage unavailable */
     }
-    const t = setTimeout(() => setReading(false), 900);
+    let timeUp = false;
+    let answered = false;
+    let over = false;
+    const end = () => {
+      if (over || !timeUp || !answered) return;
+      over = true;
+      setReading(false);
+    };
+    const t = setTimeout(() => {
+      timeUp = true;
+      if (!aiOn()) answered = true;
+      end();
+    }, 900);
+    void probeAi().then(async (on) => {
+      const said = getState().jobs.find((x) => x.id === id)?.chat.find((m) => m.from === 'user')?.text;
+      if (on && said && !answered) await askAi(id, said, { first: true, open: (x) => openRef.current(x) });
+      answered = true;
+      end();
+    });
     return () => clearTimeout(t);
-  }, [reading]);
+  }, [reading, id]);
 
   useEffect(() => {
     const el = bodyRef.current;
@@ -589,17 +651,6 @@ export default function Window({ id }: { id?: string }) {
     if (askId) setPart(job.id, 'details');
   }, [askId, job]);
 
-  if (!job) {
-    return (
-      <div className="mx-auto max-w-[560px] p-6">
-        <p className="aj-muted">This job is not in the demo any more.</p>
-        <button type="button" className="aj-ink-btn" onClick={() => go('create')}>
-          Create a job
-        </button>
-      </div>
-    );
-  }
-
   const reviewing = Boolean(s.reviewerAs);
   const parts = partsOf(job, s);
   const current = currentPart(job, s, parts);
@@ -651,14 +702,26 @@ export default function Window({ id }: { id?: string }) {
     if (phone) setView('job');
     requestAnimationFrame(() => document.getElementById('ej-w-panel')?.focus());
   };
+  /** What the AI asked to bring into view; a delete only opens its confirmation. */
+  const openTarget = (t: OpenTarget) => {
+    const j = getState().jobs.find((x) => x.id === job.id);
+    if (!j) return;
+    if (t === 'templates' || t === 'own') return openPick(t);
+    if (t === 'preview') return j.sections.length ? openPreview() : undefined;
+    if (t === 'versions') return j.versions.length ? setVersionsOpen(true) : undefined;
+    if (t === 'download') return j.sections.length ? downloadCopy(j, getState().org.name) : undefined;
+    if (t === 'delete') return canDelete(getState(), j) ? undefined : setDeleteOpen(true);
+    if (t === 'review') return goPart('publish');
+    goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
+  };
+  useEffect(() => {
+    openRef.current = openTarget;
+  });
+  /** The window's own requests, exact and at once; everything else goes to the AI when it is on, or to the rules. */
   const send = (text: string) => {
     const t = text.toLowerCase().trim();
     if (t === OPEN_PUBLISH.toLowerCase()) return go('publish', job.id);
     if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
-    if (job.setup === 'template' && !/^use /i.test(t)) {
-      if (OWN.test(t)) openPick('own');
-      else if (OTHERS.test(t)) openPick('templates');
-    }
     if (PREVIEW.test(t) && !job.setup) {
       openPreview();
       return chatNote(job.id, text, 'The preview is open in the panel: the job page, how it shows in Google, and how it looks when shared.');
@@ -678,7 +741,25 @@ export default function Window({ id }: { id?: string }) {
     }
     if (PUBLISH.test(t)) return chatNote(job.id, text, 'For now, publishing is on the Check and publish page.', isReviewable(job) ? [OPEN_PUBLISH] : undefined);
     if (REVIEW.test(t)) return chatNote(job.id, text, 'For now, review is in the earlier workspace, in its Review panel.', [OPEN_EARLIER]);
-    sendChat(job.id, text, focus ?? undefined);
+    const last = job.chat[job.chat.length - 1];
+    const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text));
+    if (aiOn() && !rulesAnswer) {
+      void askAi(job.id, text, { focus: focus ?? undefined, open: (x) => openRef.current(x) }).then((done) => {
+        if (!done) byRules(text);
+      });
+      return;
+    }
+    byRules(text);
+  };
+  const byRules = (text: string) => {
+    const j = getState().jobs.find((x) => x.id === job.id);
+    if (!j) return;
+    const t = text.toLowerCase().trim();
+    if (j.setup === 'template' && !/^use /i.test(t)) {
+      if (OWN.test(t)) openPick('own');
+      else if (OTHERS.test(t)) openPick('templates');
+    }
+    sendChat(j.id, text, sectionOf(currentPart(j, getState(), partsOf(j, getState()))) ?? undefined);
   };
 
   const pickOrder = pick ? previewOrder(s, job, pick) : null;

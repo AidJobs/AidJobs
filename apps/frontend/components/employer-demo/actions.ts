@@ -8,6 +8,7 @@ import {
   buildSection,
   buildSections,
   daysUntil,
+  detectRole,
   emptyFacts,
   ENGAGEMENTS,
   extractFacts,
@@ -62,8 +63,10 @@ function rebuilt(s: State, j: DemoJob): DemoJob {
   const ctx = ctxFor(s, j);
   const fill = (l: string) => l.replace('[Duty station]', j.facts.location || '[Duty station]').replace('[Closing date]', j.facts.deadline ? longDate(j.facts.deadline) : '[Closing date]');
   return { ...j, sections: j.tags.map((k) => {
-    const own = j.sections.find((x) => x.key === k && x.edited);
-    return own ? { ...own, lines: own.lines.map(fill) } : buildSection(k, ctx);
+    const own = j.sections.find((x) => x.key === k && (x.edited || x.ai));
+    if (own) return { ...own, lines: own.lines.map(fill) };
+    const built = buildSection(k, ctx);
+    return j.renamed?.[k] ? { ...built, title: j.renamed[k] } : built;
   }) };
 }
 
@@ -273,6 +276,76 @@ export function setSdgs(id: string, sdgs: number[] | null) {
   updateJob(id, (j) => ({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined }));
 }
 
+/** "Keep it for all jobs": the job's style becomes the organisation's, and is not offered again. */
+export function keepStyleForAll(id: string) {
+  const style = getState().jobs.find((j) => j.id === id)?.style;
+  if (!ownerOnly() || !style) return;
+  update((s) => ({ ...s, org: { ...s.org, voice: style, styleKept: true } }));
+}
+
+/** The style changed after the first draft: the rules' sections follow it; sections written by the AI or by hand keep their words. */
+export function setStyle(id: string, style: string[]) {
+  if (!ownerOnly()) return;
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? rebuilt(s, touched({ ...j, style, tone: toneOf(style) })) : j)) }));
+}
+
+/** Facts read by the AI chat; a title also gives the role family when the job has none yet. */
+export function setFactsFromChat(id: string, patch: Partial<Facts>) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const role = patch.title ? detectRole(patch.title).role : null;
+      return withFacts(s, { ...j, family: j.family === 'programme' && role ? role.key : j.family }, { ...j.facts, ...patch });
+    }),
+  }));
+}
+
+/** A heading renamed for this job only. */
+export function renameSection(id: string, key: string, heading: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (j.tags.includes(key) ? { ...touched(j), renamed: { ...j.renamed, [key]: heading }, sections: j.sections.map((x) => (x.key === key ? { ...x, title: heading } : x)) } : j));
+}
+
+/**
+ * Sections written by the AI chat: kept when the facts change, with a version, and shown as the last change with its undo. With no
+ * draft yet, the other sections are written by the rules so the job description is whole.
+ */
+export function writeSections(id: string, writes: Array<{ key: string; lines: string[] }>, note: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((x) => {
+      if (x.id !== id) return x;
+      const base = x.sections.length ? x.sections : buildSections(x.tags, ctxFor(s, x));
+      const sections = base.map((sec) => {
+        const w = writes.find((v) => v.key === sec.key);
+        return w ? { ...sec, lines: w.lines, ai: true, edited: undefined } : sec;
+      });
+      const keys = changedKeys(x.sections, sections);
+      if (!keys.length) return x;
+      return {
+        ...reopenApproval(x),
+        sections,
+        ...liveEdit(x),
+        versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note, sections }],
+        lastChange: { keys, text: note, before: x.sections, beforeTags: x.tags, beforeFacts: x.facts, beforeTone: x.tone },
+      };
+    }),
+  }));
+}
+
+/**
+ * One turn of the AI chat in the conversation: what was said and the AI's reply, in place of anything the actions' own rules said
+ * along the way. `said` is null for the first reply, whose message is already there. `askNext`: a reply that asks nothing is followed
+ * by the next missing fact's question, as the rules do.
+ */
+export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask'] }, askNext = true) {
+  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true }] }));
+  if (askNext) ensureAsk(id);
+}
+
 /** A template matched by name in a message: "use the UN one", "INGO role profile". */
 function templateIn(s: State, text: string): string | null {
   const t = text.toLowerCase().replace(/^use\s+/, '').replace(/[.!?]$/, '').trim();
@@ -431,8 +504,8 @@ function chatTurn(id: string, text: string, focus?: string) {
     return;
   }
   if (text.trim() === KEEP_QUICK[0] && j.style) {
-    const style = j.style;
-    update((st) => ({ ...st, org: { ...st.org, voice: style, styleKept: true }, jobs: st.jobs.map((x) => (x.id === id ? { ...x, chat: [...x.chat, userMsg, msg('ai', 'Kept: every new job starts in this style. You can change it in Organisation settings.')] } : x)) }));
+    keepStyleForAll(id);
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', 'Kept: every new job starts in this style. You can change it in Organisation settings.')] }));
     return;
   }
   if (text.trim() === KEEP_QUICK[1]) {
@@ -595,9 +668,9 @@ export function applyFormat(id: string, formatKey: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
-      const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && x.edited)));
+      const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      const next = { ...touched(j), format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      const next = { ...touched(j), renamed: undefined, format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));

@@ -1,7 +1,8 @@
 'use client';
 
 import { Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Users } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { probeAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Billing from './Billing';
 import { currentMonth, FREE_PER_MONTH, freeLeft, monthName, paidJobsLeft } from './plans';
@@ -76,6 +77,9 @@ export default function EmployerDemo() {
   const [drawer, setDrawer] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    void probeAi();
+  }, []);
 
   if (!mounted) {
     return (

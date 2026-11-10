@@ -475,7 +475,7 @@ export const PLACES: Place[] = [
   { city: 'Maputo', country: 'Mozambique', iso: 'MZ', tz: 'CAT', currency: 'MZN' },
 ];
 
-const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali', 'Hausa', 'Hindi', 'Bengali'];
+export const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali', 'Hausa', 'Hindi', 'Bengali'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const HOLIDAYS: Record<string, string[]> = { KE: ['01-01', '05-01', '06-01', '10-10', '10-20', '12-12', '12-25', '12-26'], default: ['01-01', '12-25'] };
 
@@ -1087,7 +1087,7 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   const t = text.toLowerCase();
   const target = sectionFrom(text, keys, ctx.format) ?? (focus && keys.includes(focus) ? focus : null);
   const role = roleByKey(ctx.roleKey);
-  const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited ? buildSection(s.key, c) : s));
+  const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited && !s.ai ? { ...buildSection(s.key, c), title: s.title } : s));
   let tone = ctx.tone;
   let facts = ctx.facts;
   const length = lengthRequest(t);

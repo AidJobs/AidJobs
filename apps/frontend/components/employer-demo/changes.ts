@@ -34,7 +34,7 @@ export function changesSince(j: DemoJob): Change[] {
     const before = p.sections.find((x) => x.key === k);
     const now = j.sections.find((x) => x.key === k);
     // A section rebuilt from the facts (How to apply quoting the closing date) is not a change of its own: the fact is listed.
-    if (same(before, now) || (before && now && !now.edited && before.title === now.title)) continue;
+    if (same(before, now) || (before && now && !now.edited && !now.ai && before.title === now.title)) continue;
     const label = (now ?? before)!.title;
     out.push({ key: `section:${k}`, label: !before ? `${label} (added)` : !now ? `${label} (removed)` : label, important: false });
   }
