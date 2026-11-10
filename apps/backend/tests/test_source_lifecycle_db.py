@@ -304,11 +304,16 @@ def test_a_restore_of_a_job_whose_source_was_deleted_permanently(routes):
 
 
 def test_a_restore_under_a_source_without_a_status_goes_through(routes):
+    """Only a database without W-52's rule (a development copy) can hold such a source."""
     _sources, jm = routes
-    source = _add_source("Old")
-    _sql("UPDATE sources SET status = NULL WHERE id = %s", (source["id"],))
-    hidden = _add_job(source["id"], deleted=True)
-    assert _restore(jm, [hidden])["restored_count"] == 1
+    _sql(RULES["status (W-52)"].rollback)
+    try:
+        source = _add_source("Old")
+        _sql("UPDATE sources SET status = NULL WHERE id = %s", (source["id"],))
+        hidden = _add_job(source["id"], deleted=True)
+        assert _restore(jm, [hidden])["restored_count"] == 1
+    finally:
+        _as_production()
 
 
 # A crawl and a source delete ---------------------------------------------------------------
@@ -470,12 +475,25 @@ def _undo_all():
         _sql(each.rollback)
 
 
+def _as_production():
+    """Both rules back, as in production since 10 November 2026 (tests/sql/crawl_schema.sql)."""
+    _sql("TRUNCATE jobs, crawl_logs, crawl_locks, sources CASCADE")
+    _undo_all()
+    for each in RULES.values():
+        _run_file(each.migration)
+
+
 @pytest.fixture(params=list(RULES), ids=list(RULES))
 def rule(request, db):  # noqa: F811
-    """Each test starts without either rule and ends without them."""
+    """Each test starts without either rule; production's rules are back afterwards."""
     _undo_all()
     yield RULES[request.param]
-    _undo_all()
+    _as_production()
+
+
+def test_the_test_schema_has_productions_rules(db):  # noqa: F811
+    for each in RULES.values():
+        assert _state(each) == ((True, each.definition), "NO")
 
 
 def _state(rule):
@@ -595,4 +613,4 @@ def test_the_two_migrations_apply_in_either_order(db, order):  # noqa: F811
         for each in RULES.values():
             assert _state(each) == ((True, each.definition), "NO")
     finally:
-        _undo_all()
+        _as_production()

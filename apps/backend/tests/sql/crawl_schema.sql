@@ -1,5 +1,7 @@
 -- Structure of production's sources, crawl_locks, crawl_logs and jobs tables
--- (PostgreSQL 17.6), read without rows on 27 October 2026.
+-- (PostgreSQL 17.6), read without rows on 27 October 2026; the two rules on sources added by
+-- infra/migrations/w52_sources_status_check.sql and w53_sources_type_check.sql, applied in
+-- production on 10 November 2026 and read back read-only.
 -- Only tests/test_crawl_ownership.py loads it, into a local *_test database.
 
 DROP TABLE IF EXISTS public.jobs, public.crawl_logs, public.crawl_locks, public.sources CASCADE;
@@ -9,9 +11,9 @@ CREATE TABLE public.sources (
     "id" uuid DEFAULT gen_random_uuid() NOT NULL,
     "org_name" text,
     "careers_url" text NOT NULL,
-    "source_type" text DEFAULT 'html'::text,
+    "source_type" text DEFAULT 'html'::text NOT NULL,
     "parser_hint" text,
-    "status" text DEFAULT 'pending_validation'::text,
+    "status" text DEFAULT 'pending_validation'::text NOT NULL,
     "crawl_frequency_days" integer DEFAULT 3,
     "last_crawled_at" timestamp with time zone,
     "last_crawl_status" text,
@@ -35,7 +37,9 @@ CREATE TABLE public.sources (
     "disabled_at" timestamp with time zone,
     "tags" text[],
     "metadata" jsonb,
-    CONSTRAINT "sources_pkey" PRIMARY KEY (id)
+    CONSTRAINT "sources_pkey" PRIMARY KEY (id),
+    CONSTRAINT "sources_status_allowed" CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'deleted'::text, 'pending_validation'::text]))),
+    CONSTRAINT "sources_type_allowed" CHECK ((source_type = ANY (ARRAY['html'::text, 'rss'::text, 'api'::text])))
 );
 CREATE UNIQUE INDEX idx_sources_careers_url ON public.sources USING btree (careers_url);
 CREATE INDEX idx_sources_next_run_at ON public.sources USING btree (next_run_at);
@@ -171,6 +175,11 @@ CREATE TABLE public.jobs (
     "quality_issues" text[],
     "needs_review" boolean DEFAULT false,
     "quality_scored_at" timestamp with time zone,
+    -- Added by infra/migrations/w37_captured_fields.sql (W-37).
+    "description" text,
+    "posted_on" date,
+    "locations" text[],
+    "advert_language" text,
     CONSTRAINT "jobs_canonical_hash_key" UNIQUE (canonical_hash),
     CONSTRAINT "jobs_pkey" PRIMARY KEY (id),
     CONSTRAINT "jobs_source_id_fkey" FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL

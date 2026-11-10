@@ -592,7 +592,7 @@ def test_reader_exception_leaves_the_generic_candidate_unchanged(monkeypatch):
     def broken(_html):
         raise RuntimeError("reader failed")
 
-    monkeypatch.setattr("crawler_v2.simple_crawler.read_detail_page", broken)
+    monkeypatch.setattr("crawler_v2.simple_crawler.read_detail_fields", broken)
 
     async def fake_fetch(url):
         return 200, "<h1>Role</h1><span>Location: Nairobi</span>", ""
