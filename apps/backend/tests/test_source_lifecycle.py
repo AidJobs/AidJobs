@@ -182,11 +182,24 @@ def test_each_contract_type_is_accepted_on_create_and_edit(database, source_type
 
 
 def test_a_create_without_a_type_is_html(database):
+    assert sources.SourceCreate(careers_url="https://example.org/jobs").source_type == "html"
     log = database({"INSERT INTO sources": [{"id": SID, "source_type": "html"}]})
     response = _sources_app().post("/api/admin/sources",
                                    json={"careers_url": "https://example.org/jobs"})
     assert response.status_code == 200
     assert any(s.startswith("INSERT INTO sources") for s in log)
+
+
+def test_the_development_seed_uses_only_contract_types():
+    from pathlib import Path
+
+    seed = (Path(__file__).resolve().parents[3] / "infra" / "seed.sql").read_text(encoding="utf-8")
+    sources_insert = seed.split("INSERT INTO sources", 1)[1].split(";", 1)[0]
+    rows = [line for line in sources_insert.splitlines() if line.strip().startswith("('")]
+    assert rows
+    for row in rows:
+        source_type = row.split("', '")[2]
+        assert source_type in {"html", "rss", "api"}, row
 
 
 def test_an_edit_without_a_type_leaves_it_unchanged(database):

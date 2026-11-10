@@ -952,12 +952,12 @@ def import_source(
     Returns:
         Created source
     """
+    check_source_type(source.source_type)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
     conn_params = _connection_params()
     
-    check_source_type(source.source_type)
     
     # Validate parser_hint for API sources
     if source.source_type == "api" and source.parser_hint:
