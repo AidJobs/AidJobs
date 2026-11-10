@@ -379,6 +379,14 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS data_quality_score INTEGER,
     ADD COLUMN IF NOT EXISTS data_quality_issues JSONB;
 
+-- Captured fields (W-37; infra/migrations/w37_captured_fields.sql)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS description TEXT,
+    ADD COLUMN IF NOT EXISTS posted_on DATE,
+    ADD COLUMN IF NOT EXISTS locations TEXT[],
+    ADD COLUMN IF NOT EXISTS advert_language TEXT,
+    ADD COLUMN IF NOT EXISTS salary_range_text TEXT;
+
 -- Create index for enrichment fields
 CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);
 CREATE INDEX IF NOT EXISTS idx_jobs_functional_role ON jobs USING GIN(functional_role);

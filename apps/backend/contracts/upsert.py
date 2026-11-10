@@ -15,6 +15,12 @@ VALIDATED_FIELDS = (
     "city",
     "is_remote",
     "deadline",
+    "description",
+    "posted_on",
+    "locations",
+    "contract_type",
+    "salary_range_text",
+    "advert_language",
 )
 
 UNCHANGED_ON_MATCH = (

@@ -18,8 +18,19 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from contracts.admission import admit_batch, log_admission_rejections
+from contracts.captured import (
+    clean_description,
+    clean_locations,
+    clean_short_text,
+    posted_day,
+)
 from contracts.countries import read_location
-from contracts.detail_reader import apply_detail_reading, read_detail_page
+from contracts.detail_reader import (
+    apply_captured_fields,
+    apply_detail_reading,
+    posting_locations,
+    read_detail_fields,
+)
 from contracts.outbound import (
     POLITENESS_STOPS,
     current_budget,
@@ -61,6 +72,8 @@ def place_job(job: Dict) -> None:
     """Fill country, code, city and remote from the job's location, offline (no network call).
 
     A job without a location keeps whatever is stored. A country its reader supplied is kept.
+    City is never read from text: it is the employer's published locality, only when the job
+    has that one structured place and the place names the job's one country.
     """
     normalized = job.get('location_normalized')
     normalized = normalized if isinstance(normalized, dict) else {}
@@ -72,6 +85,12 @@ def place_job(job: Dict) -> None:
         for name in ('country', 'country_iso', 'city'):
             if not job.get(name):
                 job[name] = reading[name]
+    place = job.get('published_place')
+    if isinstance(place, dict) and not job.get('city') and job.get('country_iso'):
+        own = read_location(place.get('location'))
+        locality = clean_short_text(place.get('locality'))
+        if own is not None and own['country_iso'] == job['country_iso'] and locality:
+            job['city'] = locality
     job['is_remote'] = (
         job.get('is_remote') is True or reading['is_remote'] or normalized.get('type') == 'remote'
     )
@@ -1081,6 +1100,9 @@ class SimpleCrawler:
                 job['location_raw'] = '; '.join(locations)
             else:
                 job['location_raw'] = str(location)
+            published = posting_locations(location)
+            if published:
+                job['locations'] = published
         
         # Extract deadline (try multiple fields)
         deadline_fields = ['validThrough', 'applicationDeadline', 'deadline', 'closingDate', 'expires']
@@ -1103,18 +1125,21 @@ class SimpleCrawler:
                         currency = value.get('currency', '')
                         if amount:
                             job['salary_raw'] = f"{currency} {amount}".strip()
-                    else:
+                    elif isinstance(value, (str, int, float)) and not isinstance(value, bool):
                         job['salary_raw'] = str(value)
                 elif 'minValue' in salary and 'maxValue' in salary:
                     job['salary_raw'] = f"{salary['minValue']} - {salary['maxValue']}"
         
         # Extract description (if available)
-        if 'description' in data:
-            job['description'] = str(data['description']).strip()
+        if isinstance(data.get('description'), str):
+            job['description'] = data['description'].strip()
         
         # Extract employment type
         if 'employmentType' in data:
-            job['employment_type'] = str(data['employmentType'])
+            kinds = data['employmentType']
+            if isinstance(kinds, list):
+                kinds = ', '.join(str(kind).strip() for kind in kinds if str(kind).strip())
+            job['employment_type'] = str(kinds)
         
         # Extract hiring organization
         if 'hiringOrganization' in data:
@@ -1587,6 +1612,27 @@ class SimpleCrawler:
                             candidate["city"] = city
                         if "is_remote" in job:
                             candidate["is_remote"] = is_remote
+                        # Captured fields (W-37): added only when published, so a job page
+                        # that was not opened never clears what is stored.
+                        description = clean_description(job.get("description"))
+                        if description:
+                            candidate["description"] = description
+                        posted_on = posted_day(job.get("posted_on"), observed_at.date())
+                        if posted_on:
+                            candidate["posted_on"] = posted_on
+                        locations = clean_locations(job.get("locations"))
+                        if locations is None and location:
+                            locations = clean_locations([location])
+                        if locations:
+                            candidate["locations"] = locations
+                        for field_name, published in (
+                            ("contract_type", job.get("employment_type")),
+                            ("salary_range_text", job.get("salary_range_text") or job.get("salary_raw")),
+                            ("advert_language", job.get("advert_language")),
+                        ):
+                            text = clean_short_text(published)
+                            if text:
+                                candidate[field_name] = text
                         for field_name in (
                             "latitude",
                             "longitude",
@@ -1925,7 +1971,8 @@ class SimpleCrawler:
             else:
                 try:
                     listing_deadline = job.get('deadline')
-                    job = apply_detail_reading(job, read_detail_page(html))
+                    results, captured = read_detail_fields(html)
+                    job = apply_captured_fields(apply_detail_reading(job, results), captured)
                     read_deadline = job.get('deadline')
                     # Day-first, the order the save step uses for every deadline.
                     if read_deadline and read_deadline != listing_deadline:
