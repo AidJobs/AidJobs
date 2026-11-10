@@ -6,7 +6,7 @@ import pytest
 
 from contracts.identity import algorithm_a, algorithm_b
 from contracts.lifecycle import counting_crawl, run_lifecycle
-from contracts.persist import LOAD_COLUMNS, persist_candidate
+from contracts.persist import LOAD_COLUMNS, created_ids, persist_candidate
 from crawler_v2.run_handle import RunHandle
 
 TITLE = "Programme Officer"
@@ -20,6 +20,7 @@ def _counts(**overrides):
         "listing_complete": True,
         "valid": 266,
         "failed": 0,
+        "unrecorded": 0,
         "active_at_start": 240,
         "matched_active": 232,
     }
@@ -49,6 +50,13 @@ def test_a_complete_crawl_with_no_valid_job_never_counts(valid):
 @pytest.mark.parametrize("failed", [1, 5])
 def test_a_complete_crawl_where_any_job_failed_to_save_does_not_count(failed):
     assert _counts(failed=failed) is False
+
+
+@pytest.mark.parametrize("unrecorded", [1, 3])
+def test_a_complete_crawl_with_a_listed_row_whose_sighting_was_not_recorded_does_not_count(
+    unrecorded,
+):
+    assert _counts(unrecorded=unrecorded) is False
 
 
 def test_fewer_than_half_of_the_open_jobs_matched_does_not_count():
@@ -87,9 +95,17 @@ def test_the_record_of_a_complete_crawl():
         "listing_stop": "no More Jobs link",
         "valid_count": 266,
         "failed_saves": 0,
+        "unrecorded": 0,
         "matched_active": 232,
         "counted": True,
     }
+
+
+def test_unrecorded_rows_are_recorded_and_stop_the_crawl_counting():
+    result = {"counts": {"failed": 0, "unrecorded": 1}, "listing": COMPLETE, "valid": 266}
+    record = run_lifecycle(result, active_at_start=240, matched_active=240)
+    assert record["unrecorded"] == 1
+    assert record["counted"] is False
 
 
 def test_the_status_does_not_decide():
@@ -131,11 +147,55 @@ def test_save_failures_are_recorded_and_stop_the_crawl_counting():
     assert record["counted"] is False
 
 
-@pytest.mark.parametrize("expected", [None, True, "266", 266.0])
-def test_a_stated_total_is_kept_only_as_a_whole_number(expected):
+@pytest.mark.parametrize("expected", [None, True, "266", 266.0, -1, 2**31, 10**12])
+def test_a_stated_total_is_kept_only_as_a_whole_number_the_column_can_hold(expected):
     listing = {**COMPLETE, "expected": expected}
     result = {"counts": {}, "listing": listing, "valid": 1}
-    assert run_lifecycle(result, active_at_start=0, matched_active=0)["listing_expected"] is None
+    record = run_lifecycle(result, active_at_start=0, matched_active=0)
+    assert record["listing_expected"] is None
+    assert record["counted"] is True, "the stated total does not decide"
+
+
+@pytest.mark.parametrize("expected", [0, 266, 2**31 - 1])
+def test_a_stated_total_within_the_column_is_kept(expected):
+    result = {"counts": {}, "listing": {**COMPLETE, "expected": expected}, "valid": 1}
+    record = run_lifecycle(result, active_at_start=0, matched_active=0)
+    assert record["listing_expected"] == expected
+
+
+@pytest.mark.parametrize("complete", ["true", 1, "yes"])
+def test_a_completeness_that_is_not_true_or_false_is_stored_empty(complete):
+    result = {"counts": {}, "listing": {**COMPLETE, "complete": complete}, "valid": 1}
+    record = run_lifecycle(result, active_at_start=0, matched_active=0)
+    assert record["listing_complete"] is None
+    assert record["counted"] is False
+
+
+class _RecordingCursor:
+    def __init__(self):
+        self.statements = []
+
+    def execute(self, sql, params=None):
+        self.statements.append((" ".join(sql.split()), params))
+
+
+def test_the_stored_stop_text_is_masked_and_capped():
+    from orchestrator import CrawlerOrchestrator
+
+    marker = "z" * 16
+    stop = f"refused: HTTP 202 on https://jobs.example.org/?page=7&token={marker} " + "x" * 400
+    cursor = _RecordingCursor()
+    result = {"counts": {}, "listing": {**COMPLETE, "stop": stop}, "valid": 1}
+    CrawlerOrchestrator("postgresql://example")._record_lifecycle(
+        cursor, "run-1", result, active_at_start=0
+    )
+    (sql, params), = cursor.statements
+    assert sql.startswith("UPDATE crawl_logs SET listing_complete = %s")
+    stored = params[2]
+    assert marker not in stored
+    assert "<redacted>" in stored
+    assert len(stored) == 300
+    assert params[-1] == "run-1"
 
 
 # ---------------------------------------------------------------------------
@@ -174,13 +234,14 @@ def _stored(**overrides):
     return row
 
 
-def _persist(rows, **candidate):
+def _persist(rows, *, source_id="src-1", **candidate):
     seen = []
     outcome = persist_candidate(
         FakeCursor(rows),
         {"title": TITLE, "apply_url": URL, "admitted": True, **candidate},
         observed_at=WHEN,
         heuristics=False,
+        source_id=source_id,
         seen=seen,
     )
     return outcome, seen
@@ -217,6 +278,28 @@ def test_a_new_job_a_rejected_row_and_a_conflict_are_not_reported():
     assert rejected == []
     two = [_stored(), _stored(id="row-2", canonical_hash=algorithm_b(TITLE, URL, None))]
     assert _persist(two) == ("identity_conflict", [])
+
+
+def test_another_sources_job_matched_by_identity_is_not_reported():
+    outcome, seen = _persist([_stored(source_id="src-other")])
+    assert outcome == "unchanged"
+    assert seen == []
+
+
+def test_a_row_without_a_source_reports_nothing():
+    assert _persist([_stored()], source_id=None) == ("unchanged", [])
+
+
+def test_created_ids_are_read_from_what_the_writer_records():
+    recorded = [
+        {"outcome": "created", "job_id": "new-1"},
+        {"outcome": "updated", "job_id": "old-1"},
+        {"outcome": "seen_again", "job_id": "hidden-1"},
+        {"outcome": "created", "job_id": "new-2"},
+    ]
+    assert created_ids(recorded) == ["new-1", "new-2"]
+    assert created_ids([]) == []
+    assert created_ids(None) == []
 
 
 def test_without_a_list_the_writer_behaves_as_before():
@@ -256,6 +339,38 @@ def test_the_run_handle_collects_matched_ids_across_saves_once_each():
     run = asyncio.run(scenario())
     assert run.seen_active == {"a", "b", "c"}
     assert run.saved["updated"] == 2
+    assert run.matched_active() == 3
+
+
+def test_jobs_the_run_created_are_not_matches_of_the_catalogue():
+    def save_jobs(jobs, source_id, org_name, *, run_token, loop):
+        return {"inserted": 1, "updated": 0, "skipped": 0, "failed": 0,
+                "seen_active": ["old-1", "new-1"], "created_ids": ["new-1"]}
+
+    async def scenario():
+        run = RunHandle("run-1", "src-1")
+        await run.save(save_jobs, [], "src-1", "Example")
+        return run
+
+    run = asyncio.run(scenario())
+    assert run.created == {"new-1"}
+    assert run.matched_active() == 1
+
+
+def test_the_run_handle_adds_up_unrecorded_rows_across_saves():
+    batches = iter([1, 2])
+
+    def save_jobs(jobs, source_id, org_name, *, run_token, loop):
+        return {"inserted": 0, "updated": 0, "skipped": 0, "failed": 0,
+                "unrecorded": next(batches)}
+
+    async def scenario():
+        run = RunHandle("run-1", "src-1")
+        await run.save(save_jobs, [], "src-1", "Example")
+        await run.save(save_jobs, [], "src-1", "Example")
+        return run
+
+    assert asyncio.run(scenario()).saved["unrecorded"] == 3
 
 
 def test_a_save_that_reports_no_matches_adds_none():

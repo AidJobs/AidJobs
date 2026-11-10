@@ -6,7 +6,7 @@ from contracts.outbound import crawl_budget
 
 __all__ = ["RunHandle", "crawl_budget"]
 
-_TOTALS = ("inserted", "updated", "skipped", "failed")
+_TOTALS = ("inserted", "updated", "skipped", "failed", "unrecorded")
 
 
 class RunHandle:
@@ -25,6 +25,7 @@ class RunHandle:
         self.source_id = str(source_id)
         self.saved = dict.fromkeys(_TOTALS, 0)
         self.seen_active: set = set()
+        self.created: set = set()
         self._pending: set = set()
 
     async def save(self, save_jobs, jobs, source_id, org_name, **kwargs):
@@ -46,6 +47,11 @@ class RunHandle:
         for name in _TOTALS:
             self.saved[name] += result.get(name, 0) or 0
         self.seen_active.update(result.get("seen_active") or ())
+        self.created.update(result.get("created_ids") or ())
+
+    def matched_active(self) -> int:
+        """Open jobs the run's rows matched, without those the run itself created."""
+        return len(self.seen_active - self.created)
 
     async def wait_for_saves(self) -> None:
         while self._pending:

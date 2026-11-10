@@ -75,6 +75,7 @@ CREATE TABLE public.crawl_logs (
     "listing_stop" text,
     "valid_count" integer,
     "failed_saves" integer,
+    "unrecorded" integer,
     "matched_active" integer,
     "observed" integer,
     "counted" boolean,

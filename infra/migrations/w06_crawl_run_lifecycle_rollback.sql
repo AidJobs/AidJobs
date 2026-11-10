@@ -1,6 +1,5 @@
 -- Undo w06_crawl_run_lifecycle.sql, only before anything depends on its columns: first deploy
 -- code that no longer writes them. Run as postgres in Supabase's SQL editor.
--- jobs.expired_at is not dropped: it existed in production before that migration.
 
 BEGIN;
 
@@ -13,6 +12,7 @@ ALTER TABLE public.crawl_logs
     DROP COLUMN IF EXISTS listing_stop,
     DROP COLUMN IF EXISTS valid_count,
     DROP COLUMN IF EXISTS failed_saves,
+    DROP COLUMN IF EXISTS unrecorded,
     DROP COLUMN IF EXISTS matched_active,
     DROP COLUMN IF EXISTS observed,
     DROP COLUMN IF EXISTS counted,

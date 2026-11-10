@@ -736,6 +736,7 @@ class CrawlerOrchestrator:
                 listing_stop = %s,
                 valid_count = %s,
                 failed_saves = %s,
+                unrecorded = %s,
                 matched_active = %s,
                 counted = %s
             WHERE id = %s
@@ -746,6 +747,7 @@ class CrawlerOrchestrator:
                 stop,
                 record["valid_count"],
                 record["failed_saves"],
+                record["unrecorded"],
                 record["matched_active"],
                 record["counted"],
                 run_id,
@@ -853,7 +855,7 @@ class CrawlerOrchestrator:
         for name, value in run.saved.items():
             if not counts.get(name):
                 counts[name] = value
-        result["matched_active"] = len(run.seen_active)
+        result["matched_active"] = run.matched_active()
         try:
             await self.finish_run(source, run.token, result, mode=mode)
         except Exception:

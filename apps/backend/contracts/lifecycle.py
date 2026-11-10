@@ -1,5 +1,8 @@
 """Lifecycle observations. This module does not touch the database."""
 
+# crawl_logs.listing_expected is a PostgreSQL integer; a listing page states its own total.
+_MAX_STORED_TOTAL = 2_147_483_647
+
 
 def jobs_not_rediscovered(known_ids, seen_ids, *, trustworthy: bool) -> list:
     """IDs from known_ids that were not seen.
@@ -17,21 +20,23 @@ def counting_crawl(
     listing_complete,
     valid: int,
     failed: int,
+    unrecorded: int,
     active_at_start,
     matched_active: int,
 ) -> bool:
     """Whether a finished crawl is evidence of absence: a counting crawl (contract §6).
 
     Only a listing read completely counts, and never one with no valid job, one where any job
-    failed to save (the user's decision of 11 November 2026: that job was listed but its sighting
-    was not recorded), or one whose rows matched fewer than half of the source's open jobs that
-    were not hidden when the run started. The crawl's status and failure counter play no part.
+    failed to save or any listed row's sighting could not be recorded (the user's decisions of
+    11 November 2026: that job was listed, but nothing shows it was seen), or one whose rows
+    matched fewer than half of the source's open jobs that were not hidden when the run started.
+    The crawl's status and failure counter play no part.
     """
     if listing_complete is not True:
         return False
     if not valid or valid < 0:
         return False
-    if failed:
+    if failed or unrecorded:
         return False
     # A run whose open jobs at its start were not recorded cannot be measured, so never counts.
     if active_at_start is None:
@@ -54,20 +59,27 @@ def run_lifecycle(result: dict, *, active_at_start, matched_active: int) -> dict
     stop = listing.get("stop")
     valid = int(result.get("valid") or 0)
     failed = int(counts.get("failed") or 0)
+    unrecorded = int(counts.get("unrecorded") or 0)
     matched = int(matched_active or 0)
     return {
         "listing_complete": complete if isinstance(complete, bool) else None,
         "listing_expected": (
-            expected if isinstance(expected, int) and not isinstance(expected, bool) else None
+            expected
+            if isinstance(expected, int)
+            and not isinstance(expected, bool)
+            and 0 <= expected <= _MAX_STORED_TOTAL
+            else None
         ),
         "listing_stop": str(stop) if stop is not None else None,
         "valid_count": valid,
         "failed_saves": failed,
+        "unrecorded": unrecorded,
         "matched_active": matched,
         "counted": counting_crawl(
             listing_complete=complete,
             valid=valid,
             failed=failed,
+            unrecorded=unrecorded,
             active_at_start=active_at_start,
             matched_active=matched,
         ),

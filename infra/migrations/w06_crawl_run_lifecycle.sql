@@ -8,8 +8,9 @@
 -- Additive only: nullable columns with no default, so no row is rewritten. Runs recorded before
 -- this have none of them, and a run without active_at_start never counts.
 -- observed, expired and returned stay empty until the later pull requests of step 4.6 fill them.
--- jobs.expired_at already exists in production (read-only check, 10 November 2026, empty on
--- every row) and is listed so the repository records it; on production that line does nothing.
+-- Only crawl_logs is altered, so only it is locked, briefly. jobs.expired_at, which step 4.6
+-- uses later, already exists in production (read-only check, 10 November 2026, empty on every
+-- row); it is recorded in infra/supabase.sql, not here, so jobs is not locked for nothing.
 -- The roles' grants are per table (infra/roles/02_grants.sql), so they cover the new columns.
 -- Undo, only before anything depends on them: w06_crawl_run_lifecycle_rollback.sql.
 
@@ -25,14 +26,12 @@ ALTER TABLE public.crawl_logs
     ADD COLUMN IF NOT EXISTS listing_stop TEXT,
     ADD COLUMN IF NOT EXISTS valid_count INTEGER,
     ADD COLUMN IF NOT EXISTS failed_saves INTEGER,
+    ADD COLUMN IF NOT EXISTS unrecorded INTEGER,
     ADD COLUMN IF NOT EXISTS matched_active INTEGER,
     ADD COLUMN IF NOT EXISTS observed INTEGER,
     ADD COLUMN IF NOT EXISTS counted BOOLEAN,
     ADD COLUMN IF NOT EXISTS expired INTEGER,
     ADD COLUMN IF NOT EXISTS returned INTEGER;
-
-ALTER TABLE public.jobs
-    ADD COLUMN IF NOT EXISTS expired_at TIMESTAMPTZ;
 
 COMMENT ON COLUMN public.crawl_logs.active_at_start IS
     'The source''s open jobs that were not hidden when the run started (W-06).';
@@ -46,6 +45,8 @@ COMMENT ON COLUMN public.crawl_logs.valid_count IS
     'Listing rows admitted by the crawl (W-06).';
 COMMENT ON COLUMN public.crawl_logs.failed_saves IS
     'Jobs whose save failed (W-06).';
+COMMENT ON COLUMN public.crawl_logs.unrecorded IS
+    'Admitted rows whose sighting was not recorded: an identity conflict, a row the writer refused, or one the save step dropped (W-06).';
 COMMENT ON COLUMN public.crawl_logs.matched_active IS
     'Open jobs, not hidden at the start, that the crawl''s rows matched (W-06).';
 COMMENT ON COLUMN public.crawl_logs.observed IS
@@ -56,7 +57,5 @@ COMMENT ON COLUMN public.crawl_logs.expired IS
     'Jobs this run expired by absence (W-06).';
 COMMENT ON COLUMN public.crawl_logs.returned IS
     'Expired jobs this run saw again and made open (W-06).';
-COMMENT ON COLUMN public.jobs.expired_at IS
-    'When the job''s lifecycle became expired; empty while it is open (W-06).';
 
 COMMIT;

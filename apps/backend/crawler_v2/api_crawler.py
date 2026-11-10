@@ -15,6 +15,7 @@ from contracts.admission import admit_batch, extraction_logger_for, log_admissio
 from contracts.outbound import FetchError, current_budget, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
+from contracts.persist import created_ids
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.log_safety import redact_exception, stored_text
@@ -222,17 +223,19 @@ class SimpleAPICrawler:
         failed = 0
         validated = 0
         seen_active = []
+        recorded = []
+        unrecorded = 0  # rows whose sighting was not recorded (a hidden job seen again is)
         
         try:
             with conn.cursor() as cur:
                 confirm_running(cur, run_token, source_id)
-                recorded = []
                 for job in jobs:
                     title = job.get('title', '').strip()
                     apply_url = job.get('apply_url', '').strip()
 
                     if not title or not apply_url:
                         skipped += 1
+                        unrecorded += 1
                         continue
 
                     candidate = {
@@ -280,6 +283,8 @@ class SimpleAPICrawler:
                         logger.debug("API job unchanged, last_seen_at only: %s", title[:80])
                     else:
                         skipped += 1
+                        if outcome != "seen_again":
+                            unrecorded += 1
                 
                 commit_and_schedule(conn, recorded, loop=loop)
         
@@ -296,7 +301,9 @@ class SimpleAPICrawler:
             'skipped': skipped,
             'failed': failed,
             'validated': validated,
+            'unrecorded': unrecorded,
             'seen_active': seen_active,
+            'created_ids': created_ids(recorded),
         }
     
     async def crawl_source(self, source: Dict, run=None) -> Dict:
