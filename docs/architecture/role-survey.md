@@ -1,0 +1,263 @@
+# AidJobs — role-content survey (W-54): plan
+
+**Status: draft, for the user's approval (10 November 2026).** Agreed in outline with the user on 10 November 2026; this file is the plan. Nothing is built and no request has been made: no website was contacted while writing it, no code was added under `tools/survey/`, and nothing is merged until the user approves the plan. Each phase below still needs its own approvals (operating conventions in `progress-ledger.md`): every batch of requests is approved before it runs, and each pull request's merge names its head commit. Read-only throughout: no production crawl, no write to the jobs database, no reindex.
+
+Related documents: `employer-side-plan.md` (decision E7 and its amendment, section 20), `employer-generator/` (the held generator design and the style study), `source-survey.md` and `source-survey/` (the employer survey, W-31, whose method, rules and files this survey reuses), `growth-and-seo-plan.md` (design rules 4.1 to 4.6).
+
+**Evidence labels.** Every finding in this survey's outputs is marked **Fact** (counted or read from a named source), **Estimate** (worked out from counts, with the method), or **Unverified** (from the agent's knowledge or a search result, not yet checked), with its source. This plan uses the same labels: statements about outside frameworks, laws and websites below are Unverified until the phase that reads them.
+
+## 1. Purpose
+
+AidJobs' job-description generator (held until the crawler foundation is done; the user, 8 November 2026) needs role templates: for each kind of job, what is actually written under each heading, how it changes by organisation type, level and context, and what would make AidJobs' version better than the best real adverts rather than merely adequate. The demo's 13 role families (`demo/employer`, `engine.ts`, `ROLE_FAMILIES`: WASH Programme Manager, Health Programme Officer, Child Protection Specialist, Education Officer, MEAL Coordinator, Finance Officer, Logistics Officer, Communications Officer, ESG and Safeguards Specialist, Climate Resilience Adviser, Livelihoods Officer, HR Officer, Programme Manager) were written by the agent in round 1 on 3 November 2026 with no evidence behind them. They are placeholders, to be replaced by this survey's results; they are not its starting point, and the demo is not changed now (the user, 10 November 2026).
+
+The survey answers four questions, in order:
+1. **Which roles** do the organisations AidJobs serves actually advertise, how often, at which levels and in which contexts (Phase 1)?
+2. **How are their adverts structured** by organisation type: sections, order, length, facts given and missing, standard text (Phase 2)?
+3. **What is written** under each heading, unit by unit, how specific it is, what each role's best adverts say that its weakest leave out, and what the profession's own standards expect (Phase 3)?
+4. **What should AidJobs' templates contain** so that, scored blind against real adverts, they beat the best quarter for each role (Phases 4 and 5)?
+
+## 2. The user's decisions of 10 November 2026
+
+1. The demo's 13 role families are placeholders to be replaced by this survey's results. The demo is not changed now.
+2. Role templates become their own library, built the way the organisation-type JD formats were. The chat offers the matching template once it recognises the role. This amends E7's "no role picker, no template picker" for templates offered through the chat (recorded in `employer-side-plan.md`, section 2 and section 20).
+3. A fairness check flags explicit restrictions; inclusion statements are never flagged; coded-word checks stay a quiet extra; an unexplained restriction is an open check on the publish page and never blocks publishing; rules depend on the organisation's country and the duty station, each with a checked legal source (`employer-side-plan.md`, section 20.2).
+4. Only planning now. Role templates and the fairness check are built after, or alongside, the job-description generator, which stays on hold until the crawler foundation is done (the user, 8 November 2026).
+5. Also planned, not built: required details before publishing as an explicit choice, where "not disclosed" counts as an answer (whether it blocks publishing is open for the user); structured publishing with separate columns for the lowest and highest salary, currency and pay period beside `salary_range_text` (`employer-side-plan.md`, sections 20.3 and 20.4).
+6. The survey's scope, phases, languages, scale, rules and known limits as set out below.
+
+**Pace (decided by the agent at the user's request, 10 November 2026).** The survey runs alongside the current work as read-only research. While it adds or changes scripts under `tools/survey/`, it takes one of the two code-stream slots (operating conventions); reading, coding and writing records outside those pull requests is background research and takes no slot. When it competes with a crawler-foundation step for the user's review time, the crawler step goes first.
+
+## 3. Rules and known limits
+
+**Rules (the user's, 10 November 2026, with the employer survey's rules where they apply):**
+- **Read-only.** Every request goes through the backend's shared fetch policy (`contracts/outbound.py`) with the survey's honest identity (`SURVEY_USER_AGENT`, `AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)`), GET or HEAD only. `robots.txt` is read first and judged with the RFC 9309 matcher (`contracts/robots.py`); a page it forbids is not requested; a `robots.txt` that cannot be reached forbids the host, as RFC 9309 says. A 403, a 429 or a bot challenge is recorded and stops that organisation for the run, never solved or bypassed. The stop rule is step F's as changed by the user on 6 November 2026: three refusals in a row from one host or one protection service, five in a row from any sites, or five network failures in a row.
+- **Each site's terms respected.** A site whose terms forbid automated access is not read by any script (as UNjobs is not). Job boards and mirrors are used only after their terms are checked and recorded.
+- **Each batch of requests is approved by the user before it runs**, with its list of hosts, the number of requests, and its expected time.
+- **No advert text copied.** Committed records hold counts, categories, and the agent's own paraphrases of at most 12 words; standard sector phrases may be quoted when under 15 words, in quotation marks and marked *(std)*. A local check, run before each commit, refuses any committed paraphrase that matches an 8-word run of the saved page.
+- **No recruiter names, emails or phone numbers** (growth plan 4.6). Contact details are removed from saved text before coding with the crawler's own cleaner (`contracts/captured.py`); a CI test fails if any committed survey file holds an email address or a phone-like number; names are never recorded (coders are instructed, and the review checks a sample).
+- **Raw pages stay local** in `tools/survey/raw/` (already git-ignored). Only cleaned records are committed, built by scripts in `tools/survey/` whose `build` step CI reruns, failing if the committed outputs differ, as for steps D to F.
+- **Every finding labelled** Fact, Estimate or Unverified, with its source.
+- **No production crawl, no write to the jobs database, no reindex.** Reading AidJobs' own stored jobs uses the read-only login, with read-only enforced and proven (operating conventions), and is its own approval.
+
+**Known limits:**
+- **ReliefWeb's API** waits on an `appname`, which ReliefWeb grants only to an official organisation address (W-31, open decision 1). Its website pages are used only within its terms, checked first (Phase 1, batch P1-3); its job pages have answered automated reads with 403, 404 and an AWS WAF challenge before (style study; W-04), so they may yield nothing.
+- **UN pages.** `careers.un.org` and some agency sites refused the style study's reads (403). Mirrors that republish the official text (the style study used `unzhaopin.com` and `untalent.org`) are used only where their terms allow it, each use noted, and the mirror's text compared with the official one where it can be. UN Talent is a benchmark only (growth plan decision 11) and was among the boards whose terms did not allow employer data to be collected (W-31, 4 November 2026), so it is not read by script.
+- **Job boards.** On 4 November 2026 the eight boards checked (Devex, Impactpool, DevNetJobs, DevelopmentAid, UN Talent, Idealist, CharityJob, Bond) did not allow their employer data to be collected, and the user decided to use none (W-31). Phase 1 keeps that decision; other boards are proposed only after their terms are read (batch P1-4), and the user decides.
+- **Workday** (20 first-batch employers, 1,225 UNjobs jobs, the largest system) builds its listing with a POST job search, which contract §9 allows only for the crawler's Workday reader (amendment of 6 November 2026). The survey cannot count Workday employers' titles until AidJobs crawls them (growth plan step 6), so Phase 1 under-counts organisations on Workday, Oracle and other script-built listings (61 of step F's first batch). This bias is reported with the role map.
+- **Bot protection.** About one employer site in nine refused step F outright (17 bot challenges, 9 refused `robots.txt`). Those employers are missing from the sample, which leans toward sites that accept honest robots.
+- **National NGOs in the Global South** are thin in the survey's own list, which comes from UNjobs and Northern registers (`organisations.csv`: 74 in Kenya, the largest Southern country). Phase 2 needs about 50 of their adverts; where they come from is a decision (section 12).
+- **One moment in time.** A listing shows current openings only; Phase 1 takes two snapshots about a month apart to reduce that bias. Large employers would dominate counts, so each organisation counts at most 20 titles per snapshot.
+- **No practitioners.** The user has no hiring managers to review the templates. Validation is by blind scoring, automatic checks, and later real use (Phase 5); until real use, the templates are labelled "based on evidence, not yet tested with hiring managers".
+
+## 4. Organisation types
+
+The survey samples by these types (the user's list of 10 November 2026). Each sampled organisation's type is assigned from `organisations.csv` (`kind`) and `first-wave.csv` (`group`), with the agent's decision and its reason recorded where those do not settle it (`role-decisions.csv`, section 11).
+
+| Type | Examples (Unverified unless in the survey's files) | In the employer survey | Advert formats seen (style study) |
+| --- | --- | --- | --- |
+| UN Secretariat | OCHA, OHCHR, peace missions | later wave; `careers.un.org` is one record for 44 offices | UN Secretariat |
+| UN agencies, funds and programmes | UNICEF (live), UNDP, UNHCR, WFP, IOM | later wave (40 organisations) | UN agency |
+| INGO head offices | IRC, Save the Children International, Oxfam, NRC | first wave (395 in the NGO group; 38 head-office decisions) | INGO role profile, purpose-led, "About you", field profile |
+| INGO country offices | the same organisations' country posts, often national | the same careers sites; told apart by duty station and contract | the same, national-post variants |
+| National NGOs in the Global South | BRAC, Amref, Pratham, local NGOs | few (section 3) | local NGO concise |
+| Red Cross and Red Crescent | ICRC (live), IFRC, national societies | ICRC live; national societies not linked as families (W-31) | field profile and their own |
+| Donors and government | GIZ, FCDO, AFD, Enabel, Sida; development banks and intergovernmental bodies (World Bank, AfDB, OECD) | first wave (29 agencies; 28 banks and bodies) | government donor |
+| Development contractors | DAI, Chemonics, Palladium | first wave (NGO and consultancy group) | development contractor |
+| Foundations | Gates Foundation, Aga Khan Foundation | first wave and the income tier | not covered by the style study |
+| Research bodies (CGIAR and others) | International Potato Center (145 UNjobs jobs), ILRI | first wave | not covered by the style study |
+| Domestic charities | UK, US, Australian, Canadian and European charities from the registers | registers; mostly outside the first wave | domestic charity |
+
+Development banks are filed under donors and government, as funders; the review may split them out if their adverts differ.
+
+## 5. Phase 0: the scoring guide
+
+Fixed before any advert is read. Every advert read in Phases 2 and 3 is scored with it, and so is every template output in Phase 5. It is built from the style study's candidate research (`employer-generator/style-study/group-c-local-ngo-readers.md`, part 2, and the weaknesses and value-add sections of groups A and B).
+
+**The target.** For each role family and organisation type with at least 8 scored adverts, the 75th percentile of the total score among real adverts. A template passes when its output scores at or above that percentile, scored blind among real adverts by an independent agent, and no dimension scores below the cell's median. Where a cell has fewer than 8 adverts, the role's percentile across all types is used, and marked.
+
+**Nine dimensions, each scored 0 to 3** (the weights are the agent's proposal, for the user's decision; they add to 100):
+
+| Dimension | Weight | 0 | 3 | How it is scored |
+| --- | --- | --- | --- | --- |
+| **Decision facts:** the facts candidates decide on (pay as a figure, range, named scale or allowance; contract type and length; duty station and travel or roving share; hours or level of effort where they vary; closing date with time and time zone; start date; selection steps or timeline; how to apply; languages) | 20 | fewer than a third of the applicable facts, no pay | all applicable facts, pay included | automatic from the Phase 2 fact list; pay counts double |
+| **Specificity:** duties carry numbers, places, named standards, tools or systems, frequency, counterparts, scale | 15 | generic duties only | most duties specific, and the role's signature facts present | from Phase 3's units (Phase 2 estimates it) |
+| **Realistic must-haves:** a clear essential and desirable split; essentials few (3 to 5 outside UN grade formulas); none inflated for the level; the real essentials stated (local language, licence, registration) | 15 | long undifferentiated list, or inflation for the level | short, split, level-appropriate, real essentials named | coded, with the inflation rules of Phase 3 |
+| **Clear outcomes:** what the post is for and how success is seen (scope: team, budget, caseload; deliverables; results or targets) | 10 | none | scope plus measurable results | coded |
+| **Field realism** (field posts only; otherwise not scored and its weight shared out): accompanied or not, hardship and R&R, housing, security, travel mode, connectivity, what is not provided | 10 | none of the conditions that apply | every applicable condition stated, or "not stated" said plainly | coded from the fact list |
+| **Fairness:** no unexplained explicit restriction; a genuine requirement explained; concrete inclusion (encouragement where it matters, adjustments offered); trust (no-fee notice, official channel, reference); a low-bandwidth way to apply | 10 | an unexplained explicit restriction (caps the dimension at 1), no trust signal | no unexplained restriction, concrete inclusion, trust signals | coded; restrictions detected by rule, then confirmed |
+| **Readability:** median sentence 13 to 20 words; acronyms spelt out; no catch-all lines, duplicated text, template residue, title and body mismatch or conflicting dates | 10 | several of these faults | none | automatic measures plus coded faults; French judged by sentence and word length, not an English grade formula |
+| **Right length for the organisation type:** role-specific words within the format's ceiling; organisation and standard text not crowding out the role | 5 | far outside the band, or boilerplate over half the advert | within the band, boilerplate at or below the type's norm | automatic, against the style study's bands (ceilings, never targets: local NGO field posts 200 to 400 words, officer posts 350 to 600; INGO role profile 650 to 1,150 of role content; UN agency 700 to 1,300), the others set in Phase 2 |
+| **Findability in search:** a recognised job title with function and level (not an internal code); the facts Google's job-posting data needs (title, description, posting date, closing date, organisation, place or remote, employment type, salary); no capitals or symbols in the title | 5 | internal or vague title, required facts missing | clear title, every required fact | automatic |
+
+Each dimension's full anchors (what earns 1 and 2) are written in the Phase 0 pull request with worked examples from AidJobs' own sample adverts, not real ones.
+
+**Calibration and reliability.** The guide is version 1 when this plan is approved. The agent recommends one recorded calibration: score a pilot of 20 adverts, adjust only the anchors that two coders read differently, record each change and its reason, rescore the 20, and freeze version 1.1 before Phase 2's main sample (the user's decision, section 12). After that, any change is a new version with every advert rescored. Two coders (independent read-only agents) score 15% of adverts blind; the target is at least 80% within one point on each dimension. A dimension below it is clarified in a new version.
+
+**A second, holistic measure.** Scoring guides reward what they count, and templates written with the guide in view could "teach to the test". The Phase 5 reviewer therefore also ranks each set by forced choice ("which advert tells you more about the job and whether you should apply?") without the guide, and a template must pass both.
+
+## 6. Phase 1: which roles
+
+**Sources, in order, cheapest first:**
+
+| Batch | Source | Requests | What it gives |
+| --- | --- | --- | --- |
+| P1-0 | Step F's saved responses (`tools/survey/raw/confirm/bodies/`, 191 files on the user's machine): the 46 confirmed listings, 805 job links (17 public job feeds: Workable 7, Greenhouse 6, Teamtailor 2, Personio 1, Lever 1; and 29 plain listing pages) | none | titles from the feeds' title fields and from the job links' text |
+| P1-0 | AidJobs' own stored jobs through the read-only login (690 rows on 9 November 2026: UNICEF, ICRC, Oxfam GB) | one read-only database session, its own approval | UN agency and Red Cross titles |
+| P1-1 | A second snapshot of the 46 listings about a month later, and the 7 organisations allowed on step F's `robots.txt` recheck | about 130 (`robots.txt` and listing, up to 3 listing pages each) | the snapshot bias halved; 7 more organisations |
+| P1-2 | The UN careers site's official job feed (`careers.un.org/jobfeed`, W-41), and a sample of about 12 UN agencies' careers pages | about 26 | UN Secretariat and agency titles; many agency pages will need JavaScript or a POST and yield none |
+| P1-3 | ReliefWeb's website, only if its `robots.txt` and terms allow automated reading of its job listings: its listing pages by career category and theme | 2, then up to about 40 | counts by ReliefWeb's own categories across many organisations, Workday users included |
+| P1-4 | The terms and `robots.txt` of up to 5 national job boards in the Global South proposed by the agent (Unverified candidates, for example bdjobs and MyJobMag), for the user's decision on using any | about 10 | whether national NGOs' titles can be counted this way |
+
+About 210 requests at most in wave 1, in four batches, each approved before it runs. Pacing is step F's: one request at a time, about 5 seconds apart, the same host never within 10 seconds, a `Crawl-delay` up to 60 seconds honoured; `robots.txt` read once per host per run and kept on disk. At that pace a batch of 130 takes about 25 minutes.
+
+**Shared with step F's remaining waves (the agent's proposal; it widens step F's scope, so it is the user's decision).** Step F's batch 2 (683 organisations: the rest of the first wave, DG ECHO's partners and the national members of networks) is read later in slices alongside the crawler foundation, each slice with its own approval (W-31). The proposal: each slice's plan also names that its saved responses are read for titles, by this survey's own offline command, after the run. No request is added, step F's records and stop rules are unchanged, and only titles are taken. It adds up to 683 organisations at no request cost, among them many French and Belgian humanitarian NGOs from DG ECHO's list. Without it, a separate visit would roughly double those requests, which the agent does not recommend.
+
+**From titles to roles.** A new script, `tools/survey/roles.py`, with tests and a CI step:
+- `titles` (local): reads the saved feeds and pages and writes one row per job title seen, contact details removed, to a small committed file (`role-titles.csv`; titles are short facts, not advert text). Plain pages use the job links `confirm.py` already recognises.
+- `group`: normalises each title by fixed rules (case, punctuation, grades, reference codes and places taken out into their own fields; abbreviations expanded: "M&E" and "MEAL", "Log", "Fin", "WASH") and assigns it, by a rule table plus recorded decisions:
+  - a **function** (what the person does): programme or project management; MEAL and information management; finance; grants, partnerships and fundraising; supply chain (logistics, procurement, fleet, warehouse); HR; administration; ICT; safety and security; communications and advocacy; policy and research; technical adviser; humanitarian coordination; leadership (country director, head of office); medical and clinical; engineering; community and field roles (mobiliser, enumerator, field officer); drivers and support services; care and support work (domestic charities). This draft list is the agent's, built on ReliefWeb's career categories and the UN's job networks and families (both Unverified until Phase 1 reads them); Phase 1 corrects it;
+  - a **sector or theme**, where the title names one: WASH; health; nutrition; food security and livelihoods; cash and markets; protection, child protection, GBV; education; shelter and camp management; climate and environment; gender; governance, peace and human rights; mine action; agriculture; migration; disaster risk reduction; ESG and safeguards; none;
+  - a **level**: assistant; officer; coordinator or manager; head or adviser; plus intern or fellow. UN grades map by AidJobs' convention: G grades to assistant, NO-A, NO-B, P-1 and P-2 to officer, NO-C, NO-D, P-3 and P-4 to coordinator or manager, P-5 and D grades to head or adviser;
+  - **contexts**, each one of two values or "unknown": field or headquarters; humanitarian or development; national or international; staff or consultant. Titles seldom show them; the listing's place, the organisation type and words such as "national", "emergency" and "consultant" set them where they can, and Phase 2 fills the rest.
+- Titles the rules cannot place go to a review list; the agent decides each with its reason (`role-decisions.csv`), as in steps D to F.
+- `build`: writes the role map. CI reruns `group` and `build` from the committed titles and decisions and fails on any difference.
+
+**A role family** is a function, split by sector only where the content differs: Phase 1 records every function and sector pair with its count; Phase 3 decides which pairs need their own template (for example a WASH programme manager's duties differ from a generic programme manager's) and which share the function's core with a sector module. That keeps the library small enough to be excellent: a function core, sector modules, and level and context variants, rather than hundreds of separate templates.
+
+**Choosing wave 1's roles.** Coverage counts each organisation's titles once per snapshot, capped at 20, shared within each organisation type. Value to paying employers weights the types the user expects to pay to advertise (NGOs and INGOs, Red Cross and Red Crescent, contractors, foundations, research bodies, domestic charities) above the UN system (the user's view of 5 November 2026 that the UN hardly pays to publish jobs). The agent ranks families by that weighted coverage, takes the smallest set that covers most of it while appearing in at least three types, and brings the list of 10 to 12 to the user with the next 10 and the reasons; the user decides. An Estimate from the style study and the demo, not used for the selection: programme management, MEAL, finance, supply chain, HR, administration, WASH, health, protection, education, food security and livelihoods, and communications are likely.
+
+**Output.** The role map: for each family, its count and share per organisation type, by level and context where known, with its title variants, the source of every count, and the biases above. It also gives the title-facts module (W-42) evidence for its fixed lists of functions and levels, and the landing pages and keyword families (growth plan 4.5) their job-title variants, without changing either step's plan.
+
+## 7. Phase 2: structure by role and organisation type
+
+**Sample.** Wave 1 reads about 350 adverts: for each chosen family, about 3 adverts in every organisation type where the role is advertised (up to 5 in the largest cells), spread across levels and contexts, and about a quarter in French (section 9). The sample is drawn by script with a fixed random seed from Phase 1's job links; a page that is refused, gone or a duplicate (the same advert reposted) is replaced by the next in the random order, and every replacement recorded. The style study's 40 adverts are not counted unless re-read under the guide.
+
+**Reading.** One request per advert to the employer's own job page (about 350), plus `robots.txt` for each new host (about 150), in two or three approved batches of about 200, the same host at most 15 adverts per batch. AidJobs' own stored descriptions (ICRC and Oxfam GB, once W-37's capture is merged and crawled) need no request. UN pages that refuse use a mirror, noted (section 3). Each page is saved locally, cleaned to plain text (contacts removed), and kept out of git.
+
+**Recorded per advert** (`adverts.csv`, `advert-sections.csv`):
+- organisation, type, family, level, contexts, language, how it was read (own site, mirror, AidJobs' database), date read;
+- the sections in order, each mapped to a fixed list of section types (header facts, about the organisation, context, role purpose, scope, responsibilities, deliverables or outcomes, working relationships, essential requirements, desirable requirements, competencies or behaviours, languages, field conditions, pay and benefits, commitments and safeguarding, equal opportunity and inclusion, how to apply, selection process, no-fee and fraud notice, data protection, other standard text), with words and bullets per section;
+- total words and role-specific words;
+- **the share of standard text**, by script: a sentence that recurs in two or more of the same organisation's adverts, or in a list of known sector standard texts (the UN Considerations, for example), counts as standard; where an organisation has one advert in the sample, the coder estimates it, marked Estimate;
+- **facts given and missing**, from a fixed list of about 30 (pay and its form, grade or band, contract type and length, hours or level of effort, duty station and remote, travel or roving share, reports to, direct reports, budget held, closing date, its time and time zone, start date, languages and levels, selection steps, application method and documents, no-fee notice, safeguarding level or checks, accompanied or not, hardship and R&R, housing and what is provided, number of posts, funding status (proposal or contingent), equal-opportunity or inclusion statement, adjustments offered, explicit restrictions by category, reference number);
+- the score on each dimension, the coder, and the guide's version.
+
+## 8. Phase 3: content, the core
+
+**Units.** Each section is broken into units by a read-only research agent working on the saved plain text, into a fixed schema (`units.csv`):
+- **duties:** the action (a normalised verb from a fixed list), the object (a category from each role's codebook, grown during coding and recorded), the specifics given (number, place, named standard, tool or system, frequency, counterpart, scale, deadline), a specificity score from 0 to 3, and the agent's paraphrase of at most 12 words;
+- **requirements:** the type (education, years of experience, technical skill, tool, language and level, licence or registration, context experience, behaviour, certification), essential or desirable, and whether it is inflated for the level, with the rule that says so;
+- **facts, conditions, outcomes and statements** in their own kinds, so the omission analysis can count them.
+
+**Inflation rules,** fixed before coding: years of experience against the level (and, for UN posts, the grade's own minimum, which is not inflation); a postgraduate degree for assistant and officer posts outside the UN's grade formulas; senior skills for junior or short posts (grant management for a 30-day surge post, donor regulations for a mobiliser; both seen in the style study); a requirement with no matching duty.
+
+**Reliability.** A second agent codes 15% of adverts blind; agreement is reported per field, and a field below 80% is clarified in the codebook and recoded.
+
+**Comparisons,** each reported with its counts (never as statistical significance: the cells are small): across organisation types, levels and contexts, the mix of unit kinds, specificity, the most common actions and objects, requirement inflation, and words by section; and, within each family, what the top quarter of adverts by score contains that the bottom quarter lacks.
+
+**Signature facts.** For each family, the 6 to 8 facts that make its advert specific and that a candidate needs (for example fleet size, warehouses and procurement thresholds for logistics; the donors and their rules, budget size and accounting system for finance; sites, population served and response phase for WASH; caseload and case-management system for protection). Each is kept only if it appears more often in the top quarter than the bottom, or a normative source requires it. The chat asks for these instead of writing filler; each is recorded with the question the chat asks, in English and French, and why it matters to candidates.
+
+**What adverts leave out:** per family, the facts and conditions most often missing, by type, with counts.
+
+**Normative sources,** read for what each expects of each role (no text copied beyond short standard phrases), each with its publisher, edition, address, licence and reuse terms checked before it is downloaded (`normative-sources.csv`). The list (Unverified until read): the UN's generic job profiles and its values and behaviours framework; the Core Humanitarian Competency Framework; the Sphere Handbook; the Core Humanitarian Standard; the Child Protection Minimum Standards (CPMS); the INEE Minimum Standards; the IASC GBV guidelines; donor rules for finance and grants roles (for example the EU's and DG ECHO's, FCDO's, the US federal grant rules, the Global Fund's); professional bodies' profiles (CIPS for procurement, CIPD for HR, ACCA for finance); and public role profiles and curricula (NRC, IFRC, RedR, the Humanitarian Leadership Academy). About 15 to 20 documents in wave 1, in one or two approved batches; those behind a sign-in or a paywall are not read.
+
+## 9. Phase 4: the templates
+
+**Per family, and for each level and context where the evidence shows a difference:**
+- the signature facts to ask for, with their questions;
+- a bank of duties, each with slots for the specifics (`Manage a fleet of [number] vehicles across [number] sites`), grouped as the formats group them;
+- must-haves by level, each with a prompt that questions inflation ("Is a master's degree truly needed for this officer post?") and the real essentials it should not drop;
+- the standards, tools and systems the role names (Sphere, Kobo, an accounting system), with when each applies;
+- results at 3, 6 and 12 months, and a typical week for field posts, offered only as suggestions the employer confirms (the style study ranks outcome statements low for driver, nurse or enumerator posts and warns that they invite invention);
+- field-context defaults: the conditions block's questions for field posts;
+- assessment suggestions (a written test, a practical task, a structured interview), by level;
+- fairness notes: the genuine requirements this role sometimes has (female staff for some protection and health posts, for example), each tied to the fairness check's reason list (`employer-side-plan.md`, section 20.2);
+- title variants and search terms in English and French, for findability (growth plan 4.5);
+- the salary basis: where pay for the role is usually stated, and the safe forms to offer (a range, a named scale, a "from" figure, allowances), never a figure AidJobs invents;
+- the differences per organisation type and level.
+
+**How a template meets a format.** A JD format (the organisation type's structure and voice, already in the demo) decides the sections and how they are phrased; a role template supplies the content in that style. The organisation's own job profiles, once it has them (`employer-side-plan.md`, section 19, step 10), come before AidJobs' templates.
+
+**Every line records its evidence:** the units and adverts it rests on (with counts), the normative sources, its label (Fact, Estimate, Unverified) and its strength. All template wording is AidJobs' own (`template-lines.csv`, and one readable file per family under `role-survey/templates/`). The production library is built later, with the generator (section 2, decision 4).
+
+## 10. Phase 5: validation
+
+- **Blind scoring.** For each wave-1 family, an independent read-only agent, which has not seen the templates, receives real adverts from every quartile and template outputs for three standard briefs (for example a national NGO field officer, an INGO country-office manager, and the role's most common other type), all in the same plain layout without branding. It scores each with the guide and ranks them by forced choice (section 5). A template that fails is revised and tested again by a new agent.
+- **Template outputs.** First assembled by hand from the template for each brief, which tests the content. Later, written by the models already tested (Kimi K2.5 to write, Gemma 4 to extract and check; `employer-side-plan.md`, section 18) with the template as grounding, in a model test round with its own budget approval and sample data only, which tests the AI and its fact checks: no number, date, amount, link or contact the brief did not give; every slot filled from the brief or left as a visible placeholder.
+- **Real use, later.** Once the generator is live, how often employers keep, edit or delete each template line (counts per line only, no text stored), with a threshold of use before a line loses the label.
+- **The label.** Until then the templates are shown as "based on evidence, not yet tested with hiring managers". The limit is stated plainly: no hiring manager or practitioner has reviewed them, and blind scoring by an agent measures the guide's criteria, not hiring outcomes.
+
+## 11. Languages
+
+**English and French from wave 1.** The employer survey holds 606 Belgian and 240 French organisations (`organisations.csv`; Fact), and francophone Africa matters; but only 37 Belgian and 28 French organisations are in the first wave, and Belgium's count includes Dutch-speaking organisations, so the francophone share is not known (Estimate). About a quarter of wave 1's adverts are French, drawn from francophone INGOs and their country offices, francophone national NGOs (West and Central Africa, the Great Lakes, Haiti, Madagascar), Belgian, French and Swiss organisations, and UN agencies' French adverts; DG ECHO's list adds many if Phase 1 is shared with step F (section 6).
+
+French templates are written in French from French adverts' own conventions, not translated from the English (Unverified until Phase 2: French adverts' usual headings, such as "Vos missions" and "Profil recherché", and the "(H/F)" or "(F/H)" mark after a title, which signals that both sexes may apply and must never be flagged). Grammatically gendered French titles are standard and are not coded words; the French coded-word list is its own.
+
+**Spanish and Arabic later,** in a later wave, each with its own sample.
+
+## 12. Output files
+
+All in `docs/architecture/role-survey/`, built by `tools/survey/roles.py` and its sister scripts (`adverts.py` for Phases 2 and 3), rebuilt by CI from committed inputs. Raw pages stay in `tools/survey/raw/roles/` and `tools/survey/raw/adverts/`.
+
+| File | Phase | Columns |
+| --- | --- | --- |
+| `role-titles.csv` | 1 | source, snapshot date, organisation id, organisation type, title as normalised, language, count |
+| `role-decisions.csv` | 1 to 4 | action, key, value, reason, label (as `step-d-decisions.csv`) |
+| `role-map.csv` | 1 | family id, function, sector, level, context fields, organisation type, titles, organisations, share within type, weighted share |
+| `role-families.csv` | 1, 3 | family id, name in English and French, function, sector, ReliefWeb category, UN job network, title variants, search terms, wave, why chosen |
+| `adverts.csv` | 2 | advert id, organisation id and type, family, level, contexts, language, read via, address, date read, words total and role-specific, standard share, facts given, facts missing, restrictions found, inclusion statements, the nine scores, total, guide version, coder |
+| `advert-sections.csv` | 2 | advert id, position, section type, words, bullets |
+| `units.csv` | 3 | unit id, advert id, section type, kind, action, object category, specifics, specificity, paraphrase, requirement type, essential, inflated and why, standard phrase (quoted, under 15 words) |
+| `signature-facts.csv` | 3 | family id, fact, question in English and French, why it matters, top and bottom quarter counts, normative sources, label |
+| `normative-sources.csv` | 3 | source id, name, publisher, edition, address, licence, checked on, used for |
+| `template-lines.csv` | 4 | line id, family id, part, level, context, organisation types, language, text, slots, evidence units, evidence sources, label, strength |
+| `validation.csv` | 5 | item id, family id, real or template, cell, scorer, nine scores, forced-choice rank, guide version |
+| `findings.md` | 1 to 5 | the narrative per phase and per family, every finding labelled |
+
+## 13. Waves and effort
+
+**Wave 1:** 10 to 12 families across all organisation types, about 350 adverts (300 to 400), English and French. **Later waves** complete 30 to 40 families, add Spanish and Arabic, and refresh Phase 1 from AidJobs' own crawled jobs once source growth has thousands of them (whether crawled descriptions may be used for this analysis, under each source's reuse terms and growth plan decision 5, is a decision for then).
+
+**Effort, honestly (Estimate; agent working days in one slot, excluding the user's review time):**
+
+| Phase | Wave 1 | The user |
+| --- | --- | --- |
+| 0: the guide's anchors, the codebook, the pilot of 20 and its calibration | 2 to 3 | approve the guide, about 1 hour |
+| 1: `roles.py` with tests and CI; the offline titles; four request batches; grouping decisions; the role map and the proposal of roles | 5 to 8 | approve four batches and the role list, 2 to 3 hours |
+| 2: sampling; two or three reading batches; structure records and scores for about 350 adverts | 6 to 9 | approve the batches, 1 to 2 hours |
+| 3: about 8,000 to 10,000 units; the reliability sample; comparisons; signature facts; 15 to 20 normative sources | 15 to 22 | approve the source downloads; read the findings, 2 to 3 hours |
+| 4: templates for 10 to 12 families, English and French | 14 to 20 | read sample templates, 3 to 4 hours |
+| 5: blind validation and revisions | 4 to 6 | approve the result, about 1 hour |
+| Records, pull requests, reviews | 3 to 5 | the merges |
+| **Total** | **49 to 73 days, about 10 to 15 weeks** | **about 12 to 16 hours** |
+
+The calendar time is longer, because crawler steps come first for the user's review. Later waves, with the method in place: about 2 to 3 days per further family (25 to 30 adverts and its template), so 45 to 80 more days for 30 to 40 families, and about a third more per family for each added language.
+
+**The agent's recommendation: start with wave 1a,** 3 families (about 90 adverts, English and French) through every phase, in about 15 to 20 days. It tests the guide's reliability, the coding effort per advert, and whether templates can beat the best quarter, before the remaining 7 to 9 families are committed. The estimate above is then corrected from measured effort.
+
+## 14. Pull requests and reviews
+
+1. **This plan** (docs only): `role-survey.md`, `employer-side-plan.md` section 20 and the E7 amendment, the ledger's W-54. Independently reviewed before it reaches the user (a large plan; review rules).
+2. **Phase 0 and Phase 1** (`tools/survey/roles.py`, tests, a CI step; the guide's anchors; the offline titles; then the request batches, each approved; the role map; the proposed roles). Independent review of the script before its first request, because it makes outbound requests (as step F's was); a re-review only if the fixes change logic.
+3. **Phase 2** (`tools/survey/adverts.py` fetch, extract and build; the sample and its records). Independent review of the script before its first request.
+4. **Phase 3**, in one or two pull requests by family (records and findings; the normative sources). Self-review and CI; the reliability sample is its own check.
+5. **Phases 4 and 5** (templates and validation). The blind validation is itself the independent review.
+
+Each merge records its step in this file (about 10 lines) and one line in the ledger.
+
+## 15. Decisions for the user
+
+1. **Approve this plan,** which covers building Phase 0's guide and the scripts as described, their reviews and fixes; every batch of requests and every merge still needs its own approval.
+2. **The scoring guide's weights** (section 5), and whether one recorded calibration on a pilot of 20 is allowed before it is frozen (recommended) or none.
+3. **Sharing Phase 1 with step F's remaining waves** (section 6; recommended): it widens step F's scope.
+4. **The reading of AidJobs' own stored jobs** through the read-only login, for titles now and descriptions once W-37's capture is merged (section 6).
+5. **Job boards:** keep the 4 November decision (none of the eight), and whether the agent may read the terms of up to 5 national boards in the Global South (batch P1-4) to propose any.
+6. **Where national NGOs' adverts come from** if no board is allowed: from their own sites, found by the agent's web search (search results only) and confirmed by step F's method, about 50 organisations (recommended), or a smaller national sample, recorded as a gap.
+7. **UN coverage:** the UN careers feed and about 12 agencies' careers pages now (batch P1-2), although the UN system is in the employer survey's later wave; the survey needs UN formats for templates, not UN jobs for the site.
+8. **Mirrors for UN pages that refuse,** each checked for terms first, or UN adverts only where the official page answers.
+9. **Wave 1a first** (3 families; recommended) or the full wave 1 at once.
+10. The final list of wave-1 families, after Phase 1 (section 6).
+
+## 16. What this plan does not do
+
+It does not change the demo, the generator's design (`employer-generator/plan-draft-v3.md`, held), the order of work, the crawler, the jobs table or any production setting. It builds no template and no fairness check: both are built after, or alongside, the generator (section 2, decision 4). It approves no request: each batch is approved before it runs.
