@@ -275,6 +275,8 @@ class _Cursor:
             raise self.conn.error
 
     def fetchone(self):
+        if "as removed" in self.last:
+            return {"count": 2, "removed": 0}
         return {"count": 2, "total": 2}
 
     def fetchall(self):

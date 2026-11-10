@@ -505,7 +505,12 @@ export default function JobManagementPage() {
 
       const data = await response.json();
       if (data.status === 'ok') {
-        toast.success(data.data.message || `Successfully restored ${data.data.restored_count} jobs`);
+        const message = data.data.message || `Successfully restored ${data.data.restored_count} jobs`;
+        if (data.data.not_restored_count > 0) {
+          toast.warning(message);
+        } else {
+          toast.success(message);
+        }
         setSelectedJobs(new Set());
         fetchJobs();
       } else {

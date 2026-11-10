@@ -77,6 +77,10 @@ def check_job_selection(job_ids: Optional[List[str]], org_name: Optional[str] = 
         raise HTTPException(status_code=400, detail="Send org_name or source_id, not both")
 
 
+def _jobs_text(n: int) -> str:
+    return f"{n} job{'' if n == 1 else 's'}"
+
+
 def _diagnosis_failed(message: str) -> dict:
     """The diagnose routes' failure answer, in their usual shape; the caller logs the cause."""
     return {
@@ -401,6 +405,8 @@ async def bulk_delete_jobs(
     """
     logger.info(f"[bulk_delete] Received deletion request: type={request.deletion_type}, job_ids={len(request.job_ids) if request.job_ids else 0}, org_name={request.org_name}, source_id={request.source_id}, admin={admin}")
     check_job_selection(request.job_ids, request.org_name, request.source_id)
+    if request.deletion_type not in ("soft", "hard"):
+        raise HTTPException(status_code=400, detail="deletion_type must be soft or hard")
     if request.export_data:
         raise HTTPException(
             status_code=400,
@@ -712,7 +718,7 @@ async def restore_jobs(
     admin=Depends(admin_required)
 ):
     """
-    Restore soft-deleted jobs.
+    Restore soft-deleted jobs whose source exists and is not deleted.
     """
     check_job_selection(request.job_ids)
     conn = None
@@ -722,6 +728,8 @@ async def restore_jobs(
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         placeholders = ','.join(['%s'] * len(request.job_ids))
+        # FOR SHARE holds back a delete of those sources until this commits, and waits for one
+        # in progress, so no job comes back live under a deleted or removed source.
         cursor.execute(f"""
             UPDATE jobs
             SET deleted_at = NULL,
@@ -729,20 +737,44 @@ async def restore_jobs(
                 deletion_reason = NULL
             WHERE id::text IN ({placeholders})
             AND deleted_at IS NOT NULL
+            AND source_id IN (
+                SELECT s.id FROM sources s JOIN jobs j ON j.source_id = s.id
+                WHERE j.id::text IN ({placeholders}) AND s.status IS DISTINCT FROM 'deleted'
+                FOR SHARE OF s
+            )
             RETURNING id::text
-        """, request.job_ids)
+        """, request.job_ids + request.job_ids)
         
         restored_ids = [row['id'] for row in cursor.fetchall()]
         restored_count = len(restored_ids)
         
+        # Still deleted: under a deleted source, or with none (its source was deleted permanently).
+        cursor.execute(f"""
+            SELECT COUNT(*) as count, COUNT(*) FILTER (WHERE source_id IS NULL) as removed
+            FROM jobs
+            WHERE id::text IN ({placeholders}) AND deleted_at IS NOT NULL
+        """, request.job_ids)
+        left = cursor.fetchone()
+        not_restored, removed = left['count'], left['removed']
+        
         conn.commit()
         
+        message = f"Successfully restored {restored_count} jobs"
+        if not_restored:
+            message = f"Restored {_jobs_text(restored_count)}."
+            if not_restored - removed:
+                message += (f" {_jobs_text(not_restored - removed)} not restored: the source is "
+                            "deleted. Add the source again, then restore its jobs.")
+            if removed:
+                message += (f" {_jobs_text(removed)} cannot be restored: the source was deleted "
+                            "permanently.")
         return {
             "status": "ok",
             "data": {
                 "restored_count": restored_count,
                 "restored_ids": restored_ids,
-                "message": f"Successfully restored {restored_count} jobs"
+                "not_restored_count": not_restored,
+                "message": message
             }
         }
     except HTTPException:

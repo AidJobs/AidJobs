@@ -19,6 +19,15 @@ export function sourceDangerActions(status: string | null | undefined): { delete
   return { deleteSource: !deleted, permanentDelete: deleted };
 }
 
+/**
+ * Which row actions the sources list offers. The backend refuses to crawl or edit a deleted
+ * source; it is restored by adding it again.
+ */
+export function sourceRowActions(status: string | null | undefined): { run: boolean; toggle: boolean; edit: boolean } {
+  const live = status !== 'deleted';
+  return { run: live, toggle: live, edit: live };
+}
+
 export type ImpactCount =
   | { state: 'loading' }
   | { state: 'ok'; count: number; atLeast: boolean }
