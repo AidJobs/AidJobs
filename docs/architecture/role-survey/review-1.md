@@ -149,7 +149,7 @@ All taken. The author checked M1 (`contracts/captured.py` is on W-37's branch on
 - **S2:** a table per organisation type after Phase 1, with fallbacks (search results, then one GET; stored descriptions; mirrors); shortfalls recorded as gaps.
 - **S3:** 70% exact agreement and a weighted kappa of 0.6; coders of different model families; the user's optional 10 adverts (decision 2).
 - **S4:** about 135 organisations (Estimate), with the Belgian and French counts.
-- **S5:** wave 1a re-estimated at 18 to 27 days; it is chosen from the first snapshot and does not wait for the second.
+- **S5:** wave 1a re-estimated (17 to 27 days after the re-review's correction); it is chosen from the first snapshot and does not wait for the second.
 - **S6:** right-to-work statements never flagged; a sixth reason proposed for the user's decision (decision 12).
 - **S7:** each of the eight demo rules placed in production.
 - **S8:** corrected in all three files.
@@ -157,5 +157,5 @@ All taken. The author checked M1 (`contracts/captured.py` is on W-37's branch on
 - **S10:** decision 5 covers stored descriptions for analysis under growth plan decision 5; section 13 refers to it.
 - **S11:** the output table marks script and coded files; CI's form checks listed; the overlap check covers template lines.
 - **S12:** `Crawl-delay` through `contracts.robots.crawl_delay`, new for the survey.
-- **S13:** hard caps per batch; at most 237 requests in Phase 1.
+- **S13:** hard caps per batch; at most 239 requests in Phase 1 (the re-review corrected the first total of 237).
 - **N1 to N10:** taken (N9: the records branch exists only locally and is not pushed; the branch is rebased on `main` before the merge if it moves).
