@@ -10,3 +10,65 @@ def jobs_not_rediscovered(known_ids, seen_ids, *, trustworthy: bool) -> list:
         return []
     seen = set(seen_ids)
     return [job_id for job_id in known_ids if job_id not in seen]
+
+
+def counting_crawl(
+    *,
+    listing_complete,
+    valid: int,
+    failed: int,
+    active_at_start,
+    matched_active: int,
+) -> bool:
+    """Whether a finished crawl is evidence of absence: a counting crawl (contract §6).
+
+    Only a listing read completely counts, and never one with no valid job, one where any job
+    failed to save (the user's decision of 11 November 2026: that job was listed but its sighting
+    was not recorded), or one whose rows matched fewer than half of the source's open jobs that
+    were not hidden when the run started. The crawl's status and failure counter play no part.
+    """
+    if listing_complete is not True:
+        return False
+    if not valid or valid < 0:
+        return False
+    if failed:
+        return False
+    # A run whose open jobs at its start were not recorded cannot be measured, so never counts.
+    if active_at_start is None:
+        return False
+    if active_at_start and matched_active * 2 < active_at_start:
+        return False
+    return True
+
+
+def run_lifecycle(result: dict, *, active_at_start, matched_active: int) -> dict:
+    """The crawl_logs lifecycle columns for a finished run, from its result.
+
+    A result without a listing report (a failure, a timeout, a shutdown, a source whose reader
+    reports no completeness) is not complete, so it never counts.
+    """
+    listing = result.get("listing") or {}
+    counts = result.get("counts") or {}
+    complete = listing.get("complete")
+    expected = listing.get("expected")
+    stop = listing.get("stop")
+    valid = int(result.get("valid") or 0)
+    failed = int(counts.get("failed") or 0)
+    matched = int(matched_active or 0)
+    return {
+        "listing_complete": complete if isinstance(complete, bool) else None,
+        "listing_expected": (
+            expected if isinstance(expected, int) and not isinstance(expected, bool) else None
+        ),
+        "listing_stop": str(stop) if stop is not None else None,
+        "valid_count": valid,
+        "failed_saves": failed,
+        "matched_active": matched,
+        "counted": counting_crawl(
+            listing_complete=complete,
+            valid=valid,
+            failed=failed,
+            active_at_start=active_at_start,
+            matched_active=matched,
+        ),
+    }

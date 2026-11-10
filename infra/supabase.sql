@@ -237,6 +237,20 @@ CREATE TABLE IF NOT EXISTS crawl_logs (
 -- Add duration_ms column if missing (idempotent)
 ALTER TABLE crawl_logs ADD COLUMN IF NOT EXISTS duration_ms INT;
 
+-- A run's completeness and lifecycle evidence (W-06; infra/migrations/w06_crawl_run_lifecycle.sql)
+ALTER TABLE crawl_logs
+    ADD COLUMN IF NOT EXISTS active_at_start INTEGER,
+    ADD COLUMN IF NOT EXISTS listing_complete BOOLEAN,
+    ADD COLUMN IF NOT EXISTS listing_expected INTEGER,
+    ADD COLUMN IF NOT EXISTS listing_stop TEXT,
+    ADD COLUMN IF NOT EXISTS valid_count INTEGER,
+    ADD COLUMN IF NOT EXISTS failed_saves INTEGER,
+    ADD COLUMN IF NOT EXISTS matched_active INTEGER,
+    ADD COLUMN IF NOT EXISTS observed INTEGER,
+    ADD COLUMN IF NOT EXISTS counted BOOLEAN,
+    ADD COLUMN IF NOT EXISTS expired INTEGER,
+    ADD COLUMN IF NOT EXISTS returned INTEGER;
+
 -- Create index for crawl_logs table
 CREATE INDEX IF NOT EXISTS idx_crawl_logs_source_id ON crawl_logs(source_id, ran_at DESC);
 
@@ -386,6 +400,10 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS locations TEXT[],
     ADD COLUMN IF NOT EXISTS advert_language TEXT,
     ADD COLUMN IF NOT EXISTS salary_range_text TEXT;
+
+-- When a job's lifecycle became expired (W-06; already in production before that migration)
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS expired_at TIMESTAMPTZ;
 
 -- Create index for enrichment fields
 CREATE INDEX IF NOT EXISTS idx_jobs_impact_domain ON jobs USING GIN(impact_domain);

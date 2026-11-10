@@ -899,7 +899,7 @@ class _FinishCursor(_SourceCursor):
     def fetchone(self):
         sql = self.statements[-1][0]
         if sql.startswith("UPDATE crawl_logs"):
-            return ("run-9",)
+            return ("run-9", 0)
         return super().fetchone()
 
 

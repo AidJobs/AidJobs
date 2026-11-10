@@ -1500,6 +1500,7 @@ class SimpleCrawler:
         skipped = validation_skipped
         failed = 0
         attempted = 0  # jobs that reached their write, or failed on the way to it
+        seen_active = []  # ids of open jobs matched, for the run's lifecycle record
         failed_inserts = []  # Track failed inserts for logging
         
         logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
@@ -1513,6 +1514,7 @@ class SimpleCrawler:
                 for job in jobs:
                     in_savepoint = False
                     recorded_mark = len(recorded)
+                    seen_mark = len(seen_active)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1672,6 +1674,7 @@ class SimpleCrawler:
                             source_id=source_id,
                             org_name=org_name,
                             recorded=recorded,
+                            seen=seen_active,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                         in_savepoint = False
@@ -1696,6 +1699,7 @@ class SimpleCrawler:
                         if in_savepoint:
                             cur.execute("ROLLBACK TO SAVEPOINT job_save")
                             del recorded[recorded_mark:]
+                            del seen_active[seen_mark:]
                         else:
                             attempted += 1
                         error_msg = f"Unexpected error processing job: {stored_text(e)}"
@@ -1759,6 +1763,7 @@ class SimpleCrawler:
             'failed': failed,
             'validated': len(jobs) if 'jobs' in locals() else 0,
             'attempted': attempted,
+            'seen_active': seen_active,
         }
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
@@ -2369,6 +2374,9 @@ class SimpleCrawler:
                 return {
                     'status': crawl_status,
                     'message': crawl_message,
+                    # Read by the run's finish for its lifecycle record (contract §6).
+                    'listing': dict(listing_report) if listing_report else None,
+                    'valid': len(admitted),
                     'validation_info': {
                         'total_extracted': len(jobs),
                         'validated': counts.get('validated', 0),

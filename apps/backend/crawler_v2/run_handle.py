@@ -14,7 +14,8 @@ class RunHandle:
 
     Saves run in a worker thread. A save cannot be cancelled once it has started, so the handle
     keeps it; the orchestrator waits for it before finishing the run. The counts of completed
-    saves are kept too, so a run that times out still records what it saved.
+    saves are kept too, so a run that times out still records what it saved, and so are the
+    open jobs they matched, for the run's lifecycle record.
     """
 
     def __init__(self, token, source_id):
@@ -23,6 +24,7 @@ class RunHandle:
         self.token = str(token)
         self.source_id = str(source_id)
         self.saved = dict.fromkeys(_TOTALS, 0)
+        self.seen_active: set = set()
         self._pending: set = set()
 
     async def save(self, save_jobs, jobs, source_id, org_name, **kwargs):
@@ -40,8 +42,10 @@ class RunHandle:
     def _count(self, future) -> None:
         if future.cancelled() or future.exception() is not None:
             return
+        result = future.result()
         for name in _TOTALS:
-            self.saved[name] += future.result().get(name, 0) or 0
+            self.saved[name] += result.get(name, 0) or 0
+        self.seen_active.update(result.get("seen_active") or ())
 
     async def wait_for_saves(self) -> None:
         while self._pending:

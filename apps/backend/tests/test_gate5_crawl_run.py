@@ -115,7 +115,8 @@ class RecordingCursor:
         self.statements.append((compact, params))
         self._row = None
         if compact.startswith("UPDATE crawl_logs") and self.owns_run:
-            self._row = (params[-1],)
+            # The finish's ownership check returns the run's id and its open jobs at the start.
+            self._row = (params[-1], 0)
         elif "FROM sources WHERE id = %s FOR NO KEY UPDATE" in compact:
             self._row = self.source_row
 
@@ -429,6 +430,24 @@ def test_a_finish_that_no_longer_owns_its_run_writes_nothing():
     sql_text = "\n".join(sql for sql, _params in statements)
     assert "DELETE FROM crawl_locks" not in sql_text
     assert "sources" not in sql_text
+    assert "counted" not in sql_text
+
+
+def test_the_lifecycle_record_is_written_after_the_ownership_check_in_the_same_transaction():
+    finished, statements, conn = _finish("ok")
+    assert finished is True
+    assert conn.commits == 1
+    updates = [(sql, p) for sql, p in statements if sql.startswith("UPDATE crawl_logs")]
+    assert len(updates) == 2
+    ownership, record = updates
+    assert "status = 'running' RETURNING id, active_at_start" in ownership[0]
+    assert "counted = %s" in record[0] and "status" not in record[0]
+    assert record[1][-1] == "run-9"
+    # No listing report in this result: not complete, so it does not count.
+    assert record[1][0] is None and record[1][-2] is False
+    order = [i for i, (sql, _p) in enumerate(statements) if sql.startswith("UPDATE crawl_logs")]
+    lock = next(i for i, (sql, _p) in enumerate(statements) if sql.startswith("DELETE FROM"))
+    assert order[1] < lock
 
 
 def test_failed_and_fail_both_increment_failures():

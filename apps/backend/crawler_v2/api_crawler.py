@@ -221,6 +221,7 @@ class SimpleAPICrawler:
         skipped = 0
         failed = 0
         validated = 0
+        seen_active = []
         
         try:
             with conn.cursor() as cur:
@@ -248,6 +249,7 @@ class SimpleAPICrawler:
                     observed_at = datetime.now(timezone.utc)
                     validated += 1
                     recorded_mark = len(recorded)
+                    seen_mark = len(seen_active)
                     cur.execute("SAVEPOINT job_save")
                     try:
                         outcome = persist_candidate(
@@ -259,12 +261,14 @@ class SimpleAPICrawler:
                             source_id=source_id,
                             org_name=org_name,
                             recorded=recorded,
+                            seen=seen_active,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                     except Exception as exc:
                         # This job only: roll back to its savepoint and drop what it recorded.
                         cur.execute("ROLLBACK TO SAVEPOINT job_save")
                         del recorded[recorded_mark:]
+                        del seen_active[seen_mark:]
                         failed += 1
                         logger.error("API job failed to save: %s", redact_exception(exc))
                         continue
@@ -292,6 +296,7 @@ class SimpleAPICrawler:
             'skipped': skipped,
             'failed': failed,
             'validated': validated,
+            'seen_active': seen_active,
         }
     
     async def crawl_source(self, source: Dict, run=None) -> Dict:

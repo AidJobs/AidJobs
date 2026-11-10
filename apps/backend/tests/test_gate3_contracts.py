@@ -440,8 +440,14 @@ def test_crawlers_persist_through_the_single_helper():
         assert "from contracts.validate" not in text
     assert not (root / "crawler_v2" / "orchestrator.py").exists()
     text = (root / "orchestrator.py").read_text(encoding="utf-8")
-    assert "from contracts" not in text
-    assert "import contracts" not in text
+    # The run's finish records its lifecycle evidence (W-06) with the one rule that touches no
+    # database; nothing else from the contracts package, and nothing that writes jobs.
+    imports = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith(("from contracts", "import contracts"))
+    ]
+    assert imports == ["from contracts.lifecycle import run_lifecycle"]
 
 
 def test_package_does_not_mention_a_key_version():
