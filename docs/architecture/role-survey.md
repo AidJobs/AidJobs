@@ -339,3 +339,31 @@ Under any option, an archived page is used only if the employer's own `robots.tx
 **Decided by the user on 10 November 2026: option (b).** Archived pages may be read from `data.commoncrawl.org` as a recorded exception to the `robots.txt` rule of section 3, on the strength of Common Crawl's own documentation, with step E's polite requester (`AidJobsSurvey/0.1`, 10 seconds apart, a stop at once on a 403 and after two refusals), only pages whose employer's own `robots.txt` does not forbid `AidJobsSurvey`, and section 3's rules on copying and privacy. The exception covers this host only. Each batch of archived pages is still approved by the user before it runs, as Phase 2's reading batches are.
 
 **Effect on the plan.** Phase 1 starts from data on disk (batches P1-0a to P1-0c), and P1-1 shrinks to the 7 allowed organisations (21 requests), saving one to two days. Phases 2 and 3 take the 116 adverts on disk, less the AI test set (section 10), and, as decision 14 allows, most INGO, NGO, foundation and research-body adverts from the archive; employers' own pages are then read only for the gaps.
+
+## 18. Open: a larger library (discussion of 11 November 2026)
+
+**Status: under discussion; nothing here changes sections 1 to 17 yet.** Recorded so the discussion is not lost; PR #134 (the library amendment) is held until it is settled (the user, 11 November 2026, about 01:40 IST).
+
+**The user's question.** Is the planned library sufficient, given how much data there is, or can a much more extensive library with much larger coverage be built?
+
+**The agent's answer.** Not sufficient for that aim. About 350 adverts give a sound first version for 10 to 12 families, but most variants by organisation type would be thin (section 9, "Pooling and thresholds"). The limit is the cost of coding each advert by hand, not the data:
+- **Counted:** 116 full adverts on disk; about 3,000 titles at about 107 organisations; Common Crawl's index for 3 crawls (August to October 2026) and only some organisations' sites and accounts points to about 300 to 350 full adverts not on Workday, at about 60 organisations (section 17).
+- **Not yet searched (Estimate, to be measured):** Common Crawl lists crawls back to 2018, about 20 of them in 2024 to 2026 (its "Get Started" page, read on 10 November 2026). Extending the index lookups to those crawls and to all 914 first-wave organisations could plausibly reach 2,000 to 4,000 distinct full adverts once reposts are removed.
+
+**The design proposed: two layers.**
+1. **A broad layer, measured by script over thousands of adverts:** sections and their order, words per section, length, facts given and missing, years of experience by level, standards and tools named (from a fixed list: Sphere, Kobo, CHS and others), title variants, distinguishing words and language. It would cover 30 to 40 families at once, with per-type and per-level values backed by real counts, and supply the library's measured parts (section 9, parts 1, 4, 6 and 7).
+2. **A deep layer, coded with judgement:** units, the duty bank and its phrasing, signature facts and the reference job descriptions (parts 2, 3 and 8). Coded by hand by agents it stays at a few hundred adverts; coded by a model, with agents checking a 10 to 15% sample against section 5's reliability targets, it could extend across the whole set, at a token cost very roughly in the tens to low hundreds of US dollars (Unverified).
+
+**Limits more data does not fix.** Workday's archived pages are shells, so the largest INGOs on Workday stay missing; government donors, national NGOs in the Global South, the Red Cross and Red Crescent, the UN Secretariat, domestic charities and French adverts stay thin (ReliefWeb's archived pages could help only if its terms allow, decision of 10 November 2026); older adverts need their year recorded and reposts removed; the user's review time limits how many reference job descriptions are read, so a sample would be. **A conflict to settle:** section 10 says no advert text goes to OpenRouter, and Common Crawl's terms name AI uses in their indemnity; model-assisted coding would send public advert text to a model provider. The agents coding by hand in Cursor also send the text they read to their own AI provider, which the plan had not said until now.
+
+**Decided by the user on 11 November 2026:**
+- **Measure first:** a small approved batch against Common Crawl's index counts the real adverts; then the plan is amended to the two layers, sized from that count.
+- **PR #134 is held** until the measurement and the two-layer amendment are ready.
+- **Model-assisted coding is decided after the measurement,** with its cost and the providers' data terms in front of the user.
+
+**Batch M1, proposed for the user's approval (not yet approved or run).** All requests to `data.commoncrawl.org` under decision 14's exception, none to employers:
+1. The index maps (`cluster.idx`) of 6 more crawls, February to July 2026 (`CC-MAIN-2026-08`, `-12`, `-17`, `-21`, `-25`, `-30`), about 100 MB each, about 600 MB, kept outside the repository beside step E's archive: 6 requests.
+2. Index lookups by step E's method (`tools/survey/careers.py`: block reads by HTTP Range, up to 30 blocks joined per request) for the 185 recruitment-system accounts already matched (Workday's 26 left out), the 81 employer sites step E covered, and about 100 more first-wave organisations' sites, across those 6 crawls, plus the 3 crawls on disk for the 100 new sites: at most 600 requests.
+3. About 20 archived job pages, sampled at random, to check how many index entries hold advert text: at most 20 requests.
+
+At most 626 requests, step E's requester (`AidJobsSurvey/0.1`, 10 seconds apart, a stop at once on a 403 and for the day after two refusals in a row), about 2 hours, possibly two evenings if the server slows the run. Output, counts only: distinct job pages with advert text by organisation type, recruitment system, year and language; the count after reposts are removed; and what it means for coverage per family and organisation type. Recorded here, in a commit to PR #134; the index files and test pages stay local.
