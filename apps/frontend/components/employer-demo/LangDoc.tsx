@@ -1,31 +1,32 @@
 'use client';
 
-import { editTranslation, refreshTranslation, reviewTranslation } from './actions';
-import { LANGS, langOf, stale, totalLines, untranslated } from './translate';
-import type { DemoJob, Lang } from './types';
+import { editTranslation, keepTranslation, refreshTranslation, reviewTranslation } from './actions';
+import { jobLang, langOf, stale, totalLines, untranslated, versionsOf } from './translate';
+import type { DemoJob, JobLang } from './types';
 import { radioKeys } from './ui';
 
-function versionStatus(job: DemoJob, k: Lang): string {
+function versionStatus(job: DemoJob, k: JobLang): string {
   const t = job.translations?.[k];
   if (!t) return '';
-  if (stale(job, t)) return 'English changed';
+  if (stale(job, t)) return `${langOf(jobLang(job)).label} changed`;
   return t.reviewed ? 'reviewed' : 'draft';
 }
 
-/** English and the job's language versions, above the job description: each version is edited there like the English. */
-export function LangSwitch({ job, current, onPick }: { job: DemoJob; current: Lang | null; onPick: (l: Lang | null) => void }) {
-  const versions = LANGS.filter((l) => job.translations?.[l.key]);
+/** The job's own language and its versions, above the job description: each version is edited there like the job's own text. */
+export function LangSwitch({ job, current, onPick }: { job: DemoJob; current: JobLang | null; onPick: (l: JobLang | null) => void }) {
+  const versions = versionsOf(job);
   if (!versions.length) return null;
+  const own = langOf(jobLang(job));
   return (
     <div className="aj-no-scrollbar flex items-center gap-1 overflow-x-auto" role="radiogroup" aria-label="Language of the job description" onKeyDown={radioKeys}>
-      <button type="button" role="radio" aria-checked={!current} className="ej-jump" data-active={!current || undefined} onClick={() => onPick(null)}>
-        English
+      <button type="button" role="radio" aria-checked={!current} className="ej-jump" data-active={!current || undefined} onClick={() => onPick(null)} lang={own.key}>
+        {own.native}
       </button>
-      {versions.map((l) => (
-        <button key={l.key} type="button" role="radio" aria-checked={current === l.key} className="ej-jump" data-active={current === l.key || undefined} onClick={() => onPick(l.key)} lang={l.key}>
-          {l.native}{' '}
+      {versions.map((k) => (
+        <button key={k} type="button" role="radio" aria-checked={current === k} className="ej-jump" data-active={current === k || undefined} onClick={() => onPick(k)} lang={k}>
+          {langOf(k).native}{' '}
           <span className="ej-jump-count" lang="en">
-            {versionStatus(job, l.key)}
+            {versionStatus(job, k)}
           </span>
         </button>
       ))}
@@ -41,13 +42,15 @@ function fit(el: HTMLTextAreaElement | null) {
 }
 
 /**
- * A language version as a document, edited in place like the English: the same headings and order, each English line faintly under
- * its translation, lines still in English marked. Facts and sections are changed in English; the version follows.
+ * A language version as a document, edited in place: its own headings and sections, each line of the job's own text faintly under its
+ * translation, lines still in the job's language marked. The facts are shared by every version; the sections are the version's own.
+ * When the job's own text changed, the version stays as it is and offers the update, or to keep it as it is.
  */
-export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: Lang; readOnly?: boolean }) {
+export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: JobLang; readOnly?: boolean }) {
   const t = job.translations?.[lang];
   if (!t) return null;
   const info = langOf(lang);
+  const own = langOf(jobLang(job));
   const left = untranslated(job, t);
   const isStale = stale(job, t);
   return (
@@ -59,16 +62,21 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: L
           </strong>
           <span className="aj-muted">
             {' '}
-            · {left ? `${left} of ${totalLines(t)} lines still in English` : 'every line is in the language'}. {readOnly ? 'Facts and sections follow the English.' : 'Edit facts and sections in English; this version follows.'}
+            · {left ? `${left} of ${totalLines(t)} lines still in ${own.label}` : 'every line is in the language'}. {readOnly ? 'The facts are shared with every version.' : `The facts are shared; its sections are its own. Changes to the ${own.label} are not copied here unless you say so.`}
             {!readOnly && job.status === 'live' && t.reviewed && ' It is on the live job page: an edit takes it off until you mark it as reviewed again.'}
           </span>
         </span>
         {!readOnly && isStale && (
-          <button type="button" className="aj-pill" onClick={() => refreshTranslation(job.id, lang)}>
-            Update the changed lines
-          </button>
+          <>
+            <button type="button" className="aj-pill" onClick={() => refreshTranslation(job.id, lang)}>
+              Update the changed lines
+            </button>
+            <button type="button" className="aj-text-btn" onClick={() => keepTranslation(job.id, lang)}>
+              Keep it as it is
+            </button>
+          </>
         )}
-        {!readOnly && !isStale && !t.reviewed && (
+        {!readOnly && !t.reviewed && (
           <button type="button" className="aj-ink-btn" onClick={() => reviewTranslation(job.id, lang)}>
             Mark as reviewed
           </button>
@@ -76,14 +84,15 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: L
       </div>
       <article className="ej-doc flex flex-col gap-4" aria-label={`${info.label} version of the job description`} lang={lang} dir={info.dir}>
         {t.sections.map((sec) => {
-          const en = job.sections.find((x) => x.key === sec.key);
+          const src = job.sections.find((x) => x.key === sec.key);
           return (
             <section key={sec.key} className="flex flex-col gap-1.5">
-              <input className="ej-tr-head" value={sec.title} readOnly={readOnly} onChange={(e) => editTranslation(job.id, lang, sec.key, 'title', e.target.value)} aria-label={`Heading: ${en?.title ?? sec.key}`} />
+              <input className="ej-tr-head" value={sec.title} readOnly={readOnly} onChange={(e) => editTranslation(job.id, lang, sec.key, 'title', e.target.value)} aria-label={`Heading: ${src?.title ?? sec.key}`} />
+              {sec.lines.length === 0 && <span className="aj-faint px-2">Empty: write it here in the chat.</span>}
               {sec.lines.map((line, i) => {
-                const source = en?.lines[i] ?? '';
-                const english = source === line && /[a-z]{3}/i.test(line);
-                // A list line ("- ...") shows as a bullet, as in the English; the marker is kept when it is edited.
+                const source = src?.lines[i] ?? '';
+                const same = source === line && /\p{L}{3}/u.test(line);
+                // A list line ("- ...") shows as a bullet, as in the job's own text; the marker is kept when it is edited.
                 const bullet = line.startsWith('- ');
                 const text = bullet ? line.slice(2) : line;
                 return (
@@ -108,16 +117,18 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: L
                         aria-label={`${sec.title}, line ${i + 1}`}
                       />
                     </div>
-                    <span className={`aj-faint px-2 ${bullet ? 'ps-5' : ''}`} style={{ fontSize: 11.5 }}>
-                      <span lang="en" dir="ltr">
-                        {english && (
-                          <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }}>
-                            English
-                          </span>
-                        )}
-                        {source.replace(/^- /, '')}
+                    {source && (
+                      <span className={`aj-faint px-2 ${bullet ? 'ps-5' : ''}`} style={{ fontSize: 11.5 }}>
+                        <span lang={own.key} dir={own.dir}>
+                          {same && (
+                            <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }} lang="en">
+                              {own.label}
+                            </span>
+                          )}
+                          {source.replace(/^- /, '')}
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </div>
                 );
               })}

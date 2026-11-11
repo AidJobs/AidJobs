@@ -2,14 +2,14 @@
 
 import { AlertCircle, BarChart3, CheckCircle2, ChevronDown, FileCheck2, Languages, Lock, Printer, UserCheck } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, isReviewable, refreshTranslation, remindReviewers, removeTranslation, reviewTranslation } from './actions';
+import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, isReviewable, keepTranslation, refreshTranslation, remindReviewers, removeTranslation, reviewTranslation } from './actions';
 import { ReviewDialog } from './Review';
 import { shortDate } from './engine';
 import { FlyerDialog } from './Flyer';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, MIN_SIMILAR, type Point } from './market';
 import { go } from './store';
-import { LANGS, langOf, stale, totalLines, untranslated } from './translate';
-import type { DemoJob, Lang, State } from './types';
+import { jobLang, langOf, stale, totalLines, untranslated, versionChoices, versionsOf } from './translate';
+import type { DemoJob, JobLang, State } from './types';
 import { Dialog, inputStyle } from './ui';
 
 export type RowKey = 'advert' | 'market' | 'languages' | 'notice' | 'review';
@@ -61,10 +61,11 @@ function Locked({ text, onChooseAmplify }: { text: string; onChooseAmplify: () =
   );
 }
 
-/** Line by line: the English above, the version below. Lines still in English are marked; any edit needs a new review. */
-function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onClose: () => void }) {
+/** Line by line: the job's own text above, the version below. Lines still in the job's language are marked; any edit needs a new review. */
+function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: JobLang; onClose: () => void }) {
   const t = job.translations?.[lang];
   const info = langOf(lang);
+  const own = langOf(jobLang(job));
   if (!t) return null;
   const left = untranslated(job, t);
   const isStale = stale(job, t);
@@ -76,7 +77,7 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
       wide
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="aj-faint mr-auto">{left ? `${left} of ${totalLines(t)} lines are still in English.` : 'Every line is in the language.'}</span>
+          <span className="aj-faint mr-auto">{left ? `${left} of ${totalLines(t)} lines are still in ${own.label}.` : 'Every line is in the language.'}</span>
           <button type="button" className="aj-pill" onClick={onClose}>
             Close
           </button>
@@ -97,13 +98,16 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
     >
       <div className="flex flex-col gap-4">
         <p className="aj-faint" style={{ margin: 0 }}>
-          Demo: AidJobs would draft the whole text. Here the headings, standard sentences, dates, and places are translated; other lines stay in English, marked, for you to translate. Your organisation&apos;s fixed texts (commitments) appear as you wrote them.
+          Demo: AidJobs would draft the whole text. Here the headings, standard sentences, dates, and places are translated; other lines stay in {own.label}, marked, for you to translate. Your organisation&apos;s fixed texts (commitments) appear as you wrote them.
         </p>
         {isStale && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl p-3" style={{ background: 'var(--amber-bg)' }}>
-            <span className="min-w-0 flex-1">The English changed after this version was made.</span>
+            <span className="min-w-0 flex-1">The {own.label} changed after this version was made. It is not copied here unless you say so.</span>
             <button type="button" className="aj-pill" onClick={() => refreshTranslation(job.id, lang)}>
               Update the changed lines
+            </button>
+            <button type="button" className="aj-text-btn" onClick={() => keepTranslation(job.id, lang)}>
+              Keep it as it is
             </button>
           </div>
         )}
@@ -114,13 +118,13 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: Lang; onCl
               <input style={{ ...inputStyle, fontWeight: 650 }} value={sec.title} onChange={(e) => editTranslation(job.id, lang, sec.key, 'title', e.target.value)} dir={info.dir} lang={lang} aria-label={`Heading: ${en?.title ?? sec.key}`} />
               {sec.lines.map((line, i) => {
                 const source = en?.lines[i] ?? '';
-                const english = source === line && /[a-z]{3}/i.test(line);
+                const english = source === line && /\p{L}{3}/u.test(line);
                 return (
                   <div key={i} className="flex flex-col gap-1">
-                    <span className="aj-faint" style={{ fontSize: 11.5 }} lang="en">
+                    <span className="aj-faint" style={{ fontSize: 11.5 }} lang={own.key}>
                       {english && (
-                        <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }}>
-                          English
+                        <span className="aj-chip" data-tone="amber" style={{ height: 18, marginRight: 6 }} lang="en">
+                          {own.label}
                         </span>
                       )}
                       {source}
@@ -153,7 +157,7 @@ export function checksToLook(job: DemoJob, s: State, amplify: boolean): number {
 /** Where the job stands before publishing, in a few words each: for the summary above the main button. */
 export function checkSummary(job: DemoJob, s: State, amplify: boolean): Array<{ key: RowKey; text: string }> {
   const toLook = checksToLook(job, s, amplify);
-  const versions = LANGS.filter((l) => job.translations?.[l.key]);
+  const versions = versionsOf(job);
   return [
     { key: 'advert', text: toLook ? `${toLook} ${toLook === 1 ? 'check' : 'checks'} to look at` : 'checks all clear' },
     ...(isReviewable(job) ? [{ key: 'review' as const, text: reviewText(job, s) }] : []),
@@ -198,7 +202,7 @@ export default function BeforePublish({
   const open = openProp === undefined ? openOwn : openProp;
   const setOpen = onOpen ?? setOpenOwn;
   const [reviewing, setReviewing] = useState(false);
-  const [review, setReview] = useState<Lang | null>(null);
+  const [review, setReview] = useState<JobLang | null>(null);
   const [flyer, setFlyer] = useState(false);
   const [similarOpen, setSimilarOpen] = useState(false);
   const owner = !s.reviewerAs;
@@ -207,12 +211,12 @@ export default function BeforePublish({
   const market = amplify ? marketCheck(job, s, schedule) : null;
   const toLook = basic.filter((p) => !p.ok).length + (full?.points.filter((p) => !p.ok).length ?? 0);
   const tips = market?.points.filter((p) => !p.ok).length ?? 0;
-  const versions = LANGS.filter((l) => job.translations?.[l.key]);
+  const versions = versionsOf(job).map((k) => langOf(k));
 
-  const status = (k: Lang) => {
+  const status = (k: JobLang) => {
     const t = job.translations?.[k];
     if (!t) return '';
-    if (stale(job, t)) return 'English changed since';
+    if (stale(job, t)) return `${langOf(jobLang(job)).label} changed since`;
     if (t.reviewed) return 'reviewed';
     const left = untranslated(job, t);
     return left ? `draft · ${left} ${left === 1 ? 'line' : 'lines'} in English` : 'draft';
@@ -303,7 +307,7 @@ export default function BeforePublish({
             </span>
           )}
           <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {LANGS.map((l) => {
+            {versionChoices(job).map((l) => {
               const t = job.translations?.[l.key];
               return (
                 <li key={l.key} className="flex flex-wrap items-center gap-2 py-2">

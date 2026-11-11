@@ -57,8 +57,8 @@ import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, goBack, notify, takePart, useDemo } from './store';
 import { SDG_NAMES, sdgLead, sdgsOf } from './setup';
-import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
-import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
+import { commitmentLabel, countryName, jobLang, langOf, localDate, publicLangs, stale, tableLang, term, ui, versionsOf } from './translate';
+import type { DemoJob, JobLang, Org, PayRequest, Plan, State } from './types';
 import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys, Steps } from './ui';
 
 export { jobUrl };
@@ -82,18 +82,18 @@ export function shareMessage(j: DemoJob, org: Org): string {
   ].join('\n');
 }
 
-/** A section's lines; in a language version, `english` holds the English lines, and a line still word for word in English is marked as English. */
-function Lines({ lines, english }: { lines: string[]; english?: string[] }) {
+/** A section's lines; in a language version, `english` holds the job's own lines, and a line still word for word in the job's language (`source`) is marked so. */
+function Lines({ lines, english, source = 'en' }: { lines: string[]; english?: string[]; source?: JobLang }) {
   const out: ReactNode[] = [];
   let list: Array<{ text: string; en: boolean }> = [];
-  const lang = (en: boolean) => (en ? 'en' : undefined);
+  const lang = (en: boolean) => (en ? source : undefined);
   const items = () => list.map((x, k) => (
     <li key={k} dir="auto" lang={lang(x.en)}>
       {x.text}
     </li>
   ));
   lines.forEach((l, i) => {
-    const en = Boolean(english && english[i] === l && /[a-z]{3}/i.test(l));
+    const en = Boolean(english && english[i] === l && /\p{L}{3}/u.test(l));
     if (l.startsWith('- ')) list.push({ text: l.slice(2), en });
     else {
       if (list.length) {
@@ -172,16 +172,18 @@ function FitSticky({ className, label, id, children }: { className: string; labe
 }
 
 /** The job page as visitors will see it on AidJobs, in English or one of its language versions; `share` adds the share buttons every visitor has. */
-export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: State; lang?: Lang; share?: boolean }) {
+export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: State; lang?: JobLang; share?: boolean }) {
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
-  const version = lang ? job.translations?.[lang] : undefined;
-  const l = version ? lang : undefined;
+  const own = jobLang(job);
+  const version = lang && lang !== own ? job.translations?.[lang] : undefined;
+  const shownLang: JobLang = version && lang ? lang : own;
+  const l = tableLang(shownLang);
   const say = (en: string, key: string, vars: Record<string, string | number> = {}) => (l ? ui(key, l, vars) : en);
   const sections = version ? version.sections : inOutlineOrder(job.sections, job.tags);
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : job.facts.arrangement === 'remote' ? term('Remote', l) : '';
   const [reporting, setReporting] = useState(false);
   return (
-    <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
+    <article className="ej-doc flex flex-col gap-3" aria-label="Job page preview" lang={shownLang} dir={l ? langOf(l).dir : undefined}>
       {job.status === 'closed' && <ClosedNotice job={job} />}
       {delisted(job, s.today) && (
         <div className="aj-card flex flex-col gap-0.5 p-3" role="status" lang="en" dir="ltr">
@@ -259,8 +261,8 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
       )}
       {sections.map((sec) => (
         <section key={sec.key}>
-          <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? 'en' : undefined}>{sec.title}</h3>
-          <Lines lines={sec.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.lines : undefined} />
+          <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? own : undefined}>{sec.title}</h3>
+          <Lines lines={sec.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.lines : undefined} source={own} />
         </section>
       ))}
       {job.commitments.length > 0 && (
@@ -353,17 +355,17 @@ function ReportDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-/** The job page with a switch between English and its language versions; `drafts` also shows versions not yet reviewed, labelled. */
+/** The job page with a switch between the job's own language and its versions; `drafts` also shows versions not yet reviewed, labelled. */
 export function JobPageLangs({ job, s, drafts = false, share = false }: { job: DemoJob; s: State; drafts?: boolean; share?: boolean }) {
-  const [lang, setLang] = useState<Lang | null>(null);
-  const shown = drafts ? LANGS.filter((x) => job.translations?.[x.key]).map((x) => x.key) : publicLangs(job);
+  const [lang, setLang] = useState<JobLang | null>(null);
+  const shown = drafts ? versionsOf(job) : publicLangs(job);
   const current = lang && shown.includes(lang) ? lang : null;
   return (
     <div className="flex flex-col gap-3">
       {shown.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Language of the job page">
-          <button type="button" role="radio" aria-checked={!current} className="aj-pill" data-active={!current} style={{ height: 28 }} onClick={() => setLang(null)}>
-            English
+          <button type="button" role="radio" aria-checked={!current} className="aj-pill" data-active={!current} style={{ height: 28 }} onClick={() => setLang(null)} lang={jobLang(job)}>
+            {langOf(jobLang(job)).native}
           </button>
           {shown.map((k) => {
             const t = job.translations?.[k];
@@ -1114,7 +1116,7 @@ export default function Publish({ id }: { id?: string }) {
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
                   {counted
-                    ? `This job already counts as one of ${monthName(month)}'s free jobs: it was downloaded or sent for review.`
+                    ? `This job already counts as one of ${monthName(month)}'s free jobs: it was scheduled before, and that stays used.`
                     : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}${earlier ? `. It counted against ${monthName(earlier)}'s free jobs, which stays used; going live in ${monthName(month)} uses one of ${monthName(month)}'s` : ''}`}
                 </span>
                 <FreeTerms s={s} />

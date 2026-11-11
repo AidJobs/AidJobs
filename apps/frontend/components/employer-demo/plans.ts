@@ -17,6 +17,24 @@ export const PACKAGES: Array<{ key: PackageKey; label: string; rule: string; pri
   { key: 'always', label: '“Always hiring” subscription', rule: `${SUBSCRIPTION_JOBS} jobs each month; unused ones lapse; extra jobs US$${EXTRA_JOB}; cancel any time`, price: 54, perJob: 18, jobs: SUBSCRIPTION_JOBS, months: 1 },
 ];
 
+/**
+ * Language versions besides the job's own language (placeholders; section 19, 8 November 2026): none for a free job, one with a job paid
+ * on its own, two with a package or subscription job (the user, 12 November 2026); each further language is US$5.
+ */
+export const LANGUAGE_PRICE = 5;
+export const LANGS_INCLUDED = { single: 1, package: 2 } as const;
+export type PaidVia = keyof typeof LANGS_INCLUDED;
+
+/** The versions a job may show: those included in how it is paid, and those bought on top; none unless amplified. */
+export function langSlots(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia = j.paidVia ?? 'single'): number {
+  return plan === 'amplify' ? LANGS_INCLUDED[via] + (j.langsPaid ?? 0) : 0;
+}
+
+/** The versions beyond what is included and already paid for: added to the job's checkout, or bought on their own after publishing. */
+export function langsToPay(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia = j.paidVia ?? 'single'): number {
+  return plan === 'amplify' ? Math.max(0, Object.keys(j.translations ?? {}).length - langSlots(j, plan, via)) : 0;
+}
+
 export const BADGE = 'Actively hiring';
 export const BADGE_TIP = 'Promoted by the employer · posted directly by a verified organisation · details checked by AidJobs';
 
@@ -116,7 +134,7 @@ export function hasFreeUse(s: State, jobId: string): boolean {
   return s.freeUses.some((u) => u.jobId === jobId);
 }
 
-/** Whether the job already counts against `month`'s free jobs (sent for review, downloaded, or published that month). */
+/** Whether the job already counts against `month`'s free jobs: published or scheduled for that month. */
 export function countedFor(s: State, jobId: string, month: string): boolean {
   return s.freeUses.some((u) => u.jobId === jobId && u.month === month);
 }

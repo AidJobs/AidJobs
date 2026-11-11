@@ -62,6 +62,14 @@ import {
   startJob,
   toggleSection,
   undoLastChange,
+  addVersionSection,
+  buyLanguages,
+  downloadBlock,
+  downloadCopy,
+  keepTranslation,
+  removeVersionSection,
+  setJobLang,
+  writeVersionSection,
 } from '../../components/employer-demo/actions';
 import { article, daysUntil, isoDay, longDate, parseIso } from '../../components/employer-demo/engine';
 import { jobUrl } from '../../components/employer-demo/links';
@@ -69,8 +77,8 @@ import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck } from '../../components/employer-demo/market';
 import { canReopen, pageRemoved, purgeDeleted } from '../../components/employer-demo/lifecycle';
-import { langOf, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
-import { addMonths, canGoFree, currentMonth, delisted, firstOfNextMonth, freeLeft, listedUntil, listingEnd, listingEndsIn, paidJobsLeft, rollBilling, singlePrice } from '../../components/employer-demo/plans';
+import { detectLang, langOf, langRequest, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
+import { addMonths, canGoFree, currentMonth, delisted, firstOfNextMonth, freeLeft, LANGUAGE_PRICE, langSlots, langsToPay, listedUntil, listingEnd, listingEndsIn, paidJobsLeft, rollBilling, singlePrice, usd } from '../../components/employer-demo/plans';
 import { changesSince, tellOffer } from '../../components/employer-demo/changes';
 import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
 
@@ -836,7 +844,7 @@ describe('language versions', () => {
     expect(langOf('ar').dir).toBe('rtl');
   });
 
-  it('only reviewed, up-to-date versions of an amplified job are public; a change to the English asks for an update that keeps edits', () => {
+  it('only reviewed versions of an amplified job are public; a change to the job is not carried over: the update keeps edits, or the version is kept as it is', () => {
     const id = startJob("We're hiring a WASH Programme Manager in Juba, 12-month fixed-term contract, closing 30 November 2026");
     addTranslation(id, 'es');
     const resp = job(id).translations!.es!.sections.find((x) => x.key === 'responsibilities')!;
@@ -848,7 +856,13 @@ describe('language versions', () => {
     expect(publicLangs(job(id))).toEqual(['es']);
     extend(id, 7);
     expect(stale(job(id), job(id).translations!.es!)).toBe(true);
-    expect(publicLangs(job(id))).toEqual([]);
+    // Since 8 November 2026 the version stays public as it was until the user updates it or keeps it.
+    expect(publicLangs(job(id))).toEqual(['es']);
+    expect(job(id).translations!.es!.sections.find((x) => x.key === 'responsibilities')?.lines[0]).toBe('Dirigir el programa de agua y saneamiento');
+    keepTranslation(id, 'es');
+    expect(stale(job(id), job(id).translations!.es!)).toBe(false);
+    expect(job(id).translations!.es!.reviewed).toBe(true);
+    extend(id, 3);
     refreshTranslation(id, 'es');
     const after = job(id).translations!.es!;
     expect(after.reviewed).toBe(false);
@@ -858,6 +872,140 @@ describe('language versions', () => {
     expect(publicLangs(job(id))).toEqual(['es']);
   });
 
+  it('each version has its own sections within the JD format; an update leaves the sections it added or removed as they are', () => {
+    const id = startJob("We're hiring a WASH Programme Manager in Juba, 12-month fixed-term contract, closing 30 November 2026");
+    addTranslation(id, 'fr');
+    const keys = () => job(id).translations!.fr!.sections.map((x) => x.key);
+    expect(keys()).toEqual(job(id).sections.map((x) => x.key));
+    const added = ['conditions', 'languages', 'firstweeks'].find((k) => !job(id).tags.includes(k))!;
+    addVersionSection(id, 'fr', added);
+    expect(keys()).toContain(added);
+    expect(job(id).tags).not.toContain(added);
+    const dropped = keys().find((k) => k !== 'about' && k !== 'apply' && k !== added)!;
+    removeVersionSection(id, 'fr', dropped);
+    expect(keys()).not.toContain(dropped);
+    writeVersionSection(id, 'fr', added, ['Une ligne propre à la version française.']);
+    setFacts(id, { deadline: '2026-12-04' });
+    refreshTranslation(id, 'fr');
+    expect(keys()).toContain(added);
+    expect(keys()).not.toContain(dropped);
+    expect(job(id).translations!.fr!.sections.find((x) => x.key === added)?.lines).toEqual(['Une ligne propre à la version française.']);
+    expect(job(id).sections.find((x) => x.key === dropped)).toBeTruthy();
+  });
+
+  it('a version is never in the job’s own language; a job in French can have an English version', () => {
+    const id = startJob("We're hiring a WASH Programme Manager in Juba, 12-month fixed-term contract, closing 30 November 2026");
+    addTranslation(id, 'en');
+    expect(job(id).translations?.en).toBeUndefined();
+    addTranslation(id, 'fr');
+    setJobLang(id, 'fr');
+    expect(job(id).lang).toBe('fr');
+    expect(job(id).translations?.fr).toBeUndefined();
+    expect(job(id).sections.find((x) => x.key === 'apply')?.title).toBe('Comment postuler');
+    addTranslation(id, 'en');
+    expect(job(id).translations?.en?.sections.find((x) => x.key === 'apply')?.title).toBe('How to apply');
+    expect(JSON.stringify(job(id).translations?.en?.sections)).toContain('30 November 2026');
+  });
+});
+
+describe('languages included and paid (section 19, 8 and 12 November 2026)', () => {
+  const twoVersions = (id: string) => {
+    for (const l of ['fr', 'es'] as const) {
+      addTranslation(id, l);
+      reviewTranslation(id, l);
+    }
+  };
+
+  it('a free job has its own language only: no version is public', () => {
+    twoVersions('job-fin');
+    expect(langSlots(job('job-fin'), 'free')).toBe(0);
+    publish('job-fin', { plan: 'free', schedule: null });
+    expect(publicLangs(job('job-fin'))).toEqual([]);
+  });
+
+  it('a job paid on its own includes one version; each further language is US$5, in the same payment', () => {
+    twoVersions('job-fin');
+    expect(langsToPay(job('job-fin'), 'amplify', 'single')).toBe(1);
+    buy('one', 'Finance Officer', 1);
+    expect(getState().receipts[0].amount).toBe(`${usd(28.4 + LANGUAGE_PRICE)} (placeholder)`);
+    expect(getState().receipts[0].item).toContain('1 more language version');
+    publish('job-fin', { plan: 'amplify', schedule: null, paid: 'direct', langs: 1 });
+    expect(job('job-fin').paidVia).toBe('single');
+    expect(publicLangs(job('job-fin'))).toEqual(['fr', 'es']);
+  });
+
+  it('without paying for the extra language, only the included version is public, in the order added', () => {
+    twoVersions('job-fin');
+    buy('one', 'Finance Officer');
+    publish('job-fin', { plan: 'amplify', schedule: null, paid: 'direct' });
+    expect(publicLangs(job('job-fin'))).toEqual(['fr']);
+    expect(langsToPay(job('job-fin'))).toBe(1);
+    expect(buyLanguages('job-fin', 1)).toBe(true);
+    expect(publicLangs(job('job-fin'))).toEqual(['fr', 'es']);
+    expect(getState().receipts[0].amount).toBe(`${usd(LANGUAGE_PRICE)} (placeholder)`);
+  });
+
+  it('a package or subscription job includes two versions', () => {
+    twoVersions('job-fin');
+    buy('three');
+    expect(langsToPay(job('job-fin'), 'amplify', 'package')).toBe(0);
+    publish('job-fin', { plan: 'amplify', schedule: null, paid: 'onHand' });
+    expect(job('job-fin').paidVia).toBe('package');
+    expect(publicLangs(job('job-fin'))).toEqual(['fr', 'es']);
+  });
+
+  it('more languages cannot be bought for a free job', () => {
+    publish('job-fin', { plan: 'free', schedule: null });
+    expect(buyLanguages('job-fin', 1)).toBe(false);
+  });
+});
+
+describe('the job’s own language', () => {
+  it('is read from the role as typed: Arabic by its script, the others by their common words, English otherwise', () => {
+    expect(detectLang("We're hiring a WASH Officer in Juba")).toBe('en');
+    expect(detectLang('Nous recherchons un chargé de programme WASH à Goma, CDD de 12 mois')).toBe('fr');
+    expect(detectLang('Buscamos una oficial de protección para el programa en Bogotá')).toBe('es');
+    expect(detectLang('Procuramos um técnico de saúde para a vaga em Maputo')).toBe('pt');
+    expect(detectLang('نبحث عن مسؤول برامج في عمّان')).toBe('ar');
+    expect(detectLang('WASH Officer, Goma')).toBe('en');
+  });
+
+  it('is changed only when asked: a request names the language', () => {
+    expect(langRequest('please write it in French')).toBe('fr');
+    expect(langRequest('en español, por favor')).toBe('es');
+    expect(langRequest('make it shorter')).toBeNull();
+  });
+
+  it('a job started in the window from a French role is written in French', () => {
+    const id = startJob('Nous recherchons un chargé de programme WASH à Goma, CDD de 12 mois', undefined, [], true);
+    expect(job(id).lang).toBe('fr');
+  });
+});
+
+describe('free jobs and downloads (section 19, 8 November 2026)', () => {
+  it('a free job is used only when it is published or scheduled, not when it is sent for review', () => {
+    const before = getState().freeUses.length;
+    const id = startJob('Hiring a Logistics Officer in Goma, closing 30 November 2026, fixed-term');
+    sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', '');
+    expect(getState().freeUses.length).toBe(before);
+    reviewerDecision(id, 'approved', '');
+    expect(publish(id, { plan: 'free', schedule: null })).toBe(true);
+    expect(getState().freeUses.length).toBe(before + 1);
+  });
+
+  it('a copy is downloaded once a free job is published, and once a paid job is paid, even before it goes live', () => {
+    const before = getState().freeUses.length;
+    expect(downloadBlock(job('job-fin'))).toMatch(/once the job is published/);
+    expect(downloadCopy(job('job-fin'), 'Riverstone Aid')).toBe(false);
+    expect(getState().freeUses.length).toBe(before);
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, paidFor: true } : j)) }));
+    expect(downloadBlock(job('job-fin'))).toBeNull();
+    const live = getState().jobs.find((j) => j.status === 'live')!;
+    expect(downloadBlock(live)).toBeNull();
+  });
+});
+
+describe('language versions and reviewers', () => {
   it('reviewers cannot change a language version', () => {
     addTranslation('job-fin', 'fr');
     update((s) => ({ ...s, reviewerAs: 'amina' }));
@@ -865,6 +1013,9 @@ describe('language versions', () => {
     editTranslation('job-fin', 'fr', 'about', 0, 'Changed by a reviewer');
     reviewTranslation('job-fin', 'fr');
     removeTranslation('job-fin', 'fr');
+    addVersionSection('job-fin', 'fr', 'conditions');
+    removeVersionSection('job-fin', 'fr', 'about');
+    keepTranslation('job-fin', 'fr');
     expect(JSON.stringify(job('job-fin').translations)).toBe(before);
   });
 });

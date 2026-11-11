@@ -18,8 +18,8 @@ import MenuButton, { type MenuAction } from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
 import { go, goBack, goToPart, useDemo } from './store';
 import Structure from './Structure';
-import { LANGS } from './translate';
-import type { Lang } from './types';
+import { versionsOf } from './translate';
+import type { JobLang } from './types';
 import { Dialog, Steps } from './ui';
 
 const SPLIT_KEY = 'aidjobs.employerDemo.split';
@@ -92,7 +92,7 @@ export default function Create({ id }: { id?: string }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [langPick, setDocLang] = useState<Lang | null>(null);
+  const [langPick, setDocLang] = useState<JobLang | null>(null);
   const [narrow, setNarrow] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const side = useRef<HTMLElement>(null);
@@ -161,7 +161,7 @@ export default function Create({ id }: { id?: string }) {
 
   const draftActions: MenuAction[] = menu
     ? [
-        ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name) }] : []),
+        ...(job.sections.length ? [{ label: 'Download a copy', run: () => downloadCopy(job, s.org.name, true) }] : []),
         ...(job.sections.length >= 3 ? [{ label: 'Update our base JD format from this job', run: () => updateBaseFromJob(job.id) }] : []),
         { label: 'Delete', danger: true, run: () => setDeleteOpen(true) },
       ]
@@ -248,7 +248,7 @@ export default function Create({ id }: { id?: string }) {
         </span>
         {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => goToPart('publish', job.id, n === 3 ? 'publish' : null) : undefined} />}
       </div>
-      {job.sections.length > 0 && LANGS.some((l) => job.translations?.[l.key]) && (
+      {job.sections.length > 0 && versionsOf(job).length > 0 && (
         <div className="shrink-0 px-3 pt-2 lg:px-5">
           <LangSwitch job={job} current={docLang} onPick={setDocLang} />
         </div>

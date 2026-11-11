@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, LINK_REPLY, sendChat, setPart, setSdgs, settleAsk, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, writeNow } from './actions';
 import { aiOn, askAi, GO_ON, probeAi, useAi } from './ai';
 import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
 import { readJobFile } from './readFile';
@@ -29,8 +29,8 @@ import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from '.
 import { getState, go, goBack, useDemo } from './store';
 import Structure, { Commitments } from './Structure';
 import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
-import { LANGS } from './translate';
-import type { DemoJob, Lang, State } from './types';
+import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
+import type { DemoJob, JobLang, State } from './types';
 import { Dialog, radioKeys } from './ui';
 
 /** Requests the window answers itself; everything else goes to the writer. */
@@ -185,7 +185,7 @@ function PanelTabs({ tabs, active, onPick }: { tabs: TabDef[]; active: string; o
   );
 }
 
-type RowKey = FactKey | 'title' | 'sdgs';
+type RowKey = FactKey | 'title' | 'sdgs' | 'lang';
 
 function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowKey) => void }) {
   const f = job.facts;
@@ -200,6 +200,7 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
     { key: 'closes', label: 'Closing date', value: f.deadline ? `${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}` : ''}` : '', missing: !f.deadline },
     { key: 'salary', label: 'Salary', value: salaryText(f) || 'Not shown' },
     { key: 'sdgs', label: 'SDGs', value: `${goals.map((g) => `SDG ${g} ${SDG_NAMES[g]}`).join(' · ')}${goals.length && job.sdgsFrom === 'org' ? " (your organisation's goals)" : ''}`, hint: 'No SDG is clear from this role' },
+    { key: 'lang', label: 'Written in', value: langOf(jobLang(job)).label },
     { key: 'more', label: 'More details', value: more, hint: 'Who can apply, languages, positions, donor' },
   ];
   return (
@@ -220,7 +221,7 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
             className="aj-pill"
             style={{ height: 30 }}
             disabled={ro}
-            aria-label={`${r.value ? 'Change' : 'Add'} ${r.label === 'SDGs' ? 'the SDGs' : r.label.toLowerCase()}`}
+            aria-label={`${r.value ? 'Change' : 'Add'} ${r.label === 'SDGs' ? 'the SDGs' : r.key === 'lang' ? "the job's language" : r.label.toLowerCase()}`}
             onClick={() => {
               if (r.key !== 'title') return onFact(r.key);
               const el = document.getElementById('ej-title-edit');
@@ -233,6 +234,35 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The language the job is written in: read from the role as typed, changed here or by asking in the chat. */
+function LangDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  const now = jobLang(job);
+  return (
+    <Dialog title="Written in" subtitle="The job's own language; versions in other languages come with Amplify" onClose={onClose} half>
+      <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="The job's language" onKeyDown={radioKeys}>
+        {ALL_LANGS.map((l) => (
+          <button
+            key={l.key}
+            type="button"
+            role="radio"
+            aria-checked={now === l.key}
+            className="aj-option"
+            data-active={now === l.key}
+            onClick={() => {
+              setJobLang(job.id, l.key);
+              onClose();
+            }}
+          >
+            <span lang={l.key}>{l.native}</span>
+            {l.native !== l.label && <span className="aj-faint">{l.label}</span>}
+          </button>
+        ))}
+        <span className="aj-faint">Text AidJobs wrote is written again in the new language; text you or the AI wrote stays as it is until you ask for it to be rewritten.</span>
+      </div>
+    </Dialog>
   );
 }
 
@@ -734,7 +764,7 @@ function JobWindow({ id }: { id: string }) {
   const current = currentPart(job, s, parts);
   const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : job.setup === 'pace' ? 'Pace' : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
-  const langs = LANGS.filter((l) => job.translations?.[l.key]);
+  const langs = versionsOf(job).map((k) => langOf(k));
   const tabs: TabDef[] = [{ key: 'doc', label: 'Job description' }, ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })), ...(preview ? [{ key: 'preview', label: 'Preview' }] : [])];
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
   const card = !reviewing && !job.setup && hasFields(current) && hidden !== current;
@@ -787,7 +817,7 @@ function JobWindow({ id }: { id: string }) {
     if (t === 'templates' || t === 'own') return openPick(t);
     if (t === 'preview') return j.sections.length ? openPreview() : undefined;
     if (t === 'versions') return j.versions.length ? setVersionsOpen(true) : undefined;
-    if (t === 'download') return j.sections.length ? downloadCopy(j, getState().org.name) : undefined;
+    if (t === 'download') return void downloadCopy(j, getState().org.name);
     if (t === 'delete') return canDelete(getState(), j) ? undefined : setDeleteOpen(true);
     if (t === 'review') return goPart('publish');
     goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
@@ -810,8 +840,9 @@ function JobWindow({ id }: { id: string }) {
       return chatNote(job.id, text, job.versions.length ? 'Earlier versions are open: pick one to see it or go back to it.' : 'There are no earlier versions yet.');
     }
     if (DOWNLOAD.test(t)) {
-      if (job.sections.length) downloadCopy(job, s.org.name);
-      return chatNote(job.id, text, job.sections.length ? 'Downloaded a copy of the job description.' : 'There is no job description to download yet.');
+      const no = downloadBlock(job);
+      if (!no) downloadCopy(job, s.org.name);
+      return chatNote(job.id, text, no ? `${no}. Until then you can still copy the text from the screen.` : 'Downloaded a copy of the job description.');
     }
     if (DELETE.test(t)) {
       const no = canDelete(s, job);
@@ -893,7 +924,7 @@ function JobWindow({ id }: { id: string }) {
       )}
     </div>
   );
-  const lang = active.startsWith('lang:') ? (active.slice(5) as Lang) : null;
+  const lang = active.startsWith('lang:') ? (active.slice(5) as JobLang) : null;
   const panel = (
     <div id="ej-w-panel" className="aj-scroll min-h-0 flex-1 px-3 py-3 lg:px-5" role={tabs.length > 1 ? 'tabpanel' : 'region'} aria-labelledby={tabs.length > 1 ? `ej-wtab-${active}` : undefined} aria-label={tabs.length > 1 ? undefined : 'Job description'} tabIndex={-1}>
       {active === 'preview' ? (
@@ -954,7 +985,8 @@ function JobWindow({ id }: { id: string }) {
         {said}
       </div>
       {fact === 'sdgs' && <SdgDialog job={job} onClose={() => setFact(null)} />}
-      {fact && fact !== 'sdgs' && fact !== 'title' && (
+      {fact === 'lang' && <LangDialog job={job} onClose={() => setFact(null)} />}
+      {fact && fact !== 'sdgs' && fact !== 'title' && fact !== 'lang' && (
         <FactDialog
           which={fact}
           job={job}

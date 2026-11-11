@@ -370,7 +370,7 @@ describe('employer demo: the conversation', () => {
     expect(JSON.stringify(job().sections)).toContain('30 November 2026');
   });
 
-  it('counts a free job the first time it is used, not when it is written', () => {
+  it('uses a free job only when it is published, not when it is written or sent for review', () => {
     act(() => resetDemo());
     const before = getState().freeUses.length;
     let id = '';
@@ -379,7 +379,7 @@ describe('employer demo: the conversation', () => {
     });
     expect(getState().freeUses.length).toBe(before);
     act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
-    expect(getState().freeUses.length).toBe(before + 1);
+    expect(getState().freeUses.length).toBe(before);
   });
 });
 
@@ -954,7 +954,7 @@ describe('employer demo: managing jobs', () => {
     const switcher = container.querySelector('[aria-label="Language of the job description"]') as HTMLElement;
     act(() => (Array.from(switcher.querySelectorAll('button')).find((b) => b.textContent?.startsWith('Français')) as HTMLElement).click());
     shows('French version');
-    shows('Edit facts and sections in English');
+    shows('The facts are shared; its sections are its own');
     const line = container.querySelector('article[lang="fr"] textarea') as HTMLTextAreaElement;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(line, 'Une ligne revue à la main');
@@ -998,7 +998,7 @@ describe('employer demo: managing jobs', () => {
     pickFrench();
     expect(Array.from(container.querySelectorAll('article[lang="fr"] textarea')).every((t) => (t as HTMLTextAreaElement).readOnly)).toBe(true);
     expect(container.textContent).not.toContain('Mark as reviewed');
-    shows('Facts and sections follow the English');
+    shows('The facts are shared with every version');
     expect(network).toEqual([]);
   });
 

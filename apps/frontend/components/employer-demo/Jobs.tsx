@@ -313,7 +313,7 @@ export function nextStep(s: State, job: DemoJob, open: Open): { label: string; r
 export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
   if (s.reviewerAs) return [];
   const del: MenuAction = { label: 'Delete', danger: true, run: () => open(job, 'delete') };
-  const copy: MenuAction = { label: 'Download a copy', run: () => downloadCopy(job, s.org.name) };
+  const copy: MenuAction = { label: 'Download a copy', run: () => downloadCopy(job, s.org.name, true) };
   const variant: MenuAction = { label: 'Same role, another place', run: () => open(job, 'variant') };
   if (job.status === 'draft' || job.status === 'review' || job.status === 'approved') {
     return [{ label: 'Continue', run: () => go('create', job.id) }, ...(job.sections.length ? [{ label: 'Send for review', run: () => openReview(job) }, copy] : []), del];

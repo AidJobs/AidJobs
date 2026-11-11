@@ -2,7 +2,7 @@
 
 import { ShieldCheck } from 'lucide-react';
 import Tip from '@/components/site/Tip';
-import { BADGE, BADGE_TIP, FREE_PER_MONTH, LISTED_DAYS, orgZone } from './plans';
+import { BADGE, BADGE_TIP, FREE_PER_MONTH, LANGS_INCLUDED, LANGUAGE_PRICE, LISTED_DAYS, orgZone, usd } from './plans';
 import type { State } from './types';
 import { Dialog } from './ui';
 
@@ -13,8 +13,9 @@ export function FreeTerms({ s }: { s: State }) {
       <li>
         {FREE_PER_MONTH} free jobs a calendar month for {s.org.name}, in {orgZone(s.org).city} time; unused ones do not carry over
       </li>
-      <li>A job counts the first time it is published, sent for review, or downloaded</li>
+      <li>A job counts only when it is published or scheduled; writing it and sending it for review are free</li>
       <li>Listed {LISTED_DAYS.free} days, or until its closing date if that is sooner; standard placement</li>
+      <li>One language, the one it is written in; a copy can be downloaded once it is published</li>
     </ul>
   );
 }
@@ -33,7 +34,11 @@ export function AmplifyIncludes() {
       </li>
       <li>Reach: invite candidates and your team by email when it goes live</li>
       <li>Market check: how your job compares with similar open jobs</li>
-      <li>Full advert check, language versions (French, Arabic, Spanish, Portuguese), and a field-post notice</li>
+      <li>Full advert check and a field-post notice</li>
+      <li>
+        {LANGS_INCLUDED.single} language version besides its own ({LANGS_INCLUDED.package} with a package or subscription job); each further language {usd(LANGUAGE_PRICE)}
+      </li>
+      <li>A copy to download as soon as it is paid</li>
     </ul>
   );
 }

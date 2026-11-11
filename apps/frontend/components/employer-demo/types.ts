@@ -176,6 +176,8 @@ export type PayRequest = {
   schedule: string | null;
   at: number;
   reminded?: number;
+  /** Language versions beyond those included, in the same payment. */
+  langs?: number;
 };
 
 export type Version = { n: number; at: number; note: string; sections: Section[] };
@@ -221,8 +223,15 @@ export type ApplySettings = {
 
 export type Lang = 'fr' | 'ar' | 'es' | 'pt';
 
-/** A language version of the job page, drafted by AidJobs and reviewed by the employer. `source` is the English text it was made from. */
-export type Translation = { sections: Section[]; reviewed: boolean; source: string; at: number };
+/** The languages a job can be written in, and its versions' languages: English or one of the four offered. */
+export type JobLang = 'en' | Lang;
+
+/**
+ * A language version of the job page, drafted by AidJobs and reviewed by the employer, with its own sections within the job's JD format.
+ * `source`: the job's own text it was last brought up to date with; `kept`: the job's text the user chose to keep this version against
+ * ("Keep the French as it is"), so the update is not offered again for it.
+ */
+export type Translation = { sections: Section[]; reviewed: boolean; source: string; at: number; kept?: string };
 
 /** Free, or Amplify: the paid offer (employer-side plan, section 16). */
 export type Plan = 'free' | 'amplify';
@@ -274,8 +283,14 @@ export type DemoJob = {
   listingChoice?: 'leave';
   /** A paid job taken back to a draft: publishing it again costs nothing. */
   paidFor?: boolean;
+  /** How an amplified job was paid: as one job, or as a package or subscription job, which includes more language versions. */
+  paidVia?: 'single' | 'package';
+  /** Language versions paid for beyond those included. */
+  langsPaid?: number;
+  /** The language the job is written in, read from the role as typed and changed only when the user asks; English when unset. */
+  lang?: JobLang;
   /** Language versions of the job page; only reviewed ones are published, and only with Amplify. */
-  translations?: Partial<Record<Lang, Translation>>;
+  translations?: Partial<Record<JobLang, Translation>>;
   audit: AuditEntry[];
   /** The part open in the window ("s:" and a section, or outline, details, fixed, check, publish); reopening the job returns to it. */
   part?: string;

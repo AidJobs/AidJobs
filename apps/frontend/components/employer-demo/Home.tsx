@@ -127,7 +127,7 @@ function briefing(s: State): Brief[] {
           title: `${j.facts.title}: page removed in ${removal} days`,
           body: 'The record stays in your history. Keep a copy, or hire for it again.',
           actions: [
-            { label: 'Download a copy', run: () => downloadCopy(j, s.org.name), primary: true },
+            { label: 'Download a copy', run: () => downloadCopy(j, s.org.name, true), primary: true },
             {
               label: 'Hire again',
               run: () => {

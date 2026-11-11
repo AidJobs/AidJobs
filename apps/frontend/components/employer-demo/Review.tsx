@@ -191,14 +191,6 @@ export function ReviewSummary({ job, s }: { job: DemoJob; s: State }) {
           asked for changes after the approval. Under your rule one approval is enough, so whoever publishes decides; publishing anyway is written in the job&apos;s history, and the reviewer is told.
         </span>
       )}
-      {changesAfterApproval(job) && isReviewable(job) && (
-        <span className="rounded-xl p-2.5" style={{ background: 'var(--amber-bg)', fontSize: 12.5 }}>
-          {changesAfterApproval(job)
-            ?.askers.map((a) => a.name.split(' ')[0])
-            .join(' and ')}{' '}
-          asked for changes after the approval. Under your rule one approval is enough, so whoever publishes decides; publishing anyway is written in the job&apos;s history, and the reviewer is told.
-        </span>
-      )}
       {!s.reviewerAs && waiting > 0 && job.review.state === 'open' && (
         <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => remindReviewers(job.id)}>
           <BellRing size={13} strokeWidth={1.8} /> Remind {waiting === 1 ? 'the reviewer' : `the ${waiting} reviewers`} who {waiting === 1 ? 'has' : 'have'} not answered

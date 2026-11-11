@@ -4,18 +4,81 @@
  * language data. Other lines stay in English, marked, for the employer to translate or edit while reviewing. The organisation's fixed
  * texts (its commitments) are shown as it wrote them.
  */
+import { langSlots } from './plans';
 import { SAMPLE_ORG } from './sample';
-import type { DemoJob, Facts, Lang, Section, Translation } from './types';
+import type { DemoJob, Facts, JobLang, Lang, Section, Translation } from './types';
 
-export const LANGS: Array<{ key: Lang; label: string; native: string; locale: string; dir: 'ltr' | 'rtl' }> = [
+type LangInfo = { key: JobLang; label: string; native: string; locale: string; dir: 'ltr' | 'rtl' };
+
+export const ENGLISH: LangInfo = { key: 'en', label: 'English', native: 'English', locale: 'en-GB', dir: 'ltr' };
+
+export const LANGS: Array<LangInfo & { key: Lang }> = [
   { key: 'fr', label: 'French', native: 'Français', locale: 'fr-FR', dir: 'ltr' },
   { key: 'ar', label: 'Arabic', native: 'العربية', locale: 'ar', dir: 'rtl' },
   { key: 'es', label: 'Spanish', native: 'Español', locale: 'es-ES', dir: 'ltr' },
   { key: 'pt', label: 'Portuguese', native: 'Português', locale: 'pt-PT', dir: 'ltr' },
 ];
 
-export function langOf(key: Lang) {
-  return LANGS.find((l) => l.key === key) ?? LANGS[0];
+/** Every language a job can be written in or have a version in. */
+export const ALL_LANGS: LangInfo[] = [ENGLISH, ...LANGS];
+
+export function langOf(key: JobLang) {
+  return ALL_LANGS.find((l) => l.key === key) ?? ENGLISH;
+}
+
+/** The language the job is written in. */
+export function jobLang(job: DemoJob): JobLang {
+  return job.lang ?? 'en';
+}
+
+/** The table's languages: the job's own wording in English needs no table. */
+export function tableLang(lang?: JobLang): Lang | undefined {
+  return lang && lang !== 'en' ? lang : undefined;
+}
+
+/** The languages a version can be made in: all those offered except the job's own. */
+export function versionChoices(job: DemoJob): LangInfo[] {
+  return ALL_LANGS.filter((l) => l.key !== jobLang(job));
+}
+
+/** The job's versions, in the order they were added. */
+export function versionsOf(job: DemoJob): JobLang[] {
+  return (Object.entries(job.translations ?? {}) as Array<[JobLang, Translation]>).sort((a, b) => a[1].at - b[1].at).map(([k]) => k);
+}
+
+const CUES: Record<Exclude<JobLang, 'ar'>, RegExp[]> = {
+  en: [/\b(the|and|for|with|we|our|is|are|of|to|in|a|an|based|looking|need|officer|manager)\b/g],
+  fr: [/\b(le|la|les|des|du|une|un|pour|avec|nous|notre|recherchons|cherchons|poste|chargée?|responsable|basée?|mois|cdd|cdi|et|est|dans|au|aux)\b/g, /[éèêàçù]/g],
+  es: [/\b(el|los|las|del|una|un|para|con|nosotros|buscamos|puesto|basado|meses|y|en|es|oficial|técnico|técnica)\b/g, /[ñ¿¡]/g],
+  pt: [/\b(o|os|as|do|da|dos|das|uma|um|para|com|nós|procuramos|vaga|baseado|meses|e|em|no|na|é|técnico|técnica)\b/g, /[ãõç]/g],
+};
+
+/**
+ * The language a role is typed in (section 19: every job is written in one of the languages offered, read from the role as typed):
+ * Arabic by its script, the others by their common words; English unless another language is clearly ahead.
+ */
+export function detectLang(text: string): JobLang {
+  if ((text.match(/[\u0600-\u06FF]/g) ?? []).length >= 3) return 'ar';
+  const t = text.toLowerCase();
+  const score = (k: keyof typeof CUES) => CUES[k].reduce((n, re) => n + (t.match(re) ?? []).length, 0);
+  const scores = (['en', 'fr', 'es', 'pt'] as const).map((k) => [k, score(k)] as const).sort((a, b) => b[1] - a[1]);
+  const [top, second] = scores;
+  if (top[0] === 'en' || top[1] < 2 || top[1] <= second[1]) return 'en';
+  return top[0];
+}
+
+/** "write it in French", "en français", "in English please": a language asked for by name; null otherwise. */
+export function langRequest(text: string): JobLang | null {
+  const t = text.toLowerCase();
+  if (!/\b(write|written|in|into|en|switch|change|use)\b/.test(t)) return null;
+  const names: Array<[JobLang, RegExp]> = [
+    ['en', /\b(in|into) english\b|\ben anglais\b/],
+    ['fr', /\b(in|into) french\b|\ben français\b|\ben francais\b/],
+    ['ar', /\b(in|into) arabic\b|بالعربية/],
+    ['es', /\b(in|into) spanish\b|\ben español\b|\ben espanol\b/],
+    ['pt', /\b(in|into) portuguese\b|\bem português\b|\bem portugues\b/],
+  ];
+  return names.find(([, re]) => re.test(t))?.[0] ?? null;
 }
 
 type T = Record<Lang, string>;
@@ -67,6 +130,11 @@ export function ui(key: keyof typeof UI | string, lang: Lang, vars: Record<strin
   return text.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
 }
 
+/** A section heading in the language, from the table; null when the table has none. */
+export function headingIn(key: string, lang: JobLang): string | null {
+  return lang === 'en' ? null : (HEADINGS[key]?.[lang] ?? null);
+}
+
 const COMMITMENT_LABELS: Record<string, T> = {
   safeguarding: { fr: 'Protection', ar: 'الحماية', es: 'Salvaguardia', pt: 'Salvaguarda' },
   psea: { fr: 'PSEA', ar: 'الحماية من الاستغلال والاعتداء الجنسيين', es: 'PSEA', pt: 'PSEA' },
@@ -77,8 +145,9 @@ const COMMITMENT_LABELS: Record<string, T> = {
   encourage: { fr: 'Postulez même si…', ar: 'قدّم حتى لو…', es: 'Postúlate aunque…', pt: 'Candidate-se mesmo que…' },
 };
 
-export function commitmentLabel(key: string, english: string, lang?: Lang): string {
-  return lang ? (COMMITMENT_LABELS[key]?.[lang] ?? english) : english;
+export function commitmentLabel(key: string, english: string, lang?: JobLang): string {
+  const l = tableLang(lang);
+  return l ? (COMMITMENT_LABELS[key]?.[l] ?? english) : english;
 }
 
 const TERMS: Record<string, T> = {
@@ -108,7 +177,8 @@ const UNITS: Array<[RegExp, T]> = [
 ];
 
 /** Short terms: contract types, arrangements, durations, and pay. Unknown words stay as written. */
-export function term(text: string, lang?: Lang): string {
+export function term(text: string, langIn?: JobLang): string {
+  const lang = tableLang(langIn);
   if (!lang || !text) return text;
   let out = TERMS[text]?.[lang] ?? text;
   for (const [k, v] of Object.entries(TERMS)) out = out.replace(new RegExp(`\\b${k.replace(/[-]/g, '\\-')}\\b`, 'g'), v[lang]);
@@ -336,14 +406,14 @@ const PATTERNS: Rule[] = [
 const MONTH_RE = /\b(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})\b/g;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-export function localDate(iso: string, lang?: Lang): string {
+export function localDate(iso: string, lang?: JobLang): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(lang ? langOf(lang).locale : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /** The country's name in the language, from the browser's own data. */
-export function countryName(iso: string, english: string, lang?: Lang): string {
-  if (!lang || !iso) return english;
+export function countryName(iso: string, english: string, lang?: JobLang): string {
+  if (!tableLang(lang) || !lang || !iso) return english;
   try {
     return new Intl.DisplayNames([langOf(lang).locale], { type: 'region' }).of(iso) ?? english;
   } catch {
@@ -371,38 +441,78 @@ export function translateLine(line: string, f: Facts, lang: Lang): string | null
   return null;
 }
 
-/** A first draft of the job in the language: what the table covers is translated; every other line stays in English, to translate while reviewing. */
-export function draftTranslation(job: DemoJob, lang: Lang): Translation {
-  const sections: Section[] = job.sections.map((sec) => ({
-    key: sec.key,
-    title: HEADINGS[sec.key]?.[lang] ?? sec.title,
-    lines: sec.lines.map((l) => translateLine(l, job.facts, lang) ?? l),
-  }));
-  return { sections, reviewed: false, source: sourceOf(job), at: Date.now() };
+/**
+ * A section the rules wrote in English, put into the job's own language by the table: its heading, and each line the table covers; other
+ * lines stay as written. Text written by hand or by the AI is already in the job's language and is left alone.
+ */
+export function inLanguage(sec: Section, f: Facts, lang: JobLang): Section {
+  const l = tableLang(lang);
+  if (!l || sec.edited || sec.ai) return sec;
+  return { ...sec, title: HEADINGS[sec.key]?.[l] ?? sec.title, lines: sec.lines.map((x) => translateLine(x, f, l) ?? x) };
+}
+
+/**
+ * A section's text in English, as the source for a version: for a job in another language, the rules' own English for the sections they
+ * wrote (`english`), and the job's own text for the rest.
+ */
+function englishOf(job: DemoJob, sec: Section, english?: (sec: Section) => Section | null): Section {
+  return jobLang(job) === 'en' ? sec : (english?.(sec) ?? sec);
+}
+
+/** One section drafted in the language: what the table covers is translated; every other line stays in the job's language, to translate while reviewing. */
+function draftSection(job: DemoJob, sec: Section, lang: JobLang, english?: (sec: Section) => Section | null): Section {
+  const en = englishOf(job, sec, english);
+  if (lang === 'en') return { key: sec.key, title: en.title, lines: en.lines };
+  return { key: sec.key, title: HEADINGS[sec.key]?.[lang] ?? sec.title, lines: sec.lines.map((l, i) => translateLine(en.lines[i] ?? l, job.facts, lang) ?? l) };
+}
+
+/** A first draft of the job in the language, with the job's sections; from then on the version keeps its own sections. */
+export function draftTranslation(job: DemoJob, lang: JobLang, english?: (sec: Section) => Section | null): Translation {
+  return { sections: job.sections.map((sec) => draftSection(job, sec, lang, english)), reviewed: false, source: sourceOf(job), at: Date.now() };
+}
+
+/** One section of the job drafted for a version that does not have it yet. */
+export function draftVersionSection(job: DemoJob, key: string, lang: JobLang, english?: (sec: Section) => Section | null): Section | null {
+  const sec = job.sections.find((x) => x.key === key);
+  return sec ? draftSection(job, sec, lang, english) : null;
 }
 
 function sourceOf(job: DemoJob): string {
   return JSON.stringify(job.sections.map((sec) => [sec.key, sec.lines]));
 }
 
-/** After the English changed: lines whose English is unchanged keep the reviewed wording; changed lines are drafted again. Needs a new review. */
-export function redraftTranslation(job: DemoJob, old: Translation, lang: Lang): Translation {
-  const before = new Map<string, string[]>(JSON.parse(old.source) as Array<[string, string[]]>);
-  const fresh = draftTranslation(job, lang);
-  const sections = fresh.sections.map((sec) => {
-    const en = job.sections.find((x) => x.key === sec.key)?.lines ?? [];
-    const oldEn = before.get(sec.key) ?? [];
-    const oldSec = old.sections.find((x) => x.key === sec.key);
-    return { ...sec, title: oldSec?.title ?? sec.title, lines: sec.lines.map((l, i) => (oldSec && oldEn[i] === en[i] && oldSec.lines[i] !== undefined ? oldSec.lines[i] : l)) };
-  });
-  return { ...fresh, sections };
+/** The sections of the job's own text that changed since the version was last brought up to date. */
+export function changedFor(job: DemoJob, t: Translation): string[] {
+  const before = new Map<string, string[]>(JSON.parse(t.source) as Array<[string, string[]]>);
+  return job.sections.filter((sec) => t.sections.some((x) => x.key === sec.key) && JSON.stringify(before.get(sec.key)) !== JSON.stringify(sec.lines)).map((sec) => sec.key);
 }
 
-/** Lines still word for word as in English, for the review. */
+/**
+ * "Update the French too": in the version's own sections, lines whose source did not change keep their wording, changed lines are
+ * drafted again; sections the version added or removed stay as they are. It needs a new review.
+ */
+export function redraftTranslation(job: DemoJob, old: Translation, lang: JobLang, english?: (sec: Section) => Section | null): Translation {
+  const before = new Map<string, string[]>(JSON.parse(old.source) as Array<[string, string[]]>);
+  const sections = old.sections.map((oldSec) => {
+    const sec = job.sections.find((x) => x.key === oldSec.key);
+    if (!sec) return oldSec;
+    const fresh = draftSection(job, sec, lang, english);
+    const oldSrc = before.get(sec.key) ?? [];
+    return { ...fresh, title: oldSec.title, lines: fresh.lines.map((l, i) => (oldSrc[i] === sec.lines[i] && oldSec.lines[i] !== undefined ? oldSec.lines[i] : l)) };
+  });
+  return { ...old, sections, reviewed: false, source: sourceOf(job), kept: undefined };
+}
+
+/** "Keep the French as it is": the version stays as it is, and the update is not offered again for this text. */
+export function keptTranslation(job: DemoJob, t: Translation): Translation {
+  return { ...t, kept: sourceOf(job) };
+}
+
+/** Lines still word for word as in the job's own language, for the review. */
 export function untranslated(job: DemoJob, t: Translation): number {
   return t.sections.reduce((n, sec) => {
-    const en = job.sections.find((x) => x.key === sec.key);
-    return n + sec.lines.filter((l, i) => en?.lines[i] === l && /[a-z]{3}/i.test(l)).length;
+    const own = job.sections.find((x) => x.key === sec.key);
+    return n + sec.lines.filter((l, i) => own?.lines[i] === l && /\p{L}{3}/u.test(l)).length;
   }, 0);
 }
 
@@ -410,16 +520,23 @@ export function totalLines(t: Translation): number {
   return t.sections.reduce((n, sec) => n + sec.lines.length, 0);
 }
 
-/** Whether the English text changed after the version was made. */
+/**
+ * Whether the job's own text changed since the version was last brought up to date, and the user has not chosen to keep it as it is.
+ * Since 8 November 2026 a change is no longer carried into the versions: the chat offers the update, and the version stays as it was.
+ */
 export function stale(job: DemoJob, t: Translation): boolean {
-  return sourceOf(job) !== t.source;
+  const now = sourceOf(job);
+  return now !== t.source && now !== t.kept;
 }
 
-/** The versions shown on the public job page: reviewed and up to date with the English, and only for an amplified job. */
-export function publicLangs(job: DemoJob): Lang[] {
+/**
+ * The versions shown on the public job page: reviewed, only for an amplified job, and only as many as it includes or has paid for, in
+ * the order they were added. A version that is behind the job's own text stays until the user updates it or keeps it.
+ */
+export function publicLangs(job: DemoJob): JobLang[] {
   if (job.plan !== 'amplify' || !job.translations) return [];
-  return LANGS.filter((l) => {
-    const t = job.translations?.[l.key];
-    return t?.reviewed && !stale(job, t);
-  }).map((l) => l.key);
+  return versionsOf(job)
+    .filter((k) => k !== jobLang(job))
+    .slice(0, langSlots(job))
+    .filter((k) => job.translations?.[k]?.reviewed);
 }

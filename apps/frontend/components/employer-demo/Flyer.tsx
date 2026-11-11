@@ -4,8 +4,8 @@ import { Printer } from 'lucide-react';
 import qrcode from 'qrcode-generator';
 import { useMemo, useState } from 'react';
 import { inOutlineOrder } from './engine';
-import { countryName, LANGS, langOf, localDate, stale, term, ui } from './translate';
-import type { DemoJob, Lang, State } from './types';
+import { countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
+import type { DemoJob, JobLang, State } from './types';
 import { Dialog, OrgMark, radioKeys } from './ui';
 
 /** A QR code drawn as one SVG path, so it prints sharply at any size. */
@@ -27,16 +27,17 @@ export function QrCode({ text, size = 132, label }: { text: string; size?: numbe
 }
 
 /** The one-page notice for a field office or community board: printed, or saved as a PDF. */
-function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; lang?: Lang }) {
+function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; lang?: JobLang }) {
   const version = lang ? job.translations?.[lang] : undefined;
-  const l = version ? lang : undefined;
+  const shown: JobLang = version && lang ? lang : jobLang(job);
+  const l = tableLang(shown);
   const say = (en: string, key: string, vars: Record<string, string | number> = {}) => (l ? ui(key, l, vars) : en);
   const sections = version ? version.sections : inOutlineOrder(job.sections, job.tags);
   const purpose = sections.find((x) => x.key === 'purpose') ?? sections.find((x) => x.key !== 'about');
   const duties = (sections.find((x) => x.key === 'responsibilities')?.lines ?? []).filter((x) => x.startsWith('- ')).slice(0, 4);
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : term('Remote', l);
   return (
-    <div className="ej-flyer" lang={l ?? 'en'} dir={l ? langOf(l).dir : undefined}>
+    <div className="ej-flyer" lang={shown} dir={langOf(shown).dir}>
       <div className="flex items-center gap-2">
         <OrgMark name={s.org.name} size={34} />
         <strong style={{ fontSize: 15 }}>{s.org.name}</strong>
@@ -83,12 +84,12 @@ function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; la
 
 /** Choose the language, see the notice, print it. Only reviewed, up-to-date language versions are offered. */
 export function FlyerDialog({ job, s, url, onClose }: { job: DemoJob; s: State; url: string; onClose: () => void }) {
-  const ready = LANGS.filter((x) => {
-    const t = job.translations?.[x.key];
+  const ready = versionsOf(job).filter((k) => {
+    const t = job.translations?.[k];
     return t?.reviewed && !stale(job, t);
-  }).map((x) => x.key);
-  const [lang, setLang] = useState<Lang | null>(null);
-  const waiting = LANGS.filter((x) => job.translations?.[x.key] && !ready.includes(x.key));
+  });
+  const [lang, setLang] = useState<JobLang | null>(null);
+  const waiting = versionsOf(job).filter((k) => !ready.includes(k)).map((k) => langOf(k));
   return (
     <Dialog
       title="Field-post notice"
@@ -107,22 +108,50 @@ export function FlyerDialog({ job, s, url, onClose }: { job: DemoJob; s: State; 
         </div>
       }
     >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Language of the notice">
-          <button type="button" role="radio" aria-checked={!lang} className="aj-pill" data-active={!lang} onClick={() => setLang(null)}>
-            English
-          </button>
-          {ready.map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={lang === k} className="aj-pill" data-active={lang === k} onClick={() => setLang(k)} lang={k}>
-              {langOf(k).native}
-            </button>
-          ))}
-        </div>
-        {waiting.length > 0 && <span className="aj-faint">{waiting.map((x) => x.label).join(' and ')}: review the language version first, then it can be printed.</span>}
-        <div className="ej-flyer-frame">
-          <Notice job={job} s={s} url={url} lang={lang ?? undefined} />
-        </div>
-      </div>
+      <FlyerBody job={job} s={s} url={url} lang={lang} setLang={setLang} ready={ready} waiting={waiting.map((x) => x.label)} />
     </Dialog>
+  );
+}
+
+function FlyerBody({ job, s, url, lang, setLang, ready, waiting }: { job: DemoJob; s: State; url: string; lang: JobLang | null; setLang: (l: JobLang | null) => void; ready: JobLang[]; waiting: string[] }) {
+  const own = langOf(jobLang(job));
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Language of the notice">
+        <button type="button" role="radio" aria-checked={!lang} className="aj-pill" data-active={!lang} onClick={() => setLang(null)} lang={own.key}>
+          {own.native}
+        </button>
+        {ready.map((k) => (
+          <button key={k} type="button" role="radio" aria-checked={lang === k} className="aj-pill" data-active={lang === k} onClick={() => setLang(k)} lang={k}>
+            {langOf(k).native}
+          </button>
+        ))}
+      </div>
+      {waiting.length > 0 && <span className="aj-faint">{waiting.join(' and ')}: review the language version first, then it can be printed.</span>}
+      <div className="ej-flyer-frame">
+        <Notice job={job} s={s} url={url} lang={lang ?? undefined} />
+      </div>
+    </div>
+  );
+}
+
+/** The field-post flyer as a panel tab in the window (section 19): choose the language, see it, print it. */
+export function FlyerPanel({ job, s, url }: { job: DemoJob; s: State; url: string }) {
+  const ready = versionsOf(job).filter((k) => {
+    const t = job.translations?.[k];
+    return t?.reviewed && !stale(job, t);
+  });
+  const [lang, setLang] = useState<JobLang | null>(null);
+  const waiting = versionsOf(job).filter((k) => !ready.includes(k)).map((k) => langOf(k).label);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="aj-muted min-w-0 flex-1">A one-page notice with a QR code to the job, for notice boards in field offices, clinics, and community centres. Use your browser&apos;s print window; choose &ldquo;Save as PDF&rdquo; to keep a file.</span>
+        <button type="button" className="aj-ink-btn" onClick={() => window.print()}>
+          <Printer size={14} strokeWidth={1.8} /> Print
+        </button>
+      </div>
+      <FlyerBody job={job} s={s} url={url} lang={lang} setLang={setLang} ready={ready} waiting={waiting} />
+    </div>
   );
 }

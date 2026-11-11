@@ -30,18 +30,18 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, LANGUAGE_PRICE, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import { workingDay, type Fix } from './market';
 import { MARKET_SAMPLE } from './sample';
 import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
-import { draftTranslation, langOf, redraftTranslation } from './translate';
+import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
 import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
 import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone } from './types';
+import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -68,6 +68,17 @@ export function ctxFor(s: State, j: DemoJob): BuildContext {
   return { facts: j.facts, roleKey: j.family, org: s.org, tone: j.tone, format: formatOf(s, j.format), commitments: j.commitments, applyLines: applyLines(j.apply, j.facts, s.org) };
 }
 
+/** A section written by the rules, in the job's own language (simulated in the demo by the table, like the language versions). */
+function built(k: string, ctx: BuildContext, j: DemoJob): Section {
+  return inLanguage(buildSection(k, ctx), ctx.facts, jobLang(j));
+}
+
+/** The rules' own English for a section they wrote, as the source of a version of a job in another language; null for text written by hand or by the AI. */
+function englishFor(s: State, j: DemoJob): (sec: Section) => Section | null {
+  const ctx = ctxFor(s, j);
+  return (sec) => (sec.edited || sec.ai ? null : buildSection(sec.key, ctx));
+}
+
 /** Rebuilds every section not edited by hand, keeping the user's order and headings from the job's format. Placeholders in edited sections are filled once the fact is known. */
 function rebuilt(s: State, j: DemoJob): DemoJob {
   if (!j.sections.length) return j;
@@ -78,8 +89,8 @@ function rebuilt(s: State, j: DemoJob): DemoJob {
   return { ...j, sections: keys.map((k) => {
     const own = j.sections.find((x) => x.key === k && (x.edited || x.ai));
     if (own) return { ...own, lines: own.lines.map(fill) };
-    const built = buildSection(k, ctx);
-    return j.renamed?.[k] ? { ...built, title: j.renamed[k] } : built;
+    const sec = built(k, ctx, j);
+    return j.renamed?.[k] ? { ...sec, title: j.renamed[k] } : sec;
   }) };
 }
 
@@ -208,8 +219,8 @@ function writeByRules(id: string, keys: string[]) {
       const add = keys
         .filter((k) => x.tags.includes(k) && !isWritten(x, k))
         .map((k) => {
-          const built = buildSection(k, ctx);
-          return x.renamed?.[k] ? { ...built, title: x.renamed[k] } : built;
+          const sec = built(k, ctx, x);
+          return x.renamed?.[k] ? { ...sec, title: x.renamed[k] } : sec;
         });
       if (!add.length) return x;
       const sections = inOutlineOrder([...x.sections.filter((sec) => !add.some((a) => a.key === sec.key)), ...add], x.tags);
@@ -278,7 +289,8 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   if (inWindow) {
-    const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] } };
+    const lang = detectLang(text);
+    const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] }, ...(lang !== 'en' ? { lang } : {}) };
     waiting.chat = [msg('user', text), ...templateQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
     update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
     return id;
@@ -336,7 +348,7 @@ function startWriting(s: State, j: DemoJob, pace: Pace): DemoJob {
   const walk = { ...(j.walk ?? { approved: [], settled: [] }), pace };
   const base: DemoJob = { ...j, setup: undefined, walk, part: undefined };
   const ctx = ctxFor(s, base);
-  const fixed = j.tags.filter((k) => FIXED_SECTIONS.includes(k) && !isWritten(j, k)).map((k) => buildSection(k, ctx));
+  const fixed = j.tags.filter((k) => FIXED_SECTIONS.includes(k) && !isWritten(j, k)).map((k) => built(k, ctx, j));
   return { ...base, sections: inOutlineOrder([...j.sections, ...fixed], j.tags) };
 }
 
@@ -1045,7 +1057,8 @@ function chatTurn(id: string, text: string, focus?: string) {
     }));
     return;
   }
-  const edit = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today, focus);
+  const edit0 = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today, focus);
+  const edit = { ...edit0, sections: edit0.sections.map((sec) => inLanguage(sec, edit0.facts, jobLang(j))) };
   const factsChanged = JSON.stringify(edit.facts) !== JSON.stringify(j.facts);
   const result = factsChanged ? { ...edit, sections: rebuilt(s, { ...j, sections: edit.sections, tags: edit.tags, tone: edit.tone, facts: edit.facts }).sections } : edit;
   if (JSON.stringify([result.sections, result.tags, result.tone, result.facts]) === JSON.stringify([j.sections, j.tags, j.tone, j.facts])) {
@@ -1118,7 +1131,7 @@ export function toggleSection(id: string, key: string) {
       const tags = has ? j.tags.filter((t) => t !== key) : outlineOrder([...j.tags, key]);
       const next = touched({ ...j, tags });
       if (!j.sections.length) return next;
-      const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, buildSection(key, ctxFor(s, next))], tags);
+      const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, built(key, ctxFor(s, next), j)], tags);
       const title = has ? j.sections.find((x) => x.key === key)?.title : sections.find((x) => x.key === key)?.title;
       return { ...next, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${has ? 'Removed' : 'Added'} ${title ?? key}`, sections }] };
     }),
@@ -1316,14 +1329,12 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   return key;
 }
 /**
- * A free job counts the first time it is used (published, sent for review, or downloaded), against the allowance of the month it is used in.
- * Exploring and editing are free; with the month's free jobs used, nothing is counted and the job is paid for when it is published.
- * Publishing needs a count for the month it goes live in (`publishing`); one from an earlier month stays used there and does not carry over.
+ * A free job is used only when it is published or scheduled, against the month it goes live in (section 19, 8 November 2026): writing,
+ * sending for review, and exploring are free. One counted in an earlier month stays used there and does not carry over.
  */
-function useFree(s: State, id: string, month = currentMonth(s), publishing = false): State {
+function useFree(s: State, id: string, month = currentMonth(s)): State {
   const j = s.jobs.find((x) => x.id === id);
-  const counted = publishing ? countedFor(s, id, month) : hasFreeUse(s, id);
-  if (!j || j.plan === 'amplify' || counted || freeLeft(s, month) === 0) return s;
+  if (!j || j.plan === 'amplify' || countedFor(s, id, month) || freeLeft(s, month) === 0) return s;
   return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
 }
 
@@ -1343,14 +1354,15 @@ export function acceptFreeTerms() {
  * Pays at the simulated checkout: one job, an extra job on the subscription, a pack of jobs, or the subscription.
  * A pack or the subscription adds paid jobs on hand; one job or an extra job pays for the job named.
  */
-export function buy(key: PackageKey | 'extra', jobTitle = '') {
+export function buy(key: PackageKey | 'extra', jobTitle = '', langs = 0) {
   update((s) => {
     const today = isoDay(s.today);
     const p = packageOf(key === 'extra' ? 'one' : key);
-    const amount = key === 'extra' ? EXTRA_JOB : p.price;
+    const amount = (key === 'extra' ? EXTRA_JOB : p.price) + langs * LANGUAGE_PRICE;
     const ends = addMonths(today, p.months);
+    const more = langs ? `, with ${langs} more language ${langs === 1 ? 'version' : 'versions'}` : '';
     const item =
-      key === 'one' ? `Amplify: ${jobTitle}` : key === 'extra' ? `Extra job on “Always hiring”: ${jobTitle}` : key === 'always' ? '“Always hiring” subscription, one month' : `${p.jobs} jobs, to use by ${longDate(ends)}`;
+      (key === 'one' ? `Amplify: ${jobTitle}` : key === 'extra' ? `Extra job on “Always hiring”: ${jobTitle}` : key === 'always' ? '“Always hiring” subscription, one month' : `${p.jobs} jobs, to use by ${longDate(ends)}`) + more;
     const next: State = {
       ...s,
       packs: key === 'three' || key === 'five' ? [...s.packs, { id: `pk${Date.now()}`, jobs: p.jobs, left: p.jobs, ends, at: Date.now() }] : s.packs,
@@ -1381,8 +1393,7 @@ export function isReviewable(j: DemoJob): boolean {
 export function sendForReview(id: string, reviewers: Array<{ name: string; email: string; outside: boolean }>, due: string, rule: 'any' | 'all', note: string) {
   const j0 = getState().jobs.find((x) => x.id === id);
   if (!j0 || !isReviewable(j0)) return;
-  update((s0) => {
-    const s = useFree(s0, id);
+  update((s) => {
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
     const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined, sent: j.sections, before: j.review.sent };
@@ -1503,22 +1514,39 @@ export function applyFix(id: string, fix: Fix, label: string) {
   }));
 }
 
-/** A first draft of a language version, for the employer to review. */
-export function addTranslation(id: string, lang: Lang) {
+/** A first draft of a language version, for the employer to review; never in the job's own language. */
+export function addTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
-  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
+  const s = getState();
+  const j0 = s.jobs.find((x) => x.id === id);
+  if (!j0 || lang === jobLang(j0) || j0.translations?.[lang]) return;
+  const english = englishFor(s, j0);
+  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang, english) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
 }
 
-/** Brings a version up to date after the English changed, keeping the wording of lines whose English did not change. */
-export function refreshTranslation(id: string, lang: Lang) {
+/** "Update the French too": brings a version up to date with the job's own text, keeping the wording of lines whose source did not change. */
+export function refreshTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
+  const s = getState();
+  const j0 = s.jobs.find((x) => x.id === id);
+  if (!j0) return;
+  const english = englishFor(s, j0);
   updateJob(id, (j) => {
     const t = j.translations?.[lang];
-    return t ? { ...j, translations: { ...j.translations, [lang]: redraftTranslation(j, t, lang) } } : j;
+    return t ? { ...j, translations: { ...j.translations, [lang]: redraftTranslation(j, t, lang, english) } } : j;
   });
 }
 
-export function removeTranslation(id: string, lang: Lang) {
+/** "Keep the French as it is": the version is not changed, and the update is not offered again for this text. */
+export function keepTranslation(id: string, lang: JobLang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const t = j.translations?.[lang];
+    return t ? { ...j, translations: { ...j.translations, [lang]: keptTranslation(j, t) } } : j;
+  });
+}
+
+export function removeTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const rest = { ...j.translations };
@@ -1527,18 +1555,92 @@ export function removeTranslation(id: string, lang: Lang) {
   });
 }
 
-/** An edit to a version needs a new review. */
-export function editTranslation(id: string, lang: Lang, key: string, index: number | 'title', text: string) {
-  if (!ownerOnly()) return;
-  updateJob(id, (j) => {
-    const t = j.translations?.[lang];
-    if (!t) return j;
-    const sections = t.sections.map((sec) => (sec.key !== key ? sec : index === 'title' ? { ...sec, title: text } : { ...sec, lines: sec.lines.map((l, i) => (i === index ? text : l)) }));
-    return { ...j, translations: { ...j.translations, [lang]: { ...t, sections, reviewed: false } } };
-  });
+function withVersion(j: DemoJob, lang: JobLang, fn: (t: Translation) => Translation): DemoJob {
+  const t = j.translations?.[lang];
+  return t ? { ...j, translations: { ...j.translations, [lang]: { ...fn(t), reviewed: false } } } : j;
 }
 
-export function reviewTranslation(id: string, lang: Lang) {
+/** An edit to a version needs a new review. */
+export function editTranslation(id: string, lang: JobLang, key: string, index: number | 'title', text: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => withVersion(j, lang, (t) => ({ ...t, sections: t.sections.map((sec) => (sec.key !== key ? sec : index === 'title' ? { ...sec, title: text } : { ...sec, lines: sec.lines.map((l, i) => (i === index ? text : l)) })) })));
+}
+
+/**
+ * A version's own sections (section 19, 8 November 2026): each version can add, remove, and reorder sections within the job's JD format,
+ * for content one country needs and another does not; the facts stay shared. A section added is drafted from the job's own text when
+ * the job has it, and otherwise starts empty for the user or the AI to write.
+ */
+export function addVersionSection(id: string, lang: JobLang, key: string) {
+  if (!ownerOnly() || !SECTION_BY_KEY[key]) return;
+  const s = getState();
+  const j0 = s.jobs.find((x) => x.id === id);
+  const t0 = j0?.translations?.[lang];
+  if (!j0 || !t0 || t0.sections.some((x) => x.key === key)) return;
+  const drafted = draftVersionSection(j0, key, lang, englishFor(s, j0));
+  const sec: Section = drafted ?? { key, title: headingIn(key, lang) ?? headingFor(key, formatOf(s, j0.format)), lines: [] };
+  updateJob(id, (j) => withVersion(j, lang, (t) => ({ ...t, sections: inOutlineOrder([...t.sections, sec], outlineOrder([...t.sections.map((x) => x.key), key])) })));
+}
+
+export function removeVersionSection(id: string, lang: JobLang, key: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => withVersion(j, lang, (t) => (t.sections.length > 1 ? { ...t, sections: t.sections.filter((x) => x.key !== key) } : t)));
+}
+
+/** A version's sections in a new order, within their groups as in every JD format. */
+export function reorderVersionSections(id: string, lang: JobLang, keys: string[]) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) =>
+    withVersion(j, lang, (t) => {
+      const queue = [...keys];
+      const order = outlineOrder(t.sections.map((x) => (keys.includes(x.key) ? (queue.shift() ?? x.key) : x.key)));
+      return { ...t, sections: inOutlineOrder(t.sections, order) };
+    }),
+  );
+}
+
+/** A version's section written or rewritten in the chat (by the AI when it is on). */
+export function writeVersionSection(id: string, lang: JobLang, key: string, lines: string[]) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => withVersion(j, lang, (t) => ({ ...t, sections: t.sections.map((x) => (x.key === key ? { ...x, lines, ai: true } : x)) })));
+}
+
+/**
+ * The job's own language, changed only when the user asks (section 19): the rules' sections are written again in it; text written by
+ * hand or by the AI stays as it is, for the AI or the user to rewrite. A version in that language is no longer needed, so it goes.
+ */
+export function setJobLang(id: string, lang: JobLang) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || jobLang(j) === lang) return j;
+      const rest = { ...j.translations };
+      delete rest[lang];
+      const next: DemoJob = { ...touched(j), lang, translations: rest, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Written in ${langOf(lang).label} from now on` }] };
+      return rebuilt(s, next);
+    }),
+  }));
+}
+
+/**
+ * Further language versions bought after publishing, from the chat (section 19): a small checkout of their own, simulated; the receipt
+ * goes to Billing. Before publishing they join the job's own checkout instead.
+ */
+export function buyLanguages(id: string, n: number): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || n < 1 || j.plan !== 'amplify') return false;
+  const item = `${n} more language ${n === 1 ? 'version' : 'versions'}: ${j.facts.title}`;
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, langsPaid: (x.langsPaid ?? 0) + n, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Paid for ${item.split(':')[0]} (simulated)` }] } : x)),
+    receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item, amount: `${usd(n * LANGUAGE_PRICE)} (placeholder)` }, ...st.receipts],
+  }));
+  return true;
+}
+
+export function reviewTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const t = j.translations?.[lang];
@@ -1614,7 +1716,13 @@ function reviewOnPublish(x: DemoJob, me: string): { audit: DemoJob['audit']; not
  */
 export type Paid = 'direct' | 'onHand';
 
-export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid };
+/** `langs`: language versions beyond those included, paid in the same checkout. */
+export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid; langs?: number };
+
+/** A job paid directly is one job (one language version included); a pack or subscription job includes two. */
+function viaOf(paid: Paid | undefined, j: DemoJob): DemoJob['paidVia'] {
+  return j.paidFor ? (j.paidVia ?? 'single') : paid === 'onHand' ? 'package' : 'single';
+}
 
 /** A publishing date must be from tomorrow, and before the job closes; the date picker's limits alone can be typed past. */
 export function scheduleBlock(s: State, j: DemoJob, schedule: string | null): string | null {
@@ -1667,7 +1775,7 @@ export function publish(id: string, o: PublishOptions): boolean {
   let told: string | undefined;
   update((s0) => {
     const prepaid = o.plan === 'amplify' && Boolean(s0.jobs.find((x) => x.id === id)?.paidFor);
-    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule), true) : s0;
+    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand' && !prepaid) s = takePaidJob(s);
     const how = o.plan === 'amplify' ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
@@ -1681,6 +1789,7 @@ export function publish(id: string, o: PublishOptions): boolean {
         scheduledFor: o.schedule ?? undefined,
         publishedAt: o.schedule ? undefined : Date.now(),
         published: o.schedule ? undefined : { facts: x.facts, sections: x.sections, at: Date.now() },
+        ...(o.plan === 'amplify' ? { paidVia: viaOf(o.paid, x), langsPaid: (x.langsPaid ?? 0) + (o.langs ?? 0) } : {}),
         paidFor: undefined,
         payRequest: undefined,
         review: { ...x.review, skipped: undefined, overruled: undefined },
@@ -1757,8 +1866,8 @@ export function completePayRequest(id: string): boolean {
   // Paid after the date asked for: the job goes live now rather than not at all.
   const schedule = req.schedule && req.schedule > isoDay(s.today) ? req.schedule : null;
   if (upgrade ? !s.org.verified : publishBlock(s, id, { plan: 'amplify', schedule, paid: 'direct' })) return false;
-  buy(req.key, j.facts.title);
-  const ok = upgrade ? amplifyLive(id, how) : publish(id, { plan: 'amplify', schedule, paid: how });
+  buy(req.key, j.facts.title, req.langs ?? 0);
+  const ok = upgrade ? amplifyLive(id, how, req.langs ?? 0) : publish(id, { plan: 'amplify', schedule, paid: how, langs: req.langs ?? 0 });
   if (!ok) return false;
   update((st) => ({
     ...st,
@@ -1779,7 +1888,7 @@ export function setReachReminders(id: string, on: boolean) {
 }
 
 /** Amplifies a live or scheduled free job: listed 100 days from publishing, and featured. The free job it used stays used. */
-export function amplifyLive(id: string, paid: Paid): boolean {
+export function amplifyLive(id: string, paid: Paid, langs = 0): boolean {
   const s0 = getState();
   const j = s0.jobs.find((x) => x.id === id);
   if (!j || s0.reviewerAs || !s0.org.verified || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
@@ -1792,7 +1901,7 @@ export function amplifyLive(id: string, paid: Paid): boolean {
       ...s,
       jobs: s.jobs.map((x) => {
         if (x.id !== id) return x;
-        const next: DemoJob = { ...x, plan: 'amplify', payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
+        const next: DemoJob = { ...x, plan: 'amplify', paidVia: viaOf(paid, x), langsPaid: (x.langsPaid ?? 0) + langs, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
         const reach = reachAtGoLive(next, sendsOn);
         sending = Boolean(reach.reach && !sendsOn);
         return { ...next, ...reach };
@@ -2188,8 +2297,23 @@ export function hireAgain(id: string, place?: string): string | null {
   return nid;
 }
 
-export function downloadCopy(j: DemoJob, orgName: string) {
-  update((s) => useFree(s, j.id));
+/**
+ * A copy of the job description: a free job's once it is published, a paid job's once it is paid, even before it goes live (section 19,
+ * 8 November 2026). Copying text from the screen is not prevented. The reason when it cannot be downloaded yet.
+ */
+export function downloadBlock(j: DemoJob): string | null {
+  if (!j.sections.length) return 'There is no job description to download yet';
+  if (isPublished(j) || j.paidFor) return null;
+  return 'A copy can be downloaded once the job is published, or with Amplify as soon as it is paid';
+}
+
+/** Downloads a copy when it may be downloaded; otherwise says when it can be (`say`), and returns false. */
+export function downloadCopy(j: DemoJob, orgName: string, say = false): boolean {
+  const no = downloadBlock(j);
+  if (no) {
+    if (say) notify(`${no}.`);
+    return false;
+  }
   const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
   const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');
@@ -2199,6 +2323,7 @@ export function downloadCopy(j: DemoJob, orgName: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(href), 60_000);
+  return true;
 }
 
 export function markInbox(id: string) {
