@@ -26,6 +26,7 @@ class RunHandle:
         self.saved = dict.fromkeys(_TOTALS, 0)
         self.seen_active: set = set()
         self.created: set = set()
+        self.not_open: set = set()
         self._pending: set = set()
 
     async def save(self, save_jobs, jobs, source_id, org_name, **kwargs):
@@ -48,10 +49,12 @@ class RunHandle:
             self.saved[name] += result.get(name, 0) or 0
         self.seen_active.update(result.get("seen_active") or ())
         self.created.update(result.get("created_ids") or ())
+        self.not_open.update(result.get("not_open_ids") or ())
 
     def matched_active(self) -> int:
-        """Open jobs the run's rows matched, without those the run itself created."""
-        return len(self.seen_active - self.created)
+        """Open jobs the run's rows matched: never one the run created, nor one that was not open
+        when a row first matched it (a row can change a job's deadline during the run)."""
+        return len(self.seen_active - self.created - self.not_open)
 
     async def wait_for_saves(self) -> None:
         while self._pending:

@@ -1628,6 +1628,53 @@ def test_jobs_whose_deadline_passed_are_neither_counted_at_the_start_nor_matched
     assert record["counted"] is True, "2 of the 4 open jobs; the passed deadlines are not open"
 
 
+def _crawl_rows(rows):
+    async def crawl(src, run):
+        counts = await run.save(_crawler().save_jobs, rows, src["id"], src["org_name"])
+        return {"status": "ok", "message": f"Found {len(rows)} jobs",
+                "counts": {"found": len(rows), **counts}, "listing": COMPLETE,
+                "valid": len(rows)}
+
+    return crawl
+
+
+def test_a_job_whose_passed_deadline_a_row_extends_is_not_a_match_when_listed_again(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 5, deadline="2000-01-01")
+    extended = {**_job(5), "deadline": "2999-12-31"}
+    run_id = _manual_run(source, _crawl_rows([_job(1), dict(extended), dict(extended)]))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 1)
+    assert record["counted"] is False
+    assert str(_sql("SELECT deadline FROM jobs WHERE title = 'Programme Officer 5'")[0][0]) == (
+        "2999-12-31"
+    ), "the new reading is still saved"
+
+
+def test_the_start_count_and_the_matches_read_the_same_calendar_in_any_time_zone(
+    db, monkeypatch
+):
+    # A database day always one off the UTC day, so the UTC clock and the database disagree.
+    utc_hour = _sql("SELECT EXTRACT(HOUR FROM NOW() AT TIME ZONE 'UTC')")[0][0]
+    ahead = utc_hour >= 12
+    monkeypatch.setenv("PGTZ", "Etc/GMT-12" if ahead else "Etc/GMT+12")
+    db_day, utc_day = _sql("SELECT CURRENT_DATE, (NOW() AT TIME ZONE 'UTC')::date")[0]
+    assert db_day != utc_day
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2)
+    # Passed by the database's day but not by UTC's when the database is ahead; the other way
+    # round, open by the database's day but passed by UTC's.
+    _store_job(source["id"], 3, deadline=utc_day if ahead else db_day)
+    run_id = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    record = _lifecycle(run_id)
+    assert record["active_at_start"] == (2 if ahead else 3)
+    assert record["matched_active"] == record["active_at_start"]
+    assert record["counted"] is True
+
+
 def test_a_hidden_job_seen_again_is_not_a_match(db):
     source = _add_source()
     for n in (1, 2):

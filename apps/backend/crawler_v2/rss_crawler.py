@@ -205,12 +205,13 @@ class SimpleRSSCrawler:
         failed = 0
         validated = 0
         seen_active = []
+        not_open = []
         recorded = []
         unrecorded = 0  # rows whose sighting was not recorded (a hidden job seen again is)
         
         try:
             with conn.cursor() as cur:
-                confirm_running(cur, run_token, source_id)
+                open_on = confirm_running(cur, run_token, source_id)
                 for job in jobs:
                     title = job.get('title', '').strip()
                     apply_url = job.get('apply_url', '').strip()
@@ -235,6 +236,7 @@ class SimpleRSSCrawler:
                     validated += 1
                     recorded_mark = len(recorded)
                     seen_mark = len(seen_active)
+                    not_open_mark = len(not_open)
                     cur.execute("SAVEPOINT job_save")
                     try:
                         outcome = persist_candidate(
@@ -247,6 +249,8 @@ class SimpleRSSCrawler:
                             org_name=org_name,
                             recorded=recorded,
                             seen=seen_active,
+                            not_open=not_open,
+                            open_on=open_on,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                     except Exception as exc:
@@ -254,6 +258,7 @@ class SimpleRSSCrawler:
                         cur.execute("ROLLBACK TO SAVEPOINT job_save")
                         del recorded[recorded_mark:]
                         del seen_active[seen_mark:]
+                        del not_open[not_open_mark:]
                         failed += 1
                         logger.error("RSS job failed to save: %s", redact_exception(exc))
                         continue
@@ -285,6 +290,7 @@ class SimpleRSSCrawler:
             'validated': validated,
             'unrecorded': unrecorded,
             'seen_active': seen_active,
+            'not_open_ids': not_open,
             'created_ids': created_ids(recorded),
         }
     
