@@ -80,6 +80,33 @@ describe('the checks on a first draft', () => {
   });
 });
 
+describe('the checks, one section at a time (round 7, phase 2)', () => {
+  const stepCtx = (written: string[], next: Record<string, unknown> | null) => ({
+    ...ctx('writing', brief),
+    job: { ...ctx('writing', brief).job, sections: sections.map((s) => ({ ...s, text: written.includes(s.key) ? 'Some text.' : null })) },
+    walk: { next },
+  });
+
+  it('holds a section written for the first time to its rules, but not an edit of one already written', () => {
+    const turn: ChatTurn = { reply: 'Here it is.', actions: [write('responsibilities', ['- Run hygiene promotion in Juba', '- Supervise repairs'])] };
+    const first = draftProblems(turn, stepCtx(['about', 'purpose'], { kind: 'write', sections: [{ key: 'responsibilities' }] }), 'Go on');
+    expect(first).toEqual(expect.arrayContaining([expect.stringContaining('Key areas of accountability: 2 duties; it needs 18 to 28')]));
+    expect(first.some((p) => p.startsWith('The draft has'))).toBe(false);
+    expect(draftProblems(turn, stepCtx(['about', 'purpose', 'responsibilities'], { kind: 'approve', section: 'responsibilities' }), 'Shorter')).toEqual([]);
+  });
+
+  it('asks again for a section the window asked for and the answer left out', () => {
+    const turn: ChatTurn = { reply: 'Shall I go on?', actions: [] };
+    expect(draftProblems(turn, stepCtx(['about'], { kind: 'write', sections: [{ key: 'purpose' }] }), 'Go on')[0]).toBe('Write the section asked for now; missing: Role purpose.');
+  });
+
+  it('a whole draft asked for at once is held to its length and its sections', () => {
+    const turn: ChatTurn = { reply: 'Draft.', actions: [write('purpose', ['The post holder supports WASH work in Juba.'])] };
+    const problems = draftProblems(turn, stepCtx(['about', 'apply'], { kind: 'write', sections: ['purpose', 'relationships', 'responsibilities'].map((key) => ({ key })) }), 'Go on');
+    expect(problems).toEqual(expect.arrayContaining([expect.stringContaining('missing: Scope of role, Key areas of accountability'), expect.stringMatching(/^The draft has \d+ words/)]));
+  });
+});
+
 describe('one targeted repair', () => {
   it('asks with the model\'s own answer and the exact problems, then puts the repaired sections in place', () => {
     const msgs = repairMessages([{ role: 'system', content: 'S' }, { role: 'user', content: 'U' }], '{"reply":"x"}', ['Fix A', 'Fix B']);

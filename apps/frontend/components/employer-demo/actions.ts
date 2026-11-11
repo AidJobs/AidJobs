@@ -7,6 +7,9 @@ import {
   article,
   buildSection,
   buildSections,
+  COMMITMENTS,
+  roleByKey,
+  SECTION_BY_KEY,
   daysUntil,
   detectRole,
   emptyFacts,
@@ -28,17 +31,25 @@ import {
   type BuildContext,
 } from './engine';
 import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, hasFreeUse, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
-import type { Fix } from './market';
+import { workingDay, type Fix } from './market';
+import { MARKET_SAMPLE } from './sample';
 import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
-import { describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, wordsFor } from './setup';
-import type { ApplySettings, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, PayRequest, Person, Plan, ReachPlan, Recipient, Review, State, Tone } from './types';
+import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
+import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
+import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, fixedNamed, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails } from './walkChat';
+import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
+}
+
+/** Fills the two fact slots the rules leave in text ("[Duty station]", "[Closing date]") once the fact is known. */
+function fillSlots(l: string, f: Facts): string {
+  return l.replace('[Duty station]', f.location || '[Duty station]').replace('[Closing date]', f.deadline ? longDate(f.deadline) : '[Closing date]');
 }
 
 function who(s: State): string {
@@ -61,8 +72,10 @@ export function ctxFor(s: State, j: DemoJob): BuildContext {
 function rebuilt(s: State, j: DemoJob): DemoJob {
   if (!j.sections.length) return j;
   const ctx = ctxFor(s, j);
-  const fill = (l: string) => l.replace('[Duty station]', j.facts.location || '[Duty station]').replace('[Closing date]', j.facts.deadline ? longDate(j.facts.deadline) : '[Closing date]');
-  return { ...j, sections: j.tags.map((k) => {
+  const fill = (l: string) => fillSlots(l, j.facts);
+  // A job written step by step has only the sections written so far; the others are written when they are reached.
+  const keys = j.walk ? j.tags.filter((k) => j.sections.some((x) => x.key === k)) : j.tags;
+  return { ...j, sections: keys.map((k) => {
     const own = j.sections.find((x) => x.key === k && (x.edited || x.ai));
     if (own) return { ...own, lines: own.lines.map(fill) };
     const built = buildSection(k, ctx);
@@ -110,15 +123,19 @@ export function isApproved(j: DemoJob): boolean {
   return j.review.state === 'approved' || (j.review.rule === 'any' ? j.review.reviewers.some((r) => r.decision === 'approved') : j.review.reviewers.length > 0 && j.review.reviewers.every((r) => r.decision === 'approved'));
 }
 
-const ASK_TEXT: Record<NonNullable<ChatMsg['ask']>, string> = {
+/** The four facts the earlier workspace asks for, in order. */
+type LegacyAsk = 'title' | 'place' | 'deadline' | 'contract';
+const LEGACY_ASKS: AskKind[] = ['title', 'place', 'deadline', 'contract'];
+
+const ASK_TEXT: Record<LegacyAsk, string> = {
   title: 'What is the job title?',
   place: 'Where is the job based?',
   deadline: 'When do applications close?',
   contract: 'What kind of contract is it?',
 };
 
-export function missingFacts(f: Facts): Array<NonNullable<ChatMsg['ask']>> {
-  const out: Array<NonNullable<ChatMsg['ask']>> = [];
+export function missingFacts(f: Facts): LegacyAsk[] {
+  const out: LegacyAsk[] = [];
   if (!f.title) out.push('title');
   if (!f.location && f.arrangement !== 'remote') out.push('place');
   if (!f.deadline) out.push('deadline');
@@ -133,12 +150,16 @@ function nextAsk(f: Facts): ChatMsg[] {
 }
 
 /** Whether a fact asked about is now known. */
-function answered(kind: NonNullable<ChatMsg['ask']>, f: Facts): boolean {
+function answered(kind: AskKind, f: Facts): boolean {
   return kind === 'title' ? Boolean(f.title) : kind === 'place' ? Boolean(f.location) || f.arrangement === 'remote' : kind === 'deadline' ? Boolean(f.deadline) : Boolean(f.contract);
 }
 
-/** Keeps a question open until it is answered: after any message, if a fact is still missing and no question is waiting, ask it. */
+/**
+ * Keeps a question open until it is answered: after any message, if a fact is still missing and no question is waiting, ask it. A job
+ * written step by step is taken to its next step instead.
+ */
 function ensureAsk(id: string) {
+  if (getState().jobs.find((j) => j.id === id)?.walk) return ensurePrompt(id);
   updateJob(id, (x) => {
     const last = x.chat[x.chat.length - 1];
     if (x.setup || (last?.from === 'ai' && last.ask)) return x;
@@ -146,9 +167,72 @@ function ensureAsk(id: string) {
     return ask.length ? { ...x, chat: [...x.chat, ...ask] } : x;
   });
 }
+
+/**
+ * Takes a job written step by step to its next step (section 19, steps 3 to 7): the fixed sections are written by the rules as they are
+ * reached; the others by the AI when it is on (the window asks it), otherwise by the rules at once; and the step's question is asked
+ * unless the last message already asks it.
+ */
+function ensurePrompt(id: string) {
+  for (let i = 0; i < 12; i++) {
+    const s = getState();
+    const j = s.jobs.find((x) => x.id === id);
+    const step = j ? nextStep(j, s) : null;
+    if (!j || !step || (step.kind === 'setup' && step.stage !== 'pace')) return;
+    if (step.kind === 'write') {
+      const fixed = step.sections.filter((k) => FIXED_SECTIONS.includes(k));
+      if (fixed.length) {
+        writeByRules(id, fixed);
+        continue;
+      }
+      if (aiWrites()) return;
+      writeByRules(id, step.sections);
+      continue;
+    }
+    const key = stepKey(step);
+    const last = j.chat[j.chat.length - 1];
+    if (step.kind === 'done' ? j.chat.some((m) => m.step === 'done') : last?.from === 'ai' && last.step === key) return;
+    const prompts = promptFor(s, j, formatOf(s, j.format), step, key, aiWrites());
+    if (prompts.length) updateJob(id, (x) => ({ ...x, chat: [...x.chat, ...prompts] }));
+    return;
+  }
+}
+
+/** Sections written by the rules, in the job's order: the fixed ones as they are reached, and the others when the AI is off. */
+function writeByRules(id: string, keys: string[]) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((x) => {
+      if (x.id !== id) return x;
+      const ctx = ctxFor(s, x);
+      const add = keys
+        .filter((k) => x.tags.includes(k) && !isWritten(x, k))
+        .map((k) => {
+          const built = buildSection(k, ctx);
+          return x.renamed?.[k] ? { ...built, title: x.renamed[k] } : built;
+        });
+      if (!add.length) return x;
+      const sections = inOutlineOrder([...x.sections.filter((sec) => !add.some((a) => a.key === sec.key)), ...add], x.tags);
+      const written = add.filter((a) => !FIXED_SECTIONS.includes(a.key));
+      if (!written.length) return { ...x, sections };
+      return { ...x, sections, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: written.length > 1 ? 'First draft' : `Wrote ${written[0].title}`, sections }] };
+    }),
+  }));
+}
+
+/** The sections the job has reached, written by the rules now: when the AI could not write them. */
+export function writeNow(id: string) {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  const step = j ? nextStep(j, s) : null;
+  if (step?.kind !== 'write' || !ownerOnly()) return;
+  writeByRules(id, step.sections);
+  ensureAsk(id);
+}
+
 /** The live draft: once the role is known, the job description is written straight away and fills in as facts arrive. */
 function withLiveDraft(s: State, j: DemoJob): DemoJob {
-  if (j.setup || j.sections.length || !j.facts.title || j.tags.length < 3) return j;
+  if (j.walk || j.setup || j.sections.length || !j.facts.title || j.tags.length < 3) return j;
   const sections = buildSections(j.tags, ctxFor(s, j));
   return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
 }
@@ -194,7 +278,7 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   if (inWindow) {
-    const waiting: DemoJob = { ...job, setup: 'template' };
+    const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] } };
     waiting.chat = [msg('user', text), ...templateQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
     update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
     return id;
@@ -207,24 +291,44 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
 
 const STYLE_QUICK = ['Yes, write it that way', 'More formal', 'Shorter sentences'];
 const KEEP_QUICK = ['Keep it for all jobs', 'Just this job'];
+export const SEE_ALL = 'See all formats';
+export const CREATE_OWN = 'Create my own';
+export const USE_MINE = 'Use one of my job descriptions';
+export const DOC_QUICK = ['Only its headings and order', 'Its headings, saved as our JD format', 'Its wording too'];
+const LINK = /^\s*(?:https?:\/\/|www\.)\S+\s*$/i;
+export const LINK_REPLY = "I can't read links here: many career sites can't be read automatically. Paste the text of the job description, or drop the file in the box.";
 
-/** The first question in the window: which template, with the recommendation and its reason; the job type read so far. */
+/** Why the job type brings in a section the template does not have ("Deliverables, because consultancies list them"). */
+function addedFor(format: Format, facts: Facts): string[] {
+  return orderSections(recommendSections(format, facts), format).filter((k) => !format.order.some((o) => o.key === k) && TYPE_REASONS[k]);
+}
+
+/**
+ * The first question in the window: which template, with the recommendation and its reason, the sections this role adds, the market
+ * line (sample figures), and the close matches as answers; the job type read so far.
+ */
 function templateQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
   const rec = recommendation(s, j.format);
   const format = formatOf(s, rec.key);
   const count = orderSections(recommendSections(format, j.facts), format).length;
   const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'a new job';
   const type = `${ENGAGEMENTS.find((e) => e.key === j.facts.engagement)?.label.toLowerCase() ?? 'job'}${j.facts.contract ? `, ${j.facts.contract.toLowerCase()}` : ''}`;
+  const added = addedFor(format, j.facts);
+  const adds = added.length ? `, with ${added.map((k) => `**${headingFor(k, format)}** (${TYPE_REASONS[k].charAt(0).toLowerCase()}${TYPE_REASONS[k].slice(1)})`).join(' and ')}` : '';
+  const sector = roleByKey(j.family).sector.toLowerCase();
+  const market = j.facts.title ? `\n\n${MARKET_SAMPLE.similar} similar ${sector} roles are on AidJobs: usually ${MARKET_SAMPLE.grade}, ${MARKET_SAMPLE.showPay}% show a salary, open about ${MARKET_SAMPLE.daysOpen} days (sample figures in the demo).` : '';
   const out: ChatMsg[] = [];
   const better = j.facts.title ? suggestTitle(j.facts.title) : null;
   if (better) out.push(msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`]));
-  out.push(
-    msg(
+  const others = rec.others.slice(0, 2).map((k) => formatOf(s, k).label);
+  out.push({
+    ...msg(
       'ai',
-      `Got it: ${what}. I read it as a ${type}${typeClear ? '' : ", though I couldn't tell the contract: tap it in the sentence at the top of the template panel, or tell me"}.\n\nFirst, the template. I'd use **${format.label}**, ${rec.reason}: ${count} sections for this job, about ${wordsFor(count)} words. Shall I use it, or would you like to see others or create your own?`,
-      [`Use ${format.label}`, 'Show me others', 'Create my own'],
+      `Got it: ${what}. I read it as a ${type}${typeClear ? '' : ", though I couldn't tell the contract: tap it in the sentence at the top of the template panel, or tell me"}.${market}\n\nFirst, the template. I'd use **${format.label}**, ${rec.reason}: ${count} sections for this job${adds}, about ${wordsFor(count)} words. Shall I use it, or one of the others?`,
+      [`Use ${format.label}`, ...others.map((l) => `Use ${l}`), SEE_ALL, CREATE_OWN, USE_MINE],
     ),
-  );
+    step: 'setup:template',
+  });
   return out;
 }
 
@@ -232,6 +336,35 @@ function templateQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
 function styleQuestion(s: State): string {
   const style = proposedStyle(s);
   return `How should it sound? ${s.org.voice.length ? 'Your organisation writes' : 'Organisations like yours usually write'} ${describeStyle(style)}. Shall I write it that way, or differently?`;
+}
+
+/** The pace is chosen: the fixed sections are written from the settings, and the writing begins. */
+function startWriting(s: State, j: DemoJob, pace: Pace): DemoJob {
+  const walk = { ...(j.walk ?? { approved: [], settled: [] }), pace };
+  const base: DemoJob = { ...j, setup: undefined, walk, part: undefined };
+  const ctx = ctxFor(s, base);
+  const fixed = j.tags.filter((k) => FIXED_SECTIONS.includes(k) && !isWritten(j, k)).map((k) => buildSection(k, ctx));
+  return { ...base, sections: inOutlineOrder([...j.sections, ...fixed], j.tags) };
+}
+
+/** "One section at a time" or "write it all": chosen once, remembered for the next job, and changed whenever the user says so. */
+export function setPace(id: string, pace: Pace, said?: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    pace,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || !j.walk) return j;
+      const user = said ? [msg('user', said)] : [];
+      if (j.setup === 'pace') {
+        const reply = pace === 'step' ? "One section at a time, then. I'll ask what each part needs just before writing it." : "I'll write it all, then we'll go through it section by section.";
+        return { ...startWriting(s, j, pace), chat: [...j.chat, ...user, msg('ai', reply)] };
+      }
+      if (j.setup) return { ...j, walk: { ...j.walk, pace }, chat: [...j.chat, ...user] };
+      return { ...j, walk: { ...j.walk, pace }, chat: [...j.chat, ...user, msg('ai', pace === 'all' ? "I'll write the rest now." : 'One section at a time from here.')] };
+    }),
+  }));
+  ensureAsk(id);
 }
 
 /** Puts the chosen template on a job that is waiting for one, and asks for the style. `tags`: the sections of a template the user built. */
@@ -246,7 +379,8 @@ export function applyTemplate(id: string, formatKey: string, said?: string, tags
       const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), part: undefined };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
-      return { ...next, setup: 'style', chat: [...j.chat, ...user, msg('ai', `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`, STYLE_QUICK)] };
+      const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
+      return { ...next, setup: 'style', chat: [...j.chat, ...user, { ...msg('ai', text, STYLE_QUICK), step: 'setup:style' }] };
     }),
   }));
 }
@@ -258,6 +392,17 @@ export function chooseStyle(id: string, style: string[], said?: string) {
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
+      if (j.walk) {
+        const offer = !s.org.styleKept;
+        const user = said ? [msg('user', said)] : [];
+        const base: DemoJob = { ...j, style, tone: toneOf(style) };
+        const keep = `I'll write it ${describeStyle(style)}.${offer ? ' Shall I keep this style for all your jobs?' : ''}`;
+        // A job description brought with its wording is already written: it is gone through section by section.
+        const pace = j.tags.every((k) => isWritten(j, k)) ? 'all' : (j.walk.pace ?? s.pace);
+        if (!pace) return { ...base, setup: 'pace', chat: [...j.chat, ...user, msg('ai', keep, offer ? KEEP_QUICK : undefined)] };
+        const how = j.tags.every((k) => isWritten(j, k)) ? '' : j.walk.pace ? '' : pace === 'step' ? ' One section at a time, as last time (say "write it all" to change).' : ' All of it first, as last time (say "one section at a time" to change).';
+        return { ...startWriting(s, base, pace), chat: [...j.chat, ...user, msg('ai', `${keep}${how}`, offer ? KEEP_QUICK : undefined)] };
+      }
       const written = withLiveDraft(s, { ...j, style, tone: toneOf(style), setup: undefined });
       const offer = !s.org.styleKept;
       const reply = written.sections.length ? `Here is the first draft, written ${describeStyle(style)}.` : `I'll write it ${describeStyle(style)} as soon as I know the job title.`;
@@ -268,6 +413,7 @@ export function chooseStyle(id: string, style: string[], said?: string) {
       };
     }),
   }));
+  if (getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
 }
 
 /** The goals a job serves, corrected by hand (at most three); `null` goes back to reading them from the role. */
@@ -325,11 +471,19 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
     ...s,
     jobs: s.jobs.map((x) => {
       if (x.id !== id) return x;
-      const base = x.sections.length ? x.sections : buildSections(x.tags, ctxFor(s, x));
-      const sections = base.map((sec) => {
-        const w = writes.find((v) => v.key === sec.key);
-        return w ? { ...sec, lines: w.lines, ai: true, edited: undefined } : sec;
-      });
+      const base = x.walk || x.sections.length ? x.sections : buildSections(x.tags, ctxFor(s, x));
+      const format = formatOf(s, x.format);
+      const fresh: Section[] = writes.filter((w) => x.tags.includes(w.key) && !base.some((b) => b.key === w.key)).map((w) => ({ key: w.key, title: x.renamed?.[w.key] ?? headingFor(w.key, format), lines: w.lines, ai: true }));
+      const sections = inOutlineOrder(
+        [
+          ...base.map((sec) => {
+            const w = writes.find((v) => v.key === sec.key);
+            return w ? { ...sec, lines: w.lines, ai: true, edited: undefined } : sec;
+          }),
+          ...fresh,
+        ],
+        x.tags,
+      );
       const keys = changedKeys(x.sections, sections);
       if (!keys.length) return x;
       return {
@@ -348,9 +502,9 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
  * along the way. `said` is null for the first reply, whose message is already there. `askNext`: a reply that asks nothing is followed
  * by the next missing fact's question, as the rules do.
  */
-export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string }, askNext = true) {
-  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}) }] }));
-  if (askNext) ensureAsk(id);
+export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string; step?: string }, askNext = true) {
+  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}), ...(reply.step ? { step: reply.step } : {}) }] }));
+  if (askNext || getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
 }
 
 /** A template matched by name in a message: "use the UN one", "INGO role profile". */
@@ -371,8 +525,40 @@ const YES = /^(yes|yep|yeah|ok|okay|sure|fine|go ahead|sounds good|use it|that o
 function setupTurn(s: State, j: DemoJob, text: string): boolean {
   const userMsg = msg('user', text);
   const say = (reply: string, quick?: string[]) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', reply, quick)] }));
+  if (j.setup === 'pace') {
+    const t = text.trim();
+    const pace = t === PACE_QUICK[0] ? 'step' : t === PACE_QUICK[1] ? 'all' : paceIn(t);
+    if (pace) setPace(j.id, pace, text);
+    else say('Shall I write one section at a time, or all of it for you to review?', PACE_QUICK);
+    return true;
+  }
+  if (j.setup === 'template' && j.walk?.doc) {
+    const t = text.trim().toLowerCase();
+    const choice = t === DOC_QUICK[0].toLowerCase() || /\bonly\b.*\bheadings?\b|\bjust the headings\b/.test(t) ? 'headings' : t === DOC_QUICK[1].toLowerCase() || /\bsave\b/.test(t) ? 'save' : t === DOC_QUICK[2].toLowerCase() || /\bwording\b|\btext too\b|\bkeep (the|its) text\b/.test(t) ? 'wording' : null;
+    if (choice) {
+      takeDocument(j.id, choice, text);
+      return true;
+    }
+  }
   if (j.setup === 'template') {
     const rec = recommendation(s, j.format);
+    if (LINK.test(text)) {
+      say(LINK_REPLY);
+      return true;
+    }
+    if (text.trim() === USE_MINE) {
+      say("Paste it here, or drop the file (text, Word, or PDF) in the box. Then I'll ask whether to use only its headings or its wording too.");
+      return true;
+    }
+    if (text.length > 150 && readPasted(text).length >= 2) {
+      updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', `${text.slice(0, 80).trim()}…`)] }));
+      bringDocument(j.id, text);
+      return true;
+    }
+    if (text.trim() === SEE_ALL || /\bsee all\b|\ball (the )?(formats|templates)\b/i.test(text)) {
+      say('All the formats are in the template panel, by family, each with its sections and length. Choose one there, or tell me which.', [`Use ${formatOf(s, rec.key).label}`, CREATE_OWN]);
+      return true;
+    }
     if (/\b(own|scratch|myself|build|custom)\b/i.test(text)) {
       say("Let's build it: give it a name, then add, remove, rename, and order the sections. They show in the job description as you go; choose \"Use\" when it looks right.");
       return true;
@@ -391,7 +577,7 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
       say(`Close matches: ${list.map((f) => `**${f.label}** (${f.usedBy.toLowerCase()})`).join('; ')}. All of them are in the template panel, by family, each with its sections.`, list.map((f) => `Use ${f.label}`));
       return true;
     }
-    say(`Which template shall I use? I'd suggest **${formatOf(s, rec.key).label}**, or pick one in the template panel, or create your own.`, [`Use ${formatOf(s, rec.key).label}`, 'Show me others', 'Create my own']);
+    say(`Which template shall I use? I'd suggest **${formatOf(s, rec.key).label}**, or pick one in the template panel, or create your own.`, [`Use ${formatOf(s, rec.key).label}`, ...(j.walk ? [SEE_ALL, CREATE_OWN, USE_MINE] : ['Show me others', 'Create my own'])]);
     return true;
   }
   if (j.setup === 'style') {
@@ -403,6 +589,7 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
 }
 
 function replyAfterFacts(s: State, j: DemoJob, first: boolean): ChatMsg[] {
+  if (j.walk) return [];
   const out: ChatMsg[] = [];
   const mem = first ? memoryHint(s, j.facts.title) : null;
   if (first) {
@@ -431,28 +618,137 @@ function answerToText(text: string, ask: ChatMsg['ask']): string {
   return t;
 }
 
-/** Sets facts and keeps the job in step: the live draft, placeholders, and a reopened approval. */
+const FACT_WORDS: Partial<Record<keyof Facts, string>> = { title: 'job title', location: 'duty station', arrangement: 'work arrangement', contract: 'contract', grade: 'grade', deadline: 'closing date', salaryMin: 'pay', salaryMax: 'pay', salaryMode: 'pay', currency: 'pay', languages: 'languages', eligibility: 'who can apply', safeguarding: 'safeguarding level', duration: 'duration', engagement: 'kind of job' };
+
+/** An old fact's words replaced by the new one's in text written by the AI or by hand ("Juba" becomes "Wau"). */
+function replaceOld(lines: string[], was: Facts, now: Facts): string[] {
+  const pairs: Array<[string, string]> = [];
+  if (was.location && now.location && was.location !== now.location) pairs.push([was.location, now.location], [was.location.split(',')[0], now.location.split(',')[0]]);
+  if (was.deadline && now.deadline && was.deadline !== now.deadline) pairs.push([longDate(was.deadline), longDate(now.deadline)]);
+  for (const k of ['title', 'contract', 'grade', 'duration'] as const) if (was[k] && now[k] && was[k] !== now[k]) pairs.push([was[k], now[k]]);
+  if (!pairs.length) return lines;
+  return lines.map((l) => pairs.reduce((acc, [a, b]) => acc.replace(new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), b), l));
+}
+
+/**
+ * Sets facts and keeps the job in step: the live draft, placeholders, and a reopened approval. In a job written step by step, the facts
+ * set answer their questions; text written by the AI or by hand takes the new fact in place of the old; and a section already approved
+ * keeps its text until the user agrees to the changed lines (section 19, step 4).
+ */
 function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
   const format = formatOf(s, j.format);
   const tags = j.sections.length ? j.tags : orderSections(Array.from(new Set([...j.tags, ...recommendSections(format, facts)])), format);
-  return touched(withLiveDraft(s, rebuilt(s, { ...j, facts, tags, ...liveEdit(j) })));
+  const own = j.walk ? { ...j, sections: j.sections.map((x) => (x.ai || x.edited ? { ...x, lines: replaceOld(x.lines, j.facts, facts) } : x)) } : j;
+  const next = touched(withLiveDraft(s, rebuilt(s, { ...own, facts, tags, ...liveEdit(j) })));
+  if (!j.walk || !next.walk) return next;
+  const changed = (Object.keys(facts) as Array<keyof Facts>).filter((k) => JSON.stringify(facts[k]) !== JSON.stringify(j.facts[k]));
+  const walk = { ...next.walk, settled: Array.from(new Set([...next.walk.settled, ...asksOf(changed)])) };
+  const changes = next.sections
+    .filter((x) => walk.approved.includes(x.key))
+    .map((x) => ({ key: x.key, was: (j.sections.find((y) => y.key === x.key)?.lines ?? []).map((l) => fillSlots(l, facts)), now: x.lines }))
+    .filter((c) => JSON.stringify(c.was) !== JSON.stringify(c.now));
+  if (!changes.length) return { ...next, walk };
+  const what = Array.from(new Set(changed.map((k) => FACT_WORDS[k]).filter(Boolean))).join(' and ') || 'details';
+  const earlier = (walk.pending?.changes ?? []).filter((c) => !changes.some((x) => x.key === c.key));
+  return {
+    ...next,
+    sections: next.sections.map((x) => {
+      const c = changes.find((y) => y.key === x.key);
+      return c ? { ...x, lines: c.was } : x;
+    }),
+    walk: { ...walk, pending: { what, changes: [...earlier, ...changes.map((c) => ({ key: c.key, lines: c.now }))] } },
+  };
 }
 
-/** Answers a question with a fact picked in the chat (a place, a date, a contract) and asks the next one. */
-export function answerFact(id: string, patch: Partial<Facts>, said: string) {
+/** The changed lines of approved sections, put in or left out as the user says. */
+export function confirmChange(id: string, apply: boolean, said?: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const p = j.walk?.pending;
+    if (!p) return j;
+    const sections = apply ? j.sections.map((x) => ({ ...x, lines: p.changes.find((c) => c.key === x.key)?.lines ?? x.lines })) : j.sections;
+    const chat = said ? [...j.chat, msg('user', said), msg('ai', apply ? 'Changed there too.' : 'Kept the text as it was.')] : j.chat;
+    return { ...j, sections, walk: { ...j.walk!, pending: undefined }, chat, versions: apply ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Updated the ${p.what}`, sections }] : j.versions };
+  });
+  ensureAsk(id);
+}
+
+/**
+ * Answers a question with a fact picked in the chat (a place, a date, a contract) and asks the next one. `kind`: the question it answers,
+ * settled even when the answer keeps the default ("Anyone", "No grade").
+ */
+export function answerFact(id: string, patch: Partial<Facts>, said: string, kind?: AskKind) {
   if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const next = withFacts(s, j, { ...j.facts, ...patch });
-      return { ...next, chat: [...j.chat, msg('user', said), ...replyAfterFacts(s, next, false)] };
+      const walk = next.walk && kind ? { ...next.walk, settled: Array.from(new Set([...next.walk.settled, kind])) } : next.walk;
+      return { ...next, walk, chat: [...j.chat, msg('user', said), ...replyAfterFacts(s, next, false)] };
     }),
   }));
+  ensureAsk(id);
+}
+
+/** How people apply, chosen in the chat; an email address is kept only when the user gave one. */
+export function setMethod(id: string, method: ApplySettings['method'], said: string, address?: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const apply = { ...j.apply, method, ...(address ? { address } : {}) };
+      const next = rebuilt(s, touched({ ...j, apply }));
+      const walk = next.walk ? { ...next.walk, settled: Array.from(new Set([...next.walk.settled, 'method'])) } : next.walk;
+      return { ...next, walk, chat: [...j.chat, msg('user', said)] };
+    }),
+  }));
+  ensureAsk(id);
+}
+
+/** A part of step 6 answered ("None of these", "Keep them", "No, thanks"). */
+function settle(id: string, what: string, said: string, reply?: string) {
+  updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, settled: Array.from(new Set([...j.walk.settled, what])) }, chat: [...j.chat, ...(said ? [msg('user', said)] : []), ...(reply ? [msg('ai', reply)] : [])] } : j));
+}
+
+/** A question answered or declined in the AI chat ("there is no grade", "anyone can apply"). */
+export function settleQuestion(id: string, what: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (j.walk && !j.walk.settled.includes(what) ? { ...j, walk: { ...j.walk, settled: [...j.walk.settled, what] } } : j));
+}
+
+/** A section the user is happy with; the chat goes on to the next step. Also from the section's own button. */
+export function approveSection(id: string, key: string, said?: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (!j.walk || !isWritten(j, key) || j.walk.approved.includes(key) ? j : { ...j, walk: { ...j.walk, approved: [...j.walk.approved, key] }, chat: said ? [...j.chat, msg('user', said)] : j.chat }));
+  ensureAsk(id);
+}
+
+/** "All good, approve the rest": every section written so far. */
+export function approveRest(id: string, said?: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, approved: Array.from(new Set([...j.walk.approved, ...j.tags.filter((k) => isWritten(j, k))])) }, chat: said ? [...j.chat, msg('user', said)] : j.chat } : j));
+  ensureAsk(id);
+}
+
+/** A check point left as it is: nothing changes, and the check moves on. */
+export function leavePoint(id: string, key: string, said?: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, skipped: Array.from(new Set([...(j.walk.skipped ?? []), key])), awaiting: undefined }, chat: said ? [...j.chat, msg('user', said), msg('ai', 'Left as it is.')] : j.chat } : j));
+  ensureAsk(id);
+}
+
+/** Highlighted wording kept as a genuine requirement, with its one-line reason. */
+export function acceptPoint(id: string, key: string, hit: string, reason: string, said?: string) {
+  if (!ownerOnly()) return;
+  markGenuine(id, hit, reason);
+  updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, skipped: Array.from(new Set([...(j.walk.skipped ?? []), key])), awaiting: undefined }, chat: said ? [...j.chat, msg('user', said), msg('ai', 'Kept, with your reason in the job’s history.')] : j.chat } : j));
+  ensureAsk(id);
 }
 
 const EDIT_WORDS = /\b(shorter|shorten|longer|expand|add|remove|drop|delete|formal|warm|plain|simple|make|change|rewrite|undo)\b/i;
-const ASK_HINT: Record<NonNullable<ChatMsg['ask']>, string> = {
+const ASK_HINT: Record<LegacyAsk, string> = {
   title: 'a job title',
   place: 'a duty station. Pick one above, search for it, or write it like "Kampala, Uganda"',
   deadline: 'a closing date. Pick one above, choose it on the calendar, or write it like "30 November 2026"',
@@ -480,21 +776,177 @@ export function chatNote(id: string, said: string, reply: string, quick?: string
   ensureAsk(id);
 }
 
-const ASK_SET: Record<NonNullable<ChatMsg['ask']>, string> = { title: 'job title', place: 'duty station', deadline: 'closing date', contract: 'contract' };
+const ASK_SET: Record<AskKind, string> = { title: 'job title', place: 'duty station', deadline: 'closing date', contract: 'contract', grade: 'grade', eligibility: 'who can apply', languages: 'languages', safeguarding: 'safeguarding level', salary: 'pay', method: 'way to apply' };
 
 /** In the window, a fact the chat asked for and then set by hand: the chat says so and goes on to the next question. */
 export function settleAsk(id: string) {
   const j = getState().jobs.find((x) => x.id === id);
   const last = j?.chat[j.chat.length - 1];
-  if (!j || !ownerOnly() || last?.from !== 'ai' || !last.ask || !answered(last.ask, j.facts)) return;
+  if (!j || !ownerOnly() || last?.from !== 'ai' || !last.ask) return;
   const kind = last.ask;
+  if (!(j.walk ? isSettled(kind, j) : LEGACY_ASKS.includes(kind) && answered(kind, j.facts))) return;
   update((s) => ({ ...s, jobs: s.jobs.map((x) => (x.id === id ? { ...x, chat: [...x.chat, msg('ai', `You set the ${ASK_SET[kind]} by hand.`), ...replyAfterFacts(s, x, false)] } : x)) }));
+  ensureAsk(id);
 }
 
 /** The part open in the window. Moving around changes nothing in the job, so an offered undo stays. */
 export function setPart(id: string, part: string) {
   if (getState().jobs.find((j) => j.id === id)?.part === part) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, part } : j)) }), true);
+}
+
+const APPROVE = /^(?:yes|yep|yeah|ok|okay|good|great|fine|perfect|lovely|looks good|that'?s (?:good|fine|great)|that works|next|approve(?:d)?|done|all good|happy with (?:it|that)|move on|go on|continue)(?:[,.!\s]+(?:thanks|thank you|next|please|move on|go on|good))*[.!]?$/i;
+const NO_MORE = /^(?:none|no|nope|nothing|skip|not now|that'?s all|no,? thanks?)\b/i;
+const OTHER_DATE = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d\d)\b/i;
+const FILL = /\[(?!Duty station\]|Closing date\])[^\]\n]{2,40}\]/;
+
+/** A line of a section changed in the chat (a check point's new wording, a placeholder filled), as an edit with its undo. */
+function changeLine(id: string, key: string, from: (lines: string[]) => string[], note: string) {
+  updateJob(id, (j) => {
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines: from(x.lines), edited: true } : x));
+    if (JSON.stringify(sections) === JSON.stringify(j.sections)) return j;
+    return { ...touched(j), sections, ...liveEdit(j), versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note, sections }], lastChange: { keys: [key], text: note, before: j.sections, beforeTags: j.tags, beforeFacts: j.facts, beforeTone: j.tone } };
+  });
+}
+
+/**
+ * A message answering the step a job written step by step is at (section 19, steps 3 to 7), read by the rules. Returns false when it is
+ * not an answer to the step (a request about the text), which the rest of the chat then handles.
+ */
+function walkTurn(s: State, j: DemoJob, text: string): boolean {
+  const step = nextStep(j, s);
+  if (!step || !j.walk) return false;
+  const t = text.trim();
+  const say = (reply: string, quick?: string[]) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', reply, quick)] }));
+  const pace = paceIn(t);
+  if (pace && j.walk.pace && pace !== j.walk.pace && j.tags.some((k) => !isWritten(j, k))) {
+    setPace(j.id, pace, text);
+    return true;
+  }
+  const format = formatOf(s, j.format);
+  switch (step.kind) {
+    case 'change':
+      if (t === CHANGE_YES || /^(?:yes|yep|ok|okay|sure|please do|change (?:it|them))\b/i.test(t)) confirmChange(j.id, true, text);
+      else if (t === CHANGE_NO || /^(?:no|keep|leave)\b/i.test(t)) confirmChange(j.id, false, text);
+      else return false;
+      return true;
+    case 'genuine': {
+      const a = j.walk.awaiting;
+      if (!a) return false;
+      if (/^(?:never ?mind|cancel|forget it)\b/i.test(t)) {
+        updateJob(j.id, (x) => ({ ...x, walk: { ...x.walk!, awaiting: undefined }, chat: [...x.chat, msg('user', text)] }));
+        return true;
+      }
+      if (t.length < 5) return false;
+      acceptPoint(j.id, a.point, a.hit, t, text);
+      return true;
+    }
+    case 'ask': {
+      if (LEGACY_ASKS.includes(step.fact)) return false;
+      const read = readAnswer(step.fact, t, s, j);
+      if (read?.method) setMethod(j.id, read.method, text, read.address);
+      else if (read) answerFact(j.id, read.patch, text, step.fact);
+      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 6) updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', `I couldn't read that. ${WALK_ASK[step.fact]}`, undefined, step.fact), step: stepKey(step) }] }));
+      else return false;
+      return true;
+    }
+    case 'approve':
+      if (t === ALL_GOOD || /\bapprove (?:all|the rest|everything)\b/i.test(t)) approveRest(j.id, text);
+      else if (t === GOOD || APPROVE.test(t)) approveSection(j.id, step.section, text);
+      else return false;
+      return true;
+    case 'details': {
+      if (t === NONE_OF_THESE || NO_MORE.test(t)) {
+        settle(j.id, 'details', text);
+        return true;
+      }
+      const d = readDetails(t);
+      if (!Object.keys(d).length) return false;
+      update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === j.id ? { ...withFacts(st, x, { ...x.facts, ...d }), chat: [...x.chat, msg('user', text)] } : x)) }));
+      settle(j.id, 'details', '', `Added: ${Object.keys(d).map((k) => ({ positions: 'positions', directReports: 'direct reports', startDate: 'the start date', donor: 'the donor' })[k]).join(', ')}.`);
+      return true;
+    }
+    case 'fixed': {
+      if (t === KEEP_FIXED || /^(?:yes|ok|okay|keep|fine|good|sure)\b/i.test(t)) {
+        settle(j.id, 'fixed', text, 'Kept, word for word.');
+        return true;
+      }
+      if (t === 'Add them') {
+        updateJob(j.id, (x) => ({ ...touched(x), commitments: Array.from(new Set([...x.commitments, 'safeguarding', 'psea', 'fraud'])) }));
+        settle(j.id, 'fixed', text, 'Added, word for word from your settings.');
+        return true;
+      }
+      if (t === 'No fixed text') {
+        settle(j.id, 'fixed', text, 'Fine: no fixed text on this job.');
+        return true;
+      }
+      const out = /\b(?:remove|without|leave out|drop|take out|no)\b/i.test(t) ? fixedNamed(t, j.commitments) : [];
+      if (!out.length) return false;
+      updateJob(j.id, (x) => ({ ...touched(x), commitments: x.commitments.filter((c) => !out.includes(c)) }));
+      settle(j.id, 'fixed', text, `Left out for this job: ${out.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')}.`);
+      return true;
+    }
+    case 'suggest': {
+      const add = step.sections.find((k) => t.toLowerCase() === `add ${headingFor(k, format).toLowerCase()}` || new RegExp(`\\badd\\b.*\\b${(SECTION_BY_KEY[k]?.label ?? k).toLowerCase()}\\b`).test(t.toLowerCase()));
+      if (add) {
+        toggleSection(j.id, add);
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Added **${headingFor(add, format)}**.`)] }));
+        return true;
+      }
+      if (t === NO_THANKS || NO_MORE.test(t)) {
+        settle(j.id, 'suggest', text, 'Fine.');
+        return true;
+      }
+      return false;
+    }
+    case 'check': {
+      const p = step.point;
+      if (t === LEAVE_IT || /^(?:leave it|keep it|it'?s fine|ignore)\b/i.test(t)) {
+        leavePoint(j.id, p.key, text);
+        return true;
+      }
+      if (p.hit && (t === GENUINE || /\bgenuine\b/i.test(t))) {
+        updateJob(j.id, (x) => ({ ...x, walk: { ...x.walk!, awaiting: { point: p.key, hit: p.hit!, label: p.title.replace(/ in .*$/, '').replace(/[“”]/g, '') } }, chat: [...x.chat, msg('user', text)] }));
+        return true;
+      }
+      if (t === OTHER_WORDING) {
+        say('Write the new wording here, or edit the line with the pencil.');
+        return true;
+      }
+      if (/^Move it to /.test(t) && j.facts.deadline) {
+        const to = workingDay(j.facts.deadline, j.facts.iso);
+        update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === j.id ? { ...withFacts(st, x, { ...x.facts, deadline: to }), chat: [...x.chat, msg('user', text), msg('ai', `The closing date is now ${longDate(to)}.`)] } : x)) }));
+        return true;
+      }
+      if (p.section && t === 'Remove the repeat') {
+        changeLine(j.id, p.section, (ls) => ls.filter((l, i) => !l.startsWith('- ') || ls.indexOf(l) === i), 'Removed a repeated line');
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', 'Removed the repeat.')] }));
+        return true;
+      }
+      if (p.section && t === 'Use the closing date' && j.facts.deadline) {
+        changeLine(j.id, p.section, (ls) => ls.map((l) => l.replace(OTHER_DATE, longDate(j.facts.deadline))), 'Used the closing date');
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Changed to ${longDate(j.facts.deadline)}.`)] }));
+        return true;
+      }
+      if (p.section && t.split(/\s+/).length >= 2 && !EDIT_WORDS.test(t.split(/\s+/)[0]) && !isRequest(t)) {
+        const sec = p.section;
+        if (p.hit && p.line) {
+          const line = p.line;
+          changeLine(j.id, sec, (ls) => ls.map((l) => (l === line ? `${l.startsWith('- ') ? '- ' : ''}${t.replace(/^- /, '')}` : l)), 'New wording from the check');
+        } else if (p.key.startsWith('fill-')) {
+          changeLine(j.id, sec, (ls) => {
+            const at = ls.findIndex((l) => FILL.test(l));
+            return ls.map((l, i) => (i === at ? l.replace(FILL, t) : l));
+          }, 'Filled in a placeholder');
+        } else return false;
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Changed in **${x.sections.find((y) => y.key === sec)?.title ?? sec}**.`)] }));
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
 }
 
 function chatTurn(id: string, text: string, focus?: string) {
@@ -504,7 +956,8 @@ function chatTurn(id: string, text: string, focus?: string) {
   const userMsg = msg('user', text);
   const lower = text.toLowerCase();
   const lastMsg = j.chat[j.chat.length - 1];
-  const pending = lastMsg?.from === 'ai' ? lastMsg.ask : undefined;
+  const asked = lastMsg?.from === 'ai' ? lastMsg.ask : undefined;
+  const pending = asked && LEGACY_ASKS.includes(asked) ? (asked as LegacyAsk) : undefined;
   const use = text.match(/^use "(.+)"$/i);
   if (use) {
     update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === id ? { ...withFacts(st, x, { ...x.facts, title: use[1] }), chat: [...x.chat, userMsg, msg('ai', `The title is now **${use[1]}**.`)] } : x)) }));
@@ -520,6 +973,11 @@ function chatTurn(id: string, text: string, focus?: string) {
     return;
   }
   if (setupTurn(s, j, text)) return;
+  if (j.walk && LINK.test(text)) {
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', LINK_REPLY)] }));
+    return;
+  }
+  if (j.walk && walkTurn(s, j, text)) return;
   if (lower === 'start from last time') {
     const past = s.jobs.find((x) => x.status === 'closed' && x.facts.title.toLowerCase() === j.facts.title.toLowerCase());
     if (past) {
@@ -630,6 +1088,7 @@ export function setFacts(id: string, patch: Partial<Facts>) {
   const j = getState().jobs.find((x) => x.id === id);
   if (j && (Object.keys(patch) as Array<keyof Facts>).every((k) => JSON.stringify(j.facts[k]) === JSON.stringify(patch[k]))) return;
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? withFacts(s, j, { ...j.facts, ...patch }) : j)) }));
+  if (getState().jobs.find((x) => x.id === id)?.walk?.pending) ensureAsk(id);
 }
 
 export function setApply(id: string, patch: Partial<ApplySettings>) {
@@ -715,17 +1174,90 @@ export function restoreVersion(id: string, n: number) {
   notify(`Restored version ${n}`);
 }
 
+/** A job description's text read into sections by their headings, one section per kind, in the document's order. */
+function readDocument(text: string): Array<{ heading: string; key: string; lines: string[] }> {
+  const merged: Array<{ heading: string; key: string; lines: string[] }> = [];
+  for (const p of readPasted(text)) {
+    const same = merged.find((m) => m.key === p.key);
+    if (same) same.lines.push(...p.lines);
+    else merged.push({ ...p, lines: [...p.lines] });
+  }
+  return merged;
+}
+
+/**
+ * "Use one of your job descriptions" in the window (section 19, step 2): the document is read into sections, its facts are taken, and
+ * the chat asks whether to use only its headings and order (and save them as the organisation's JD format) or its wording too.
+ */
+export function bringDocument(id: string, text: string): boolean {
+  const s = getState();
+  const doc = readDocument(text);
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j?.walk || !ownerOnly()) return false;
+  if (!doc.length) {
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('ai', 'No headings or text were found in it. Headings work best on their own lines.')] }));
+    return false;
+  }
+  const { facts, role } = extractFacts(text, s.today, j.facts);
+  update((st) => ({
+    ...st,
+    jobs: st.jobs.map((x) =>
+      x.id === id
+        ? {
+            ...x,
+            facts,
+            family: x.family === 'programme' && role ? role.key : x.family,
+            walk: { ...x.walk!, doc: doc.map((d) => ({ key: d.key, title: d.heading, lines: d.lines, edited: true })) },
+            chat: [...x.chat, { ...msg('ai', `I read ${doc.length} sections from your job description: ${doc.map((d) => d.heading).join(', ')}. Shall I use only its headings and order, or its wording too, which I keep and improve rather than write anew?`, DOC_QUICK), step: 'setup:template' }],
+          }
+        : x,
+    ),
+  }));
+  return true;
+}
+
+/** A job started from a document on the Create a job page: the window opens with the question about how to use it. */
+export function startFromDocument(text: string): string | null {
+  if (!readDocument(text).length) return null;
+  const s = getState();
+  const id = nextId('job');
+  const job: DemoJob = { ...newJob(s, id, emptyFacts(), 'programme', defaultFormatKey(s)), setup: 'template', walk: { approved: [], settled: [] } };
+  job.chat = [msg('user', 'My job description')];
+  job.audit = [{ at: Date.now(), who: s.me.name, what: 'Started from an uploaded job description' }];
+  update((st) => ({ ...st, jobs: [job, ...st.jobs] }));
+  bringDocument(id, text);
+  return id;
+}
+
+/** How the document is used: its headings as the template (saved as the organisation's JD format if asked), or its wording too. */
+function takeDocument(id: string, how: 'headings' | 'save' | 'wording', said: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  const doc = j?.walk?.doc;
+  if (!j || !doc) return;
+  const order = doc.map((d) => ({ key: d.key, heading: d.title }));
+  const s = getState();
+  const key =
+    how === 'save'
+      ? createFormat(`${s.org.short} job description format`, order, j.tone)
+      : (() => {
+          const k = `pasted-${s.seq + 1}`;
+          update((st) => ({ ...st, seq: st.seq + 1, formats: [...st.formats, { key: k, label: 'The headings of your job description', family: 'Your organisation', usedBy: `Read from ${order.length} headings in your job description`, tone: j.tone, order, commitments: formatOf(st, 'house').commitments }] }));
+          return k;
+        })();
+  updateJob(id, (x) => ({ ...x, walk: { ...x.walk!, doc: undefined } }));
+  applyTemplate(id, key, said, order.map((o) => o.key));
+  if (how !== 'wording') return;
+  updateJob(id, (x) => {
+    const sections = inOutlineOrder(doc.filter((d) => x.tags.includes(d.key)), x.tags);
+    return { ...x, sections, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'Your job description, as uploaded', sections }] };
+  });
+}
+
 /** An uploaded job description becomes a job in its own JD format, keeping its wording and headings. `fromHost` marks text that stands in for a web page (the demo never fetches). */
 export function importPasted(text: string, fromHost?: string): string | null {
   const s = getState();
-  const parsed = readPasted(text);
-  if (!parsed.length) return null;
-  const merged: Array<{ heading: string; key: string; lines: string[] }> = [];
-  for (const p of parsed) {
-    const same = merged.find((m) => m.key === p.key);
-    if (same) same.lines.push(...p.lines);
-    else merged.push({ ...p });
-  }
+  const merged = readDocument(text);
+  if (!merged.length) return null;
   const { facts, role } = extractFacts(text, s.today);
   const fkey = `pasted-${s.seq + 1}`;
   const format: Format = {
@@ -769,7 +1301,7 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   update((s) => ({
     ...s,
     formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments }],
-    notice: { text: `Saved ${label}. It is under Your organisation in Select a JD format.` },
+    notice: { text: `Saved ${label}. It is under Your organisation in the template panel and on the JD formats page.` },
   }));
   return key;
 }

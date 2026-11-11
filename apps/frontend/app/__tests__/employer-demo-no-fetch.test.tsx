@@ -122,32 +122,29 @@ describe('employer demo: never calls the network', () => {
     click(/Email me a sign-in link/);
     click('Open the link (demo)');
     shows('What role are you hiring for?');
-    shows('Add:');
-    for (const [tool, inside] of [
-      ['Upload a job description, hire again, or continue a job draft', 'Continue a job draft'],
-      ['Select a JD format', 'UN Secretariat format'],
-    ] as const) {
-      const el = Array.from(container.querySelectorAll('button')).find((b) => (typeof tool === 'string' ? b.getAttribute('aria-label') === tool : tool.test(b.getAttribute('aria-label') ?? '')));
-      act(() => el?.click());
-      shows(inside);
-      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-    }
-    act(() => (Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Select a JD format') as HTMLElement).click());
-    click('Create your own JD format');
-    const nameInput = document.querySelector('input[placeholder^="For example"]') as HTMLInputElement;
+    // The template and the sections this role adds are chosen in the window's chat (round 7, phase 2), not on this screen.
+    expect(container.textContent).not.toContain('Add:');
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.getAttribute('aria-label') === 'Select a JD format')).toBe(false);
+    const plus = () => Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Upload a job description, hire again, or continue a job draft') as HTMLElement;
+    act(() => plus().click());
+    shows('Continue a job draft');
+    click('Upload a job description');
+    expect(document.querySelector('input[aria-label="Link to a job description"]')).toBeNull();
+    shows("Links can't be read: paste the text or use the file.");
+    const doc = document.querySelector('textarea[aria-label="Job description text"]') as HTMLTextAreaElement;
     act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(nameInput, 'Riverstone field roles');
-      nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(doc, 'ABOUT THE ROLE\nThe officer leads the team in Juba.\n\nRESPONSIBILITIES\n- Lead the team\n\nHOW TO APPLY\nApply online.');
+      doc.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    for (const sec of ['About us', 'Responsibilities', 'How to apply']) click(sec);
-    click('Save format');
-    const made = getState().formats.find((f) => f.label === 'Riverstone field roles');
+    click('Use this job description');
+    route(window.location.hash);
+    expect(window.location.hash).toMatch(/^#job\//);
+    shows('I read 3 sections from your job description');
+    click('Its headings, saved as our JD format');
+    const made = getState().formats.find((f) => f.label === 'Riverstone job description format');
     expect(made?.family).toBe('Your organisation');
-    expect(made?.order.map((o) => o.key)).toEqual(['about', 'responsibilities', 'apply']);
-    expect(Array.from(container.querySelectorAll('button')).some((b) => b.getAttribute('aria-label') === 'JD format: Riverstone field roles')).toBe(true);
-    const pill = container.querySelector('[aria-label="Add sections"] button');
-    act(() => (pill as HTMLElement).click());
-    expect(pill?.getAttribute('aria-pressed')).toBe('true');
+    expect(made?.order.map((o) => o.key)).toEqual(['purpose', 'responsibilities', 'apply']);
+    shows('How should it sound?');
     for (const p of [false, true]) {
       phone = p;
       render();
@@ -1228,15 +1225,20 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('.ej-w-head nav[aria-label="Parts of this job"]')).not.toBeNull();
     expect(container.querySelector('[role="tab"]')).toBeNull();
     expect(container.querySelector('.ej-line-mark')).toBeNull();
+    shows('similar nutrition roles are on AidJobs');
     click(`Use ${format.label}`);
     expect(job(id).setup).toBe('style');
+    shows(`${format.label} it is:`);
     shows('How should it sound?');
     expect(container.querySelector('[aria-label$=": its sections"]')).not.toBeNull();
     click('Yes, write it that way');
+    expect(job(id).setup).toBe('pace');
+    shows('Shall I write it one section at a time');
+    click('One section at a time');
     expect(job(id).setup).toBeUndefined();
     expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
-    shows('Here is the first draft, written');
-    shows('Where is the job based?');
+    shows('Before I write About us: Where is the job based?');
+    shows('Written when we get here.');
     expect(currentLabel()).toBe('Details');
     shows('To add');
     click('Skip to the job description');
@@ -1255,7 +1257,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     phone = false;
     render();
     route(`#job/${id}`);
-    click('Show me others');
+    click('See all formats');
     const panel = () => container.querySelector('section.ej-float') as HTMLElement;
     expect(panel().getAttribute('aria-label')).toBe('Choose a template');
     expect(container.querySelector('article[aria-label$=": its sections"]')).not.toBeNull();
@@ -1288,8 +1290,12 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(job(id).setup).toBe('style');
     expect(container.querySelector('section.ej-float')).toBeNull();
     say('warm, and short sentences');
-    expect(job(id).sections[0].title).toBe('Who we are');
     expect(job(id).style).toContain('Short sentences');
+    click("Write it all, then I'll review");
+    expect(job(id).sections[0].title).toBe('Who we are');
+    expect(job(id).tags.every((k) => job(id).sections.some((x) => x.key === k))).toBe(true);
+    shows('Here is the whole draft, written warmly, in plain English');
+    shows("in short sentences. Let's go through it.");
     part('Riverstone consultancies');
     expect(panel().getAttribute('aria-label')).toBe('Template: Riverstone consultancies');
     expect(panel().querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("This job's sections");
@@ -1585,7 +1591,8 @@ describe('employer demo: asking the chat to act', () => {
 });
 
 describe('employer demo: the AI chat, with a stand-in model on its own route', () => {
-  type Sent = { message: string; first: boolean; model?: string; context: { stage: string; job: { sections: Array<{ key: string; fixed: boolean }> }; recommendation: { key: string } } };
+  type Next = { kind: string; section?: string; sections?: Array<{ key: string }>; fact?: string };
+  type Sent = { message: string; first: boolean; silent?: boolean; model?: string; context: { stage: string; walk: { next: Next | null } | null; job: { sections: Array<{ key: string; fixed: boolean }> }; recommendation: { key: string } } };
   const flush = () =>
     act(async () => {
       for (let i = 0; i < 30; i++) await Promise.resolve();
@@ -1607,15 +1614,21 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
       stage.failNext = false;
       return { status: 502, body: { error: 'failed' } };
     }
-    const { first, context, model: chosen } = JSON.parse(body) as Sent & { model?: string };
+    const { first, silent, message, context, model: chosen } = JSON.parse(body) as Sent & { model?: string };
     const ok = (b: Record<string, unknown>): Answer => ({ status: 200, body: { ...b, model: chosen } });
+    const next = context.walk?.next;
     if (first) return ok({ reply: 'A nutrition role in Juba: I would use your usual template. Shall I?', actions: [{ type: 'ask', quick: ['Yes, use it'] }] });
     if (context.stage === 'template') return ok({ reply: 'Done. How should it sound: warm and plain?', actions: [{ type: 'use_template', template: context.recommendation.key }] });
-    if (context.stage === 'style') {
-      const writes = context.job.sections.filter((x) => !x.fixed).map((x) => ({ type: 'write_section', section: x.key, lines: [`Written by the stand-in model for ${x.key}.`] }));
-      return ok({ reply: 'Here is the first draft. Keep this style for every job?', actions: [{ type: 'set_style', style: ['Warm', 'Plain English'] }, ...writes, { type: 'write_section', section: 'apply', lines: ['Send your CV to jobs@invented.example'] }, { type: 'ask', quick: ['Keep it for all jobs', 'Just this job'] }] });
+    if (context.stage === 'style') return ok({ reply: 'Warm and plain. One section at a time, or all of it first?', actions: [{ type: 'set_style', style: ['Warm', 'Plain English'] }, { type: 'ask', quick: ['One section at a time', "Write it all, then I'll review", 'Keep it for all jobs'] }] });
+    if (message === 'Keep it for all jobs') return ok({ reply: 'Kept for every job. One section at a time, or all of it first?', actions: [{ type: 'keep_style', all: true }] });
+    if (context.stage === 'pace') return ok({ reply: 'One section at a time, then.', actions: [{ type: 'set_pace', pace: 'step' }] });
+    if (silent && next?.kind === 'write') {
+      const writes = (next.sections ?? []).map((x) => ({ type: 'write_section', section: x.key, lines: [`Written by the stand-in model for ${x.key}.`] }));
+      return ok({ reply: 'Here it is. Good, or change something?', actions: [...writes, { type: 'write_section', section: 'apply', lines: ['Send your CV to jobs@invented.example'] }, { type: 'ask', quick: ['Good, next'] }] });
     }
-    return ok({ reply: 'Kept for every job.', actions: [{ type: 'keep_style', all: true }] });
+    if (next?.kind === 'ask') return ok({ reply: `Noted. ${next.fact === 'grade' ? 'And the grade?' : 'Next question?'}`, actions: next.fact === 'contract' ? [{ type: 'set_facts', facts: { contract: 'fixed-term' } }] : next.fact === 'grade' ? [{ type: 'settle', fact: 'grade' }] : [] });
+    if (next?.kind === 'approve') return ok({ reply: 'Good. On we go.', actions: [{ type: 'approve_section', section: next.section }] });
+    return ok({ reply: 'Done.', actions: [] });
   };
 
   afterAll(() => {
@@ -1669,20 +1682,51 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     await flush();
     expect(posts().at(-1)?.model).toBe('sonnet');
     expect(job().chat.filter((m) => m.ai).map((m) => m.by)).toEqual(['GPT-6.1 Terra', 'GPT-6.1 Terra', 'Claude Sonnet 5.5']);
-    expect(job().setup).toBeUndefined();
-    const written = job().sections.filter((x) => x.ai);
-    expect(written.length).toBe(job().sections.filter((x) => x.key !== 'about' && x.key !== 'apply').length);
-    expect(job().sections.find((x) => x.key === 'apply')?.lines.join(' ')).not.toContain('invented.example');
-    shows('Written by the stand-in model for');
-    shows('Not done:');
-    shows('written from your settings');
-    expect(job().chat.filter((m) => m.ai).map((m) => m.text.slice(0, 20))).toEqual(['A nutrition role in ', 'Done. How should it ', 'Here is the first dr']);
-    expect(job().chat.some((m) => /First, the template\.|Here is the first draft, written|How should it sound\? /.test(m.text))).toBe(false);
+    expect(job().setup).toBe('pace');
+    expect(job().sections).toEqual([]);
+    expect(job().chat.some((m) => /First, the template\.|How should it sound\? |Shall I write it one section at a time/.test(m.text))).toBe(false);
 
     click('Keep it for all jobs');
     await flush();
     expect(posts().at(-1)?.message).toBe('Keep it for all jobs');
     expect(getState().org.styleKept).toBe(true);
+
+    say('One section at a time');
+    await flush();
+    expect(job().setup).toBeUndefined();
+    expect(job().sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    shows('Before I write About us: What kind of contract is it?');
+    say('Fixed-term');
+    await flush();
+    expect(job().facts.contract).toBe('Fixed-term');
+    expect(posts().at(-1)?.context.walk?.next).toMatchObject({ kind: 'ask', fact: 'contract' });
+    say('No grade');
+    await flush();
+    expect(job().walk?.settled).toContain('grade');
+    expect(job().chat.at(-1)).toMatchObject({ ai: true, step: 'approve:about' });
+
+    say('Good');
+    await flush();
+    await flush();
+    expect(job().walk?.approved).toEqual(['about']);
+    const goOn = posts().at(-1)!;
+    expect(goOn).toMatchObject({ silent: true, message: 'Go on with the next step: write it now.', context: { walk: { next: { kind: 'write', sections: [{ key: 'purpose' }] } } } });
+    expect(job().sections.find((x) => x.key === 'purpose')).toMatchObject({ lines: ['Written by the stand-in model for purpose.'], ai: true });
+    expect(job().sections.find((x) => x.key === 'apply')?.lines.join(' ')).not.toContain('invented.example');
+    shows('Written by the stand-in model for');
+    shows('Not done:');
+    shows('written from your settings');
+    expect(job().chat.at(-1)).toMatchObject({ ai: true, step: 'approve:purpose' });
+    expect(job().chat.filter((m) => m.from === 'user').map((m) => m.text)).not.toContain('Go on with the next step: write it now.');
+
+    say('Good');
+    stage.failNext = true;
+    await flush();
+    await flush();
+    expect(job().walk?.approved).toEqual(['about', 'purpose']);
+    expect(job().sections.find((x) => x.key === 'responsibilities')?.ai).toBeUndefined();
+    expect(job().sections.find((x) => x.key === 'responsibilities')?.lines.length).toBeGreaterThan(2);
+    shows("The AI could not answer just now, so the demo's own rules did.");
 
     stage.failNext = true;
     say('shorter');

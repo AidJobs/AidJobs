@@ -72,6 +72,26 @@ export function wordsOf(format: Format): number {
   return wordsFor(format.order.length);
 }
 
+/** What a template's content is like, for the overview before anything is written (section 19, step 3). */
+const CONTENT: Record<string, string> = {
+  'un-secretariat': 'formal and in the third person: the office and reporting line, duties within delegated authority, the Secretariat competencies, education and experience by grade, and the working languages',
+  'un-agency': 'formal and in the third person: the programme background, duties in function groups, the institutional arrangement, the UN competencies, and the education and experience rules',
+  'ingo-role-profile': 'formal and in the third person: the role purpose, its scope (reporting line, budget, safeguarding level), the key areas of accountability in groups, behaviours, and essential and desirable criteria',
+  'ingo-purpose': "the team's purpose, the job's purpose, the key responsibilities, then what we are looking for and what we offer",
+  'about-you': 'warm and in the second person: the opportunity, the key responsibilities, about you, and what we offer',
+  'field-profile': 'plain and operational: the main purpose, accountabilities by area, working relationships, requirements, and the conditions of the duty station',
+  donor: 'formal and precise: the programme, your tasks, your profile, and what we offer',
+  contractor: 'formal and specific: the position overview, responsibilities, deliverables, and qualifications',
+  'local-concise': 'short and direct, for readers on a phone: the project brief, the purpose, the key responsibilities, and qualifications',
+  charity: 'warm and inclusive: about the role, what you will do, about you, and why join us',
+};
+
+const FAMILY_OF: Record<State['org']['orgType'], string> = { ingo: 'an INGO', ngo: 'a national NGO', un: 'a UN agency', charity: 'a charity', donor: 'a government donor', contractor: 'a development contractor' };
+
+export function contentOf(format: Format, orgType: State['org']['orgType']): string {
+  return CONTENT[format.key] ?? `your own headings in your order, each written to the depth of ${FAMILY_OF[orgType]}'s job descriptions`;
+}
+
 /** The template the chat recommends, with its reason, and the close matches it offers next. */
 export function recommendation(s: State, defaultKey: string): { key: string; reason: string; others: string[] } {
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));

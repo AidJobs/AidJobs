@@ -1,6 +1,7 @@
 import { formatOf, missingFacts } from './actions';
 import { openPoints } from './Checks';
 import { headingFor } from './engine';
+import { ASKS, checkPoints, isSettled } from './flow';
 import { canGoFree } from './plans';
 import type { DemoJob, State } from './types';
 
@@ -15,20 +16,25 @@ export function sectionOf(part: string): string | null {
   return part.startsWith('s:') ? part.slice(2) : null;
 }
 
-/** The parts in the line's order: the sections first, then the details, the fixed text, the check, and publishing. */
+/**
+ * The parts in the line's order: the sections first, then the details, the fixed text, the check, and publishing. A job written step by
+ * step ticks a section off when it is approved, and the details, the fixed text, and the check when their steps are answered.
+ */
 export function partsOf(job: DemoJob, s: State): Part[] {
   const format = formatOf(s, job.format);
   const amplify = Boolean(job.paidFor) || !canGoFree(s, job.id, null);
+  const walk = job.walk;
   const sections = job.tags.map((k): Part => {
     const sec = job.sections.find((x) => x.key === k);
-    return { key: sectionPart(k), label: sec?.title ?? headingFor(k, format), section: k, done: Boolean(sec?.lines.length) && !sec?.lines.some((l) => PLACEHOLDER.test(l)) };
+    const written = Boolean(sec?.lines.length);
+    return { key: sectionPart(k), label: sec?.title ?? job.renamed?.[k] ?? headingFor(k, format), section: k, done: walk ? written && walk.approved.includes(k) : written && !sec?.lines.some((l) => PLACEHOLDER.test(l)) };
   });
   return [
     { key: 'outline', label: format.label, done: !job.setup },
     ...sections,
-    { key: 'details', label: 'Details', done: missingFacts(job.facts).length === 0 },
-    { key: 'fixed', label: 'Fixed text', done: job.commitments.length > 0 },
-    { key: 'check', label: 'Check', done: job.sections.length > 0 && openPoints(job, s, amplify).length === 0 },
+    { key: 'details', label: 'Details', done: walk ? ASKS.every((k) => isSettled(k, job)) && isSettled('details', job) : missingFacts(job.facts).length === 0 },
+    { key: 'fixed', label: 'Fixed text', done: walk ? isSettled('fixed', job) : job.commitments.length > 0 },
+    { key: 'check', label: 'Check', done: walk ? job.sections.length > 0 && !job.setup && checkPoints(job, s).length === 0 : job.sections.length > 0 && openPoints(job, s, amplify).length === 0 },
     { key: 'publish', label: 'Publish', done: ['scheduled', 'live', 'closed'].includes(job.status) },
   ];
 }

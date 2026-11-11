@@ -4,15 +4,18 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyTemplate, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, sendChat, setPart, setSdgs, settleAsk } from './actions';
-import { aiOn, askAi, probeAi, useAi } from './ai';
+import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, LINK_REPLY, sendChat, setPart, setSdgs, settleAsk, writeNow } from './actions';
+import { aiOn, askAi, GO_ON, probeAi, useAi } from './ai';
+import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
+import { readJobFile } from './readFile';
+import { OTHER_WORDING } from './walkChat';
 import type { OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
 import { READING_KEY } from './CreateEntry';
 import { ApplyFields, AskAnswer, DocumentView, rich, TitleEditor } from './DocPane';
-import { arrangementLabel, completeText, longDate, PLACES, salaryText } from './engine';
+import { arrangementLabel, completeText, headingFor, longDate, PLACES, salaryText } from './engine';
 import { FactDialog, typeLabel, type FactKey } from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
@@ -38,7 +41,8 @@ const DELETE = /^(please\s+)?(delete|discard) (this|the) (job|draft|job draft)\b
 const PUBLISH = /^(please\s+)?(publish|post it|go live|schedule)\b/;
 const REVIEW = /^(please\s+)?(send|submit|ask)\b.*\breview/;
 const OWN = /\b(own|scratch|myself|build|custom)\b/i;
-const OTHERS = /\b(other|others|more|show|options|different|alternatives?|else)\b/i;
+const OTHERS = /\b(other|others|more|show|options|different|alternatives?|else)\b|\bsee all\b/i;
+const LINK = /^\s*(?:https?:\/\/|www\.)\S+\s*$/i;
 const OPEN_PUBLISH = 'Open Check and publish';
 const OPEN_EARLIER = 'Open the earlier workspace';
 const SPLIT_KEY = 'aidjobs.employerDemo.windowSplit';
@@ -418,13 +422,13 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
   const end = useRef<HTMLDivElement>(null);
   const ai = useAi();
   const waiting = ai.pending[job.id];
-  const thinking = Boolean(waiting) && !waiting?.first;
+  const thinking = Boolean(waiting) && !waiting?.first && !waiting?.silent;
   const busy = Boolean(waiting) || reading;
   const firstUser = job.chat.findIndex((m) => m.from === 'user');
   const shown = reading ? job.chat.slice(0, firstUser + 1) : job.chat;
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' });
-  }, [shown.length, thinking]);
+  }, [shown.length, thinking, waiting?.silent]);
   const reviewing = Boolean(s.reviewerAs);
   const lastUser = shown.map((m) => m.from).lastIndexOf('user');
   const last = shown[shown.length - 1];
@@ -472,6 +476,11 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
             </div>
           </>
         )}
+        {waiting?.silent && (
+          <div className="ej-bubble ej-reading" data-from="ai" role="status">
+            Writing {waiting.silent}…
+          </div>
+        )}
         <div ref={end} />
       </div>
       <div className="shrink-0 border-t px-3 pb-2.5 aj-hair">
@@ -509,11 +518,21 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
                 setText('');
               }}
               suggestion={completeText(text, own)}
-              placeholder={job.setup === 'template' ? 'Answer here, or choose a template' : last?.ask ? 'Answer here, or pick above' : `Ask about ${subject}, or anything else`}
+              placeholder={job.setup === 'template' ? 'Answer here, choose a template, or drop your own job description' : last?.ask ? 'Answer here, or pick above' : `Ask about ${subject}, or anything else`}
               label="Message AidJobs about this job"
               compact
               autoFocus={autoFocus}
               minHeight={box}
+              onFile={
+                job.setup === 'template' && !busy
+                  ? (file) =>
+                      void readJobFile(file).then((r) => {
+                        if (r.error) return chatNote(job.id, file.name, r.error);
+                        chatNote(job.id, file.name, 'Reading it…');
+                        bringDocument(job.id, r.text ?? '');
+                      })
+                  : undefined
+              }
             />
             {ai.status === 'on' && <p className="ej-ai-note m-0">Messages go to an AI model through {ai.provider || 'an AI provider'}. Use sample details only.</p>}
           </>
@@ -662,10 +681,47 @@ function JobWindow({ id }: { id: string }) {
     if (askId) setPart(job.id, 'details');
   }, [askId, job]);
 
+  // The line follows a new employer's writing: each step brings its part into view.
+  const step = nextStep(job, s);
+  const stepNow = stepKey(step);
+  const seenStep = useRef(stepNow);
+  useEffect(() => {
+    if (stepNow === seenStep.current || reading) return;
+    seenStep.current = stepNow;
+    const p = partOfStep(step, job);
+    if (!p || s.reviewerAs) return;
+    setPart(job.id, p);
+    const sec = sectionOf(p);
+    scrollToId(sec && p !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');
+  }, [stepNow, step, job, reading, s.reviewerAs]);
+
+  // A section reached in the writing is written by the AI when it is on; if it cannot, the rules write it.
+  const ai = useAi();
+  const writeKey = step?.kind === 'write' ? step.sections.filter((k) => !FIXED_SECTIONS.includes(k)).join(',') : '';
+  const busyAi = Boolean(ai.pending[job.id]);
+  const askedToWrite = useRef('');
+  useEffect(() => {
+    if (!writeKey || reading || s.reviewerAs || busyAi || askedToWrite.current === `${job.id}:${writeKey}`) return;
+    if (ai.status === 'off') {
+      writeNow(job.id);
+      return;
+    }
+    if (ai.status !== 'on') return;
+    askedToWrite.current = `${job.id}:${writeKey}`;
+    const keys = writeKey.split(',');
+    const j0 = getState().jobs.find((x) => x.id === job.id);
+    const label = keys.length > 1 ? 'the whole draft' : (j0?.renamed?.[keys[0]] ?? headingFor(keys[0], formatOf(getState(), j0?.format ?? '')));
+    void askAi(job.id, GO_ON, { silent: label, focus: keys[0], open: (x) => openRef.current(x) }).then(() => {
+      const j = getState().jobs.find((x) => x.id === job.id);
+      const now = j ? nextStep(j, getState()) : null;
+      if (now?.kind === 'write' && now.sections.filter((k) => !FIXED_SECTIONS.includes(k)).join(',') === writeKey) writeNow(job.id);
+    });
+  }, [writeKey, reading, s.reviewerAs, busyAi, ai.status, job.id]);
+
   const reviewing = Boolean(s.reviewerAs);
   const parts = partsOf(job, s);
   const current = currentPart(job, s, parts);
-  const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : (parts.find((p) => p.key === current)?.label ?? 'the job');
+  const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : job.setup === 'pace' ? 'Pace' : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = LANGS.filter((l) => job.translations?.[l.key]);
   const tabs: TabDef[] = [{ key: 'doc', label: 'Job description' }, ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })), ...(preview ? [{ key: 'preview', label: 'Preview' }] : [])];
@@ -733,6 +789,7 @@ function JobWindow({ id }: { id: string }) {
     const t = text.toLowerCase().trim();
     if (t === OPEN_PUBLISH.toLowerCase()) return go('publish', job.id);
     if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
+    if (LINK.test(t)) return chatNote(job.id, text, LINK_REPLY);
     if (PREVIEW.test(t) && !job.setup) {
       openPreview();
       return chatNote(job.id, text, 'The preview is open in the panel: the job page, how it shows in Google, and how it looks when shared.');
@@ -753,7 +810,7 @@ function JobWindow({ id }: { id: string }) {
     if (PUBLISH.test(t)) return chatNote(job.id, text, 'For now, publishing is on the Check and publish page.', isReviewable(job) ? [OPEN_PUBLISH] : undefined);
     if (REVIEW.test(t)) return chatNote(job.id, text, 'For now, review is in the earlier workspace, in its Review panel.', [OPEN_EARLIER]);
     const last = job.chat[job.chat.length - 1];
-    const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text));
+    const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
     if (aiOn() && !rulesAnswer) {
       void askAi(job.id, text, { focus: focus ?? undefined, open: (x) => openRef.current(x) }).then((done) => {
         if (!done) byRules(text);
@@ -779,9 +836,9 @@ function JobWindow({ id }: { id: string }) {
       const name = pick.tab === 'own' ? pick.name.trim() || 'Your template' : formatOf(s, pick.key).label;
       return <HeadingsPreview order={pickOrder} title={name} note={`${pickOrder.length} sections · about ${wordsFor(pickOrder.length)} words · ${job.setup ? 'choose Use in the template panel to start writing' : 'choose Change to use it; text you edited is kept where its section stays'}`} />;
     }
-    if (job.setup === 'style') {
+    if (job.setup === 'style' || job.setup === 'pace') {
       const format = formatOf(s, job.format);
-      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: format.order.find((o) => o.key === k)?.heading ?? k }))} title={format.label} note="Choose in the chat how it should sound; then it is written in these sections." />;
+      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: job.sections.find((x) => x.key === k)?.title ?? headingFor(k, format) }))} title={format.label} note={job.setup === 'style' ? 'Choose in the chat how it should sound; then it is written in these sections.' : 'Choose in the chat whether to write one section at a time or all of it first.'} />;
     }
     return (
       <div className="aj-card flex flex-col items-center gap-3 p-8 text-center aj-muted">

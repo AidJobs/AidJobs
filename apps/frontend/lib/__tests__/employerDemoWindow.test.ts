@@ -1,8 +1,30 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { changeWithUndo, getState, resetDemo, update } from '../../components/employer-demo/store';
-import { applyOrgSdgs, applyTemplate, chatNote, chooseStyle, editSection, formatOf, sendChat, setFacts, setPart, setSdgs, settleAsk, startJob } from '../../components/employer-demo/actions';
+import { changeWithUndo, getState, normalise, resetDemo, update } from '../../components/employer-demo/store';
+import {
+  answerFact,
+  applyOrgSdgs,
+  applyTemplate,
+  approveSection,
+  chatNote,
+  chooseStyle,
+  DOC_QUICK,
+  editSection,
+  formatOf,
+  LINK_REPLY,
+  sendChat,
+  setFacts,
+  setPace,
+  setPart,
+  setSdgs,
+  settleAsk,
+  startFromDocument,
+  startJob,
+  writeSections,
+} from '../../components/employer-demo/actions';
 import { currentPart, lineFit, onLine, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
-import { COMMITMENTS, commitmentText } from '../../components/employer-demo/engine';
+import { addDays, COMMITMENTS, commitmentText } from '../../components/employer-demo/engine';
+import { nextStep } from '../../components/employer-demo/flow';
+import { PACE_QUICK } from '../../components/employer-demo/walkChat';
 import { describeStyle, inferSdgs, proposedStyle, sdgLead, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -163,24 +185,34 @@ describe('the window, revised: the template comes first, then the style, then th
     expect(job(yes).setup).toBe('style');
   });
 
-  it('the style is taken from any reply; the first draft is written in it, the facts are asked, and keeping it fills in the organisation', () => {
+  it('the overview, then the style from any reply; then the pace, remembered for the next job; keeping the style fills in the organisation', () => {
     const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
     applyTemplate(id, job(id).format);
+    expect(job(id).chat.at(-1)?.text).toMatch(/^\*\*Riverstone format\*\* it is: \d+ sections, about \d+ words, your own headings in your order, each written to the depth of an INGO's job descriptions\. How should it sound\?/);
     sendChat(id, 'more formal please, and short sentences');
-    expect(job(id).setup).toBeUndefined();
+    expect(job(id).setup).toBe('pace');
     expect(job(id).style).toContain('Formal');
     expect(job(id).style).toContain('Short sentences');
     expect(job(id).style).not.toContain('Warm');
     expect(job(id).tone).toBe('formal');
-    expect(job(id).sections.length).toBeGreaterThan(2);
-    expect(job(id).chat.at(-1)?.ask).toBe('place');
+    expect(job(id).sections).toEqual([]);
     expect(job(id).chat.at(-2)?.quick).toEqual(['Keep it for all jobs', 'Just this job']);
+    expect(job(id).chat.at(-1)?.quick).toEqual(PACE_QUICK);
     sendChat(id, 'Keep it for all jobs');
     expect(getState().org.voice).toEqual(job(id).style);
     expect(getState().org.styleKept).toBe(true);
+    expect(job(id).chat.at(-1)?.quick).toEqual(PACE_QUICK);
+    sendChat(id, 'One section at a time');
+    expect(job(id).setup).toBeUndefined();
+    expect(getState().pace).toBe('step');
+    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    expect(job(id).chat.at(-1)).toMatchObject({ text: 'Before I write **About us**: Where is the job based?', ask: 'place', step: 'ask:place' });
     const next = startJob('We are hiring a Health Officer', undefined, [], true);
     applyTemplate(next, job(next).format);
     chooseStyle(next, proposedStyle(getState()));
+    expect(job(next).setup).toBeUndefined();
+    expect(job(next).walk?.pace).toBe('step');
+    expect(job(next).chat.some((m) => m.text.includes('One section at a time, as last time'))).toBe(true);
     expect(job(next).chat.some((m) => m.quick?.includes('Keep it for all jobs'))).toBe(false);
   });
 
@@ -195,6 +227,164 @@ describe('the window, revised: the template comes first, then the style, then th
     expect(styleFromReply(['Warm', 'Plain English'], 'make it more professional')).toEqual(['Formal', 'Plain English']);
     expect(toneOf(['Plain English'])).toBe('plain');
     expect(toneOf(['Warm', 'Formal'])).toBe('formal');
+  });
+});
+
+describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to 7', () => {
+  const ask = (id: string) => job(id).chat.at(-1)?.ask;
+  const step = (id: string) => nextStep(job(id), getState());
+  const ready = (text: string, pace: 'step' | 'all') => {
+    const id = startJob(text, undefined, [], true);
+    applyTemplate(id, job(id).format);
+    chooseStyle(id, ['Warm']);
+    setPace(id, pace);
+    return id;
+  };
+
+  it('one section at a time: each fact just before its section, then the section written and approved, in order', () => {
+    const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'step');
+    expect(job(id).tags).toEqual(['about', 'purpose', 'responsibilities', 'requirements', 'offer', 'conditions', 'apply']);
+    expect(ask(id)).toBe('grade');
+    sendChat(id, 'no grade');
+    expect(step(id)).toEqual({ kind: 'approve', section: 'about' });
+    expect(job(id).chat.at(-1)?.text).toBe('**About us** comes from your organisation profile, word for word. Good as it is?');
+    sendChat(id, 'Good, next');
+    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'purpose', 'apply']);
+    expect(job(id).chat.at(-1)?.text).toBe('Here is **The role**. Good, or change something?');
+    expect(partsOf(job(id), getState()).find((p) => p.key === 's:purpose')?.done).toBe(false);
+    sendChat(id, 'The post holder travels to field sites twice a month', 'purpose');
+    expect(job(id).chat.at(-1)?.text).toBe('**The role**: good now, or change something else?');
+    approveSection(id, 'purpose');
+    expect(partsOf(job(id), getState()).find((p) => p.key === 's:purpose')?.done).toBe(true);
+    expect(job(id).chat.at(-1)?.text).toBe('Here is **What you will do**. Good, or change something?');
+    sendChat(id, 'looks good');
+    expect(ask(id)).toBe('eligibility');
+    expect(job(id).chat.at(-1)?.text).toMatch(/^Before I write \*\*What you will bring\*\*: Who can apply/);
+    sendChat(id, 'nationals only');
+    expect(job(id).facts.eligibility).toBe('nationals');
+    expect(ask(id)).toBe('languages');
+    answerFact(id, { languages: ['English', 'Arabic'] }, 'English and Arabic', 'languages');
+    expect(ask(id)).toBe('safeguarding');
+    sendChat(id, 'medium');
+    expect(step(id)).toEqual({ kind: 'approve', section: 'requirements' });
+    sendChat(id, 'ok');
+    expect(ask(id)).toBe('salary');
+    sendChat(id, "don't show it");
+    expect(job(id).facts.salaryMode).toBe('hidden');
+    sendChat(id, 'Good, next');
+    sendChat(id, 'Good, next');
+    expect(ask(id)).toBe('deadline');
+    answerFact(id, { deadline: addDays(getState().today, 30) }, 'in a month', 'deadline');
+    expect(ask(id)).toBe('method');
+    sendChat(id, 'by email');
+    expect(job(id).apply.method).toBe('email');
+    expect(step(id)).toEqual({ kind: 'approve', section: 'apply' });
+    sendChat(id, 'Good, next');
+    expect(step(id)).toEqual({ kind: 'details' });
+    sendChat(id, '2 positions, starting in January');
+    expect(job(id).facts).toMatchObject({ positions: '2', startDate: 'January' });
+    expect(step(id)).toEqual({ kind: 'fixed' });
+    expect(job(id).chat.at(-1)?.text).toMatch(/^Then your organisation's fixed text, added word for word from your settings: Safeguarding, PSEA/);
+    sendChat(id, 'leave out the misconduct disclosure scheme');
+    expect(job(id).commitments).not.toContain('mds');
+    expect(step(id)?.kind).toBe('suggest');
+    sendChat(id, 'No, thanks');
+    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it');
+    expect(step(id)).toEqual({ kind: 'done' });
+    expect(job(id).chat.at(-1)?.step).toBe('done');
+    expect(partsOf(job(id), getState()).filter((p) => p.key !== 'publish').every((p) => p.done)).toBe(true);
+    sendChat(id, 'thanks');
+    expect(job(id).chat.filter((m) => m.step === 'done')).toHaveLength(1);
+  });
+
+  it('write it all: the whole draft at once with placeholders, then each fact just before its section is approved; "approve the rest"', () => {
+    const id = ready("We're hiring a Nutrition Officer, fixed-term", 'all');
+    expect(job(id).tags.every((k) => job(id).sections.some((x) => x.key === k))).toBe(true);
+    expect(JSON.stringify(job(id).sections)).toContain('[Duty station]');
+    expect(job(id).chat.at(-1)).toMatchObject({ ask: 'place' });
+    expect(job(id).chat.at(-1)?.text).toMatch(/^Here is the whole draft, written warmly\. Let's go through it\. Before you approve \*\*About us\*\*: Where is the job based\?/);
+    sendChat(id, 'Goma');
+    expect(JSON.stringify(job(id).sections)).not.toContain('[Duty station]');
+    sendChat(id, 'no grade');
+    expect(job(id).chat.at(-1)?.text).toBe('**About us** comes from your organisation profile, word for word. Good as it is?');
+    expect(job(id).chat.at(-1)?.quick).toEqual(['Good, next', 'All good, approve the rest']);
+    sendChat(id, 'All good, approve the rest');
+    expect(job(id).walk?.approved).toEqual(job(id).tags);
+    expect(ask(id)).toBe('eligibility');
+    expect(job(id).chat.at(-1)?.text).toMatch(/^For the listing: Who can apply/);
+  });
+
+  it('a fact changed after its section was approved: the changed lines are shown, and go in only with a yes', () => {
+    const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term, no grade", 'step');
+    sendChat(id, 'no grade');
+    sendChat(id, 'Good, next');
+    sendChat(id, 'Good, next');
+    expect(job(id).walk?.approved).toEqual(['about', 'purpose']);
+    const before = job(id).sections.find((x) => x.key === 'purpose')!.lines;
+    expect(before.join(' ')).toContain('Juba');
+    setFacts(id, { location: 'Goma, DR Congo', country: 'DR Congo', iso: 'CD' });
+    expect(job(id).sections.find((x) => x.key === 'purpose')!.lines).toEqual(before);
+    expect(step(id)).toEqual({ kind: 'change' });
+    expect(job(id).chat.at(-1)?.text).toMatch(/^You changed the duty station, and a section you approved mentions it\.\nIn \*\*The role\*\*: “.*Juba.*” becomes “.*Goma.*”\.\nChange it there too\?$/);
+    sendChat(id, 'Yes, change it');
+    expect(job(id).sections.find((x) => x.key === 'purpose')!.lines.join(' ')).toContain('Goma');
+    expect(step(id)).toEqual({ kind: 'approve', section: 'responsibilities' });
+  });
+
+  it('text written by the AI or by hand takes the new fact in place of the old', () => {
+    const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'step');
+    writeSections(id, [{ key: 'purpose', lines: ['Based in Juba, the post holder runs screening.'] }], 'AI');
+    setFacts(id, { location: 'Goma, DR Congo', country: 'DR Congo', iso: 'CD' });
+    expect(job(id).sections.find((x) => x.key === 'purpose')!.lines).toEqual(['Based in Goma, the post holder runs screening.']);
+  });
+
+  it('the basic check, point by point: a genuine requirement with its reason, new wording, or left as it is', () => {
+    const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'all');
+    editSection(id, 'requirements', 'Essential:\n- A young graduate in nutrition\n- Fluent in Arabic, a native speaker preferred');
+    setFacts(id, { deadline: addDays(getState().today, 30) });
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: ['grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'details', 'fixed', 'suggest'] } } : j)) }));
+    chatNote(id, 'show the preview', 'The preview is open.');
+    const first = step(id);
+    expect(first?.kind).toBe('check');
+    expect(job(id).chat.at(-1)?.text).toMatch(/^From the basic check: \*\*“young” in What you will bring\*\*\./);
+    expect(job(id).chat.at(-1)?.quick).toEqual(["It's a genuine requirement", 'Leave it']);
+    sendChat(id, "It's a genuine requirement");
+    expect(job(id).chat.at(-1)?.text).toBe('In a line, why is “young” a genuine requirement of this job?');
+    sendChat(id, 'A graduate scheme for people under 25');
+    expect(Object.values(job(id).genuine)).toEqual(['A graduate scheme for people under 25']);
+    expect(job(id).chat.at(-1)?.text).toMatch(/^From the basic check: \*\*“native speaker”/);
+    sendChat(id, 'Fluent in Arabic');
+    expect(job(id).sections.find((x) => x.key === 'requirements')?.lines).toContain('- Fluent in Arabic');
+    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it');
+    expect(step(id)).toEqual({ kind: 'done' });
+  });
+
+  it('a link is not read; a pasted job description is used by its headings or with its wording', () => {
+    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    sendChat(id, 'https://careers.example.org/jobs/123');
+    expect(job(id).chat.at(-1)?.text).toBe(LINK_REPLY);
+    const doc = `ABOUT THE ROLE\nThe officer leads nutrition screening in Juba with two partners and community volunteers across the county.\n\nRESPONSIBILITIES\n- Lead screening\n- Train volunteers\n- Report monthly\n\nHOW TO APPLY\nApply online with a CV and a letter before the closing date, through the careers page.`;
+    sendChat(id, doc);
+    expect(job(id).chat.at(-1)?.quick).toEqual(DOC_QUICK);
+    sendChat(id, 'Its wording too');
+    expect(job(id).setup).toBe('style');
+    expect(job(id).sections.find((x) => x.key === 'responsibilities')).toMatchObject({ lines: ['- Lead screening', '- Train volunteers', '- Report monthly'], edited: true });
+    chooseStyle(id, ['Warm']);
+    expect(job(id).setup).toBeUndefined();
+    expect(job(id).walk?.pace).toBe('all');
+    const fromDoc = startFromDocument(doc)!;
+    expect(job(fromDoc).chat.at(-1)?.text).toMatch(/^I read 3 sections from your job description/);
+    sendChat(fromDoc, 'Only its headings and order');
+    expect(job(fromDoc).sections).toEqual([]);
+    expect(formatOf(getState(), job(fromDoc).format).order.map((o) => o.key)).toEqual(['purpose', 'responsibilities', 'apply']);
+  });
+
+  it('a job saved by an earlier version while choosing its template is brought forward; jobs already written are left as they are', () => {
+    const s = getState();
+    const old = { ...s.jobs[0], id: 'old-window', setup: 'style' as const, walk: undefined };
+    const out = normalise({ ...s, jobs: [old, ...s.jobs] });
+    expect(out.jobs[0].walk).toEqual({ approved: [], settled: [] });
+    expect(out.jobs.slice(1).every((j) => !j.walk)).toBe(true);
   });
 });
 

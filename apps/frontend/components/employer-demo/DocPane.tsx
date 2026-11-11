@@ -3,11 +3,11 @@
 import { AlertCircle, Check, CheckCircle2, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, answerFact, changedSinceLastRound, dismissChange, editSection, markGenuine, sendChat, setApply, setFacts, settleRemark, undoLastChange } from './actions';
-import { contractPicks, deadlinePicks, placePatch, placePicks } from './answers';
+import { addRemark, answerFact, approveSection, changedSinceLastRound, dismissChange, editSection, formatOf, markGenuine, sendChat, setApply, setFacts, setMethod, settleRemark, undoLastChange } from './actions';
+import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import Composer, { type ComposerHandle } from './Composer';
-import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
+import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
@@ -223,6 +223,11 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </span>
         )}
         {sec.edited && <span className="aj-chip">Your text</span>}
+        {job.walk && !job.setup && !reviewing && sec.lines.length > 0 && !job.walk.approved.includes(sec.key) && (
+          <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
+            <Check size={12} strokeWidth={2} aria-hidden /> Approve
+          </button>
+        )}
         {!reviewing && sec.key === 'apply' && (
           <Tip label="Set up how to apply">
             <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
@@ -429,9 +434,22 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
           </div>
           <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
-        {inOutlineOrder(job.sections, job.tags).map((sec) => (
-          <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} />
-        ))}
+        {job.walk
+          ? job.tags.map((k) => {
+              const sec = job.sections.find((x) => x.key === k);
+              if (sec) return <SectionView key={k} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} />;
+              return (
+                <section key={k} id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" aria-label={`${job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}, not written yet`} style={{ scrollMarginTop: 12 }}>
+                  <h3 className="aj-faint">{job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}</h3>
+                  <p className="aj-faint m-0" style={{ fontSize: 12.5 }}>
+                    Written when we get here.
+                  </p>
+                </section>
+              );
+            })
+          : inOutlineOrder(job.sections, job.tags).map((sec) => (
+              <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} />
+            ))}
         {job.commitments.length > 0 && (
           <section className="rounded-2xl px-3 py-2" aria-label="Commitments">
             <h3 className="flex items-center gap-1.5">
@@ -459,16 +477,52 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
   );
 }
 
+const PICKS: Partial<Record<NonNullable<ChatMsg['ask']>, (s: State, job: DemoJob) => Pick[]>> = {
+  place: placePicks,
+  deadline: deadlinePicks,
+  contract: contractPicks,
+  grade: gradePicks,
+  eligibility: eligibilityPicks,
+  languages: languagePicks,
+  safeguarding: () => safeguardingPicks(),
+  salary: salaryPicks,
+};
+
+/** The fact dialog that offers more than the picks, opened from the question. */
+const MORE: Partial<Record<NonNullable<ChatMsg['ask']>, string>> = { grade: 'grade', salary: 'salary', eligibility: 'more', languages: 'more', safeguarding: 'more' };
+
 /** Answers built into AidJobs' question: relevant picks, each with its reason, plus a search or a calendar. Free text in the box works too. */
 export function AskAnswer({ job, s, kind, onAnswered }: { job: DemoJob; s: State; kind: NonNullable<ChatMsg['ask']>; onAnswered: () => void }) {
   const [q, setQ] = useState('');
   const [date, setDate] = useState('');
   const min = addDays(s.today, 1);
-  const picks = kind === 'place' ? placePicks(s, job) : kind === 'deadline' ? deadlinePicks(s, job) : kind === 'contract' ? contractPicks(s, job) : [];
+  const picks = PICKS[kind]?.(s, job) ?? [];
   const answer = (patch: Partial<Facts>, said: string) => {
-    answerFact(job.id, patch, said);
+    answerFact(job.id, patch, said, kind);
     onAnswered();
   };
+  if (kind === 'method')
+    return (
+      <div className="ej-ask-answer">
+        <div className="flex flex-wrap gap-1.5">
+          {methodPicks(s).map((p) => (
+            <Tip key={p.label} label={p.why}>
+              <button
+                type="button"
+                className="aj-pill"
+                style={{ height: 30 }}
+                onClick={() => {
+                  setMethod(job.id, p.method, p.label);
+                  onAnswered();
+                }}
+              >
+                {p.label}
+              </button>
+            </Tip>
+          ))}
+        </div>
+      </div>
+    );
   const dateOk = /^20\d\d-\d\d-\d\d$/.test(date) && date >= min;
   const matches = kind === 'place' && q.trim().length >= 2 ? PLACES.filter((p) => `${p.city} ${p.country}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 5) : [];
   const choosePlace = (text: string) => {
@@ -527,6 +581,11 @@ export function AskAnswer({ job, s, kind, onAnswered }: { job: DemoJob; s: State
             Set date
           </button>
         </div>
+      )}
+      {MORE[kind] && (
+        <button type="button" className="aj-text-btn self-start" style={{ height: 26, paddingInline: 0 }} onClick={() => window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: MORE[kind] }))}>
+          More options…
+        </button>
       )}
     </div>
   );

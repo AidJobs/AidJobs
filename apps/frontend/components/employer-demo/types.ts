@@ -106,11 +106,34 @@ export type Facts = {
 /** `ai`: written by the AI chat; like a hand edit, it is kept when the facts change rather than rebuilt by the rules. */
 export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean };
 
+/** What the chat asks for, each just before the first section that uses it (employer-side plan, section 19, step 4). */
+export type AskKind = 'title' | 'place' | 'contract' | 'grade' | 'eligibility' | 'languages' | 'safeguarding' | 'salary' | 'deadline' | 'method';
+
 /**
  * `ai`: a reply written by the AI chat, so its answer buttons go back to the AI; the rules' own answers go to the rules. `by`: the
- * model that wrote it, shown under the reply while two models are compared in the preview.
+ * model that wrote it, shown under the reply while two models are compared in the preview. `step`: the step of a new employer's
+ * writing this message asks about, so the same question is not asked twice.
  */
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract'; ai?: boolean; by?: string };
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: AskKind; ai?: boolean; by?: string; step?: string };
+
+/** "One section at a time", or "write it all, then I'll review". */
+export type Pace = 'step' | 'all';
+
+/**
+ * A new employer's writing in the window (section 19, steps 3 to 7): the pace, the sections approved, and the questions answered or
+ * declined ('details', 'fixed', and 'suggest' for step 6). `skipped`: check points left as they are. `awaiting`: a one-line reason for
+ * a genuine requirement. `pending`: a fact changed after its section was approved; the new lines wait for the user's yes.
+ */
+export type Walk = {
+  pace?: Pace;
+  approved: string[];
+  settled: string[];
+  skipped?: string[];
+  awaiting?: { point: string; hit: string; label: string };
+  pending?: { what: string; changes: Array<{ key: string; lines: string[] }> };
+  /** A job description the user brought (pasted or a file), read into sections, until they say how to use it. */
+  doc?: Section[];
+};
 
 export type Remark = {
   id: string;
@@ -256,8 +279,10 @@ export type DemoJob = {
   audit: AuditEntry[];
   /** The part open in the window ("s:" and a section, or outline, details, fixed, check, publish); reopening the job returns to it. */
   part?: string;
-  /** A job started in the window waits for its template, then its writing style, before anything is written. */
-  setup?: 'template' | 'style';
+  /** A job started in the window waits for its template, then its writing style and the pace, before anything is written. */
+  setup?: 'template' | 'style' | 'pace';
+  /** A job started in the window is written step by step; jobs without it (the samples, earlier versions) are already written. */
+  walk?: Walk;
   /** The writing style, as the chips of Organisation settings. */
   style?: string[];
   /** The goals the job serves, when corrected by hand; otherwise read from the role by rules. */
@@ -317,4 +342,6 @@ export type State = {
   activity?: Activity[];
   /** Jobs once published and then deleted: their shared links say "no longer available". */
   gone?: string[];
+  /** The pace chosen last time, used for the next new job. */
+  pace?: Pace;
 };

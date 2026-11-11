@@ -9,8 +9,9 @@ import { readModelReply, type ChatMessage, type ChatTurn, type ModelResult } fro
  */
 type Ctx = {
   stage?: string;
-  job?: { template?: { key?: string }; facts?: Record<string, unknown>; sections?: Array<{ key: string; heading: string; fixed?: boolean }> };
+  job?: { template?: { key?: string }; facts?: Record<string, unknown>; sections?: Array<{ key: string; heading: string; fixed?: boolean; text?: string | null }> };
   org?: { orgType?: string };
+  walk?: { next?: { kind?: string; sections?: Array<{ key: string }> } | null } | null;
   conversation?: Array<{ from?: string; text?: string }>;
 };
 
@@ -46,10 +47,14 @@ function writesOf(turn: ChatTurn) {
     .map((a) => ({ key: a.section as string, lines: (a.lines as unknown[]).filter((l): l is string => typeof l === 'string') }));
 }
 
-/** What the demo's checks find in a turn that writes; an empty list when it passes or writes nothing. */
+/**
+ * What the demo's checks find in a turn that writes; an empty list when it passes or writes nothing. A section written for the first
+ * time is held to its template's rules; a whole draft also to its length and to the facts given; an edit only for content, so a
+ * section shortened on purpose is never repaired back to full length.
+ */
 export function draftProblems(turn: ChatTurn, ctx: Ctx, message: string): string[] {
   const writes = writesOf(turn);
-  if (!writes.length) return [];
+  if (!writes.length && ctx.walk?.next?.kind !== 'write') return [];
   const key = ctx.job?.template?.key ?? '';
   const guide = guideFor(key, ctx.org?.orgType ?? '');
   const rules = RULES[key] ?? guide.rules;
@@ -58,24 +63,33 @@ export function draftProblems(turn: ChatTurn, ctx: Ctx, message: string): string
   const userLower = user.toLowerCase();
   const text = writes.map((w) => w.lines.join('\n')).join('\n');
   const problems: string[] = [];
+  const next = ctx.walk?.next;
+  const asked = next?.kind === 'write' ? (next.sections ?? []).map((s) => s.key) : [];
+  const wholeDraft = ctx.stage === 'style' || asked.length > 1;
+  const fresh = wholeDraft ? writes : writes.filter((w) => (ctx.job?.sections ?? []).find((s) => s.key === w.key)?.text === null);
 
-  if (ctx.stage === 'style') {
-    const need = (ctx.job?.sections ?? []).filter((s) => !s.fixed).map((s) => s.key);
-    const missing = need.filter((k) => !writes.some((w) => w.key === k));
-    if (missing.length) problems.push(`Write every section of the first draft; missing: ${missing.map((k) => headings[k] ?? k).join(', ')}.`);
+  for (const w of fresh) {
+    const rule = rules[w.key];
+    if (!rule) continue;
+    const st = stats(w.lines);
+    const h = headings[w.key] ?? w.key;
+    if (rule.minWords && st.words < rule.minWords) problems.push(`${h}: ${st.words} words; it needs at least ${rule.minWords}.`);
+    if (rule.bullets && st.bullets < rule.bullets[0]) problems.push(`${h}: ${st.bullets} duties; it needs ${rule.bullets[0]} to ${rule.bullets[1]}, each a line starting "- ".`);
+    if (rule.bullets && st.bullets > rule.bullets[1]) problems.push(`${h}: ${st.bullets} duties; keep it to ${rule.bullets[1]} at most.`);
+    if (rule.groups && st.groups < rule.groups[0]) problems.push(`${h}: ${st.groups} groups; it needs ${rule.groups[0]} to ${rule.groups[1]}, each a short label line ending with ":".`);
+    if (rule.minLines && st.lines < rule.minLines) problems.push(`${h}: ${st.lines} lines; it needs at least ${rule.minLines}.`);
+  }
+  const missingAsked = asked.filter((k) => !writes.some((w) => w.key === k));
+  if (missingAsked.length) problems.unshift(`Write ${missingAsked.length > 1 ? 'every section asked for' : 'the section asked for'} now; missing: ${missingAsked.map((k) => headings[k] ?? k).join(', ')}.`);
+
+  if (wholeDraft) {
+    if (!asked.length) {
+      const need = (ctx.job?.sections ?? []).filter((s) => !s.fixed).map((s) => s.key);
+      const missing = need.filter((k) => !writes.some((w) => w.key === k));
+      if (missing.length) problems.push(`Write every section of the first draft; missing: ${missing.map((k) => headings[k] ?? k).join(', ')}.`);
+    }
     const total = stats(writes.flatMap((w) => w.lines)).words;
     if (total < guide.words[0]) problems.push(`The draft has ${total} words; this template needs about ${guide.words[0]} to ${guide.words[1]} for the sections you write. Add depth where the rules below ask, with standard content for this role, never invented facts.`);
-    for (const w of writes) {
-      const rule = rules[w.key];
-      if (!rule) continue;
-      const st = stats(w.lines);
-      const h = headings[w.key] ?? w.key;
-      if (rule.minWords && st.words < rule.minWords) problems.push(`${h}: ${st.words} words; it needs at least ${rule.minWords}.`);
-      if (rule.bullets && st.bullets < rule.bullets[0]) problems.push(`${h}: ${st.bullets} duties; it needs ${rule.bullets[0]} to ${rule.bullets[1]}, each a line starting "- ".`);
-      if (rule.bullets && st.bullets > rule.bullets[1]) problems.push(`${h}: ${st.bullets} duties; keep it to ${rule.bullets[1]} at most.`);
-      if (rule.groups && st.groups < rule.groups[0]) problems.push(`${h}: ${st.groups} groups; it needs ${rule.groups[0]} to ${rule.groups[1]}, each a short label line ending with ":".`);
-      if (rule.minLines && st.lines < rule.minLines) problems.push(`${h}: ${st.lines} lines; it needs at least ${rule.minLines}.`);
-    }
     const city = String(ctx.job?.facts?.location ?? '').split(',')[0].trim();
     if (city && !text.toLowerCase().includes(city.toLowerCase())) problems.push(`Use the duty station, ${city}, in the text.`);
     const unused = Array.from(user.matchAll(QUANTITY))

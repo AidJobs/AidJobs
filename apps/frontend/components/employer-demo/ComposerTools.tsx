@@ -1,13 +1,13 @@
 'use client';
 
-import { ChevronDown, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { inputStyle } from './ui';
 import Tip from '@/components/site/Tip';
 import { hireAgain } from './actions';
 import { refocus } from './MenuButton';
 import { contractPicks, deadlinePicks, memoryPick, pickPhrase, placePatch, placePicks } from './answers';
-import { addDays, FAMILIES_ORDER, longDate, PLACES } from './engine';
+import { addDays, longDate, PLACES } from './engine';
 import { statusLine } from './Home';
 import { go } from './store';
 import type { Facts, State } from './types';
@@ -108,7 +108,7 @@ export function PlusMenu({ s, onUpload }: { s: State; onUpload: () => void }) {
   const drafts = s.jobs.filter((j) => j.status === 'draft' || j.status === 'review' || j.status === 'approved');
   return (
     <ClickMenu label="Upload a job description, hire again, or continue a job draft" icon trigger={<Plus size={16} strokeWidth={2} />}>
-      <MenuItem title="Upload a job description" tip="Paste text, choose a file (text, Word, or PDF), or give a link. Your wording and headings are kept." onClick={onUpload} />
+      <MenuItem title="Upload a job description" tip="Paste text, or choose a file (text, Word, or PDF). Use its headings, or its wording too." onClick={onUpload} />
       {past.length > 0 && <span className="ej-menu-label">Hire again</span>}
       {past.map((j) => (
         <MenuItem
@@ -129,38 +129,6 @@ export function PlusMenu({ s, onUpload }: { s: State; onUpload: () => void }) {
     </ClickMenu>
   );
 }
-/** The format the new job is written in; choosing one applies its headings, order, and tone. */
-export function FormatMenu({ s, value, onChange, onCreate }: { s: State; value: string | null; onChange: (key: string) => void; onCreate: () => void }) {
-  const formats = s.formats.filter((f) => !f.key.startsWith('pasted-'));
-  const current = formats.find((f) => f.key === value);
-  return (
-    <ClickMenu
-      label={current ? `JD format: ${current.label}` : 'Select a JD format'}
-      trigger={
-        <>
-          <span className="ej-tool-text max-w-[110px] sm:max-w-[200px]">{current ? current.label : 'Select a JD format'}</span>
-          <ChevronDown size={13} strokeWidth={2} className="shrink-0" />
-        </>
-      }
-    >
-      <MenuItem title="Create your own JD format" tip="Name it, choose its sections and headings, and save it for reuse." onClick={onCreate} />
-      <div className="ej-menu-sep" />
-      {FAMILIES_ORDER.map((fam) => {
-        const list = formats.filter((f) => f.family === fam);
-        if (!list.length) return null;
-        return (
-          <div key={fam}>
-            <span className="ej-menu-label">{fam}</span>
-            {list.map((f) => (
-              <MenuItem key={f.key} title={f.label} tip={`${f.usedBy}. Headings: ${f.order.map((o) => o.heading).join(', ')}.`} current={f.key === current?.key} onClick={() => onChange(f.key)} />
-            ))}
-          </div>
-        );
-      })}
-    </ClickMenu>
-  );
-}
-
 const SLOT_NAME = { place: 'Duty station', deadline: 'Closing date', contract: 'Contract' } as const;
 
 /**

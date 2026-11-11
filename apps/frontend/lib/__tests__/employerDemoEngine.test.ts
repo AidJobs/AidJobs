@@ -85,6 +85,11 @@ describe('reading the first message', () => {
     expect(shorter.sections.find((x) => x.key === 'offer')!.lines.filter((l) => l.startsWith('- '))).toHaveLength(3);
   });
 
+  it('does not flag "young" in the people a programme serves ("infant and young child feeding")', () => {
+    expect(findInclusive('Promote infant and young child feeding with young people and young mothers', 'house')).toEqual([]);
+    expect(findInclusive('We want a young graduate', 'house').map((h) => h.match)).toEqual(['young']);
+  });
+
   it('reads a nutrition role as nutrition, not health; a health role stays health', () => {
     expect(detectRole('We are hiring a Nutrition Officer in Juba').role?.key).toBe('nutrition');
     expect(detectRole('CMAM supervisor').role?.key).toBe('nutrition');

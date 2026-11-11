@@ -24,14 +24,16 @@ function save(s: State) {
 }
 
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline; lapses and renews paid jobs. */
-function normalise(s0: State): State {
+export function normalise(s0: State): State {
   const s = purgeDeleted(goLive(rollBilling(s0)));
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
     const tags = outlineOrder(j0.tags);
     const j1 = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
     // Saved before jobs kept a copy of what went live: today's text is the starting point for "changed since publishing".
-    const j = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;
+    const j2 = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;
+    // A job still choosing its template or style when saved by an earlier version is written step by step from here.
+    const j = j2.setup && !j2.walk ? { ...j2, walk: { approved: [], settled: [] } } : j2;
     if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;

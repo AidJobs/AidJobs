@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   if (!p) return answer({ error: 'off' }, 503);
   const raw = await req.text();
   if (raw.length > MAX_BODY) return answer({ error: 'too large' }, 413);
-  let body: { message?: unknown; context?: unknown; first?: unknown; model?: unknown };
+  let body: { message?: unknown; context?: unknown; first?: unknown; silent?: unknown; model?: unknown };
   try {
     body = JSON.parse(raw);
   } catch {
@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
   const ctx = context as Record<string, unknown>;
   const model: AiModelKey | 'kimi' = p.name === 'openrouter' ? modelKeyOf(body.model) : 'kimi';
   const call = (m: ChatMessage[]): Promise<ModelResult> => (p.name === 'openrouter' ? callOpenRouter(m, p.key, model as AiModelKey) : callModel(m, p.keys));
-  const result = await answerWithChecks(call, messagesFor(ctx, message.trim(), body.first === true), ctx, message.trim());
+  const silent = body.silent === true;
+  const result = await answerWithChecks(call, messagesFor(ctx, message.trim(), body.first === true, silent), ctx, silent ? '' : message.trim());
   if (!result.ok) {
     if (result.code === 'unreadable') console.warn(`employer demo chat: the ${model} answer was not the JSON asked for (${Date.now() - started} ms)`);
     else console.warn(`employer demo chat: the ${model} call failed (status ${result.status}${result.code ? `, ${p.name} ${result.code}` : ''}, ${Date.now() - started} ms)`);

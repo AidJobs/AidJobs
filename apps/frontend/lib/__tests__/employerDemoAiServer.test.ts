@@ -77,6 +77,12 @@ describe("the model's answer", () => {
     expect(SYSTEM).toContain('You must never invent facts: pay, allowances, benefits');
     expect(SYSTEM).toContain('Never write the organisation\'s fixed text');
   });
+
+  it("says when the window, not the user, asks the AI to go on, and tells it each step of a new employer's writing", () => {
+    expect(messagesFor({ stage: 'writing' }, 'Go on with the next step: write it now.', false, true)[1].content).toMatch(/The window says \(the user wrote nothing new\):\nGo on with the next step: write it now\.$/);
+    for (const kind of ['"ask"', '"write"', '"approve"', '"change"', '"genuine"', '"details"', '"fixed"', '"suggest"', '"check"', '"done"']) expect(SYSTEM).toContain(`  - ${kind}:`);
+    for (const action of ['set_pace', 'approve_section', 'settle', 'set_apply', 'fixed_text', 'leave_point', 'accept_point', 'confirm_change']) expect(SYSTEM).toContain(`{"type":"${action}"`);
+  });
 });
 
 describe('the call to Bedrock', () => {

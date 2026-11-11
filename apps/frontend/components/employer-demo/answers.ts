@@ -2,9 +2,10 @@
  * Quick picks for AidJobs' questions in the chat. Each pick is relevant and says why; when nothing relevant exists there are no picks, only
  * search or free text. Sources, in order: what the organisation said about itself and its own jobs, then AidJobs data (sample figures in the demo).
  */
-import { addDays, CONTRACTS, holiday, longDate, PLACES, weekend } from './engine';
+import { addDays, CONTRACTS, holiday, longDate, PLACES, salarySuggestion, weekend } from './engine';
+import { LOCAL_LANG } from './market';
 import { MARKET_SAMPLE } from './sample';
-import type { DemoJob, Facts, State } from './types';
+import type { ApplySettings, DemoJob, Facts, State } from './types';
 
 export type Pick = { label: string; why: string; patch: Partial<Facts> };
 
@@ -74,6 +75,64 @@ export function contractPicks(s: State, j: Subject): Pick[] {
   const by = s.org.orgType === 'un' ? 'UN agencies' : s.org.orgType === 'contractor' ? 'development contractors' : 'NGOs like yours';
   const kind = j.facts.engagement === 'consultancy' ? 'consultancies' : j.facts.engagement === 'internship' ? 'internships' : j.facts.engagement === 'volunteer' ? 'volunteer roles' : 'staff jobs';
   return options.slice(0, 3).map((c) => ({ label: c, why: `A contract type ${by} use for ${kind}`, patch: { contract: c } }));
+}
+
+export function gradePicks(s: State, j: Subject): Pick[] {
+  const own = s.org.scale.map((r) => r.grade);
+  const un = s.org.orgType === 'un' ? ['P2', 'P3', 'P4'] : [];
+  const grades = (own.length ? own : un).slice(0, 4);
+  return [
+    ...grades.map((g) => ({ label: g, why: own.includes(g) ? `A grade on your ${s.org.short} salary scale` : 'A UN professional grade', patch: { grade: g } })),
+    { label: 'No grade', why: 'The job description shows no grade or band', patch: { grade: '' } },
+  ];
+}
+
+export function eligibilityPicks(_s: State, j: Subject): Pick[] {
+  const where = j.facts.country || 'the country';
+  return [
+    { label: 'Anyone', why: 'Open to all applicants', patch: { eligibility: 'anyone' } },
+    { label: `Nationals of ${where}`, why: 'A national post', patch: { eligibility: 'nationals' } },
+    { label: 'Right to work there', why: 'People already allowed to work in the country', patch: { eligibility: 'righttowork' } },
+    { label: 'Internal candidates', why: 'Only people who already work for you', patch: { eligibility: 'internal' } },
+  ];
+}
+
+export function languagePicks(_s: State, j: Subject): Pick[] {
+  const local = LOCAL_LANG[j.facts.iso];
+  const out: Pick[] = [{ label: 'English', why: 'English only', patch: { languages: ['English'] } }];
+  if (local) out.push({ label: `English and ${local}`, why: `${local} is widely used in ${j.facts.country} (sample figures in the demo)`, patch: { languages: ['English', local] } });
+  if (local !== 'French') out.push({ label: 'English and French', why: 'Often asked for in the sector', patch: { languages: ['English', 'French'] } });
+  return out;
+}
+
+export function safeguardingPicks(): Pick[] {
+  return [
+    { label: 'High', why: 'Regular direct contact with children or adults at risk', patch: { safeguarding: 'high' } },
+    { label: 'Medium', why: 'Some contact, or access to their data', patch: { safeguarding: 'medium' } },
+    { label: 'Low', why: 'No contact with children or adults at risk', patch: { safeguarding: 'low' } },
+  ];
+}
+
+export function salaryPicks(s: State, j: Subject): Pick[] {
+  const hint = salarySuggestion(j.facts, s.org);
+  const fmt = (n: number) => n.toLocaleString('en-US');
+  const per = (p: string) => ({ hour: 'an hour', day: 'a day', month: 'a month', year: 'a year' })[p] ?? `a ${p}`;
+  const out: Pick[] = [];
+  if (hint) out.push({ label: `${hint.currency} ${fmt(hint.min)} to ${fmt(hint.max)} ${per(hint.period)}`, why: `Basis: ${hint.basis}`, patch: { salaryMode: 'range', salaryMin: fmt(hint.min), salaryMax: fmt(hint.max), currency: hint.currency, period: hint.period } });
+  if (j.facts.grade) out.push({ label: `By grade (${j.facts.grade})`, why: 'Shows the grade instead of an amount', patch: { salaryMode: 'grade' } });
+  if (s.org.scale.length) out.push({ label: 'As per our salary scale', why: `Your ${s.org.short} salary scale, without an amount`, patch: { salaryMode: 'scale' } });
+  out.push({ label: 'Not shown', why: 'No pay in the job description; jobs that show pay get more applications', patch: { salaryMode: 'hidden' } });
+  return out;
+}
+
+export type MethodPick = { label: string; why: string; method: ApplySettings['method'] };
+
+export function methodPicks(s: State): MethodPick[] {
+  return [
+    { label: 'Through our careers site', why: s.org.careersUrl ? `Your careers site, ${s.org.careersUrl}` : 'Your careers site', method: 'system' },
+    { label: 'By email', why: 'CVs and letters to an address you give', method: 'email' },
+    { label: 'An online form', why: 'A short form, with a CV', method: 'form' },
+  ];
 }
 
 /** How a pick reads when added to the first message ("in Juba, South Sudan", "closing 25 November 2026"). */

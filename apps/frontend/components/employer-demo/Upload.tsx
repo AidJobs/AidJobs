@@ -1,39 +1,20 @@
 'use client';
 
-import { ArrowUp, Info, Upload as UploadIcon } from 'lucide-react';
+import { Info, Upload as UploadIcon } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import Tip from '@/components/site/Tip';
-import { importJobDescription } from './actions';
 import { ACCEPTED, readJobFile } from './readFile';
-import { LINKED_SAMPLE } from './sample';
-import { go } from './store';
 import { Dialog, inputStyle } from './ui';
 
-function hostOf(link: string): string {
-  try {
-    const u = new URL(link.trim());
-    return /^https?:$/.test(u.protocol) && u.hostname.includes('.') ? u.hostname : '';
-  } catch {
-    return '';
-  }
-}
-
-/** One window for an existing job description: paste it, choose or drop a file, or give a link. */
-export default function UploadDialog({ onClose }: { onClose: () => void }) {
+/**
+ * One window for an existing job description: paste it, or choose or drop a file. Links are not read (section 19, step 2): many career
+ * sites cannot be read automatically. The chat then asks whether to use only its headings or its wording too.
+ */
+export default function UploadDialog({ onClose, onUse }: { onClose: () => void; onUse: (text: string) => void }) {
   const [text, setText] = useState('');
-  const [link, setLink] = useState('');
-  const [save, setSave] = useState(false);
-  const [name, setName] = useState('');
   const [note, setNote] = useState('');
   const [reading, setReading] = useState(false);
-  const host = hostOf(link);
 
-  const finish = (body: string, fromHost?: string) => {
-    const id = importJobDescription(body, { host: fromHost, saveAs: save ? name : undefined });
-    if (!id) return setNote('No headings or text were found. Headings work best on their own lines.');
-    onClose();
-    go('create', id);
-  };
   const readFile = async (file: File | undefined) => {
     if (!file) return;
     setReading(true);
@@ -47,20 +28,19 @@ export default function UploadDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     void readFile(e.dataTransfer.files?.[0]);
   };
-  const blocked = save && !name.trim();
 
   return (
     <Dialog
       title="Upload a job description"
-      subtitle="Your wording and headings are kept"
+      subtitle="Use its headings, or its wording too"
       onClose={onClose}
       wide
       footer={
         <div className="flex items-center justify-between gap-2">
           <span className="aj-faint" style={{ fontSize: 11 }}>
-            Demo: files are read in your browser; links use a sample.
+            Demo: files are read in your browser.
           </span>
-          <button type="button" className="aj-ink-btn" disabled={!text.trim() || blocked || reading} onClick={() => finish(text)}>
+          <button type="button" className="aj-ink-btn" disabled={!text.trim() || reading} onClick={() => onUse(text)}>
             Use this job description
           </button>
         </div>
@@ -86,32 +66,9 @@ export default function UploadDialog({ onClose }: { onClose: () => void }) {
               <Info size={14} strokeWidth={1.8} />
             </span>
           </Tip>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input
-            style={{ ...inputStyle, flex: 1 }}
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && host && !blocked && finish(LINKED_SAMPLE, host)}
-            placeholder="Or paste a link to a job description"
-            aria-label="Link to a job description"
-            inputMode="url"
-          />
-          <Tip label="A public page only; AidJobs reads that one page once.">
-            <span className="inline-flex aj-faint" tabIndex={0} aria-label="About links">
-              <Info size={14} strokeWidth={1.8} />
-            </span>
-          </Tip>
-          <button type="button" className="aj-ink-btn" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }} disabled={!host || blocked} onClick={() => finish(LINKED_SAMPLE, host)} aria-label="Use the job description at this link">
-            <ArrowUp size={16} strokeWidth={2.2} />
-          </button>
-        </div>
-        <div className="flex flex-col gap-1.5 border-t pt-3 aj-hair">
-          <label className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
-            <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />
-            Save its headings as a JD format
-          </label>
-          {save && <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name it, for example: Riverstone field roles" aria-label="JD format name" autoFocus />}
+          <span className="aj-faint" style={{ fontSize: 12 }}>
+            Links can&apos;t be read: paste the text or use the file.
+          </span>
         </div>
         {note && (
           <span role="alert" style={{ color: 'var(--red)', fontSize: 12 }}>

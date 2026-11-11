@@ -4,6 +4,7 @@ import { setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi } from '../../components/employer-demo/ai';
 import { addDays } from '../../components/employer-demo/engine';
+import { nextStep } from '../../components/employer-demo/flow';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const lastAi = (id: string) => job(id).chat.filter((m) => m.ai).at(-1);
@@ -81,21 +82,54 @@ describe('the AI chat: written text is checked', () => {
 });
 
 describe('the AI chat: the demo carries out the actions', () => {
-  it('chooses the template, then the style with the first draft; the AI replies take the place of the rules\' own', () => {
+  it('chooses the template, then the style and the pace; nothing is written before them; the AI replies take the place of the rules\' own', () => {
+    resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
     applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }] }, open);
     expect(job(id).setup).toBe('style');
     expect(job(id).chat.slice(-2)).toEqual([expect.objectContaining({ from: 'user', text: 'Yes' }), expect.objectContaining({ from: 'ai', text: 'Done.', ai: true })]);
     expect(job(id).chat.some((m) => m.text.includes('How should it sound?'))).toBe(false);
     const keys = job(id).tags.filter((k) => k !== 'about' && k !== 'apply');
-    applyAiTurn(id, 'warm', { reply: 'Here it is.', actions: [...keys.map((k) => ({ type: 'write_section', section: k, lines: [`AI ${k}`] })), { type: 'set_style', style: ['warm'] }] }, open);
+    applyAiTurn(id, 'warm', { reply: 'Warm it is. One section at a time, or all of it first?', actions: [{ type: 'write_section', section: keys[0], lines: ['Too early'] }, { type: 'set_style', style: ['warm'] }] }, open);
+    expect(job(id)).toMatchObject({ setup: 'pace', style: ['Warm'], sections: [] });
+    expect(lastAi(id)?.text).toContain('Not done: The role: written before the template and style are chosen');
+    applyAiTurn(id, 'one at a time', { reply: 'One at a time.', actions: [{ type: 'set_pace', pace: 'step' }] }, open);
     expect(job(id).setup).toBeUndefined();
-    expect(job(id).style).toEqual(['Warm']);
-    for (const k of keys) expect(job(id).sections.find((x) => x.key === k)).toMatchObject({ lines: [`AI ${k}`], ai: true });
-    expect([...(job(id).lastChange?.keys ?? [])].sort()).toEqual([...keys].sort());
-    expect(job(id).versions.at(-1)?.note).toBe('warm');
-    setFacts(id, { deadline: addDays(getState().today, 30), location: 'Juba, South Sudan' });
-    for (const k of keys) expect(job(id).sections.find((x) => x.key === k)?.lines).toEqual([`AI ${k}`]);
+    expect(job(id).walk?.pace).toBe('step');
+    expect(getState().pace).toBe('step');
+    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'ask', fact: 'contract', section: 'about' });
+  });
+
+  it('answers each question, approves a section, and writes the next in the same answer; text it wrote keeps its words when facts change', () => {
+    resetAi('on');
+    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }, { type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'step' }] }, open);
+    applyAiTurn(id, 'fixed-term, and there is no grade', { reply: 'Got it. About us comes from your profile: good as it is?', actions: [{ type: 'set_facts', facts: { contract: 'fixed-term' } }, { type: 'settle', fact: 'grade' }] }, open);
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
+    expect(lastAi(id)?.step).toBe('approve:about');
+    applyAiTurn(id, 'yes', { reply: 'Here is The role. Good, or change something?', actions: [{ type: 'approve_section', section: 'about' }, { type: 'write_section', section: 'purpose', lines: ['The post holder runs nutrition screening in Juba.'] }] }, open);
+    expect(job(id).walk?.approved).toEqual(['about']);
+    expect(job(id).sections.find((x) => x.key === 'purpose')).toMatchObject({ lines: ['The post holder runs nutrition screening in Juba.'], ai: true });
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'purpose' });
+    applyAiTurn(id, 'good', { reply: 'Next.', actions: [{ type: 'approve_section', section: 'responsibilities' }, { type: 'approve_section', section: 'purpose' }] }, open);
+    expect(job(id).walk?.approved).toEqual(['about', 'purpose']);
+    expect(lastAi(id)?.text).toContain('Not done: approving What you will do: it is not written yet');
+    setFacts(id, { deadline: addDays(getState().today, 30) });
+    expect(job(id).sections.find((x) => x.key === 'purpose')?.lines).toEqual(['The post holder runs nutrition screening in Juba.']);
+  });
+
+  it('refuses settling a fact that needs a value, an address nobody gave, and wording kept without a reason', () => {
+    resetAi('on');
+    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }, { type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'all' }] }, open);
+    applyAiTurn(id, 'x', { reply: 'Hm.', actions: [{ type: 'settle', fact: 'deadline' }, { type: 'set_apply', method: 'email', address: 'hr@invented.example' }, { type: 'accept_point', point: 'nope', reason: 'ok' }, { type: 'set_pace', pace: 'sometimes' }] }, open);
+    expect(job(id).walk?.settled).toEqual([]);
+    expect(job(id).apply.method).not.toBe('email');
+    expect(lastAi(id)?.text).toMatch(/Not done: an application address that was not given; settling "deadline"; the pace\.$/);
+    applyAiTurn(id, 'by email to jobs@riverstone.example.org', { reply: 'Done.', actions: [{ type: 'set_apply', method: 'email', address: 'jobs@riverstone.example.org' }] }, open);
+    expect(job(id).apply).toMatchObject({ method: 'email', address: 'jobs@riverstone.example.org' });
+    expect(job(id).walk?.settled).toContain('method');
   });
 
   it('refuses unknown and unsafe actions, changes nothing for them, and says what was not done', () => {

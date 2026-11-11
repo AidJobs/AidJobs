@@ -14,7 +14,8 @@ export type SimilarJob = { org: string; title: string; city: string; country: st
 /** A one-tap fix: what changes, in the job's own terms. */
 export type Fix = { kind: 'deadline'; date: string } | { kind: 'language'; lang: string } | { kind: 'facts'; patch: Partial<Facts> } | { kind: 'text'; section: string; lines: string[] };
 
-export type Point = { key: string; ok: boolean; title: string; detail?: string; fix?: { label: string; fix: Fix }; section?: string };
+/** `hit`: for highlighted wording, the key a genuine requirement is kept under; `line`: the line it is in. */
+export type Point = { key: string; ok: boolean; title: string; detail?: string; fix?: { label: string; fix: Fix }; section?: string; hit?: string; line?: string };
 
 const ORGS = ['Harbour Health Alliance', 'Meridian Education Trust', 'Northfield Relief', 'Bluewater Climate Fund', 'Open Hands Foundation', 'Lakeshore Development Partners', 'Cedar Humanitarian', 'Sunrise Community Action', 'Tideway Aid', 'Granite Relief International', 'Willow Child Fund', 'Kestrel Water Initiative'];
 
@@ -37,7 +38,7 @@ const REGIONS: Array<{ name: string; isos: string[] }> = [
 ];
 
 /** The language similar jobs in a country most often ask for besides English. */
-const LOCAL_LANG: Record<string, string> = { CD: 'French', SN: 'French', HT: 'French', JO: 'Arabic', SS: 'Arabic', SO: 'Arabic', MZ: 'Portuguese', CO: 'Spanish', KE: 'Swahili', UG: 'Swahili' };
+export const LOCAL_LANG: Record<string, string> = { CD: 'French', SN: 'French', HT: 'French', JO: 'Arabic', SS: 'Arabic', SO: 'Arabic', MZ: 'Portuguese', CO: 'Spanish', KE: 'Swahili', UG: 'Swahili' };
 
 function seeded(text: string): () => number {
   let h = 2166136261;
@@ -222,8 +223,9 @@ export function basicAdvertCheck(job: DemoJob, s: State): Point[] {
   for (const sec of job.sections) {
     for (const [n, line] of sec.lines.entries()) {
       for (const h of findInclusive(line, job.format)) {
-        if (job.genuine[`${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`]) continue;
-        points.push({ key: `inclusive-${sec.key}-${n}-${h.index}-${h.rule.id}`, ok: false, section: sec.key, title: `“${h.match}” in ${sec.title}`, detail: `${h.rule.why} ${h.rule.alt}.` });
+        const hit = `${h.rule.id}:${sec.key}:${h.match.toLowerCase()}`;
+        if (job.genuine[hit]) continue;
+        points.push({ key: `inclusive-${sec.key}-${n}-${h.index}-${h.rule.id}`, ok: false, section: sec.key, title: `“${h.match}” in ${sec.title}`, detail: `${h.rule.why} ${h.rule.alt}.`, hit, line });
       }
     }
   }

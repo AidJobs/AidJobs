@@ -2,11 +2,12 @@
 
 import { useSyncExternalStore } from 'react';
 import { formatOf, missingFacts } from './actions';
-import { applyAiTurn, FIXED_SECTIONS, type Applied, type OpenTarget } from './aiActions';
-import { CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTIONS } from './engine';
-import { proposedStyle, recommendation, STYLES, wordsFor } from './setup';
+import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
+import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
+import { afterApproval, FIXED_SECTIONS, nextStep, setAiWrites, type Step } from './flow';
+import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
-import type { DemoJob, Facts, State } from './types';
+import type { DemoJob, Facts, Format, State } from './types';
 
 /**
  * The AI chat's one way out of the browser: the demo's own route, and nothing else (employer-side plan, section 19, "The AI chat in
@@ -21,8 +22,11 @@ const MODEL_KEY = 'aidjobs.employerDemo.aiModel';
 
 type Status = 'unknown' | 'on' | 'off';
 export type AiModel = { key: string; label: string };
-/** `models` and `model`: the models the route offers and the one chosen in the demo's controls, for comparing them in the preview. */
-type Snapshot = { status: Status; pending: Record<string, { text: string; first: boolean }>; fallback: Record<string, string>; models: AiModel[]; model: string; provider: string };
+/**
+ * `models` and `model`: the models the route offers and the one chosen in the demo's controls, for comparing them in the preview.
+ * `pending`: the message being answered for a job; `silent` when the window asked the AI to go on by itself, with what it is writing.
+ */
+type Snapshot = { status: Status; pending: Record<string, { text: string; first: boolean; silent?: string }>; fallback: Record<string, string>; models: AiModel[]; model: string; provider: string };
 
 let snap: Snapshot = { status: 'unknown', pending: {}, fallback: {}, models: [], model: '', provider: '' };
 let probing: Promise<boolean> | null = null;
@@ -30,6 +34,7 @@ const listeners = new Set<() => void>();
 
 function set(next: Partial<Snapshot>) {
   snap = { ...snap, ...next };
+  setAiWrites(snap.status === 'on');
   listeners.forEach((l) => l());
 }
 
@@ -90,6 +95,7 @@ export function chooseAiModel(key: string) {
 export function resetAi(status: Status = 'unknown', models: AiModel[] = [], provider = '') {
   probing = null;
   snap = { status, pending: {}, fallback: {}, models, model: models[0]?.key ?? '', provider };
+  setAiWrites(status === 'on');
   listeners.forEach((l) => l());
 }
 
@@ -97,32 +103,79 @@ function filled(f: Facts): Partial<Facts> {
   return Object.fromEntries(Object.entries(f).filter(([, v]) => (Array.isArray(v) ? v.length > 0 : v !== '' && v !== false))) as Partial<Facts>;
 }
 
+const headingOf = (j: DemoJob, format: Format, k: string) => j.sections.find((x) => x.key === k)?.title ?? j.renamed?.[k] ?? headingFor(k, format);
+
+/** The step a job written step by step is at, as the AI is told it: plain data, with headings in place of keys where it helps. */
+function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Record<string, unknown> | null {
+  if (!step) return null;
+  switch (step.kind) {
+    case 'ask':
+      return { kind: 'ask', fact: step.fact, ...(step.section ? { before: step.section, heading: headingOf(j, format, step.section) } : {}) };
+    case 'write':
+      return { kind: 'write', sections: step.sections.filter((k) => !FIXED_SECTIONS.includes(k)).map((k) => ({ key: k, heading: headingOf(j, format, k) })) };
+    case 'approve':
+      return { kind: 'approve', section: step.section, heading: headingOf(j, format, step.section), then: stepFor(afterApproval(j, s, step.section), j, s, format) };
+    case 'change':
+      return { kind: 'change', what: j.walk?.pending?.what, changes: (j.walk?.pending?.changes ?? []).map((c) => ({ heading: headingOf(j, format, c.key), now: c.lines.join('\n') })) };
+    case 'genuine':
+      return { kind: 'genuine', point: step.point, wording: j.walk?.awaiting?.label };
+    case 'fixed':
+      return { kind: 'fixed', onThisJob: j.commitments.map((k) => ({ key: k, label: COMMITMENTS.find((c) => c.key === k)?.label, fromSettings: commitmentText(k, s.org, j.facts).own })) };
+    case 'suggest':
+      return { kind: 'suggest', sections: step.sections.map((k) => ({ key: k, heading: headingFor(k, format), why: SECTION_BY_KEY[k]?.hint })) };
+    case 'check':
+      return { kind: 'check', point: { key: step.point.key, title: step.point.title, detail: step.point.detail ?? null, section: step.point.section ?? null, line: step.point.line ?? null, canBeGenuine: Boolean(step.point.hit) } };
+    default:
+      return { ...step };
+  }
+}
+
 /** What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation. */
 export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean) {
   const format = formatOf(s, j.format);
   const rec = recommendation(s, j.format);
   const recFormat = formatOf(s, rec.key);
-  const recCount = orderSections(recommendSections(recFormat, j.facts), recFormat).length;
+  const recKeys = orderSections(recommendSections(recFormat, j.facts), recFormat);
+  const recCount = recKeys.length;
   const history = first ? [] : j.chat.slice(-HISTORY).map((m) => ({ from: m.from === 'ai' ? 'assistant' : 'user', text: m.text.slice(0, 1500) }));
   return {
     today: isoDay(s.today),
     stage: j.setup ?? 'writing',
-    org: { name: s.org.name, short: s.org.short, type: s.org.type, orgType: s.org.orgType, about: s.org.about, countries: s.org.countries, style: s.org.voice, styleKept: Boolean(s.org.styleKept) },
+    org: {
+      name: s.org.name,
+      short: s.org.short,
+      type: s.org.type,
+      orgType: s.org.orgType,
+      about: s.org.about,
+      countries: s.org.countries,
+      style: s.org.voice,
+      styleKept: Boolean(s.org.styleKept),
+      fixedTexts: COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => ({ key: c.key, label: c.label })),
+    },
     job: {
       status: j.status,
       facts: filled(j.facts),
       missingFacts: missingFacts(j.facts),
-      template: { key: format.key, label: format.label, family: format.family, usedBy: format.usedBy },
+      template: { key: format.key, label: format.label, family: format.family, usedBy: format.usedBy, content: contentOf(format, s.org.orgType), words: wordsFor(j.tags.length) },
       style: j.style ?? null,
       proposedStyle: proposedStyle(s),
       inView: focus ?? null,
       canUndo: Boolean(j.lastChange),
       sections: j.tags.map((k) => {
         const sec = j.sections.find((x) => x.key === k);
-        return { key: k, heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format), fixed: FIXED_SECTIONS.includes(k), by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null, text: sec ? sec.lines.join('\n') : null };
+        return { key: k, heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format), fixed: FIXED_SECTIONS.includes(k), by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null, approved: j.walk ? j.walk.approved.includes(k) : null, text: sec ? sec.lines.join('\n') : null };
       }),
     },
-    recommendation: { key: rec.key, label: recFormat.label, reason: rec.reason, sections: recCount, words: wordsFor(recCount), others: rec.others.map((k) => ({ key: k, label: formatOf(s, k).label, usedBy: formatOf(s, k).usedBy })) },
+    walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,
+    recommendation: {
+      key: rec.key,
+      label: recFormat.label,
+      reason: rec.reason,
+      sections: recCount,
+      words: wordsFor(recCount),
+      added: recKeys.filter((k) => !recFormat.order.some((o) => o.key === k) && TYPE_REASONS[k]).map((k) => ({ heading: headingFor(k, recFormat), why: TYPE_REASONS[k] })),
+      others: rec.others.map((k) => ({ key: k, label: formatOf(s, k).label, usedBy: formatOf(s, k).usedBy })),
+    },
     templates: s.formats.filter((f) => !f.key.startsWith('pasted-')).map((f) => ({ key: f.key, label: f.label, family: f.family, usedBy: f.usedBy, headings: f.order.map((o) => o.heading) })),
     sectionTypes: SECTIONS.map((x) => ({ key: x.key, label: x.label, group: x.group, hint: x.hint })),
     styles: STYLES,
@@ -132,23 +185,28 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
   };
 }
 
+/** What the window says to the AI when it asks it to go on by itself: write the part the job has reached. */
+export const GO_ON = 'Go on with the next step: write it now.';
+
 /**
  * Sends one message to the AI and carries out its answer. Returns what was applied, or null when the AI is off or failed, in which
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.
+ * `silent`: the window asks the AI to go on by itself (to write the next section), named in the chat while it writes.
  */
-export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; open: (t: OpenTarget) => void }): Promise<Applied | null> {
+export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; open: (t: OpenTarget) => void }): Promise<Applied | null> {
   const first = Boolean(opts.first);
+  const silent = opts.silent;
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || snap.status !== 'on' || snap.pending[id]) return null;
-  set({ pending: { ...snap.pending, [id]: { text, first } }, fallback: { ...snap.fallback, [id]: '' } });
+  set({ pending: { ...snap.pending, [id]: { text: silent ? '' : text, first, ...(silent ? { silent } : {}) } }, fallback: { ...snap.fallback, [id]: '' } });
   const stop = new AbortController();
   const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(AI_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, first, context: contextFor(s, j, opts.focus, first), ...(snap.model ? { model: snap.model } : {}) }),
+      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first), ...(snap.model ? { model: snap.model } : {}) }),
       signal: stop.signal,
       cache: 'no-store',
     });
@@ -156,7 +214,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
-    return applyAiTurn(id, first ? null : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by);
+    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by);
   } catch {
     set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;

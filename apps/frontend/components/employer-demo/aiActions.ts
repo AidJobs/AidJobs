@@ -1,24 +1,35 @@
 'use client';
 
 import {
+  acceptPoint,
   aiExchange,
   applyFormat,
   applyTemplate,
+  approveSection,
   chooseStyle,
+  confirmChange,
   keepStyleForAll,
+  leavePoint,
   missingFacts,
   renameSection,
   reorderSections,
+  setApply,
   setFactsFromChat,
+  setPace,
   setStyle,
+  settleQuestion,
+  toggleCommitment,
   toggleSection,
   undoLastChange,
   writeSections,
 } from './actions';
-import { CONTRACTS, daysUntil, extractFacts, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
+import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
+import { ASKS, checkPoints, DECLINABLE, FIXED_SECTIONS, isSettled, isWritten, LEFT, nextStep, stepKey } from './flow';
 import { STYLES } from './setup';
 import { getState } from './store';
-import type { ChatMsg, DemoJob, Engagement, Facts, State } from './types';
+import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, State } from './types';
+
+export { FIXED_SECTIONS };
 
 /**
  * The demo's side of the AI chat (employer-side plan, section 19, "The AI chat in the demo"): the AI understands and writes; the demo
@@ -28,12 +39,30 @@ import type { ChatMsg, DemoJob, Engagement, Facts, State } from './types';
 export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 'check', 'publish', 'preview', 'versions', 'download', 'delete', 'review'] as const;
 export type OpenTarget = (typeof OPEN_TARGETS)[number] | `section:${string}`;
 
-/** Sections the rules write from the organisation's profile and its application settings; the AI never writes them. */
-export const FIXED_SECTIONS = ['about', 'apply'];
-
-const ASKS: Array<NonNullable<ChatMsg['ask']>> = ['title', 'place', 'deadline', 'contract'];
 const ENGAGEMENT_KEYS: Engagement[] = ['job', 'consultancy', 'internship', 'volunteer'];
-const ORDER = ['undo', 'set_facts', 'use_template', 'set_style', 'keep_style', 'add_section', 'remove_section', 'reorder_sections', 'rename_section', 'write_section', 'open', 'ask'];
+const ORDER = [
+  'undo',
+  'confirm_change',
+  'set_facts',
+  'set_apply',
+  'settle',
+  'use_template',
+  'set_style',
+  'keep_style',
+  'set_pace',
+  'add_section',
+  'remove_section',
+  'reorder_sections',
+  'rename_section',
+  'write_section',
+  'approve_section',
+  'fixed_text',
+  'leave_point',
+  'accept_point',
+  'open',
+  'ask',
+];
+const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
 
 const PAY = /(?:\b(?:USD|US\$|EUR|GBP|KES|UGX|TZS|ETB|NGN|ZAR|INR|BDT|PKR|AUD|CAD|CHF|SEK|NOK|DKK|XOF|XAF)|[$€£])\s?\d[\d,.]*\s?k?\b/gi;
 const CONTACT = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b|\bhttps?:\/\/[^\s)]+|\bwww\.[^\s)]+/gi;
@@ -212,13 +241,13 @@ export function checkFacts(raw: unknown, job: DemoJob, today: number): { patch: 
 /** "2,500" and "2500" as the same number. */
 const plainNumbers = (t: string) => t.replace(/(\d)[,.\s](?=\d{3}\b)/g, '$1');
 
-/** Everything the job and the organisation already say, which a written section may quote. */
-function known(s: State, job: DemoJob): string {
-  return [JSON.stringify(job.facts), JSON.stringify(job.apply), s.org.website, s.org.careersUrl, s.org.domain, s.org.about, ...job.chat.filter((m) => m.from === 'user').map((m) => m.text)].join(' ').toLowerCase();
+/** Everything the job, the organisation, and the user already say, which a written section may quote; `said`: the message being answered. */
+function known(s: State, job: DemoJob, said = ''): string {
+  return [JSON.stringify(job.facts), JSON.stringify(job.apply), s.org.website, s.org.careersUrl, s.org.domain, s.org.about, ...job.chat.filter((m) => m.from === 'user').map((m) => m.text), said].join(' ').toLowerCase();
 }
 
 /** A written section's lines, cleaned, or the reason it is refused. */
-export function checkLines(raw: unknown, key: string, s: State, job: DemoJob): { lines: string[] } | { refused: string } {
+export function checkLines(raw: unknown, key: string, s: State, job: DemoJob, said = ''): { lines: string[] } | { refused: string } {
   const label = job.sections.find((x) => x.key === key)?.title ?? SECTION_BY_KEY[key]?.label ?? key;
   if (!Array.isArray(raw)) return { refused: `${label}: no text` };
   const headings = [label, SECTION_BY_KEY[key]?.label ?? key].map((h) => h.toLowerCase());
@@ -228,7 +257,7 @@ export function checkLines(raw: unknown, key: string, s: State, job: DemoJob): {
     .filter((l) => l.trim() && !headings.includes(l.trim().replace(/[:*]+$/, '').replace(/^\*+/, '').toLowerCase()));
   if (!lines.length || lines.length > 60 || lines.some((l) => l.length > 2000)) return { refused: `${label}: not usable text` };
   const text = lines.join('\n');
-  const facts = plainNumbers(known(s, job));
+  const facts = plainNumbers(known(s, job, said));
   const pay = (text.match(PAY) ?? []).filter((m) => !facts.includes(plainNumbers(m).match(/\d+/)?.[0] ?? '\u0000'));
   if (pay.length) return { refused: `${label}: it named pay that was not given (${pay[0]})` };
   const contact = (text.match(CONTACT) ?? []).filter((m) => !facts.includes(m.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')));
@@ -241,7 +270,8 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
 /**
  * Carries out one AI turn on a job: each action checked against the job as it stands at that point, in a fixed order (undo, facts, the
  * template, the style, the outline, the text, then what to open), and the conversation gets the message and the AI's reply. `said` is
- * null for the reply to the first message. `open` brings a part, a panel, or a dialog into view in the window.
+ * null for the reply to the first message, and empty when the window asked the AI to go on by itself (to write the next section). `open`
+ * brings a part, a panel, or a dialog into view in the window.
  */
 export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string): Applied {
   const refused: string[] = [];
@@ -254,13 +284,17 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const actions = valid.filter((a) => ORDER.includes(String(a.type))).sort((a, b) => ORDER.indexOf(String(a.type)) - ORDER.indexOf(String(b.type)));
   for (const a of valid) if (!ORDER.includes(String(a.type))) refused.push(`an action the demo does not have ("${String(a.type).slice(0, 30)}")`);
   const writes: Array<{ key: string; lines: string[] }> = [];
+  const note = said ? said.slice(0, 60) : 'Written by AidJobs';
   let ask: { fact?: ChatMsg['ask']; quick?: string[] } = {};
   for (const a of actions) {
+    // The text is written before anything that follows it in the order, so a section written and approved in one answer is approved as written.
+    if (writes.length && ORDER.indexOf(String(a.type)) > ORDER.indexOf('write_section')) writeSections(id, writes.splice(0), note);
     const s = getState();
     const j = job();
     if (!j) break;
     const section = typeof a.section === 'string' ? a.section : '';
-    const name = j.sections.find((x) => x.key === section)?.title ?? SECTION_BY_KEY[section]?.label ?? section;
+    const format = s.formats.find((f) => f.key === j.format) ?? s.formats[0];
+    const name = j.sections.find((x) => x.key === section)?.title ?? j.renamed?.[section] ?? (SECTION_BY_KEY[section] ? headingFor(section, format) : section);
     switch (a.type) {
       case 'undo':
         if (j.lastChange) undoLastChange(id);
@@ -315,7 +349,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         else if (!j.tags.includes(section)) refused.push(`${name || 'a section'}: not in this job`);
         else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
         else {
-          const out = checkLines(a.lines, section, s, j);
+          const out = checkLines(a.lines, section, s, j, said ?? '');
           if ('refused' in out) refused.push(out.refused);
           else writes.push({ key: section, lines: out.lines });
         }
@@ -328,20 +362,82 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         else if (!ok) refused.push(`opening "${t.slice(0, 30)}"`);
         break;
       }
+      case 'set_pace': {
+        const pace = oneOf(a.pace, ['step', 'all'] as const);
+        if (!pace || !j.walk) refused.push('the pace');
+        else if (j.setup === 'template') refused.push('the pace, before the template');
+        else setPace(id, pace);
+        break;
+      }
+      case 'approve_section':
+        if (!j.walk || !j.tags.includes(section) || !isWritten(j, section)) refused.push(`approving ${name || 'a section'}: it is not written yet`);
+        else approveSection(id, section);
+        break;
+      case 'settle': {
+        const what = typeof a.fact === 'string' ? a.fact : '';
+        if (!j.walk || !([...DECLINABLE, ...LEFT] as string[]).includes(what)) refused.push(`settling "${what.slice(0, 30)}"`);
+        else settleQuestion(id, what);
+        break;
+      }
+      case 'set_apply': {
+        const method = oneOf(a.method, METHODS);
+        const address = a.address === undefined ? undefined : str(a.address, 120);
+        const given = address ? known(s, j, said ?? '').includes(address.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')) : true;
+        if (!method) refused.push('the way to apply');
+        else if (a.address !== undefined && (!address || !given)) refused.push('an application address that was not given');
+        else {
+          setApply(id, { method, ...(address ? { address } : {}) });
+          settleQuestion(id, 'method');
+        }
+        break;
+      }
+      case 'fixed_text': {
+        const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+        const valid = (k: string) => COMMITMENTS.some((c) => c.key === k) && (k !== 'mds' || s.org.mdsMember);
+        const remove = keys(a.remove);
+        const add = keys(a.add);
+        if ([...remove, ...add].some((k) => !valid(k))) refused.push('a fixed text the organisation does not have');
+        else {
+          for (const k of remove) if (j.commitments.includes(k)) toggleCommitment(id, k);
+          for (const k of add) if (!job()?.commitments.includes(k)) toggleCommitment(id, k);
+        }
+        break;
+      }
+      case 'leave_point': {
+        const point = checkPoints(j, s).find((p) => p.key === a.point);
+        if (!point) refused.push('leaving a check point that is not open');
+        else leavePoint(id, point.key);
+        break;
+      }
+      case 'accept_point': {
+        const point = checkPoints(j, s).find((p) => p.key === a.point);
+        const reason = str(a.reason, 200);
+        if (!point?.hit || !reason || reason.length < 5) refused.push('keeping wording as a genuine requirement, without its reason');
+        else acceptPoint(id, point.key, point.hit, reason);
+        break;
+      }
+      case 'confirm_change':
+        if (!j.walk?.pending || typeof a.apply !== 'boolean') refused.push('the changed lines');
+        else confirmChange(id, a.apply);
+        break;
       case 'ask': {
         const fact = oneOf(a.fact, ASKS);
-        const quick = Array.isArray(a.quick) ? a.quick.filter((q): q is string => typeof q === 'string' && q.trim().length > 0 && q.length <= 60 && !/[\n\r]/.test(q)).slice(0, 4) : [];
-        ask = { fact: fact && missingFacts(j.facts).includes(fact) ? fact : undefined, quick: quick.length ? quick : undefined };
+        const quick = Array.isArray(a.quick) ? a.quick.filter((q): q is string => typeof q === 'string' && q.trim().length > 0 && q.length <= 60 && !/[\n\r]/.test(q)).slice(0, 6) : [];
+        const unanswered = (k: AskKind) => (j.walk ? !isSettled(k, j) : (missingFacts(j.facts) as AskKind[]).includes(k));
+        ask = { fact: fact && unanswered(fact) ? fact : undefined, quick: quick.length ? quick : undefined };
         break;
       }
     }
   }
-  if (writes.length) writeSections(id, writes, said ? said.slice(0, 60) : 'Written by AidJobs');
+  if (writes.length) writeSections(id, writes, note);
   const now = job();
   if (!now) return { refused, opened };
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
-  const note = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${note}`, quick: ask.quick, ask: ask.fact, by }, !/\?\s*$/.test(turn.reply));
+  const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
+  const asks = /\?\s*$/.test(turn.reply);
+  // A reply that asks a question stands for the step the job is now at, so the rules do not ask it again.
+  const step = asks && now.walk ? stepKey(nextStep(now, getState())) : undefined;
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ask.quick, ask: ask.fact, by, step }, !asks);
   for (const t of opened) open(t);
   return { refused, opened };
 }
