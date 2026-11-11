@@ -341,8 +341,8 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
  * along the way. `said` is null for the first reply, whose message is already there. `askNext`: a reply that asks nothing is followed
  * by the next missing fact's question, as the rules do.
  */
-export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask'] }, askNext = true) {
-  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true }] }));
+export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string }, askNext = true) {
+  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}) }] }));
   if (askNext) ensureAsk(id);
 }
 

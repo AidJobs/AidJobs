@@ -434,6 +434,12 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
         {shown.map((m, i) => (
           <div key={m.id} className="ej-bubble" data-from={m.from}>
             {rich(m.text)}
+            {m.ai && m.by && (
+              <span className="ej-ai-by">
+                <span className="sr-only">Written by </span>
+                {m.by}
+              </span>
+            )}
             {m.from === 'ai' && m.quick && m.quick.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {m.quick.map((q) => (
@@ -504,7 +510,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
               autoFocus={autoFocus}
               minHeight={box}
             />
-            {ai.status === 'on' && <p className="ej-ai-note m-0">Messages go to an AI provider (Amazon Bedrock). Use sample details only.</p>}
+            {ai.status === 'on' && <p className="ej-ai-note m-0">Messages go to an AI model through {ai.provider || 'an AI provider'}. Use sample details only.</p>}
           </>
         )}
       </div>

@@ -106,8 +106,11 @@ export type Facts = {
 /** `ai`: written by the AI chat; like a hand edit, it is kept when the facts change rather than rebuilt by the rules. */
 export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean };
 
-/** `ai`: a reply written by the AI chat, so its answer buttons go back to the AI; the rules' own answers go to the rules. */
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract'; ai?: boolean };
+/**
+ * `ai`: a reply written by the AI chat, so its answer buttons go back to the AI; the rules' own answers go to the rules. `by`: the
+ * model that wrote it, shown under the reply while two models are compared in the preview.
+ */
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: 'title' | 'place' | 'deadline' | 'contract'; ai?: boolean; by?: string };
 
 export type Remark = {
   id: string;

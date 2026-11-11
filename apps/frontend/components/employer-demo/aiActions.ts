@@ -243,7 +243,7 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
  * template, the style, the outline, the text, then what to open), and the conversation gets the message and the AI's reply. `said` is
  * null for the reply to the first message. `open` brings a part, a panel, or a dialog into view in the window.
  */
-export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void): Applied {
+export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string): Applied {
   const refused: string[] = [];
   const opened: OpenTarget[] = [];
   const job = () => getState().jobs.find((j) => j.id === id);
@@ -341,7 +341,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   if (!now) return { refused, opened };
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const note = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${note}`, quick: ask.quick, ask: ask.fact }, !/\?\s*$/.test(turn.reply));
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${note}`, quick: ask.quick, ask: ask.fact, by }, !/\?\s*$/.test(turn.reply));
   for (const t of opened) open(t);
   return { refused, opened };
 }

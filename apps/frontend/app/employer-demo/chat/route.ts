@@ -39,8 +39,8 @@ export async function GET() {
   if (!allowed()) return answer({ error: 'not found' }, 404);
   const p = provider();
   if (!p) return answer({ ai: false });
-  if (p.name === 'bedrock') return answer({ ai: true, models: [{ key: 'kimi', label: 'Kimi K2.5' }], default: 'kimi' });
-  return answer({ ai: true, models: Object.entries(AI_MODELS).map(([key, m]) => ({ key, label: m.label })), default: DEFAULT_MODEL });
+  if (p.name === 'bedrock') return answer({ ai: true, provider: 'Amazon Bedrock', models: [{ key: 'kimi', label: 'Kimi K2.5' }], default: 'kimi' });
+  return answer({ ai: true, provider: 'OpenRouter, with zero data retention', models: Object.entries(AI_MODELS).map(([key, m]) => ({ key, label: m.label })), default: DEFAULT_MODEL });
 }
 
 export async function POST(req: NextRequest) {

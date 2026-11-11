@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 import { setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
-import { AI_ROUTE, aiOn, aiState, askAi, resetAi } from '../../components/employer-demo/ai';
+import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi } from '../../components/employer-demo/ai';
 import { addDays } from '../../components/employer-demo/engine';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -194,6 +194,31 @@ describe('the AI chat: one message through the route, and the fallback', () => {
     }
     expect(aiState().fallback['job-comms']).toBe("The AI could not answer just now, so the demo's own rules did.");
     expect(aiState().pending).toEqual({});
+  });
+
+  it('sends the model chosen in the demo, remembers the choice, and labels the reply with the model that answered', async () => {
+    resetAi('on', [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }]);
+    chooseAiModel('gpt-99');
+    expect(aiState().model).toBe('terra');
+    chooseAiModel('sonnet');
+    expect(aiState().model).toBe('sonnet');
+    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBe('sonnet');
+    const f = answer(200, { reply: 'Hello.', actions: [], model: 'sonnet' });
+    await askAi('job-comms', 'hi', { open });
+    expect(JSON.parse(f.mock.calls[0][1]?.body ?? '{}').model).toBe('sonnet');
+    expect(lastAi('job-comms')).toMatchObject({ text: 'Hello.', by: 'Claude Sonnet 5.5' });
+  });
+
+  it('a saved choice the route still offers is used on the next visit; otherwise the route default', async () => {
+    localStorage.setItem('aidjobs.employerDemo.aiModel', 'sonnet');
+    answer(200, { ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra', provider: 'OpenRouter, with zero data retention' });
+    expect(await probeAi()).toBe(true);
+    expect(aiState()).toMatchObject({ model: 'sonnet', provider: 'OpenRouter, with zero data retention' });
+    resetAi();
+    localStorage.setItem('aidjobs.employerDemo.aiModel', 'kimi');
+    answer(200, { ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }], default: 'terra' });
+    await probeAi();
+    expect(aiState().model).toBe('terra');
   });
 
   it('one message at a time per job', async () => {

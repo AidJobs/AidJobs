@@ -1,8 +1,8 @@
 'use client';
 
-import { Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Users } from 'lucide-react';
+import { Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { probeAi } from './ai';
+import { chooseAiModel, probeAi, useAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Billing from './Billing';
 import { currentMonth, FREE_PER_MONTH, freeLeft, monthName, paidJobsLeft } from './plans';
@@ -19,7 +19,37 @@ import MenuButton from './MenuButton';
 import Window from './Window';
 import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
-/** "View as" and "Reset demo": demo-only controls, at the bottom of the side menu. */
+/** While the AI is on and offers more than one model: which one writes, for comparing them in the preview (demo only). */
+function ModelChoice({ collapsed, inHeader }: { collapsed: boolean; inHeader: boolean }) {
+  const ai = useAi();
+  if (ai.status !== 'on' || ai.models.length < 2) return null;
+  const current = ai.models.find((m) => m.key === ai.model);
+  if (collapsed) {
+    return (
+      <MenuButton
+        label={`AI model: ${current?.label ?? ''}`}
+        trigger={<Sparkles size={15} strokeWidth={1.8} />}
+        align={inHeader ? 'right' : 'left'}
+        up={!inHeader}
+        actions={ai.models.map((m) => ({ label: m.label, current: m.key === ai.model, run: () => chooseAiModel(m.key) }))}
+      />
+    );
+  }
+  return (
+    <span className="flex w-full items-center gap-1.5">
+      <Sparkles size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
+      <select className="aj-pill min-w-0 flex-1" style={{ height: 32, paddingRight: 6 }} value={ai.model} onChange={(e) => chooseAiModel(e.target.value)} aria-label="AI model (demo only)">
+        {ai.models.map((m) => (
+          <option key={m.key} value={m.key}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/** "View as", the AI model, and "Reset demo": demo-only controls, at the bottom of the side menu. */
 function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boolean; onReset: () => void; inHeader?: boolean }) {
   const s = useDemo();
   const reviewers = s.team.filter((p) => p.role === 'reviewer');
@@ -47,6 +77,7 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
           up={!inHeader}
           actions={[{ label: `${s.me.name.split(' ')[0]} (you)`, current: !s.reviewerAs, run: () => pick(null) }, ...reviewers.map((p) => ({ label: `${p.name.split(' ')[0]} (reviewer)`, current: s.reviewerAs === p.id, run: () => pick(p.id) }))]}
         />
+        <ModelChoice collapsed inHeader={inHeader} />
         {reset}
       </>
     );
@@ -66,6 +97,7 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
         </select>
         {reset}
       </span>
+      <ModelChoice collapsed={false} inHeader={inHeader} />
     </>
   );
 }

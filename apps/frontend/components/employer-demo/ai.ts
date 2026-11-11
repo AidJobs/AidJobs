@@ -17,10 +17,14 @@ export const AI_ROUTE = '/employer-demo/chat';
 const TIMEOUT_MS = 55_000;
 const HISTORY = 14;
 
-type Status = 'unknown' | 'on' | 'off';
-type Snapshot = { status: Status; pending: Record<string, { text: string; first: boolean }>; fallback: Record<string, string> };
+const MODEL_KEY = 'aidjobs.employerDemo.aiModel';
 
-let snap: Snapshot = { status: 'unknown', pending: {}, fallback: {} };
+type Status = 'unknown' | 'on' | 'off';
+export type AiModel = { key: string; label: string };
+/** `models` and `model`: the models the route offers and the one chosen in the demo's controls, for comparing them in the preview. */
+type Snapshot = { status: Status; pending: Record<string, { text: string; first: boolean }>; fallback: Record<string, string>; models: AiModel[]; model: string; provider: string };
+
+let snap: Snapshot = { status: 'unknown', pending: {}, fallback: {}, models: [], model: '', provider: '' };
 let probing: Promise<boolean> | null = null;
 const listeners = new Set<() => void>();
 
@@ -54,8 +58,11 @@ export function probeAi(): Promise<boolean> {
   probing = (async () => {
     try {
       const res = await fetch(AI_ROUTE, { method: 'GET', cache: 'no-store' });
-      const data = res.ok ? ((await res.json()) as { ai?: unknown }) : null;
-      set({ status: data?.ai === true ? 'on' : 'off' });
+      const data = res.ok ? ((await res.json()) as { ai?: unknown; models?: unknown; default?: unknown; provider?: unknown }) : null;
+      const models = Array.isArray(data?.models) ? data.models.filter((m): m is AiModel => Boolean(m) && typeof m.key === 'string' && typeof m.label === 'string') : [];
+      const saved = readModel();
+      const model = models.some((m) => m.key === saved) ? saved : typeof data?.default === 'string' && models.some((m) => m.key === data.default) ? data.default : (models[0]?.key ?? '');
+      set({ status: data?.ai === true ? 'on' : 'off', models, model, provider: typeof data?.provider === 'string' ? data.provider.slice(0, 60) : 'an AI provider' });
     } catch {
       set({ status: 'off' });
     }
@@ -64,10 +71,29 @@ export function probeAi(): Promise<boolean> {
   return probing;
 }
 
+function readModel(): string {
+  try {
+    return localStorage.getItem(MODEL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** The model chosen in the demo's controls, remembered in this browser; one the route does not offer is ignored. */
+export function chooseAiModel(key: string) {
+  if (!snap.models.some((m) => m.key === key)) return;
+  try {
+    localStorage.setItem(MODEL_KEY, key);
+  } catch {
+    /* storage unavailable: the choice holds for this visit */
+  }
+  set({ model: key });
+}
+
 /** For tests and the demo's reset: the AI's state as at the start of a visit. */
-export function resetAi(status: Status = 'unknown') {
+export function resetAi(status: Status = 'unknown', models: AiModel[] = [], provider = '') {
   probing = null;
-  snap = { status, pending: {}, fallback: {} };
+  snap = { status, pending: {}, fallback: {}, models, model: models[0]?.key ?? '', provider };
   listeners.forEach((l) => l());
 }
 
@@ -126,14 +152,15 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const res = await fetch(AI_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, first, context: contextFor(s, j, opts.focus, first) }),
+      body: JSON.stringify({ message: text, first, context: contextFor(s, j, opts.focus, first), ...(snap.model ? { model: snap.model } : {}) }),
       signal: stop.signal,
       cache: 'no-store',
     });
     if (res.status === 503 || res.status === 404) set({ status: 'off' });
-    const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown }) : null;
+    const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
-    return applyAiTurn(id, first ? null : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open);
+    const by = snap.models.find((m) => m.key === data.model)?.label;
+    return applyAiTurn(id, first ? null : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by);
   } catch {
     set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;

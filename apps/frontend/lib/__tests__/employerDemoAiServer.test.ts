@@ -128,7 +128,7 @@ describe('the route', () => {
     const res = await GET();
     expect(res.headers.get('cache-control')).toBe('no-store');
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ ai: true, models: [{ key: 'kimi', label: 'Kimi K2.5' }], default: 'kimi' });
+    expect(JSON.parse(text)).toEqual({ ai: true, provider: 'Amazon Bedrock', models: [{ key: 'kimi', label: 'Kimi K2.5' }], default: 'kimi' });
     expect(text).not.toContain('AKIDTEST');
   });
 
@@ -136,7 +136,7 @@ describe('the route', () => {
     withKeys();
     process.env.AIDJOBS_OPENROUTER_API_KEY = 'sk-or-test-key';
     const text = await (await GET()).text();
-    expect(JSON.parse(text)).toEqual({ ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra' });
+    expect(JSON.parse(text)).toEqual({ ai: true, provider: 'OpenRouter, with zero data retention', models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra' });
     expect(text).not.toContain('sk-or-test-key');
   });
 

@@ -1567,7 +1567,7 @@ describe('employer demo: asking the chat to act', () => {
 });
 
 describe('employer demo: the AI chat, with a stand-in model on its own route', () => {
-  type Sent = { message: string; first: boolean; context: { stage: string; job: { sections: Array<{ key: string; fixed: boolean }> }; recommendation: { key: string } } };
+  type Sent = { message: string; first: boolean; model?: string; context: { stage: string; job: { sections: Array<{ key: string; fixed: boolean }> }; recommendation: { key: string } } };
   const flush = () =>
     act(async () => {
       for (let i = 0; i < 30; i++) await Promise.resolve();
@@ -1584,19 +1584,20 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
   const posts = () => aiCalls.filter((c) => c.method === 'POST').map((c) => JSON.parse(c.body) as Sent);
   const stage = { failNext: false };
   const model = (method: string, body: string): Answer => {
-    if (method === 'GET') return { status: 200, body: { ai: true } };
+    if (method === 'GET') return { status: 200, body: { ai: true, provider: 'OpenRouter, with zero data retention', models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra' } };
     if (stage.failNext) {
       stage.failNext = false;
       return { status: 502, body: { error: 'failed' } };
     }
-    const { first, context } = JSON.parse(body) as Sent;
-    if (first) return { status: 200, body: { reply: 'A nutrition role in Juba: I would use your usual template. Shall I?', actions: [{ type: 'ask', quick: ['Yes, use it'] }] } };
-    if (context.stage === 'template') return { status: 200, body: { reply: 'Done. How should it sound: warm and plain?', actions: [{ type: 'use_template', template: context.recommendation.key }] } };
+    const { first, context, model: chosen } = JSON.parse(body) as Sent & { model?: string };
+    const ok = (b: Record<string, unknown>): Answer => ({ status: 200, body: { ...b, model: chosen } });
+    if (first) return ok({ reply: 'A nutrition role in Juba: I would use your usual template. Shall I?', actions: [{ type: 'ask', quick: ['Yes, use it'] }] });
+    if (context.stage === 'template') return ok({ reply: 'Done. How should it sound: warm and plain?', actions: [{ type: 'use_template', template: context.recommendation.key }] });
     if (context.stage === 'style') {
       const writes = context.job.sections.filter((x) => !x.fixed).map((x) => ({ type: 'write_section', section: x.key, lines: [`Written by the stand-in model for ${x.key}.`] }));
-      return { status: 200, body: { reply: 'Here is the first draft. Keep this style for every job?', actions: [{ type: 'set_style', style: ['Warm', 'Plain English'] }, ...writes, { type: 'write_section', section: 'apply', lines: ['Send your CV to jobs@invented.example'] }, { type: 'ask', quick: ['Keep it for all jobs', 'Just this job'] }] } };
+      return ok({ reply: 'Here is the first draft. Keep this style for every job?', actions: [{ type: 'set_style', style: ['Warm', 'Plain English'] }, ...writes, { type: 'write_section', section: 'apply', lines: ['Send your CV to jobs@invented.example'] }, { type: 'ask', quick: ['Keep it for all jobs', 'Just this job'] }] });
     }
-    return { status: 200, body: { reply: 'Kept for every job.', actions: [{ type: 'keep_style', all: true }] } };
+    return ok({ reply: 'Kept for every job.', actions: [{ type: 'keep_style', all: true }] });
   };
 
   afterAll(() => {
@@ -1627,8 +1628,12 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     expect(container.textContent).not.toContain('Reading your role…');
     shows('A nutrition role in Juba');
     expect(container.textContent).not.toContain('First, the template.');
-    expect(posts()[0]).toMatchObject({ first: true, message: "We're hiring a Nutrition Officer in Juba, closing 30 December 2026", context: { stage: 'template' } });
-    shows('Messages go to an AI provider (Amazon Bedrock). Use sample details only.');
+    expect(posts()[0]).toMatchObject({ first: true, message: "We're hiring a Nutrition Officer in Juba, closing 30 December 2026", context: { stage: 'template' }, model: 'terra' });
+    shows('Messages go to an AI model through OpenRouter, with zero data retention. Use sample details only.');
+    const choice = container.querySelector('select[aria-label="AI model (demo only)"]') as HTMLSelectElement;
+    expect(Array.from(choice.options).map((o) => o.textContent)).toEqual(['GPT-6.1 Terra', 'Claude Sonnet 5.5']);
+    expect(choice.value).toBe('terra');
+    expect(container.querySelector('.ej-ai-by')?.textContent).toBe('Written by GPT-6.1 Terra');
 
     say('Yes, use it');
     shows('Thinking…');
@@ -1637,8 +1642,15 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     expect(job().setup).toBe('style');
     shows('How should it sound: warm and plain?');
 
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(choice, 'sonnet');
+      choice.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBe('sonnet');
     say('Warm and plain, please');
     await flush();
+    expect(posts().at(-1)?.model).toBe('sonnet');
+    expect(job().chat.filter((m) => m.ai).map((m) => m.by)).toEqual(['GPT-6.1 Terra', 'GPT-6.1 Terra', 'Claude Sonnet 5.5']);
     expect(job().setup).toBeUndefined();
     const written = job().sections.filter((x) => x.ai);
     expect(written.length).toBe(job().sections.filter((x) => x.key !== 'about' && x.key !== 'apply').length);
