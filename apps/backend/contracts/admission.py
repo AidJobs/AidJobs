@@ -167,7 +167,9 @@ def _vacancy_shape(url: str) -> bool:
 
 
 def _structured(job: dict, record_class: str) -> bool:
-    if record_class == "job_posting":
+    # A platform reader's job card is a structured record like a posting (crawler plan, C3,
+    # amendment of 11 November 2026): its link need carry no job number.
+    if record_class in ("job_posting", "reader_card"):
         return _present(job, _JOB_POSTING_FIELDS)
     if record_class == "rss":
         return _present(job, _RSS_FIELDS)
@@ -242,7 +244,7 @@ def too_thin(job: dict, reason: str) -> bool:
         return True
     return (
         reason == "no_qualifying_structured_evidence"
-        and job.get("record_class") == "job_posting"
+        and job.get("record_class") in ("job_posting", "reader_card")
     )
 
 
