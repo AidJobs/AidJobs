@@ -739,6 +739,17 @@ def test_r5_is_held_until_the_un_terms_are_decided(tmp_path, monkeypatch):
     assert adverts.requests_sent(tmp_path / "r5") == 0
 
 
+def test_a_slow_down_answer_doubles_the_spacing(tmp_path):
+    waits = []
+    s = FakeSession([FakeResponse(503), FakeResponse(206, b"x"), FakeResponse(206, b"x")])
+    clock = iter(range(0, 1000, 1))
+    r = adverts.ArchiveReader(tmp_path, 10, session=s, sleep=waits.append, clock=lambda: next(clock))
+    for i in range(3):
+        r.get("crawl-data/a", 0, 1, f"p{i}")
+    assert abs(r.interval - 12.8) < 1e-9 and max(waits) > 15        # 10 doubled to 20, eased twice to 12.8
+    assert abs(adverts.ArchiveReader(tmp_path, 10, session=s, sleep=lambda x: None).interval - 12.8) < 1e-9
+
+
 def test_archive_streaks_persist_and_redirects_are_not_followed(tmp_path):
     s = FakeSession([FakeResponse(429)])
     adverts.ArchiveReader(tmp_path, 10, session=s, sleep=lambda x: None).get("crawl-data/a", 0, 10, "p1")

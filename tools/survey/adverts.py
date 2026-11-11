@@ -305,10 +305,12 @@ def stop_batch(folder: Path, why: str) -> None:
 
 class ArchiveReader:
     """Byte-range reads from Common Crawl's data server (decision 14): one GET per page with the
-    survey's identity, 10 seconds apart, never retried; only a 206 answer is kept, read no further
-    than the record's length. A 403 stops the batch at once, two 429 or 503 answers in a row stop
-    it, three failures in a row stop it. Each request is one line of the batch's requests.log,
-    written before it is sent, so the batch's size holds across runs."""
+    survey's identity, at least 10 seconds apart, never retried; only a 206 answer is kept, read no
+    further than the record's length. A 429 or 503 (the server asking to slow down) doubles the
+    spacing, up to 30 seconds, which eases back after answers; a 403 stops the batch at once, two
+    429 or 503 answers in a row stop it for the day, three failures in a row stop it. Each request
+    is one line of the batch's requests.log, written before it is sent, so the batch's size holds
+    across runs."""
 
     INTERVAL, REFUSALS, FAILURES, SLACK = 10.0, 2, 3, 4096
 
@@ -327,10 +329,12 @@ class ArchiveReader:
         state = folder / "archive-state.json"
         saved = json.loads(state.read_text(encoding="utf-8")) if state.exists() else {}
         self.last, self.refusals, self.failures = -1e9, saved.get("refusals", 0), saved.get("failures", 0)
+        self.interval = saved.get("interval", self.INTERVAL)
 
     def _save_state(self) -> None:
         (self.folder / "archive-state.json").write_text(
-            json.dumps({"refusals": self.refusals, "failures": self.failures}), encoding="utf-8")
+            json.dumps({"refusals": self.refusals, "failures": self.failures, "interval": self.interval}),
+            encoding="utf-8")
 
     def _log(self, text: str) -> None:
         with (self.folder / "requests.log").open("a", encoding="utf-8") as handle:
@@ -339,7 +343,7 @@ class ArchiveReader:
     def get(self, filename: str, offset: int, length: int, what: str) -> bytes | None:
         if requests_sent(self.folder) >= self.cap:
             raise Stopped(f"stopped: the batch's size of {self.cap} requests reached")
-        wait = self.INTERVAL - (self.clock() - self.last)
+        wait = self.interval - (self.clock() - self.last)
         if wait > 0:
             self.sleep(wait)
         self.last = self.clock()
@@ -361,12 +365,14 @@ class ArchiveReader:
             handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\t{status}\t{len(body)}\t{what}\n")
         if status == 206 and len(body) <= length + self.SLACK:
             self.refusals = self.failures = 0
+            self.interval = max(self.INTERVAL, self.interval * 0.8)
             self._save_state()
             return body
         if status == 403:
             stop_batch(self.folder, f"HTTP 403 ({what})")
         if status in (429, 503):
             self.refusals += 1
+            self.interval = min(self.interval * 2, 30.0)     # the server asks to slow down (step E's rule)
             self._save_state()
             if self.refusals >= self.REFUSALS:
                 stop_batch(self.folder, f"{self.refusals} refusals in a row (HTTP {status})")
