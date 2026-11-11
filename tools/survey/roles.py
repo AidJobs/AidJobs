@@ -72,6 +72,18 @@ UN_NAMES = re.compile(
     r"|International Atomic Energy Agency|International Fund for Agricultural Development"
     r"|International Maritime Organization|World Meteorological Organization|Universal Postal Union"
     r"|International Trade Centre|UN-Habitat|IFAD|WFP|WHO|ILO|FAO|IOM|WIPO|ITU|IAEA)\b")
+UN_HOSTS = re.compile(r"(?:^|\.)(?:un\.org|undp\.org|unicef\.org|ilo\.org|itu\.int|wfp\.org|who\.int|unfpa\.org|"
+                      r"unhcr\.org|iaea\.org|fao\.org|ifad\.org|wipo\.int|unesco\.org|unops\.org|unwomen\.org|"
+                      r"unido\.org|iom\.int|unrwa\.org|unu\.edu|unep\.org|ohchr\.org|unocha\.org|unaids\.org|"
+                      r"unitar\.org|intracen\.org|wmo\.int|imo\.org|upu\.int|icao\.int|unv\.org|unssc\.org)$")
+
+
+def un_system(org_type: str, host: str = "") -> bool:
+    """Whether a page belongs to the UN system, whose terms of use are held for the user's decision
+    (role-survey.md, 19.11): by the organisation's type, or by a UN host."""
+    return org_type in UN_SYSTEM or bool(UN_HOSTS.search((host or "").lower()))
+
+
 RED_CROSS = re.compile(r"red cross|red crescent|croix-rouge|rode kruis|rotes kreuz|\bicrc\b|\bifrc\b",
                        re.IGNORECASE)
 RESEARCH = re.compile(r"\b(?:institut[eo]?|institution|research|university|universit[ée]|centre for"
@@ -302,7 +314,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                       r"\bresident representative\b|\brepr[ée]sentant(?:e)?\b|\bdirect(?:eur|rice) "
                       r"(?:pays|ex[ée]cuti[fv]e?|g[ée]n[ée]ral)|\bchef de (?:mission|base|bureau|"
                       r"d[ée]l[ée]gation)\b|\bcountry lead\b|\bpresident\b|\bfield coordinator\b|"
-                      r"\bhead of country\b|\bcountry coordinator\b|\boffice director\b")),
+                      r"\bhead of country\b|\bcountry coordinator\b|\boffice director\b|"
+                      r"\barea (?:coordinator|manager|director)\b")),
     ("meal", _r(r"\bmonitoring\b|\bevaluation\b|\bmeal\b|\bmel\b|\bmerl?\b|\binformation management\b|"
                 r"\bim (?:officer|assistant|specialist|manager)\b|\bdata (?:analyst|officer|manager|"
                 r"specialist|scientist|management|assistant|collector)\b|\baccountability\b|"
@@ -311,7 +324,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                 r"\bdata (?:analysis|analytics|quality)\b|\bsurveys?\b")),
     ("finance", _r(r"\bfinanc|\baccountant|\baccounting\b|\baccounts\b|\btreasur|\bpayroll\b|"
                    r"\baudit|\bcontroller\b|\bbookkeep|\bcomptab|\bbudget\b|\bfiscal\b|\bcashier\b|"
-                   r"\bcaissi")),
+                   r"\bcaissi|\bap (?:coordinator|manager|officer|specialist|clerk)\b|\baccounts "
+                   r"(?:payable|receivable)\b")),
     ("grants_partnerships", _r(r"\bgrants?\b|\bpartnerships?\b|\bfundrais|\bdonor\b|\bbusiness "
                                r"development\b|\bproposal|\bresource mobili[sz]ation\b|\bphilanthrop|"
                                r"\bmajor (?:gifts?|donors?)\b|\blegac(?:y|ies)\b|\bsupporter\b|"
@@ -320,24 +334,26 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                                r"\bnew business\b|\bcorporate (?:relations|engagement)\b|"
                                r"^(?:senior )?development (?:officer|coordinator|manager|director|"
                                r"associate|assistant|executive)\b|\badvancement\b|\bdonations?\b|"
-                               r"\bgifts?\b|\bsponsorship\b")),
+                               r"\bgifts?\b|\bsponsorship\b|\bawards?\b")),
     ("commercial", _r(r"\bsales\b|\bretail\b|\bcustomer\b|\baccount (?:manager|executive)\b|"
                       r"\bclient (?:relations|services|success)\b|\bshop (?:manager|assistant)\b|"
                       r"\bacquisition\b|\bchannel\b|\bdistributor\b|\bmerchandis|\bcommercial\b|"
-                      r"\bproduct (?:manager|owner|lead)\b")),
-    ("supply_chain", _r(r"\blogisti|\breceiving\b|\border process|\bprocurement\b|\bsupply\b|\bfleet\b|\bwarehouse|\bpurchas|"
+                      r"\bproduct\b")),
+    ("supply_chain", _r(r"\blogisti|\breceiving\b|\border process|\baviation\b|\bair operations\b|\bprocurement\b|\bsupply\b|\bfleet\b|\bwarehouse|\bpurchas|"
                         r"\btransport\b|\blogisticien|\bachats?\b|\bapprovisionnement\b|\bmagasin|"
                         r"\bstock\b|\bstorekeeper\b|\bsourcing\b|\bimport\b|\bcustoms\b")),
     ("hr", _r(r"\bhuman resources?\b|\bpeople (?:and culture|partner|operations|officer|manager|"
               r"lead|business partner|director|services)\b|\btalent\b|\brecruit|\blearning and "
               r"development\b|\bressources humaines\b|\bstaff (?:welfare|care|development)\b|"
-              r"\bcompensation and benefits\b|\bhr\b|\bpersonnel\b|\bwellbeing\b|\bdiversity\b")),
+              r"\bcompensation and benefits\b|\bhr\b|\bpersonnel\b|\bwellbeing\b|\bdiversity\b|"
+              r"\bpeople (?:division|team|function)\b")),
     ("ict", _r(r"\binformation technology\b|\bict\b|\bsoftware\b|\bdeveloper\b|\bdata engineer|"
                r"\bsystems? (?:administrator|analyst|engineer)\b|\bnetwork\b|\binformatique\b|"
                r"\bdevops\b|\bcyber|\bdatabase\b|\bweb\b|\bdigital (?:product|platform|"
                r"transformation|solutions)\b|\bcloud\b|\btechnolog|\bit support\b|\bservice desk\b|"
                r"\bhelp ?desk\b|\bprogrammer\b|\bsalesforce\b|\berp\b|\bgis\b|\btech\b|\bai\b|"
-               r"\bartificial intelligence\b|\bmachine learning\b")),
+               r"\bartificial intelligence\b|\bmachine learning\b|\binformation systems\b|"
+               r"\bsystems officer\b|\bediscovery\b")),
     ("safety_security", _r(NOT_SECURITY + r"\bsecurity\b(?! council)|\bsafety\b|\bs[ûu]ret[ée]\b|"
                            r"(?<!alimentaire )\bs[ée]curit[ée]\b(?! alimentaire)")),
     ("communications_advocacy", _r(r"\bcommunicat|\bmedia\b|\badvocacy\b|\bcampaign|\bcontent\b|"
@@ -346,7 +362,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                                    r"|\bphotograph|\bbrand\b|\bstorytell|\bvideo|\bwriter\b|"
                                    r"\bdigital (?:marketing|engagement|content|communications)\b|"
                                    r"\bexternal (?:relations|affairs)\b|\boutreach and comm|"
-                                   r"\bevents?\b|\bdesign(?:er)?\b|\bgraphic|\bcreative\b")),
+                                   r"\bevents?\b|\bdesign(?:er)?\b|\bgraphic|\bcreative\b|"
+                                   r"\bgovernment (?:relations|liaison|affairs)\b|\bliaison\b")),
     ("medical_clinical", _r(r"\bdoctor\b|\bphysician\b|\bnurs(?:e|es|ing)\b|\bmidwi|\bmedical\b|"
                             r"\bclinic(?:al|ian)?\b|\bpharmac|\bsurgeon\b|\bsurgery\b|\ban(?:a)?esthe|"
                             r"\blaborator|\blab (?:technician|scientist|manager)\b|\bm[ée]decin\b|"
@@ -361,7 +378,7 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                        r"\belectrical\b|\bmechanical\b|\bsurveyor\b")),
     ("legal", _r(r"\blegal\b|\blawyer\b|\bcounsel\b|\bparalegal\b|\battorney\b|\bjuriste\b|"
                  r"\bavocat|\bcompliance\b|\bjuridique\b|\blitigation\b|\bcontracts? (?:officer|"
-                 r"manager|specialist)\b")),
+                 r"manager|specialist)\b|\binvestigat")),
     ("teaching", _r(r"\bteacher\b|\btrainer\b|\btutor\b|\blecturer\b|\bprofessor\b|\binstructor\b|"
                     r"\benseignant|\bformat(?:eur|rice)\b|\beducator\b|\bteaching\b|\bcoach\b|"
                     r"\bfacilitator\b|\btraining\b|\besl\b|\benglish (?:conversation|language|class)")),
@@ -385,7 +402,7 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                            r"\bmobili[sz]er\b|\bvolunteer\b|\binterpreter\b|\btranslator\b|"
                            r"\bdistribution\b|\bregistration\b")),
     ("humanitarian_coordination", _r(r"\bcluster\b|\bhumanitarian (?:affairs|coordinat|access)\b|"
-                                     r"\binter-?agency\b|\baccess (?:officer|coordinator|adviser)\b|"
+                                     r"\binter-?agency\b|\baccess (?:officer|coordinator|adviser|and)\b|"
                                      r"\bcivil-military\b|\bcoordination (?:officer|specialist|"
                                      r"associate|analyst)\b|\bemergency (?:coordinator|response "
                                      r"coordinator|team leader|manager)\b")),
@@ -398,7 +415,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                           r"assistant\b|\bassistant(?:e)? de direction\b|\bclerk\b|\bdata entry\b|"
                           r"\bfront desk\b|\bfacilities\b|\btravel (?:officer|assistant|"
                           r"coordinator)\b|\bprotocol\b|\bexecutive coordinator\b|\boperations\b|"
-                          r"\bop[ée]rations\b|\bsupport services\b|\bgestionnaire\b")),
+                          r"\bop[ée]rations\b|\bsupport services\b|\bgestionnaire\b|\bbuilding\b|"
+                          r"\bbusiness support\b")),
     ("programme_management", _r(r"\bprogramm?es?\b|\bprojects?\b|\bportfolio\b|\bchef de projet\b|"
                                 r"\bcharg[ée]e? de (?:programme|projet)s?\b|\bresponsable (?:de )?"
                                 r"(?:programme|projet)s?\b|\bcoordinat(?:eur|rice) (?:de )?"
@@ -427,7 +445,8 @@ SECTORS: list[tuple[str, re.Pattern]] = [
     ("protection", _r(r"\bprotection\b|\bgbv\b|\bgender[- ]based violence\b|\bsafeguarding\b|\bpsea\b|"
                       r"\bcase management\b|\bvbg\b|\bviolences? bas[ée]es? sur le genre\b|"
                       r"\bmhpss\b|\bpsychosocial\b|\btrafficking\b|\bchild (?:rights|labou?r)\b|"
-                      r"\bsexual (?:exploitation|violence)\b|\bdocumentation\b")),
+                      r"\bsexual (?:exploitation|violence)\b|\bdocumentation\b|\brsd\b|"
+                      r"\brefugee status\b")),
     ("education", _r(r"\beducation|\bschool|\blearning centre|\b[ée]ducation\b|\bliteracy\b|"
                      r"\bearly childhood\b|\bteacher\b|\bcurriculum\b|\bscholarship")),
     ("shelter_camp", _r(r"\bshelter\b|\bcccm\b|\bcamp (?:management|coordination)\b|\bnfi\b|"
@@ -443,13 +462,14 @@ SECTORS: list[tuple[str, re.Pattern]] = [
                                r"\bnature\b|\bsustainab|\brenewable|\bemission|\bwaste\b|"
                                r"\bnatural resource|\becolog|\bland(?:scape)?\b|\bfisher")),
     ("agriculture", _r(r"\bagricultur|\bagronom|\bfarm|\blivestock\b|\bagricole\b|\bseed|\bcrop|"
-                       r"\bhorticult|\bagri|\bveterinar|\birrigation\b|\bvalue chain")),
+                       r"\bhorticult|\bagri|\bagro|\bveterinar|\birrigation\b|\bvalue chain|\bbreed")),
     ("gender", _r(r"\bgender\b(?![- ]based)|\bwomen'?s?\b|\bgenre\b|\bgirls?\b|\bfeminis")),
     ("disability_inclusion", _r(r"\bdisabilit|\binclusion\b|\bhandicap\b|\baccessib")),
     ("governance_peace_rights", _r(r"\bgovernance\b|\bpeace|\bhuman rights\b|\brule of law\b|"
                                    r"\bdemocra|\bjustice\b|\bgouvernance\b|\bdroits\b|\belection|"
                                    r"\bconflict\b|\bsocial cohesion\b|\bcivic\b|\bcivil society\b|"
-                                   r"\banti-corruption\b|\bparliament")),
+                                   r"\banti-corruption\b|\bparliament|\btorture\b|\bcrime\b|"
+                                   r"\bfreedom of\b")),
     ("esg_safeguards", _r(r"\besg\b|\benvironmental (?:and|&) social\b|\be&s\b|\bsafeguards\b|"
                           r"\bsocial (?:and environmental )?standards\b")),
     ("health", _r(r"\bhealth\b|\bsant[ée]\b|\bhiv\b|\baids\b|\bmalaria\b|\btuberculosis\b|\btb\b|"
@@ -550,8 +570,10 @@ def role_words(text: str) -> bool:
 
 
 NON_TITLE_WORDS = re.compile(r"\b(?:apply|application|saved jobs|how to|benefits|life at|why work|our "
-                             r"(?:team|values|people|culture)|roster|expression of interest|"
-                             r"spontaneous|trustees|board members?|faq|cookie|privacy|login|sign in)\b",
+                             r"(?:team|values|people|culture)|roster|expressions? of interest|"
+                             r"spontaneous|trustees|board members?|faq|cookie|privacy|login|sign in|"
+                             r"call for|call tender|tenders?|appel (?:a|à|d)|avis d|bolsa de talento|"
+                             r"pr[ée]qualification|request for (?:proposals?|quotations?))\b",
                              re.IGNORECASE)
 
 
@@ -844,7 +866,9 @@ def counts(args) -> int:
         if not oid:
             continue
         role = classify(r["title"], by_title)
-        if not role.normalised:
+        # German titles come from the German Red Cross's hospital and care jobs, left out of R0 as
+        # outside wave 1's languages (19.10); they are left out here too.
+        if not role.normalised or role.language == "de":
             continue
         key = (oid, role.normalised, r["page"] or r["title"])
         if key in seen:

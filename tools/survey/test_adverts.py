@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import adverts
+import roles
 
 PAGE = """<html><head><title>Logistics Officer | Acme Relief</title></head><body>
 <nav><a href="/">Home</a><a href="/jobs">Jobs</a></nav>
@@ -249,6 +250,15 @@ def test_a_batch_plans_only_pages_r0_allowed_and_not_read_before():
     v = FakeVerdicts({"https://a.example/jobs/x-y-z", "https://b.example/jobs/a-b-c", "https://b.example/jobs/d-e-f"})
     chosen = adverts.plan_batch("r2", pages, v, done={"p3"})
     assert [c["page_id"] for c in chosen] == ["p1"]       # p2 forbidden, p3 read before, p4 German
+    assert adverts.plan_batch("r2", pages, v, done=set(), held={"a"}) == [pages[2]]
+
+
+def test_un_system_pages_are_held():
+    assert roles.un_system("un_agency")
+    assert roles.un_system("other", "jobs.ilo.org")
+    assert roles.un_system("other", "careers.un.org")
+    assert not roles.un_system("ingo", "www.acme.example")
+    assert not roles.un_system("donor_government", "jobs.osce.org")
 
 
 def test_the_ai_test_set_draw_caps_each_organisation():
@@ -266,6 +276,15 @@ def test_the_ai_test_set_draw_caps_each_organisation():
     assert by_org["o1"] <= 10 and by_org["o2"] <= 10 and by_org["o3"] <= 5 and by_org.get("o4", 0) <= 1
     assert len(test) == 30
     assert adverts.ai_test_set(ads) == (pilot, test)       # fixed seed
+
+
+def test_duty_lines_and_their_specificity():
+    lines = adverts.duty_lines(adverts.advert_from_html(PAGE, "https://www.acme.example/jobs/x"))
+    assert any(t.startswith("Manage a fleet") for t in lines)
+    assert not any("bachelor" in t for t in lines)                 # requirements are not duties
+    assert adverts.specificity("Liaise with stakeholders as needed.")[0] == 0
+    score, kinds = adverts.specificity("Submit a monthly report to the donor on the 12 sites using Kobo.")
+    assert score == 3 and {"number", "frequency", "standard_or_tool"} <= set(kinds)
 
 
 def test_the_partial_scores():

@@ -185,11 +185,13 @@ def _site_of(host: str) -> str:
     return ""
 
 
-def plan_batch(batch: str, pages: list[dict], verdicts: RobotsVerdicts, done: set[str]) -> list[dict]:
+def plan_batch(batch: str, pages: list[dict], verdicts: RobotsVerdicts, done: set[str],
+               held: set[str] | frozenset = frozenset()) -> list[dict]:
     """R1: about 40 archived pages of the gap-filling sites and about 20 of the largest own sites,
     at random; R2: the broad sample, capped per organisation. Only pages R0 allows; pages already
-    saved (earlier batches) are not planned again."""
-    allowed = [c for c in pages if in_wave_language(c["languages"]) and verdicts.verdict(c["url"]) == "allowed"]
+    saved (earlier batches) are not planned again; organisations in `held` are left out."""
+    allowed = [c for c in pages if in_wave_language(c["languages"]) and c["org_id"] not in held
+               and verdicts.verdict(c["url"]) == "allowed"]
     rng = random.Random(SEED + (1 if batch == "r1" else 2))
     if batch == "r1":
         gap = defaultdict(list)
@@ -242,11 +244,20 @@ def write_local(path: Path, fields: list[str], rows: list[dict]) -> None:
 PLAN_FIELDS = ["page_id", "org_id", "system", "host", "crawl", "languages", "filename", "offset", "length", "url"]
 
 
+def held_organisations(pages: list[dict], orgs: roles.Organisations) -> set[str]:
+    """The UN system's organisations, held until the user decides on the UN's terms of use (19.11)."""
+    return {c["org_id"] for c in pages if roles.un_system(orgs.type_of(c["org_id"]), c["host"])}
+
+
 def plan(args) -> int:
-    pages = candidates()
+    orgs = roles.Organisations.load(decisions=_decisions(), pools=roles.pools_of())
+    pages = candidates(orgs=orgs)
     verdicts = RobotsVerdicts()
     done = set(saved_pages())
-    chosen = plan_batch(args.batch, pages, verdicts, done)
+    held = held_organisations(pages, orgs)
+    chosen = plan_batch(args.batch, pages, verdicts, done, held)
+    print(f"held for the UN terms decision: {len(held)} organisations, "
+          f"{sum(1 for c in pages if c['org_id'] in held)} pages")
     write_local(READING / args.batch / "plan.csv", PLAN_FIELDS, chosen)
     v = Counter(verdicts.verdict(c["url"]) for c in pages)
     print(f"distinct archived job pages: {len(pages)} at {len({c['org_id'] for c in pages})} organisations; "
@@ -461,6 +472,9 @@ def fetch_live(args) -> int:
             if run.stopped:
                 break
     elif batch == "r5":
+        if not args.un_terms_decided:
+            print("r5: held until the user decides on the UN's terms of use (role-survey.md, 19.11); no request")
+            return 0
         for name, url in UN_PAGES.items():
             host = urlsplit(url).hostname
             if run.robots(host):
@@ -1147,6 +1161,39 @@ SECONDARY = re.compile(r"\bdiploma\b|\bcertificate\b|\bhigh school\b|\bsecondary
                        r"\bo-?level|\ba-?level|\bwaec\b|\bkcse\b|\bssce\b", re.IGNORECASE)
 
 
+SPECIFICS = {
+    "number": re.compile(r"\b\d[\d,.]*\s*(?:%|percent|people|staff|sites?|vehicles?|households|beneficiaries|"
+                         r"partners|projects|million|m\b|k\b|days?|weeks?|months?)?|\b(?:two|three|four|five|six|"
+                         r"seven|eight|nine|ten|twelve|twenty|hundred)\b", re.IGNORECASE),
+    "standard_or_tool": re.compile("|".join(p.pattern for p in STANDARDS.values()), re.IGNORECASE),
+    "frequency": re.compile(r"\b(?:daily|weekly|monthly|quarterly|annual(?:ly)?|bi-?weekly|each (?:week|month|"
+                            r"quarter)|every (?:week|month|quarter)|hebdomadaire|mensuel(?:le)?|trimestriel(?:le)?)\b",
+                            re.IGNORECASE),
+    "counterpart": re.compile(r"\b(?:government|ministry|ministries|donors?|partners?|clusters?|communit(?:y|ies)|"
+                              r"local authorities|county|district|headquarters|regional office|suppliers?|"
+                              r"minist[èe]re|bailleurs?|partenaires?|autorit[ée]s)\b", re.IGNORECASE),
+    "deadline_or_output": re.compile(r"\b(?:report|plan|budget|strategy|proposal|assessment|database|dashboard|"
+                                     r"training|guidelines?|rapport|plan d'action|termes de r[ée]f[ée]rence)s?\b",
+                                     re.IGNORECASE),
+}
+
+
+def specificity(line: str) -> tuple[int, list[str]]:
+    """0 to 3 for one duty line, by the kinds of specifics it carries (section 8: numbers, named
+    standards or tools, frequency, counterparts, outputs): none 0, one 1, two 2, three or more 3."""
+    kinds = [k for k, p in SPECIFICS.items() if p.search(line)]
+    return min(len(kinds), 3), kinds
+
+
+def duty_lines(ad: dict) -> list[str]:
+    """The lines of an advert's responsibilities sections, 5 to 60 words each."""
+    out = []
+    for s in sections_of(ad["lines"]):
+        if s["type"] in ("responsibilities", "deliverables"):
+            out += [t for t in s["lines"] if 5 <= words_of(t) <= 60]
+    return out
+
+
 def _num(s: str) -> int:
     return int(s) if s.isdigit() else NUMBER_WORDS.get(s.lower(), 0)
 
@@ -1436,6 +1483,9 @@ def measure(_args=None) -> int:
         if not ad["org_id"]:
             dropped["no organisation"] += 1
             continue
+        if roles.un_system(orgs.type_of(ad["org_id"]), urlsplit(ad["url"]).hostname or ""):
+            dropped["held: the UN's terms of use (19.11)"] += 1
+            continue
         adverts.append(ad)
     chrome = chrome_lines(adverts)
     for ad in adverts:
@@ -1652,6 +1702,8 @@ def main() -> int:
     p = sub.add_parser("fetch-live")
     p.add_argument("--batch", choices=["r3", "r4", "r5"], required=True)
     p.add_argument("--cap", type=int, default=0)
+    p.add_argument("--un-terms-decided", action="store_true",
+                   help="only once the user has decided that UN pages may be read (19.11)")
     p.set_defaults(func=fetch_live)
     sub.add_parser("extract").set_defaults(func=extract)
     sub.add_parser("measure").set_defaults(func=measure)
