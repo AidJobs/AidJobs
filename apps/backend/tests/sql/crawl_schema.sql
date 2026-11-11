@@ -68,6 +68,19 @@ CREATE TABLE public.crawl_logs (
     "content_size_bytes" integer,
     "retry_attempt" integer DEFAULT 0,
     "crawler_version" text,
+    -- Added by infra/migrations/w06_crawl_run_lifecycle.sql (W-06).
+    "active_at_start" integer,
+    "listing_complete" boolean,
+    "listing_expected" integer,
+    "listing_stop" text,
+    "valid_count" integer,
+    "failed_saves" integer,
+    "unrecorded" integer,
+    "matched_active" integer,
+    "observed" integer,
+    "counted" boolean,
+    "expired" integer,
+    "returned" integer,
     CONSTRAINT "crawl_logs_pkey" PRIMARY KEY (id),
     CONSTRAINT "crawl_logs_source_id_fkey" FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 );

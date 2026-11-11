@@ -12,7 +12,8 @@ import psycopg2
 import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
-from app.log_safety import REQUEST_ID, redact_exception, stored_text
+from app.log_safety import REQUEST_ID, redact_exception, redact_text, stored_text
+from contracts.lifecycle import run_lifecycle
 from crawler_v2.run_handle import RunHandle, crawl_budget
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
@@ -503,15 +504,23 @@ class CrawlerOrchestrator:
                         if not row or not row[0]:
                             conn.rollback()
                             return None, False, "not due"
+                    # The source's open jobs that are not hidden as the run starts: what the
+                    # crawl's matches are measured against (contract §6). A passed deadline
+                    # makes a job expired under that policy, whatever its stored status says.
                     cur.execute(
                         """
                         INSERT INTO crawl_logs (
                             source_id, ran_at, found, inserted, updated,
-                            skipped, status, message
-                        ) VALUES (%s, NOW(), 0, 0, 0, 0, 'running', 'queued')
+                            skipped, status, message, active_at_start
+                        ) VALUES (
+                            %s, NOW(), 0, 0, 0, 0, 'running', 'queued',
+                            (SELECT COUNT(*) FROM jobs
+                             WHERE source_id = %s AND status = 'active' AND deleted_at IS NULL
+                               AND (deadline IS NULL OR deadline >= CURRENT_DATE))
+                        )
                         RETURNING id
                         """,
-                        (source_id,),
+                        (source_id, source_id),
                     )
                     run_id = _row_id(cur.fetchone())
                 conn.commit()
@@ -707,6 +716,46 @@ class CrawlerOrchestrator:
             (run_status, message, failures, nochange, next_run_at, new_status, source_id),
         )
 
+    def _record_lifecycle(self, cur, run_id, result: Dict, *, active_at_start) -> None:
+        """Store the run's completeness and whether it counts, inside its ownership-checked finish.
+
+        Nothing is expired here: whether the crawl counts as evidence of absence is recorded on
+        the run itself, never read from extraction_logs (contract §6, B4 record).
+        """
+        record = run_lifecycle(
+            result,
+            active_at_start=active_at_start,
+            matched_active=result.get("matched_active") or 0,
+        )
+        stop = record["listing_stop"]
+        if stop is not None:
+            stop = redact_text(stop)[:300]
+        cur.execute(
+            """
+            UPDATE crawl_logs SET
+                listing_complete = %s,
+                listing_expected = %s,
+                listing_stop = %s,
+                valid_count = %s,
+                failed_saves = %s,
+                unrecorded = %s,
+                matched_active = %s,
+                counted = %s
+            WHERE id = %s
+            """,
+            (
+                record["listing_complete"],
+                record["listing_expected"],
+                stop,
+                record["valid_count"],
+                record["failed_saves"],
+                record["unrecorded"],
+                record["matched_active"],
+                record["counted"],
+                run_id,
+            ),
+        )
+
     def _finish(self, source_id, run_id, result: Dict, *, mode: str, health) -> bool:
         """Close the run if it is still ours. False, with nothing written, when it is not.
 
@@ -732,7 +781,7 @@ class CrawlerOrchestrator:
                             status = %s,
                             message = %s
                         WHERE id = %s AND status = 'running'
-                        RETURNING id
+                        RETURNING id, active_at_start
                         """,
                         (
                             result.get("duration_ms", 0) or 0,
@@ -745,13 +794,15 @@ class CrawlerOrchestrator:
                             run_id,
                         ),
                     )
-                    if cur.fetchone() is None:
+                    owned = cur.fetchone()
+                    if owned is None:
                         conn.rollback()
                         logger.warning(
                             "[orchestrator] Run %s no longer owns source %s; nothing written",
                             run_id, source_id,
                         )
                         return False
+                    self._record_lifecycle(cur, run_id, result, active_at_start=owned[1])
                     # Only this run's own lock: the one taken in the same transaction as its row.
                     cur.execute(
                         """
@@ -806,6 +857,7 @@ class CrawlerOrchestrator:
         for name, value in run.saved.items():
             if not counts.get(name):
                 counts[name] = value
+        result["matched_active"] = run.matched_active()
         try:
             await self.finish_run(source, run.token, result, mode=mode)
         except Exception:

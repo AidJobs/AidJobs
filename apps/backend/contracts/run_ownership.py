@@ -32,8 +32,10 @@ SOURCE_LIVE_SQL = """
     FOR KEY SHARE
 """
 
+# ran_at::date is the day the run started on as the database dates it: the CURRENT_DATE its start
+# count of open jobs used, so the writer reads "deadline passed" on the same calendar.
 CONFIRM_RUNNING_SQL = """
-    SELECT 1 FROM crawl_logs
+    SELECT ran_at::date FROM crawl_logs
     WHERE id = %s AND source_id = %s AND status = 'running'
     FOR SHARE
 """
@@ -41,10 +43,11 @@ CONFIRM_RUNNING_SQL = """
 SOURCE_DELETED_MESSAGE = "The source was deleted during the crawl; no more of its jobs were saved"
 
 
-def confirm_running(cursor, run_token, source_id) -> None:
+def confirm_running(cursor, run_token, source_id):
     """Raise OwnershipLost unless run_token is a running run of source_id, and SourceDeleted
     when that source is deleted or gone. Locks the source row, then the run row.
 
+    Returns the day the run started on, as the database dates it (for the writer's open jobs).
     Must be the first statement of the save's transaction; it also sets the step timeouts.
     """
     if not run_token:
@@ -55,8 +58,10 @@ def confirm_running(cursor, run_token, source_id) -> None:
     if source is None or source[0] == "deleted":
         raise SourceDeleted(SOURCE_DELETED_MESSAGE)
     cursor.execute(CONFIRM_RUNNING_SQL, (str(run_token), str(source_id)))
-    if cursor.fetchone() is None:
+    run = cursor.fetchone()
+    if run is None:
         raise OwnershipLost(f"run {run_token} is not running for source {source_id}")
+    return run[0]
 
 
 def save_failure_outcome(status: str, message: str, counts: dict) -> tuple:

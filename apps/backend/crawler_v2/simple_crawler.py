@@ -38,6 +38,7 @@ from contracts.outbound import (
     fetch_url,
 )
 from contracts.persist import persist_candidate
+from contracts.persist import created_ids
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.log_safety import redact_exception, stored_text
@@ -1483,7 +1484,8 @@ class SimpleCrawler:
                 'updated': 0, 
                 'skipped': validation_skipped, 
                 'failed': 0,
-                'validated': 0
+                'validated': 0,
+                'unrecorded': validation_skipped,
             }
         
         if not jobs:
@@ -1492,14 +1494,21 @@ class SimpleCrawler:
                 'updated': 0, 
                 'skipped': validation_skipped, 
                 'failed': 0,
-                'validated': 0
+                'validated': 0,
+                'unrecorded': validation_skipped,
             }
         
         inserted = 0
         updated = 0
         skipped = validation_skipped
+        # Rows handed in whose sighting was not recorded: a crawl with any does not count
+        # (contract §6). A hidden job seen again is recorded, so it is not one of them.
+        unrecorded = validation_skipped
         failed = 0
         attempted = 0  # jobs that reached their write, or failed on the way to it
+        seen_active = []  # ids of open jobs matched, for the run's lifecycle record
+        not_open = []
+        recorded = []
         failed_inserts = []  # Track failed inserts for logging
         
         logger.info(f"Saving {len(jobs)} jobs to database for source {source_id} ({org_name})")
@@ -1508,11 +1517,12 @@ class SimpleCrawler:
         try:
             conn = self._get_db_conn()
             with conn.cursor() as cur:
-                confirm_running(cur, run_token, source_id)
-                recorded = []
+                open_on = confirm_running(cur, run_token, source_id)
                 for job in jobs:
                     in_savepoint = False
                     recorded_mark = len(recorded)
+                    seen_mark = len(seen_active)
+                    not_open_mark = len(not_open)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1539,6 +1549,7 @@ class SimpleCrawler:
                             reason = f"Missing title or URL (title: {title[:50] if title else 'None'}, url: {apply_url[:50] if apply_url else 'None'})"
                             logger.warning(f"Skipping job: {reason}")
                             skipped += 1
+                            unrecorded += 1
                             failed_inserts.append({
                                 'title': title[:100] if title else None,
                                 'apply_url': apply_url[:200] if apply_url else None,
@@ -1554,6 +1565,7 @@ class SimpleCrawler:
                             reason = f"Title too short: {title[:50]}"
                             logger.warning(f"Skipping job: {reason}")
                             skipped += 1
+                            unrecorded += 1
                             failed_inserts.append({
                                 'title': title[:100],
                                 'apply_url': apply_url[:200],
@@ -1567,6 +1579,7 @@ class SimpleCrawler:
                             reason = f"Invalid URL: {apply_url[:50]}"
                             logger.debug(f"Skipping job: {reason}")
                             skipped += 1
+                            unrecorded += 1
                             failed_inserts.append({
                                 'title': title[:100],
                                 'apply_url': apply_url[:200],
@@ -1672,6 +1685,9 @@ class SimpleCrawler:
                             source_id=source_id,
                             org_name=org_name,
                             recorded=recorded,
+                            seen=seen_active,
+                            not_open=not_open,
+                            open_on=open_on,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                         in_savepoint = False
@@ -1683,6 +1699,8 @@ class SimpleCrawler:
                             logger.debug("Job unchanged, last_seen_at only: %s", title[:80])
                         else:
                             skipped += 1
+                            if outcome != "seen_again":
+                                unrecorded += 1
                             failed_inserts.append({
                                 "title": title[:100],
                                 "apply_url": apply_url[:200],
@@ -1696,6 +1714,8 @@ class SimpleCrawler:
                         if in_savepoint:
                             cur.execute("ROLLBACK TO SAVEPOINT job_save")
                             del recorded[recorded_mark:]
+                            del seen_active[seen_mark:]
+                            del not_open[not_open_mark:]
                         else:
                             attempted += 1
                         error_msg = f"Unexpected error processing job: {stored_text(e)}"
@@ -1759,6 +1779,10 @@ class SimpleCrawler:
             'failed': failed,
             'validated': len(jobs) if 'jobs' in locals() else 0,
             'attempted': attempted,
+            'unrecorded': unrecorded,
+            'seen_active': seen_active,
+            'not_open_ids': not_open,
+            'created_ids': created_ids(recorded),
         }
     
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
@@ -2369,6 +2393,9 @@ class SimpleCrawler:
                 return {
                     'status': crawl_status,
                     'message': crawl_message,
+                    # Read by the run's finish for its lifecycle record (contract §6).
+                    'listing': dict(listing_report) if listing_report else None,
+                    'valid': len(admitted),
                     'validation_info': {
                         'total_extracted': len(jobs),
                         'validated': counts.get('validated', 0),
@@ -2381,7 +2408,8 @@ class SimpleCrawler:
                         'inserted': counts['inserted'],
                         'updated': counts['updated'],
                         'skipped': counts['skipped'],
-                        'failed': counts.get('failed', 0)
+                        'failed': counts.get('failed', 0),
+                        'unrecorded': counts.get('unrecorded', 0),
                     }
                 }
             
