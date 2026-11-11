@@ -505,7 +505,8 @@ class CrawlerOrchestrator:
                             conn.rollback()
                             return None, False, "not due"
                     # The source's open jobs that are not hidden as the run starts: what the
-                    # crawl's matches are measured against (contract §6).
+                    # crawl's matches are measured against (contract §6). A passed deadline
+                    # makes a job expired under that policy, whatever its stored status says.
                     cur.execute(
                         """
                         INSERT INTO crawl_logs (
@@ -514,7 +515,8 @@ class CrawlerOrchestrator:
                         ) VALUES (
                             %s, NOW(), 0, 0, 0, 0, 'running', 'queued',
                             (SELECT COUNT(*) FROM jobs
-                             WHERE source_id = %s AND status = 'active' AND deleted_at IS NULL)
+                             WHERE source_id = %s AND status = 'active' AND deleted_at IS NULL
+                               AND (deadline IS NULL OR deadline >= CURRENT_DATE))
                         )
                         RETURNING id
                         """,

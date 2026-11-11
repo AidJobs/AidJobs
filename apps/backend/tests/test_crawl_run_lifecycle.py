@@ -1,6 +1,6 @@
 """A crawl run's lifecycle record (W-06): its completeness and whether it counts. No database."""
 import asyncio
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -278,6 +278,32 @@ def test_a_new_job_a_rejected_row_and_a_conflict_are_not_reported():
     assert rejected == []
     two = [_stored(), _stored(id="row-2", canonical_hash=algorithm_b(TITLE, URL, None))]
     assert _persist(two) == ("identity_conflict", [])
+
+
+@pytest.mark.parametrize("deadline", [date(2026, 11, 10), "2026-11-10", date(2025, 12, 6)])
+def test_a_job_whose_deadline_had_passed_is_not_reported(deadline):
+    outcome, seen = _persist([_stored(deadline=deadline)])
+    assert outcome == "unchanged"
+    assert seen == []
+
+
+@pytest.mark.parametrize("deadline", [None, date(2026, 11, 11), "2026-11-11", date(2027, 1, 31)])
+def test_a_job_whose_deadline_is_today_later_or_unknown_is_reported(deadline):
+    assert _persist([_stored(deadline=deadline)]) == ("unchanged", ["row-1"])
+
+
+def test_the_deadline_is_read_on_the_utc_day():
+    late_in_india = datetime(2026, 11, 11, 3, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    seen = []
+    persist_candidate(
+        FakeCursor([_stored(deadline=date(2026, 11, 10))]),
+        {"title": TITLE, "apply_url": URL, "admitted": True},
+        observed_at=late_in_india,
+        heuristics=False,
+        source_id="src-1",
+        seen=seen,
+    )
+    assert seen == ["row-1"], "21:30 UTC on 10 November: that deadline has not passed"
 
 
 def test_another_sources_job_matched_by_identity_is_not_reported():

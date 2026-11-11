@@ -1521,15 +1521,15 @@ def test_the_run_route_starts_a_crawl_returns_the_open_run_and_refuses_an_unknow
 COMPLETE = {"pages": 2, "expected": 3, "complete": True, "stop": "no More Jobs link"}
 
 
-def _store_job(source_id, n, *, status="active", hidden=False):
+def _store_job(source_id, n, *, status="active", hidden=False, deadline=None):
     title, url = f"Programme Officer {n}", f"https://example.org/jobs/{n}"
     _sql(
         """
         INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status,
-                          deleted_at)
-        VALUES (%s, 'Example', %s, %s, %s, %s, CASE WHEN %s THEN NOW() END)
+                          deleted_at, deadline)
+        VALUES (%s, 'Example', %s, %s, %s, %s, CASE WHEN %s THEN NOW() END, %s)
         """,
-        (source_id, title, url, algorithm_a(title, url), status, hidden),
+        (source_id, title, url, algorithm_a(title, url), status, hidden, deadline),
     )
 
 
@@ -1569,10 +1569,15 @@ def test_a_run_records_its_sources_open_jobs_that_are_not_hidden_at_its_start(db
     _store_job(source["id"], 4, hidden=True)
     _store_job(source["id"], 5, status="expired")
     _store_job(other["id"], 6)
+    _store_job(source["id"], 7, deadline="2000-01-01")
+    _store_job(source["id"], 8, deadline="2999-12-31")
+    _sql(
+        "UPDATE jobs SET deadline = CURRENT_DATE WHERE title = 'Programme Officer 3'"
+    )
     run_id, started = _orch()._begin(source["id"], False)
     assert started
     record = _lifecycle(run_id)
-    assert record["active_at_start"] == 3
+    assert record["active_at_start"] == 4, "1, 2, 3 (deadline today) and 8; not 7, passed"
     assert record["counted"] is None, "not decided until the run's finish"
 
 
@@ -1609,6 +1614,18 @@ def test_fewer_than_half_of_the_open_jobs_matched_does_not_count(db, stored, lis
     record = _lifecycle(run_id)
     assert (record["active_at_start"], record["matched_active"]) == (stored, len(listed))
     assert record["counted"] is counted
+
+
+def test_jobs_whose_deadline_passed_are_neither_counted_at_the_start_nor_matched(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    for n in (5, 6, 7):
+        _store_job(source["id"], n, deadline="2000-01-01")
+    run_id = _manual_run(source, _listing_crawl([1, 2, 5], COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 2)
+    assert record["counted"] is True, "2 of the 4 open jobs; the passed deadlines are not open"
 
 
 def test_a_hidden_job_seen_again_is_not_a_match(db):

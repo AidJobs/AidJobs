@@ -4,11 +4,11 @@ This module does not open a connection, commit, roll back, or take a lock.
 The crawler that already owns the transaction calls it and keeps that boundary.
 """
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from contracts.identity import both_keys
 from contracts.models import CrawlRun
-from contracts.upsert import VALIDATED_FIELDS, upsert
+from contracts.upsert import VALIDATED_FIELDS, _calendar_day, upsert
 from contracts.validate import rejection_reason
 
 # Read set for the match. Geocoding and quality are not loaded and are not
@@ -75,7 +75,8 @@ def persist_candidate(
     """Validate, decide with the contract upsert, then write that decision.
 
     seen, when given, receives the id of a matched job of this candidate's source that was open
-    and not hidden before this write: the crawl's evidence that it read the source's open jobs
+    (active, its deadline not passed) and not hidden before this write: the crawl's evidence
+    that it read the source's open jobs
     (contract §6). A job this run created is reported too when a later row matches it; the
     caller removes those.
     """
@@ -124,12 +125,12 @@ def persist_candidate(
         )
         if decision == "seen_again":
             _remember(recorded, decision, row.get("id"))
-        _note_seen(seen, before.get(row["id"]), payload.get("source_id"))
+        _note_seen(seen, before.get(row["id"]), payload.get("source_id"), observed_at)
         return decision
 
     row = catalog[0]
     prior = before[row["id"]]
-    _note_seen(seen, prior, payload.get("source_id"))
+    _note_seen(seen, prior, payload.get("source_id"), observed_at)
     assignments = {
         name: row.get(name)
         for name in VALIDATED_FIELDS
@@ -150,14 +151,24 @@ def created_ids(recorded) -> list:
     return [entry["job_id"] for entry in recorded or () if entry.get("outcome") == "created"]
 
 
-def _note_seen(seen, prior, source_id) -> None:
+def _note_seen(seen, prior, source_id, observed_at) -> None:
     if seen is None or not prior or prior.get("id") is None or source_id is None:
         return
     # The identity keys ignore the source, so a row can match another source's job.
     if str(prior.get("source_id")) != str(source_id):
         return
-    if prior.get("status") == "active" and prior.get("deleted_at") is None:
-        seen.append(str(prior["id"]))
+    if prior.get("status") != "active" or prior.get("deleted_at") is not None:
+        return
+    # A stored deadline already passed makes the job expired under contract §6, so it is not
+    # one of the open jobs the run's start counted. Compared on the UTC day, as CURRENT_DATE is.
+    if observed_at.tzinfo is None:
+        today = observed_at.date()
+    else:
+        today = observed_at.astimezone(timezone.utc).date()
+    deadline = _calendar_day(prior.get("deadline"))
+    if deadline is not None and deadline < today.isoformat():
+        return
+    seen.append(str(prior["id"]))
 
 
 def _remember(recorded, outcome: str, job_id) -> None:
