@@ -1,6 +1,6 @@
 # AidJobs — role-content survey (W-54): plan
 
-**Status: approved by the user on 10 November 2026 ("approve all"; the decisions in section 15); amended at the user's request the same day (section 2, decisions 7 and 8), with decisions 15 to 17 open.** Agreed in outline with the user on 10 November 2026; this file is the plan. Nothing is built yet: no code has been added under `tools/survey/`. The only requests made so far are those recorded in section 17. Each phase below still needs its own approvals (operating conventions in `progress-ledger.md`): every batch of requests is approved before it runs, and each pull request's merge names its head commit. Read-only throughout: no production crawl, no write to the jobs database, no reindex.
+**Status: approved by the user on 10 November 2026 ("approve all"; the decisions in section 15); amended at the user's request the same day (section 2, decisions 7 and 8), with decisions 15 to 17 open; a two-layer library drafted on 11 November 2026 (section 19), with decisions 18 to 21 open.** Agreed in outline with the user on 10 November 2026; this file is the plan. Nothing is built yet: no code has been added under `tools/survey/`. The only requests made so far are those recorded in section 17. Each phase below still needs its own approvals (operating conventions in `progress-ledger.md`): every batch of requests is approved before it runs, and each pull request's merge names its head commit. Read-only throughout: no production crawl, no write to the jobs database, no reindex.
 
 Related documents: `employer-side-plan.md` (decision E7 and its amendment, section 20), `employer-generator/` (the held generator design and the style study), `source-survey.md` and `source-survey/` (the employer survey, W-31, whose method, rules and files this survey reuses), `growth-and-seo-plan.md` (design rules 4.1 to 4.6).
 
@@ -32,6 +32,7 @@ The answers are delivered in two forms: readable findings for people, and a mach
 6. The survey's scope, phases, languages, scale, rules and known limits as set out below.
 7. **The main output is also a machine-readable role library for the AI chat** (amendment of 10 November 2026, after the plan's approval): built by a script from the survey's cleaned records and committed with a schema version, per role family and level, with variants by organisation type and context (section 9). It also carries a test set for AI drafts taken from the adverts on disk (section 10). Its long-term home, a database table read by the job-description generator, is decided later with the generator; until then it lives as files with a schema. The agent's choices within this amendment, for the user's approval (decision 17): the thresholds of at least 5 adverts for a median or a variant and at least 8 for a best-quarter figure; one JSON file per family under `docs/architecture/role-survey/library/`; the version rule and the schema's independent review; checking the schema with a stated subset of JSON Schema and no new dependency; about 3 main formats per family for the reference job descriptions, each in English and French, kept only after both the blind score and the forced-choice ranking; and the AI test set held out of the library's evidence and Phase 0's pilot, capped per organisation, and widened from Common Crawl's archive.
 8. **The models the user chose for Phase 5** are Claude Sonnet 5.5 and GPT-6.1 Terra, through OpenRouter (a service that routes requests to many AI providers), in place of Kimi K2.5 and Gemma 4 (amendment of 10 November 2026; section 10). This records Phase 5 only; the demo's own chat model is W-51's, recorded in its own stream.
+9. **A larger library in two layers** (the user's question of 11 November 2026, section 18): a broad layer measured by script over every advert read, and a deep layer coded with judgement, drafted by the agent as section 19 for the user's approval (decision 18).
 
 **Pace (decided by the agent at the user's request, 10 November 2026).** The survey runs alongside the current work as read-only research. While it adds or changes scripts under `tools/survey/`, it takes one of the two code-stream slots (operating conventions); reading, coding and writing records outside those pull requests is background research and takes no slot. When it competes with a crawler-foundation step for the user's review time, the crawler step goes first.
 
@@ -309,6 +310,10 @@ Each merge records its step in this file (about 10 lines) and one line in the le
 15. **The AI test set's briefs** (section 10, amendment of 10 November 2026): kept local and git-ignored, with their schema, checksums and results committed (recommended, because each brief comes from one employer's advert and the employer survey's rule commits no page content); or committed with the organisation replaced by its type, if the user amends that rule for briefs.
 16. **The model test round** with Claude Sonnet 5.5 and GPT-6.1 Terra through OpenRouter (section 10), approved before it runs: its budget; a new OpenRouter key used only for this round, with a spending limit set at OpenRouter, kept in the SecretStore vault and read for the run only through `scripts/with-secret.ps1`, never printed (checked with `node scripts/env_check.mjs`), and revoked after the round. It is separate from any key W-14 might create for Render, and decides nothing about W-14 (every earlier OpenRouter key was revoked on 18 October 2026, W-01).
 17. **The agent's choices within the amendment** (section 2, decision 7): the thresholds (5 for a median, a frequency or a variant; 8 for a best-quarter figure); one JSON file per family; the version rule and the schema's independent review; the schema checked with a stated subset of JSON Schema and no new dependency (or `jsonschema` as a test-only dependency); about 3 main formats per family for the reference job descriptions, each in English and French; and the test set's draw order, caps and hold-out (section 10).
+18. **The two-layer library** (section 19, drafted on 11 November 2026): approve it, with what it replaces (19.5).
+19. **The reading batches R1 to R4** (19.6): about 40, 2,300, 230 and 14 requests, each batch still approved before it runs.
+20. **Model-assisted coding of the deep layer** (19.4; decided after the measurement, as the user chose): a model codes the units and scores for the whole deep sample with agents checking a 10 to 15% sample against section 5's reliability targets, or agents code by hand only. It would send public advert text to a model provider, which section 10's rule for the model round does not allow, so it needs the user's explicit exception, a provider that neither trains on nor keeps the data, and a budget (very roughly tens to low hundreds of US dollars in tokens for 1,000 to 2,000 adverts, Unverified). The agents coding by hand in Cursor also send the text they read to their own AI provider.
+21. **The cap per organisation in the broad layer:** 30 adverts (the agent's choice).
 
 ## 16. What this plan does not do
 
@@ -342,7 +347,7 @@ Under any option, an archived page is used only if the employer's own `robots.tx
 
 ## 18. Open: a larger library (discussion of 11 November 2026)
 
-**Status: under discussion; nothing here changes sections 1 to 17 yet.** Recorded so the discussion is not lost; PR #134 (the library amendment) is held until it is settled (the user, 11 November 2026, about 01:40 IST).
+**Status: the discussion and its measurements; the resulting proposal is section 19.** Recorded so the discussion is not lost; PR #134 (the library amendment) is held until it is settled (the user, 11 November 2026, about 01:40 IST).
 
 **The user's question.** Is the planned library sufficient, given how much data there is, or can a much more extensive library with much larger coverage be built?
 
@@ -450,3 +455,77 @@ Requests to `data.commoncrawl.org` for the screens and stage 2: 754, all answere
 - **Boards, one listing page each:** all 6 answered; **139 job links at 4 boards:** MyJobMag 60 (Nigeria, Kenya), Ground Zero 60 (India), NGO Jobs Africa 10, NGO Jobs in Africa 9; HumanitaireHub and NGOBox showed no job links in that page (built by script or linked differently).
 
 **What it shows (the agent's reading).** Live careers pages of small NGOs yield little at any one moment (8 links from 38 Global South pages); the boards whose terms allow it are the richest single source for national NGOs in Nigeria, Kenya and India, at one request per advert; domestic charities' adverts are reachable through the recruitment systems their pages name. Phase 2's reading batches can therefore sample Global South adverts mainly from those boards and the archive (590 job pages at 10 NGOs), and domestic adverts from the named systems' feeds and the archive (316 at 5).
+
+## 19. The two-layer library (amendment of 11 November 2026, for the user's approval)
+
+**Status: drafted by the agent on 11 November 2026, as the user asked (section 18), sized from the counts above; for the user's approval (decision 18).** Once approved it replaces the parts of sections 6 to 10 and 13 named below; everything else stands. It changes no rule of section 3.
+
+### 19.1 Why
+
+The plan of sections 6 to 10 reads about 350 adverts for 10 to 12 families and codes every one by hand. Most of its variants by organisation type would be thin (section 9, "Pooling and thresholds"), and the library would cover a third of the families. The measurement of 10 and 11 November shows the evidence is far larger. Most of what the library measures (structure, length, facts given and missing, years asked, standards named, title variants, restrictions) needs no judgement and can be measured by script over every advert; only the duty bank, the signature facts, the scores and the reference job descriptions need judgement. So the library is built in two layers.
+
+### 19.2 The evidence base (Fact where counted, Estimate where marked)
+
+| Source | Job pages or links | Organisations | How it is read |
+| --- | --- | --- | --- |
+| Common Crawl's archive, first-wave organisations (M1 to M3) | 2,943 (about 2,450 with advert text, Estimate) | 100 | one byte-range request per page to `data.commoncrawl.org` (decision 14) |
+| The archive, donors and the Red Cross (M4) | 1,351 | 6 (ILO, the Netherlands Red Cross, Enabel, the British Red Cross, LuxDev, Denmark's foreign ministry) | the same |
+| The archive, domestic charities (M4) | 316 | 5 | the same |
+| The archive, Global South NGOs (M5) | 590 | 10 | the same |
+| Boards whose terms are silent or do not forbid it (live) | 139 links on one listing page each; their full listings hold more (Estimate) | 4 boards so far (MyJobMag, Ground Zero, NGO Jobs Africa, NGO Jobs in Africa) | one request per advert, live |
+| Domestic charities' recruitment systems (live) | 31 links at 9 charities; about 14 charities on systems with public feeds | 14 | the documented feed, one request each (step F's method) |
+| Step F's saved feeds | 116 full adverts | 4 | on disk; the AI test set is drawn from them (section 10) |
+| AidJobs' own stored jobs | ICRC and Oxfam GB descriptions, once W-37's capture is merged | 2 | the read-only login (decision 5) |
+
+Whether the archived pages of the gap-filling hold advert text is not yet sampled; the first reading batch samples them first (19.6).
+
+### 19.3 The broad layer: measured by script over every advert read
+
+- **Sample:** every archived or live advert with text that the reading batches return, capped at 30 per organisation (the agent's choice, decision 21) so no employer dominates: about 1,500 from the first-wave archive, about 200 from donors and the Red Cross, about 100 from domestic charities, about 250 from Global South NGOs in the archive and about 200 from the boards: **about 2,000 to 2,300 adverts** (Estimate). The AI test set's adverts are held out (section 10).
+- **What it measures, per advert, by fixed rules in a script** (`tools/survey/adverts.py`, with tests): the job title and its family, level and context (Phase 1's rules); the sections, their order and words per section (headings matched to Phase 2's section types); the facts given and missing (Phase 2's fixed list, by patterns); the years of experience asked and the degree level; the standards, frameworks and tools named (a fixed list: Sphere, CHS, CPMS, INEE, Kobo, ODK, DHIS2, SAP, Sage and others, grown as found); explicit restrictions and inclusion statements (the fairness check's categories, `employer-side-plan.md` section 20.2); the advert's language; the share of standard text (Phase 2's method); and the terms that tell similar families apart.
+- **Its accuracy is measured before its results are used:** on a validation sample of 100 adverts coded by hand (two coders, section 5's reliability rule), the script's readings must reach at least 0.9 precision and 0.85 recall for sections and facts, and within one year for years of experience; a measure below that is reported as Estimate or left out.
+- **It supplies the library's measured parts** (section 9): part 1 (recognition: title variants, search terms and distinguishing terms, with counts), part 4 (years and degree levels by level and organisation type, and the upper quartiles that mark inflation), part 5's counts (which standards and tools each family names), part 6 (what adverts leave out, by family and type) and part 7 (structure and length, median and best quarter), and the restriction and inclusion frequencies for the fairness check.
+- **Coverage:** every family with at least 30 adverts in the broad sample, expected to be **30 to 40 families from the first build** (Estimate), with values per organisation type and level wherever a cell meets section 9's thresholds (5 for a median, a frequency or a variant; 8 for a best-quarter figure). With 2,000 or more adverts most cells for INGOs, NGOs, foundations, research bodies, development banks and UN agencies' own sites meet them; government donors, the Red Cross, domestic charities and the Global South meet them for the larger families only.
+
+### 19.4 The deep layer: coded with judgement
+
+- **What it codes** (Phase 3's units and the scoring guide, sections 5 and 8): the duty units (action, object, specifics, specificity), the requirements' types and inflation, the scores, the signature facts, and the reference job descriptions.
+- **Sample:** for each family, about 30 adverts drawn from the broad sample by script, stratified by organisation type, level, context and language (English and French), so the deep layer stands on the broad layer's frame instead of a separate sample.
+- **Waves:** wave 1a, 3 families; wave 1, 10 to 12 families (about 350 adverts, as before); later waves the rest of the 30 to 40 families, about 30 adverts each. The broad layer covers all families from the start; the deep layer catches up wave by wave, and the library marks for each family which parts are deep-coded yet.
+- **Who codes:** read-only agents in Cursor, as planned; whether a model codes the deep layer at scale with agents checking a 10 to 15% sample is decision 20.
+
+### 19.5 What it replaces
+
+- **Section 6 (Phase 1):** the role map comes from the broad layer's titles over 2,000 or more adverts and the 3,000 titles counted in section 17, instead of the request batches P1-1 to P1-4; P1-2 (the UN careers feed and 12 agencies' pages) stays, the rest is not needed.
+- **Section 7 (Phase 2):** structure, length, facts and standard text are measured by script over the broad sample; the 350-advert reading becomes the deep layer's sample, drawn from it.
+- **Sections 8 and 9:** the measured parts of the library come from the broad layer (19.3); the coded parts from the deep layer (19.4).
+- **Section 13:** the effort below.
+- Sections 3, 5, 10, 11, 12 and 16 stand, with `adverts.py`'s outputs added to section 12 (`broad-adverts.csv`: one row per advert with the measures above and the held-out flag; `broad-sections.csv`; `broad-validation.csv`).
+
+### 19.6 Requests needed (each batch approved before it runs)
+
+| Batch | What | Requests | Time |
+| --- | --- | --- | --- |
+| R1 | About 40 archived pages of the gap-filling sites, sampled at random, to check for advert text | about 40, to `data.commoncrawl.org` | under 10 minutes |
+| R2 | The broad sample's archived pages | about 2,300, to `data.commoncrawl.org`, in two or three nights | about 6.5 hours |
+| R3 | The boards' adverts: their listing pages and about 200 adverts | about 230, to 4 boards, at most 1 request every 10 seconds per board | about 1 hour |
+| R4 | The domestic charities' public job feeds | about 14 | minutes |
+
+### 19.7 Effort (Estimate; agent working days in one slot)
+
+| Work | Days |
+| --- | --- |
+| Phase 0, the guide and its pilot | 2 to 3 |
+| The broad layer: `adverts.py` with tests and CI, the validation sample of 100, the reading batches R1 to R4 (run unattended) | 10 to 15 |
+| The role map and the families from the broad layer (Phase 1, revised) | 2 to 4 |
+| The deep layer for wave 1 (10 to 12 families, about 350 adverts; Phase 3) | 15 to 22 |
+| The library, templates and reference job descriptions for wave 1 (Phase 4) | 32 to 48 |
+| Phase 5 and the AI test set | 7 to 11 |
+| Records, pull requests, reviews | 4 to 6 |
+| **Wave 1, with the broad layer over 30 to 40 families** | **72 to 109 days** |
+
+The broad layer adds about 10 to 15 days and replaces most of Phase 1's request work; it gives all 30 to 40 families their measured parts from the first build, instead of 10 to 12. Each later family's deep layer and templates take about 2 to 3 days. Model-assisted coding (decision 20) would shorten the deep layer.
+
+### 19.8 Limits that stand
+
+Workday employers (their archived pages are shells), government donors other than the 6 found, the UN Secretariat, domestic charities on systems without public feeds, and the Global South's smaller NGOs stay thin; the library marks them so. Most archived pages date from February to October 2026, so the library describes 2026 adverts. The boards' adverts are read for analysis only and no advert text is committed, as for every source (section 3); Common Crawl's terms name AI uses in their indemnity, recorded beside any coding of archived text by agents or models.
