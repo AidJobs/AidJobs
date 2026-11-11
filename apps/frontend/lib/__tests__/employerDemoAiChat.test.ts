@@ -85,9 +85,9 @@ describe('the AI chat: the demo carries out the actions', () => {
   it('chooses the template, then the style and the pace; nothing is written before them; the AI replies take the place of the rules\' own', () => {
     resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
-    applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }] }, open);
+    applyAiTurn(id, 'Yes', { reply: 'Done. Warm and plain, as usual?', actions: [{ type: 'use_template', template: job(id).format }] }, open);
     expect(job(id).setup).toBe('style');
-    expect(job(id).chat.slice(-2)).toEqual([expect.objectContaining({ from: 'user', text: 'Yes' }), expect.objectContaining({ from: 'ai', text: 'Done.', ai: true })]);
+    expect(job(id).chat.slice(-2)).toEqual([expect.objectContaining({ from: 'user', text: 'Yes' }), expect.objectContaining({ from: 'ai', text: 'Done. Warm and plain, as usual?', ai: true, step: 'setup:style' })]);
     expect(job(id).chat.some((m) => m.text.includes('How should it sound?'))).toBe(false);
     const keys = job(id).tags.filter((k) => k !== 'about' && k !== 'apply');
     applyAiTurn(id, 'warm', { reply: 'Warm it is. One section at a time, or all of it first?', actions: [{ type: 'write_section', section: keys[0], lines: ['Too early'] }, { type: 'set_style', style: ['warm'] }] }, open);
@@ -99,6 +99,14 @@ describe('the AI chat: the demo carries out the actions', () => {
     expect(getState().pace).toBe('step');
     expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
     expect(nextStep(job(id), getState())).toEqual({ kind: 'ask', fact: 'contract', section: 'about' });
+  });
+
+  it('a template applied without a question: the rules give the overview and ask the style, and ask again after a reply that leaves it unasked', () => {
+    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    applyAiTurn(id, 'Yes', { reply: "I'll use your format.", actions: [{ type: 'use_template', template: job(id).format }] }, open);
+    expect(job(id).chat.at(-1)).toMatchObject({ step: 'setup:style', text: expect.stringContaining('How should it sound?') });
+    applyAiTurn(id, 'hm', { reply: 'Take your time.', actions: [] }, open);
+    expect(job(id).chat.filter((m) => m.step === 'setup:style' && !m.ai)).toHaveLength(2);
   });
 
   it('answers each question, approves a section, and writes the next in the same answer; text it wrote keeps its words when facts change', () => {

@@ -95,6 +95,8 @@ describe('reading the first message', () => {
     expect(detectRole('CMAM supervisor').role?.key).toBe('nutrition');
     expect(detectRole('Health Officer in Goma').role?.key).toBe('health');
     expect(detectRole('Nutrition Officer').role?.sector).toBe('Nutrition');
+    expect(detectRole('We are hiring a Nutrition Officer in Maiduguri. The officer runs CMAM with 3 partner clinics.').role?.key).toBe('nutrition');
+    expect(detectRole('We are hiring someone in Maiduguri. They will work in health clinics.').role?.key).toBe('health');
   });
 
   it('reads engagement, work arrangement, recruitment, and funding conditions', () => {

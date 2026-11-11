@@ -24,6 +24,7 @@ import {
 import { currentPart, lineFit, onLine, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
 import { addDays, COMMITMENTS, commitmentText } from '../../components/employer-demo/engine';
 import { nextStep } from '../../components/employer-demo/flow';
+import { workingDay } from '../../components/employer-demo/market';
 import { PACE_QUICK } from '../../components/employer-demo/walkChat';
 import { describeStyle, inferSdgs, proposedStyle, sdgLead, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
 
@@ -243,6 +244,10 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
 
   it('one section at a time: each fact just before its section, then the section written and approved, in order', () => {
     const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'step');
+    const offer = job(id).chat.find((m) => m.step === 'setup:template');
+    expect(offer?.text).toContain('7 sections for this job, with **Conditions** (the duty station has security conditions), about 900 words');
+    expect(offer?.text).toContain('similar nutrition roles are on AidJobs');
+    expect(offer?.quick).toEqual(['Use Riverstone format', 'Use UN Secretariat format', 'Use UN agency format', 'See all formats', 'Create my own', 'Use one of my job descriptions']);
     expect(job(id).tags).toEqual(['about', 'purpose', 'responsibilities', 'requirements', 'offer', 'conditions', 'apply']);
     expect(ask(id)).toBe('grade');
     sendChat(id, 'no grade');
@@ -341,7 +346,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
   it('the basic check, point by point: a genuine requirement with its reason, new wording, or left as it is', () => {
     const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'all');
     editSection(id, 'requirements', 'Essential:\n- A young graduate in nutrition\n- Fluent in Arabic, a native speaker preferred');
-    setFacts(id, { deadline: addDays(getState().today, 30) });
+    setFacts(id, { deadline: workingDay(addDays(getState().today, 30), job(id).facts.iso) });
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: ['grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'details', 'fixed', 'suggest'] } } : j)) }));
     chatNote(id, 'show the preview', 'The preview is open.');
     const first = step(id);
@@ -357,6 +362,17 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(job(id).sections.find((x) => x.key === 'requirements')?.lines).toContain('- Fluent in Arabic');
     for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it');
     expect(step(id)).toEqual({ kind: 'done' });
+  });
+
+  it('a placeholder left by the AI is a check point, filled with the value from the answer', () => {
+    const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'all');
+    writeSections(id, [{ key: 'purpose', lines: ['The post holder runs screening in Juba and reports to [Reports to].'] }], 'AI');
+    setFacts(id, { deadline: workingDay(addDays(getState().today, 30), job(id).facts.iso) });
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: ['grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'details', 'fixed', 'suggest'] } } : j)) }));
+    chatNote(id, 'show the preview', 'The preview is open.');
+    expect(step(id)).toMatchObject({ kind: 'check', point: { key: 'fill-purpose' } });
+    sendChat(id, 'It reports to the Nutrition Programme Manager.');
+    expect(job(id).sections.find((x) => x.key === 'purpose')?.lines).toEqual(['The post holder runs screening in Juba and reports to the Nutrition Programme Manager.']);
   });
 
   it('a link is not read; a pasted job description is used by its headings or with its wording', () => {

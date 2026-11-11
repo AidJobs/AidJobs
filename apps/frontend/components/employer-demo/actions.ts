@@ -40,7 +40,7 @@ import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
 import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
-import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, fixedNamed, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails } from './walkChat';
+import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, fixedNamed, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
@@ -178,7 +178,7 @@ function ensurePrompt(id: string) {
     const s = getState();
     const j = s.jobs.find((x) => x.id === id);
     const step = j ? nextStep(j, s) : null;
-    if (!j || !step || (step.kind === 'setup' && step.stage !== 'pace')) return;
+    if (!j || !step || (step.kind === 'setup' && step.stage === 'template')) return;
     if (step.kind === 'write') {
       const fixed = step.sections.filter((k) => FIXED_SECTIONS.includes(k));
       if (fixed.length) {
@@ -289,7 +289,6 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
   return id;
 }
 
-const STYLE_QUICK = ['Yes, write it that way', 'More formal', 'Shorter sentences'];
 const KEEP_QUICK = ['Keep it for all jobs', 'Just this job'];
 export const SEE_ALL = 'See all formats';
 export const CREATE_OWN = 'Create my own';
@@ -330,12 +329,6 @@ function templateQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
     step: 'setup:template',
   });
   return out;
-}
-
-/** "How should it sound?", asked once the template is chosen and before anything is written. */
-function styleQuestion(s: State): string {
-  const style = proposedStyle(s);
-  return `How should it sound? ${s.org.voice.length ? 'Your organisation writes' : 'Organisations like yours usually write'} ${describeStyle(style)}. Shall I write it that way, or differently?`;
 }
 
 /** The pace is chosen: the fixed sections are written from the settings, and the writing begins. */
@@ -934,9 +927,13 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
           const line = p.line;
           changeLine(j.id, sec, (ls) => ls.map((l) => (l === line ? `${l.startsWith('- ') ? '- ' : ''}${t.replace(/^- /, '')}` : l)), 'New wording from the check');
         } else if (p.key.startsWith('fill-')) {
+          const value = t
+            .replace(/^(?:it|this|they|he|she|the (?:post|role|post holder|officer))\s+(?:reports? to|is|are|will be|should (?:say|be))\s+/i, '')
+            .replace(/^(?:say|use|put|write)\s+/i, '')
+            .replace(/[.!]+$/, '');
           changeLine(j.id, sec, (ls) => {
             const at = ls.findIndex((l) => FILL.test(l));
-            return ls.map((l, i) => (i === at ? l.replace(FILL, t) : l));
+            return ls.map((l, i) => (i === at ? l.replace(FILL, value) : l));
           }, 'Filled in a placeholder');
         } else return false;
         updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Changed in **${x.sections.find((y) => y.key === sec)?.title ?? sec}**.`)] }));

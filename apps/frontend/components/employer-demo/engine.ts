@@ -613,8 +613,12 @@ export function detectRole(text: string): { role: RoleFamily | null; engagement:
   else if (/\bintern(ship)?\b|\bfellow(ship)?\b/.test(t)) engagement = 'internship';
   else if (/\bvolunteer\b/.test(t)) engagement = 'volunteer';
   // ESG's phrases are the most specific ("environmental and social safeguards"), so they are read before child protection's "safeguard".
-  const esg = ROLE_FAMILIES.find((f) => f.key === 'esg' && f.words.some((w) => t.includes(w)));
-  const role = esg ?? ROLE_FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => t.includes(w))) ?? ROLE_FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => t.includes(w))) ?? null;
+  const pick = (s: string) => {
+    const esg = ROLE_FAMILIES.find((f) => f.key === 'esg' && f.words.some((w) => s.includes(w)));
+    return esg ?? ROLE_FAMILIES.find((f) => f.key !== 'programme' && f.words.some((w) => s.includes(w))) ?? ROLE_FAMILIES.find((f) => f.key === 'programme' && f.words.some((w) => s.includes(w))) ?? null;
+  };
+  // The role is named in the first sentence; later ones describe the work ("with 3 partner clinics") and are read only if it names none.
+  const role = pick(`${t.split(/[.!?;]\s/)[0]} `) ?? pick(t);
   return { role, engagement };
 }
 

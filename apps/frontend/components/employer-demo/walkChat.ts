@@ -1,7 +1,7 @@
 import { commitmentText, COMMITMENTS, extractFacts, headingFor, LANGUAGES, longDate, placeOf, SECTION_BY_KEY, salarySuggestion } from './engine';
 import { isWritten, type Step } from './flow';
 import { workingDay } from './market';
-import { describeStyle } from './setup';
+import { contentOf, describeStyle, proposedStyle, wordsFor } from './setup';
 import type { ApplySettings, AskKind, ChatMsg, DemoJob, Facts, Format, State } from './types';
 
 /**
@@ -59,6 +59,7 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
   const intro = all && !job.walk?.approved.length && !draftShown ? `${DRAFT_INTRO}, written ${describeStyle(job.style ?? [])}. Let's go through it. ` : '';
   switch (step.kind) {
     case 'setup':
+      if (step.stage === 'style') return [stepMsg(overview(format, job.tags.length, wordsFor(job.tags.length), contentOf(format, s.org.orgType), styleQuestion(s)), key, STYLE_QUICK)];
       if (step.stage !== 'pace') return [];
       return [stepMsg('Shall I write it one section at a time, so you can shape each one as we go, or write it all and then go through it with you?', key, PACE_QUICK)];
     case 'change': {
@@ -214,6 +215,13 @@ export function paceIn(text: string): 'step' | 'all' | null {
 }
 
 /** The overview of a template, before anything is written (step 3), with the style question. */
-export function overview(format: Format, count: number, words: number, content: string, styleQuestion: string): string {
-  return `**${format.label}** it is: ${count} sections, about ${words} words, ${content}. ${styleQuestion}`;
+export function overview(format: Format, count: number, words: number, content: string, question: string): string {
+  return `**${format.label}** it is: ${count} sections, about ${words} words, ${content}. ${question}`;
+}
+
+export const STYLE_QUICK = ['Yes, write it that way', 'More formal', 'Shorter sentences'];
+
+/** "How should it sound?", asked once the template is chosen and before anything is written. */
+export function styleQuestion(s: State): string {
+  return `How should it sound? ${s.org.voice.length ? 'Your organisation writes' : 'Organisations like yours usually write'} ${describeStyle(proposedStyle(s))}. Shall I write it that way, or differently?`;
 }

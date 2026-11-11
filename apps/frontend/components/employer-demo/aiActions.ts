@@ -24,7 +24,7 @@ import {
   writeSections,
 } from './actions';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
-import { ASKS, checkPoints, DECLINABLE, FIXED_SECTIONS, isSettled, isWritten, LEFT, nextStep, stepKey } from './flow';
+import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, isSettled, isWritten, LEFT, nextStep, stepKey } from './flow';
 import { STYLES } from './setup';
 import { getState } from './store';
 import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, State } from './types';
@@ -304,6 +304,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const { patch, refused: no } = checkFacts(a.facts, j, s.today);
         refused.push(...no);
         if (Object.keys(patch).length) setFactsFromChat(id, patch);
+        // A fact given answers its question even when it is the default ("anyone can apply").
+        if (j.walk) for (const k of asksOf(Object.keys(patch))) settleQuestion(id, k);
         break;
       }
       case 'use_template': {
@@ -434,7 +436,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   if (!now) return { refused, opened };
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
-  const asks = /\?\s*$/.test(turn.reply);
+  const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask');
   // A reply that asks a question stands for the step the job is now at, so the rules do not ask it again.
   const step = asks && now.walk ? stepKey(nextStep(now, getState())) : undefined;
   aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ask.quick, ask: ask.fact, by, step }, !asks);
