@@ -25,6 +25,7 @@ import adverts
 MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"   # English and French, Apache 2.0
 DISTANCE = 0.45          # cosine distance within which lines join one group (average linkage)
 MIN_GROUP = 3            # a group needs lines from at least this many adverts to be reported
+MIN_ORGS = 2             # and from at least this many organisations
 
 
 def main(families: list[str]) -> int:
@@ -55,8 +56,8 @@ def main(families: list[str]) -> int:
         report, kept = [], 0
         for g, idx in sorted(groups.items(), key=lambda kv: -len(kv[1])):
             ads = {owners[i][0] for i in idx}
-            if len(ads) < MIN_GROUP:
-                continue
+            if len(ads) < MIN_GROUP or len({owners[i][1] for i in idx}) < MIN_ORGS:
+                continue                    # one organisation's repeated text is not a shared duty
             kept += len(idx)
             ranked = sorted(idx, key=lambda i: -adverts.specificity(lines[i])[0])
             report.append({"group": g, "lines": len(idx), "adverts": len(ads),
@@ -66,7 +67,8 @@ def main(families: list[str]) -> int:
         (out_dir / f"{family}.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
         n_ads = len({o[0] for o in owners})
         print(f"{family}: {len(lines)} duty lines from {n_ads} adverts; {len(groups)} groups, "
-              f"{len(report)} shared by {MIN_GROUP}+ adverts covering {kept} lines ({100 * kept / len(lines):.0f}%); "
+              f"{len(report)} shared by {MIN_GROUP}+ adverts at {MIN_ORGS}+ organisations covering {kept} lines "
+              f"({100 * kept / len(lines):.0f}%); "
               f"largest {[r['adverts'] for r in report[:8]]}")
     return 0
 
