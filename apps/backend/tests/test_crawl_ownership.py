@@ -2020,14 +2020,32 @@ def test_a_saved_jobs_page_that_fails_clears_nothing_from_its_listing_row(db, mo
     source = _add_source()
     _store_job(source["id"], 1)
     _sql("UPDATE jobs SET deadline = CURRENT_DATE + 1, is_remote = true,"
-         " location_raw = 'Home based'")
+         " location_raw = 'Home based', locations = ARRAY['Home based', 'Geneva']")
     row = {**_thin(1), "location_raw": "Nairobi, Kenya", "deadline": ""}
     run_id, opened = _html_crawl(source, [row], monkeypatch, page_fails=True)
     assert opened == [_thin(1)["apply_url"]], "near its deadline: chosen, but not read"
-    stored = _sql("SELECT deadline = CURRENT_DATE + 1, is_remote, location_raw FROM jobs")[0]
-    assert tuple(stored) == (True, True, "Nairobi, Kenya"), (
-        "the listing's empty deadline and 'not remote' clear nothing; its location is a reading"
+    stored = _sql("SELECT deadline = CURRENT_DATE + 1, is_remote, location_raw, locations"
+                  " FROM jobs")[0]
+    assert tuple(stored) == (True, True, "Nairobi, Kenya", ["Home based", "Geneva"]), (
+        "the listing's empty deadline and 'not remote' clear nothing, nor does its one location"
+        " replace the page's list; its location text is a reading"
     )
+
+
+def test_a_failed_observation_read_keeps_the_admitted_rows(db, monkeypatch):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    run_id, _ = _orch()._begin(source["id"], False)
+
+    def unreadable(cursor, source_id):
+        cursor.execute("SELECT * FROM no_such_table")
+
+    monkeypatch.setattr(simple_crawler_module, "observable_jobs", unreadable)
+    counts = _crawler().save_jobs([_job(2)], source["id"], "Example", run_token=run_id,
+                                  thin=[_thin(1), _thin(9)])
+    assert counts["inserted"] == 1, "the admitted row stands"
+    assert (counts["observed"], counts["unrecorded"]) == (0, 2)
+    assert _job_count() == 2
 
 
 def test_a_saved_jobs_listing_row_never_clears_what_its_page_gave(db, monkeypatch):

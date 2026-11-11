@@ -145,14 +145,17 @@ def test_a_saved_job_is_reopened_exactly_on_its_rotation_turn(run_number):
     assert plan.saved == set(range(len(rows)))
 
 
-def test_no_saved_job_waits_behind_the_same_others_when_its_turn_is_over_the_cap():
-    rows = [_row(n) for n in range(1, 40)]
+@pytest.mark.parametrize("count", [21, 39])
+def test_no_saved_job_waits_behind_the_same_others_when_its_turn_is_over_the_cap(count):
+    # 21 rows with a cap of 3: a start moved on every crawl rather than every turn would move
+    # 7 x 3 = 21 places a turn, back to where it was, and reach only three of them.
+    rows = [_row(n) for n in range(1, count + 1)]
     ids = [next(f"cap-{i}-{k}" for k in range(1000) if rotation_bucket(f"cap-{i}-{k}") == 0)
            for i in range(len(rows))]
     saved = {row["apply_url"]: saved_job(ids[i], None, hidden=False)
              for i, row in enumerate(rows)}
     opened = set()
-    for turn in range(13):  # ceil(39 / 3) of the bucket's turns
+    for turn in range(-(-count // 3)):  # ceil(count / 3) of the bucket's turns
         opened |= _plan(rows, saved, run_number=turn * ROTATION_CRAWLS, known_cap=3).open
     assert opened == set(range(len(rows)))
 
