@@ -2,11 +2,14 @@
 
 Pages are opened for the listing's new vacancies, up to NEW_PAGE_CAP a crawl. A saved job's page
 is reopened only when its deadline is within DEADLINE_WINDOW_DAYS either side of the run's day, so
-an extension is caught, or in a rotation that reaches each saved job about one crawl in
-ROTATION_CRAWLS, up to KNOWN_PAGE_CAP a crawl. Every other saved job is read from its listing row
-alone; a thin row of one is seen through the observation path in the writer. A new vacancy over the
-cap that the listing alone leaves too thin is held back as detail_unconfirmed and read by a later
-crawl; one the listing already admits is saved from the listing. Junk rows are never opened.
+an extension is caught, or on its turn in a rotation of ROTATION_CRAWLS crawls, up to
+KNOWN_PAGE_CAP a crawl, deadlines first. When more rows qualify than a cap allows, the start of
+their order moves on by the cap each crawl (each turn, for the rotation), so no row waits behind
+the same others every time. Every other
+saved job is read from its listing row alone; a too-thin row of one is seen through the
+observation path in the writer. A new vacancy over the cap that the listing alone leaves too thin
+is held back as detail_unconfirmed and read by a later crawl; one the listing already admits is
+saved from the listing. A row whose rejection no page can cure is never opened.
 
 No network and no database: the crawler supplies the source's saved jobs and the admission verdicts.
 """
@@ -42,6 +45,8 @@ class PagePlan:
     open: set[int] = field(default_factory=set)
     listing_only: set[int] = field(default_factory=set)
     unconfirmed: set[int] = field(default_factory=set)
+    # Every row that is a saved job of the source, opened or not.
+    saved: set[int] = field(default_factory=set)
 
 
 def link_key(url) -> str:
@@ -49,9 +54,24 @@ def link_key(url) -> str:
     return observation_link(url)
 
 
+def _digest(text: str) -> int:
+    return int(hashlib.sha256(text.encode()).hexdigest(), 16)
+
+
 def rotation_bucket(job_id: str) -> int:
-    """A stable bucket per job, the same in every process."""
-    return int(hashlib.sha256(str(job_id).encode()).hexdigest(), 16) % ROTATION_CRAWLS
+    """A stable bucket per job, the same in every process: its turn is when the source's crawl
+    count modulo ROTATION_CRAWLS equals it."""
+    return _digest(str(job_id)) % ROTATION_CRAWLS
+
+
+def _this_crawls_order(rows: list[dict], indexes: list[int], step: int, cap: int) -> list[int]:
+    """The rows in a fixed order (by link), started cap places further on each step, so with an
+    unchanged set every row is within the cap at least once in ceil(len / cap) steps."""
+    ordered = sorted(indexes, key=lambda index: _digest(link_key(rows[index].get("apply_url"))))
+    if not ordered or cap <= 0:
+        return ordered
+    start = (step * cap) % len(ordered)
+    return ordered[start:] + ordered[:start]
 
 
 def _near_deadline(deadline: str | None, today: date) -> bool:
@@ -78,24 +98,21 @@ def choose_pages(
 
     verdicts: admission's verdict on each row as the listing gives it ('admitted' or
     'thin_vacancy'); a row without one is junk. saved: the source's saved jobs by link_key.
-    run_number: the source's crawl count, which turns the rotation.
+    run_number: the source's crawl count, which turns the rotation and the order within a cap.
     """
     new_cap = NEW_PAGE_CAP if new_cap is None else new_cap
     known_cap = KNOWN_PAGE_CAP if known_cap is None else known_cap
     plan = PagePlan()
-    new_rows = 0
+    new_rows: list[int] = []
     deadline_rows: list[int] = []
     rotation_rows: list[int] = []
     turn = run_number % ROTATION_CRAWLS
     for index in sorted(verdicts):
         known = saved.get(link_key(rows[index].get("apply_url")), [])
         if not known:
-            if new_rows < new_cap:
-                plan.open.add(index)
-                new_rows += 1
-            elif verdicts[index] == "thin_vacancy":
-                plan.unconfirmed.add(index)
+            new_rows.append(index)
             continue
+        plan.saved.add(index)
         visible = [job for job in known if not job.hidden]
         if any(_near_deadline(job.deadline, today) for job in visible):
             deadline_rows.append(index)
@@ -103,8 +120,17 @@ def choose_pages(
             rotation_rows.append(index)
         else:
             plan.listing_only.add(index)
-    for index in (deadline_rows + rotation_rows)[:known_cap]:
-        plan.open.add(index)
-    for index in (deadline_rows + rotation_rows)[known_cap:]:
-        plan.listing_only.add(index)
+    ordered_new = _this_crawls_order(rows, new_rows, run_number, new_cap)
+    plan.open.update(ordered_new[:new_cap])
+    plan.unconfirmed.update(
+        index for index in ordered_new[new_cap:] if verdicts[index] == "thin_vacancy"
+    )
+    # Deadlines first; a rotation bucket comes round once in ROTATION_CRAWLS crawls, so its
+    # order moves on once per turn.
+    known_rows = (
+        _this_crawls_order(rows, deadline_rows, run_number, known_cap)
+        + _this_crawls_order(rows, rotation_rows, run_number // ROTATION_CRAWLS, known_cap)
+    )
+    plan.open.update(known_rows[:known_cap])
+    plan.listing_only.update(known_rows[known_cap:])
     return plan

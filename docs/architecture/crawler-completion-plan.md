@@ -392,7 +392,7 @@ Re-scope of the confirmation fetch. `crawl_source` already fetches every detail 
 - **Job pages for new jobs only.** A listing's job pages are opened for rows that are not yet saved, within a cap per crawl and in the one admission batch; rows beyond the cap are logged `detail_unconfirmed`, not saved, and read by a later crawl. This replaces reopening every job page of a 1–50 candidate listing on every crawl, and covers listings above 50.
 - **Known jobs' pages,** within each crawl's budget: reopened when the job's deadline is within 3 days or has just passed, so an extension is caught, plus a slow rotation through all other known jobs.
 - The UNICEF skip and the UNDP behaviour stay until platform readers replace them (ledger W-19).
-- Built on 11 November 2026 (ledger W-36): the cap is 40 new pages and 10 saved jobs' pages a crawl; "near or just passed" is within 3 days of the run's day either side; the rotation reaches each saved job one crawl in seven. Junk rows are not opened, since a page cannot change their rejection.
+- Built on 11 November 2026 (ledger W-36): the cap is 40 new pages and 10 saved jobs' pages a crawl, deadlines first; "near or just passed" is within 3 days of the run's day either side; each saved job's rotation turn comes once in seven crawls, and when more qualify than the cap the order's start moves on each crawl (each turn, for the rotation). "Too thin" covers a vacancy link without location, deadline or contract type and a structured posting from the listing without them: both a page can cure, and both may be observed. Rows with any other rejection are not opened, since no page can change it.
 
 #### C5. Exit on the six sites
 

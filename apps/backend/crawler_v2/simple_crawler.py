@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import date, datetime, timezone
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
-from contracts.admission import admit_batch, log_admission_rejections, page_verdicts
+from contracts.admission import admit_batch, log_admission_rejections, page_verdicts, too_thin
 from contracts.captured import (
     clean_description,
     clean_locations,
@@ -1630,7 +1630,7 @@ class SimpleCrawler:
                         if posted_on:
                             candidate["posted_on"] = posted_on
                         locations = clean_locations(job.get("locations"))
-                        if locations is None and location:
+                        if locations is None and location and not job.get("page_not_read"):
                             locations = clean_locations([location])
                         if locations:
                             candidate["locations"] = locations
@@ -1668,11 +1668,13 @@ class SimpleCrawler:
                         ):
                             candidate["quality_scored_at"] = observed_at
                         if job.get("page_not_read"):
-                            # A saved job whose page this crawl did not reopen: its listing row
-                            # never clears what the page gave (crawler plan, C3 and C4 amendment).
+                            # A saved job whose page this crawl did not read: its listing row
+                            # never clears what the page gave (crawler plan, C3 and C4
+                            # amendment), and a listing's "not remote" is no reading at all.
                             candidate = {
                                 name: value for name, value in candidate.items()
                                 if value not in (None, "", [])
+                                and not (name == "is_remote" and value is not True)
                             }
                         if job.get("admitted") is True:
                             candidate["admitted"] = True
@@ -1733,8 +1735,19 @@ class SimpleCrawler:
                         })
 
                 # The observation path (W-36): read after the admitted rows, so what they saved
-                # is what the thin rows are matched against.
-                by_link = observable_jobs(cur, source_id) if thin else {}
+                # is what the thin rows are matched against. If that read fails, the admitted
+                # rows stand and no thin row is recorded as seen.
+                by_link = {}
+                if thin:
+                    cur.execute("SAVEPOINT job_observe_read")
+                    try:
+                        by_link = observable_jobs(cur, source_id)
+                        cur.execute("RELEASE SAVEPOINT job_observe_read")
+                    except Exception as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT job_observe_read")
+                        logger.error("Saved jobs not read for observation: %s", redact_exception(e))
+                        unrecorded += len(thin)
+                        thin = []
                 for row in thin:
                     seen_mark = len(seen_active)
                     not_open_mark = len(not_open)
@@ -1868,6 +1881,8 @@ class SimpleCrawler:
                     "Detail page not read: %s (%s)", job['apply_url'], stop or f"HTTP {status}"
                 )
                 return job
+            # Read: the crawl lifts its listing-only mark (crawler_v2/job_pages.py).
+            job['page_read'] = True
             
             soup = BeautifulSoup(html, 'html.parser')
             
@@ -2362,7 +2377,9 @@ class SimpleCrawler:
                             run_number=run_number,
                         )
                         to_open = {id(jobs[index]) for index in plan.open}
-                        for index in plan.listing_only:
+                        # A saved job's listing row clears nothing its page gave, unless this
+                        # crawl reads that page; the mark is lifted only once it has.
+                        for index in plan.saved:
                             jobs[index]['page_not_read'] = True
                         unconfirmed = [jobs[index] for index in sorted(plan.unconfirmed)]
                         jobs = [job for index, job in enumerate(jobs) if index not in plan.unconfirmed]
@@ -2391,6 +2408,8 @@ class SimpleCrawler:
                         if job.get('apply_url'):
                             try:
                                 enriched_job = await self.enrich_job_from_detail_page(job, careers_url)
+                                if enriched_job.pop('page_read', False):
+                                    enriched_job.pop('page_not_read', None)
                                 enriched_jobs.append(enriched_job)
                             except Exception as e:
                                 logger.warning(f"Error enriching job {job.get('title', 'unknown')}: {e}")
@@ -2438,7 +2457,8 @@ class SimpleCrawler:
                 )
                 if run is None:
                     raise OwnershipLost("crawl_source needs the run that owns the source")
-                thin = [job for job, reason in rejected if reason == "thin_vacancy"]
+                # Too-thin rows, and the rows held back over the cap, may be saved jobs seen.
+                thin = [job for job, reason in rejected if too_thin(job, reason)] + unconfirmed
                 counts = await run.save(
                     self.save_jobs, admitted, source_id, org_name, base_url=careers_url,
                     thin=thin,

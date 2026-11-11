@@ -62,17 +62,35 @@ def test_page_verdicts_name_admitted_and_thin_rows_and_leave_out_junk():
 def test_new_vacancies_are_opened_up_to_the_cap():
     rows = [_row(n) for n in range(1, 6)]
     plan = _plan(rows, new_cap=3)
-    assert plan.open == {0, 1, 2}
-    assert plan.unconfirmed == {3, 4}, "thin and over the cap: held back"
-    assert plan.listing_only == set()
+    assert len(plan.open) == 3
+    assert plan.open | plan.unconfirmed == {0, 1, 2, 3, 4}
+    assert not plan.open & plan.unconfirmed, "thin and over the cap: held back"
+    assert plan.listing_only == plan.saved == set()
+
+
+def test_no_new_vacancy_waits_behind_the_same_others_every_crawl():
+    rows = [_row(n) for n in range(1, 21)]
+    opened = set()
+    for run_number in range(7):  # ceil(20 / 3) crawls
+        opened |= _plan(rows, run_number=run_number, new_cap=3).open
+    assert opened == set(range(20))
+
+
+def test_a_structured_posting_without_its_fields_is_a_row_its_page_can_cure():
+    rows = [{"title": "Officer", "apply_url": "https://jobs.example/careers/officer",
+             "record_class": "job_posting"}]
+    assert page_verdicts(rows, "html") == {0: "thin_vacancy"}
+    assert _plan(rows).open == {0}
 
 
 def test_a_new_vacancy_over_the_cap_the_listing_admits_is_saved_from_the_listing():
     rows = [_row(1), _row(2, deadline="2026-12-01")]
-    plan = _plan(rows, new_cap=1)
-    assert plan.open == {0}
-    assert plan.unconfirmed == set()
-    assert 1 not in plan.listing_only, "new, so not a saved job read from its listing"
+    for run_number in range(2):
+        plan = _plan(rows, run_number=run_number, new_cap=1)
+        assert len(plan.open) == 1
+        assert 1 not in plan.unconfirmed, "admitted by its listing: saved from it, never held"
+        assert plan.unconfirmed == {0} - plan.open, "thin and over the cap: held back"
+        assert 1 not in plan.listing_only, "new, so not a saved job read from its listing"
 
 
 def test_junk_rows_are_never_opened():
@@ -113,6 +131,30 @@ def test_the_rotation_reopens_each_saved_job_once_in_seven_crawls():
             opened[index] += 1
         assert plan.open | plan.listing_only == set(range(len(rows)))
     assert set(opened.values()) == {1}
+
+
+@pytest.mark.parametrize("run_number", [0, 1, 6, 7, 13, 700])
+def test_a_saved_job_is_reopened_exactly_on_its_rotation_turn(run_number):
+    rows = [_row(n) for n in range(1, 15)]
+    saved = {row["apply_url"]: saved_job(f"turn-{i}", None, hidden=False)
+             for i, row in enumerate(rows)}
+    plan = _plan(rows, saved, run_number=run_number, known_cap=len(rows))
+    expected = {i for i in range(len(rows))
+                if rotation_bucket(f"turn-{i}") == run_number % ROTATION_CRAWLS}
+    assert plan.open == expected
+    assert plan.saved == set(range(len(rows)))
+
+
+def test_no_saved_job_waits_behind_the_same_others_when_its_turn_is_over_the_cap():
+    rows = [_row(n) for n in range(1, 40)]
+    ids = [next(f"cap-{i}-{k}" for k in range(1000) if rotation_bucket(f"cap-{i}-{k}") == 0)
+           for i in range(len(rows))]
+    saved = {row["apply_url"]: saved_job(ids[i], None, hidden=False)
+             for i, row in enumerate(rows)}
+    opened = set()
+    for turn in range(13):  # ceil(39 / 3) of the bucket's turns
+        opened |= _plan(rows, saved, run_number=turn * ROTATION_CRAWLS, known_cap=3).open
+    assert opened == set(range(len(rows)))
 
 
 def test_the_saved_jobs_cap_takes_deadlines_before_the_rotation():

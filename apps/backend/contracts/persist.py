@@ -161,9 +161,11 @@ def observation_link(url) -> str:
 
 
 def observable_jobs(cursor, source_id) -> dict:
-    """The source's saved jobs by observation_link, read inside the save's transaction."""
+    """The source's saved jobs that could be observed (not hidden; active or expired), by
+    observation_link, read inside the save's transaction. observe_known applies the deadline."""
     cursor.execute(
-        f"SELECT {', '.join(_OBSERVABLE_COLUMNS)} FROM jobs WHERE source_id = %s",
+        f"SELECT {', '.join(_OBSERVABLE_COLUMNS)} FROM jobs"
+        " WHERE source_id = %s AND deleted_at IS NULL AND status IN ('active', 'expired')",
         (str(source_id),),
     )
     by_link: dict = {}

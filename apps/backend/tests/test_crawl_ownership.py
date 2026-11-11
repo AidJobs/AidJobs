@@ -26,7 +26,7 @@ import sys
 import threading
 import time
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -1886,8 +1886,23 @@ def test_hidden_and_passed_jobs_are_not_observed(db):
     assert fresh == ["Programme Officer 3"]
 
 
-def _html_crawl(source, rows, monkeypatch, *, page_fields=None):
-    """The real HTML crawl through the orchestrator, with the listing and job pages served here."""
+class _RejectionLog:
+    def __init__(self):
+        self.errors = []
+
+    def log_extraction(self, **kwargs):
+        return None
+
+    def log_failed_insert(self, *, source_url, error, **kwargs):
+        self.errors.append((error, source_url))
+
+
+def _html_crawl(source, rows, monkeypatch, *, page_fields=None, page_fails=False, log=None,
+                saved_jobs=None):
+    """The real HTML crawl through the orchestrator, with the listing and job pages served here.
+
+    saved_jobs, when given, replaces the crawl's read of the saved jobs for its page plan.
+    """
     import crawler_v2.job_pages as job_pages
 
     monkeypatch.setattr(job_pages, "rotation_bucket", lambda job_id: -1)
@@ -1896,9 +1911,11 @@ def _html_crawl(source, rows, monkeypatch, *, page_fields=None):
     async def scenario():
         orch = _orch()
         crawler = orch.html_crawler
-        crawler.extraction_logger = None
+        crawler.extraction_logger = log
         crawler.html_storage = None
         crawler.quality_scorer = None
+        if saved_jobs is not None:
+            crawler._saved_jobs_for_pages = saved_jobs
 
         async def fetch_page(url):
             return 200, "<html><body>listing</body></html>", ""
@@ -1908,7 +1925,10 @@ def _html_crawl(source, rows, monkeypatch, *, page_fields=None):
 
         async def detail_page(job, base_url):
             opened.append(job["apply_url"])
-            return {**job, **(page_fields or {"location_raw": "Nairobi, Kenya"})}
+            if page_fails:
+                return job
+            fields = page_fields or {"location_raw": "Nairobi, Kenya"}
+            return {**job, **fields, "page_read": True}
 
         crawler._fetch_page = fetch_page
         crawler._listing_jobs = listing
@@ -1942,11 +1962,71 @@ def test_new_vacancies_over_the_cap_are_held_back_not_saved(db, monkeypatch):
 
     monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 1)
     source = _add_source()
-    run_id, opened = _html_crawl(source, [_thin(4), _thin(5), _job(6)], monkeypatch)
-    assert opened == ["https://example.org/jobs/4"]
+    log = _RejectionLog()
+    run_id, opened = _html_crawl(source, [_thin(4), _thin(5), _job(6)], monkeypatch, log=log)
+    assert len(opened) == 1
     titles = sorted(r[0] for r in _sql("SELECT title FROM jobs"))
-    assert titles == ["Programme Officer 4", "Programme Officer 6"], (
-        "5 is thin and over the cap: read by a later crawl; 6 the listing admits"
+    read = "Programme Officer " + opened[0].rsplit("/", 1)[-1]
+    assert titles == sorted([read, "Programme Officer 6"]), (
+        "the other thin one is over the cap: read by a later crawl; 6 the listing admits"
+    )
+    held = [url for error, url in log.errors if error == "detail_unconfirmed"]
+    assert len(held) == 1 and held[0] not in opened and held[0] != _job(6)["apply_url"]
+
+
+def test_without_the_saved_jobs_every_vacancy_is_new_and_saved_ones_are_still_seen(
+    db, monkeypatch
+):
+    import crawler_v2.job_pages as job_pages
+
+    monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 1)
+    source = _add_source()
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+
+    def unreadable(source_id, run_token):
+        raise RuntimeError("the read timed out")
+
+    run_id, opened = _html_crawl(source, [_thin(n) for n in (1, 2, 3)], monkeypatch,
+                                 saved_jobs=unreadable)
+    assert len(opened) == 1, "every vacancy treated as new, within the cap"
+    record = _lifecycle(run_id)
+    observed = _sql("SELECT observed FROM crawl_logs WHERE id = %s", (run_id,))[0][0]
+    assert observed == 2, "the two held back over the cap are seen through their rows"
+    assert record["matched_active"] == 3
+    assert _job_count() == 3
+
+
+def test_the_deadline_window_is_read_on_the_runs_day(db, monkeypatch, caplog):
+    import logging
+
+    from crawler_v2.job_pages import link_key, saved_job
+
+    source = _add_source()
+    _store_job(source["id"], 1, deadline="2999-01-11")
+    stored_id = str(_sql("SELECT id FROM jobs")[0][0])
+
+    def on_a_far_day(source_id, run_token):
+        saved = {link_key(_thin(1)["apply_url"]): [saved_job(stored_id, "2999-01-11", False)]}
+        return saved, 3, date(2999, 1, 10)
+
+    with caplog.at_level(logging.WARNING, logger="crawler_v2.simple_crawler"):
+        _run_id, opened = _html_crawl(source, [_thin(1)], monkeypatch, saved_jobs=on_a_far_day)
+    assert "Saved jobs not read" not in caplog.text, "the plan used the saved jobs given"
+    assert opened == [_thin(1)["apply_url"]], "a day before its deadline on the run's day"
+
+
+def test_a_saved_jobs_page_that_fails_clears_nothing_from_its_listing_row(db, monkeypatch):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _sql("UPDATE jobs SET deadline = CURRENT_DATE + 1, is_remote = true,"
+         " location_raw = 'Home based'")
+    row = {**_thin(1), "location_raw": "Nairobi, Kenya", "deadline": ""}
+    run_id, opened = _html_crawl(source, [row], monkeypatch, page_fails=True)
+    assert opened == [_thin(1)["apply_url"]], "near its deadline: chosen, but not read"
+    stored = _sql("SELECT deadline = CURRENT_DATE + 1, is_remote, location_raw FROM jobs")[0]
+    assert tuple(stored) == (True, True, "Nairobi, Kenya"), (
+        "the listing's empty deadline and 'not remote' clear nothing; its location is a reading"
     )
 
 
