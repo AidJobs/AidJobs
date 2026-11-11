@@ -1,13 +1,40 @@
-name: CI
+name: CI backend
 
 # Branch work is checked through its pull request; pushes run only on main, after a merge.
+# Runs only when something it checks changes, to stay within GitHub's free Actions minutes
+# (decided by the user, 11 November 2026); the frontend is in ci-frontend.yml, and the secret
+# scan, which runs on every push, in secrets.yml.
 on:
   push:
     branches: [main]
+    paths:
+      - 'apps/backend/**'
+      - 'apps/frontend/lib/site/countries.ts'
+      - 'infra/**'
+      - 'tools/survey/**'
+      - 'docs/architecture/source-survey/**'
+      - '.github/scripts/**'
+      - '.github/audit-exceptions.json'
+      - '.github/workflows/ci.yml'
   pull_request:
+    paths:
+      - 'apps/backend/**'
+      - 'apps/frontend/lib/site/countries.ts'
+      - 'infra/**'
+      - 'tools/survey/**'
+      - 'docs/architecture/source-survey/**'
+      - '.github/scripts/**'
+      - '.github/audit-exceptions.json'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# A newer push to the same pull request cancels the run it replaces; runs on main are kept.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -31,6 +58,28 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # The lock check, Render's build rehearsal and the dependency audit run only when the
+      # dependencies or the audit scripts change; the weekly dependency-audit.yml catches new
+      # advisories against unchanged files. This file is left out, as most pull requests add tests
+      # to its lists; one that edits those three checks is run by hand (Actions, CI backend, Run
+      # workflow), which runs them all. A pull request is checked out as its merge with main, and
+      # main moves only by merges, so the first parent is what the change is measured against. If
+      # that comparison fails, the checks run.
+      - name: Dependency files changed
+        id: deps
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] && git diff --quiet HEAD^1 HEAD -- \
+              ':(glob)*.in' ':(glob)*.txt' .python-version pyproject.toml \
+              scripts/lock.sh scripts/render_build.sh \
+              ../../.github/scripts ../../.github/audit-exceptions.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -222,7 +271,7 @@ jobs:
 
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.deps.outputs.changed == 'true' }}
         run: |
           python -m venv /tmp/lock-tool
           /tmp/lock-tool/bin/python -m pip install --quiet --require-hashes -r lock-tools.txt
@@ -233,7 +282,7 @@ jobs:
       # setuptools 65.5.0), without pip's cache (so sgmllib3k is built from source, as on
       # Render); it must install exactly the lock.
       - name: Rehearse Render's build
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.deps.outputs.changed == 'true' }}
         env:
           PIP_NO_CACHE_DIR: '1'
         run: |
@@ -242,14 +291,14 @@ jobs:
           PATH="/tmp/render-venv/bin:$PATH" bash scripts/render_build.sh
 
       - name: Prepare dependency audit
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.deps.outputs.changed == 'true' }}
         run: bash ../../.github/scripts/prepare_pypi_audit.sh
 
       # Security plan, stage 3A, part 3: any finding in an installed package fails, the locked
       # build tools included, unless .github/audit-exceptions.json accepts it. A missing, broken,
       # or incomplete audit also fails.
       - name: Dependency audit gate
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.deps.outputs.changed == 'true' }}
         run: >
           python ../../.github/scripts/audit_gate.py
           --exceptions ../../.github/audit-exceptions.json
@@ -259,71 +308,9 @@ jobs:
           --output audit/pip-audit.json
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && steps.deps.outputs.changed == 'true' }}
         continue-on-error: true
         with:
           name: backend-dependency-audit
           path: apps/backend/audit/
 
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-
-      - name: Install dependencies
-        id: install
-        run: npm ci
-
-      # Next.js 16's build no longer lints. The ceiling is the reviewed baseline (progress ledger, W-47);
-      # more warnings fail the job, and it only goes down.
-      - name: Frontend lint
-        run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 37
-
-      - name: Frontend tests
-        run: npm run test --workspace=@aidjobs/frontend
-
-      # Security plan, stage 5: the agent secret guard, its registration in .cursor/hooks.json,
-      # and the settings checker. An edit that unhooks or weakens the guard fails here.
-      - name: Secret guard tests
-        if: ${{ !cancelled() }}
-        run: node --test .cursor/hooks/secret-guard.test.mjs scripts/env_check.test.mjs
-
-      # Security plan, stage 3A, part 3: each high or critical advisory in a runtime package fails,
-      # unless .github/audit-exceptions.json accepts it. A missing or broken audit also fails.
-      - name: Dependency audit gate
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: python3 .github/scripts/audit_gate.py npm --output audit/npm-audit-runtime.json
-
-      # Report only: development tools are cleaned up in a later step, and Dependabot alerts on them.
-      - name: Development tools audit (report only)
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: mkdir -p audit && (npm audit --json > audit/npm-audit-full.json || true)
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        continue-on-error: true
-        with:
-          name: frontend-dependency-audit
-          path: audit/
-
-  secrets:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # Scans only the commits a push or pull request adds. Values in older history were
-      # rotated on 23 October 2026 and would fail every run if scanned again.
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: false
