@@ -132,6 +132,7 @@ const SDG_WORDS: Array<[RegExp, number[]]> = [
 const SDG_SECTOR: Record<string, number[]> = {
   'Water, sanitation and hygiene': [6, 3],
   Health: [3],
+  Nutrition: [2, 3],
   'Child protection': [16],
   Education: [4],
   'Climate and environment': [13],

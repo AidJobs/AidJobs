@@ -58,6 +58,40 @@ describe('reading the first message', () => {
     expect(facts.languages).toEqual(['English', 'French']);
   });
 
+  it('reads an amount as pay only when it is pay: a range, an amount per period, or one next to a pay word', () => {
+    const pay = (t: string) => extractFacts(t, TODAY).facts;
+    expect(pay('Finance Officer in Juba who approves purchases up to USD 5,000 per purchase')).toMatchObject({ salaryMin: '', salaryMode: 'hidden' });
+    expect(pay('Logistics Officer, budget of USD 200,000 a year, salary USD 2,500 a month')).toMatchObject({ salaryMin: '2,500', currency: 'USD', period: 'month' });
+    expect(pay('Officer with signing authority of €10,000')).toMatchObject({ salaryMin: '' });
+    expect(pay('Officer, USD 5,000 per transaction')).toMatchObject({ salaryMin: '' });
+    expect(pay('Officer, salary $3,200')).toMatchObject({ salaryMin: '3,200', currency: 'USD', salaryMode: 'exact' });
+    expect(pay('Officer, a stipend of £400')).toMatchObject({ salaryMin: '400', currency: 'GBP' });
+    expect(pay('Officer, GBP 30,000 to 34,000')).toMatchObject({ salaryMin: '30,000', salaryMax: '34,000', salaryMode: 'range' });
+  });
+
+  it('understands "make <any section> longer"; the rules add only what they know, and ask for pay and benefits', () => {
+    const f = { ...emptyFacts(), title: 'WASH Officer' };
+    const secs = ['purpose', 'responsibilities', 'requirements', 'offer'].map((k) => buildSection(k, ctx(f)));
+    const keys = secs.map((x) => x.key);
+    const offer = applyEdit('make what we offer longer', keys, secs, ctx(f), TODAY, 'purpose');
+    expect(offer.sections).toEqual(secs);
+    expect(offer.reply).toMatch(/^I can't add more to .+ without your details/);
+    const duties = applyEdit('make it longer', keys, secs, ctx(f), TODAY, 'responsibilities');
+    expect(duties.sections.find((x) => x.key === 'responsibilities')!.lines.length).toBeGreaterThan(secs.find((x) => x.key === 'responsibilities')!.lines.length);
+    expect(duties.sections.find((x) => x.key === 'offer')).toEqual(secs.find((x) => x.key === 'offer'));
+    expect(applyEdit('make it longer', keys, secs, ctx(f), TODAY, 'requirements').reply).toMatch(/^I can't add more to/);
+    const many = secs.map((x) => (x.key === 'offer' ? { ...x, lines: ['- One', '- Two', '- Three', '- Four', '- Five'] } : x));
+    const shorter = applyEdit('make the offer shorter', keys, many, ctx(f), TODAY, 'purpose');
+    expect(shorter.sections.find((x) => x.key === 'offer')!.lines.filter((l) => l.startsWith('- '))).toHaveLength(3);
+  });
+
+  it('reads a nutrition role as nutrition, not health; a health role stays health', () => {
+    expect(detectRole('We are hiring a Nutrition Officer in Juba').role?.key).toBe('nutrition');
+    expect(detectRole('CMAM supervisor').role?.key).toBe('nutrition');
+    expect(detectRole('Health Officer in Goma').role?.key).toBe('health');
+    expect(detectRole('Nutrition Officer').role?.sector).toBe('Nutrition');
+  });
+
   it('reads engagement, work arrangement, recruitment, and funding conditions', () => {
     expect(detectRole('WASH consultant for 40 days').engagement).toBe('consultancy');
     expect(detectRole('communications internship').engagement).toBe('internship');

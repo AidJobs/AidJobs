@@ -18,6 +18,7 @@ const REMOTE_OK = new Set(['finance', 'comms', 'meal', 'hr', 'climate']);
 const MARKET_PLACES: Record<string, string[]> = {
   wash: ['Juba', "Cox's Bazar", 'Maiduguri'],
   health: ['Juba', 'Goma', 'Kabul'],
+  nutrition: ['Maiduguri', 'Juba', "Cox's Bazar"],
   protection: ["Cox's Bazar", 'Amman', 'Goma'],
   education: ["Cox's Bazar", 'Amman', 'Kabul'],
   logistics: ['Goma', 'Juba', 'Port-au-Prince'],

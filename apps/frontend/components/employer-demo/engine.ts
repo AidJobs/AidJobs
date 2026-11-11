@@ -270,7 +270,7 @@ export const ROLE_FAMILIES: RoleFamily[] = [
   {
     key: 'health',
     title: 'Health Programme Officer',
-    words: ['health', 'medical', 'clinic', 'epidemiolog', 'nurse', 'doctor', 'malaria', 'vaccin', 'nutrition'],
+    words: ['health', 'medical', 'clinic', 'epidemiolog', 'nurse', 'doctor', 'malaria', 'vaccin'],
     sector: 'Health',
     sdg: 3,
     resp: ['Support primary health care activities with health facilities and community health workers', 'Monitor health indicators and the quality of services', 'Coordinate with the Ministry of Health and the health cluster', 'Manage medical supplies with the logistics team', 'Train health staff and volunteers'],
@@ -280,6 +280,26 @@ export const ROLE_FAMILIES: RoleFamily[] = [
     comp: ['Works well with government counterparts', 'Accurate with data', 'Calm under pressure'],
     deliverables: ['Inception report', 'Health facility assessment', 'Draft and final report'],
     learning: ['How health programmes are monitored', 'Working with health authorities'],
+  },
+  {
+    key: 'nutrition',
+    title: 'Nutrition Officer',
+    words: ['nutrition', 'malnutrition', 'cmam', 'iycf', 'feeding programme', 'feeding program'],
+    sector: 'Nutrition',
+    sdg: 2,
+    resp: [
+      'Run community-based management of acute malnutrition with health facilities and community volunteers',
+      'Organise screening for acute malnutrition and follow up referrals to treatment',
+      'Promote infant and young child feeding with mothers, caregivers, and community groups',
+      'Track nutrition supplies and stock with the logistics team',
+      'Coordinate with the Ministry of Health and the nutrition cluster',
+    ],
+    more: ['Support nutrition surveys and act on their results', 'Make sure services reach pregnant and breastfeeding women and children under five'],
+    essential: ['Degree in nutrition, public health, or a related field', 'Experience in nutrition programmes in humanitarian or development settings'],
+    desirable: ['Knowledge of national nutrition protocols and the nutrition cluster'],
+    comp: ['Works closely with communities and health staff', 'Accurate with data', 'Calm under pressure'],
+    deliverables: ['Inception report', 'Nutrition assessment', 'Draft and final report'],
+    learning: ['How nutrition programmes are run and monitored', 'Screening and referral in the field'],
   },
   {
     key: 'protection',
@@ -637,6 +657,26 @@ function nextDate(today: number, day: number, monthIdx: number, year?: number): 
   return isoDay(d.getTime());
 }
 
+const MONEY = /(?:\b(?:USD|US\$|EUR|GBP|KES|AUD|INR)|[$€£])\s?(\d[\d,.]*k?)(?:\s?(?:-|–|to)\s?(\d[\d,.]*k?))?(?:\s?(?:a|per|\/)\s?(hour|day|month|year|annum))?/gi;
+const PAY_WORD = /\b(?:salary|salaries|pay|paid|paying|stipend|wages?|remuneration|compensation|gross|net|earn\w*|fees?|rate)\b/i;
+const NOT_PAY_BEFORE = /\b(?:budgets?|purchases?|procurement|spend\w*|approv\w*|authori[sz]\w*|thresholds?|limits?|up to|sign(?:ing)?[- ]off|grants?|awards?|worth|value|portfolio|funding|turnover)\b[^.;\n]{0,30}$/i;
+const NOT_PAY_AFTER = /^\s*(?:per|a|each|for each)\s+(?:purchase|transaction|order|item|invoice|payment|request|contract|grant|procurement)\b/i;
+
+/**
+ * The first amount in the text that is pay: a range, an amount per hour, day, month, or year, or one next to a pay word ("salary",
+ * "stipend"). A budget, a spending limit, or an amount per purchase is not pay ("approves purchases up to USD 5,000 per purchase").
+ */
+function payIn(t: string): string[] | null {
+  for (const m of t.matchAll(MONEY)) {
+    const at = m.index ?? 0;
+    const before = t.slice(Math.max(0, at - 40), at);
+    const after = t.slice(at + m[0].length, at + m[0].length + 30);
+    if (NOT_PAY_BEFORE.test(before) || NOT_PAY_AFTER.test(after)) continue;
+    if (m[2] || m[3] || PAY_WORD.test(before) || PAY_WORD.test(after.slice(0, 20))) return [m[0], m[0].replace(/\s?\d.*$/, ''), m[1], m[2], m[3]];
+  }
+  return null;
+}
+
 export function extractFacts(text: string, today: number, base: Facts = emptyFacts()): { facts: Facts; role: RoleFamily | null; engagement: Engagement | null } {
   const { role, engagement } = detectRole(text);
   const f: Facts = { ...base, languages: [...base.languages] };
@@ -698,7 +738,7 @@ export function extractFacts(text: string, today: number, base: Facts = emptyFac
     const now = new Date(today).getUTCDay();
     f.deadline = addDays(today, ((want - now + 7) % 7) || 7);
   }
-  const sal = t.match(/\b(USD|US\$|EUR|GBP|KES|AUD|INR|\$|€|£)\s?(\d[\d,.]*k?)(?:\s?(?:-|–|to)\s?(\d[\d,.]*k?))?(?:\s?(?:a|per|\/)\s?(hour|day|month|year|annum))?/i);
+  const sal = payIn(t);
   if (sal) {
     const c = sal[1].toUpperCase();
     f.currency = c === '$' || c === 'US$' ? 'USD' : sal[1] === '€' ? 'EUR' : sal[1] === '£' ? 'GBP' : c;
@@ -1076,9 +1116,19 @@ export function toneRequest(text: string): Tone | null {
 /** Whether a message asks to make the text shorter or longer, rather than containing those words in a sentence. */
 export function lengthRequest(t: string): 'shorter' | 'longer' | null {
   const s = t.trim().replace(/[.!?]+$/, '').replace(/[\s,]+please$/, '').replace(/^please\s+/, '').replace(/^(can|could|would) you\s+/, '');
-  if (/^(shorter|more concise|too long|(make|keep) (it|this|the [a-z ]+) (shorter|more concise|brief)|(shorten|cut|trim|tighten)( down)? (it|this|that|the\b.*)|(shorten|cut|trim|tighten)( it)? down)$/.test(s) || /^shorten\b/.test(s)) return 'shorter';
-  if (/^(longer|more detail|too short|add more( detail)?.*|more detail (on|in|for) .+|(make|write) (it|this|the [a-z ]+) longer|expand (it|this|that|the\b.*))$/.test(s)) return 'longer';
+  if (/^(shorter|more concise|too long|(make|keep) [\p{L}' ]{1,40} (shorter|more concise|brief)|(shorten|cut|trim|tighten)( down)? (it|this|that|the\b.*)|(shorten|cut|trim|tighten)( it)? down)$/u.test(s) || /^shorten\b/.test(s)) return 'shorter';
+  if (/^(longer|more detail|too short|add more( detail)?.*|more detail (on|in|for) .+|(make|write) [\p{L}' ]{1,40} longer|expand (it|this|that|the\b.*))$/u.test(s)) return 'longer';
   return null;
+}
+
+/** What the rules can add to a section asked to be longer, from the role's own lines; none where only the employer knows (pay, benefits). */
+function moreFor(key: string, role: RoleFamily): string[] {
+  if (key === 'responsibilities') return role.more;
+  if (key === 'requirements') return role.desirable;
+  if (key === 'competencies') return role.comp;
+  if (key === 'deliverables') return role.deliverables;
+  if (key === 'learning') return role.learning;
+  return [];
 }
 
 /** Edits asked for in the chat after the first draft. */
@@ -1103,8 +1153,12 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   }
   if (length === 'longer') {
     const k = target ?? 'responsibilities';
-    const next = sections.map((s) => (s.key === k ? { ...s, lines: [...s.lines, ...role.more.filter((m) => !s.lines.includes(`- ${m}`)).map((m) => `- ${m}`)], edited: true } : s));
-    return { sections: next, tags: keys, tone, facts, reply: `Added more detail to ${headingFor(k, ctx.format)}.` };
+    const sec = sections.find((s) => s.key === k);
+    const add = sec ? moreFor(k, role).filter((m) => !sec.lines.includes(`- ${m}`)) : [];
+    const heading = sec?.title ?? headingFor(k, ctx.format);
+    if (!add.length) return { sections, tags: keys, tone, facts, reply: `I can't add more to ${heading} without your details. Tell me what to add (for example the benefits, leave, or allowances), and I'll put it in.` };
+    const next = sections.map((s) => (s.key === k ? { ...s, lines: [...s.lines, ...add.map((m) => `- ${m}`)], edited: true } : s));
+    return { sections: next, tags: keys, tone, facts, reply: `Added more detail to ${heading}.` };
   }
   const asked = toneRequest(text);
   if (asked && asked !== ctx.tone) {

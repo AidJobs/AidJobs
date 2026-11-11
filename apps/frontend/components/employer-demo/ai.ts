@@ -60,8 +60,8 @@ export function probeAi(): Promise<boolean> {
       const res = await fetch(AI_ROUTE, { method: 'GET', cache: 'no-store' });
       const data = res.ok ? ((await res.json()) as { ai?: unknown; models?: unknown; default?: unknown; provider?: unknown }) : null;
       const models = Array.isArray(data?.models) ? data.models.filter((m): m is AiModel => Boolean(m) && typeof m.key === 'string' && typeof m.label === 'string') : [];
-      const saved = readModel();
-      const model = models.some((m) => m.key === saved) ? saved : typeof data?.default === 'string' && models.some((m) => m.key === data.default) ? data.default : (models[0]?.key ?? '');
+      forgetSavedModel();
+      const model = typeof data?.default === 'string' && models.some((m) => m.key === data.default) ? data.default : (models[0]?.key ?? '');
       set({ status: data?.ai === true ? 'on' : 'off', models, model, provider: typeof data?.provider === 'string' ? data.provider.slice(0, 60) : 'an AI provider' });
     } catch {
       set({ status: 'off' });
@@ -71,22 +71,18 @@ export function probeAi(): Promise<boolean> {
   return probing;
 }
 
-function readModel(): string {
+/** A choice an earlier version remembered across visits; every visit now starts on the route's default. */
+function forgetSavedModel() {
   try {
-    return localStorage.getItem(MODEL_KEY) ?? '';
+    localStorage.removeItem(MODEL_KEY);
   } catch {
-    return '';
+    /* storage unavailable */
   }
 }
 
-/** The model chosen in the demo's controls, remembered in this browser; one the route does not offer is ignored. */
+/** The model chosen in the demo's controls, for this visit only; one the route does not offer is ignored. */
 export function chooseAiModel(key: string) {
   if (!snap.models.some((m) => m.key === key)) return;
-  try {
-    localStorage.setItem(MODEL_KEY, key);
-  } catch {
-    /* storage unavailable: the choice holds for this visit */
-  }
   set({ model: key });
 }
 

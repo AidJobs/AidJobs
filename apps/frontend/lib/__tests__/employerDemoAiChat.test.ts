@@ -196,29 +196,25 @@ describe('the AI chat: one message through the route, and the fallback', () => {
     expect(aiState().pending).toEqual({});
   });
 
-  it('sends the model chosen in the demo, remembers the choice, and labels the reply with the model that answered', async () => {
+  it('sends the model chosen in the demo, for this visit only, and labels the reply with the model that answered', async () => {
     resetAi('on', [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }]);
     chooseAiModel('gpt-99');
     expect(aiState().model).toBe('terra');
     chooseAiModel('sonnet');
     expect(aiState().model).toBe('sonnet');
-    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBe('sonnet');
+    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBeNull();
     const f = answer(200, { reply: 'Hello.', actions: [], model: 'sonnet' });
     await askAi('job-comms', 'hi', { open });
     expect(JSON.parse(f.mock.calls[0][1]?.body ?? '{}').model).toBe('sonnet');
     expect(lastAi('job-comms')).toMatchObject({ text: 'Hello.', by: 'Claude Sonnet 5.5' });
   });
 
-  it('a saved choice the route still offers is used on the next visit; otherwise the route default', async () => {
+  it("every visit starts on the route's default, and a choice an earlier version saved is forgotten", async () => {
     localStorage.setItem('aidjobs.employerDemo.aiModel', 'sonnet');
     answer(200, { ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra', provider: 'OpenRouter, with zero data retention' });
     expect(await probeAi()).toBe(true);
-    expect(aiState()).toMatchObject({ model: 'sonnet', provider: 'OpenRouter, with zero data retention' });
-    resetAi();
-    localStorage.setItem('aidjobs.employerDemo.aiModel', 'kimi');
-    answer(200, { ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }], default: 'terra' });
-    await probeAi();
-    expect(aiState().model).toBe('terra');
+    expect(aiState()).toMatchObject({ model: 'terra', provider: 'OpenRouter, with zero data retention' });
+    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBeNull();
   });
 
   it('one message at a time per job', async () => {

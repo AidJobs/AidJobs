@@ -1664,7 +1664,7 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(choice, 'sonnet');
       choice.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBe('sonnet');
+    expect(localStorage.getItem('aidjobs.employerDemo.aiModel')).toBeNull();
     say('Warm and plain, please');
     await flush();
     expect(posts().at(-1)?.model).toBe('sonnet');
