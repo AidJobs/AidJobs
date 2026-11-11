@@ -1540,13 +1540,13 @@ def _lifecycle(run_id):
     return dict(zip(LIFECYCLE_COLUMNS, row))
 
 
-def _listing_crawl(numbers, report, *, titles=None):
+def _listing_crawl(numbers, report, *, titles=None, cls=SimpleCrawler):
     """A crawl that saves these jobs through the real writer and reports this listing."""
     titles = titles or {}
 
     async def crawl(src, run):
         jobs = [_job(n, titles.get(n)) for n in numbers]
-        counts = await run.save(_crawler().save_jobs, jobs, src["id"], src["org_name"])
+        counts = await run.save(_crawler(cls).save_jobs, jobs, src["id"], src["org_name"])
         return {
             "status": "ok",
             "message": f"Found {len(jobs)} jobs",
@@ -1653,10 +1653,17 @@ def test_a_job_whose_passed_deadline_a_row_extends_is_not_a_match_when_listed_ag
     ), "the new reading is still saved"
 
 
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
 def test_the_start_count_and_the_matches_read_the_same_calendar_in_any_time_zone(
-    db, monkeypatch
+    db, monkeypatch, cls
 ):
     # A database day always one off the UTC day, so the UTC clock and the database disagree.
+    # Not within two minutes of 00:00 or 12:00 UTC, so the choice below holds for the whole test.
+    to_boundary = _sql(
+        "SELECT 43200 - EXTRACT(EPOCH FROM NOW() AT TIME ZONE 'UTC')::bigint % 43200"
+    )[0][0]
+    if to_boundary < 120:
+        time.sleep(float(to_boundary) + 5)
     utc_hour = _sql("SELECT EXTRACT(HOUR FROM NOW() AT TIME ZONE 'UTC')")[0][0]
     ahead = utc_hour >= 12
     monkeypatch.setenv("PGTZ", "Etc/GMT-12" if ahead else "Etc/GMT+12")
@@ -1668,7 +1675,7 @@ def test_the_start_count_and_the_matches_read_the_same_calendar_in_any_time_zone
     # Passed by the database's day but not by UTC's when the database is ahead; the other way
     # round, open by the database's day but passed by UTC's.
     _store_job(source["id"], 3, deadline=utc_day if ahead else db_day)
-    run_id = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    run_id = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE, cls=cls))
     record = _lifecycle(run_id)
     assert record["active_at_start"] == (2 if ahead else 3)
     assert record["matched_active"] == record["active_at_start"]
@@ -1765,14 +1772,37 @@ def test_a_match_whose_update_rolls_back_is_not_reported(failing_updates, cls):
     source = _add_source()
     _store_job(source["id"], 1)
     _store_job(source["id"], 2)
+    _store_job(source["id"], 3, deadline="2000-01-01")
+    _store_job(source["id"], 4, deadline="2000-01-01")
     run_id, _ = _orch()._begin(source["id"], False)
-    failing = {**_job(1), "location_raw": "Reject me"}
-    counts = _crawler(cls).save_jobs([failing, _job(2)], source["id"], "Example",
-                                     run_token=run_id)
-    assert counts["failed"] == 1
+    failing_open = {**_job(1), "location_raw": "Reject me"}
+    failing_passed = {**_job(3), "location_raw": "Reject me"}
+    rows = [failing_open, _job(2), failing_passed, _job(4)]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    assert counts["failed"] == 2
     stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
     assert counts["seen_active"] == [stored["Programme Officer 2"]]
+    assert counts["not_open_ids"] == [stored["Programme Officer 4"]]
     assert counts["created_ids"] == []
+
+
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
+def test_every_save_step_reports_open_and_not_open_matches_apart(db, cls):
+    source, other = _add_source(), _add_source("Other")
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2, deadline="2000-01-01")
+    _store_job(source["id"], 3, status="expired")
+    _store_job(source["id"], 4, hidden=True)
+    _store_job(other["id"], 5)
+    run_id, _ = _orch()._begin(source["id"], False)
+    rows = [_job(n) for n in (1, 2, 3, 4, 5, 6)]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
+    assert counts["seen_active"] == [stored["Programme Officer 1"]]
+    assert sorted(counts["not_open_ids"]) == sorted(
+        stored[f"Programme Officer {n}"] for n in (2, 3, 4)
+    )
+    assert counts["created_ids"] == [stored["Programme Officer 6"]]
 
 
 TRACKED = "https://example.org/jobs/1?utm_source=newsletter"

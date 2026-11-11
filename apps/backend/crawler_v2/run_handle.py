@@ -53,7 +53,7 @@ class RunHandle:
 
     def matched_active(self) -> int:
         """Open jobs the run's rows matched: never one the run created, nor one that was not open
-        when a row first matched it (a row can change a job's deadline during the run)."""
+        at any of its matches (a row can change a job's deadline during the run)."""
         return len(self.seen_active - self.created - self.not_open)
 
     async def wait_for_saves(self) -> None:
