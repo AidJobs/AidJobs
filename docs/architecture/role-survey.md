@@ -584,4 +584,12 @@ Every item as the agent recommended, the user's words noted where they add somet
 16. **Not needed:** asking DevNetJobsIndia and BrighterMonday for permission ("we have enough data", the user).
 17. **Later:** practitioner validation through the product (a free Amplify for template ratings), once the employer side is ready; **re-measuring from AidJobs' own crawled job descriptions,** to be planned "carefully and thoroughly" before anything is done (its reuse terms, consent, how often, and how a new version is tested).
 
-**Order:** R0 now (with `confirm.py`'s reviewed fetcher); then, in a new chat (the ledger is the handover), the build: `roles.py` with its grouping rules, the reading and measuring script `adverts.py` with its independent review before R1, then R1 to R5, the local grouping tool's proof on 2 or 3 families, and the standards documents.
+### 19.10 Batch R0, run on 11 November 2026 (19:25 to 19:40 IST)
+
+The hosts of every archived job page R2 may read were counted from the saved index rows (no request): 188 hosts, more than the approved 130 to 150, so the run was kept within its size by leaving out the German Red Cross's host (outside wave 1's languages) and hosts with fewer than 3 job pages, and always keeping the hosts of the 30 pages read earlier: **133 hosts, covering 15,633 of 16,993 job-page captures (92%).** One `robots.txt` request per host through the backend's fetch policy with the survey's identity (`confirm.py`'s fetcher): 133 requests; 96 answered, 10 have none (404, which allows reading), 22 refused (403) and 5 did not connect. Verdicts, by RFC 9309 and the survey's rules:
+- **job-page captures:** 14,396 allowed; 12 forbidden; 390 on hosts that refused and 835 on hosts that did not connect, neither read; 1,360 on the hosts left out. Among those not read: the Natural Justice and One Acre Fund sites and Solidarités International (no connection), UNFPA's site (refused), DRC's forum pages (refused).
+- **the 30 pages read earlier without the check:** 29 allowed; **1 refused**, M1's sample page 01 on `www.unfpa.org`, now dropped from the text-rate sample (own sites 2 of 2 with text). UNFPA's 250 own-site job pages leave the broad sample.
+
+Kept outside the repository (`survey-raw-archive/role-survey-r0-2026-11-11`). The broad sample's estimate (19.3) is unchanged within its range; R2 reads only allowed pages.
+
+**Order:** R0 done; then, in a new chat (the ledger is the handover), the build: `roles.py` with its grouping rules, the reading and measuring script `adverts.py` with its independent review before R1, then R1 to R5, the local grouping tool's proof on 2 or 3 families, and the standards documents.
