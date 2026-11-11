@@ -417,6 +417,7 @@ function BoxGrip({ height, onChange }: { height: number; onChange: (h: number) =
  */
 function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean }) {
   const [text, setText] = useState('');
+  const [tapped, setTapped] = useState<string | null>(null);
   const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
   const input = useRef<ComposerHandle>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -452,7 +453,17 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
             {m.from === 'ai' && m.quick && m.quick.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {m.quick.map((q) => (
-                  <button key={q} type="button" className="aj-pill" style={{ height: 30 }} disabled={i < lastUser || reviewing || busy} onClick={() => onSend(q)}>
+                  <button
+                    key={q}
+                    type="button"
+                    className="aj-pill"
+                    style={{ height: 30 }}
+                    disabled={i < lastUser || reviewing || busy || tapped === m.id}
+                    onClick={() => {
+                      setTapped(m.id);
+                      onSend(q);
+                    }}
+                  >
                     {q}
                   </button>
                 ))}
