@@ -1,5 +1,6 @@
 import { addSuggestions, SECTION_BY_KEY } from './engine';
 import { basicAdvertCheck, type Point } from './market';
+import { inferSdgs } from './setup';
 import type { AskKind, DemoJob, Format, GroupKey, State } from './types';
 
 /**
@@ -27,7 +28,7 @@ export const ASKS: AskKind[] = ['title', 'place', 'contract', 'grade', 'eligibil
 export const DECLINABLE: AskKind[] = ['grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method'];
 
 /** The parts of step 6 that are settled once answered. */
-export const LEFT = ['details', 'fixed', 'suggest'] as const;
+export const LEFT = ['details', 'sdgs', 'fixed', 'suggest'] as const;
 
 let aiWriting = false;
 
@@ -88,6 +89,7 @@ export type Step =
   | { kind: 'write'; sections: string[] }
   | { kind: 'approve'; section: string }
   | { kind: 'details' }
+  | { kind: 'sdgs' }
   | { kind: 'fixed' }
   | { kind: 'suggest'; sections: string[] }
   | { kind: 'check'; point: Point }
@@ -130,6 +132,7 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   const ask = ASKS.find((f) => !isSettled(f, job));
   if (ask) return { kind: 'ask', fact: ask };
   if (!isSettled('details', job)) return { kind: 'details' };
+  if (!isSettled('sdgs', job) && !job.sdgs && !inferSdgs(job).length && s.org.sdgs.length) return { kind: 'sdgs' };
   if (!isSettled('fixed', job)) return { kind: 'fixed' };
   const offered = suggestionsFor(job, s);
   if (!isSettled('suggest', job) && offered.length) return { kind: 'suggest', sections: offered };
@@ -174,6 +177,7 @@ export function partOfStep(step: Step | null, job: DemoJob): string | null {
     case 'change':
       return job.walk?.pending?.changes[0] ? `s:${job.walk.pending.changes[0].key}` : null;
     case 'details':
+    case 'sdgs':
       return 'details';
     case 'fixed':
       return 'fixed';

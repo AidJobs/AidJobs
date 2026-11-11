@@ -8,7 +8,7 @@ import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, cha
 import { aiOn, askAi, GO_ON, probeAi, useAi } from './ai';
 import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
 import { readJobFile } from './readFile';
-import { OTHER_WORDING } from './walkChat';
+import { CHOOSE_SDGS, OTHER_WORDING } from './walkChat';
 import type { OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
@@ -821,6 +821,7 @@ function JobWindow({ id }: { id: string }) {
     if (PUBLISH.test(t)) return chatNote(job.id, text, 'For now, publishing is on the Check and publish page.', isReviewable(job) ? [OPEN_PUBLISH] : undefined);
     if (REVIEW.test(t)) return chatNote(job.id, text, 'For now, review is in the earlier workspace, in its Review panel.', [OPEN_EARLIER]);
     const last = job.chat[job.chat.length - 1];
+    if (text === CHOOSE_SDGS) setFact('sdgs');
     const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
     if (aiOn() && !rulesAnswer) {
       void askAi(job.id, text, { focus: focus ?? undefined, open: (x) => openRef.current(x) }).then((done) => {

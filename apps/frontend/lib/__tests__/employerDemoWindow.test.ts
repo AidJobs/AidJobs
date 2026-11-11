@@ -364,6 +364,43 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(step(id)).toEqual({ kind: 'done' });
   });
 
+  it("a role with no clear goal: step 6 offers the organisation's goals, none, or the dialog, so they need not be found in Details", () => {
+    const toSdgs = (id: string) => {
+      setFacts(id, { deadline: workingDay(addDays(getState().today, 30), job(id).facts.iso) });
+      update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: ['grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'details'] } } : j)) }));
+      chatNote(id, 'show the preview', 'The preview is open.');
+    };
+    const id = ready("We're hiring a Communications Intern in Kampala", 'all');
+    expect(inferSdgs(job(id))).toEqual([]);
+    toSdgs(id);
+    expect(step(id)).toEqual({ kind: 'sdgs' });
+    expect(job(id).chat.at(-1)).toMatchObject({
+      text: "No SDG is clear from this role. Shall I use your organisation's goals (SDG 3, 6, 16)? The job page then says Riverstone Aid works towards them.",
+      quick: ["Use your organisation's goals (SDG 3, 6, 16)", 'Choose them myself', 'No SDGs'],
+    });
+    sendChat(id, "Use your organisation's goals (SDG 3, 6, 16)");
+    expect(job(id)).toMatchObject({ sdgs: [3, 6, 16], sdgsFrom: 'org' });
+    expect(step(id)).toEqual({ kind: 'fixed' });
+
+    const none = ready("We're hiring a Communications Intern in Kampala", 'all');
+    toSdgs(none);
+    sendChat(none, 'No SDGs');
+    expect(sdgsOf(job(none))).toEqual([]);
+    expect(step(none)).toEqual({ kind: 'fixed' });
+
+    const own = ready("We're hiring a Communications Intern in Kampala", 'all');
+    toSdgs(own);
+    sendChat(own, 'Choose them myself');
+    expect(step(own)).toEqual({ kind: 'sdgs' });
+    expect(job(own).chat.at(-1)?.step).toBe('sdgs');
+    setSdgs(own, [17]);
+    expect(step(own)).toEqual({ kind: 'fixed' });
+
+    const clear = ready("We're hiring a WASH Officer in Kampala", 'all');
+    toSdgs(clear);
+    expect(step(clear)?.kind).not.toBe('sdgs');
+  });
+
   it('a placeholder left by the AI is a check point, filled with the value from the answer', () => {
     const id = ready("We're hiring a Nutrition Officer in Juba, fixed-term", 'all');
     writeSections(id, [{ key: 'purpose', lines: ['The post holder runs screening in Juba and reports to [Reports to].'] }], 'AI');

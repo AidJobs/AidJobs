@@ -21,6 +21,17 @@ export const LEAVE_IT = 'Leave it';
 export const GENUINE = "It's a genuine requirement";
 export const OTHER_WORDING = 'Suggest other wording';
 export const OPEN_PUBLISH = 'Open Check and publish';
+export const CHOOSE_SDGS = 'Choose them myself';
+export const NO_SDGS = 'No SDGs';
+
+/** "SDG 3, 6, 16": the organisation's goals, at most three, as the Details row names them. */
+export function orgGoals(s: State): string {
+  return `SDG ${s.org.sdgs.slice(0, 3).join(', ')}`;
+}
+
+export function orgGoalsAnswer(s: State): string {
+  return `Use your organisation's goals (${orgGoals(s)})`;
+}
 const DRAFT_INTRO = 'Here is the whole draft';
 
 export const ASK_TEXT: Record<AskKind, string> = {
@@ -101,6 +112,8 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
     }
     case 'details':
       return [stepMsg('Anything else for the listing: the number of positions, direct reports, the start date, or the donor?', key, [NONE_OF_THESE])];
+    case 'sdgs':
+      return [stepMsg(`No SDG is clear from this role. Shall I use your organisation's goals (${orgGoals(s)})? The job page then says ${s.org.name} works towards them.`, key, [orgGoalsAnswer(s), CHOOSE_SDGS, NO_SDGS])];
     case 'fixed': {
       if (!job.commitments.length) return [stepMsg("This job has no fixed text yet. Shall I add the usual ones, Safeguarding, PSEA, and the no-fee notice, word for word from your settings?", key, ['Add them', 'No fixed text'])];
       const items = job.commitments.map((k) => ({ label: COMMITMENTS.find((c) => c.key === k)?.label ?? k, own: commitmentText(k, s.org, job.facts).own }));

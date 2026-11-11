@@ -127,6 +127,18 @@ describe('the AI chat: the demo carries out the actions', () => {
     expect(job(id).sections.find((x) => x.key === 'purpose')?.lines).toEqual(['The post holder runs nutrition screening in Juba.']);
   });
 
+  it("uses the organisation's goals only on a job whose role has none, and only when asked", () => {
+    resetAi('on');
+    const intern = startJob("We're hiring a Communications Intern in Kampala", undefined, [], true);
+    applyAiTurn(intern, 'yes, use ours', { reply: 'Done.', actions: [{ type: 'use_org_sdgs' }] }, open);
+    expect(job(intern)).toMatchObject({ sdgs: [3, 6, 16], sdgsFrom: 'org' });
+    expect(job(intern).walk?.settled).toContain('sdgs');
+    const wash = startJob("We're hiring a WASH Officer in Kampala", undefined, [], true);
+    applyAiTurn(wash, 'use ours', { reply: 'Done.', actions: [{ type: 'use_org_sdgs' }] }, open);
+    expect(job(wash).sdgs).toBeUndefined();
+    expect(lastAi(wash)?.text).toContain("Not done: the organisation's goals: the job already has goals");
+  });
+
   it('refuses settling a fact that needs a value, an address nobody gave, and wording kept without a reason', () => {
     resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);

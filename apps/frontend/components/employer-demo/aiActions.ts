@@ -3,6 +3,7 @@
 import {
   acceptPoint,
   aiExchange,
+  applyOrgSdgs,
   applyFormat,
   applyTemplate,
   approveSection,
@@ -25,7 +26,7 @@ import {
 } from './actions';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, isSettled, isWritten, LEFT, nextStep, stepKey } from './flow';
-import { STYLES } from './setup';
+import { sdgsOf, STYLES } from './setup';
 import { getState } from './store';
 import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, State } from './types';
 
@@ -57,6 +58,7 @@ const ORDER = [
   'write_section',
   'approve_section',
   'fixed_text',
+  'use_org_sdgs',
   'leave_point',
   'accept_point',
   'open',
@@ -405,6 +407,10 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         }
         break;
       }
+      case 'use_org_sdgs':
+        if (!s.org.sdgs.length || sdgsOf(j).length) refused.push("the organisation's goals: the job already has goals, or the organisation has none");
+        else applyOrgSdgs(id);
+        break;
       case 'leave_point': {
         const point = checkPoints(j, s).find((p) => p.key === a.point);
         if (!point) refused.push('leaving a check point that is not open');

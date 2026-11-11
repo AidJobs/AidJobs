@@ -119,6 +119,8 @@ function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Recor
       return { kind: 'change', what: j.walk?.pending?.what, changes: (j.walk?.pending?.changes ?? []).map((c) => ({ heading: headingOf(j, format, c.key), now: c.lines.join('\n') })) };
     case 'genuine':
       return { kind: 'genuine', point: step.point, wording: j.walk?.awaiting?.label };
+    case 'sdgs':
+      return { kind: 'sdgs', orgGoals: s.org.sdgs.slice(0, 3) };
     case 'fixed':
       return { kind: 'fixed', onThisJob: j.commitments.map((k) => ({ key: k, label: COMMITMENTS.find((c) => c.key === k)?.label, fromSettings: commitmentText(k, s.org, j.facts).own })) };
     case 'suggest':

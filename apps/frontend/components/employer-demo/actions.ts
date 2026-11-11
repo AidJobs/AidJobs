@@ -40,7 +40,7 @@ import { canReopen, isPublished } from './lifecycle';
 import { draftTranslation, langOf, redraftTranslation } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
 import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
-import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, fixedNamed, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
+import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, Lang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
@@ -412,14 +412,21 @@ export function chooseStyle(id: string, style: string[], said?: string) {
 /** The goals a job serves, corrected by hand (at most three); `null` goes back to reading them from the role. */
 export function setSdgs(id: string, sdgs: number[] | null) {
   if (!ownerOnly()) return;
-  updateJob(id, (j) => ({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined, sdgsFrom: undefined }));
+  updateJob(id, (j) => withSdgsAnswered({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined, sdgsFrom: undefined }));
+  if (getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
 }
 
 /** No goal is clear from the role: the user chooses the organisation's own goals (at most three), never applied without asking. */
-export function applyOrgSdgs(id: string) {
+export function applyOrgSdgs(id: string, said?: string) {
   const goals = getState().org.sdgs.slice(0, 3);
   if (!ownerOnly() || !goals.length) return;
-  updateJob(id, (j) => ({ ...touched(j), sdgs: goals, sdgsFrom: 'org' }));
+  updateJob(id, (j) => withSdgsAnswered({ ...touched(j), sdgs: goals, sdgsFrom: 'org', chat: said ? [...j.chat, msg('user', said), msg('ai', `Done: the job page says ${getState().org.name} works towards SDG ${goals.join(', ')}.`)] : j.chat }));
+  if (getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
+}
+
+/** In a job written step by step, choosing the goals in any way answers the chat's question about them (step 6). */
+function withSdgsAnswered(j: DemoJob): DemoJob {
+  return j.walk && !j.walk.settled.includes('sdgs') ? { ...j, walk: { ...j.walk, settled: [...j.walk.settled, 'sdgs'] } } : j;
 }
 
 /** "Keep it for all jobs": the job's style becomes the organisation's, and is not offered again. */
@@ -859,6 +866,12 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       settle(j.id, 'details', '', `Added: ${Object.keys(d).map((k) => ({ positions: 'positions', directReports: 'direct reports', startDate: 'the start date', donor: 'the donor' })[k]).join(', ')}.`);
       return true;
     }
+    case 'sdgs':
+      if (t === orgGoalsAnswer(s) || /^(?:yes|ok|okay|sure|please do|use (?:them|our|the organisation'?s|your))\b/i.test(t)) applyOrgSdgs(j.id, text);
+      else if (t === CHOOSE_SDGS) updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', "Pick up to three in the dialog; I'll go on once they're set."), step: 'sdgs' }] }));
+      else if (t === NO_SDGS || /^(?:no|none|nope|skip|not now)\b/i.test(t)) settle(j.id, 'sdgs', text, 'Fine: no SDGs on this job. You can add them from Details at any time.');
+      else return false;
+      return true;
     case 'fixed': {
       if (t === KEEP_FIXED || /^(?:yes|ok|okay|keep|fine|good|sure)\b/i.test(t)) {
         settle(j.id, 'fixed', text, 'Kept, word for word.');
