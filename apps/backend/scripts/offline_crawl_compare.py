@@ -18,6 +18,8 @@ secrets, at the places that store a crawl outcome or log a database failure:
       --scenario normal --out before-normal.json
   python scripts/offline_crawl_compare.py compare before-normal.json after-normal.json
 
+--passes 2 crawls every source a second time over what the first saved (the saved-jobs paths).
+
 compare prints every difference in sources, crawl_logs, jobs and failed_inserts, after leaving
 out ids and timestamps. A difference is "masked" only when the second file's value is the first's
 with each fake secret replaced by the redaction mark (cut at a stored limit at most); any other
@@ -269,7 +271,13 @@ def run(args) -> None:
                 pass
             connect_fails[0] = False
             return
-        await orch.run_due_sources_once()
+        for crawl in range(args.passes):
+            if crawl:
+                # Each source due again, in the first pass's order, over what it saved.
+                for hours, (_name, _pattern, url, _status) in enumerate(SOURCES[::-1], start=1):
+                    sql("UPDATE sources SET next_run_at = NOW() - make_interval(hours => %s)"
+                        " WHERE careers_url = %s", (hours, url))
+            await orch.run_due_sources_once()
 
     orchestrator_module.time.sleep = lambda seconds: None
     asyncio.run(scenario())
@@ -356,6 +364,8 @@ def main() -> int:
     r.add_argument("--pages", required=True)
     r.add_argument("--db", required=True)
     r.add_argument("--scenario", choices=SCENARIOS, default="normal")
+    r.add_argument("--passes", type=int, default=1,
+                   help="crawl every source this many times over the same database")
     r.add_argument("--out", required=True)
     c = sub.add_parser("compare")
     c.add_argument("before")

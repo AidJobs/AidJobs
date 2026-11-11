@@ -233,6 +233,35 @@ def admit_batch(jobs: list[dict], record_class: str) -> tuple[list[dict], list[t
     return admitted, rejected
 
 
+def too_thin(job: dict, reason: str) -> bool:
+    """A rejection a job page can cure, because the page may supply the location, deadline or
+    contract type it lacks: a vacancy link with none of them ('thin_vacancy'), or a structured
+    posting read from the listing without them. Every other rejection stands whatever the page
+    says. These are the rows the observation path may match to a saved job (W-36)."""
+    if reason == "thin_vacancy":
+        return True
+    return (
+        reason == "no_qualifying_structured_evidence"
+        and job.get("record_class") == "job_posting"
+    )
+
+
+def page_verdicts(jobs: list[dict], record_class: str) -> dict[int, str]:
+    """Admission's verdict on each row as the listing gives it, to choose which job pages to open
+    (C4): the index of every row admitted ('admitted') or too thin ('thin_vacancy', see too_thin).
+    A row with any other rejection is junk and absent. Copies are judged, so no row is stamped;
+    admit_batch on the finished list still decides what is saved.
+    """
+    copies = [dict(job) for job in jobs]
+    position = {id(copy): index for index, copy in enumerate(copies)}
+    admitted, rejected = admit_batch(copies, record_class)
+    verdicts = {position[id(job)]: "admitted" for job in admitted}
+    for job, reason in rejected:
+        if too_thin(job, reason):
+            verdicts[position[id(job)]] = "thin_vacancy"
+    return verdicts
+
+
 def extraction_logger_for(db_url: str):
     """Existing failed-insert logger. A missing logger does not block admission."""
     try:

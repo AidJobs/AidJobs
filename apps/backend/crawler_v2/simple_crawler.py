@@ -13,11 +13,11 @@ import asyncio
 import contextvars
 import re
 import threading
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import date, datetime, timezone
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
-from contracts.admission import admit_batch, log_admission_rejections
+from contracts.admission import admit_batch, log_admission_rejections, page_verdicts, too_thin
 from contracts.captured import (
     clean_description,
     clean_locations,
@@ -38,9 +38,10 @@ from contracts.outbound import (
     fetch_url,
 )
 from contracts.persist import persist_candidate
-from contracts.persist import created_ids
+from contracts.persist import created_ids, observable_jobs, observe_known
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
+from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
 from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
 import httpx
@@ -1418,6 +1419,7 @@ class SimpleCrawler:
         *,
         run_token: Optional[str] = None,
         loop=None,
+        thin: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Save jobs as the run that owns the source, one savepoint per job.
@@ -1425,19 +1427,22 @@ class SimpleCrawler:
         Without a token, or with one that is not a running run of this source, nothing is
         written and OwnershipLost is raised. A database error on one job rolls back that job
         only and counts it as failed. loop, when given, is the event loop that schedules the
-        search projection (this method runs in a worker thread).
+        search projection (this method runs in a worker thread). thin: the listing rows
+        admission rejected as too thin; each that is a saved job of the source is observed
+        (W-36), in the same transaction, after the admitted rows.
 
         Returns:
-            Dict with counts: {inserted, updated, skipped, failed, validated}
+            Dict with counts: {inserted, updated, skipped, failed, validated, observed, ...}
         """
         if not run_token:
             raise OwnershipLost("save_jobs needs a run token")
+        thin = list(thin or [])
         logger.info(f"save_jobs called: {len(jobs)} jobs, source_id={source_id}, org_name={org_name}")
         
         # DEBUG: Log extracted jobs before validation
         logger.info(f"DEBUG: Extracted {len(jobs)} jobs before validation: {[j.get('title', '<no title>')[:80] for j in jobs[:5]]}")
         
-        if not jobs:
+        if not jobs and not thin:
             logger.warning("save_jobs called with empty jobs list")
             return {'inserted': 0, 'updated': 0, 'skipped': 0, 'failed': 0, 'validated': 0}
         
@@ -1477,7 +1482,7 @@ class SimpleCrawler:
         if validation_skipped > 0:
             logger.warning(f"Basic validation: {validation_skipped} jobs skipped, {len(jobs)} valid")
         
-        if not jobs:
+        if not jobs and not thin:
             logger.warning(f"No valid jobs to save after validation (had {len(jobs) + validation_skipped} total)")
             return {
                 'inserted': 0, 
@@ -1488,17 +1493,8 @@ class SimpleCrawler:
                 'unrecorded': validation_skipped,
             }
         
-        if not jobs:
-            return {
-                'inserted': 0, 
-                'updated': 0, 
-                'skipped': validation_skipped, 
-                'failed': 0,
-                'validated': 0,
-                'unrecorded': validation_skipped,
-            }
-        
         inserted = 0
+        observed = 0
         updated = 0
         skipped = validation_skipped
         # Rows handed in whose sighting was not recorded: a crawl with any does not count
@@ -1634,7 +1630,7 @@ class SimpleCrawler:
                         if posted_on:
                             candidate["posted_on"] = posted_on
                         locations = clean_locations(job.get("locations"))
-                        if locations is None and location:
+                        if locations is None and location and not job.get("page_not_read"):
                             locations = clean_locations([location])
                         if locations:
                             candidate["locations"] = locations
@@ -1671,6 +1667,15 @@ class SimpleCrawler:
                             )
                         ):
                             candidate["quality_scored_at"] = observed_at
+                        if job.get("page_not_read"):
+                            # A saved job whose page this crawl did not read: its listing row
+                            # never clears what the page gave (crawler plan, C3 and C4
+                            # amendment), and a listing's "not remote" is no reading at all.
+                            candidate = {
+                                name: value for name, value in candidate.items()
+                                if value not in (None, "", [])
+                                and not (name == "is_remote" and value is not True)
+                            }
                         if job.get("admitted") is True:
                             candidate["admitted"] = True
                         cur.execute("SAVEPOINT job_save")
@@ -1728,9 +1733,53 @@ class SimpleCrawler:
                             'payload': {k: str(v)[:200] for k, v in job.items()},
                             'operation': 'process'
                         })
+
+                # The observation path (W-36): read after the admitted rows, so what they saved
+                # is what the thin rows are matched against. If that read fails, the admitted
+                # rows stand and no thin row is recorded as seen.
+                by_link = {}
+                if thin:
+                    cur.execute("SAVEPOINT job_observe_read")
+                    try:
+                        by_link = observable_jobs(cur, source_id)
+                        cur.execute("RELEASE SAVEPOINT job_observe_read")
+                    except Exception as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT job_observe_read")
+                        logger.error("Saved jobs not read for observation: %s", redact_exception(e))
+                        unrecorded += len(thin)
+                        thin = []
+                for row in thin:
+                    seen_mark = len(seen_active)
+                    not_open_mark = len(not_open)
+                    cur.execute("SAVEPOINT job_observe")
+                    attempted += 1
+                    try:
+                        outcome = observe_known(
+                            cur,
+                            row,
+                            by_link,
+                            observed_at=datetime.now(timezone.utc),
+                            source_id=source_id,
+                            open_on=open_on,
+                            seen=seen_active,
+                            not_open=not_open,
+                        )
+                        cur.execute("RELEASE SAVEPOINT job_observe")
+                    except Exception as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT job_observe")
+                        del seen_active[seen_mark:]
+                        del not_open[not_open_mark:]
+                        failed += 1
+                        logger.error("Error observing a known job: %s", redact_exception(e))
+                        continue
+                    if outcome == "observed":
+                        observed += 1
+                    elif outcome == "ambiguous":
+                        # A saved job was listed, but which one cannot be told: not recorded.
+                        unrecorded += 1
                 
                 commit_and_schedule(conn, recorded, loop=loop)
-                logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {skipped} skipped, {failed} failed")
+                logger.info(f"Successfully saved jobs: {inserted} inserted, {updated} updated, {observed} observed, {skipped} skipped, {failed} failed")
         
         except Exception as e:
             logger.error(f"Error saving jobs (batch): {redact_exception(e)}", exc_info=True)
@@ -1780,11 +1829,40 @@ class SimpleCrawler:
             'validated': len(jobs) if 'jobs' in locals() else 0,
             'attempted': attempted,
             'unrecorded': unrecorded,
+            'observed': observed,
             'seen_active': seen_active,
             'not_open_ids': not_open,
             'created_ids': created_ids(recorded),
         }
     
+    def _saved_jobs_for_pages(self, source_id: str, run_token) -> Tuple[Dict, int, Any]:
+        """For choosing job pages, read only: the source's saved jobs by normalised link, its
+        crawl count (the rotation's turn), and the day the run started on as the database dates
+        it. Run in a worker thread."""
+        conn = self._get_db_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = '30s'")
+                cur.execute(
+                    "SELECT id, apply_url, deadline, deleted_at FROM jobs WHERE source_id = %s",
+                    (str(source_id),),
+                )
+                saved: Dict[str, List[SavedJob]] = {}
+                for job_id, apply_url, deadline, deleted_at in cur.fetchall():
+                    saved.setdefault(link_key(apply_url), []).append(
+                        saved_job(job_id, deadline, hidden=deleted_at is not None)
+                    )
+                cur.execute(
+                    "SELECT COUNT(*), (SELECT ran_at::date FROM crawl_logs WHERE id = %s)"
+                    " FROM crawl_logs WHERE source_id = %s",
+                    (str(run_token), str(source_id)),
+                )
+                run_number, run_day = cur.fetchone()
+            conn.rollback()
+            return saved, int(run_number or 0), run_day
+        finally:
+            conn.close()
+
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
         """
         Enrich job data by fetching and parsing the detail page.
@@ -1803,6 +1881,8 @@ class SimpleCrawler:
                     "Detail page not read: %s (%s)", job['apply_url'], stop or f"HTTP {status}"
                 )
                 return job
+            # Read: the crawl lifts its listing-only mark (crawler_v2/job_pages.py).
+            job['page_read'] = True
             
             soup = BeautifulSoup(html, 'html.parser')
             
@@ -2266,19 +2346,56 @@ class SimpleCrawler:
                 needs_enrichment = any('undp.org' in job.get('apply_url', '').lower() for job in jobs)
                 skip_enrichment = any('unicef.org' in job.get('apply_url', '').lower() for job in jobs)
                 
+                unconfirmed = []
                 if skip_enrichment:
                     logger.info(f"Skipping detail page enrichment for {len(jobs)} UNICEF jobs (403 errors - will save from listing page only)")
-                elif len(jobs) > 0 and (len(jobs) <= 50 or needs_enrichment):
+                elif jobs:
                     if needs_enrichment:
                         logger.info(f"Enriching {len(jobs)} jobs from detail pages (UNDP requires detail page data)...")
+                        to_open = {id(job) for job in jobs}
                     else:
-                        logger.info(f"Enriching {len(jobs)} jobs from detail pages...")
+                        # New vacancies' pages, within a cap; saved jobs' pages near their
+                        # deadline or in rotation; the others read from the listing alone.
+                        if run is None:
+                            raise OwnershipLost("crawl_source needs the run that owns the source")
+                        try:
+                            saved, run_number, run_day = await asyncio.to_thread(
+                                self._saved_jobs_for_pages, source_id, run.token
+                            )
+                        except Exception as e:
+                            # Opening a page never writes; without the saved jobs every
+                            # vacancy is treated as new, as before this plan.
+                            logger.warning(
+                                "Saved jobs not read for the job pages: %s", redact_exception(e)
+                            )
+                            saved, run_number, run_day = {}, 0, None
+                        plan = choose_pages(
+                            jobs,
+                            page_verdicts(jobs, "html"),
+                            saved,
+                            today=run_day if isinstance(run_day, date) else date.today(),
+                            run_number=run_number,
+                        )
+                        to_open = {id(jobs[index]) for index in plan.open}
+                        # A saved job's listing row clears nothing its page gave, unless this
+                        # crawl reads that page; the mark is lifted only once it has.
+                        for index in plan.saved:
+                            jobs[index]['page_not_read'] = True
+                        unconfirmed = [jobs[index] for index in sorted(plan.unconfirmed)]
+                        jobs = [job for index, job in enumerate(jobs) if index not in plan.unconfirmed]
+                        logger.info(
+                            "Job pages: %s to open, %s read from the listing alone, %s held back",
+                            len(to_open), len(plan.listing_only), len(unconfirmed),
+                        )
                     
                     # The fetch policy spaces requests to one host; a refusal or a spent budget
                     # ends the job pages, and the rows not opened keep their listing fields.
                     budget = current_budget()
                     enriched_jobs = []
                     for i, job in enumerate(jobs):
+                        if id(job) not in to_open:
+                            enriched_jobs.append(job)
+                            continue
                         stopped = budget.stopped() if budget is not None else ''
                         if stopped:
                             logger.warning(
@@ -2291,6 +2408,8 @@ class SimpleCrawler:
                         if job.get('apply_url'):
                             try:
                                 enriched_job = await self.enrich_job_from_detail_page(job, careers_url)
+                                if enriched_job.pop('page_read', False):
+                                    enriched_job.pop('page_not_read', None)
                                 enriched_jobs.append(enriched_job)
                             except Exception as e:
                                 logger.warning(f"Error enriching job {job.get('title', 'unknown')}: {e}")
@@ -2300,10 +2419,15 @@ class SimpleCrawler:
                     jobs = enriched_jobs
                     if not detail_stop and budget is not None and budget.refused:
                         detail_stop = _budget_stop_text(budget)
-                else:
-                    if len(jobs) > 50 and not needs_enrichment:
-                        logger.info(f"Skipping detail page enrichment for {len(jobs)} jobs (too many)")
-                    jobs = jobs
+                if unconfirmed:
+                    # New vacancies over the cap that the listing leaves too thin: not saved,
+                    # read by a later crawl (crawler plan, C4).
+                    await asyncio.to_thread(
+                        log_admission_rejections,
+                        self.extraction_logger,
+                        [(job, "detail_unconfirmed") for job in unconfirmed],
+                        source_id,
+                    )
                 
                 for job in jobs:
                     place_job(job)
@@ -2333,8 +2457,11 @@ class SimpleCrawler:
                 )
                 if run is None:
                     raise OwnershipLost("crawl_source needs the run that owns the source")
+                # Too-thin rows, and the rows held back over the cap, may be saved jobs seen.
+                thin = [job for job, reason in rejected if too_thin(job, reason)] + unconfirmed
                 counts = await run.save(
-                    self.save_jobs, admitted, source_id, org_name, base_url=careers_url
+                    self.save_jobs, admitted, source_id, org_name, base_url=careers_url,
+                    thin=thin,
                 )
                 
                 # Log extraction result (Phase 2)
@@ -2410,6 +2537,7 @@ class SimpleCrawler:
                         'skipped': counts['skipped'],
                         'failed': counts.get('failed', 0),
                         'unrecorded': counts.get('unrecorded', 0),
+                        'observed': counts.get('observed', 0),
                     }
                 }
             
