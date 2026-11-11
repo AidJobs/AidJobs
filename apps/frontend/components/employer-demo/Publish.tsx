@@ -56,7 +56,7 @@ import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
 import { getState, go, goBack, notify, takePart, useDemo } from './store';
-import { SDG_NAMES, sdgsOf } from './setup';
+import { SDG_NAMES, sdgLead, sdgsOf } from './setup';
 import { commitmentLabel, countryName, LANGS, langOf, localDate, publicLangs, stale, term, ui } from './translate';
 import type { DemoJob, Lang, Org, PayRequest, Plan, State } from './types';
 import { DemoMark, Dialog, Field, inputStyle, isEmail, JobLink, LegalLine, OrgMark, radioKeys, Steps } from './ui';
@@ -239,7 +239,10 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
         )}
       </div>
       {sdgsOf(job).length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label="Sustainable Development Goals" lang="en">
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Sustainable Development Goals" lang="en">
+          <span className="aj-muted" style={{ fontSize: 12 }}>
+            {sdgLead(job, s.org.name)}
+          </span>
           {sdgsOf(job).map((g) => (
             <span key={g} className="aj-chip" data-tone="sage">
               SDG {g} · {SDG_NAMES[g]}

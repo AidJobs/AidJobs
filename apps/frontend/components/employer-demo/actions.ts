@@ -273,7 +273,14 @@ export function chooseStyle(id: string, style: string[], said?: string) {
 /** The goals a job serves, corrected by hand (at most three); `null` goes back to reading them from the role. */
 export function setSdgs(id: string, sdgs: number[] | null) {
   if (!ownerOnly()) return;
-  updateJob(id, (j) => ({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined }));
+  updateJob(id, (j) => ({ ...touched(j), sdgs: sdgs ? sdgs.slice(0, 3) : undefined, sdgsFrom: undefined }));
+}
+
+/** No goal is clear from the role: the user chooses the organisation's own goals (at most three), never applied without asking. */
+export function applyOrgSdgs(id: string) {
+  const goals = getState().org.sdgs.slice(0, 3);
+  if (!ownerOnly() || !goals.length) return;
+  updateJob(id, (j) => ({ ...touched(j), sdgs: goals, sdgsFrom: 'org' }));
 }
 
 /** "Keep it for all jobs": the job's style becomes the organisation's, and is not offered again. */

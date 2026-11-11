@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyTemplate, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, sendChat, setPart, setSdgs, settleAsk } from './actions';
+import { applyFormat, applyOrgSdgs, applyTemplate, canDelete, chatNote, createFormat, downloadCopy, formatOf, isReviewable, sendChat, setPart, setSdgs, settleAsk } from './actions';
 import { aiOn, askAi, probeAi, useAi } from './ai';
 import type { OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
@@ -195,7 +195,7 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
     { key: 'grade', label: 'Grade or band', value: f.grade },
     { key: 'closes', label: 'Closing date', value: f.deadline ? `${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}` : ''}` : '', missing: !f.deadline },
     { key: 'salary', label: 'Salary', value: salaryText(f) || 'Not shown' },
-    { key: 'sdgs', label: 'SDGs', value: goals.map((g) => `SDG ${g} ${SDG_NAMES[g]}`).join(' · '), hint: 'None: no goal is clear from the role' },
+    { key: 'sdgs', label: 'SDGs', value: `${goals.map((g) => `SDG ${g} ${SDG_NAMES[g]}`).join(' · ')}${goals.length && job.sdgsFrom === 'org' ? " (your organisation's goals)" : ''}`, hint: 'No SDG is clear from this role' },
     { key: 'more', label: 'More details', value: more, hint: 'Who can apply, languages, positions, donor' },
   ];
   return (
@@ -205,6 +205,11 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
           <span className="aj-muted">{r.label}</span>
           <span className={r.value || r.missing ? 'min-w-0' : 'aj-faint min-w-0'} data-missing={r.missing || undefined}>
             {r.value || (r.missing ? 'To add' : (r.hint ?? 'None'))}
+            {r.key === 'sdgs' && !goals.length && s.org.sdgs.length > 0 && !ro && (
+              <button type="button" className="aj-text-btn block" style={{ height: 26, paddingInline: 0 }} onClick={() => applyOrgSdgs(job.id)}>
+                {`Use your organisation's goals (SDG ${s.org.sdgs.slice(0, 3).join(', ')})`}
+              </button>
+            )}
           </span>
           <button
             type="button"

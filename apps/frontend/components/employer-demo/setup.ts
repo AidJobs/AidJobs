@@ -146,7 +146,12 @@ export function inferSdgs(job: DemoJob): number[] {
   return (SDG_SECTOR[roleByKey(job.family).sector] ?? []).slice(0, 3);
 }
 
-/** The job's goals: corrected by hand, or read by rules. */
+/** The job's goals: corrected by hand, chosen from the organisation's, or read by rules. */
 export function sdgsOf(job: DemoJob): number[] {
   return job.sdgs ?? inferSdgs(job);
+}
+
+/** How the job page introduces the goals: the role's own, or the organisation's when the user chose those. */
+export function sdgLead(job: DemoJob, orgName: string): string {
+  return job.sdgsFrom === 'org' ? `${orgName} works towards` : 'This role contributes to';
 }

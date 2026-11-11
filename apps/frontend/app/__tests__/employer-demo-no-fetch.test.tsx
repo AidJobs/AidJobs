@@ -1529,7 +1529,25 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(job(id).sdgs).toEqual([6, 13]);
     click('Done');
     say('show the preview');
-    expect(container.querySelector('[aria-label="Sustainable Development Goals"]')?.textContent).toBe('SDG 6 · Clean water and sanitationSDG 13 · Climate action');
+    expect(container.querySelector('[aria-label="Sustainable Development Goals"]')?.textContent).toBe('This role contributes toSDG 6 · Clean water and sanitationSDG 13 · Climate action');
+  });
+
+  it('SDGs when no goal is clear: none shown, the organisation\'s goals offered, and the job page says whose they are', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Finance Officer in Juba, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    part('Details');
+    shows('No SDG is clear from this role');
+    click("Use your organisation's goals (SDG 3, 6, 16)");
+    expect(job(id)).toMatchObject({ sdgs: [3, 6, 16], sdgsFrom: 'org' });
+    shows("(your organisation's goals)");
+    say('show the preview');
+    expect(container.querySelector('[aria-label="Sustainable Development Goals"]')?.textContent).toMatch(/^Riverstone Aid works towardsSDG 3 · /);
   });
 });
 

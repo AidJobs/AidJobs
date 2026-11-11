@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { changeWithUndo, getState, resetDemo, update } from '../../components/employer-demo/store';
-import { applyTemplate, chatNote, chooseStyle, editSection, formatOf, sendChat, setFacts, setPart, setSdgs, settleAsk, startJob } from '../../components/employer-demo/actions';
+import { applyOrgSdgs, applyTemplate, chatNote, chooseStyle, editSection, formatOf, sendChat, setFacts, setPart, setSdgs, settleAsk, startJob } from '../../components/employer-demo/actions';
 import { currentPart, lineFit, onLine, partsOf, sectionOf, sectionPart } from '../../components/employer-demo/parts';
 import { COMMITMENTS, commitmentText } from '../../components/employer-demo/engine';
-import { describeStyle, inferSdgs, proposedStyle, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
+import { describeStyle, inferSdgs, proposedStyle, sdgLead, sdgsOf, styleFromReply, toneOf } from '../../components/employer-demo/setup';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const lines = (id: string, key: string) => job(id).sections.find((x) => x.key === key)?.lines;
@@ -12,6 +12,26 @@ beforeEach(() => {
   localStorage.clear();
   resetDemo();
   update((s) => ({ ...s, signedIn: true }));
+});
+
+describe("SDGs when no goal is clear (the user's decision, 11 November 2026)", () => {
+  it('shows none, never falls back silently, and uses the organisation\'s goals only when chosen, saying so on the job page', () => {
+    const id = startJob('We are hiring a Finance Officer in Juba, South Sudan');
+    expect(sdgsOf(job(id))).toEqual([]);
+    expect(sdgLead(job(id), getState().org.name)).toBe('This role contributes to');
+    applyOrgSdgs(id);
+    expect(job(id)).toMatchObject({ sdgs: [3, 6, 16], sdgsFrom: 'org' });
+    expect(sdgLead(job(id), getState().org.name)).toBe('Riverstone Aid works towards');
+    setSdgs(id, [8]);
+    expect(job(id).sdgsFrom).toBeUndefined();
+    expect(sdgLead(job(id), getState().org.name)).toBe('This role contributes to');
+  });
+
+  it('goals read from the role are introduced as the role\'s', () => {
+    const id = startJob('We are hiring a WASH Officer in Juba');
+    expect(sdgsOf(job(id)).length).toBeGreaterThan(0);
+    expect(sdgLead(job(id), getState().org.name)).toBe('This role contributes to');
+  });
 });
 
 describe('the window: the chat follows the part in view', () => {

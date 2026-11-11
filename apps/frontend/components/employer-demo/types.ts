@@ -262,6 +262,8 @@ export type DemoJob = {
   style?: string[];
   /** The goals the job serves, when corrected by hand; otherwise read from the role by rules. */
   sdgs?: number[];
+  /** 'org': no goal was clear from the role, and the user chose the organisation's own goals; the job page says so. */
+  sdgsFrom?: 'org';
   /** Headings renamed for this job only, by section; kept when the rules rebuild a section, cleared when the template changes. */
   renamed?: Record<string, string>;
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
