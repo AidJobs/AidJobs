@@ -1075,12 +1075,21 @@ def load_adverts(folder: Path | None = None) -> list[dict]:
     return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(folder.glob("*.json"))]
 
 
-def read_saved_titles():
-    """(source, snapshot, url, title) of the adverts read, for roles.py's titles."""
+def read_saved_titles(orgs: roles.Organisations | None = None):
+    """(source, snapshot, url, title, organisation id or '') of the adverts read, for roles.py's titles;
+    a board's advert carries its employer's id (and its type is set in `orgs`), a feed's its charity's."""
+    names = org_names(orgs) if orgs else {}
     for ad in load_adverts() if (WORK / "adverts").exists() else []:
         if ad.get("title") and ad["source"] != "step-f-feed":
             snap = ad.get("crawl") or ad.get("batch")
-            yield ad["source"], snap, ad["url"], ad["title"]
+            oid = ""
+            if orgs and ad["source"] == "board":
+                oid, _basis, t = board_identity(ad, orgs, names)
+                if t:
+                    orgs.types[oid] = t
+            elif orgs and ad["source"] == "feed" and ad.get("org_site"):
+                oid = orgs.of_url("https://" + ad["org_site"] + "/")
+            yield ad["source"], snap, ad["url"], ad["title"], oid
     # R5's UN listing pages give titles only, from their job links (read only if the user allows UN pages).
     from confirm import JOB_LINK
     for meta_path in sorted((READING / "r5" / "bodies").glob("*.json")):
@@ -1092,7 +1101,7 @@ def read_saved_titles():
         for href, inner in roles.ANCHOR.findall(body.read_bytes().decode("utf-8", "replace")):
             t = roles.clean_text(inner)
             if JOB_LINK.search(href) and 4 <= len(t) <= 140 and roles.looks_like_title(t):
-                yield "un-page", "r5", urljoin(base, href), t
+                yield "un-page", "r5", urljoin(base, href), t, ""
 
 
 # --- measuring (local -> committed) -------------------------------------------------------------
@@ -1888,6 +1897,30 @@ def board_employer(employer: str, html: str, board: str) -> str:
     return ""                       # the board does not name the employer (Ground Zero writes for clients)
 
 
+def org_names(orgs: roles.Organisations) -> dict[str, str]:
+    """The survey's organisations by their name and acronym, letters and digits only."""
+    names = {}
+    for oid, r in orgs.rows.items():
+        for n in (r.get("name", ""), r.get("acronym", "")):
+            k = re.sub(r"[^a-z0-9]", "", n.lower())
+            if len(k) >= 4:
+                names.setdefault(k, oid)
+    return names
+
+
+def board_identity(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tuple[str, str, str]:
+    """(organisation id, basis, type or '') of a board's advert. An employer outside the survey's list
+    is typed by the name rules (Red Cross, UN, foundation, research), otherwise by the boards' own
+    market, national NGOs in the Global South (an estimate); '' leaves the list's type."""
+    oid, basis = board_org(ad, orgs, names)
+    if not oid.startswith("board-employer:"):
+        return oid, basis, ""
+    t = roles.org_type_of({"name": ad.get("employer", ""), "kind": "", "country": ""})
+    if t in ("other", "ingo"):
+        t, basis = "national_ngo_south", "board default (Estimate)"
+    return oid, basis, t
+
+
 def board_org(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tuple[str, str]:
     """(organisation id, basis) for a board's advert: the employer it names, matched to the survey's
     list by name; otherwise a stable id from the name, never the name itself."""
@@ -1909,25 +1942,15 @@ def measure(_args=None) -> int:
     decisions = _decisions()
     orgs = roles.Organisations.load(decisions=decisions, pools=roles.pools_of())
     title_decisions = roles.decision_map(decisions)
-    names = {}
-    for oid, r in orgs.rows.items():
-        for n in (r.get("name", ""), r.get("acronym", "")):
-            k = re.sub(r"[^a-z0-9]", "", n.lower())
-            if len(k) >= 4:
-                names.setdefault(k, oid)
+    names = org_names(orgs)
     adverts, dropped, board_types = [], Counter(), {}
     for ad in load_adverts():
         if ad["source"] == "step-f-feed":
             ad["org_id"] = orgs.parent(ad.get("org_hint", ""))
             ad["org_type_basis"] = "rule"
         elif ad["source"] == "board":
-            ad["org_id"], ad["org_type_basis"] = board_org(ad, orgs, names)
-            if ad["org_id"].startswith("board-employer:"):
-                # An employer outside the survey's list: its type by the name rules (Red Cross, UN,
-                # foundation, research); otherwise the boards' own market, national NGOs (an estimate).
-                t = roles.org_type_of({"name": ad.get("employer", ""), "kind": "", "country": ""})
-                if t in ("other", "ingo"):
-                    t, ad["org_type_basis"] = "national_ngo_south", "board default (Estimate)"
+            ad["org_id"], ad["org_type_basis"], t = board_identity(ad, orgs, names)
+            if t:
                 board_types[ad["org_id"]] = t
         elif ad["source"] == "feed" and ad.get("org_site"):
             ad["org_id"] = orgs.of_url("https://" + ad["org_site"] + "/")

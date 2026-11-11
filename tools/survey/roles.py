@@ -55,7 +55,7 @@ DECISION_FIELDS = ["action", "key", "value", "reason", "label"]
 MAP_FIELDS = ["family_id", "function", "sector", "level", "org_type", "titles", "organisations",
               "share_within_type", "weighted_share", "consultant_share", "national_share",
               "humanitarian_share"]
-LOCAL_TITLE_FIELDS = ["source", "snapshot", "org_id", "title", "page"]
+LOCAL_TITLE_FIELDS = ["source", "snapshot", "org_id", "title", "page", "org_type"]
 
 # --- organisation types (role-survey.md, section 4) -----------------------------------------
 
@@ -828,10 +828,10 @@ def titles(args) -> int:
         # step E's saved rows hold every account on each recruitment system; only the survey's count
         if oid and not oid.startswith("account:"):
             rows.append(["archive", snap, oid, t, page_hash(url)])
-    for source, snap, url, t in read_saved_titles():
-        oid = orgs.of_url(url)
-        if oid:
-            rows.append([source, snap, oid, t, page_hash(url)])
+    for source, snap, url, t, hint in read_saved_titles(orgs):
+        oid = hint or orgs.of_url(url)
+        if oid and not oid.startswith("account:"):
+            rows.append([source, snap, oid, t, page_hash(url), orgs.type_of(oid)])
     with (WORK / "titles.csv").open("w", newline="", encoding="utf-8") as handle:
         w = csv.writer(handle)
         w.writerow(LOCAL_TITLE_FIELDS)
@@ -889,7 +889,7 @@ def counts(args) -> int:
         seen.add(key)
         if not role.function:
             unplaced[role.normalised].add(oid)
-        agg[(r["source"], r["snapshot"], oid, orgs.type_of(oid), role.function or "unplaced",
+        agg[(r["source"], r["snapshot"], oid, r.get("org_type") or orgs.type_of(oid), role.function or "unplaced",
              role.sector, role.level or "unknown", *[role.contexts[c] for c in CONTEXT_FIELDS])] += 1
         v = variants[role.normalised]
         v["orgs"].add(oid)
