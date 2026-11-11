@@ -96,5 +96,13 @@ Survived:
 
 ## Fixes (12 November 2026)
 
-Recorded with the fixes' commit.
+All findings taken; 80 tests pass, ruff clean, the form check passes on the real output. The fixes change logic, so a further focused re-review follows.
+
+- **Must-fix 1 and 2 (the live batch size):** as the reviewer proposed, a counting resolver (`CountingResolver`) is given to the fetch policy beside `max_redirects=2`. The policy asks it for an address once for every request it sends (each redirect hop and its own robots.txt reads, with their redirects, included), before connecting; it writes one line to the batch's `resolver.log`, which is the batch's only count, refuses once the size is reached (the run then stops), and refuses a host off the request's site, which is never contacted. The worst-case reservation and the separate policy log are gone. Tests run the real `confirm.Fetcher` and fetch policy with only the lowest network step faked: two redirects then a timeout (5 requests sent, 5 counted), a robots.txt that redirects past the size (stops at exactly the size), a redirect off the site (the other host never reached), and the cap of 2 redirects.
+- **Chrome removal:** a short line is kept only if it is a sentence of five words or more carrying a known standard text, inclusion statement, restriction or fact, or a "label: value" line with a fact; menu items such as "Apply now", "Remote jobs" or "Personal data policy" are removed again, and a recognised section name is kept only when it is a heading.
+- **Contract length:** skipped only when "experience" follows the duration directly, in the same line.
+- **Restrictions:** "for women only" needs the post or applications as its subject; "at height" and "presentable" without the applicant as subject are not flagged; an "Age: N–M" heading is read whatever comes before it; a nationality exception counts only within its own sentence; words in brackets after "Applicants" do not hide an age restriction; "national recruitment" and "national consultant" are no longer national-post signals.
+- **Pay:** a year-like figure counts when "per month", "a year" or a currency follows; allowances need a figure of three digits or more; "pay" as vague pay only in "pay: competitive" and similar.
+- **Minor:** a refusal on the final host of a same-site redirect blocks both hosts; a saved off-site record blocks its host again on resume; "UN Women UK" and similar supporters are not UN agencies. The per-host robots.txt bookkeeping went away with the counting resolver, which counts every read whatever the scheme or size.
+- **Mutation survivors:** each now has a test (the real `Fetcher` path, `fetch-archive` with one held list missing, `measure` keeping a held-out advert over its copy, menu lines, "years ago", the board-only title cut, the reloaded failure streak).
 

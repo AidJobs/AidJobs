@@ -636,7 +636,8 @@ class PolicyNet:
     async def hop(self, url, method, headers, timeout, max_bytes, resolver, backend_factory, pool_factory,
                   dns_timeout):
         from urllib.parse import urlsplit as split
-        await resolver(split(url).hostname, 443)
+        addresses = await resolver(split(url).hostname, 443)
+        assert addresses == ["93.184.216.34"]          # the lookup's own answer reaches the policy
         self.sent.append(url)
         status, location, body = self.routes.get(url, (404, None, b""))
         if isinstance(status, Exception):
@@ -693,6 +694,30 @@ def test_a_redirect_off_the_site_is_never_contacted(tmp_path, monkeypatch):
     assert "b.example" in run.blocked_hosts and not run.failures and not run.refusals
 
 
+def test_a_normal_page_after_an_off_site_one_is_kept(tmp_path, monkeypatch):
+    routes = {"https://b.example/x": (302, "https://other.example/z", None),
+              "https://c.example/y": (200, None, b"<p>a page</p>")}
+    run, _ = real_run(tmp_path, monkeypatch, routes)
+    run.get("https://b.example/x", "page")
+    meta = run.get("https://c.example/y", "page")
+    assert meta["body"] == b"<p>a page</p>" and "c.example" not in run.blocked_hosts
+
+
+def test_a_resumed_run_judges_a_host_on_its_own_robots_answer(tmp_path, monkeypatch):
+    routes = {"https://c.example/robots.txt": (404, None, b""),
+              "https://b.example/x": (302, "https://c.example/z", None),
+              "https://c.example/y": (200, None, b"<p>c page</p>")}
+    run, _ = real_run(tmp_path, monkeypatch, routes)
+    assert run.robots("c.example")                       # run 1 keeps c.example's robots.txt answer on disk
+    from contracts import outbound
+    monkeypatch.setattr(outbound, "_robots", type(outbound._robots)())   # a new process
+    run2 = adverts.LiveRun("r3", 50, folder=tmp_path, lookup=run.resolver.lookup)
+    run2.get("https://b.example/x", "page")              # off the site: c.example's robots read refused
+    assert run2.robots("c.example")                      # answered from disk, handed to the policy
+    meta = run2.get("https://c.example/y", "page")
+    assert meta["body"] == b"<p>c page</p>" and "c.example" not in run2.blocked_hosts
+
+
 def test_the_policy_follows_at_most_two_redirects(tmp_path, monkeypatch):
     routes = {f"https://a.example/p{i}": (302, f"https://a.example/p{i + 1}", None) for i in range(5)}
     run, net = real_run(tmp_path, monkeypatch, routes)
@@ -723,6 +748,26 @@ def test_live_state_reloads_refusals_and_a_cached_robots_refusal_blocks(tmp_path
     assert f4.urls == []
 
 
+def test_refusals_on_the_final_host_and_robots_errors_block_hosts(tmp_path):
+    run, _ = live(tmp_path, {"https://a.example/x": {"status": 403, "final_url": "https://www.a.example/y",
+                                                     "body": b""},
+                             "https://b.example/x": {"status": None, "final_url": "", "body": b"",
+                                                     "error": "robots.txt forbids this address"}}, cap=50)
+    run.get("https://a.example/x", "page")
+    assert {"a.example", "www.a.example"} <= run.blocked_hosts and run.refusals[-1][0] == "www.a.example"
+    run.get("https://b.example/x", "page")
+    assert "b.example" in run.blocked_hosts and not run.failures
+
+
+def test_a_saved_off_site_record_blocks_its_host_again(tmp_path):
+    meta = {"url": "https://b.example/x", "what": "page", "status": None, "error": "redirected off the site, "
+            "not followed (off the site (other.example))", "final_url": "", "protection": "", "content_type": ""}
+    run, f = live(tmp_path, {}, cap=50)
+    (tmp_path / "bodies" / f"{adverts.page_id(meta['url'])}.json").write_text(json.dumps(meta), encoding="utf-8")
+    run.get("https://b.example/x", "page")
+    assert "b.example" in run.blocked_hosts and run.get("https://b.example/other", "page") is None and not f.urls
+
+
 def test_the_next_page_must_be_the_next_number(tmp_path):
     listing = b'<a href="https://board.example/job/a-b-c/">x</a><a href="https://board.example/page/3/">3</a>'
     run, f = live(tmp_path, {"https://board.example/": (200, listing)}, cap=50)
@@ -736,7 +781,7 @@ def test_r5_is_held_until_the_un_terms_are_decided(tmp_path, monkeypatch):
     import argparse
     monkeypatch.setattr(adverts, "READING", tmp_path)
     assert adverts.fetch_live(argparse.Namespace(batch="r5", cap=0, un_terms_decided=False)) == 0
-    assert adverts.requests_sent(tmp_path / "r5") == 0
+    assert adverts.live_requests_sent(tmp_path / "r5") == 0
 
 
 def test_a_slow_down_answer_doubles_the_spacing(tmp_path):
@@ -862,6 +907,16 @@ def test_contract_length_before_an_experience_line_is_kept():
     assert "contract_length" in adverts.facts_of("Contract duration: 12 months. Experience: 5 years")
     assert "contract_length" in adverts.facts_of("Contract duration: 12 months\nExperience: 5 years")
     assert "contract_length" not in adverts.facts_of("The position requires 5 years of professional experience.")
+    assert "contract_length" not in adverts.facts_of("The position requires 5 years' experience.")
+    assert "contract_length" not in adverts.facts_of("The position requires 5 years’ experience.")
+
+
+def test_minor_points_of_the_third_re_review():
+    assert adverts.carries_meaning("Equal opportunity employer")
+    assert not adverts.carries_meaning("Personal data policy")
+    assert not restricted("The role supports a project for women only.")
+    assert "pay" not in adverts.facts_of("Salary review 2025/26 is under way.")
+    assert "pay" in adverts.facts_of("Salary: 2000/month")
 
 
 def test_restrictions_from_the_second_re_review():

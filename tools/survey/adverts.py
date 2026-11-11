@@ -490,6 +490,22 @@ UN_PAGES = {   # P1-2 (19.6, R5): the UN careers feed and 12 agencies' careers p
 LIVE_REDIRECTS = 2   # redirects the fetch policy may follow for one live request
 
 
+def remember_policy_robots(host: str, status: int, text: str) -> None:
+    """Give the fetch policy a robots.txt answer the survey already holds (as the policy itself does
+    when the survey asks for robots.txt), so it does not keep an older answer for the host."""
+    from contracts import outbound
+    outbound._remember_robots(outbound._origin(f"https://{host}/"), status, text)
+
+
+def forget_policy_robots(host: str) -> None:
+    """Drop the fetch policy's cached robots.txt answers for a host (any scheme or port)."""
+    if not host:
+        return
+    from contracts import outbound
+    for origin in [o for o in list(outbound._robots) if str(host).lower() in [str(x).lower() for x in o]]:
+        outbound._robots.pop(origin, None)
+
+
 class SurveyRefusal(Exception):
     """Raised by the counting resolver: the batch's size is reached, or a host is off the site."""
 
@@ -515,11 +531,11 @@ class CountingResolver:
                 _default_resolver as lookup,  # the policy's own DNS lookup
             )
         self.folder, self.cap, self.lookup = folder, cap, lookup
-        self.site, self.refused = "", ""
+        self.site, self.refused, self.refused_host = "", "", ""
 
     async def __call__(self, host: str, port: int) -> list[str]:
         if self.site and site_host(host) != self.site:
-            self.refused = f"off the site ({host})"
+            self.refused, self.refused_host = f"off the site ({host})", host
             raise SurveyRefusal(self.refused)
         if live_requests_sent(self.folder) >= self.cap:
             self.refused = "size"
@@ -581,7 +597,7 @@ class LiveRun:
         if live_requests_sent(self.dir) >= self.cap:
             self.stopped = f"the batch's size of {self.cap} requests reached"
             return None
-        self.resolver.site, self.resolver.refused = site_host(host), ""
+        self.resolver.site, self.resolver.refused, self.resolver.refused_host = site_host(host), "", ""
         r = self.fetcher.get(url, what)
         error = r["error"] or ""
         if self.resolver.refused == "size":
@@ -592,8 +608,13 @@ class LiveRun:
         prot = self.confirm.bot_protection(r["status"], r["headers"], text) if r["status"] else ""
         refusal = None
         if self.resolver.refused:
-            # A redirect off the site was refused before it was followed: not kept, host blocked.
+            # A redirect off the site was refused before it was followed: not kept, host blocked. The
+            # policy may have cached the refused host's robots.txt as unreachable; that answer is dropped,
+            # so the host is judged on its own answer if the batch reads it.
             self.blocked_hosts.add(host)
+            forget_policy_robots(self.resolver.refused_host)
+            # One label for both cases: a page redirected off the site, and a host whose own robots.txt
+            # redirects off it; the policy reads the next host's robots.txt first, so they look the same.
             error, r = f"redirected off the site, not followed ({self.resolver.refused})", \
                 {**r, "status": None, "body": b""}
         elif self._refused(r["status"], prot) or error == "robots.txt refused the crawler":
@@ -622,9 +643,13 @@ class LiveRun:
     def robots(self, host: str) -> bool:
         """Read and keep a host's robots.txt (the fetch policy reuses the answer); False when the
         host may not be read."""
+        cached = (self.dir / "bodies" / f"{page_id(f'https://{host}/robots.txt')}.json").exists()
         meta = self.get(f"https://{host}/robots.txt", f"robots.txt {host}")
         if not meta:
             return False
+        if cached and meta.get("status") is not None:
+            # Answered from disk: the policy is given the same answer, as it would be after a request.
+            remember_policy_robots(host, meta["status"], (meta["body"] or b"").decode("utf-8", "replace"))
         verdict = self.confirm.robots_verdict(meta["status"], (meta["body"] or b"").decode("utf-8", "replace"),
                                               f"https://{host}/")
         if verdict != "allowed":
@@ -1224,7 +1249,8 @@ FACTS: dict[str, re.Pattern] = {
                       r"ugx|tzs|etb|ghs|zar|sek|nok|dkk)\s?\d[\d,.\s]{2,}|\b\d[\d,.]{2,}\s?(?:usd|eur|€|£|gbp|kes|ksh|"
                       r"ngn|inr|chf|xof|fcfa|bdt|ugx|tzs|etb|ghs|zar|sek|nok|dkk|lakhs?)\b|\b(?:salary|"
                       r"remuneration|stipend|honorarium|gross pay|net pay|r[ée]mun[ée]ration|salaire|allowances?|"
-                      r"per diem)\b[^.\n]{0,25}?\b(?!(?:19|20)\d{2}\b(?!\s*(?:per|a (?:month|year)|/|usd|eur|gbp|"
+                      r"per diem)\b[^.\n]{0,25}?\b(?!(?:19|20)\d{2}\b(?!\s*(?:per|a (?:month|year)|/\s*(?:month|year|"
+                      r"annum|mo|yr)|usd|eur|gbp|"
                       r"kes|ngn|inr|\$|€|£)))(?:\d{1,3}(?:[,.\s]\d{3})+|\d{3,})\b|\b(?:salary|pay) (?:scale|band|grade)"
                       r"\s*:?\s*[A-Z]{0,3}-?\d|\bon the [\w\s]{2,40}? salary scale\b|\bgrade\s?[A-Z]{0,2}-?\d+ of the\b|"
                       r"\b(?:annual|monthly) net (?:base )?salary\b|\bnet base salary\b|\bpay band\b|"
@@ -1322,7 +1348,7 @@ def facts_of(text: str) -> set[str]:
     found = set()
     for kind, pattern in FACTS.items():
         for m in pattern.finditer(text):
-            if kind == "contract_length" and re.match(r"[ \t]*(?:of[ \t]+)?(?:[\w-]+[ \t]+){0,3}?exp[ée]rience",
+            if kind == "contract_length" and re.match(r"['’]?[ \t]*(?:of[ \t]+)?(?:[\w-]+[ \t]+){0,3}?exp[ée]rience",
                                                       text[m.end():m.end() + 60], re.IGNORECASE):
                 continue
             found.add(kind)
@@ -1384,8 +1410,9 @@ APPLICANT = r"(?:candidates?|applicants?|you|the (?:successful )?(?:candidate|ap
 RESTRICTIONS: dict[str, re.Pattern] = {
     "sex": re.compile(r"\b(?:female|male|women|men)\s+(?:candidates?|applicants?)\s+only\b|\bonly\s+(?:female|male|women|"
                       r"men)\s+(?:candidates?|applicants?|may apply|need apply|should apply|are eligible)\b|"
-                      r"\b(?:position|post|vacancy|role|job|opportunity|applications?)\b[^.\n]{0,30}\bfor (?:women|men|"
-                      r"females|males) only\b|\b" + APPLICANT +
+                      r"\b(?:position|post|vacancy|role|job|opportunity|applications?)\s+(?:is|are)\s+(?:open\s+|reserved\s+)?"
+                      r"(?:only\s+)?for (?:women|men|females|males)(?:\s+(?:candidates|applicants))?\s+only\b|\b" +
+                      APPLICANT +
                       r"\s+(?:must|should) be (?:a )?(?:female|male|woman|man)\b|\bopen only to (?:female|male|women|"
                       r"men)\b|\bopen to (?:female|male|women|men)(?: candidates| applicants)? only\b|\bposte "
                       r"r[ée]serv[ée] aux (?:femmes|hommes)\b|\buniquement (?:aux|des) (?:candidates|femmes|hommes)\b|"
@@ -1687,12 +1714,19 @@ def norm_sentence(s: str) -> str:
 
 
 CHROME_WORDS = 6
+# Standard statements that stay whatever their length ("Equal opportunity employer"); links such as
+# "Personal data policy" do not.
+SHORT_STANDARD = re.compile(r"equal (?:opportunit|employment)|disability confident|zero tolerance|"
+                            r"(?:not|never) charge|no (?:recruitment )?fees?\b|[ée]galit[ée] des chances|aucun frais",
+                            re.IGNORECASE)
 
 
 def carries_meaning(line: str) -> bool:
     """A short line the measures read is never site furniture, however often it recurs: a sentence of
     five words or more that carries a known standard text, an inclusion statement, a restriction or a
     fact, or a "label: value" line with a fact. Menu items ("Apply now", "Remote jobs") are neither."""
+    if SHORT_STANDARD.search(line):
+        return True
     if re.match(r"^[^:]{2,40}:\s*\S", line):
         return any(p.search(line) for p in FACTS.values())
     if words_of(line) < 5:
