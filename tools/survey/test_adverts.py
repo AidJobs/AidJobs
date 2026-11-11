@@ -217,11 +217,20 @@ def test_the_form_check_refuses_contacts_addresses_and_unknown_values(tmp_path):
     assert adverts.check_file(p, adverts.ADVERT_FIELDS)
     write_rows(p, [row(system="Logistics Officer at Acme, apply now!")])
     assert adverts.check_file(p, adverts.ADVERT_FIELDS)            # free text in a code column
-    write_rows(p, [row(advert_id="1234567890123456", words_total="1234567890")])
-    assert adverts.check_file(p, adverts.ADVERT_FIELDS) == []      # digits in id and count columns are fine
+    write_rows(p, [row(advert_id="1234567890123456", words_total="1234567890", org_id="irs:521231983")])
+    assert adverts.check_file(p, adverts.ADVERT_FIELDS) == []      # register ids and counts are not phones
     assert adverts.check(roles_dir=tmp_path) == 0
     write_rows(p, [row(org_id="someone@example.org")])
     assert adverts.check(roles_dir=tmp_path) == 1
+
+
+def test_role_counts_with_register_ids_pass_the_form_check(tmp_path):
+    with (tmp_path / "role-counts.csv").open("w", newline="", encoding="utf-8") as h:
+        w = csv.writer(h, lineterminator="\n")
+        w.writerow(roles.COUNT_FIELDS)
+        w.writerow(["archive", "cc-2026", "cra:100072586RR0001", "foundation", "finance", "none", "officer",
+                    "unknown", "unknown", "unknown", "unknown", "3"])
+    assert adverts.check(roles_dir=tmp_path) == 0
 
 
 def test_title_variants_must_be_seen_at_two_organisations(tmp_path):

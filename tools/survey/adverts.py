@@ -1892,8 +1892,10 @@ FORMS = {   # free-text columns: identifiers and codes only, never words from an
     "org_type_basis": re.compile(r"rule|matched by name|board, employer not in the list|decision"),
     "standard_basis": re.compile(r"recurring|known texts only \(Estimate\)"),
 }
-NOT_FREE_TEXT = {"advert_id", "words_total", "words_role", "sections", "words", "position", "years_min", "years_alt",
-                 "median_sentence", "standard_share", "partial_score"}
+# Columns of identifiers and numbers: register ids ("irs:521231983") and counts are not phone numbers.
+NOT_FREE_TEXT = {"advert_id", "org_id", "snapshot", "words_total", "words_role", "sections", "words", "position", "years_min",
+                 "years_alt", "median_sentence", "standard_share", "partial_score", "count", "titles", "organisations",
+                 "share_within_type", "weighted_share", "consultant_share", "national_share", "humanitarian_share"}
 
 
 def check_file(path: Path, fields: list[str]) -> list[str]:
@@ -1936,9 +1938,13 @@ def check(_args=None, roles_dir: Path = ROLES_DIR) -> int:
                 if reader.fieldnames != fields:
                     problems.append(f"{name}: columns {reader.fieldnames} are not {fields}")
                 for i, row in enumerate(reader, 2):
-                    if any(EMAIL.search(v or "") or PHONE_LIKE.search(v or "") or re.search(r"https?://", v or "")
-                           for v in row.values()):
+                    if any(EMAIL.search(v or "") or re.search(r"https?://|www\.", v or "") or
+                           (k not in NOT_FREE_TEXT and PHONE_LIKE.search(v or "")) for k, v in row.items()):
                         problems.append(f"{name}:{i}: an email address, phone-like number or address")
+                    if "org_id" in row and not FORMS["org_id"].fullmatch(row["org_id"] or ""):
+                        problems.append(f"{name}:{i}: org_id is not in its form")
+                    if "snapshot" in row and not re.fullmatch(r"[A-Za-z0-9-]{1,20}", row["snapshot"] or ""):
+                        problems.append(f"{name}:{i}: snapshot is not in its form")
                     if name == "title-variants.csv" and int(row["organisations"] or 0) < 2:
                         problems.append(f"{name}:{i}: a title seen at fewer than two organisations")
     for p in problems[:50]:
