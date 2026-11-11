@@ -82,6 +82,8 @@ def test_a_card_whose_link_leaves_the_site_or_holds_two_links_is_skipped():
     ("Closing at: 28 November 2026 - 23:55 CET", "2026-11-28"),
     ("Closing at: 1 Sept 2027", "2027-09-01"),
     ("Closing at: 31 Feb 2027", None),
+    ("Closing at: 3 Smarch 2027", None),
+    ("Closing at: 120 Nov 2026", None),
     ("Closing at: soon", None),
     ("", None),
 ])
@@ -225,7 +227,87 @@ def test_a_later_page_that_adds_no_jobs_ends_the_walk():
     }
     jobs, report, asked = _walk(first, answers)
     assert len(jobs) == 4 and len(asked) == 2
-    assert report["stop"] == "page 3 added no new jobs"
+    assert report["stop"] == f"{_SEARCH}?page=2&per_page=100 added no new jobs"
+
+
+def test_a_job_closing_during_the_walk_makes_it_partial_not_complete():
+    # 7 jobs; job 2 closes after page one at 50 is read, so page 2 starts one job later and
+    # job 6 falls between pages. The site now says 6: the walk must not call itself complete.
+    first = _page([1, 2, 3], 7, "/jobs/search?page=2")
+    answers = {
+        f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3, 4, 5], 7,
+                                               "/jobs/search?page=2&per_page=100"), ""),
+        f"{_SEARCH}?page=2&per_page=100": (200, _page([7], 6), ""),
+    }
+    jobs, report, _asked = _walk(first, answers)
+    assert "Officer 6" not in [job["title"] for job in jobs]
+    assert report["complete"] is False
+    assert report["expected"] == 7
+    assert report["stop"] == f"total changed from 7 to 6 on {_SEARCH}?page=2&per_page=100"
+
+
+def test_more_jobs_than_the_stated_total_is_partial():
+    _jobs, report, _asked = _walk(_page([1, 2, 3], 2), {})
+    assert report["complete"] is False
+    assert report["stop"] == "read 3 jobs, more than the stated 2"
+
+
+@pytest.mark.parametrize("href", ["https://elsewhere.example/jobs/search?page=2",
+                                  "/careers/other?page=2"])
+def test_a_next_link_found_but_not_followed_is_partial(href):
+    page = SitesListingReader().read_page(_page([1, 2], 4, href), _SEARCH)
+    assert page.next_url is None and page.next_refused is True
+    jobs, report, asked = _walk(_page([1, 2], 4, href), {})
+    assert asked == []
+    assert report["complete"] is False
+    assert report["stop"] == f"next-page link not followed on {_SEARCH}"
+
+
+def test_a_site_that_ignores_the_page_size_is_still_read_page_by_page():
+    first = _page([1, 2, 3], 7, "/jobs/search?page=2")
+    answers = {
+        f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3], 7,
+                                               "/jobs/search?page=2&per_page=100"), ""),
+        f"{_SEARCH}?page=2&per_page=100": (200, _page([4, 5, 6], 7,
+                                                      "/jobs/search?page=3&per_page=100"), ""),
+        f"{_SEARCH}?page=3&per_page=100": (200, _page([7], 7), ""),
+    }
+    jobs, report, asked = _walk(first, answers)
+    assert len(asked) == 3
+    assert len(jobs) == 7 and report["complete"] is True
+
+
+def test_the_resized_page_one_may_add_nothing_only_while_it_links_on():
+    first = _page([1, 2, 3], 7, "/jobs/search?page=2")
+    answers = {f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3], 7), "")}
+    _jobs, report, _asked = _walk(first, answers)
+    assert report["stop"] == f"{_SEARCH}?per_page=100 added no new jobs"
+
+
+def test_the_walk_stops_at_the_page_cap(monkeypatch):
+    from crawler_v2 import simple_crawler
+
+    monkeypatch.setattr(simple_crawler, "_PAGEUP_PAGE_CAP", 2)
+    first = _page([1, 2, 3], 9, "/jobs/search?page=2")
+    answers = {
+        f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3, 4], 9,
+                                               "/jobs/search?page=2&per_page=100"), ""),
+    }
+    _jobs, report, asked = _walk(first, answers)
+    assert len(asked) == 1
+    assert report["stop"] == "page cap 2" and report["complete"] is False
+
+
+def test_a_stated_total_with_a_thousands_separator_is_read():
+    html = _page([1], None).replace("<b>?</b>", "<b>1,230</b>")
+    assert SitesListingReader().read_page(html, _SEARCH).total == 1230
+
+
+def test_a_card_linking_to_the_listing_itself_is_skipped():
+    html = _page([1, 2], 2).replace("https://jobs.unicef.org/jobs/officer-1",
+                                    "https://jobs.unicef.org/jobs/search?per_page=100")
+    jobs = SitesListingReader().read_page(html, _SEARCH).jobs
+    assert [job["title"] for job in jobs] == ["Officer 2"]
 
 
 def test_the_crawl_chooses_this_reader_by_the_page_not_the_address():

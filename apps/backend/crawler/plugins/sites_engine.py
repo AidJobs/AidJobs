@@ -25,7 +25,7 @@ from bs4 import BeautifulSoup
 PAGE_SIZE = 100
 
 _TOTAL = re.compile(r"of\s+([\d,]+)\s+in\s+total", re.I)
-_DATE = re.compile(r"(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})")
+_DATE = re.compile(r"\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b")
 _MONTHS = {
     name: number
     for number, names in enumerate(
@@ -48,6 +48,8 @@ class SitesPage:
     jobs: List[Dict] = field(default_factory=list)
     total: Optional[int] = None
     next_url: Optional[str] = None
+    # A next-page link that leaves the site or the listing: found, but not to be followed.
+    next_refused: bool = False
     is_sites: bool = False
 
 
@@ -110,6 +112,9 @@ class SitesListingReader:
             apply_url = urljoin(page_url, href)
             if apply_url in seen or not _same_site(apply_url, page_url):
                 continue
+            if urlparse(apply_url).path.rstrip("/") == urlparse(page_url).path.rstrip("/"):
+                continue  # the listing itself, not a job
+
             title = _text(links[0])
             if not title:
                 continue
@@ -135,4 +140,6 @@ class SitesListingReader:
             same_listing = urlparse(next_url).path == urlparse(page_url).path
             if _same_site(next_url, page_url) and same_listing:
                 page.next_url = next_url
+            else:
+                page.next_refused = True
         return page

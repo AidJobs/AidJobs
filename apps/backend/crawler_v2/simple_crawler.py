@@ -2128,9 +2128,11 @@ class SimpleCrawler:
         reader's page size, then the site's own next-page links, one request at a time. All
         pages form one batch. ([], None) when the page is not such a site; no request then.
 
-        A failed or refused page keeps the jobs already read and ends the walk as partial. Only
-        a walk that ran out of next-page links and read at least the site's stated total is
-        complete; no stated total is partial.
+        A failed or refused page keeps the jobs already read and ends the walk as partial. The
+        total is page one's: if a later page states another, the listing changed during the walk
+        (a job closed or opened, and the pages shifted), so the walk is partial. Only a walk
+        that ran out of next-page links, followed every one it found, and read exactly the
+        stated total is complete; no stated total is partial.
         """
         from crawler.plugins.sites_engine import SitesListingReader, resized_url
         reader = SitesListingReader()
@@ -2142,11 +2144,13 @@ class SimpleCrawler:
         expected = first.total
         pages = 1
         stop = _SITES_COMPLETE_STOP
+        if first.next_refused:
+            stop = f'next-page link not followed on {careers_url}'
         next_url = resized_url(careers_url) if first.next_url else None
         resized = next_url is not None
         if next_url is None:
             next_url = first.next_url
-        while next_url is not None:
+        while next_url is not None and stop == _SITES_COMPLETE_STOP:
             if pages >= _PAGEUP_PAGE_CAP:
                 stop = f'page cap {_PAGEUP_PAGE_CAP}'
                 break
@@ -2161,19 +2165,25 @@ class SimpleCrawler:
             page = reader.read_page(page_html, next_url)
             new_jobs = [job for job in _first_row_per_link(page.jobs)
                         if job.get('apply_url') not in seen]
-            if page.total is not None:
-                expected = page.total
             if not new_jobs and not (resized and page.jobs and page.next_url):
-                stop = f'page {pages} added no new jobs'
+                stop = f'{next_url} added no new jobs'
                 break
             seen.update(job.get('apply_url') for job in new_jobs)
             jobs.extend(new_jobs)
+            if page.total is not None and expected is not None and page.total != expected:
+                stop = f'total changed from {expected} to {page.total} on {next_url}'
+                break
+            if page.next_refused:
+                stop = f'next-page link not followed on {next_url}'
+                break
             next_url, resized = page.next_url, False
         if stop == _SITES_COMPLETE_STOP:
             if expected is None:
                 stop = 'expected total unknown'
             elif len(jobs) < expected:
                 stop = f'read {len(jobs)} of {expected} jobs'
+            elif len(jobs) > expected:
+                stop = f'read {len(jobs)} jobs, more than the stated {expected}'
         logger.info(
             "Sites listing: %s pages, %s jobs, expected %s, stopped: %s",
             pages, len(jobs), expected if expected is not None else 'unknown', stop,
