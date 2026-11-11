@@ -492,9 +492,23 @@ def test_board_employer_is_read_after_the_last_at():
     ad = {"employer": "", "url": "https://www.example.org/job/finance-officer-at-save-the-children-3"}
     assert adverts.board_org(ad, orgs, names) == ("org:stc", "matched by name")
     ad = {"employer": "", "url": "https://www.example.org/job/finance-officer-kampala"}
-    assert adverts.board_org(ad, orgs, names)[0] == "board-employer:unknown"
+    assert adverts.board_org(ad, orgs, names)[0] == "board-employer:unknown-board"
     ad = {"employer": "", "url": "https://www.example.org/job/head-of-at-risk-programmes-at-save-the-children"}
     assert adverts.board_org(ad, orgs, names) == ("org:stc", "matched by name")    # the last "-at-"
+
+
+def test_a_board_that_names_itself_gives_way_to_the_pages_organisation_link():
+    page = '<a href="/organisations/acme-health-trust">Acme Health Trust</a>'
+    assert adverts.board_employer("Ground Zero", page, "groundzero") == "acme health trust"
+    assert adverts.board_employer("Evidence Partners", page, "myjobmag") == "Evidence Partners"
+    assert adverts.board_employer("", "<p>no link</p>", "ngojobsinafrica") == ""
+    own = '<a href="/company/groundzerocommunity">Ground Zero</a>'
+    assert adverts.board_employer("Ground Zero", own, "groundzero") == ""
+    assert adverts.board_org({"employer": "", "url": "https://x.example/jobs/1", "system": "groundzero"},
+                             roles.Organisations(), {})[0] == "board-employer:unknown-groundzero"
+    names = {"actionagainsthunger": "org:acf"}
+    ad = {"employer": "Action Against Hunger | ACF Nigeria LTD", "url": "https://www.example.org/job/x"}
+    assert adverts.board_org(ad, roles.Organisations(), names) == ("org:acf", "matched by name")
 
 
 def test_a_board_copy_with_at_employer_is_still_a_copy():

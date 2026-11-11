@@ -41,7 +41,7 @@ import zlib
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 
 import roles
 from careers import read_csv, site_host, system_of
@@ -1022,8 +1022,11 @@ def extract(_args=None) -> int:
                     n += 1
                     kinds["feed"] += 1
             elif batch == "r3" and what.startswith("advert"):
-                ad = advert_from_html(body.decode("utf-8", "replace"), meta["url"])
-                ad.update(id=page_id(meta["url"]), source="board", batch=batch, system=what.split()[-1],
+                html = body.decode("utf-8", "replace")
+                ad = advert_from_html(html, meta["url"])
+                board = what.split()[-1]
+                ad["employer"] = board_employer(ad.get("employer", ""), html, board)
+                ad.update(id=page_id(meta["url"]), source="board", batch=batch, system=board,
                           crawl="", languages="", read_at=meta.get("read_at", ""))
                 _save_advert(out, ad)
                 n += 1
@@ -1866,6 +1869,25 @@ def is_advert(ad: dict) -> bool:
     return signals >= 2 or bool(secs & {"responsibilities", "essential_requirements"})
 
 
+BOARD_NAMES = {"myjobmag": "myjobmag", "groundzero": "groundzero", "ngoportal": "ngojobsafrica",
+               "ngojobsinafrica": "ngojobsinafrica"}
+ORG_LINK = re.compile(r"href=[\"'][^\"']*/(?:organi[sz]ations?|company|companies|employers?|jobs-at)/([^\"'/?#]+)",
+                      re.IGNORECASE)
+
+
+def board_employer(employer: str, html: str, board: str) -> str:
+    """The employer a board's advert names: its job data's hiring organisation, unless that is the
+    board itself (Ground Zero names itself), then the page's own link to the organisation's page."""
+    key = re.sub(r"[^a-z0-9]", "", employer.lower())
+    if key and BOARD_NAMES.get(board, "") not in key:
+        return employer
+    for m in ORG_LINK.finditer(html):
+        name = unquote(m.group(1)).replace("-", " ").strip()
+        if BOARD_NAMES.get(board, "") not in re.sub(r"[^a-z0-9]", "", name.lower()):
+            return name
+    return ""                       # the board does not name the employer (Ground Zero writes for clients)
+
+
 def board_org(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tuple[str, str]:
     """(organisation id, basis) for a board's advert: the employer it names, matched to the survey's
     list by name; otherwise a stable id from the name, never the name itself."""
@@ -1874,10 +1896,13 @@ def board_org(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tup
         slug = re.sub(r"-\d+/?$", "", urlsplit(ad["url"]).path.rstrip("/").split("/")[-1])
         emp = slug.rsplit("-at-", 1)[1].replace("-", " ") if "-at-" in slug else ""
     key = re.sub(r"[^a-z0-9]", "", emp.lower())
-    if key and key in names:
-        return names[key], "matched by name"
+    for candidate in (key, re.sub(r"[^a-z0-9]", "", re.split(r"\s*[|(–-]\s*", emp)[0].lower())):
+        if candidate and candidate in names:
+            return names[candidate], "matched by name"
+    # An employer the board does not name: one id per board, so its adverts (written by the board for
+    # its clients) are capped like one organisation's.
     return ("board-employer:h" + hashlib.sha1(key.encode()).hexdigest()[:10] if key else
-            "board-employer:unknown"), "board, employer not in the list"
+            f"board-employer:unknown-{ad.get('system', 'board')}"), "board, employer not in the list"
 
 
 def measure(_args=None) -> int:
@@ -1890,13 +1915,20 @@ def measure(_args=None) -> int:
             k = re.sub(r"[^a-z0-9]", "", n.lower())
             if len(k) >= 4:
                 names.setdefault(k, oid)
-    adverts, dropped = [], Counter()
+    adverts, dropped, board_types = [], Counter(), {}
     for ad in load_adverts():
         if ad["source"] == "step-f-feed":
             ad["org_id"] = orgs.parent(ad.get("org_hint", ""))
             ad["org_type_basis"] = "rule"
         elif ad["source"] == "board":
             ad["org_id"], ad["org_type_basis"] = board_org(ad, orgs, names)
+            if ad["org_id"].startswith("board-employer:"):
+                # An employer outside the survey's list: its type by the name rules (Red Cross, UN,
+                # foundation, research); otherwise the boards' own market, national NGOs (an estimate).
+                t = roles.org_type_of({"name": ad.get("employer", ""), "kind": "", "country": ""})
+                if t in ("other", "ingo"):
+                    t, ad["org_type_basis"] = "national_ngo_south", "board default (Estimate)"
+                board_types[ad["org_id"]] = t
         elif ad["source"] == "feed" and ad.get("org_site"):
             ad["org_id"] = orgs.of_url("https://" + ad["org_site"] + "/")
             ad["org_type_basis"] = "rule"
@@ -1909,7 +1941,7 @@ def measure(_args=None) -> int:
         if not ad["org_id"]:
             dropped["no organisation"] += 1
             continue
-        if roles.un_system(orgs.type_of(ad["org_id"]), urlsplit(ad["url"]).hostname or ""):
+        if roles.un_system(board_types.get(ad["org_id"]) or orgs.type_of(ad["org_id"]), urlsplit(ad["url"]).hostname or ""):
             dropped["held: the UN's terms of use (19.11)"] += 1
             continue
         adverts.append(ad)
@@ -1966,7 +1998,7 @@ def measure(_args=None) -> int:
         y_min, y_alt = years_asked(req_text)
         lang = language_of(text)
         med = statistics.median([words_of(s) for s in sents]) if sents else 0
-        org_type = orgs.type_of(ad["org_id"])
+        org_type = board_types.get(ad["org_id"]) or orgs.type_of(ad["org_id"])
         google = {"title": bool(ad.get("title")), "description": words_total >= MIN_ADVERT_WORDS,
                   "date_posted": bool(f.get("date_posted")), "closing_date": "closing_date" in given,
                   "organisation": True, "place": "duty_station" in given or "remote" in given,
@@ -2070,7 +2102,8 @@ FORMS = {   # free-text columns: identifiers and codes only, never words from an
     "advert_id": re.compile(r"[0-9a-f]{16}"), "org_id": re.compile(r"[\w.:/-]{1,80}"),
     "system": re.compile(r"[A-Za-z][A-Za-z .()]{0,40}"), "grade": re.compile(r"(?:[A-Z]{1,4}-[0-9A-E]{1,2})?"),
     "period": re.compile(r"(?:\d{4}-\d{2})?"), "batch": re.compile(r"r[1-5]|step-f|earlier"),
-    "org_type_basis": re.compile(r"rule|matched by name|board, employer not in the list|decision"),
+    "org_type_basis": re.compile(r"rule|matched by name|board, employer not in the list|board default \(Estimate\)|"
+                                 r"decision"),
     "standard_basis": re.compile(r"recurring|known texts only \(Estimate\)"),
 }
 # Columns of identifiers and numbers: register ids ("irs:521231983") and counts are not phone numbers.
