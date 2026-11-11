@@ -15,6 +15,7 @@ from contracts.admission import admit_batch, extraction_logger_for, log_admissio
 from contracts.outbound import FetchError, current_budget, fetch_url
 from contracts.identity import heuristics_enabled
 from contracts.persist import persist_candidate
+from contracts.persist import created_ids
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from app.log_safety import redact_exception, stored_text
@@ -221,17 +222,21 @@ class SimpleAPICrawler:
         skipped = 0
         failed = 0
         validated = 0
+        seen_active = []
+        not_open = []
+        recorded = []
+        unrecorded = 0  # rows whose sighting was not recorded (a hidden job seen again is)
         
         try:
             with conn.cursor() as cur:
-                confirm_running(cur, run_token, source_id)
-                recorded = []
+                open_on = confirm_running(cur, run_token, source_id)
                 for job in jobs:
                     title = job.get('title', '').strip()
                     apply_url = job.get('apply_url', '').strip()
 
                     if not title or not apply_url:
                         skipped += 1
+                        unrecorded += 1
                         continue
 
                     candidate = {
@@ -248,6 +253,8 @@ class SimpleAPICrawler:
                     observed_at = datetime.now(timezone.utc)
                     validated += 1
                     recorded_mark = len(recorded)
+                    seen_mark = len(seen_active)
+                    not_open_mark = len(not_open)
                     cur.execute("SAVEPOINT job_save")
                     try:
                         outcome = persist_candidate(
@@ -259,12 +266,17 @@ class SimpleAPICrawler:
                             source_id=source_id,
                             org_name=org_name,
                             recorded=recorded,
+                            seen=seen_active,
+                            not_open=not_open,
+                            open_on=open_on,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                     except Exception as exc:
                         # This job only: roll back to its savepoint and drop what it recorded.
                         cur.execute("ROLLBACK TO SAVEPOINT job_save")
                         del recorded[recorded_mark:]
+                        del seen_active[seen_mark:]
+                        del not_open[not_open_mark:]
                         failed += 1
                         logger.error("API job failed to save: %s", redact_exception(exc))
                         continue
@@ -276,6 +288,8 @@ class SimpleAPICrawler:
                         logger.debug("API job unchanged, last_seen_at only: %s", title[:80])
                     else:
                         skipped += 1
+                        if outcome != "seen_again":
+                            unrecorded += 1
                 
                 commit_and_schedule(conn, recorded, loop=loop)
         
@@ -292,6 +306,10 @@ class SimpleAPICrawler:
             'skipped': skipped,
             'failed': failed,
             'validated': validated,
+            'unrecorded': unrecorded,
+            'seen_active': seen_active,
+            'not_open_ids': not_open,
+            'created_ids': created_ids(recorded),
         }
     
     async def crawl_source(self, source: Dict, run=None) -> Dict:

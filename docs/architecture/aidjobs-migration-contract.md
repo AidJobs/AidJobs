@@ -236,6 +236,8 @@ Policy recorded on 30 October 2026 (`growth-and-seo-plan.md`, section 4.3, which
 
 The implementation is its own pull request (ledger W-06, W-36), with its own approval, and adds no rule beyond these.
 
+Amended by the user on 11 November 2026, with the plan for step 4.6 (`growth-and-seo-plan.md`, section 4.3, amendment of that date; effective when the user explicitly approves merging that record): a complete crawl in which any job failed to save, or any listed row's sighting could not be recorded (an identity conflict, a row the writer refuses, or one the save step drops), does not count; expiry by absence and the half-matched test cover only jobs that are not suppressed, while expiry by a passed deadline applies to every row; only crawls whose completeness is recorded on their own crawl run count, with no backfill from `extraction_logs`.
+
 Gate 6 without that approval may add explicit lifecycle state fields, record CrawlRun observations, and identify jobs that were not rediscovered. It must not expire currently active jobs. “Implement trusted reconciliation” is not permission to invent a trust ratio, an empty-catalogue rule, or a consecutive-missing threshold inside the implementation pull request.
 
 These results are never a complete trusted catalogue:

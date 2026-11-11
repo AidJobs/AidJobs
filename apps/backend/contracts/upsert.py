@@ -42,7 +42,7 @@ def _field(row: dict, name: str):
     return row.get(name)
 
 
-def _calendar_day(value) -> str | None:
+def calendar_day(value) -> str | None:
     """YYYY-MM-DD for a date, datetime, or that same calendar day as text."""
     if isinstance(value, datetime):
         return value.date().isoformat()
@@ -63,8 +63,8 @@ def _equivalent(stored, incoming) -> bool:
     """Same value, including a Postgres date and its YYYY-MM-DD text."""
     if stored == incoming:
         return True
-    stored_day = _calendar_day(stored)
-    incoming_day = _calendar_day(incoming)
+    stored_day = calendar_day(stored)
+    incoming_day = calendar_day(incoming)
     return stored_day is not None and stored_day == incoming_day
 
 
