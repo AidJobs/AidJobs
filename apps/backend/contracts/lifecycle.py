@@ -58,6 +58,7 @@ def run_lifecycle(result: dict, *, active_at_start, matched_active: int) -> dict
     expected = listing.get("expected")
     stop = listing.get("stop")
     valid = int(result.get("valid") or 0)
+    observed = int(counts.get("observed") or 0)
     failed = int(counts.get("failed") or 0)
     unrecorded = int(counts.get("unrecorded") or 0)
     matched = int(matched_active or 0)
@@ -72,12 +73,15 @@ def run_lifecycle(result: dict, *, active_at_start, matched_active: int) -> dict
         ),
         "listing_stop": str(stop) if stop is not None else None,
         "valid_count": valid,
+        "observed": observed,
         "failed_saves": failed,
         "unrecorded": unrecorded,
         "matched_active": matched,
+        # A saved job seen through a thin row is a valid row too (contract §6: "admitted or
+        # observed").
         "counted": counting_crawl(
             listing_complete=complete,
-            valid=valid,
+            valid=valid + observed,
             failed=failed,
             unrecorded=unrecorded,
             active_at_start=active_at_start,

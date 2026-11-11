@@ -1805,6 +1805,165 @@ def test_every_save_step_reports_open_and_not_open_matches_apart(db, cls):
     assert counts["created_ids"] == [stored["Programme Officer 6"]]
 
 
+# ---------------------------------------------------------------------------
+# The observation path and job pages for new jobs only (W-36, W-09).
+# ---------------------------------------------------------------------------
+
+
+def _thin(n):
+    """A listing row with a job link and nothing else: admission rejects it as too thin."""
+    return {"title": f"Programme Officer {n}", "apply_url": f"https://example.org/jobs/{n}"}
+
+
+def _job_state():
+    """Every stored column of every job but last_seen_at, to show what an observation leaves."""
+    return {
+        r[0]: r[1]
+        for r in _sql(
+            "SELECT title, (to_jsonb(j) - 'last_seen_at')::text FROM jobs j ORDER BY title"
+        )
+    }
+
+
+def _observing_crawl(thin_rows, admitted_rows=()):
+    async def crawl(src, run):
+        counts = await run.save(_crawler().save_jobs, list(admitted_rows), src["id"],
+                                src["org_name"], thin=list(thin_rows))
+        return {"status": "ok", "message": "Found jobs", "listing": COMPLETE,
+                "counts": {"found": len(thin_rows) + len(admitted_rows), **counts},
+                "valid": len(admitted_rows)}
+
+    return crawl
+
+
+def test_a_thin_row_of_a_saved_job_records_only_its_sighting(db):
+    source = _add_source()
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+    _sql("UPDATE jobs SET last_seen_at = '2026-01-01', location_raw = 'Geneva'")
+    before = _job_state()
+    run_id = _manual_run(source, _observing_crawl([_thin(1), _thin(2), _thin(9)]))
+    record = _lifecycle(run_id)
+    assert (record["valid_count"], record["matched_active"], record["unrecorded"]) == (0, 2, 0)
+    assert _sql("SELECT observed FROM crawl_logs WHERE id = %s", (run_id,))[0][0] == 2
+    assert record["counted"] is True, "2 of 3 open jobs seen through their thin rows"
+    assert _job_state() == before, "nothing but last_seen_at changes; the unknown row adds none"
+    seen = {r[0]: r[1] for r in _sql(
+        "SELECT title, last_seen_at > '2026-01-02' FROM jobs ORDER BY title")}
+    assert seen == {"Programme Officer 1": True, "Programme Officer 2": True,
+                    "Programme Officer 3": False}
+
+
+def test_two_saved_jobs_with_the_same_link_observe_neither_and_stop_the_crawl_counting(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2)
+    title, slashed = "Programme Officer 1 copy", "https://example.org/jobs/1/"
+    _sql(
+        "INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status)"
+        " VALUES (%s, 'Example', %s, %s, %s, 'active')",
+        (source["id"], title, slashed, algorithm_a(title, slashed)),
+    )
+    _sql("UPDATE jobs SET last_seen_at = '2026-01-01'")
+    run_id = _manual_run(source, _observing_crawl([_thin(1), _thin(2)]))
+    record = _lifecycle(run_id)
+    assert record["unrecorded"] == 1
+    assert record["counted"] is False
+    stale = _sql("SELECT count(*) FROM jobs WHERE last_seen_at < '2026-01-02'")[0][0]
+    assert stale == 2, "both copies of job 1 untouched"
+
+
+def test_hidden_and_passed_jobs_are_not_observed(db):
+    source = _add_source()
+    _store_job(source["id"], 1, hidden=True)
+    _store_job(source["id"], 2, deadline="2000-01-01")
+    _store_job(source["id"], 3)
+    _sql("UPDATE jobs SET last_seen_at = '2026-01-01'")
+    run_id = _manual_run(source, _observing_crawl([_thin(1), _thin(2), _thin(3)]))
+    assert _sql("SELECT observed FROM crawl_logs WHERE id = %s", (run_id,))[0][0] == 1
+    fresh = [r[0] for r in _sql(
+        "SELECT title FROM jobs WHERE last_seen_at > '2026-01-02' ORDER BY title")]
+    assert fresh == ["Programme Officer 3"]
+
+
+def _html_crawl(source, rows, monkeypatch, *, page_fields=None):
+    """The real HTML crawl through the orchestrator, with the listing and job pages served here."""
+    import crawler_v2.job_pages as job_pages
+
+    monkeypatch.setattr(job_pages, "rotation_bucket", lambda job_id: -1)
+    opened = []
+
+    async def scenario():
+        orch = _orch()
+        crawler = orch.html_crawler
+        crawler.extraction_logger = None
+        crawler.html_storage = None
+        crawler.quality_scorer = None
+
+        async def fetch_page(url):
+            return 200, "<html><body>listing</body></html>", ""
+
+        async def listing(html, url):
+            return [dict(row) for row in rows], dict(COMPLETE)
+
+        async def detail_page(job, base_url):
+            opened.append(job["apply_url"])
+            return {**job, **(page_fields or {"location_raw": "Nairobi, Kenya"})}
+
+        crawler._fetch_page = fetch_page
+        crawler._listing_jobs = listing
+        crawler.enrich_job_from_detail_page = detail_page
+        run_id, started = await orch.start_manual_run(source)
+        assert started
+        await asyncio.wait_for(asyncio.gather(*list(orch._tasks)), STEP_SECONDS)
+        return run_id
+
+    return asyncio.run(scenario()), opened
+
+
+def test_only_new_vacancies_pages_are_opened_and_saved_jobs_are_observed(db, monkeypatch):
+    source = _add_source()
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+    rows = [_thin(n) for n in (1, 2, 3, 4, 5)]
+    rows.append({"title": "About us", "apply_url": "https://example.org/about"})
+    run_id, opened = _html_crawl(source, rows, monkeypatch)
+    assert opened == ["https://example.org/jobs/4", "https://example.org/jobs/5"]
+    record = _lifecycle(run_id)
+    observed = _sql("SELECT observed, inserted FROM crawl_logs WHERE id = %s", (run_id,))[0]
+    assert tuple(observed) == (3, 2), "the saved three seen; the two new ones read and saved"
+    assert (record["active_at_start"], record["matched_active"]) == (3, 3)
+    assert record["counted"] is True
+    assert _job_count() == 5
+
+
+def test_new_vacancies_over_the_cap_are_held_back_not_saved(db, monkeypatch):
+    import crawler_v2.job_pages as job_pages
+
+    monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 1)
+    source = _add_source()
+    run_id, opened = _html_crawl(source, [_thin(4), _thin(5), _job(6)], monkeypatch)
+    assert opened == ["https://example.org/jobs/4"]
+    titles = sorted(r[0] for r in _sql("SELECT title FROM jobs"))
+    assert titles == ["Programme Officer 4", "Programme Officer 6"], (
+        "5 is thin and over the cap: read by a later crawl; 6 the listing admits"
+    )
+
+
+def test_a_saved_jobs_listing_row_never_clears_what_its_page_gave(db, monkeypatch):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _sql("UPDATE jobs SET location_raw = 'Geneva', country = 'Switzerland',"
+         " country_iso = 'CH', deadline = '2999-01-31'")
+    row = {**_thin(1), "location_raw": "", "deadline": "2999-02-28"}
+    run_id, opened = _html_crawl(source, [row], monkeypatch)
+    assert opened == [], "a saved job far from its deadline and not in rotation"
+    stored = _sql("SELECT location_raw, country, country_iso, deadline::text FROM jobs")[0]
+    assert tuple(stored) == ("Geneva", "Switzerland", "CH", "2999-02-28"), (
+        "the listing's new deadline is saved; its blank location clears nothing"
+    )
+
+
 TRACKED = "https://example.org/jobs/1?utm_source=newsletter"
 
 

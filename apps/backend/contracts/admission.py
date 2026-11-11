@@ -233,6 +233,22 @@ def admit_batch(jobs: list[dict], record_class: str) -> tuple[list[dict], list[t
     return admitted, rejected
 
 
+def page_verdicts(jobs: list[dict], record_class: str) -> dict[int, str]:
+    """Admission's verdict on each row as the listing gives it, to choose which job pages to open
+    (C4): the index of every row admitted ('admitted') or rejected as 'thin_vacancy'. A row with
+    any other rejection is junk and absent. Copies are judged, so no row is stamped; admit_batch
+    on the finished list still decides what is saved.
+    """
+    copies = [dict(job) for job in jobs]
+    position = {id(copy): index for index, copy in enumerate(copies)}
+    admitted, rejected = admit_batch(copies, record_class)
+    verdicts = {position[id(job)]: "admitted" for job in admitted}
+    for job, reason in rejected:
+        if reason == "thin_vacancy":
+            verdicts[position[id(job)]] = "thin_vacancy"
+    return verdicts
+
+
 def extraction_logger_for(db_url: str):
     """Existing failed-insert logger. A missing logger does not block admission."""
     try:

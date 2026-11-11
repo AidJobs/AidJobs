@@ -10,6 +10,7 @@ from contracts.identity import both_keys
 from contracts.models import CrawlRun
 from contracts.upsert import VALIDATED_FIELDS, calendar_day, upsert
 from contracts.validate import rejection_reason
+from core.extraction_heuristics import normalize_url
 
 # Read set for the match. Geocoding and quality are not loaded and are not
 # part of the unchanged-versus-updated decision.
@@ -149,6 +150,72 @@ def persist_candidate(
     _update(cursor, row["id"], assignments)
     _remember(recorded, decision, row.get("id"))
     return decision
+
+
+_OBSERVABLE_COLUMNS = ("id", "apply_url", "status", "deadline", "deleted_at")
+
+
+def observation_link(url) -> str:
+    """The normalised apply link the observation path matches on (W-36)."""
+    return normalize_url(str(url or "").strip())
+
+
+def observable_jobs(cursor, source_id) -> dict:
+    """The source's saved jobs by observation_link, read inside the save's transaction."""
+    cursor.execute(
+        f"SELECT {', '.join(_OBSERVABLE_COLUMNS)} FROM jobs WHERE source_id = %s",
+        (str(source_id),),
+    )
+    by_link: dict = {}
+    for record in cursor.fetchall():
+        row = dict(record) if isinstance(record, dict) else dict(zip(_OBSERVABLE_COLUMNS, record))
+        by_link.setdefault(observation_link(row.get("apply_url")), []).append(row)
+    return by_link
+
+
+def observe_known(
+    cursor,
+    row: dict,
+    by_link: dict,
+    *,
+    observed_at: datetime,
+    source_id,
+    open_on: date | None = None,
+    seen: list | None = None,
+    not_open: list | None = None,
+) -> str:
+    """The observation path (crawler plan, C3 and C4 amendment; contract §6; W-36).
+
+    A listing row admission rejected as too thin counts as a saved job seen when its normalised
+    apply link matches exactly one job of the same source that is not hidden and is active or
+    expired by absence; a job whose stored deadline has passed is expired by its deadline and is
+    not matched. Only that job's last_seen_at is written: no other field, no identity, no
+    lifecycle, no hiding. Returns 'observed', 'ambiguous' (two or more such jobs: nothing is
+    observed), 'ineligible' (only hidden, passed or other jobs have the link) or 'unknown'.
+    """
+    day = _open_on(open_on, observed_at)
+    matches = by_link.get(observation_link(row.get("apply_url")), [])
+    if not matches:
+        return "unknown"
+    eligible = [
+        job for job in matches
+        if job.get("deleted_at") is None
+        and job.get("status") in ("active", "expired")
+        and not _deadline_before(job.get("deadline"), day)
+    ]
+    if not eligible:
+        return "ineligible"
+    if len(eligible) > 1:
+        return "ambiguous"
+    job = eligible[0]
+    cursor.execute("UPDATE jobs SET last_seen_at = %s WHERE id = %s", (observed_at, job["id"]))
+    _note_seen(seen, not_open, {**job, "source_id": source_id}, source_id, day)
+    return "observed"
+
+
+def _deadline_before(deadline, day: date) -> bool:
+    stored = calendar_day(deadline)
+    return stored is not None and stored < day.isoformat()
 
 
 def created_ids(recorded) -> list:

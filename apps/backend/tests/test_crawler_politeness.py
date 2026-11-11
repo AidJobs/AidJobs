@@ -677,6 +677,8 @@ def _html_crawler(monkeypatch, answer):
     crawler = simple_crawler.SimpleCrawler("postgresql://unused")
     crawler.extraction_logger = None
     crawler.html_storage = None
+    # No saved jobs: every vacancy's page is new to the crawl (crawler_v2/job_pages.py).
+    crawler._saved_jobs_for_pages = lambda source_id, run_token: ({}, 0, None)
     return crawler
 
 
@@ -704,6 +706,8 @@ def test_a_first_page_that_is_not_a_listing_fails_the_crawl(answer, message, mon
 
 
 class _Run:
+    token = "run-1"
+
     def __init__(self):
         self.saved = []
 

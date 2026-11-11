@@ -6,7 +6,7 @@ from contracts.outbound import crawl_budget
 
 __all__ = ["RunHandle", "crawl_budget"]
 
-_TOTALS = ("inserted", "updated", "skipped", "failed", "unrecorded")
+_TOTALS = ("inserted", "updated", "skipped", "failed", "unrecorded", "observed")
 
 
 class RunHandle:
