@@ -121,6 +121,7 @@ socket.socket.connect_ex = _loopback_connect_ex
 dotenv.load_dotenv = lambda *args, **kwargs: False
 
 import crawler_v2.simple_crawler as simple_crawler_module  # noqa: E402
+from contracts.identity import algorithm_a, algorithm_b  # noqa: E402
 from contracts.persist import LOAD_COLUMNS, SUPPLEMENTARY_FIELDS  # noqa: E402
 from contracts.run_ownership import OwnershipLost, save_failure_outcome  # noqa: E402
 from contracts.upsert import VALIDATED_FIELDS  # noqa: E402
@@ -141,6 +142,10 @@ from tests.role_grants import statements_for_tables  # noqa: E402
 
 SCHEMA = Path(__file__).parent / "sql" / "crawl_schema.sql"
 STEP_SECONDS = 20
+LIFECYCLE_COLUMNS = (
+    "active_at_start", "listing_complete", "listing_expected", "listing_stop", "valid_count",
+    "failed_saves", "unrecorded", "matched_active", "counted",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +427,8 @@ def test_the_schema_has_every_column_the_crawl_writes(db):
             "last_crawled_at", "next_run_at", "updated_at"} <= columns("sources")
     assert {"id", "source_id", "ran_at", "status", "message", "duration_ms", "found",
             "inserted", "updated", "skipped"} <= columns("crawl_logs")
+    assert set(LIFECYCLE_COLUMNS) | {"observed", "expired", "returned"} <= columns("crawl_logs")
+    assert "expired_at" in columns("jobs")
     assert columns("crawl_locks") == {"source_id", "locked_at"}
 
 
@@ -1504,3 +1511,363 @@ def test_the_run_route_starts_a_crawl_returns_the_open_run_and_refuses_an_unknow
     }
     assert unknown_status == 404
     assert _runs(source["id"]) == [(run_id, "ok", "Found 0 jobs")]
+
+
+# ---------------------------------------------------------------------------
+# The run's lifecycle record (W-06): completeness and whether the crawl counts as evidence of
+# absence, written by the run's ownership-checked finish. Nothing is expired.
+# ---------------------------------------------------------------------------
+
+COMPLETE = {"pages": 2, "expected": 3, "complete": True, "stop": "no More Jobs link"}
+
+
+def _store_job(source_id, n, *, status="active", hidden=False):
+    title, url = f"Programme Officer {n}", f"https://example.org/jobs/{n}"
+    _sql(
+        """
+        INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status,
+                          deleted_at)
+        VALUES (%s, 'Example', %s, %s, %s, %s, CASE WHEN %s THEN NOW() END)
+        """,
+        (source_id, title, url, algorithm_a(title, url), status, hidden),
+    )
+
+
+def _lifecycle(run_id):
+    row = _sql(
+        f"SELECT {', '.join(LIFECYCLE_COLUMNS)} FROM crawl_logs WHERE id = %s", (run_id,)
+    )[0]
+    return dict(zip(LIFECYCLE_COLUMNS, row))
+
+
+def _listing_crawl(numbers, report, *, titles=None):
+    """A crawl that saves these jobs through the real writer and reports this listing."""
+    titles = titles or {}
+
+    async def crawl(src, run):
+        jobs = [_job(n, titles.get(n)) for n in numbers]
+        counts = await run.save(_crawler().save_jobs, jobs, src["id"], src["org_name"])
+        return {
+            "status": "ok",
+            "message": f"Found {len(jobs)} jobs",
+            "counts": {"found": len(jobs), **counts},
+            "listing": report,
+            "valid": len(jobs),
+        }
+
+    return crawl
+
+
+def _jobs_rows():
+    return _sql("SELECT id, status, deleted_at, last_seen_at IS NOT NULL FROM jobs ORDER BY id")
+
+
+def test_a_run_records_its_sources_open_jobs_that_are_not_hidden_at_its_start(db):
+    source, other = _add_source(), _add_source("Other")
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 4, hidden=True)
+    _store_job(source["id"], 5, status="expired")
+    _store_job(other["id"], 6)
+    run_id, started = _orch()._begin(source["id"], False)
+    assert started
+    record = _lifecycle(run_id)
+    assert record["active_at_start"] == 3
+    assert record["counted"] is None, "not decided until the run's finish"
+
+
+def test_a_complete_crawl_that_matched_its_catalogue_counts_and_expires_nothing(db):
+    source = _add_source()
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 9)
+    before = {r[0]: r[1:3] for r in _jobs_rows()}
+    run_id = _manual_run(source, _listing_crawl([1, 2, 3, 4], COMPLETE))
+    assert _lifecycle(run_id) == {
+        "active_at_start": 4,
+        "listing_complete": True,
+        "listing_expected": 3,
+        "listing_stop": "no More Jobs link",
+        "valid_count": 4,
+        "failed_saves": 0,
+        "unrecorded": 0,
+        "matched_active": 3,
+        "counted": True,
+    }
+    after = {r[0]: r[1:3] for r in _jobs_rows()}
+    for job_id, state in before.items():
+        assert after[job_id] == state, "no status or hiding changes on any stored job"
+    assert len(after) == 5
+
+
+@pytest.mark.parametrize("stored, listed, counted", [(4, [1, 2], True), (3, [1], False)])
+def test_fewer_than_half_of_the_open_jobs_matched_does_not_count(db, stored, listed, counted):
+    source = _add_source()
+    for n in range(1, stored + 1):
+        _store_job(source["id"], n)
+    run_id = _manual_run(source, _listing_crawl(listed, COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (stored, len(listed))
+    assert record["counted"] is counted
+
+
+def test_a_hidden_job_seen_again_is_not_a_match(db):
+    source = _add_source()
+    for n in (1, 2):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 3, hidden=True)
+    run_id = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (2, 2)
+    assert record["counted"] is True
+    assert _sql("SELECT count(*) FROM jobs WHERE deleted_at IS NOT NULL")[0][0] == 1
+
+
+def test_another_sources_job_with_the_same_identity_is_not_a_match(db):
+    source, other = _add_source(), _add_source("Other")
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    for n in (5, 6):
+        _store_job(other["id"], n)
+    run_id = _manual_run(source, _listing_crawl([1, 5, 6], COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 1)
+    assert record["counted"] is False
+    owners = _sql("SELECT count(*) FROM jobs WHERE source_id = %s", (other["id"],))[0][0]
+    assert owners == 2, "the other source's jobs are not taken over"
+
+
+def test_a_listed_row_whose_sighting_is_not_recorded_stops_the_crawl_counting(db):
+    source = _add_source()
+    for n in (1, 2, 3):
+        _store_job(source["id"], n)
+    # Job 1 listed with a tracking parameter: its first key matches a second stored copy, its
+    # second (the normalised link) the first copy. An identity conflict: neither is recorded.
+    title, tracked = "Programme Officer 1", "https://example.org/jobs/1?utm_source=newsletter"
+    assert algorithm_a(title, tracked) != algorithm_b(title, tracked, None)
+    _sql(
+        """
+        INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status)
+        VALUES (%s, 'Example', %s, %s, %s, 'active')
+        """,
+        (source["id"], title, tracked, algorithm_a(title, tracked)),
+    )
+
+    async def crawl(src, run):
+        jobs = [{**_job(1), "apply_url": tracked}, _job(2), _job(3)]
+        counts = await run.save(_crawler().save_jobs, jobs, src["id"], src["org_name"])
+        return {"status": "ok", "message": "Found 3 jobs", "counts": {"found": 3, **counts},
+                "listing": COMPLETE, "valid": 3}
+
+    run_id = _manual_run(source, crawl)
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 2)
+    assert record["unrecorded"] == 1
+    assert record["failed_saves"] == 0
+    assert record["counted"] is False, "half matched, but a listed job's sighting is missing"
+
+
+def test_a_new_job_listed_twice_is_not_a_match_of_the_catalogue(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    run_id = _manual_run(source, _listing_crawl([1, 7, 7], COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 1)
+    assert record["counted"] is False
+
+
+@pytest.fixture
+def failing_updates(db):
+    _sql(
+        """
+        CREATE OR REPLACE FUNCTION test_reject_update() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'test update failure';
+        END $$
+        """
+    )
+    _sql(
+        "CREATE TRIGGER test_reject_update BEFORE UPDATE ON jobs FOR EACH ROW"
+        " WHEN (NEW.location_raw = 'Reject me') EXECUTE FUNCTION test_reject_update()"
+    )
+    yield
+    _sql("DROP TRIGGER IF EXISTS test_reject_update ON jobs")
+    _sql("DROP FUNCTION IF EXISTS test_reject_update()")
+
+
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
+def test_a_match_whose_update_rolls_back_is_not_reported(failing_updates, cls):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2)
+    run_id, _ = _orch()._begin(source["id"], False)
+    failing = {**_job(1), "location_raw": "Reject me"}
+    counts = _crawler(cls).save_jobs([failing, _job(2)], source["id"], "Example",
+                                     run_token=run_id)
+    assert counts["failed"] == 1
+    stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
+    assert counts["seen_active"] == [stored["Programme Officer 2"]]
+    assert counts["created_ids"] == []
+
+
+TRACKED = "https://example.org/jobs/1?utm_source=newsletter"
+
+
+def _store_conflict(source_id):
+    """Job 1 stored twice, so a row listing it with TRACKED matches both: an identity conflict."""
+    _store_job(source_id, 1)
+    title = "Programme Officer 1"
+    _sql(
+        """
+        INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status)
+        VALUES (%s, 'Example', %s, %s, %s, 'active')
+        """,
+        (source_id, title, TRACKED, algorithm_a(title, TRACKED)),
+    )
+
+
+def test_every_html_row_whose_sighting_is_not_recorded_is_counted(db):
+    source = _add_source()
+    _store_conflict(source["id"])
+    _store_job(source["id"], 10, hidden=True)
+    run_id, _ = _orch()._begin(source["id"], False)
+    rows = [
+        {**_job(21), "title": ""},  # basic validation: no title
+        {**_job(22), "title": "   "},  # no title once trimmed
+        {**_job(23), "title": "  AB "},  # too short once trimmed
+        {**_job(24), "apply_url": "#apply"},  # not a link
+        {**_job(25), "admitted": False},  # refused by the writer
+        {**_job(1), "apply_url": TRACKED},  # identity conflict
+        _job(10),  # a hidden job seen again: recorded
+        _job(2),  # new: recorded
+    ]
+    counts = _crawler().save_jobs(rows, source["id"], "Example", run_token=run_id)
+    assert counts["unrecorded"] == 6
+    assert counts["inserted"] == 1
+    assert counts["failed"] == 0
+
+    only_invalid = _crawler().save_jobs(
+        [{**_job(26), "title": ""}], source["id"], "Example", run_token=run_id
+    )
+    assert only_invalid["unrecorded"] == 1
+
+
+@pytest.mark.parametrize("cls", [SimpleRSSCrawler, SimpleAPICrawler])
+def test_every_feed_row_whose_sighting_is_not_recorded_is_counted(db, cls):
+    source = _add_source()
+    _store_conflict(source["id"])
+    _store_job(source["id"], 10, hidden=True)
+    run_id, _ = _orch()._begin(source["id"], False)
+    rows = [
+        {**_job(21), "title": ""},  # no title
+        {**_job(22), "apply_url": "  "},  # no link once trimmed
+        {**_job(25), "admitted": False},  # refused by the writer
+        {**_job(1), "apply_url": TRACKED},  # identity conflict
+        _job(10),  # a hidden job seen again: recorded
+        _job(2),  # new: recorded
+    ]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    assert counts["unrecorded"] == 4
+    assert counts["inserted"] == 1
+    assert counts["failed"] == 0
+
+
+def test_the_html_crawl_hands_its_listing_and_admitted_rows_to_the_finish(db):
+    source = _add_source("UNICEF", url="https://jobs.unicef.org/en-us/listing/")
+    report = {"pages": 1, "expected": 2, "complete": True, "stop": "no More Jobs link"}
+
+    async def scenario(rows):
+        orch = _orch()
+        crawler = orch.html_crawler
+        crawler.extraction_logger = None
+        crawler.html_storage = None
+        crawler.quality_scorer = None
+
+        async def fetch_page(url):
+            return 200, "<html><body>listing</body></html>", ""
+
+        async def pageup_reader(html, url):
+            return rows, dict(report)
+
+        crawler._fetch_page = fetch_page
+        crawler._pageup_listing_jobs = pageup_reader
+        run_id, _ = await orch.begin_run(source)
+        result = await crawler.crawl_source(source, RunHandle(run_id, source["id"]))
+        await orch.finish_run(source, run_id, result)
+        return run_id, result
+
+    junk = {"title": "Careers home", "apply_url": "https://jobs.unicef.org/"}
+    run_id, result = asyncio.run(scenario([_job(1), junk]))
+    assert result["listing"] == report
+    assert result["valid"] == 1
+    assert _lifecycle(run_id)["listing_complete"] is True
+
+    run_id, result = asyncio.run(scenario([junk]))
+    assert result["listing"] == report
+    assert result["valid"] == 0
+    assert _lifecycle(run_id)["valid_count"] == 0
+    assert _lifecycle(run_id)["counted"] is False
+
+
+def test_a_partial_listing_is_recorded_and_does_not_count(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    partial = {"pages": 6, "expected": 270, "complete": False, "stop": "refused: HTTP 202"}
+    run_id = _manual_run(source, _listing_crawl([1], partial))
+    record = _lifecycle(run_id)
+    assert record["listing_complete"] is False
+    assert record["listing_expected"] == 270
+    assert record["listing_stop"] == "refused: HTTP 202"
+    assert record["counted"] is False
+
+
+def test_a_reader_without_a_completeness_report_never_counts(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    run_id = _manual_run(source, _listing_crawl([1], None))
+    record = _lifecycle(run_id)
+    assert record["listing_complete"] is None
+    assert record["matched_active"] == 1
+    assert record["counted"] is False
+
+
+def test_a_complete_crawl_where_a_job_failed_to_save_does_not_count(failing_titles):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    crawl = _listing_crawl([1, 2], COMPLETE, titles={2: "Broken Officer"})
+    run_id = _manual_run(source, crawl)
+    record = _lifecycle(run_id)
+    assert record["failed_saves"] == 1
+    assert record["matched_active"] == 1
+    assert record["counted"] is False
+    assert [r[1] for r in _runs(source["id"])] == ["ok"]
+
+
+def test_a_failed_run_records_no_completeness(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+
+    async def failing(src, run):
+        return _fail()
+
+    run_id = _manual_run(source, failing)
+    record = _lifecycle(run_id)
+    assert record["listing_complete"] is None
+    assert record["counted"] is False
+    assert record["active_at_start"] == 1
+
+
+def test_a_stale_finish_writes_no_lifecycle_record(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    old = _orch()
+    stale_run, _ = old._begin(source["id"], False)
+    _age(source["id"], old.lock_lifetime.total_seconds() + 60)
+    new_run, started = _orch()._begin(source["id"], False)
+    assert started
+    complete = {**_ok(found=1), "listing": COMPLETE, "valid": 1}
+    assert old._finish(source["id"], stale_run, complete, mode="normal", health=None) is False
+    assert _lifecycle(stale_run)["counted"] is None
+    assert _lifecycle(stale_run)["listing_complete"] is None
+    assert _lifecycle(new_run)["counted"] is None

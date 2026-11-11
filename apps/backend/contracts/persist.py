@@ -70,8 +70,15 @@ def persist_candidate(
     source_id: str | None = None,
     org_name: str | None = None,
     recorded: list | None = None,
+    seen: list | None = None,
 ) -> str:
-    """Validate, decide with the contract upsert, then write that decision."""
+    """Validate, decide with the contract upsert, then write that decision.
+
+    seen, when given, receives the id of a matched job of this candidate's source that was open
+    and not hidden before this write: the crawl's evidence that it read the source's open jobs
+    (contract §6). A job this run created is reported too when a later row matches it; the
+    caller removes those.
+    """
     if candidate.get("admitted") is not True:
         return "rejected"
     if rejection_reason(candidate):
@@ -117,10 +124,12 @@ def persist_candidate(
         )
         if decision == "seen_again":
             _remember(recorded, decision, row.get("id"))
+        _note_seen(seen, before.get(row["id"]), payload.get("source_id"))
         return decision
 
     row = catalog[0]
     prior = before[row["id"]]
+    _note_seen(seen, prior, payload.get("source_id"))
     assignments = {
         name: row.get(name)
         for name in VALIDATED_FIELDS
@@ -134,6 +143,21 @@ def persist_candidate(
     _update(cursor, row["id"], assignments)
     _remember(recorded, decision, row.get("id"))
     return decision
+
+
+def created_ids(recorded) -> list:
+    """The ids a save created, from the list persist_candidate records them in."""
+    return [entry["job_id"] for entry in recorded or () if entry.get("outcome") == "created"]
+
+
+def _note_seen(seen, prior, source_id) -> None:
+    if seen is None or not prior or prior.get("id") is None or source_id is None:
+        return
+    # The identity keys ignore the source, so a row can match another source's job.
+    if str(prior.get("source_id")) != str(source_id):
+        return
+    if prior.get("status") == "active" and prior.get("deleted_at") is None:
+        seen.append(str(prior["id"]))
 
 
 def _remember(recorded, outcome: str, job_id) -> None:
