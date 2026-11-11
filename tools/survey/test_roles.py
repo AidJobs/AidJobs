@@ -79,6 +79,7 @@ def test_un_supporters_are_not_un_agencies():
     assert t({"name": "UN Office for Project Services", "kind": "intergovernmental", "country": ""}) == "un_agency"
     assert t({"name": "UN Global Compact Network Kenya", "kind": "National NGO", "country": "KE"}) != "un_agency"
     assert t({"name": "United Nations Foundation", "kind": "Foundation", "country": "US"}) == "foundation"
+    assert t({"name": "UN Women UK", "kind": "", "country": "GB"}) != "un_agency"
 
 
 def test_sectors_take_the_earliest_and_tell_safeguards_from_safeguarding():

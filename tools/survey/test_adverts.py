@@ -587,14 +587,14 @@ def test_a_planned_row_is_checked_again_before_it_is_read():
 
 
 class FakeFetcher:
-    """Answers by host; writes one log line per request, as confirm.Fetcher does."""
+    """Answers by host; writes one resolver line per request, as the counting resolver does."""
 
     def __init__(self, folder, answers):
         self.folder, self.answers, self.urls = folder, answers, []
 
     def get(self, url, what):
         self.urls.append(url)
-        with (self.folder / "requests.log").open("a", encoding="utf-8") as h:
+        with (self.folder / "resolver.log").open("a", encoding="utf-8") as h:
             h.write(f"x\t{what}\n")
         host = url.split("/")[2]
         answer = self.answers.get(url, self.answers.get(host, (200, b"<html></html>")))
@@ -617,34 +617,92 @@ def test_a_resumed_live_run_does_not_ask_a_host_that_refused(tmp_path):
     assert run2.get("https://bad.example/b", "page") is None and f2.urls == []
 
 
-def test_the_live_batch_size_counts_the_policys_robots_reads_across_runs(tmp_path):
-    # Each request reserves its worst case: the page, a new host's robots.txt, and 2 redirects with theirs.
-    run, _ = live(tmp_path, {}, cap=8)
-    run.get("https://a.example/1", "page")             # the page and the policy's robots.txt read: 2
-    run2, _ = live(tmp_path, {}, cap=8)
-    run2.get("https://a.example/2", "page")            # a new process: the policy reads robots.txt again
-    assert adverts.requests_sent(tmp_path) == 4
-    assert run2.get("https://a.example/3", "page") is None and run2.stopped   # 4 + 5 reserved > 8
+def test_the_live_batch_size_holds_across_runs(tmp_path):
+    run, _ = live(tmp_path, {}, cap=2)
+    run.get("https://a.example/1", "page")
+    run2, f2 = live(tmp_path, {}, cap=2)
+    run2.get("https://a.example/2", "page")
+    assert adverts.live_requests_sent(tmp_path) == 2
+    assert run2.get("https://a.example/3", "page") is None and run2.stopped and len(f2.urls) == 1
 
 
-def test_redirect_hops_are_counted_and_a_page_off_its_site_is_not_kept(tmp_path):
-    run, _ = live(tmp_path, {"https://a.example/x": {"status": 200, "final_url": "https://www.a.example/y",
-                                                     "redirects": 2, "body": b"<p>same site</p>"},
-                             "https://b.example/x": {"status": 200, "final_url": "https://other.example/z",
-                                                     "redirects": 1, "body": b"<p>elsewhere</p>"}}, cap=50)
-    meta = run.get("https://a.example/x", "page")
-    assert meta["body"] and adverts.requests_sent(tmp_path) == 1 + 1 + 4
-    meta = run.get("https://b.example/x", "page")
-    assert meta["body"] == b"" and meta["error"].startswith("redirected off the host")
-    assert "b.example" in run.blocked_hosts and not run.failures and not run.refusals
-    assert adverts.requests_sent(tmp_path) == 6 + 1 + 1 + 2
+class PolicyNet:
+    """The fetch policy's lowest step replaced: each call is one request the policy would send. It
+    asks the policy's resolver first, as the real step does, so the counting resolver sees it."""
+
+    def __init__(self, routes):
+        self.routes, self.sent = routes, []
+
+    async def hop(self, url, method, headers, timeout, max_bytes, resolver, backend_factory, pool_factory,
+                  dns_timeout):
+        from urllib.parse import urlsplit as split
+        await resolver(split(url).hostname, 443)
+        self.sent.append(url)
+        status, location, body = self.routes.get(url, (404, None, b""))
+        if isinstance(status, Exception):
+            raise status
+        return status, {"content-type": "text/html", **({"location": location} if location else {})}, \
+            (None if location else body), location
 
 
-def test_a_redirect_limit_counts_every_hop(tmp_path):
-    run, _ = live(tmp_path, {"https://a.example/x": {"status": None, "final_url": "", "redirects": 0,
-                                                     "error": "redirect limit", "body": b""}}, cap=50)
+def real_run(tmp_path, monkeypatch, routes, cap=50):
+    """A live run through the real confirm.Fetcher and fetch policy; only the network step is fake."""
+    import confirm
+    from contracts import outbound
+    net = PolicyNet(routes)
+
+    async def no_wait(*_a, **_k):
+        return None
+
+    async def lookup(host, port):
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(outbound, "_hop", net.hop)
+    monkeypatch.setattr(outbound, "_sleep", no_wait)
+    monkeypatch.setattr(outbound, "_robots", type(outbound._robots)())
+    monkeypatch.setattr(outbound, "_last_answer", type(outbound._last_answer)())
+    monkeypatch.setattr(confirm.time, "sleep", lambda s: None)
+    return adverts.LiveRun("r3", cap, folder=tmp_path, lookup=lookup), net
+
+
+def test_every_request_the_policy_sends_is_counted(tmp_path, monkeypatch):
+    routes = {"https://a.example/x": (301, "https://www.a.example/y", None),
+              "https://www.a.example/y": (302, "https://www.a.example/z", None),
+              "https://www.a.example/z": (outbound_error("timeout"), None, None)}
+    run, net = real_run(tmp_path, monkeypatch, routes)
     run.get("https://a.example/x", "page")
-    assert adverts.requests_sent(tmp_path) == 1 + 1 + 2 * adverts.LIVE_REDIRECTS
+    # two robots.txt reads (a.example, www.a.example), three page hops, the last timing out
+    assert len(net.sent) == 5 and adverts.live_requests_sent(tmp_path) == 5
+
+
+def test_the_policys_robots_redirects_are_counted_and_the_size_is_a_hard_limit(tmp_path, monkeypatch):
+    routes = {f"https://a.example/r{i}": (301, f"https://a.example/r{i + 1}", None) for i in range(6)}
+    routes["https://a.example/robots.txt"] = (301, "https://a.example/r0", None)
+    run, net = real_run(tmp_path, monkeypatch, routes, cap=4)
+    run.get("https://a.example/page", "page")
+    assert len(net.sent) == 4 and adverts.live_requests_sent(tmp_path) == 4
+    assert run.stopped
+
+
+def test_a_redirect_off_the_site_is_never_contacted(tmp_path, monkeypatch):
+    routes = {"https://b.example/x": (302, "https://other.example/z", None)}
+    run, net = real_run(tmp_path, monkeypatch, routes)
+    meta = run.get("https://b.example/x", "page")
+    assert not any("other.example" in u for u in net.sent)
+    assert meta["body"] == b"" and meta["error"].startswith("redirected off the site")
+    assert "b.example" in run.blocked_hosts and not run.failures and not run.refusals
+
+
+def test_the_policy_follows_at_most_two_redirects(tmp_path, monkeypatch):
+    routes = {f"https://a.example/p{i}": (302, f"https://a.example/p{i + 1}", None) for i in range(5)}
+    run, net = real_run(tmp_path, monkeypatch, routes)
+    meta = run.get("https://a.example/p0", "page")
+    assert meta["error"] == "redirect limit" and len([u for u in net.sent if "/p" in u]) == 3
+
+
+def outbound_error(message):
+    from contracts.outbound import FetchError
+    return FetchError(message)
 
 
 def test_live_state_reloads_refusals_and_a_cached_robots_refusal_blocks(tmp_path):
@@ -653,6 +711,11 @@ def test_live_state_reloads_refusals_and_a_cached_robots_refusal_blocks(tmp_path
     run.get("https://b.example/x", "page")
     run2, _ = live(tmp_path, {}, cap=50)
     assert len(run2.refusals) == 2 and {"a.example", "b.example"} <= run2.blocked_hosts
+    f = tmp_path / "f"
+    runf, _ = live(f, {"c.example": (None, b""), "d.example": (None, b"")}, cap=50)
+    runf.get("https://c.example/x", "page")
+    runf.get("https://d.example/x", "page")
+    assert live(f, {}, cap=50)[0].failures == 2                     # the failure streak reloads
     run3, _ = live(tmp_path / "r", {"https://c.example/robots.txt": (403, b"")}, cap=50)
     assert run3.robots("c.example") is False
     run4, f4 = live(tmp_path / "r", {}, cap=50)
@@ -726,6 +789,7 @@ def test_fetch_archive_checks_each_row_again(tmp_path, monkeypatch):
     args = argparse.Namespace(batch="r1", cap=0)
     assert adverts.fetch_archive(args) == 1                          # no held lists: refused
     (folder / "held-hosts.txt").write_text("\n", encoding="utf-8")
+    assert adverts.fetch_archive(args) == 1                          # the held organisations missing: refused
     (folder / "held-orgs.txt").write_text("un:1\n", encoding="utf-8")
     s = FakeSession([FakeResponse(206, b"x")] * 3)
     real = adverts.ArchiveReader
@@ -758,6 +822,63 @@ def test_measure_drops_un_pages_and_keeps_held_out_adverts_beside_the_cap(tmp_pa
     rows = list(csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8")))
     assert all(r["org_id"] != "site:jobs.ilo.org" for r in rows)       # held for the UN terms decision
     assert len(rows) == 32 and sum(r["held_out"] == "true" for r in rows) == 2   # 30 evidence + 2 held
+
+
+def test_measure_keeps_a_held_out_advert_over_its_copy(tmp_path, monkeypatch):
+    work, docs = tmp_path / "work", tmp_path / "docs"
+    (work / "adverts").mkdir(parents=True)
+    held, copy = page_ad(7), dict(page_ad(7), id="0000000000000001", source="step-f-feed", org_hint="seed:1")
+    for ad in (held, copy):
+        adverts._save_advert(work / "adverts", ad)
+    (work / "ai-test-set.json").write_text(json.dumps({"pilot": [], "test": [held["id"]]}), encoding="utf-8")
+    monkeypatch.setattr(adverts, "WORK", work)
+    monkeypatch.setattr(adverts, "ROLES_DIR", docs)
+    adverts.measure()
+    rows = list(csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8")))
+    assert [(r["advert_id"], r["held_out"]) for r in rows] == [(held["id"], "true")]
+
+
+def test_menu_lines_are_still_site_furniture():
+    menu = ["Apply now", "Remote jobs", "Part-time jobs", "Closing soon", "Upload your CV", "Personal data policy"]
+    ads = [{"org_id": "o", "method": "html", "lines": [{"text": t, "heading": False, "tag": "a"} for t in menu] +
+            [{"text": f"Duty number {i} of this advert", "heading": False, "tag": "p"}]} for i in range(3)]
+    assert set(menu) <= adverts.chrome_lines(ads)["o"]
+    assert adverts.carries_meaning("Closing date: 30 November 2026")
+    assert adverts.carries_meaning("We are an equal opportunity employer.")
+
+
+def test_contract_length_before_an_experience_line_is_kept():
+    assert "contract_length" in adverts.facts_of("Contract duration: 12 months. Experience: 5 years")
+    assert "contract_length" in adverts.facts_of("Contract duration: 12 months\nExperience: 5 years")
+    assert "contract_length" not in adverts.facts_of("The position requires 5 years of professional experience.")
+
+
+def test_restrictions_from_the_second_re_review():
+    for text in ("A scholarship programme for women only.", "You must be able to work at height.",
+                 "Reports must be presentable.", "Duties include national recruitment of staff.",
+                 "We welcome all regardless of nationality. Our training for women only runs monthly."):
+        assert not restricted(text), text
+    assert restricted("Support women farmers.\nAge: 25 - 35 years") == {"age"}
+    assert restricted("We hire regardless of nationality. Only Kenyan nationals may apply.") == {"nationality"}
+    assert restricted("Applicants (youth) must be aged 18-35 years.") == {"age"}
+    assert restricted("This position is for women only.") == {"sex"}
+
+
+def test_pay_cases_from_the_second_re_review():
+    assert "pay" in adverts.facts_of("Salary: 2000 per month")
+    assert "pay" not in adverts.facts_of("Allowances 4.2 and 4.3 of the staff rules apply.")
+    assert "pay_vague" not in adverts.facts_of("Partners pay close attention to competitive bids.")
+    assert "pay_vague" in adverts.facts_of("Pay: competitive.")
+
+
+def test_years_ago_is_not_years_asked():
+    assert adverts.years_asked("Founded 30 years ago, our experience in grants is wide.") == ("", "")
+
+
+def test_the_at_employer_cut_is_for_board_titles_only():
+    assert adverts.comparable_title("Finance Officer at Acme", "board") == "finance officer"
+    assert adverts.comparable_title("Officer at Headquarters", "archive") != adverts.comparable_title(
+        "Officer at Headquarters", "board")
 
 
 def test_live_stop_rules_persist(tmp_path):

@@ -91,7 +91,7 @@ RESEARCH = re.compile(r"\b(?:institut[eo]?|institution|research|university|unive
 
 
 # Charities that support the UN are not UN agencies: UN associations, national committees, "friends of".
-NOT_UN = re.compile(r"United Nations Association|\bUNA-|\bUNICEF (?:UK|USA|Canada|Australia|Ireland|Nederland|"
+NOT_UN = re.compile(r"United Nations Association|\bUNA-|\b(?:UNICEF|UN Women|UNHCR|UNFPA) (?:UK|USA|Canada|Australia|Ireland|Nederland|"
                     r"Deutschland|France|Japan|Sverige|Norge|Danmark|Suomi|Schweiz|Belgique|Espa[ñn]a|Italia)\b|"
                     r"national committee|friends of|\b(?:USA|UK) for UN|for UNICEF|for UNHCR|"
                     r"(?:UN|United Nations) Foundation|Foundation for (?:the )?(?:UN|United Nations)", re.IGNORECASE)

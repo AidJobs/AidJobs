@@ -282,15 +282,12 @@ class Stopped(SystemExit):
 
 
 def requests_sent(folder: Path) -> int:
-    """Requests a batch has made across all its runs: one line each in its logs (the pages asked for,
-    and the redirect hops and robots.txt reads the fetch policy made on the way)."""
-    n = 0
-    for name in ("requests.log", "policy-requests.log"):
-        p = folder / name
-        if p.exists():
-            with p.open(encoding="utf-8") as handle:
-                n += sum(1 for line in handle if line.strip())
-    return n
+    """Requests an archive batch has made across all its runs: one line each in its requests.log."""
+    p = folder / "requests.log"
+    if not p.exists():
+        return 0
+    with p.open(encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
 
 
 def check_not_stopped(folder: Path) -> None:
@@ -487,11 +484,51 @@ UN_PAGES = {   # P1-2 (19.6, R5): the UN careers feed and 12 agencies' careers p
 LIVE_REDIRECTS = 2   # redirects the fetch policy may follow for one live request
 
 
-class LiveRun:
-    """One live batch: confirm.Fetcher (the fetch policy, the survey's identity), step F's stop rules,
-    the batch's size, every body kept outside the repository."""
+class SurveyRefusal(Exception):
+    """Raised by the counting resolver: the batch's size is reached, or a host is off the site."""
 
-    def __init__(self, batch: str, cap: int, fetcher=None, folder: Path | None = None):
+
+def live_requests_sent(folder: Path) -> int:
+    """Requests a live batch has made across all its runs: one line each in its resolver log."""
+    p = folder / "resolver.log"
+    if not p.exists():
+        return 0
+    with p.open(encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+class CountingResolver:
+    """The fetch policy asks its resolver for a host's address once for every request it makes (each
+    redirect hop and its own robots.txt reads included), before connecting. This resolver logs each
+    request there, refuses it once the batch's size is reached, and refuses a host off the current
+    request's site, which is then never contacted; otherwise it returns the policy's own lookup."""
+
+    def __init__(self, folder: Path, cap: int, lookup=None):
+        if lookup is None:
+            from contracts.outbound import (
+                _default_resolver as lookup,  # the policy's own DNS lookup
+            )
+        self.folder, self.cap, self.lookup = folder, cap, lookup
+        self.site, self.refused = "", ""
+
+    async def __call__(self, host: str, port: int) -> list[str]:
+        if self.site and site_host(host) != self.site:
+            self.refused = f"off the site ({host})"
+            raise SurveyRefusal(self.refused)
+        if live_requests_sent(self.folder) >= self.cap:
+            self.refused = "size"
+            raise SurveyRefusal(f"the batch's size of {self.cap} requests reached")
+        with (self.folder / "resolver.log").open("a", encoding="utf-8") as handle:
+            handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\t{host}:{port}\n")
+        return await self.lookup(host, port)
+
+
+class LiveRun:
+    """One live batch: confirm.Fetcher (the fetch policy, the survey's identity, at most LIVE_REDIRECTS
+    redirects), a counting resolver that makes the batch's size exact and keeps each request on its
+    site, step F's stop rules, every body kept outside the repository."""
+
+    def __init__(self, batch: str, cap: int, fetcher=None, folder: Path | None = None, lookup=None):
         import functools
 
         import confirm
@@ -500,34 +537,23 @@ class LiveRun:
         self.dir = folder or READING / batch
         (self.dir / "bodies").mkdir(parents=True, exist_ok=True)
         check_not_stopped(self.dir)
+        self.resolver = CountingResolver(self.dir, cap, lookup)
         if fetcher is None:
             fetcher = confirm.Fetcher(self.dir / "requests.log")
-            fetcher.fetch_url = functools.partial(fetcher.fetch_url, max_redirects=LIVE_REDIRECTS)
+            fetcher.fetch_url = functools.partial(fetcher.fetch_url, max_redirects=LIVE_REDIRECTS,
+                                                  resolver=self.resolver)
         self.fetcher = fetcher
         state = self.dir / "state.json"
         saved = json.loads(state.read_text(encoding="utf-8")) if state.exists() else {}
         self.refusals = [tuple(x) for x in saved.get("refusals", [])]
         self.failures, self.stopped = saved.get("failures", 0), ""
         self.blocked_hosts = set(saved.get("blocked_hosts", []))
-        self.robots_known = set()   # hosts whose robots.txt the policy holds in this process
         self.records = []
 
     def _save_state(self) -> None:
         (self.dir / "state.json").write_text(json.dumps({
             "refusals": self.refusals, "failures": self.failures,
             "blocked_hosts": sorted(self.blocked_hosts)}), encoding="utf-8")
-
-    def _note_policy(self, what: str, n: int = 1) -> None:
-        with (self.dir / "policy-requests.log").open("a", encoding="utf-8") as handle:
-            for _ in range(n):
-                handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\t{what}\n")
-
-    def _note_policy_robots(self, host: str) -> None:
-        """The fetch policy reads a host's robots.txt itself before the first request to it in a
-        process; that read counts toward the batch's size."""
-        if host and host not in self.robots_known:
-            self.robots_known.add(host)
-            self._note_policy(f"robots.txt by the policy\t{host}")
 
     def _refused(self, status, protection: str) -> bool:
         return status in (401, 403, 429) or bool(protection)
@@ -541,42 +567,32 @@ class LiveRun:
         if meta_path.exists():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             if self._refused(meta.get("status"), meta.get("protection", "")) or \
-                    (meta.get("error") or "").startswith("robots.txt"):
+                    (meta.get("error") or "").startswith(("robots.txt", "redirected off")):
                 self.blocked_hosts.add(host)
             body = self.dir / "bodies" / f"{pid}.bin"
             meta["body"] = body.read_bytes() if body.exists() else b""
             return meta
-        is_robots = urlsplit(url).path == "/robots.txt"
-        # The worst case is reserved before the request: the page, its host's robots.txt, and for
-        # each redirect the policy may follow (at most LIVE_REDIRECTS) the hop and a new host's robots.txt.
-        needed = 1 + (0 if is_robots or host in self.robots_known else 1) + 2 * LIVE_REDIRECTS
-        if requests_sent(self.dir) + needed > self.cap:
+        if live_requests_sent(self.dir) >= self.cap:
             self.stopped = f"the batch's size of {self.cap} requests reached"
             return None
-        if is_robots:
-            self.robots_known.add(host)
-        else:
-            self._note_policy_robots(host)
+        self.resolver.site, self.resolver.refused = site_host(host), ""
         r = self.fetcher.get(url, what)
         error = r["error"] or ""
-        hops = LIVE_REDIRECTS if error == "redirect limit" else int(r.get("redirects") or 0)
-        if hops:
-            # Each hop and, since the hosts in between are not reported, a robots.txt read per hop.
-            self._note_policy(f"redirect hop or its host's robots.txt\t{host}", 2 * hops)
+        if self.resolver.refused == "size":
+            self.stopped = f"the batch's size of {self.cap} requests reached"
+            return None
         final_host = (urlsplit(r["final_url"]).hostname or "").lower() if r["final_url"] else host
-        off_host = bool(r["final_url"]) and site_host(final_host) != site_host(host)
-        if off_host:
-            self.robots_known.add(final_host)
         text = (r["body"] or b"").decode("utf-8", "replace")
         prot = self.confirm.bot_protection(r["status"], r["headers"], text) if r["status"] else ""
         refusal = None
-        if off_host:
-            # A page that leaves its host is outside the batch's list of hosts: not kept, host blocked.
+        if self.resolver.refused:
+            # A redirect off the site was refused before it was followed: not kept, host blocked.
             self.blocked_hosts.add(host)
-            error, r = f"redirected off the host ({final_host})", {**r, "status": None, "body": b""}
+            error, r = f"redirected off the site, not followed ({self.resolver.refused})", \
+                {**r, "status": None, "body": b""}
         elif self._refused(r["status"], prot) or error == "robots.txt refused the crawler":
-            refusal = (host, self.confirm.service_of(prot, r["headers"].get("server", "")))
-            self.blocked_hosts.add(host)
+            refusal = (final_host, self.confirm.service_of(prot, r["headers"].get("server", "")))
+            self.blocked_hosts |= {host, final_host}
         elif error.startswith("robots.txt"):
             self.blocked_hosts.add(host)     # forbidden, unreachable or too long a delay: not read
         network_failure = r["status"] is None and not error.startswith(("robots.txt", "redirected off"))
@@ -682,7 +698,8 @@ def fetch_live(args) -> int:
             if run.stopped:
                 break
     statuses = Counter(str(m["status"] or m["error"]) for m in run.records)
-    print(f"{batch}: {len(run.records)} requests this run, {requests_sent(run.dir)} in the batch (size {cap}); "
+    print(f"{batch}: {len(run.records)} pages asked for this run, {live_requests_sent(run.dir)} requests in the "
+          f"batch (size {cap}); "
           f"statuses {dict(statuses)}; blocked hosts {sorted(run.blocked_hosts)}"
           + (f"; stopped: {run.stopped}" if run.stopped else ""))
     return 0
@@ -1201,13 +1218,15 @@ FACTS: dict[str, re.Pattern] = {
                       r"ugx|tzs|etb|ghs|zar|sek|nok|dkk)\s?\d[\d,.\s]{2,}|\b\d[\d,.]{2,}\s?(?:usd|eur|€|£|gbp|kes|ksh|"
                       r"ngn|inr|chf|xof|fcfa|bdt|ugx|tzs|etb|ghs|zar|sek|nok|dkk|lakhs?)\b|\b(?:salary|"
                       r"remuneration|stipend|honorarium|gross pay|net pay|r[ée]mun[ée]ration|salaire|allowances?|"
-                      r"per diem)\b[^.\n]{0,25}?\b(?!(?:19|20)\d{2}\b)\d[\d,.]{2,}|\b(?:salary|pay) (?:scale|band|grade)"
+                      r"per diem)\b[^.\n]{0,25}?\b(?!(?:19|20)\d{2}\b(?!\s*(?:per|a (?:month|year)|/|usd|eur|gbp|"
+                      r"kes|ngn|inr|\$|€|£)))(?:\d{1,3}(?:[,.\s]\d{3})+|\d{3,})\b|\b(?:salary|pay) (?:scale|band|grade)"
                       r"\s*:?\s*[A-Z]{0,3}-?\d|\bon the [\w\s]{2,40}? salary scale\b|\bgrade\s?[A-Z]{0,2}-?\d+ of the\b|"
                       r"\b(?:annual|monthly) net (?:base )?salary\b|\bnet base salary\b|\bpay band\b|"
                       r"\b\d+(?:\.\d+)?\s*(?:lakhs?|crores?|lpa)\b", re.IGNORECASE),
     "pay_vague": re.compile(r"\b(?:competitive|attractive|negotiable|commensurate)\b[^.\n]{0,30}\b(?:salary|pay|"
-                            r"remuneration|package|compensation)\b|\b(?:salary|pay|remuneration)\b[^.\n]{0,25}?\b"
-                            r"(?:commensurate|negotiable|competitive|depending on experience|tbc|tbd)\b|"
+                            r"remuneration|package|compensation)\b|\b(?:salary|remuneration)\b[^.\n]{0,25}?\b"
+                            r"(?:commensurate|negotiable|competitive|depending on experience|tbc|tbd)\b|\bpay\s*(?::|is|"
+                            r"will be)\s*(?:competitive|negotiable|commensurate)\b|"
                             r"\bsalaire (?:attractif|comp[ée]titif|selon)\b", re.IGNORECASE),
     "grade": re.compile(r"\b(?:grade|band|level|cat[ée]gorie|groupe)\s*:?\s*[A-Z]{0,3}-?\d|\b(?:P|D|G|GS|NO)-\s?[1-7A-E]\b|"
                         r"\bNO[A-E]\b|\b(?:SB|SC|ICS|LICA|IICA|NPSA|IPSA)-?\d", re.IGNORECASE),
@@ -1297,7 +1316,8 @@ def facts_of(text: str) -> set[str]:
     found = set()
     for kind, pattern in FACTS.items():
         for m in pattern.finditer(text):
-            if kind == "contract_length" and re.search(r"exp[ée]rience", text[m.end():m.end() + 50], re.IGNORECASE):
+            if kind == "contract_length" and re.match(r"[ \t]*(?:of[ \t]+)?(?:[\w-]+[ \t]+){0,3}?exp[ée]rience",
+                                                      text[m.end():m.end() + 60], re.IGNORECASE):
                 continue
             found.add(kind)
             break
@@ -1358,7 +1378,8 @@ APPLICANT = r"(?:candidates?|applicants?|you|the (?:successful )?(?:candidate|ap
 RESTRICTIONS: dict[str, re.Pattern] = {
     "sex": re.compile(r"\b(?:female|male|women|men)\s+(?:candidates?|applicants?)\s+only\b|\bonly\s+(?:female|male|women|"
                       r"men)\s+(?:candidates?|applicants?|may apply|need apply|should apply|are eligible)\b|"
-                      r"\bfor (?:women|men|females|males) only\b|\b" + APPLICANT +
+                      r"\b(?:position|post|vacancy|role|job|opportunity|applications?)\b[^.\n]{0,30}\bfor (?:women|men|"
+                      r"females|males) only\b|\b" + APPLICANT +
                       r"\s+(?:must|should) be (?:a )?(?:female|male|woman|man)\b|\bopen only to (?:female|male|women|"
                       r"men)\b|\bopen to (?:female|male|women|men)(?: candidates| applicants)? only\b|\bposte "
                       r"r[ée]serv[ée] aux (?:femmes|hommes)\b|\buniquement (?:aux|des) (?:candidates|femmes|hommes)\b|"
@@ -1385,14 +1406,15 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                               r"only\b|\bressortissants? [^.\n]{0,30}uniquement\b|\bnationalit[ée] [^.\n]{0,20}"
                               r"(?:exig[ée]e|obligatoire)\b|\bnon-?nationals? only\b", re.IGNORECASE),
     # UN-style national posts are a case of their own (section 20.2), recorded apart from nationality.
-    "national_post": re.compile(r"(?i:\bnational (?:position|post|officer|professional officer|staff (?:position|post)|"
-                                r"consultant|recruitment)\b|\bposte national\b)|\bNO-?[A-E]\b"),
+    "national_post": re.compile(r"(?i:\bnational (?:position|post|officer|professional officer|staff (?:position|post))\b|"
+                                r"\bposte national\b)|\bNO-?[A-E]\b"),
     "disability": re.compile(r"\bable[- ]bodied\b", re.IGNORECASE),
     "photo_appearance": re.compile(r"(?<!not )(?<!n't )(?<!never )\b(?:attach|include|send|submit|enclose) (?:a |your )?"
-                                   r"(?:recent )?(?:passport[- ]size )?(?:photo|photograph|picture)\b|\b(?:be|look) "
-                                   r"presentable\b|\bpresentable (?:appearance|candidates?|applicants?)\b|\bgood appearance\b|"
-                                   r"\b(?:minimum height|height requirement)\b|\b" + APPLICANT +
-                                   r"\b[^.\n]{0,30}\b(?:must|should) (?:be|have)\b[^.\n]{0,20}\bheight\b|"
+                                   r"(?:recent )?(?:passport[- ]size )?(?:photo|photograph|picture)\b|\b" + APPLICANT +
+                                   r"\b[^.\n]{0,20}\b(?:be|look) presentable\b|\bpresentable (?:appearance|candidates?|"
+                                   r"applicants?)\b|\bgood appearance\b|\b(?:minimum height|height requirement)\b|\b" +
+                                   APPLICANT + r"\b[^.\n]{0,30}\b(?:must|should) (?:be|have)\b[^.\n]{0,20}(?<!at )"
+                                   r"\bheight\b(?!s)|"
                                    r"\bphoto (?:d'identit[ée]|r[ée]cente)\b", re.IGNORECASE),
 }
 # A match about the people an organisation serves, not the applicant, is not a restriction.
@@ -1401,9 +1423,6 @@ SERVED = re.compile(r"\b(?:children|child|youth|young people|girls?|boys?|women|
                     re.IGNORECASE)
 NOT_NATIONALITY = re.compile(r"\ball nationals\b|\bnationals? and non-?nationals?\b|\bnon-?nationals? and nationals?\b|"
                              r"\bregardless of (?:their )?nationality\b", re.IGNORECASE)
-SERVICE_PLACE = re.compile(r"\b(?:spaces?|shelters?|centres?|centers?|sessions?|groups?|clinics?|toilets?|latrines?|"
-                           r"safe spaces?)\b", re.IGNORECASE)
-
 
 def restrictions_of(text: str) -> set[str]:
     """The explicit restrictions an advert states (employer-side plan, section 20.2), each match checked
@@ -1413,13 +1432,15 @@ def restrictions_of(text: str) -> set[str]:
     for kind, pattern in RESTRICTIONS.items():
         for m in pattern.finditer(text):
             before = text[max(0, m.start() - 40):m.start()]
-            window = before + m.group(0) + text[m.end():m.end() + 30]
-            if kind == "age" and (SERVED.search(m.group(0)) or (SERVED.search(before) and
-                                                                 not re.search(APPLICANT, m.group(0), re.IGNORECASE))):
+            own = re.sub(r"\([^)]*\)", " ", m.group(0))      # "Applicants (youth) must be aged …" is about applicants
+            heading = re.match(r"\s*age\s*:", m.group(0), re.IGNORECASE)
+            if kind == "age" and not heading and (SERVED.search(own) or (
+                    SERVED.search(before) and not re.search(APPLICANT, own, re.IGNORECASE))):
                 continue
-            if kind == "nationality" and NOT_NATIONALITY.search(window):
-                continue
-            if kind == "sex" and m.group(0).lower().startswith("for ") and SERVICE_PLACE.search(before):
+            start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
+            ends = [i for i in (text.find(c, m.end()) for c in ".!?\n") if i >= 0]
+            sentence = text[start:min(ends) if ends else len(text)]
+            if kind == "nationality" and NOT_NATIONALITY.search(sentence):
                 continue
             found.add(kind)
             break
@@ -1663,8 +1684,13 @@ CHROME_WORDS = 6
 
 
 def carries_meaning(line: str) -> bool:
-    """A short line the measures read (a known standard text, a fact, an inclusion statement or a
-    restriction) is never site furniture, however often it recurs."""
+    """A short line the measures read is never site furniture, however often it recurs: a sentence of
+    five words or more that carries a known standard text, an inclusion statement, a restriction or a
+    fact, or a "label: value" line with a fact. Menu items ("Apply now", "Remote jobs") are neither."""
+    if re.match(r"^[^:]{2,40}:\s*\S", line):
+        return any(p.search(line) for p in FACTS.values())
+    if words_of(line) < 5:
+        return False
     return bool(KNOWN_STANDARD.search(line)) or any(p.search(line) for p in FACTS.values()) or \
         any(p.search(line) for p in INCLUSION.values()) or any(p.search(line) for p in RESTRICTIONS.values())
 
@@ -1678,8 +1704,8 @@ def chrome_lines(adverts: list[dict]) -> dict[str, set[str]]:
     for ad in adverts:
         if ad["method"] == "html":
             by_org[ad["org_id"]].append({ln["text"] for ln in ad["lines"] if words_of(ln["text"]) <= CHROME_WORDS
-                                         and section_type(ln["text"]) == "unclassified" and not
-                                         carries_meaning(ln["text"])})
+                                         and not (ln["heading"] and section_type(ln["text"]) != "unclassified")
+                                         and not carries_meaning(ln["text"])})
     out = {}
     for o, pages in by_org.items():
         if len(pages) >= 3:
