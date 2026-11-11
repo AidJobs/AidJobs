@@ -90,6 +90,12 @@ RESEARCH = re.compile(r"\b(?:institut[eo]?|institution|research|university|unive
                       r"|center for|cgiar)\b", re.IGNORECASE)
 
 
+# Charities that support the UN are not UN agencies: UN associations, national committees, "friends of".
+NOT_UN = re.compile(r"United Nations Association|\bUNA-|\bUNICEF (?:UK|USA|Canada|Australia|Ireland|Nederland|"
+                    r"Deutschland|France|Japan|Sverige|Norge|Danmark|Suomi|Schweiz|Belgique|Espa[ñn]a|Italia)\b|"
+                    r"national committee|friends of|\b(?:USA|UK) for UN|for UNICEF|for UNHCR", re.IGNORECASE)
+
+
 def org_type_of(org: dict, group: str = "", pool: str = "") -> str:
     """The section 4 type of a row of organisations.csv, by fixed rules; decisions override."""
     kind, name, country = org.get("kind", ""), org.get("name", ""), org.get("country", "")
@@ -97,15 +103,15 @@ def org_type_of(org: dict, group: str = "", pool: str = "") -> str:
         return "red_cross"
     if "un-secretariat" in kind:
         return "un_secretariat"
-    if UN_NAMES.search(name):
+    if UN_NAMES.search(name) and not NOT_UN.search(name):
         return "un_agency"
     if any(k in kind for k in ("un-or-intergovernmental", "Multilateral", "intergovernmental",
                                "Government", "government agency", "Other public sector")):
         return "donor_government"
     if pool == "domestic":
         return "domestic_charity"
-    if "Foundation" in kind or re.search(r"\bfoundation\b|\bfondation\b", name, re.IGNORECASE) \
-            and "NGO" not in kind:
+    if "Foundation" in kind or (re.search(r"\bfoundation\b|\bfondation\b", name, re.IGNORECASE)
+                                and "NGO" not in kind):
         return "foundation"
     if "Private sector" in kind:
         return "contractor"
@@ -305,7 +311,8 @@ def _r(pattern: str) -> re.Pattern:
     return re.compile(pattern, re.IGNORECASE)
 
 
-NOT_SECURITY = r"(?<!food )(?<!social )(?<!income )(?<!job )(?<!water )"
+NOT_SECURITY = (r"(?<!food )(?<!social )(?<!income )(?<!job )(?<!water )(?<!human )(?<!health )(?<!nutrition )"
+                r"(?<!energy )(?<!climate )(?<!economic )(?<!tenure )(?<!land )")
 FUNCTIONS: list[tuple[str, re.Pattern]] = [
     ("leadership", _r(r"\bcountry (?:director|representative|manager)\b|\bexecutive director\b|"
                       r"\bmanaging director\b|\bhead of (?:mission|office|delegation|sub-?office|base|"
@@ -339,16 +346,17 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                       r"\bclient (?:relations|services|success)\b|\bshop (?:manager|assistant)\b|"
                       r"\bacquisition\b|\bchannel\b|\bdistributor\b|\bmerchandis|\bcommercial\b|"
                       r"\bproduct\b")),
-    ("supply_chain", _r(r"\blogisti|\breceiving\b|\border process|\baviation\b|\bair operations\b|\bprocurement\b|\bsupply\b|\bfleet\b|\bwarehouse|\bpurchas|"
+    ("supply_chain", _r(r"\blogisti|\breceiving\b|\border process|\baviation\b|\bair operations\b|\bprocurement\b|(?<!water )\bsupply\b|\bfleet\b|\bwarehouse|\bpurchas|"
                         r"\btransport\b|\blogisticien|\bachats?\b|\bapprovisionnement\b|\bmagasin|"
                         r"\bstock\b|\bstorekeeper\b|\bsourcing\b|\bimport\b|\bcustoms\b")),
     ("hr", _r(r"\bhuman resources?\b|\bpeople (?:and culture|partner|operations|officer|manager|"
               r"lead|business partner|director|services)\b|\btalent\b|\brecruit|\blearning and "
               r"development\b|\bressources humaines\b|\bstaff (?:welfare|care|development)\b|"
-              r"\bcompensation and benefits\b|\bhr\b|\bpersonnel\b|\bwellbeing\b|\bdiversity\b|"
+              r"\bcompensation and benefits\b|\bhr\b|\bpersonnel\b|\b(?:staff|employee) wellbeing\b|\bdiversity\b|"
               r"\bpeople (?:division|team|function)\b")),
     ("ict", _r(r"\binformation technology\b|\bict\b|\bsoftware\b|\bdeveloper\b|\bdata engineer|"
-               r"\bsystems? (?:administrator|analyst|engineer)\b|\bnetwork\b|\binformatique\b|"
+               r"\bsystems? (?:administrator|analyst|engineer)\b|\bnetwork (?:engineer|administrator|technician|security|infrastructure|"
+               r"specialist)\b|\binformatique\b|"
                r"\bdevops\b|\bcyber|\bdatabase\b|\bweb\b|\bdigital (?:product|platform|"
                r"transformation|solutions)\b|\bcloud\b|\btechnolog|\bit support\b|\bservice desk\b|"
                r"\bhelp ?desk\b|\bprogrammer\b|\bsalesforce\b|\berp\b|\bgis\b|\btech\b|\bai\b|"
@@ -362,7 +370,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                                    r"|\bphotograph|\bbrand\b|\bstorytell|\bvideo|\bwriter\b|"
                                    r"\bdigital (?:marketing|engagement|content|communications)\b|"
                                    r"\bexternal (?:relations|affairs)\b|\boutreach and comm|"
-                                   r"\bevents?\b|\bdesign(?:er)?\b|\bgraphic|\bcreative\b|"
+                                   r"\bevents?\b|\bdesigner\b|\b(?:graphic|visual|web|ux|ui|publication)s? "
+                                   r"design\b|\bgraphic|\bcreative\b|"
                                    r"\bgovernment (?:relations|liaison|affairs)\b|\bliaison\b")),
     ("medical_clinical", _r(r"\bdoctor\b|\bphysician\b|\bnurs(?:e|es|ing)\b|\bmidwi|\bmedical\b|"
                             r"\bclinic(?:al|ian)?\b|\bpharmac|\bsurgeon\b|\bsurgery\b|\ban(?:a)?esthe|"
@@ -381,7 +390,7 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                  r"manager|specialist)\b|\binvestigat")),
     ("teaching", _r(r"\bteacher\b|\btrainer\b|\btutor\b|\blecturer\b|\bprofessor\b|\binstructor\b|"
                     r"\benseignant|\bformat(?:eur|rice)\b|\beducator\b|\bteaching\b|\bcoach\b|"
-                    r"\bfacilitator\b|\btraining\b|\besl\b|\benglish (?:conversation|language|class)")),
+                    r"\btraining (?:officer|coordinator|manager|specialist|facilitator)\b|\besl\b|\benglish (?:conversation|language|class)")),
     ("drivers_support", _r(r"\bdriver\b|\bchauffeur\b|\bcleaner\b|\bguard\b|\bwatchm[ae]n\b|\bcook\b|"
                            r"\bmaintenance\b|\bhandy(?:man|person)\b|\bgardien\b|\bcuisini|"
                            r"\bmessenger\b|\bporter\b|\bmechanic\b|\bgardener\b|\bhousekeep|"
@@ -415,12 +424,12 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                           r"assistant\b|\bassistant(?:e)? de direction\b|\bclerk\b|\bdata entry\b|"
                           r"\bfront desk\b|\bfacilities\b|\btravel (?:officer|assistant|"
                           r"coordinator)\b|\bprotocol\b|\bexecutive coordinator\b|\boperations\b|"
-                          r"\bop[ée]rations\b|\bsupport services\b|\bgestionnaire\b|\bbuilding\b|"
+                          r"\bop[ée]rations\b|\bsupport services\b|\bgestionnaire administrati|\bbuilding\b|"
                           r"\bbusiness support\b")),
     ("programme_management", _r(r"\bprogramm?es?\b|\bprojects?\b|\bportfolio\b|\bchef de projet\b|"
                                 r"\bcharg[ée]e? de (?:programme|projet)s?\b|\bresponsable (?:de )?"
                                 r"(?:programme|projet)s?\b|\bcoordinat(?:eur|rice) (?:de )?"
-                                r"(?:programme|projet)s?\b|\bchef de programme\b|\bprojet\b|"
+                                r"(?:programme|projet)s?\b|\bchef de programme\b|\bprojets?\b|"
                                 r"\bproyecto|\bprograma\b|\binitiative\b|\bdelivery\b|"
                                 r"\bimplementation\b")),
 ]
@@ -492,7 +501,7 @@ LEVELS: list[tuple[str, re.Pattern]] = [
     ("coordinator_manager", _r(r"\bmanager\b|\bcoordinator\b|\blead\b|\bleader\b|\bsupervisor\b|"
                                r"\bresponsable\b|\bcoordinat(?:eur|rice)\b|\bchef de (?:projet|programme|"
                                r"[ée]quipe)\b|\bgestionnaire\b|\bcoordinador|\bgerente\b|"
-                               r"\bprojectleider\b|\bleiter|\bleitung\b|\bmanagement\b")),
+                               r"\bprojectleider\b|\bleiter|\bleitung\b")),
     ("officer", _r(r"\bofficer\b|\bspecialist\b|\banalyst\b|\bassociate\b|\bexpert\b|\bcharg[ée]e?s?\b|"
                    r"\br[ée]f[ée]rent|\bsp[ée]cialiste\b|\baccountant\b|\bengineer\b|\bnurse\b|"
                    r"\bdoctor\b|\bphysician\b|\bm[ée]decin\b|\blogisticien|\bnutritionist\b|\bteacher\b|"

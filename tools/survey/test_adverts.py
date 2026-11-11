@@ -3,6 +3,7 @@ written for the tests by AidJobs; none is copied from a real advert. Run: python
 import csv
 import gzip
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -122,7 +123,7 @@ def test_explicit_restrictions_are_found_and_inclusion_is_never_a_restriction():
     def found(text):
         return {k for k, p in adverts.RESTRICTIONS.items() if p.search(text)}
     assert found("Female candidates only.") == {"sex"}
-    assert found("Applicants must be aged between 25 and 35.") == {"age"}
+    assert found("Applicants must be aged between 25 and 35 years.") == {"age"}
     assert found("Open to Kenyan nationals only.") == {"nationality"}
     assert found("Please attach a recent passport-size photo.") == {"photo_appearance"}
     assert found("Women are strongly encouraged to apply.") == set()
@@ -176,15 +177,19 @@ def test_the_eight_word_copy_check():
     assert adverts.copy_matches("We manage a fleet of twelve vehicles and their drivers today.", saved)
     assert not adverts.copy_matches("Manage the vehicles and drivers at three sites.", saved)
     assert not adverts.copy_matches('"manage a fleet of twelve vehicles and their drivers" *(std)*', saved)
+    long_quote = '"' + "we manage a fleet of twelve vehicles and their drivers across three sites in the east" + \
+        '" *(std)*'
+    assert adverts.copy_matches(long_quote, saved)               # a quote of 15 words or more is not exempt
 
 
 def row(**kw):
     base = {f: "" for f in adverts.ADVERT_FIELDS}
-    base.update(advert_id="abc", org_id="seed:1", org_type="ingo", org_type_basis="rule", source="archive",
+    base.update(advert_id="0123456789abcdef", org_id="seed:1", org_type="ingo", org_type_basis="rule", source="archive",
                 batch="r2", system="own site", family_id="finance", function="finance", sector="none",
                 level="officer", staff_consultant="unknown", national_international="unknown",
                 humanitarian_development="unknown", field_hq="unknown", language="en", extraction="html",
-                words_total="500", words_role="400", sections="6", held_out="false", facts_given="pay;hours")
+                words_total="500", words_role="400", sections="6", held_out="false", facts_given="pay;hours",
+                standard_basis="recurring")
     base.update(kw)
     return base
 
@@ -210,6 +215,20 @@ def test_the_form_check_refuses_contacts_addresses_and_unknown_values(tmp_path):
     assert adverts.check_file(p, adverts.ADVERT_FIELDS)
     write_rows(p, [row(words_total="+254 712 345 678")])
     assert adverts.check_file(p, adverts.ADVERT_FIELDS)
+    write_rows(p, [row(system="Logistics Officer at Acme, apply now!")])
+    assert adverts.check_file(p, adverts.ADVERT_FIELDS)            # free text in a code column
+    write_rows(p, [row(advert_id="1234567890123456", words_total="1234567890")])
+    assert adverts.check_file(p, adverts.ADVERT_FIELDS) == []      # digits in id and count columns are fine
+    assert adverts.check(roles_dir=tmp_path) == 0
+    write_rows(p, [row(org_id="someone@example.org")])
+    assert adverts.check(roles_dir=tmp_path) == 1
+
+
+def test_title_variants_must_be_seen_at_two_organisations(tmp_path):
+    with (tmp_path / "title-variants.csv").open("w", newline="", encoding="utf-8") as h:
+        w = csv.writer(h, lineterminator="\n")
+        w.writerow(roles.VARIANT_FIELDS)
+        w.writerow(["finance officer", "finance", "none", "officer", "en", "1", "3"])
     assert adverts.check(roles_dir=tmp_path) == 1
 
 
@@ -288,10 +307,268 @@ def test_duty_lines_and_their_specificity():
 
 
 def test_the_partial_scores():
-    assert adverts.score_decision_facts(set(adverts.DECISION_FACTS), False) == 3
-    assert adverts.score_decision_facts(set(adverts.DECISION_FACTS) - {"pay"}, False) == 2
-    assert adverts.score_decision_facts({"how_to_apply"}, False) == 0
+    assert adverts.score_decision_facts(set(adverts.DECISION_FACTS)) == 3
+    assert adverts.score_decision_facts(set(adverts.DECISION_FACTS) - {"pay"}) == 2
+    assert adverts.score_decision_facts(set(adverts.DECISION_FACTS) - {"start_date"}) == 2   # 3 needs every fact
+    assert adverts.score_decision_facts({"how_to_apply"}) == 0
     assert adverts.score_readability(16) == 3 and adverts.score_readability(40) == 0
     assert adverts.score_length("ingo", 1200, 800, 0.2) == 3
+    assert adverts.score_length("ingo", 1200, 400, 0.2) == 3       # under the ceiling is not penalised
+    assert adverts.score_length("ingo", 1200, 200, 0.2) == 2
+    assert adverts.score_length("ingo", 2400, 2000, 0.2) == 0
     assert adverts.score_length("ingo", 1200, 800, 0.6) == 0
     assert adverts.score_length("foundation", 1200, 800, 0.2) is None
+
+
+def given(text):
+    return {k for k, p in adverts.FACTS.items() if p.search(text)}
+
+
+def test_pay_needs_a_figure_or_a_named_scale():
+    for text in ("Salary: USD 2,500 per month", "KES 120,000 - 150,000 gross", "The salary is 45,000 a year",
+                 "Grade P-3 on the UN salary scale", "Annual net base salary plus allowances", "INR 6 lakhs per annum"):
+        assert "pay" in given(text), text
+    for text in ("a network of 25 partners", "the annual report 2025", "internet 24 hours a day",
+                 "competitive salary and benefits", "monthly meetings with 12 partners"):
+        assert "pay" not in given(text), text
+    assert "pay_vague" in given("We offer a competitive salary and benefits.")
+
+
+def test_other_facts_do_not_fire_on_ordinary_words():
+    assert "hours" not in given("reduce stunting by 20% across the district")
+    assert "hours" in given("This is a 50% FTE position.")
+    assert "contract_length" not in given("Minimum 5 years in a similar role; founded 30 years ago.")
+    assert "contract_length" in given("A 12-month fixed-term contract.")
+    assert "contract_length" in given("Duration of the assignment: 6 months")
+    assert "duty_station" not in given("Au lieu de cela, le projet continue.")
+    assert "duty_station" in given("Lieu d'affectation : Goma")
+    assert "languages" not in given("Good language and writing skills.")
+    assert "languages" in given("Fluency in French and English is required.")
+
+
+def restricted(text):
+    return {k for k, p in adverts.RESTRICTIONS.items() if p.search(text)}
+
+
+def test_restrictions_need_the_applicant_as_their_subject():
+    for text in ("services for children under 18 years", "women aged 15-49 years in the district",
+                 "youth aged 15 to 35 years", "contracts not exceeding 12 months", "do not include a photo",
+                 "at the height of the crisis", "the only women's rights network in the region",
+                 "unmarried adolescent girls", "candidates must be physically fit for field travel",
+                 "les enfants âgés de moins de 5 ans"):
+        assert not restricted(text) - {"national_post"}, text
+    assert restricted("Applicants must be aged between 25 and 35 years.") == {"age"}
+    assert restricted("Maximum age: 35") == {"age"}
+    assert restricted("Candidates must be able-bodied.") == {"disability"}
+    assert restricted("Female applicants only.") == {"sex"}
+    assert restricted("Please attach a recent passport-size photo.") == {"photo_appearance"}
+    assert restricted("This is a national position.") == {"national_post"}
+    assert "national_post" not in adverts.FAIRNESS_CATEGORIES
+
+
+def test_the_both_sexes_mark_is_its_own_inclusion_item():
+    inc = {k for k, p in adverts.INCLUSION.items() if p.search("Chargé de projet (H/F)")}
+    assert inc == {"both_sexes_mark"}
+
+
+def test_years_ranges_additional_years_and_ages():
+    assert adverts.years_asked("5 to 7 years of experience in finance") == ("5", "")
+    assert adverts.years_asked("2-3 years of relevant experience") == ("2", "")
+    assert adverts.years_asked("Experience with children under 5 years; 4 years of experience in nutrition.") == \
+        ("4", "")
+    un = ("A minimum of five years of relevant experience. A first-level university degree in combination "
+          "with two additional years of qualifying experience may be accepted in lieu of the advanced degree.")
+    assert adverts.years_asked(un) == ("5", "7")
+    semi = ("A master's degree with seven years of relevant experience; or a bachelor's degree with nine years "
+            "of relevant experience.")
+    assert adverts.years_asked(semi) == ("7", "9")
+
+
+def test_degree_words_that_are_not_degrees():
+    assert adverts.degree_asked("A valid driving licence is required") == ""
+    assert adverts.degree_asked("Mastery of Excel; payments by Mastercard") == ""
+    assert adverts.degree_asked("La maîtrise du français est requise") == "master"   # maîtrise is the degree
+    assert adverts.degree_asked("Licence en économie ou équivalent") == "bachelor"
+    assert adverts.degree_asked("Master's degree in public health") == "master"
+
+
+def test_about_the_role_is_not_organisation_text():
+    assert adverts.section_type("About the role") == "role_purpose"
+    assert adverts.section_type("About the job") == "role_purpose"
+    assert adverts.section_type("About you") == "essential_requirements"
+    assert adverts.section_type("About Acme Relief") == "about_organisation"
+    assert adverts.section_type("About us") == "about_organisation"
+    assert adverts.section_type("Overview of the organisation") == "about_organisation"
+    assert adverts.section_type("Location") == "header_facts"
+
+
+def test_site_furniture_removal_keeps_standard_sentences():
+    eo = "Acme Relief is an equal opportunity employer and does not charge any fee at any stage."
+    ads = [{"org_id": "o", "method": "html", "lines": [{"text": "Home", "heading": False, "tag": "a"},
+                                                        {"text": eo, "heading": False, "tag": "p"},
+                                                        {"text": f"Duty {i}", "heading": False, "tag": "p"}]}
+           for i in range(4)]
+    chrome = adverts.chrome_lines(ads)["o"]
+    assert "Home" in chrome and eo not in chrome
+
+
+def test_the_ai_test_set_stays_frozen_and_is_only_topped_up():
+    ads = [{"id": f"o1-{i:02d}", "org_id": "o1", "org_name": "IMPACT Initiatives", "source": "step-f-feed"}
+           for i in range(40)]
+    ads += [{"id": f"cc-{i:03d}", "org_id": f"c{i % 5}", "org_name": "", "source": "archive"} for i in range(6)]
+    pilot, test = adverts.ai_test_set(ads)
+    more = ads + [{"id": f"cd-{i:03d}", "org_id": f"d{i}", "org_name": "", "source": "archive"} for i in range(50)]
+    pilot2, test2 = adverts.ai_test_set(more, {"pilot": pilot, "test": sorted(test)})
+    assert pilot2 == pilot and test <= test2 and len(test2) == 30
+
+
+def test_board_employer_is_read_after_the_last_at():
+    orgs = roles.Organisations()
+    names = {"savethechildren": "org:stc"}
+    ad = {"employer": "", "url": "https://www.example.org/job/finance-officer-at-save-the-children-3"}
+    assert adverts.board_org(ad, orgs, names) == ("org:stc", "matched by name")
+    ad = {"employer": "", "url": "https://www.example.org/job/finance-officer-kampala"}
+    assert adverts.board_org(ad, orgs, names)[0] == "board-employer:unknown"
+
+
+def test_a_board_copy_with_at_employer_is_still_a_copy():
+    body = [{"text": " ".join(f"word{i}" for i in range(80)), "heading": False, "tag": "p"}]
+    ads = [{"id": "a1", "source": "archive", "title": "Finance Officer", "lines": body},
+           {"id": "b1", "source": "board", "title": "Finance Officer at Acme Relief", "lines": body},
+           {"id": "f1", "source": "step-f-feed", "title": "Finance Officer", "lines": body}]
+    assert adverts.near_duplicates(ads) == {"a1": "f1", "b1": "f1"}   # step F's feed copy is kept
+
+
+class FakeResponse:
+    def __init__(self, status, body=b""):
+        self.status_code, self.body, self.closed = status, body, False
+
+    def iter_content(self, size):
+        for i in range(0, len(self.body), size):
+            yield self.body[i:i + size]
+
+    def close(self):
+        self.closed = True
+
+
+class FakeSession:
+    def __init__(self, answers):
+        self.answers, self.calls = list(answers), 0
+
+    def get(self, *a, **k):
+        self.calls += 1
+        return self.answers.pop(0)
+
+
+def reader(tmp_path, answers, cap=3):
+    return adverts.ArchiveReader(tmp_path, cap, session=FakeSession(answers), sleep=lambda s: None)
+
+
+def test_the_archive_batch_size_holds_across_runs(tmp_path):
+    r = reader(tmp_path, [FakeResponse(206, b"x" * 10)] * 2, cap=3)
+    assert r.get("crawl-data/a", 0, 10, "p1") and r.get("crawl-data/a", 0, 10, "p2")
+    r2 = reader(tmp_path, [FakeResponse(206, b"x" * 10)] * 5, cap=3)
+    assert r2.get("crawl-data/a", 0, 10, "p3")
+    try:
+        r2.get("crawl-data/a", 0, 10, "p4")
+        raise AssertionError("the batch's size was not kept")
+    except adverts.Stopped:
+        pass
+    assert r2.session.calls == 1
+
+
+def test_the_archive_reader_never_retries_and_reads_no_further_than_the_record(tmp_path):
+    s = FakeSession([FakeResponse(404), FakeResponse(200, b"y" * 10_000_000)])
+    r = adverts.ArchiveReader(tmp_path, 10, session=s, sleep=lambda x: None)
+    assert r.get("crawl-data/a", 0, 10, "p1") is None and s.calls == 1
+    assert r.get("crawl-data/a", 0, 10, "p2") is None              # a 200 is not a byte range: not read
+    big = FakeSession([FakeResponse(206, b"z" * 1_000_000)])
+    assert adverts.ArchiveReader(tmp_path / "b", 10, session=big, sleep=lambda x: None).get(
+        "crawl-data/a", 0, 10, "p3") is None
+
+
+def test_a_403_stops_the_archive_batch_for_good(tmp_path):
+    r = reader(tmp_path, [FakeResponse(403)], cap=10)
+    try:
+        r.get("crawl-data/a", 0, 10, "p1")
+        raise AssertionError("a 403 did not stop the batch")
+    except adverts.Stopped:
+        pass
+    try:
+        reader(tmp_path, [FakeResponse(206, b"x")], cap=10)
+        raise AssertionError("a stopped batch was resumed")
+    except adverts.Stopped:
+        pass
+
+
+def test_a_planned_row_is_checked_again_before_it_is_read():
+    v = FakeVerdicts({"https://a.example/jobs/x-y-z"})
+    ok = {"url": "https://a.example/jobs/x-y-z", "filename": "crawl-data/x", "languages": "eng"}
+    assert adverts.row_still_allowed(ok, v, set()) == ""
+    assert adverts.row_still_allowed(dict(ok, url="https://a.example/jobs/other-x-y"), v, set()) == "not allowed by R0"
+    assert adverts.row_still_allowed(dict(ok, url="https://acme.wd1.myworkdayjobs.com/x"), v, set()) == "shell host"
+    assert adverts.row_still_allowed(dict(ok, languages="deu"), v, set()) == "language outside wave 1"
+    assert adverts.row_still_allowed(dict(ok, url="https://jobs.ilo.org/x"), v, set()).startswith("held")
+    assert adverts.row_still_allowed(ok, v, {"a.example"}).startswith("held")
+
+
+class FakeFetcher:
+    """Answers by host; writes one log line per request, as confirm.Fetcher does."""
+
+    def __init__(self, folder, answers):
+        self.folder, self.answers, self.urls = folder, answers, []
+
+    def get(self, url, what):
+        self.urls.append(url)
+        with (self.folder / "requests.log").open("a", encoding="utf-8") as h:
+            h.write(f"x\t{what}\n")
+        host = url.split("/")[2]
+        status, body = self.answers.get(url, self.answers.get(host, (200, b"<html></html>")))
+        return {"status": status, "final_url": url, "headers": {}, "body": body, "error": "", "bytes": len(body)}
+
+
+def live(tmp_path, answers, cap=20):
+    f = FakeFetcher(tmp_path, answers)
+    return adverts.LiveRun("r3", cap, fetcher=f, folder=tmp_path), f
+
+
+def test_a_resumed_live_run_does_not_ask_a_host_that_refused(tmp_path):
+    run, _ = live(tmp_path, {"bad.example": (403, b"no")})
+    run.get("https://bad.example/a", "page")
+    run2, f2 = live(tmp_path, {})
+    run2.get("https://bad.example/a", "page")          # cached: blocks the host again
+    assert run2.get("https://bad.example/b", "page") is None and f2.urls == []
+
+
+def test_the_live_batch_size_counts_the_policys_robots_reads_across_runs(tmp_path):
+    run, _ = live(tmp_path, {}, cap=4)
+    run.get("https://a.example/1", "page")             # the page and the policy's robots.txt read: 2
+    run2, _ = live(tmp_path, {}, cap=4)
+    run2.get("https://a.example/2", "page")            # a new process: the policy reads robots.txt again
+    assert adverts.requests_sent(tmp_path) == 4
+    assert run2.get("https://a.example/3", "page") is None and run2.stopped
+
+
+def test_live_stop_rules_persist(tmp_path):
+    run, _ = live(tmp_path, {"a.example": (403, b""), "b.example": (403, b""), "c.example": (403, b""),
+                             "d.example": (403, b""), "e.example": (403, b"")}, cap=50)
+    for h in "abcde":
+        run.get(f"https://{h}.example/x", "page")
+    assert run.stopped and (tmp_path / "stopped.txt").exists()
+    try:
+        live(tmp_path, {})
+        raise AssertionError("a stopped live batch was resumed")
+    except adverts.Stopped:
+        pass
+
+
+def test_board_pages_follow_only_the_boards_own_next_page(tmp_path):
+    listing = (b'<a href="https://board.example/job/a-b-c/">x</a>'
+               b'<a href="https://evil.example/page/2/">next</a><a href="https://board.example/page/2/">next</a>')
+    run, f = live(tmp_path, {"https://board.example/": (200, listing),
+                             "https://board.example/page/2/": (200, b"")}, cap=50)
+    cfg = {"listings": ["https://board.example/"], "next": r"/page/(\d+)/?$",
+           "link": r"^https://board\.example/job/[^/?#]+/?$", "adverts": 5, "listing_pages": 3}
+    adverts.board_pages(run, "b", cfg, random.Random(1))
+    assert all("evil.example" not in u for u in f.urls)
+    assert "https://board.example/page/2/" in f.urls

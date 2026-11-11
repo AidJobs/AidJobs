@@ -56,6 +56,28 @@ def test_functions_follow_the_rule_order():
     assert role("Responsable de recherche")[0] == "policy_research"
 
 
+def test_precedence_errors_found_by_the_review_stay_fixed():
+    assert role("Information Management Officer")[2] == "officer"
+    assert role("Grants Management Officer")[2] == "officer"
+    assert role("Water Supply Engineer")[0] == "engineering"
+    for t in ("Food and Nutrition Security Officer", "Human Security Adviser", "Global Health Security Specialist"):
+        assert role(t)[0] != "safety_security", t
+    assert role("Regional Network Coordinator")[0] != "ict"
+    assert role("Programme Design Specialist")[0] != "communications_advocacy"
+    assert role("Community Facilitator")[0] == "community_field"
+    assert role("Gestionnaire de projets")[0] == "programme_management"
+    assert role("Child Wellbeing Officer")[0] != "hr"
+    assert role("Graphic Designer")[0] == "communications_advocacy"
+    assert role("Network Engineer")[0] == "ict"
+
+
+def test_un_supporters_are_not_un_agencies():
+    t = roles.org_type_of
+    assert t({"name": "United Nations Association of the UK", "kind": "", "country": "GB"}) != "un_agency"
+    assert t({"name": "UNICEF UK", "kind": "", "country": "GB"}) != "un_agency"
+    assert t({"name": "UNICEF", "kind": "un-or-intergovernmental", "country": ""}) == "un_agency"
+
+
 def test_sectors_take_the_earliest_and_tell_safeguards_from_safeguarding():
     assert role("Health and Nutrition Manager")[1] == "health"
     assert role("Nutrition and Health Manager")[1] == "nutrition"
