@@ -387,3 +387,26 @@ At most 626 requests, step E's requester (`AidJobsSurvey/0.1`, 10 seconds apart,
 4. **The Global South:** priority markets Kenya, Uganda, Nigeria, India and Bangladesh, and French-speaking West and Central Africa; the number of national job boards whose terms are read, and whether NGOs that fail the archive screen are read live on their own sites, left to the agent ("high value and high impact"). The agent's choices: all 472 sites screened; NGOs in the priority markets that fail the screen read live by step F's method (`robots.txt`, then the careers page, at most 2 requests each, never bypassing a block); the terms and `robots.txt` of about 12 national job boards (one or two per priority market, found by web search), each used only if its terms allow.
 5. **ReliefWeb:** its terms read (one request); its archived pages used only if they allow it.
 6. **Batches, each run as approved:** M3, the 121 remaining lookups (about 135 index reads); M4, the domestic and donor screen, then their full lookup; M5, the Global South screen, then its full lookup and the live reads. Requests to `data.commoncrawl.org` run one at a time, so the batches run in turn.
+
+**M3, run on 11 November 2026 (10:47 to 11:10 IST):** 135 index reads, all answered; every one of the 181 sites now covered in all 9 crawls. Totals with M1 and M2: 2,943 distinct job pages at 100 organisations (own sites 1,528), about 2,450 with advert text (Estimate); 1,761 requests to `data.commoncrawl.org`, all answered.
+
+**ReliefWeb's terms, read on 11 November 2026** (`reliefweb.int/terms-conditions`, one request): its materials may be downloaded and copied "for the User's personal, non-commercial use, without any right to resell or redistribute them or to compile or create derivative works therefrom". A role library for a commercial service is a compilation and a derivative work, so under the user's rule ReliefWeb's pages, live or archived, are **left out**. Its API (W-41, discovery) has its own terms and is not affected.
+
+**National job boards' terms, read on 11 November 2026** (12 boards found by web search for the priority markets; read through search results and the boards' terms pages, about 12 requests; Fact as read that day):
+
+| Board | Market | Terms on automated reading or reuse | Usable |
+| --- | --- | --- | --- |
+| BrighterMonday (and its Uganda and Tanzania sites) | Kenya, Uganda, Tanzania | forbids "data mining, robots, screen scraping" without prior written approval | no, unless permission |
+| Jobberman (same group) | Nigeria, Ghana | forbids copying, reproducing, republishing | no |
+| MyNGOJobs | Nigeria | forbids copying, scraping or harvesting vacancy information | no |
+| DevNetJobsIndia | India | forbids reproducing, storing or circulating without permission; permission possible, by request | no, unless permission |
+| Dohaj | Bangladesh | personal use only; no copying or redistribution | no |
+| bdjobs | Bangladesh | silent; job pages built by script (its data behind an undocumented API) | no |
+| DevelopmentWala | India | no terms found | no |
+| Pages Humanitaires | Mali and the Sahel | no terms found | no |
+| MyJobMag | Nigeria, Kenya | silent (terms of 2012); its `robots.txt` allows job pages | possible, the user's decision |
+| HumanitaireHub | French-speaking Africa | silent (CGU of April 2026) | possible, the user's decision |
+| NGO Jobs in Africa | Africa | silent; it republishes employers' adverts | possible, the user's decision |
+| NGO Jobs Africa (NGO Portal Africa) | Africa | silent; republishes adverts, some members-only | possible, the user's decision |
+
+None of the 12 clearly allows its adverts to be read for a commercial compilation; four are silent. **The Global South's main routes are therefore the NGOs' own sites, archived and live**, as decided; boards only with explicit permission (DevNetJobsIndia and BrighterMonday name a route) or, for the four silent ones, by the user's decision to treat silence as permission for analysis only (no text committed). Most of the silent boards republish employers' adverts, whose own sites are the better source anyway. (The agent's observation, for the employer side: boards in these markets close their content, so direct posting by national NGOs on AidJobs is where AidJobs' Global South coverage can grow.)
