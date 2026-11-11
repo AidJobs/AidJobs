@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-Runs the frontend's dev server with the employer demo's AI chat on: the two Bedrock keys of the mantle-only test user are read
-from the SecretStore vault and set for this process and the server only, then put back as they were. Prints nothing secret.
+Runs the frontend's dev server with the employer demo's AI chat on: the demo-only OpenRouter key (US$5 limit) is read from the
+SecretStore vault and set for this process and the server only, then put back as it was. Prints nothing secret.
 
 .DESCRIPTION
-For the demo/employer branch only (employer-side plan, section 19, "The AI chat in the demo"). The server listens on this computer
-only (127.0.0.1), not on the network, because with the keys set its AI route can call Bedrock. Open
-http://127.0.0.1:5000/employer-demo and stop the server with Ctrl+C.
+For the demo/employer branch only (employer-side plan, section 19, "The AI chat in the demo", amended 11 November 2026). The
+server listens on this computer only (127.0.0.1), not on the network, because with the key set its AI route can call OpenRouter.
+Open http://127.0.0.1:5000/employer-demo and stop the server with Ctrl+C.
 
 .EXAMPLE
 & .\scripts\dev-employer-demo-ai.ps1
 #>
 $ErrorActionPreference = 'Stop'
-$names = @('AIDJOBS_BEDROCK_ACCESS_KEY_ID', 'AIDJOBS_BEDROCK_SECRET_ACCESS_KEY')
+$names = @('AIDJOBS_OPENROUTER_API_KEY')
 
 if (-not (Get-Command Get-Secret -ErrorAction SilentlyContinue)) {
     Write-Host "Get-Secret is not available: install Microsoft.PowerShell.SecretManagement and Microsoft.PowerShell.SecretStore (README, 'Secrets on this machine')."

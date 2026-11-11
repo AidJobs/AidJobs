@@ -64,7 +64,8 @@ describe('the AI chat: written text is checked', () => {
       expect(out).toEqual({ lines: ['- Lead the team', '- Plan the budget', '- Report every month'] });
     }
     expect(checkLines('text', 'responsibilities', s, job('job-comms'))).toEqual({ refused: expect.stringContaining('no text') });
-    expect(checkLines(Array(41).fill('- A line'), 'responsibilities', s, job('job-comms'))).toEqual({ refused: expect.stringContaining('not usable text') });
+    expect(checkLines(Array(61).fill('- A line'), 'responsibilities', s, job('job-comms'))).toEqual({ refused: expect.stringContaining('not usable text') });
+    expect(checkLines(['x'.repeat(2001)], 'responsibilities', s, job('job-comms'))).toEqual({ refused: expect.stringContaining('not usable text') });
   });
 
   it('refuses pay and contacts that were not given, and accepts the ones that were', () => {

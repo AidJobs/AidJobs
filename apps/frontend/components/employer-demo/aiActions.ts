@@ -226,7 +226,7 @@ export function checkLines(raw: unknown, key: string, s: State, job: DemoJob): {
     .filter((l): l is string => typeof l === 'string')
     .map((l) => l.replace(/^\s*(?:[•*–]|-)\s+/, '- ').replace(/^#+\s*/, '').replace(/[\u2010-\u2013\u2011]/g, '-').replace(/\u00a0/g, ' ').trimEnd())
     .filter((l) => l.trim() && !headings.includes(l.trim().replace(/[:*]+$/, '').replace(/^\*+/, '').toLowerCase()));
-  if (!lines.length || lines.length > 40 || lines.some((l) => l.length > 700)) return { refused: `${label}: not usable text` };
+  if (!lines.length || lines.length > 60 || lines.some((l) => l.length > 2000)) return { refused: `${label}: not usable text` };
   const text = lines.join('\n');
   const facts = plainNumbers(known(s, job));
   const pay = (text.match(PAY) ?? []).filter((m) => !facts.includes(plainNumbers(m).match(/\d+/)?.[0] ?? '\u0000'));

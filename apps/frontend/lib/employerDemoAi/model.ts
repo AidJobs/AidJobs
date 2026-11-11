@@ -1,3 +1,4 @@
+import { guideFor } from './guides';
 import { signRequest, type Credentials } from './sigv4';
 
 /**
@@ -37,44 +38,79 @@ Actions. The window checks each one and carries it out with its own rules, so da
 
 Where the job is (context.stage):
 - "template": no template yet. In plain words, recommend context.recommendation (why, how many sections, about how long) and say you can show others or build their own. Apply a template only once the user agrees or names one. To show others, open "templates"; to build their own, open "own". If the job type (job, consultancy, internship, volunteer, and the contract) is unclear from what they wrote, ask about it naturally. Do not ask for other facts yet and do not write sections.
-- "style": the template is chosen and nothing is written yet. Settle how it should sound, proposing context.job.proposedStyle in plain words. As soon as the user answers (agreement, or their own words), return set_style and, in the same answer, write_section for every section in context.job.sections that is not fixed, in order: this is the first draft. If context.org.styleKept is false, end the reply by asking whether to keep this style for every job, with the quick answers "Keep it for all jobs" and "Just this job".
+- "style": the template is chosen and nothing is written yet. Settle how it should sound, proposing context.job.proposedStyle in plain words. As soon as the user answers (agreement, or their own words), return set_style and, in the same answer, write_section for every section in context.job.sections that is not fixed, in order: this is the first draft, complete and to the template's length. In the reply, say in one sentence which parts are typical content for this kind of role that they should check or replace with their own, and name the placeholders still to fill. If context.org.styleKept is false, end the reply by asking whether to keep this style for every job, with the quick answers "Keep it for all jobs" and "Just this job".
 - "writing": the draft exists. Do what the user asks. A request that names no section is about context.job.inView. When a fact changes, also rewrite the sections whose text mentions it. When context.job.missingFacts is not empty and nothing else is pending, ask for the first missing fact, with the ask action and its fact.
 
 Writing the job description (every write_section):
-- Write for the template (its family and who uses it) and in the chosen style: realistic and specific, as the best organisations of that kind write. Concrete duties with a verb, an object, and where; three to five real must-haves, then nice-to-haves; sentences of about 13 to 18 words; acronyms spelt out on first use; no jargon, hype, or catch-all lines such as "any other duties".
-- Use only facts in the context or the conversation. Never invent pay, dates, grades, contacts, links, numbers, benefits, working hours, donors, partners, or requirements. Duties and qualifications may describe what the role normally involves in the sector, plainly, without invented numbers, targets, or names.
+- Follow the template's writing guide below: its structure, voice, section rules, and length. Write as the best organisations of that kind write, to the depth candidates expect from them: a UN or INGO job description is full and detailed, a local NGO advert short. Acronyms spelt out on first use; no hype.
+- Standard content is expected, invented facts are not. You may write what a role with this title, at this level, in this sector, normally does and needs; the competency or behaviour framework of the template's family; and the general, well-known context of the place and the sector. You must never invent facts: pay, allowances, benefits, leave, rest and recuperation, accommodation, security ratings, dates, durations, grades, numbers of any kind (team size, budget, targets, people reached), years of experience (unless given, or set by the guide's grade rule), donors, partner or project names, contacts, or links.
+- Keep every fact, duty, number, date, and name the user gave, exactly, and use them where they belong: the places, partners, reporting line and figures the user gave appear in the duties, not only in the purpose. Keep the education and years of experience exactly as given; never raise them.
+- Never state anything about the post's history or funding that the user did not say: not that it is new, replaces someone, is part of a growing team, or is newly funded.
+- Where the template expects a fact that was not given, write a short bracketed placeholder ("[Duty station]" and "[Closing date]" exactly for those two; otherwise for example "[Reports to]", "[Budget responsibility]", "[to confirm]"), and name the placeholders in your reply. Conditions of service not given (security, rest and recuperation, accommodation, allowances, leave) take one line only: "Conditions of service: [to confirm]", in the job's language.
+- Voice: every duty names what, with whom or for whom, and where or how often, as far as the facts allow; active verbs; varied openings; no filler. Words that add nothing: "relevant stakeholders", "as appropriate", "in line with applicable procedures", "various", "ensure effective", "robust", "dynamic", "passionate", "etc.". For example, not "Coordinate with relevant stakeholders to support coherent delivery in line with applicable procedures" but "Agree a monthly work plan with the two partners in Juba and Gumbo, and follow up each repair until the water point works".
+- Write every heading label and line label in the job's language, translating the guide's labels (for example "Reports to:" becomes "Rend compte à :" in French).
 - Never write the organisation's fixed text (safeguarding, PSEA, equal opportunity, no-fee notice, data protection and the like): the window adds it word for word. Never write sections marked fixed (About us, How to apply): they come from the organisation's profile and its application settings.
-- Where the duty station or closing date is needed and missing, write exactly "[Duty station]" or "[Closing date]". Leave other missing facts out and name them briefly in your reply ("Still to confirm: the salary and the reporting line").
-- Keep every fact, number, date, and name exactly as given. Plain hyphens and ordinary spaces.
+- Plain hyphens and ordinary spaces. A line ending with ":" is a group label; a line starting "- " is a bullet.
 - Sections marked by "user" keep their wording unless the user asks you to change them.
 - Write the job description in the job's language: the language of the user's first message.`;
 
 export type ChatTurn = { reply: string; actions: Array<Record<string, unknown>> };
 
+/** The instructions with the writing guide of the job's template. */
+export function systemFor(context: Record<string, unknown>): string {
+  const job = context.job as { template?: { key?: unknown } } | undefined;
+  const org = context.org as { orgType?: unknown } | undefined;
+  const key = typeof job?.template?.key === 'string' ? job.template.key : '';
+  const guide = guideFor(key, typeof org?.orgType === 'string' ? org.orgType : '');
+  const example = guide.example ? `\n\nA worked example in this template, for another role, to show the depth and voice expected. Follow its standard, never its facts or wording:\n${guide.example}` : '';
+  return `${SYSTEM}\n\nThe template's writing guide (about ${guide.words[0]} to ${guide.words[1]} words for the sections you write):\n${guide.text}${example}`;
+}
+
+export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+
 /** The request to the model: the instructions, then the job and the conversation as data, then the message. */
-export function messagesFor(context: Record<string, unknown>, message: string, first: boolean): Array<{ role: 'system' | 'user'; content: string }> {
+export function messagesFor(context: Record<string, unknown>, message: string, first: boolean): ChatMessage[] {
   const lead = first ? "This is the user's first message, typed on the Create a job page; the window has just opened on it." : 'The user says:';
   return [
-    { role: 'system', content: SYSTEM },
+    { role: 'system', content: systemFor(context) },
     { role: 'user', content: `Context (JSON):\n${JSON.stringify(context)}\n\n${lead}\n${message}` },
   ];
 }
 
-/** The model's answer as a reply and a list of actions, or null when it is not the JSON asked for. Nothing else is trusted here. */
-export function readModelReply(content: string): ChatTurn | null {
-  const text = content.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) return null;
-  let data: unknown;
-  try {
-    data = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
+/** The balanced `{…}` starting at `start`, skipping braces inside strings; null when it never closes. */
+function objectAt(text: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === '\\') i++;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
   }
-  if (!data || typeof data !== 'object') return null;
-  const { reply, actions } = data as { reply?: unknown; actions?: unknown };
-  if (typeof reply !== 'string' || !reply.trim()) return null;
+  return null;
+}
+
+/**
+ * The model's answer as a reply and a list of actions, or null when it holds no JSON object with a reply. Some models wrap the object
+ * in a code fence or a stray tag, so the first complete object with a reply is taken. Nothing else is trusted here.
+ */
+export function readModelReply(content: string): ChatTurn | null {
+  let data: unknown = null;
+  for (let i = content.indexOf('{'); i >= 0 && !data; i = content.indexOf('{', i + 1)) {
+    const candidate = objectAt(content, i);
+    if (!candidate) continue;
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object' && typeof (parsed as { reply?: unknown }).reply === 'string' && (parsed as { reply: string }).reply.trim()) data = parsed;
+    } catch {
+      /* not this one */
+    }
+  }
+  if (!data) return null;
+  const { reply, actions } = data as { reply: string; actions?: unknown };
   const list = Array.isArray(actions) ? actions : [];
   return {
     reply: reply.trim().slice(0, 2000),
@@ -96,7 +132,7 @@ async function errorCode(res: Response): Promise<string | undefined> {
 }
 
 /** One signed call to the mantle route. Returns the model's text, or the HTTP status (0 for a network error or a timeout). */
-export async function callModel(messages: ReturnType<typeof messagesFor>, credentials: Credentials, fetchImpl: typeof fetch = fetch): Promise<ModelResult> {
+export async function callModel(messages: ChatMessage[], credentials: Credentials, fetchImpl: typeof fetch = fetch): Promise<ModelResult> {
   const body = JSON.stringify({ model: MODEL, messages, max_tokens: MAX_TOKENS, temperature: 0.3 });
   const headers = signRequest({ method: 'POST', url: ENDPOINT, body, region: REGION, service: 'bedrock', credentials, headers: { 'content-type': 'application/json' } });
   try {

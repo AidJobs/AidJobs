@@ -1685,12 +1685,14 @@ describe('employer demo: source has no network path', () => {
     }
   });
 
-  it('the AI route signs its own requests: no AI or AWS package on either side, and the model is reached only at Bedrock', () => {
-    const server = [join(__dirname, '..', 'employer-demo', 'chat', 'route.ts'), ...['model.ts', 'sigv4.ts'].map((f) => join(__dirname, '..', '..', 'lib', 'employerDemoAi', f))];
+  it('the AI route makes its own requests: no AI or AWS package on either side, and models are reached only at OpenRouter or Bedrock', () => {
+    const lib = join(__dirname, '..', '..', 'lib', 'employerDemoAi');
+    const server = [join(__dirname, '..', 'employer-demo', 'chat', 'route.ts'), ...readdirSync(lib).map((f) => join(lib, f))];
+    expect(server.length).toBeGreaterThanOrEqual(7);
     for (const f of server) {
       const src = readFileSync(f, 'utf8');
       expect({ f, ai: AI_SDK.test(src), aws: /from ['"](@aws-sdk\/[\w-]+|aws-sdk|aws4|@smithy\/[\w-]+)['"]/.test(src) }).toEqual({ f, ai: false, aws: false });
-      expect({ f, urls: (src.match(/https:\/\/[^\s'"`]+/g) ?? []).filter((u) => !u.startsWith('https://bedrock-mantle.')) }).toEqual({ f, urls: [] });
+      expect({ f, urls: (src.match(/https:\/\/[^\s'"`]+/g) ?? []).filter((u) => !u.startsWith('https://bedrock-mantle.') && u !== 'https://openrouter.ai/api/v1/chat/completions') }).toEqual({ f, urls: [] });
       expect({ f, logsText: /console\.\w+\([^)]*\b(message|content|context|body|raw)\b/.test(src) }).toEqual({ f, logsText: false });
     }
     const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };

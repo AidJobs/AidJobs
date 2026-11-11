@@ -1,10 +1,17 @@
 import { applyLines, defaultApply } from './apply';
 import { monthOf, orgZone } from './plans';
 import { defaultMessages } from './invites';
-import { addDays, buildSections, emptyFacts, FORMATS, orderSections } from './engine';
+import { addDays, buildSections, emptyFacts, FORMATS, holiday, orderSections, weekend } from './engine';
 import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } from './types';
 
 const DAY = 86_400_000;
+
+/** About `days` from today, moved on to the next working day in the country, so the sample draft's checks do not depend on the weekday. */
+function workingDay(today: number, days: number, countryIso: string): string {
+  let n = days;
+  while (weekend(addDays(today, n), countryIso) || holiday(addDays(today, n), countryIso)) n += 1;
+  return addDays(today, n);
+}
 
 /** A fictional organisation; every address is on example.org, which is reserved for examples. */
 export const SAMPLE_ORG: Org = {
@@ -166,7 +173,7 @@ function sampleList(today: number): DemoJob[] {
         { at: today - 55 * DAY, who: SAMPLE_ME.name, what: 'Published free' },
       ],
     }),
-    job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 24) }, {
+    job(today, 'job-fin', 'finance', 'ingo-role-profile', { title: 'Finance Officer', location: 'Juba, South Sudan', country: 'South Sudan', iso: 'SS', timezone: 'CAT', grade: 'D1', contract: 'Fixed-term', duration: '12 months', deadline: workingDay(today, 24, 'SS') }, {
       status: 'approved',
       review: {
         state: 'approved',

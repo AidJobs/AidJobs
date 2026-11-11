@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { signRequest } from '../employerDemoAi/sigv4';
 import { callModel, ENDPOINT, messagesFor, MODEL, readModelReply, SYSTEM } from '../employerDemoAi/model';
 import { GET, POST } from '../../app/employer-demo/chat/route';
+import { OPENROUTER_ENDPOINT } from '../employerDemoAi/openrouter';
 
 const creds = { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' };
 const body = '{"model":"moonshotai.kimi-k2.5","messages":[{"role":"user","content":"Say OK."}],"max_tokens":10}';
@@ -38,18 +39,42 @@ describe("the model's answer", () => {
     expect(readModelReply('{"reply":" Hi ","actions":[{"type":"undo"},"x",{"no":1},[1]]}')).toEqual({ reply: 'Hi', actions: [{ type: 'undo' }] });
     expect(readModelReply('```json\n{"reply":"Hi"}\n```')).toEqual({ reply: 'Hi', actions: [] });
     expect(readModelReply('Sure! {"reply":"Hi","actions":[]} Hope that helps.')).toEqual({ reply: 'Hi', actions: [] });
+    expect(readModelReply('\n<invoke name="x">\n{"reply":"Hi {there}","actions":[{"type":"undo"}]}\n</invoke> and a stray } brace')).toEqual({ reply: 'Hi {there}', actions: [{ type: 'undo' }] });
+    expect(readModelReply('Thinking about {options} first... {"reply":"Done","actions":[]}')).toEqual({ reply: 'Done', actions: [] });
   });
 
   it('refuses anything else', () => {
     for (const bad of ['Hello there', '{"reply":""}', '{"actions":[]}', '{"reply":3}', '{broken', '[]']) expect(readModelReply(bad)).toBeNull();
   });
 
+  it("adds the writing guide of the job's template; an organisation's own template is written to the depth of its organisation type", () => {
+    const un = messagesFor({ job: { template: { key: 'un-agency' } }, org: { orgType: 'ingo' } }, 'x', false)[0].content;
+    expect(un.startsWith(SYSTEM)).toBe(true);
+    expect(un).toContain('UN agency format');
+    expect(un).toContain('about 900 to 1400 words');
+    const own = messagesFor({ job: { template: { key: 'house' } }, org: { orgType: 'ingo' } }, 'x', false)[0].content;
+    expect(own).toContain("The organisation's own format: keep its headings");
+    expect(own).toContain('INGO role profile');
+    const local = messagesFor({ job: { template: { key: 'custom-1' } }, org: { orgType: 'ngo' } }, 'x', false)[0].content;
+    expect(local).toContain('Local NGO concise');
+    expect(un).toContain('A worked example in this template, for another role');
+    expect(un).toContain('Education Specialist in Maiduguri');
+    expect(local).not.toContain('A worked example');
+  });
+
+  it('keeps the instructions, the guide and the example before the job, so the long start of each request can be cached', () => {
+    const a = messagesFor({ job: { template: { key: 'donor' } }, org: { orgType: 'ingo' }, stage: 'style' }, 'one', false);
+    const b = messagesFor({ job: { template: { key: 'donor' }, facts: { title: 'Other' } }, org: { orgType: 'ingo' }, stage: 'writing' }, 'two', false);
+    expect(a[0].content).toBe(b[0].content);
+  });
+
   it('asks with the instructions, then the job as data and the message', () => {
     const m = messagesFor({ stage: 'template' }, 'Hiring a nurse', true);
-    expect(m[0]).toEqual({ role: 'system', content: SYSTEM });
+    expect(m[0].content.startsWith(SYSTEM)).toBe(true);
+    expect(m[0].role).toBe('system');
     expect(m[1].content).toContain('{"stage":"template"}');
     expect(m[1].content).toMatch(/first message[\s\S]*\nHiring a nurse$/);
-    expect(SYSTEM).toContain('Never invent pay, dates, grades, contacts');
+    expect(SYSTEM).toContain('You must never invent facts: pay, allowances, benefits');
     expect(SYSTEM).toContain('Never write the organisation\'s fixed text');
   });
 });
@@ -83,7 +108,7 @@ describe('the route', () => {
   let warn: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
-    for (const k of ['AIDJOBS_BEDROCK_ACCESS_KEY_ID', 'AIDJOBS_BEDROCK_SECRET_ACCESS_KEY', 'VERCEL', 'VERCEL_ENV', 'VERCEL_GIT_COMMIT_REF']) delete process.env[k];
+    for (const k of ['AIDJOBS_OPENROUTER_API_KEY', 'AIDJOBS_BEDROCK_ACCESS_KEY_ID', 'AIDJOBS_BEDROCK_SECRET_ACCESS_KEY', 'VERCEL', 'VERCEL_ENV', 'VERCEL_GIT_COMMIT_REF']) delete process.env[k];
     warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
   afterEach(() => {
@@ -103,8 +128,35 @@ describe('the route', () => {
     const res = await GET();
     expect(res.headers.get('cache-control')).toBe('no-store');
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ ai: true });
+    expect(JSON.parse(text)).toEqual({ ai: true, models: [{ key: 'kimi', label: 'Kimi K2.5' }], default: 'kimi' });
     expect(text).not.toContain('AKIDTEST');
+  });
+
+  it('prefers OpenRouter when its key is set, and offers both models', async () => {
+    withKeys();
+    process.env.AIDJOBS_OPENROUTER_API_KEY = 'sk-or-test-key';
+    const text = await (await GET()).text();
+    expect(JSON.parse(text)).toEqual({ ai: true, models: [{ key: 'terra', label: 'GPT-6.1 Terra' }, { key: 'sonnet', label: 'Claude Sonnet 5.5' }], default: 'terra' });
+    expect(text).not.toContain('sk-or-test-key');
+  });
+
+  it('sends the chosen model with zero data retention and no data collection, and says which model answered', async () => {
+    process.env.AIDJOBS_OPENROUTER_API_KEY = 'sk-or-test-key';
+    const reply = () => new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"Hello","actions":[]}' } }] }), { status: 200 });
+    const f = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => reply());
+    expect(await (await post({ ...turn, model: 'sonnet' })).json()).toEqual({ reply: 'Hello', actions: [], model: 'sonnet' });
+    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(OPENROUTER_ENDPOINT);
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer sk-or-test-key');
+    expect(JSON.parse(String(init.body))).toMatchObject({ model: 'anthropic/claude-sonnet-5.5', response_format: { type: 'json_object' }, provider: { zdr: true, data_collection: 'deny' }, reasoning: { effort: 'low' } });
+    expect(await (await post({ ...turn, model: 'gpt-99' })).json()).toMatchObject({ model: 'terra' });
+    expect(JSON.parse(String((f.mock.calls[1][1] as RequestInit).body))).toMatchObject({ model: 'openai/gpt-6.1-terra', reasoning: { effort: 'none' } });
+    f.mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 429, message: 'Rate limited for the request about a nurse' } }), { status: 429 }));
+    expect((await post(turn)).status).toBe(502);
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).toContain('the terra call failed (status 429, openrouter code 429');
+    expect(logged).not.toContain('nurse');
+    expect(logged).not.toContain('sk-or-test-key');
   });
 
   it('is not there in production, or on Vercel for any branch but demo/employer', async () => {
@@ -134,7 +186,7 @@ describe('the route', () => {
     withKeys();
     const f = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"Hello","actions":[{"type":"ask","quick":["Yes"]}]}' } }] }), { status: 200 }));
     const ok = await post(turn);
-    expect(await ok.json()).toEqual({ reply: 'Hello', actions: [{ type: 'ask', quick: ['Yes'] }] });
+    expect(await ok.json()).toEqual({ reply: 'Hello', actions: [{ type: 'ask', quick: ['Yes'] }], model: 'kimi' });
     expect(f.mock.calls[0][0]).toBe(ENDPOINT);
     expect(String((f.mock.calls[0][1] as RequestInit).body)).toContain('Hiring a nurse in Juba');
     f.mockResolvedValueOnce(new Response('denied', { status: 403 }));
@@ -145,7 +197,7 @@ describe('the route', () => {
     expect((await post(turn)).status).toBe(502);
     const logged = JSON.stringify(warn.mock.calls);
     expect(logged).toContain('status 403');
-    expect(logged).toContain('status 400, Bedrock Error 002');
+    expect(logged).toContain('status 400, bedrock Error 002');
     expect(logged).not.toContain('Access refused');
     expect(logged).not.toContain('nurse');
     expect(logged).not.toContain('Not JSON');

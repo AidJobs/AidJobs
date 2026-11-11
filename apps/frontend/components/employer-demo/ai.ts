@@ -85,7 +85,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
   return {
     today: isoDay(s.today),
     stage: j.setup ?? 'writing',
-    org: { name: s.org.name, short: s.org.short, type: s.org.type, about: s.org.about, countries: s.org.countries, style: s.org.voice, styleKept: Boolean(s.org.styleKept) },
+    org: { name: s.org.name, short: s.org.short, type: s.org.type, orgType: s.org.orgType, about: s.org.about, countries: s.org.countries, style: s.org.voice, styleKept: Boolean(s.org.styleKept) },
     job: {
       status: j.status,
       facts: filled(j.facts),
