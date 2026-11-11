@@ -19,7 +19,7 @@
 - **S2.** Add the broad files to section 12 and to `library.py`'s inputs; no job title or address in `broad-adverts.csv`; distinguishing terms only pooled.
 - **S3.** Ground Zero's terms restrict reproduction, which is not silence: make it the user's decision; give board adverts the type of the employer they name.
 - **S4.** Define the validation: per measure with at least 15 positive cases, a seeded sample stratified by source, system, organisation and language, reconciled answers, targets for years, family, language and restrictions, overlap with the deep sample, use of embedded job-posting data.
-- **S5.** Effort: add the deep layer's scoring (3 to 5 days); the role map 4 to 6; state the net change against section 13 (+7 to +10); later families about 4 to 6 days each.
+- **S5.** Effort: add the deep layer's scoring (3 to 5 days); the role map 4 to 6; state the net change against section 13 (+2 to +3 before the missing scoring days were added); later families about 4 to 6 days each.
 - **S5a.** Sample own-site pages in R1 (only 3 were sampled); skip shell systems in R2.
 - **S6.** ILO is a UN agency and the Red Cross societies their own type, so only 3 government donors were found; drop the claim about research bodies and banks; state the priority markets' gap plainly; the cap cuts the main French source.
 - **S7.** Decision 20 would amend section 3's exception bullet; name its key; the coding model's family must differ from the blind scorers'.
@@ -49,3 +49,15 @@ All taken; section 19 rewritten.
 - **S6:** types corrected; the claim about research bodies and banks dropped; the priority markets' gap stated; French allowed up to 60 per organisation (decision 21).
 - **S7, S8, S9:** decision 20 states that it amends section 3's bullet, names its own key and the scorer rule; section 15 updated; the ledger item rewritten in date order.
 - **N1 to N8:** taken (N8 by 19.7's "remaining 18 to 30 families").
+
+## Re-review of the fixes (the same reviewer, 11 November 2026, at `84e5ae3`)
+
+**Approve with changes.** All 22 earlier findings fixed or nearly so; the totals add up (wave 1 77 to 116 days, wave 1a 35 to 57 before R1 below); 19.6's batch sizes match decision 19; the ledger item in date order. Eight small new points, all taken by the author the same day:
+- **R1:** wave 1a had no days for blind validation: 1 to 2 added, so about 36 to 59 days.
+- **R2:** the first-wave figure's upper end exceeded its own method: "30 or more pages contribute 30"; the first-wave archive about 1,200 to 1,350, the total about 1,850 to 2,000.
+- **R3:** section 18 still called Ground Zero "used": now pending the user's decision (decision 19).
+- **R4:** the validation sample could not also be the deep sample's first 100: drawn first by its own stratification; adverts in a deep-coded family also count there.
+- **R5:** R0 now includes the test's 10 hosts and names its fetcher (`confirm.py`'s, already reviewed).
+- **R6:** a wrong cross-reference in 19.5 corrected.
+- **R7:** sections 5, 6, 7, 10, 12, 13 and 14 now carry a pointer to 19.5.
+- **R8:** the ledger's 70 to 106 baseline restored and "checks after the fact"; this file's S5 wording corrected; decision 21's French cap made unambiguous; 19.4's fallbacks each in their own approved batch.
