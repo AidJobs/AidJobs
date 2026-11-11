@@ -394,7 +394,7 @@ def test_a_save_locks_its_source_with_key_share_then_its_run_row(status):
     cursor = _SaveCursor((status,))
     confirm_running(cursor, "run-1", SID)
     assert cursor.log[1] == "SELECT status FROM sources WHERE id = %s FOR KEY SHARE"
-    assert cursor.log[2] == ("SELECT 1 FROM crawl_logs WHERE id = %s AND source_id = %s "
+    assert cursor.log[2] == ("SELECT ran_at::date FROM crawl_logs WHERE id = %s AND source_id = %s "
                              "AND status = 'running' FOR SHARE")
 
 

@@ -1,6 +1,6 @@
 """A crawl run's lifecycle record (W-06): its completeness and whether it counts. No database."""
 import asyncio
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -280,6 +280,81 @@ def test_a_new_job_a_rejected_row_and_a_conflict_are_not_reported():
     assert _persist(two) == ("identity_conflict", [])
 
 
+@pytest.mark.parametrize("deadline", [date(2026, 11, 10), "2026-11-10", date(2025, 12, 6)])
+def test_a_job_whose_deadline_had_passed_is_not_reported(deadline):
+    outcome, seen = _persist([_stored(deadline=deadline)])
+    assert outcome == "unchanged"
+    assert seen == []
+
+
+@pytest.mark.parametrize("deadline", [None, date(2026, 11, 11), "2026-11-11", date(2027, 1, 31)])
+def test_a_job_whose_deadline_is_today_later_or_unknown_is_reported(deadline):
+    assert _persist([_stored(deadline=deadline)]) == ("unchanged", ["row-1"])
+
+
+def test_the_deadline_is_read_on_the_utc_day():
+    late_in_india = datetime(2026, 11, 11, 3, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    seen = []
+    persist_candidate(
+        FakeCursor([_stored(deadline=date(2026, 11, 10))]),
+        {"title": TITLE, "apply_url": URL, "admitted": True},
+        observed_at=late_in_india,
+        heuristics=False,
+        source_id="src-1",
+        seen=seen,
+    )
+    assert seen == ["row-1"], "21:30 UTC on 10 November: that deadline has not passed"
+
+
+def _persist_on(rows, *, open_on=None, observed_at=WHEN, **candidate):
+    seen, not_open = [], []
+    outcome = persist_candidate(
+        FakeCursor(rows),
+        {"title": TITLE, "apply_url": URL, "admitted": True, **candidate},
+        observed_at=observed_at,
+        heuristics=False,
+        source_id="src-1",
+        seen=seen,
+        not_open=not_open,
+        open_on=open_on,
+    )
+    return outcome, seen, not_open
+
+
+def test_the_runs_own_day_decides_not_the_clock():
+    stored = [_stored(deadline=date(2026, 11, 11))]
+    assert _persist_on(stored, open_on=date(2026, 11, 12)) == ("unchanged", [], ["row-1"])
+    assert _persist_on(stored, open_on=date(2026, 11, 11)) == ("unchanged", ["row-1"], [])
+    assert _persist_on(stored, open_on=date(2026, 11, 10)) == ("unchanged", ["row-1"], [])
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"status": "expired"}, {"deleted_at": WHEN}, {"deadline": date(2026, 11, 1)}],
+)
+def test_a_matched_job_that_was_not_open_is_reported_as_not_open(overrides):
+    outcome, seen, not_open = _persist_on([_stored(**overrides)])
+    assert seen == []
+    assert not_open == ["row-1"]
+
+
+def test_another_sources_job_is_reported_neither_way():
+    assert _persist_on([_stored(source_id="src-other")]) == ("unchanged", [], [])
+
+
+def test_an_update_is_judged_on_the_job_before_the_new_reading():
+    extended = _persist_on([_stored(deadline=date(2026, 11, 1))], deadline="2026-12-31")
+    assert extended == ("updated", [], ["row-1"]), "not open at the start, whatever the row says"
+    shortened = _persist_on([_stored(deadline=date(2026, 12, 31))], deadline="2026-11-01")
+    assert shortened == ("updated", ["row-1"], []), "open at the start"
+
+
+def test_without_the_runs_day_a_naive_time_is_read_as_a_utc_day():
+    naive = datetime(2026, 11, 11, 2, 0)
+    stored = [_stored(deadline=date(2026, 11, 10))]
+    assert _persist_on(stored, observed_at=naive) == ("unchanged", [], ["row-1"])
+
+
 def test_another_sources_job_matched_by_identity_is_not_reported():
     outcome, seen = _persist([_stored(source_id="src-other")])
     assert outcome == "unchanged"
@@ -354,6 +429,26 @@ def test_jobs_the_run_created_are_not_matches_of_the_catalogue():
 
     run = asyncio.run(scenario())
     assert run.created == {"new-1"}
+    assert run.matched_active() == 1
+
+
+def test_a_job_not_open_when_first_matched_is_never_a_match():
+    batches = iter([
+        {"seen_active": ["old-1"], "not_open_ids": ["passed-1"]},
+        {"seen_active": ["old-1", "passed-1"]},
+    ])
+
+    def save_jobs(jobs, source_id, org_name, *, run_token, loop):
+        return {"inserted": 0, "updated": 1, "skipped": 0, "failed": 0, **next(batches)}
+
+    async def scenario():
+        run = RunHandle("run-1", "src-1")
+        await run.save(save_jobs, [], "src-1", "Example")
+        await run.save(save_jobs, [], "src-1", "Example")
+        return run
+
+    run = asyncio.run(scenario())
+    assert run.not_open == {"passed-1"}
     assert run.matched_active() == 1
 
 

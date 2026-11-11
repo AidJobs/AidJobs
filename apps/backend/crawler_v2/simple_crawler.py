@@ -1507,6 +1507,7 @@ class SimpleCrawler:
         failed = 0
         attempted = 0  # jobs that reached their write, or failed on the way to it
         seen_active = []  # ids of open jobs matched, for the run's lifecycle record
+        not_open = []
         recorded = []
         failed_inserts = []  # Track failed inserts for logging
         
@@ -1516,11 +1517,12 @@ class SimpleCrawler:
         try:
             conn = self._get_db_conn()
             with conn.cursor() as cur:
-                confirm_running(cur, run_token, source_id)
+                open_on = confirm_running(cur, run_token, source_id)
                 for job in jobs:
                     in_savepoint = False
                     recorded_mark = len(recorded)
                     seen_mark = len(seen_active)
+                    not_open_mark = len(not_open)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1684,6 +1686,8 @@ class SimpleCrawler:
                             org_name=org_name,
                             recorded=recorded,
                             seen=seen_active,
+                            not_open=not_open,
+                            open_on=open_on,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                         in_savepoint = False
@@ -1711,6 +1715,7 @@ class SimpleCrawler:
                             cur.execute("ROLLBACK TO SAVEPOINT job_save")
                             del recorded[recorded_mark:]
                             del seen_active[seen_mark:]
+                            del not_open[not_open_mark:]
                         else:
                             attempted += 1
                         error_msg = f"Unexpected error processing job: {stored_text(e)}"
@@ -1776,6 +1781,7 @@ class SimpleCrawler:
             'attempted': attempted,
             'unrecorded': unrecorded,
             'seen_active': seen_active,
+            'not_open_ids': not_open,
             'created_ids': created_ids(recorded),
         }
     

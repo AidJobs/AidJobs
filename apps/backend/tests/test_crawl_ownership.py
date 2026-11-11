@@ -1521,15 +1521,15 @@ def test_the_run_route_starts_a_crawl_returns_the_open_run_and_refuses_an_unknow
 COMPLETE = {"pages": 2, "expected": 3, "complete": True, "stop": "no More Jobs link"}
 
 
-def _store_job(source_id, n, *, status="active", hidden=False):
+def _store_job(source_id, n, *, status="active", hidden=False, deadline=None):
     title, url = f"Programme Officer {n}", f"https://example.org/jobs/{n}"
     _sql(
         """
         INSERT INTO jobs (source_id, org_name, title, apply_url, canonical_hash, status,
-                          deleted_at)
-        VALUES (%s, 'Example', %s, %s, %s, %s, CASE WHEN %s THEN NOW() END)
+                          deleted_at, deadline)
+        VALUES (%s, 'Example', %s, %s, %s, %s, CASE WHEN %s THEN NOW() END, %s)
         """,
-        (source_id, title, url, algorithm_a(title, url), status, hidden),
+        (source_id, title, url, algorithm_a(title, url), status, hidden, deadline),
     )
 
 
@@ -1540,13 +1540,13 @@ def _lifecycle(run_id):
     return dict(zip(LIFECYCLE_COLUMNS, row))
 
 
-def _listing_crawl(numbers, report, *, titles=None):
+def _listing_crawl(numbers, report, *, titles=None, cls=SimpleCrawler):
     """A crawl that saves these jobs through the real writer and reports this listing."""
     titles = titles or {}
 
     async def crawl(src, run):
         jobs = [_job(n, titles.get(n)) for n in numbers]
-        counts = await run.save(_crawler().save_jobs, jobs, src["id"], src["org_name"])
+        counts = await run.save(_crawler(cls).save_jobs, jobs, src["id"], src["org_name"])
         return {
             "status": "ok",
             "message": f"Found {len(jobs)} jobs",
@@ -1569,10 +1569,15 @@ def test_a_run_records_its_sources_open_jobs_that_are_not_hidden_at_its_start(db
     _store_job(source["id"], 4, hidden=True)
     _store_job(source["id"], 5, status="expired")
     _store_job(other["id"], 6)
+    _store_job(source["id"], 7, deadline="2000-01-01")
+    _store_job(source["id"], 8, deadline="2999-12-31")
+    _sql(
+        "UPDATE jobs SET deadline = CURRENT_DATE WHERE title = 'Programme Officer 3'"
+    )
     run_id, started = _orch()._begin(source["id"], False)
     assert started
     record = _lifecycle(run_id)
-    assert record["active_at_start"] == 3
+    assert record["active_at_start"] == 4, "1, 2, 3 (deadline today) and 8; not 7, passed"
     assert record["counted"] is None, "not decided until the run's finish"
 
 
@@ -1609,6 +1614,72 @@ def test_fewer_than_half_of_the_open_jobs_matched_does_not_count(db, stored, lis
     record = _lifecycle(run_id)
     assert (record["active_at_start"], record["matched_active"]) == (stored, len(listed))
     assert record["counted"] is counted
+
+
+def test_jobs_whose_deadline_passed_are_neither_counted_at_the_start_nor_matched(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    for n in (5, 6, 7):
+        _store_job(source["id"], n, deadline="2000-01-01")
+    run_id = _manual_run(source, _listing_crawl([1, 2, 5], COMPLETE))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 2)
+    assert record["counted"] is True, "2 of the 4 open jobs; the passed deadlines are not open"
+
+
+def _crawl_rows(rows):
+    async def crawl(src, run):
+        counts = await run.save(_crawler().save_jobs, rows, src["id"], src["org_name"])
+        return {"status": "ok", "message": f"Found {len(rows)} jobs",
+                "counts": {"found": len(rows), **counts}, "listing": COMPLETE,
+                "valid": len(rows)}
+
+    return crawl
+
+
+def test_a_job_whose_passed_deadline_a_row_extends_is_not_a_match_when_listed_again(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 5, deadline="2000-01-01")
+    extended = {**_job(5), "deadline": "2999-12-31"}
+    run_id = _manual_run(source, _crawl_rows([_job(1), dict(extended), dict(extended)]))
+    record = _lifecycle(run_id)
+    assert (record["active_at_start"], record["matched_active"]) == (4, 1)
+    assert record["counted"] is False
+    assert str(_sql("SELECT deadline FROM jobs WHERE title = 'Programme Officer 5'")[0][0]) == (
+        "2999-12-31"
+    ), "the new reading is still saved"
+
+
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
+def test_the_start_count_and_the_matches_read_the_same_calendar_in_any_time_zone(
+    db, monkeypatch, cls
+):
+    # A database day always one off the UTC day, so the UTC clock and the database disagree.
+    # Not within two minutes of 00:00 or 12:00 UTC, so the choice below holds for the whole test.
+    to_boundary = _sql(
+        "SELECT 43200 - EXTRACT(EPOCH FROM NOW() AT TIME ZONE 'UTC')::bigint % 43200"
+    )[0][0]
+    if to_boundary < 120:
+        time.sleep(float(to_boundary) + 5)
+    utc_hour = _sql("SELECT EXTRACT(HOUR FROM NOW() AT TIME ZONE 'UTC')")[0][0]
+    ahead = utc_hour >= 12
+    monkeypatch.setenv("PGTZ", "Etc/GMT-12" if ahead else "Etc/GMT+12")
+    db_day, utc_day = _sql("SELECT CURRENT_DATE, (NOW() AT TIME ZONE 'UTC')::date")[0]
+    assert db_day != utc_day
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2)
+    # Passed by the database's day but not by UTC's when the database is ahead; the other way
+    # round, open by the database's day but passed by UTC's.
+    _store_job(source["id"], 3, deadline=utc_day if ahead else db_day)
+    run_id = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE, cls=cls))
+    record = _lifecycle(run_id)
+    assert record["active_at_start"] == (2 if ahead else 3)
+    assert record["matched_active"] == record["active_at_start"]
+    assert record["counted"] is True
 
 
 def test_a_hidden_job_seen_again_is_not_a_match(db):
@@ -1701,14 +1772,37 @@ def test_a_match_whose_update_rolls_back_is_not_reported(failing_updates, cls):
     source = _add_source()
     _store_job(source["id"], 1)
     _store_job(source["id"], 2)
+    _store_job(source["id"], 3, deadline="2000-01-01")
+    _store_job(source["id"], 4, deadline="2000-01-01")
     run_id, _ = _orch()._begin(source["id"], False)
-    failing = {**_job(1), "location_raw": "Reject me"}
-    counts = _crawler(cls).save_jobs([failing, _job(2)], source["id"], "Example",
-                                     run_token=run_id)
-    assert counts["failed"] == 1
+    failing_open = {**_job(1), "location_raw": "Reject me"}
+    failing_passed = {**_job(3), "location_raw": "Reject me"}
+    rows = [failing_open, _job(2), failing_passed, _job(4)]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    assert counts["failed"] == 2
     stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
     assert counts["seen_active"] == [stored["Programme Officer 2"]]
+    assert counts["not_open_ids"] == [stored["Programme Officer 4"]]
     assert counts["created_ids"] == []
+
+
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
+def test_every_save_step_reports_open_and_not_open_matches_apart(db, cls):
+    source, other = _add_source(), _add_source("Other")
+    _store_job(source["id"], 1)
+    _store_job(source["id"], 2, deadline="2000-01-01")
+    _store_job(source["id"], 3, status="expired")
+    _store_job(source["id"], 4, hidden=True)
+    _store_job(other["id"], 5)
+    run_id, _ = _orch()._begin(source["id"], False)
+    rows = [_job(n) for n in (1, 2, 3, 4, 5, 6)]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
+    assert counts["seen_active"] == [stored["Programme Officer 1"]]
+    assert sorted(counts["not_open_ids"]) == sorted(
+        stored[f"Programme Officer {n}"] for n in (2, 3, 4)
+    )
+    assert counts["created_ids"] == [stored["Programme Officer 6"]]
 
 
 TRACKED = "https://example.org/jobs/1?utm_source=newsletter"

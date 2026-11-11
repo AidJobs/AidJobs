@@ -4,11 +4,11 @@ This module does not open a connection, commit, roll back, or take a lock.
 The crawler that already owns the transaction calls it and keeps that boundary.
 """
 import json
-from datetime import datetime
+from datetime import date, datetime, timezone
 
 from contracts.identity import both_keys
 from contracts.models import CrawlRun
-from contracts.upsert import VALIDATED_FIELDS, upsert
+from contracts.upsert import VALIDATED_FIELDS, calendar_day, upsert
 from contracts.validate import rejection_reason
 
 # Read set for the match. Geocoding and quality are not loaded and are not
@@ -71,13 +71,18 @@ def persist_candidate(
     org_name: str | None = None,
     recorded: list | None = None,
     seen: list | None = None,
+    not_open: list | None = None,
+    open_on: date | None = None,
 ) -> str:
     """Validate, decide with the contract upsert, then write that decision.
 
     seen, when given, receives the id of a matched job of this candidate's source that was open
-    and not hidden before this write: the crawl's evidence that it read the source's open jobs
-    (contract §6). A job this run created is reported too when a later row matches it; the
-    caller removes those.
+    before this write (active, not hidden, its deadline not before open_on): the crawl's evidence
+    that it read the source's open jobs (contract §6). not_open receives the other matched jobs
+    of the source. open_on is the run's first day as the database dates it, so the writer and
+    the run's start count read "passed" on the same calendar; without it, the UTC day.
+    A job reported in seen may still have to be left out by the caller: one this run created, or
+    one that was in not_open earlier in the run (a row can change a job's deadline).
     """
     if candidate.get("admitted") is not True:
         return "rejected"
@@ -124,12 +129,13 @@ def persist_candidate(
         )
         if decision == "seen_again":
             _remember(recorded, decision, row.get("id"))
-        _note_seen(seen, before.get(row["id"]), payload.get("source_id"))
+        _note_seen(seen, not_open, before.get(row["id"]), payload.get("source_id"),
+                   _open_on(open_on, observed_at))
         return decision
 
     row = catalog[0]
     prior = before[row["id"]]
-    _note_seen(seen, prior, payload.get("source_id"))
+    _note_seen(seen, not_open, prior, payload.get("source_id"), _open_on(open_on, observed_at))
     assignments = {
         name: row.get(name)
         for name in VALIDATED_FIELDS
@@ -150,14 +156,33 @@ def created_ids(recorded) -> list:
     return [entry["job_id"] for entry in recorded or () if entry.get("outcome") == "created"]
 
 
-def _note_seen(seen, prior, source_id) -> None:
+def _open_on(open_on, observed_at: datetime) -> date:
+    """The run's day when known; otherwise the UTC day of the observation (naive is UTC)."""
+    if isinstance(open_on, date) and not isinstance(open_on, datetime):
+        return open_on
+    if observed_at.tzinfo is None:
+        return observed_at.date()
+    return observed_at.astimezone(timezone.utc).date()
+
+
+def _note_seen(seen, not_open, prior, source_id, open_on: date) -> None:
     if seen is None or not prior or prior.get("id") is None or source_id is None:
         return
     # The identity keys ignore the source, so a row can match another source's job.
     if str(prior.get("source_id")) != str(source_id):
         return
-    if prior.get("status") == "active" and prior.get("deleted_at") is None:
+    # A stored deadline already passed makes the job expired under contract §6, so it is not
+    # one of the open jobs the run's start counted.
+    deadline = calendar_day(prior.get("deadline"))
+    is_open = (
+        prior.get("status") == "active"
+        and prior.get("deleted_at") is None
+        and (deadline is None or deadline >= open_on.isoformat())
+    )
+    if is_open:
         seen.append(str(prior["id"]))
+    elif not_open is not None:
+        not_open.append(str(prior["id"]))
 
 
 def _remember(recorded, outcome: str, job_id) -> None:
