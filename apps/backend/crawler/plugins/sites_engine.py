@@ -72,6 +72,10 @@ def closing_day(text: str) -> Optional[str]:
         return None
 
 
+def _path(url: str) -> str:
+    return urlparse(url).path.rstrip("/")
+
+
 def _same_site(url: str, base_url: str) -> bool:
     one, other = urlparse(url), urlparse(base_url)
     return one.scheme in ("http", "https") and one.netloc.lower() == other.netloc.lower()
@@ -112,7 +116,7 @@ class SitesListingReader:
             apply_url = urljoin(page_url, href)
             if apply_url in seen or not _same_site(apply_url, page_url):
                 continue
-            if urlparse(apply_url).path.rstrip("/") == urlparse(page_url).path.rstrip("/"):
+            if _path(apply_url) == _path(page_url):
                 continue  # the listing itself, not a job
 
             title = _text(links[0])
@@ -137,7 +141,7 @@ class SitesListingReader:
         following = pager.select_one("li.next:not(.disabled) a[rel=next][href]")
         if following is not None:
             next_url = urljoin(page_url, following.get("href", ""))
-            same_listing = urlparse(next_url).path == urlparse(page_url).path
+            same_listing = _path(next_url) == _path(page_url)
             if _same_site(next_url, page_url) and same_listing:
                 page.next_url = next_url
             else:

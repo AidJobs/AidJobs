@@ -241,9 +241,38 @@ def test_a_job_closing_during_the_walk_makes_it_partial_not_complete():
     }
     jobs, report, _asked = _walk(first, answers)
     assert "Officer 6" not in [job["title"] for job in jobs]
+    assert "Officer 7" in [job["title"] for job in jobs], "the page's own jobs are kept"
     assert report["complete"] is False
     assert report["expected"] == 7
     assert report["stop"] == f"total changed from 7 to 6 on {_SEARCH}?page=2&per_page=100"
+
+
+def test_a_total_changing_on_page_one_at_50_makes_the_walk_partial():
+    first = _page([1, 2, 3], 7, "/jobs/search?page=2")
+    answers = {
+        f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3, 4, 5], 8,
+                                               "/jobs/search?page=2&per_page=100"), ""),
+    }
+    jobs, report, asked = _walk(first, answers)
+    assert len(asked) == 1 and len(jobs) == 5
+    assert report["stop"] == f"total changed from 7 to 8 on {_SEARCH}?per_page=100"
+
+
+def test_a_later_pages_next_link_not_followed_is_partial():
+    first = _page([1, 2, 3], 9, "/jobs/search?page=2")
+    answers = {
+        f"{_SEARCH}?per_page=100": (200, _page([1, 2, 3, 4], 9,
+                                               "https://elsewhere.example/jobs/search?page=2"), ""),
+    }
+    jobs, report, asked = _walk(first, answers)
+    assert len(asked) == 1 and len(jobs) == 4
+    assert report["stop"] == f"next-page link not followed on {_SEARCH}?per_page=100"
+
+
+def test_a_listing_address_with_a_trailing_slash_reads_its_own_links():
+    page = SitesListingReader().read_page(_page([1, 2], 4, "/jobs/search?page=2"),
+                                          f"{_SEARCH}/")
+    assert page.next_url == f"{_SEARCH}?page=2" and page.next_refused is False
 
 
 def test_more_jobs_than_the_stated_total_is_partial():
