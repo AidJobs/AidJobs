@@ -93,7 +93,11 @@ RESEARCH = re.compile(r"\b(?:institut[eo]?|institution|research|university|unive
 # Charities that support the UN are not UN agencies: UN associations, national committees, "friends of".
 NOT_UN = re.compile(r"United Nations Association|\bUNA-|\bUNICEF (?:UK|USA|Canada|Australia|Ireland|Nederland|"
                     r"Deutschland|France|Japan|Sverige|Norge|Danmark|Suomi|Schweiz|Belgique|Espa[ñn]a|Italia)\b|"
-                    r"national committee|friends of|\b(?:USA|UK) for UN|for UNICEF|for UNHCR", re.IGNORECASE)
+                    r"national committee|friends of|\b(?:USA|UK) for UN|for UNICEF|for UNHCR|"
+                    r"(?:UN|United Nations) Foundation|Foundation for (?:the )?(?:UN|United Nations)", re.IGNORECASE)
+# Names that begin "UN ..." (UN Office for Project Services, UN Relief and Works Agency), not the UN
+# Global Compact's local networks or the Italian NGO "Un Ponte Per".
+UN_PREFIX = re.compile(r"^UN (?!Global Compact|Ponte)")
 
 
 def org_type_of(org: dict, group: str = "", pool: str = "") -> str:
@@ -103,7 +107,7 @@ def org_type_of(org: dict, group: str = "", pool: str = "") -> str:
         return "red_cross"
     if "un-secretariat" in kind:
         return "un_secretariat"
-    if UN_NAMES.search(name) and not NOT_UN.search(name):
+    if (UN_NAMES.search(name) or UN_PREFIX.search(name)) and not NOT_UN.search(name):
         return "un_agency"
     if any(k in kind for k in ("un-or-intergovernmental", "Multilateral", "intergovernmental",
                                "Government", "government agency", "Other public sector")):

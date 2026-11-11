@@ -121,7 +121,7 @@ def test_degree_level():
 
 def test_explicit_restrictions_are_found_and_inclusion_is_never_a_restriction():
     def found(text):
-        return {k for k, p in adverts.RESTRICTIONS.items() if p.search(text)}
+        return adverts.restrictions_of(text)
     assert found("Female candidates only.") == {"sex"}
     assert found("Applicants must be aged between 25 and 35 years.") == {"age"}
     assert found("Open to Kenyan nationals only.") == {"nationality"}
@@ -222,6 +222,17 @@ def test_the_form_check_refuses_contacts_addresses_and_unknown_values(tmp_path):
     assert adverts.check(roles_dir=tmp_path) == 0
     write_rows(p, [row(org_id="someone@example.org")])
     assert adverts.check(roles_dir=tmp_path) == 1
+
+
+def test_real_organisation_id_shapes_pass_the_form_check(tmp_path):
+    p = tmp_path / "broad-adverts.csv"
+    ids = ["iati:XM-DAC-41/123", "acnc:28004778081", "eu:171598852000-42", "board-employer:h0123456789",
+           "site:reach-iraq.org", "cra:100072586RR0001"]
+    write_rows(p, [row(advert_id=f"{i:016x}", org_id=o) for i, o in enumerate(ids)])
+    assert adverts.check_file(p, adverts.ADVERT_FIELDS) == []
+    ad = {"employer": "", "url": "https://www.example.org/job/x"}
+    assert adverts.board_org(dict(ad, employer="Some Local Group"), roles.Organisations(), {})[0].startswith(
+        "board-employer:h")
 
 
 def test_role_counts_with_register_ids_pass_the_form_check(tmp_path):
@@ -356,7 +367,45 @@ def test_other_facts_do_not_fire_on_ordinary_words():
 
 
 def restricted(text):
-    return {k for k, p in adverts.RESTRICTIONS.items() if p.search(text)}
+    return adverts.restrictions_of(text)
+
+
+def test_restrictions_found_by_the_re_review():
+    for text in ("You will work with children under 18 years.", "youth aged 15 to 35 years",
+                 "Candidates will train women aged 15-49 years.", "The post is open to all nationals.",
+                 "Open to nationals and non-nationals.", "You will work at a height of 3 metres.",
+                 "presentable reports for donors", "Run a safe space for women only."):
+        assert not restricted(text) - {"national_post"}, text
+    assert restricted("Candidates should be between 25 and 40 years old.") == {"age"}
+    assert restricted("Applicants should be 35 years or younger.") == {"age"}
+    assert restricted("Age: 25 - 35 years") == {"age"}
+    assert restricted("This position is for women only.") == {"sex"}
+    assert restricted("You must be an EU citizen.") == {"nationality"}
+    assert restricted("National Professional Officer, NOB") == {"national_post"}
+    assert restricted("national professional officer") == {"national_post"}
+
+
+def test_more_fact_and_years_cases_from_the_re_review():
+    assert "pay" not in adverts.facts_of("Salary range: commensurate with experience.")
+    assert "pay_vague" in adverts.facts_of("Salary range: commensurate with experience.")
+    assert "pay" not in adverts.facts_of("Remuneration according to the 2024 policy.")
+    assert "pay" in adverts.facts_of("A monthly allowance of 15,000 is paid.")
+    assert "contract_length" not in adverts.facts_of("The position requires a minimum of 5 years of relevant experience.")
+    assert "contract_length" in adverts.facts_of("The position is for 12 months, renewable.")
+    assert "hours" not in adverts.facts_of("You may be called outside working hours.")
+    assert "duty_station" not in adverts.facts_of("We run evidence-based in-country programmes.")
+    assert adverts.years_asked("Over 10 years of experience in finance.") == ("10", "")
+    assert adverts.years_asked("Experience working with children under 5 years.") == ("", "")
+    assert adverts.years_asked("Founded 30 years ago, we seek 4 years of experience in grants.") == ("4", "")
+    assert {k for k, p in adverts.INCLUSION.items() if p.search("Referent (m/f/d)")} == {"both_sexes_mark"}
+    assert adverts.section_type("About the team") == "working_relationships"
+    assert adverts.section_type("About the Candidate") == "essential_requirements"
+
+
+def test_travel_and_hours_are_not_required_for_a_3_and_pay_lifts_a_0():
+    core = set(adverts.DECISION_FACTS) - adverts.OPTIONAL_FACTS
+    assert adverts.score_decision_facts(core) == 3
+    assert adverts.score_decision_facts({"pay"}) == 1
 
 
 def test_restrictions_need_the_applicant_as_their_subject():
@@ -396,7 +445,9 @@ def test_years_ranges_additional_years_and_ages():
 def test_degree_words_that_are_not_degrees():
     assert adverts.degree_asked("A valid driving licence is required") == ""
     assert adverts.degree_asked("Mastery of Excel; payments by Mastercard") == ""
-    assert adverts.degree_asked("La maîtrise du français est requise") == "master"   # maîtrise is the degree
+    assert adverts.degree_asked("La maîtrise du français est requise") == ""         # mastery of a language
+    assert adverts.degree_asked("Maîtrise en sciences sociales") == "master"
+    assert adverts.degree_asked("Permis de conduire et licence de conduire exigés") == ""
     assert adverts.degree_asked("Licence en économie ou équivalent") == "bachelor"
     assert adverts.degree_asked("Master's degree in public health") == "master"
 
@@ -419,6 +470,10 @@ def test_site_furniture_removal_keeps_standard_sentences():
            for i in range(4)]
     chrome = adverts.chrome_lines(ads)["o"]
     assert "Home" in chrome and eo not in chrome
+    short = "We are an equal opportunity employer."
+    for a in ads:
+        a["lines"].append({"text": short, "heading": False, "tag": "p"})
+    assert short not in adverts.chrome_lines(ads)["o"]
 
 
 def test_the_ai_test_set_stays_frozen_and_is_only_topped_up():
@@ -438,6 +493,8 @@ def test_board_employer_is_read_after_the_last_at():
     assert adverts.board_org(ad, orgs, names) == ("org:stc", "matched by name")
     ad = {"employer": "", "url": "https://www.example.org/job/finance-officer-kampala"}
     assert adverts.board_org(ad, orgs, names)[0] == "board-employer:unknown"
+    ad = {"employer": "", "url": "https://www.example.org/job/head-of-at-risk-programmes-at-save-the-children"}
+    assert adverts.board_org(ad, orgs, names) == ("org:stc", "matched by name")    # the last "-at-"
 
 
 def test_a_board_copy_with_at_employer_is_still_a_copy():
@@ -446,6 +503,14 @@ def test_a_board_copy_with_at_employer_is_still_a_copy():
            {"id": "b1", "source": "board", "title": "Finance Officer at Acme Relief", "lines": body},
            {"id": "f1", "source": "step-f-feed", "title": "Finance Officer", "lines": body}]
     assert adverts.near_duplicates(ads) == {"a1": "f1", "b1": "f1"}   # step F's feed copy is kept
+    assert adverts.near_duplicates(ads, keep={"a1"}) == {"b1": "a1", "f1": "a1"}   # a held-out advert is kept
+    shared = " ".join(f"word{i}" for i in range(100))
+    two = [{"id": "a2", "source": "archive", "title": "Finance Officer",
+            "lines": [{"text": shared + " apply by email to the team", "heading": False, "tag": "p"}]},
+           {"id": "b2", "source": "board", "title": "Finance Officer at Acme Relief",
+            "lines": [{"text": shared + " see more jobs like this today on the board", "heading": False,
+                       "tag": "p"}]}]
+    assert adverts.near_duplicates(two) == {"b2": "a2"}             # 0.8 to 0.95 alike, same job
 
 
 class FakeResponse:
@@ -532,7 +597,10 @@ class FakeFetcher:
         with (self.folder / "requests.log").open("a", encoding="utf-8") as h:
             h.write(f"x\t{what}\n")
         host = url.split("/")[2]
-        status, body = self.answers.get(url, self.answers.get(host, (200, b"<html></html>")))
+        answer = self.answers.get(url, self.answers.get(host, (200, b"<html></html>")))
+        if isinstance(answer, dict):
+            return {"headers": {}, "error": "", "bytes": len(answer.get("body", b"")), **answer}
+        status, body = answer
         return {"status": status, "final_url": url, "headers": {}, "body": body, "error": "", "bytes": len(body)}
 
 
@@ -550,12 +618,146 @@ def test_a_resumed_live_run_does_not_ask_a_host_that_refused(tmp_path):
 
 
 def test_the_live_batch_size_counts_the_policys_robots_reads_across_runs(tmp_path):
-    run, _ = live(tmp_path, {}, cap=4)
+    # Each request reserves its worst case: the page, a new host's robots.txt, and 2 redirects with theirs.
+    run, _ = live(tmp_path, {}, cap=8)
     run.get("https://a.example/1", "page")             # the page and the policy's robots.txt read: 2
-    run2, _ = live(tmp_path, {}, cap=4)
+    run2, _ = live(tmp_path, {}, cap=8)
     run2.get("https://a.example/2", "page")            # a new process: the policy reads robots.txt again
     assert adverts.requests_sent(tmp_path) == 4
-    assert run2.get("https://a.example/3", "page") is None and run2.stopped
+    assert run2.get("https://a.example/3", "page") is None and run2.stopped   # 4 + 5 reserved > 8
+
+
+def test_redirect_hops_are_counted_and_a_page_off_its_site_is_not_kept(tmp_path):
+    run, _ = live(tmp_path, {"https://a.example/x": {"status": 200, "final_url": "https://www.a.example/y",
+                                                     "redirects": 2, "body": b"<p>same site</p>"},
+                             "https://b.example/x": {"status": 200, "final_url": "https://other.example/z",
+                                                     "redirects": 1, "body": b"<p>elsewhere</p>"}}, cap=50)
+    meta = run.get("https://a.example/x", "page")
+    assert meta["body"] and adverts.requests_sent(tmp_path) == 1 + 1 + 4
+    meta = run.get("https://b.example/x", "page")
+    assert meta["body"] == b"" and meta["error"].startswith("redirected off the host")
+    assert "b.example" in run.blocked_hosts and not run.failures and not run.refusals
+    assert adverts.requests_sent(tmp_path) == 6 + 1 + 1 + 2
+
+
+def test_a_redirect_limit_counts_every_hop(tmp_path):
+    run, _ = live(tmp_path, {"https://a.example/x": {"status": None, "final_url": "", "redirects": 0,
+                                                     "error": "redirect limit", "body": b""}}, cap=50)
+    run.get("https://a.example/x", "page")
+    assert adverts.requests_sent(tmp_path) == 1 + 1 + 2 * adverts.LIVE_REDIRECTS
+
+
+def test_live_state_reloads_refusals_and_a_cached_robots_refusal_blocks(tmp_path):
+    run, _ = live(tmp_path, {"a.example": (403, b""), "b.example": (403, b"")}, cap=50)
+    run.get("https://a.example/x", "page")
+    run.get("https://b.example/x", "page")
+    run2, _ = live(tmp_path, {}, cap=50)
+    assert len(run2.refusals) == 2 and {"a.example", "b.example"} <= run2.blocked_hosts
+    run3, _ = live(tmp_path / "r", {"https://c.example/robots.txt": (403, b"")}, cap=50)
+    assert run3.robots("c.example") is False
+    run4, f4 = live(tmp_path / "r", {}, cap=50)
+    assert run4.robots("c.example") is False and run4.get("https://c.example/page", "page") is None
+    assert f4.urls == []
+
+
+def test_the_next_page_must_be_the_next_number(tmp_path):
+    listing = b'<a href="https://board.example/job/a-b-c/">x</a><a href="https://board.example/page/3/">3</a>'
+    run, f = live(tmp_path, {"https://board.example/": (200, listing)}, cap=50)
+    cfg = {"listings": ["https://board.example/"], "next": r"/page/(\d+)/?$",
+           "link": r"^https://board\.example/job/[^/?#]+/?$", "adverts": 5, "listing_pages": 3}
+    adverts.board_pages(run, "b", cfg, random.Random(1))
+    assert "https://board.example/page/3/" not in f.urls
+
+
+def test_r5_is_held_until_the_un_terms_are_decided(tmp_path, monkeypatch):
+    import argparse
+    monkeypatch.setattr(adverts, "READING", tmp_path)
+    assert adverts.fetch_live(argparse.Namespace(batch="r5", cap=0, un_terms_decided=False)) == 0
+    assert adverts.requests_sent(tmp_path / "r5") == 0
+
+
+def test_archive_streaks_persist_and_redirects_are_not_followed(tmp_path):
+    s = FakeSession([FakeResponse(429)])
+    adverts.ArchiveReader(tmp_path, 10, session=s, sleep=lambda x: None).get("crawl-data/a", 0, 10, "p1")
+    try:
+        reader(tmp_path, [FakeResponse(503)], cap=10).get("crawl-data/a", 0, 10, "p2")
+        raise AssertionError("two refusals in a row across runs did not stop the batch")
+    except adverts.Stopped:
+        pass
+    f = tmp_path / "f"
+    for i in range(2):
+        reader(f, [FakeResponse(302)], cap=10).get("crawl-data/a", 0, 10, f"p{i}")
+    try:
+        reader(f, [FakeResponse(500)], cap=10).get("crawl-data/a", 0, 10, "p3")
+        raise AssertionError("three failures in a row did not stop the batch")
+    except adverts.Stopped:
+        pass
+
+
+class RecordingSession(FakeSession):
+    def get(self, *a, **k):
+        self.kwargs = k
+        return super().get(*a, **k)
+
+
+def test_the_archive_session_does_not_follow_redirects(tmp_path):
+    s = RecordingSession([FakeResponse(206, b"x")])
+    adverts.ArchiveReader(tmp_path, 10, session=s, sleep=lambda x: None).get("crawl-data/a", 0, 1, "p1")
+    assert s.kwargs["allow_redirects"] is False
+
+
+def test_fetch_archive_checks_each_row_again(tmp_path, monkeypatch):
+    import argparse
+    folder = tmp_path / "r1"
+    folder.mkdir()
+    rows = [{"page_id": "p1", "org_id": "seed:1", "system": "own site", "host": "a.example", "crawl": "",
+             "languages": "eng", "filename": "crawl-data/x", "offset": "0", "length": "1",
+             "url": "https://a.example/jobs/x-y-z"},
+            {"page_id": "p2", "org_id": "seed:2", "system": "own site", "host": "b.example", "crawl": "",
+             "languages": "eng", "filename": "crawl-data/y", "offset": "0", "length": "1",
+             "url": "https://b.example/jobs/x-y-z"},
+            {"page_id": "p3", "org_id": "un:1", "system": "own site", "host": "c.example", "crawl": "",
+             "languages": "eng", "filename": "crawl-data/z", "offset": "0", "length": "1",
+             "url": "https://c.example/jobs/x-y-z"}]
+    adverts.write_local(folder / "plan.csv", adverts.PLAN_FIELDS, rows)
+    monkeypatch.setattr(adverts, "READING", tmp_path)
+    monkeypatch.setattr(adverts, "RobotsVerdicts",
+                        lambda: FakeVerdicts({"https://a.example/jobs/x-y-z", "https://c.example/jobs/x-y-z"}))
+    args = argparse.Namespace(batch="r1", cap=0)
+    assert adverts.fetch_archive(args) == 1                          # no held lists: refused
+    (folder / "held-hosts.txt").write_text("\n", encoding="utf-8")
+    (folder / "held-orgs.txt").write_text("un:1\n", encoding="utf-8")
+    s = FakeSession([FakeResponse(206, b"x")] * 3)
+    real = adverts.ArchiveReader
+    monkeypatch.setattr(adverts, "ArchiveReader", lambda f, c: real(f, c, session=s, sleep=lambda x: None))
+    adverts.fetch_archive(args)
+    assert s.calls == 1 and (folder / "pages" / "p1.warc.gz").exists()   # p2 not allowed, p3 held
+
+
+def page_ad(i, host="acme.example", words=200):
+    text = " ".join(f"duty{i}x{j}" for j in range(words))
+    return {"id": f"{i:016x}", "source": "archive", "batch": "r2", "system": "own site", "crawl": "",
+            "languages": "", "method": "html", "facts": {}, "employer": "", "title": "Finance Officer",
+            "url": f"https://{host}/jobs/finance-officer-{i}-x-y",
+            "lines": [{"text": "Key responsibilities", "heading": True, "tag": "h2"},
+                      {"text": text, "heading": False, "tag": "p"},
+                      {"text": "How to apply: send your CV by the closing date.", "heading": False, "tag": "p"}]}
+
+
+def test_measure_drops_un_pages_and_keeps_held_out_adverts_beside_the_cap(tmp_path, monkeypatch):
+    work, docs = tmp_path / "work", tmp_path / "docs"
+    (work / "adverts").mkdir(parents=True)
+    ads = [page_ad(i) for i in range(32)] + [page_ad(99, host="jobs.ilo.org")]
+    for ad in ads:
+        adverts._save_advert(work / "adverts", ad)
+    held = [ads[0]["id"], ads[1]["id"]]
+    (work / "ai-test-set.json").write_text(json.dumps({"pilot": [], "test": held}), encoding="utf-8")
+    monkeypatch.setattr(adverts, "WORK", work)
+    monkeypatch.setattr(adverts, "ROLES_DIR", docs)
+    assert adverts.measure() == 0
+    rows = list(csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8")))
+    assert all(r["org_id"] != "site:jobs.ilo.org" for r in rows)       # held for the UN terms decision
+    assert len(rows) == 32 and sum(r["held_out"] == "true" for r in rows) == 2   # 30 evidence + 2 held
 
 
 def test_live_stop_rules_persist(tmp_path):

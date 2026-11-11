@@ -259,6 +259,7 @@ def plan(args) -> int:
     (READING / args.batch).mkdir(parents=True, exist_ok=True)
     (READING / args.batch / "held-hosts.txt").write_text(
         "\n".join(sorted({c["host"] for c in pages if c["org_id"] in held})) + "\n", encoding="utf-8")
+    (READING / args.batch / "held-orgs.txt").write_text("\n".join(sorted(held)) + "\n", encoding="utf-8")
     print(f"held for the UN terms decision: {len(held)} organisations, "
           f"{sum(1 for c in pages if c['org_id'] in held)} pages")
     write_local(READING / args.batch / "plan.csv", PLAN_FIELDS, chosen)
@@ -281,9 +282,10 @@ class Stopped(SystemExit):
 
 
 def requests_sent(folder: Path) -> int:
-    """Requests a batch has made across all its runs: one line each in its logs."""
+    """Requests a batch has made across all its runs: one line each in its logs (the pages asked for,
+    and the redirect hops and robots.txt reads the fetch policy made on the way)."""
     n = 0
-    for name in ("requests.log", "policy-robots.log"):
+    for name in ("requests.log", "policy-requests.log"):
         p = folder / name
         if p.exists():
             with p.open(encoding="utf-8") as handle:
@@ -324,8 +326,14 @@ class ArchiveReader:
             session = requests.Session()
             session.headers.update({"User-Agent": careers.USER_AGENT})
         self.session, self.sleep, self.clock = session, sleep or time.sleep, clock or time.monotonic
-        self.last, self.refusals, self.failures = -1e9, 0, 0
         check_not_stopped(folder)
+        state = folder / "archive-state.json"
+        saved = json.loads(state.read_text(encoding="utf-8")) if state.exists() else {}
+        self.last, self.refusals, self.failures = -1e9, saved.get("refusals", 0), saved.get("failures", 0)
+
+    def _save_state(self) -> None:
+        (self.folder / "archive-state.json").write_text(
+            json.dumps({"refusals": self.refusals, "failures": self.failures}), encoding="utf-8")
 
     def _log(self, text: str) -> None:
         with (self.folder / "requests.log").open("a", encoding="utf-8") as handle:
@@ -341,7 +349,7 @@ class ArchiveReader:
         self._log(f"GET\t{what}")
         status, body = None, b""
         try:
-            response = self.session.get(DATA_HOST + filename, timeout=(30, 180), stream=True,
+            response = self.session.get(DATA_HOST + filename, timeout=(30, 180), stream=True, allow_redirects=False,
                                         headers={"Range": f"bytes={offset}-{offset + length - 1}"})
             status = response.status_code
             if status == 206:
@@ -356,23 +364,27 @@ class ArchiveReader:
             handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\t{status}\t{len(body)}\t{what}\n")
         if status == 206 and len(body) <= length + self.SLACK:
             self.refusals = self.failures = 0
+            self._save_state()
             return body
         if status == 403:
             stop_batch(self.folder, f"HTTP 403 ({what})")
         if status in (429, 503):
             self.refusals += 1
+            self._save_state()
             if self.refusals >= self.REFUSALS:
                 stop_batch(self.folder, f"{self.refusals} refusals in a row (HTTP {status})")
             return None
-        self.failures += 1
+        self.failures += 1          # a redirect, a 404, a 200 to a byte range, an error
+        self._save_state()
         if self.failures >= self.FAILURES:
             stop_batch(self.folder, f"{self.failures} failures in a row ({status})")
         return None
 
 
-def row_still_allowed(r: dict, verdicts: RobotsVerdicts, held_hosts: set[str]) -> str:
+def row_still_allowed(r: dict, verdicts: RobotsVerdicts, held_hosts: set[str],
+                      held_orgs: set[str] | frozenset = frozenset()) -> str:
     """'' when a planned row may be read now, else why not (R0's verdict, a shell host, a language
-    outside wave 1, a UN host held for the terms decision, or not an archive file)."""
+    outside wave 1, a UN organisation or host held for the terms decision, or not an archive file)."""
     host = (urlsplit(r["url"]).hostname or "").lower()
     if not r["filename"].startswith("crawl-data/"):
         return "not an archive file"
@@ -380,7 +392,7 @@ def row_still_allowed(r: dict, verdicts: RobotsVerdicts, held_hosts: set[str]) -
         return "shell host"
     if not in_wave_language(r["languages"]):
         return "language outside wave 1"
-    if host in held_hosts or roles.UN_HOSTS.search(host):
+    if host in held_hosts or roles.UN_HOSTS.search(host) or r.get("org_id", "") in held_orgs:
         return "held: the UN's terms of use"
     if verdicts.verdict(r["url"]) != "allowed":
         return "not allowed by R0"
@@ -395,8 +407,11 @@ def fetch_archive(args) -> int:
     out = folder / "pages"
     out.mkdir(parents=True, exist_ok=True)
     verdicts = RobotsVerdicts()
-    held_hosts = {h.strip() for h in (folder / "held-hosts.txt").read_text(encoding="utf-8").split()} \
-        if (folder / "held-hosts.txt").exists() else set()
+    if not (folder / "held-hosts.txt").exists() or not (folder / "held-orgs.txt").exists():
+        print(f"{batch}: the plan has no list of held UN organisations and hosts; run plan again first")
+        return 1
+    held_hosts = set((folder / "held-hosts.txt").read_text(encoding="utf-8").split())
+    held_orgs = set((folder / "held-orgs.txt").read_text(encoding="utf-8").split())
     reader = ArchiveReader(folder, cap)
     saved = failed = 0
     skipped = Counter()
@@ -405,7 +420,7 @@ def fetch_archive(args) -> int:
             target = out / f"{r['page_id']}.warc.gz"
             if target.exists():
                 continue
-            why = row_still_allowed(r, verdicts, held_hosts)
+            why = row_still_allowed(r, verdicts, held_hosts, held_orgs)
             if why:
                 skipped[why] += 1
                 continue
@@ -469,18 +484,26 @@ UN_PAGES = {   # P1-2 (19.6, R5): the UN careers feed and 12 agencies' careers p
 }
 
 
+LIVE_REDIRECTS = 2   # redirects the fetch policy may follow for one live request
+
+
 class LiveRun:
     """One live batch: confirm.Fetcher (the fetch policy, the survey's identity), step F's stop rules,
     the batch's size, every body kept outside the repository."""
 
     def __init__(self, batch: str, cap: int, fetcher=None, folder: Path | None = None):
+        import functools
+
         import confirm
         self.confirm = confirm
         self.batch, self.cap = batch, cap
         self.dir = folder or READING / batch
         (self.dir / "bodies").mkdir(parents=True, exist_ok=True)
         check_not_stopped(self.dir)
-        self.fetcher = fetcher or confirm.Fetcher(self.dir / "requests.log")
+        if fetcher is None:
+            fetcher = confirm.Fetcher(self.dir / "requests.log")
+            fetcher.fetch_url = functools.partial(fetcher.fetch_url, max_redirects=LIVE_REDIRECTS)
+        self.fetcher = fetcher
         state = self.dir / "state.json"
         saved = json.loads(state.read_text(encoding="utf-8")) if state.exists() else {}
         self.refusals = [tuple(x) for x in saved.get("refusals", [])]
@@ -494,13 +517,17 @@ class LiveRun:
             "refusals": self.refusals, "failures": self.failures,
             "blocked_hosts": sorted(self.blocked_hosts)}), encoding="utf-8")
 
+    def _note_policy(self, what: str, n: int = 1) -> None:
+        with (self.dir / "policy-requests.log").open("a", encoding="utf-8") as handle:
+            for _ in range(n):
+                handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\t{what}\n")
+
     def _note_policy_robots(self, host: str) -> None:
         """The fetch policy reads a host's robots.txt itself before the first request to it in a
-        process (or after a redirect to it); that read counts toward the batch's size."""
+        process; that read counts toward the batch's size."""
         if host and host not in self.robots_known:
             self.robots_known.add(host)
-            with (self.dir / "policy-robots.log").open("a", encoding="utf-8") as handle:
-                handle.write(f"{datetime.now(UTC).isoformat(timespec='seconds')}\trobots.txt by the policy\t{host}\n")
+            self._note_policy(f"robots.txt by the policy\t{host}")
 
     def _refused(self, status, protection: str) -> bool:
         return status in (401, 403, 429) or bool(protection)
@@ -520,7 +547,9 @@ class LiveRun:
             meta["body"] = body.read_bytes() if body.exists() else b""
             return meta
         is_robots = urlsplit(url).path == "/robots.txt"
-        needed = 1 + (0 if is_robots or host in self.robots_known else 1)
+        # The worst case is reserved before the request: the page, its host's robots.txt, and for
+        # each redirect the policy may follow (at most LIVE_REDIRECTS) the hop and a new host's robots.txt.
+        needed = 1 + (0 if is_robots or host in self.robots_known else 1) + 2 * LIVE_REDIRECTS
         if requests_sent(self.dir) + needed > self.cap:
             self.stopped = f"the batch's size of {self.cap} requests reached"
             return None
@@ -529,20 +558,29 @@ class LiveRun:
         else:
             self._note_policy_robots(host)
         r = self.fetcher.get(url, what)
+        error = r["error"] or ""
+        hops = LIVE_REDIRECTS if error == "redirect limit" else int(r.get("redirects") or 0)
+        if hops:
+            # Each hop and, since the hosts in between are not reported, a robots.txt read per hop.
+            self._note_policy(f"redirect hop or its host's robots.txt\t{host}", 2 * hops)
         final_host = (urlsplit(r["final_url"]).hostname or "").lower() if r["final_url"] else host
-        if final_host != host:
-            self._note_policy_robots(final_host)
+        off_host = bool(r["final_url"]) and site_host(final_host) != site_host(host)
+        if off_host:
+            self.robots_known.add(final_host)
         text = (r["body"] or b"").decode("utf-8", "replace")
         prot = self.confirm.bot_protection(r["status"], r["headers"], text) if r["status"] else ""
-        error = r["error"] or ""
         refusal = None
-        if self._refused(r["status"], prot) or error == "robots.txt refused the crawler":
+        if off_host:
+            # A page that leaves its host is outside the batch's list of hosts: not kept, host blocked.
+            self.blocked_hosts.add(host)
+            error, r = f"redirected off the host ({final_host})", {**r, "status": None, "body": b""}
+        elif self._refused(r["status"], prot) or error == "robots.txt refused the crawler":
             refusal = (host, self.confirm.service_of(prot, r["headers"].get("server", "")))
             self.blocked_hosts.add(host)
         elif error.startswith("robots.txt"):
             self.blocked_hosts.add(host)     # forbidden, unreachable or too long a delay: not read
-        self.refusals, self.failures = self.confirm.tally(
-            self.refusals, self.failures, refusal, r["status"] is None and not error.startswith("robots.txt"))
+        network_failure = r["status"] is None and not error.startswith(("robots.txt", "redirected off"))
+        self.refusals, self.failures = self.confirm.tally(self.refusals, self.failures, refusal, network_failure)
         meta = {"url": url, "what": what, "status": r["status"], "error": error, "final_url": r["final_url"],
                 "protection": prot, "content_type": r["headers"].get("content-type", ""),
                 "read_at": datetime.now(UTC).isoformat(timespec="seconds")}
@@ -1013,6 +1051,9 @@ def words_of(text: str) -> int:
 
 
 SECTION_TYPES: list[tuple[str, re.Pattern]] = [
+    ("working_relationships", re.compile(r"^about (?:the|our) (?:team|department|unit|division)\b", re.IGNORECASE)),
+    ("context", re.compile(r"^about (?:the|this) (?:programme|program|project)\b", re.IGNORECASE)),
+    ("essential_requirements", re.compile(r"^about (?:the )?(?:candidate|applicant)s?\b", re.IGNORECASE)),
     ("about_organisation", re.compile(r"^(?:about(?:$| (?!the (?:role|job|position|post|opportunity|assignment|"
                                       r"vacancy)\b|this (?:role|job|position|post|opportunity)\b|you\b|the candidate\b))|"
                                       r"who we are|our organi[sz]ation|the organi[sz]ation|organi[sz]ational "
@@ -1159,12 +1200,14 @@ FACTS: dict[str, re.Pattern] = {
     "pay": re.compile(r"(?<![\w])(?:usd|us\$|\$|eur|€|£|gbp|kes|ksh|ngn|₦|inr|₹|rs\.?|chf|cad|aud|xof|fcfa|bdt|"
                       r"ugx|tzs|etb|ghs|zar|sek|nok|dkk)\s?\d[\d,.\s]{2,}|\b\d[\d,.]{2,}\s?(?:usd|eur|€|£|gbp|kes|ksh|"
                       r"ngn|inr|chf|xof|fcfa|bdt|ugx|tzs|etb|ghs|zar|sek|nok|dkk|lakhs?)\b|\b(?:salary|"
-                      r"remuneration|stipend|honorarium|gross pay|net pay|r[ée]mun[ée]ration|salaire)\b[^.\n]{0,25}?"
-                      r"\b\d[\d,.]{2,}|\b(?:salary|pay) (?:scale|band|grade|range)\b|\bgrade\s?[A-Z]{0,2}-?\d+ of the\b|"
+                      r"remuneration|stipend|honorarium|gross pay|net pay|r[ée]mun[ée]ration|salaire|allowances?|"
+                      r"per diem)\b[^.\n]{0,25}?\b(?!(?:19|20)\d{2}\b)\d[\d,.]{2,}|\b(?:salary|pay) (?:scale|band|grade)"
+                      r"\s*:?\s*[A-Z]{0,3}-?\d|\bon the [\w\s]{2,40}? salary scale\b|\bgrade\s?[A-Z]{0,2}-?\d+ of the\b|"
                       r"\b(?:annual|monthly) net (?:base )?salary\b|\bnet base salary\b|\bpay band\b|"
                       r"\b\d+(?:\.\d+)?\s*(?:lakhs?|crores?|lpa)\b", re.IGNORECASE),
     "pay_vague": re.compile(r"\b(?:competitive|attractive|negotiable|commensurate)\b[^.\n]{0,30}\b(?:salary|pay|"
-                            r"remuneration|package|compensation)\b|\bsalary\s*:?\s*(?:negotiable|competitive|tbc|tbd)\b|"
+                            r"remuneration|package|compensation)\b|\b(?:salary|pay|remuneration)\b[^.\n]{0,25}?\b"
+                            r"(?:commensurate|negotiable|competitive|depending on experience|tbc|tbd)\b|"
                             r"\bsalaire (?:attractif|comp[ée]titif|selon)\b", re.IGNORECASE),
     "grade": re.compile(r"\b(?:grade|band|level|cat[ée]gorie|groupe)\s*:?\s*[A-Z]{0,3}-?\d|\b(?:P|D|G|GS|NO)-\s?[1-7A-E]\b|"
                         r"\bNO[A-E]\b|\b(?:SB|SC|ICS|LICA|IICA|NPSA|IPSA)-?\d", re.IGNORECASE),
@@ -1181,9 +1224,10 @@ FACTS: dict[str, re.Pattern] = {
                                   r"(?:contract|fixed|appointment)\b", re.IGNORECASE),
     "hours": re.compile(r"\bfull[- ]time\b|\bpart[- ]time\b|\b\d{1,2}(?:\.\d)?\s*(?:hours|hrs|h)\s*(?:per|a|/)\s*"
                         r"week|\btemps (?:plein|partiel)\b|\b\d{2,3}\s?%\s*(?:fte|time|temps|of full[- ]time)\b|"
-                        r"\bfte\b|\blevel of effort\b|\bworking hours\b|\bheures (?:par|hebdomadaires)\b", re.IGNORECASE),
-    "duty_station": re.compile(r"\bduty station\b|\blocation\s*:|\bbased in\b|\blieu d'affectation\b|"
-                               r"\blieu de (?:travail|mission)\b|\blieu\s*:|\bbase(?:d)? (?:at|in)\b|\bplace of "
+                        r"\bfte\b|\blevel of effort\b|(?<!outside )(?<!outside of )\bworking hours\b|"
+                        r"\bheures (?:par|hebdomadaires)\b", re.IGNORECASE),
+    "duty_station": re.compile(r"\bduty station\b|\blocation\s*:|(?<![\w-])based in\b|\blieu d'affectation\b|"
+                               r"\blieu de (?:travail|mission)\b|\blieu\s*:|(?<![\w-])based? (?:at|in)\b|\bplace of "
                                r"(?:work|assignment|performance)\b|\boffice location\b|\blocalisation\s*:|"
                                r"\bposte bas[ée]\b|\blocation of (?:the )?(?:post|position|assignment)\b", re.IGNORECASE),
     "remote": re.compile(r"\bremote\b|\bhome[- ]based\b|\bwork from home\b|\bhybrid\b|\bt[ée]l[ée]travail\b|"
@@ -1247,9 +1291,23 @@ FACTS: dict[str, re.Pattern] = {
     "reference_number": re.compile(r"\b(?:reference|ref\.?|vacancy|requisition|job|req)\s*(?:no\.?|number|id|#|code)"
                                    r"\s*:?\s*[A-Z0-9][A-Z0-9/_.-]{2,}|\br[ée]f[ée]rence\s*:", re.IGNORECASE),
 }
+def facts_of(text: str) -> set[str]:
+    """The facts an advert gives, by FACTS, each match checked: a duration followed by "experience"
+    is years asked, not the contract's length."""
+    found = set()
+    for kind, pattern in FACTS.items():
+        for m in pattern.finditer(text):
+            if kind == "contract_length" and re.search(r"exp[ée]rience", text[m.end():m.end() + 50], re.IGNORECASE):
+                continue
+            found.add(kind)
+            break
+    return found
+
+
 DECISION_FACTS = ["pay", "contract_type", "contract_length", "hours", "duty_station", "travel", "closing_date",
                   "closing_time", "start_date", "selection_steps", "how_to_apply", "languages"]
 FIELD_FACTS = ["accompanied", "hardship_rr", "housing"]
+OPTIONAL_FACTS = {"travel", "hours"}
 
 STANDARDS: dict[str, re.Pattern] = {
     "Sphere": re.compile(r"\bsphere\b(?: standards| handbook| minimum)?", re.IGNORECASE),
@@ -1299,7 +1357,8 @@ STANDARDS: dict[str, re.Pattern] = {
 APPLICANT = r"(?:candidates?|applicants?|you|the (?:successful )?(?:candidate|applicant|post ?holder|incumbent))"
 RESTRICTIONS: dict[str, re.Pattern] = {
     "sex": re.compile(r"\b(?:female|male|women|men)\s+(?:candidates?|applicants?)\s+only\b|\bonly\s+(?:female|male|women|"
-                      r"men)\s+(?:candidates?|applicants?|may apply|need apply|should apply|are eligible)\b|\b" + APPLICANT +
+                      r"men)\s+(?:candidates?|applicants?|may apply|need apply|should apply|are eligible)\b|"
+                      r"\bfor (?:women|men|females|males) only\b|\b" + APPLICANT +
                       r"\s+(?:must|should) be (?:a )?(?:female|male|woman|man)\b|\bopen only to (?:female|male|women|"
                       r"men)\b|\bopen to (?:female|male|women|men)(?: candidates| applicants)? only\b|\bposte "
                       r"r[ée]serv[ée] aux (?:femmes|hommes)\b|\buniquement (?:aux|des) (?:candidates|femmes|hommes)\b|"
@@ -1307,7 +1366,9 @@ RESTRICTIONS: dict[str, re.Pattern] = {
     "age": re.compile(r"\b" + APPLICANT + r"\b[^.\n]{0,40}?\b(?:aged?|between the ages? of|not (?:older|more) than|under|"
                       r"below|must not (?:be older than|exceed))\s*(?:between\s+)?\d{2}\s*(?:(?:-|–|to|and)\s*\d{2}\s*)?"
                       r"(?:years|yrs)\b|"
-                      r"\b(?:upper )?(?:age limit|maximum age)\s*(?:of|:|is)?\s*\d{2}\b|\bcandidat(?:e|s|es)?\b[^.\n]{0,40}?"
+                      r"\b(?:upper )?(?:age limit|maximum age)\s*(?:of|:|is)?\s*\d{2}\b|\bbetween\s+\d{2}\s*(?:and|-|–|to)\s*"
+                      r"\d{2}\s*years?\s+(?:old|of age)\b|\b\d{2}\s*years?\s*(?:old\s*)?or\s*(?:younger|less|under|below)\b|"
+                      r"(?m:^\s*age\s*:\s*\d{2}\s*(?:-|–|to)\s*\d{2}\b)|\bcandidat(?:e|s|es)?\b[^.\n]{0,40}?"
                       r"\b[âa]g[ée]e?s? de (?:moins de|plus de|au plus|entre) \d{2}\b|\b[âa]ge (?:maximum|limite)\s*:?\s*"
                       r"\d{2}\s*ans\b", re.IGNORECASE),
     "religion": re.compile(r"\bmust be (?:a )?(?:practising|committed|born-again|devout)\s+(?:christian|muslim|"
@@ -1319,25 +1380,57 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                                  r"married) (?:candidate|applicant)s? only\b|\bc[ée]libataires? uniquement\b",
                                  re.IGNORECASE),
     "nationality": re.compile(r"\b(?:nationals?|citizens?) (?:of [a-z]+(?: [a-z]+)? )?only\b|\bonly (?:open to )?(?:[a-z]+ )?"
-                              r"(?:nationals|citizens)\b|\b" + APPLICANT + r" must be (?:a )?(?:[a-z]+ )?(?:national|"
+                              r"(?:nationals|citizens)\b|\b" + APPLICANT + r" must be (?:an? )?(?:[a-z]+ )?(?:national|"
                               r"citizen)s?\b|\bopen (?:only )?to (?:[a-z]+ )?nationals(?: only)?\b|\blocal candidates "
                               r"only\b|\bressortissants? [^.\n]{0,30}uniquement\b|\bnationalit[ée] [^.\n]{0,20}"
                               r"(?:exig[ée]e|obligatoire)\b|\bnon-?nationals? only\b", re.IGNORECASE),
     # UN-style national posts are a case of their own (section 20.2), recorded apart from nationality.
-    "national_post": re.compile(r"\bnational (?:position|post|officer|professional officer|staff (?:position|post))\b|"
-                                r"\bNO-?[A-E]\b|\bposte national\b|\bnational (?:consultant|recruitment)\b"),
+    "national_post": re.compile(r"(?i:\bnational (?:position|post|officer|professional officer|staff (?:position|post)|"
+                                r"consultant|recruitment)\b|\bposte national\b)|\bNO-?[A-E]\b"),
     "disability": re.compile(r"\bable[- ]bodied\b", re.IGNORECASE),
     "photo_appearance": re.compile(r"(?<!not )(?<!n't )(?<!never )\b(?:attach|include|send|submit|enclose) (?:a |your )?"
-                                   r"(?:recent )?(?:passport[- ]size )?(?:photo|photograph|picture)\b|\bpresentable\b|"
-                                   r"\bgood appearance\b|\bheight\s*(?:of|:)?\s*(?:at least\s*)?\d|\bphoto "
-                                   r"(?:d'identit[ée]|r[ée]cente)\b", re.IGNORECASE),
+                                   r"(?:recent )?(?:passport[- ]size )?(?:photo|photograph|picture)\b|\b(?:be|look) "
+                                   r"presentable\b|\bpresentable (?:appearance|candidates?|applicants?)\b|\bgood appearance\b|"
+                                   r"\b(?:minimum height|height requirement)\b|\b" + APPLICANT +
+                                   r"\b[^.\n]{0,30}\b(?:must|should) (?:be|have)\b[^.\n]{0,20}\bheight\b|"
+                                   r"\bphoto (?:d'identit[ée]|r[ée]cente)\b", re.IGNORECASE),
 }
+# A match about the people an organisation serves, not the applicant, is not a restriction.
+SERVED = re.compile(r"\b(?:children|child|youth|young people|girls?|boys?|women|men|adolescents?|beneficiar\w*|pupils?|"
+                    r"students?|infants?|participants?|survivors?|patients?|learners?|enfants|jeunes|filles|femmes)\b",
+                    re.IGNORECASE)
+NOT_NATIONALITY = re.compile(r"\ball nationals\b|\bnationals? and non-?nationals?\b|\bnon-?nationals? and nationals?\b|"
+                             r"\bregardless of (?:their )?nationality\b", re.IGNORECASE)
+SERVICE_PLACE = re.compile(r"\b(?:spaces?|shelters?|centres?|centers?|sessions?|groups?|clinics?|toilets?|latrines?|"
+                           r"safe spaces?)\b", re.IGNORECASE)
+
+
+def restrictions_of(text: str) -> set[str]:
+    """The explicit restrictions an advert states (employer-side plan, section 20.2), each match checked
+    against its surroundings: an age about the people served, "open to all nationals", or a service
+    "for women only" is not a restriction on who may apply."""
+    found = set()
+    for kind, pattern in RESTRICTIONS.items():
+        for m in pattern.finditer(text):
+            before = text[max(0, m.start() - 40):m.start()]
+            window = before + m.group(0) + text[m.end():m.end() + 30]
+            if kind == "age" and (SERVED.search(m.group(0)) or (SERVED.search(before) and
+                                                                 not re.search(APPLICANT, m.group(0), re.IGNORECASE))):
+                continue
+            if kind == "nationality" and NOT_NATIONALITY.search(window):
+                continue
+            if kind == "sex" and m.group(0).lower().startswith("for ") and SERVICE_PLACE.search(before):
+                continue
+            found.add(kind)
+            break
+    return found
 FAIRNESS_CATEGORIES = [k for k in RESTRICTIONS if k != "national_post"]
 INCLUSION: dict[str, re.Pattern] = {
     "women_encouraged": re.compile(r"\b(?:women|female (?:candidates|applicants))[^.\n]{0,30}(?:strongly )?encouraged\b|"
                                    r"\bencourage[sd]? (?:applications from |)(?:women|female)\b|\bcandidatures? "
                                    r"f[ée]minines? (?:sont )?(?:vivement )?encourag[ée]es\b", re.IGNORECASE),
-    "both_sexes_mark": re.compile(r"\((?:h\s*/\s*f|f\s*/\s*h|m\s*/\s*f|f\s*/\s*m|m\s*/\s*w\s*/\s*d|h\s*/\s*f\s*/\s*x)\)|"
+    "both_sexes_mark": re.compile(r"\((?:h\s*/\s*f|f\s*/\s*h|m\s*/\s*f|f\s*/\s*m|m\s*/\s*w\s*/\s*d|m\s*/\s*f\s*/\s*d|"
+                                  r"h\s*/\s*f\s*/\s*x)\)|"
                                   r"\b(?:h/f|f/h)\b", re.IGNORECASE),
     "disability_encouraged": re.compile(r"\b(?:persons?|people|candidates?|applicants?) with disabilit(?:y|ies)[^.\n]"
                                         r"{0,40}encouraged\b|\bdisability confident\b|\bguaranteed interview\b|"
@@ -1360,14 +1453,17 @@ YEARS_FR = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?\s*(?:ans|ann[ée]es)\
                       r"exp[ée]rience[^.;\n]{0,40}?(?:d'au moins|minimum de|de|d')\s*" + NUM + r"\s*(?:ans|ann[ée]es)", re.IGNORECASE)
 MASTER = re.compile(r"\bmaster'?s\b|\bmasters? (?:degree|of|in|en)\b|\badvanced (?:university )?degree\b|\bpost-?graduate "
                     r"(?:degree|diploma|qualification)\b|\bm\.sc\b|\bmsc\b|\bm\.a\.|\bma (?:in|degree)\b|\bmba\b|\bmph\b|"
-                    r"\bma[îi]trise\b|\bbac ?\+ ?5\b|\bdipl[ôo]me (?:universitaire )?sup[ée]rieur\b", re.IGNORECASE)
+                    r"\bma[îi]trise (?:en|universitaire)\b|\bdipl[ôo]me de ma[îi]trise\b|\bbac ?\+ ?5\b|"
+                    r"\bdipl[ôo]me (?:universitaire )?sup[ée]rieur\b", re.IGNORECASE)
 BACHELOR = re.compile(r"\bbachelor'?s?\b|\bfirst[- ]level (?:university )?degree\b|\bundergraduate degree\b|\bb\.sc\b|"
-                      r"\bbsc\b|\bb\.a\.|\bba (?:in|degree)\b|\blicence (?:en|in|universitaire|professionnelle|de)\b|"
+                      r"\bbsc\b|\bb\.a\.|\bba (?:in|degree)\b|\blicence (?:en|in|universitaire|professionnelle)\b|"
+                      r"\blicence de (?!conduire)|"
                       r"\bbac ?\+ ?[34]\b|\buniversity degree\b|\b(?:a|relevant|academic) degree in\b|\bhnd\b",
                       re.IGNORECASE)
 YEAR_RANGE = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?:-|–|to|à|a)\s*" + NUM +
                         r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?=\s*(?:\+\s*)?(?:years?|ans|ann[ée]es)\b)", re.IGNORECASE)
-NOT_EXPERIENCE = re.compile(r"(?:under|below|over|aged?|children|age of|moins de|[âa]g[ée]e?s? de)\s*$", re.IGNORECASE)
+NOT_EXPERIENCE = re.compile(r"(?:under|below|aged?|children|age of|moins de|[âa]g[ée]e?s? de)\s*$", re.IGNORECASE)
+YEARS_AGO = re.compile(r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?:\+\s*)?(?:years?|ans)\s+(?:ago|old)\b", re.IGNORECASE)
 ADDITIONAL_YEARS = re.compile(r"\b(?:first[- ]level|bachelor'?s?)\b[^.]{0,200}?\b" + NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?"
                               r"additional years", re.IGNORECASE)
 PHD = re.compile(r"\bph\.?d\b|\bdoctora(?:te|l)\b|\bdoctorat\b", re.IGNORECASE)
@@ -1420,10 +1516,16 @@ def years_asked(text: str) -> tuple[str, str]:
     def numbers(chunk: str) -> list[int]:
         out = []
         for pattern in (YEARS_EN, YEARS_FR):
-            for m in pattern.finditer(chunk):
-                if NOT_EXPERIENCE.search(chunk[max(0, m.start() - 15):m.start()]):
+            pos = 0
+            while m := pattern.search(chunk, pos):
+                idx = next((i for i in range(1, len(m.groups()) + 1) if m.group(i)), 0)
+                if not idx:
+                    break
+                at, end = m.start(idx), m.end(idx)
+                pos = end            # the next search starts after this number, so none is swallowed
+                if NOT_EXPERIENCE.search(chunk[max(0, at - 15):at]) or YEARS_AGO.match(chunk, end):
                     continue
-                n = next((_num(g) for g in m.groups() if g), 0)
+                n = _num(m.group(idx))
                 if 0 < n <= 30:
                     out.append(n)
         return out
@@ -1475,16 +1577,19 @@ LENGTH_BANDS = {"national_ngo_south": (200, 600, "whole"), "ingo": (650, 1150, "
 
 def score_decision_facts(given: set[str]) -> int:
     """Section 5's decision facts (field conditions belong to field realism, which is coded, not
-    scored here): 3 for every fact with pay, 0 under a third; pay counts double. The anchors for 1
-    and 2 (a third, two thirds) are provisional until Phase 0's guide fixes them."""
-    units = len(DECISION_FACTS) + 1
-    have = sum(1 for f in DECISION_FACTS if f in given) + ("pay" in given)
+    scored here): 3 for every applicable fact with pay, 0 under a third without pay; pay counts
+    double. Travel and hours apply only "where they vary", which a script cannot tell, so they count
+    when stated and are not required. The anchors for 1 and 2 (a third, two thirds) are provisional
+    until Phase 0's guide fixes them."""
+    facts = [f for f in DECISION_FACTS if f not in OPTIONAL_FACTS or f in given]
+    units = len(facts) + 1
+    have = sum(1 for f in facts if f in given) + ("pay" in given)
     share = have / units
     if share >= 1 and "pay" in given:
         return 3
     if share >= 2 / 3:
         return 2
-    if share >= 1 / 3:
+    if share >= 1 / 3 or "pay" in given:
         return 1
     return 0
 
@@ -1557,6 +1662,13 @@ def norm_sentence(s: str) -> str:
 CHROME_WORDS = 6
 
 
+def carries_meaning(line: str) -> bool:
+    """A short line the measures read (a known standard text, a fact, an inclusion statement or a
+    restriction) is never site furniture, however often it recurs."""
+    return bool(KNOWN_STANDARD.search(line)) or any(p.search(line) for p in FACTS.values()) or \
+        any(p.search(line) for p in INCLUSION.values()) or any(p.search(line) for p in RESTRICTIONS.values())
+
+
 def chrome_lines(adverts: list[dict]) -> dict[str, set[str]]:
     """Per organisation with three or more pages read as HTML, the short lines (at most CHROME_WORDS
     words, and not a recognised section heading) on at least 60% of them: menus, buttons and other
@@ -1566,7 +1678,8 @@ def chrome_lines(adverts: list[dict]) -> dict[str, set[str]]:
     for ad in adverts:
         if ad["method"] == "html":
             by_org[ad["org_id"]].append({ln["text"] for ln in ad["lines"] if words_of(ln["text"]) <= CHROME_WORDS
-                                         and section_type(ln["text"]) == "unclassified"})
+                                         and section_type(ln["text"]) == "unclassified" and not
+                                         carries_meaning(ln["text"])})
     out = {}
     for o, pages in by_org.items():
         if len(pages) >= 3:
@@ -1580,9 +1693,9 @@ def shingles(text: str, k: int = 5) -> set[int]:
     return {zlib.crc32(" ".join(w[i:i + k]).encode("utf-8")) for i in range(max(len(w) - k + 1, 1))}
 
 
-def comparable_title(title: str) -> str:
-    """A title as copies are compared: a board's ' at <employer>' ending dropped."""
-    t = re.split(r"\s+(?:at|chez)\s+", title or "", maxsplit=1)[0]
+def comparable_title(title: str, source: str = "board") -> str:
+    """A title as copies are compared: a board's ' at <employer>' ending dropped (boards only)."""
+    t = re.split(r"\s+(?:at|chez)\s+", title or "", maxsplit=1)[0] if source == "board" else (title or "")
     return roles.normalise(t).text
 
 
@@ -1597,7 +1710,8 @@ def minhash(sh: set[int], seeds: list[int]) -> list[int]:
 SOURCE_RANK = {"step-f-feed": 0, "archive": 1, "feed": 2, "board": 3}
 
 
-def near_duplicates(adverts: list[dict], threshold: float = 0.8) -> dict[str, str]:
+def near_duplicates(adverts: list[dict], threshold: float = 0.8,
+                    keep: set[str] | frozenset = frozenset()) -> dict[str, str]:
     """advert id -> the id it duplicates (the same advert in another copy: an archived copy, a board's
     copy or a feed's), by 5-word shingles; an employer's own copy is kept over a board's."""
     rng = random.Random(SEED)
@@ -1610,8 +1724,9 @@ def near_duplicates(adverts: list[dict], threshold: float = 0.8) -> dict[str, st
     for aid, sig in sigs.items():
         for band in range(16):
             buckets[(band, tuple(sig[band * 4:(band + 1) * 4]))].append(aid)
-    order = {ad["id"]: (SOURCE_RANK.get(ad["source"], 3), ad["id"]) for ad in adverts}
-    titles = {ad["id"]: comparable_title(ad.get("title", "")) for ad in adverts}
+    # Held-out adverts (`keep`) are always the copy kept, so no copy of one enters the evidence.
+    order = {ad["id"]: (ad["id"] not in keep, SOURCE_RANK.get(ad["source"], 3), ad["id"]) for ad in adverts}
+    titles = {ad["id"]: comparable_title(ad.get("title", ""), ad["source"]) for ad in adverts}
     dup = {}
     for ids in buckets.values():
         if len(ids) < 2:
@@ -1695,7 +1810,7 @@ def board_org(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tup
     key = re.sub(r"[^a-z0-9]", "", emp.lower())
     if key and key in names:
         return names[key], "matched by name"
-    return ("board-employer:" + hashlib.sha1(key.encode()).hexdigest()[:10] if key else
+    return ("board-employer:h" + hashlib.sha1(key.encode()).hexdigest()[:10] if key else
             "board-employer:unknown"), "board, employer not in the list"
 
 
@@ -1743,11 +1858,11 @@ def measure(_args=None) -> int:
             kept.append(ad)
         else:
             dropped["not an advert (too short or no advert signals)"] += 1
-    dup = near_duplicates(kept)
-    kept = [a for a in kept if a["id"] not in dup]
-    dropped["near-duplicate of another copy"] += len(dup)
     saved_path = WORK / "ai-test-set.json"
     saved = json.loads(saved_path.read_text(encoding="utf-8")) if saved_path.exists() else None
+    dup = near_duplicates(kept, keep=set((saved or {}).get("test", [])))
+    kept = [a for a in kept if a["id"] not in dup]
+    dropped["near-duplicate of another copy"] += len(dup)
     pilot, held = ai_test_set(kept, saved)
     saved_path.write_text(json.dumps({"pilot": pilot, "test": sorted(held)}), encoding="utf-8")
     # The cap of 30 (French 60) counts evidence only; held-out adverts are kept beside it.
@@ -1769,7 +1884,7 @@ def measure(_args=None) -> int:
         std_section_words = sum(s["words"] for s in secs if s["type"] in STANDARD_SECTIONS)
         standard_share = min(1.0, max(std_words, std_section_words) / max(words_total, 1))
         words_role = max(0, words_total - max(std_words, std_section_words))
-        given = {k for k, p in FACTS.items() if p.search(text)}
+        given = facts_of(text)
         f = ad.get("facts") or {}
         if f.get("pay"):
             given.add("pay")
@@ -1810,7 +1925,7 @@ def measure(_args=None) -> int:
             "facts_given": ";".join(sorted(given & set(FACTS))), "facts_missing": ";".join(missing),
             "years_min": y_min, "years_alt": y_alt, "degree": degree_asked(req_text),
             "standards": ";".join(sorted(k for k, p in STANDARDS.items() if p.search(text))),
-            "restrictions": ";".join(sorted(k for k, p in RESTRICTIONS.items() if p.search(text))),
+            "restrictions": ";".join(sorted(restrictions_of(text))),
             "inclusion": ";".join(sorted(k for k, p in INCLUSION.items() if p.search(text))),
             "median_sentence": f"{med:.1f}", "score_decision_facts": s_df, "score_readability": s_rd,
             "score_length": "" if s_ln is None else s_ln, "score_findability": s_fd,
@@ -1886,7 +2001,7 @@ ALLOWED = {
 LISTS = {"facts_given": set(FACTS), "facts_missing": set(FACTS), "standards": set(STANDARDS),
          "restrictions": set(RESTRICTIONS), "inclusion": set(INCLUSION)}
 FORMS = {   # free-text columns: identifiers and codes only, never words from an advert
-    "advert_id": re.compile(r"[0-9a-f]{16}"), "org_id": re.compile(r"[\w.:-]{1,80}"),
+    "advert_id": re.compile(r"[0-9a-f]{16}"), "org_id": re.compile(r"[\w.:/-]{1,80}"),
     "system": re.compile(r"[A-Za-z][A-Za-z .()]{0,40}"), "grade": re.compile(r"(?:[A-Z]{1,4}-[0-9A-E]{1,2})?"),
     "period": re.compile(r"(?:\d{4}-\d{2})?"), "batch": re.compile(r"r[1-5]|step-f|earlier"),
     "org_type_basis": re.compile(r"rule|matched by name|board, employer not in the list|decision"),
