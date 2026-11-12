@@ -236,9 +236,9 @@ def r6_index(_args=None) -> int:
     R6_INDEX_READS reads."""
     import careers
     folder = READING / "r6"
-    reader = ArchiveReader(folder, BATCH_CAPS["r6"])
     reads = 0
     try:
+        reader = ArchiveReader(folder, BATCH_CAPS["r6"])
         for crawl in R6_CRAWLS:
             target = folder / "index" / f"{crawl}.cdx.gz"
             if target.exists():
@@ -292,6 +292,7 @@ def select_r6(rows: list[dict], verdict, n: int = R6_PAGES, seed: int = SEED) ->
 def plan_r6() -> int:
     import confirm
     folder = READING / "r6"
+    check_not_stopped(folder)
     robots = folder / "robots" / f"{RELIEFWEB}.json"
     if not robots.exists():
         print("r6: ReliefWeb's robots.txt has not been read (fetch-live --batch r6 first); nothing planned")
@@ -817,10 +818,16 @@ def fetch_r6_robots() -> int:
     the plan and the archive reader judge each archived page by it."""
     folder = READING / "r6"
     url = f"https://{RELIEFWEB}/robots.txt"
-    if not r6_may_retry(folder / "live" / "bodies" / f"{page_id(url)}.json", datetime.now(UTC)):
+    record = folder / "live" / "bodies" / f"{page_id(url)}.json"
+    if not r6_may_retry(record, datetime.now(UTC)):
         return 1
     run = LiveRun("r6", BATCH_CAPS["r6-live"], folder=folder / "live")
-    meta = run.get(url, f"robots.txt {RELIEFWEB}")
+    if record.exists():
+        meta = json.loads(record.read_text(encoding="utf-8"))   # an answer on disk: no request
+        body = record.with_suffix(".bin")
+        meta["body"] = body.read_bytes() if body.exists() else b""
+    else:
+        meta = run.get(url, f"robots.txt {RELIEFWEB}")
     if not meta or meta.get("status") is None:
         print(f"r6: ReliefWeb's robots.txt not read ({(meta or {}).get('error') or run.stopped}); its pages are not read")
         return 1
@@ -832,6 +839,13 @@ def fetch_r6_robots() -> int:
     import confirm
     verdict = confirm.robots_verdict(meta["status"], text, f"https://{RELIEFWEB}/job/1234567/example")
     print(f"r6: ReliefWeb's robots.txt answered {meta['status']}; a job page is {verdict} for the survey")
+    if run._refused(meta["status"], meta.get("protection", "")):
+        try:
+            stop_batch(folder, f"ReliefWeb refused the survey's robots.txt read ({meta['status']}"
+                               f"{', ' + meta['protection'] if meta.get('protection') else ''}); R6 ends")
+        except Stopped as stop:
+            print(stop)
+        return 1
     return 0
 
 

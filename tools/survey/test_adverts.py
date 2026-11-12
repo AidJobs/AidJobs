@@ -7,6 +7,8 @@ import random
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import adverts
@@ -569,6 +571,23 @@ def test_a_failed_reliefweb_robots_read_is_retried_only_an_hour_later(tmp_path):
     assert not adverts.r6_may_retry(record, second + timedelta(minutes=30))
     record.write_text(json.dumps({"status": 200, "read_at": second.isoformat()}), encoding="utf-8")
     assert adverts.r6_may_retry(record, second) and record.exists()  # an answer is replayed, not asked again
+
+
+def test_a_refused_reliefweb_robots_answer_on_disk_ends_r6_without_a_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(adverts, "READING", tmp_path)
+    bodies = tmp_path / "r6" / "live" / "bodies"
+    bodies.mkdir(parents=True)
+    (tmp_path / "r6" / "live" / "state.json").write_text(json.dumps(
+        {"refusals": [["reliefweb.int", "aws"]], "failures": 0, "blocked_hosts": ["reliefweb.int"]}), encoding="utf-8")
+    (bodies / f"{adverts.page_id('https://reliefweb.int/robots.txt')}.json").write_text(json.dumps(
+        {"status": 202, "error": "", "protection": "AWS WAF", "read_at": "2026-11-12T13:09:32+00:00"}),
+        encoding="utf-8")
+    assert adverts.fetch_r6_robots() == 1
+    assert "R6 ends" in (tmp_path / "r6" / "stopped.txt").read_text(encoding="utf-8")
+    assert adverts.live_requests_sent(tmp_path / "r6" / "live") == 0
+    assert adverts.r6_index() == 0 and adverts.requests_sent(tmp_path / "r6") == 0
+    with pytest.raises(adverts.Stopped):
+        adverts.plan_r6()
 
 
 def test_a_reliefweb_employer_outside_the_list_is_estimated_international():
