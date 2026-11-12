@@ -335,6 +335,8 @@ Classification uses the destination path and URL structure, not the extracted ti
 
 The W-44 tests (`tests/test_link_admission.py`) admit the four real links with their fields and reject them as `thin_vacancy` without; they keep rejected a second slug next to the id, a two-word slug, a slug before the token, upper-case and empty-word page slugs, a dotted page name, and a path without a vacancy token and id. The implementation tests cover the positive case, `thin_vacancy` for the 18 confirmed listing rows, the seven junk ICRC candidates, the 46 membership rows with populated fields, profile and the other non-vacancy destinations, and a missing, empty, and non-numeric `job_id`.
 
+**Amendment, decided by the user on 11 November 2026 (ledger W-55), effective when the user explicitly approves merging this record.** A platform reader's job card counts as a structured record, like a JSON-LD posting: a card a reader chosen by page structure reads (record class `reader_card`), with its title, a link on the listing's own site, and a non-blank location, deadline or contract type, is admitted although its link carries no job number. Why: UNICEF's new careers site (the "Sites" engine) links each job as `/jobs/{title-slug}`, so every card was rejected as `no_qualifying_family`. A card without any of the three is too thin, as a posting without them is. Destination rejections still apply first; the reader skips a card whose link leaves the listing's site or links to the listing itself, or that holds more than one title link. Rows without the reader's mark are judged as before.
+
 The Global Partnership for Education extraction miss, the International Rescue Committee landing link, the Médecins Sans Frontières `/careers` 404, and the ReliefWeb challenge stay explicit findings. A passing C3 does not close them.
 
 #### C4. Confirm a thin row
@@ -392,6 +394,7 @@ Re-scope of the confirmation fetch. `crawl_source` already fetches every detail 
 - **Job pages for new jobs only.** A listing's job pages are opened for rows that are not yet saved, within a cap per crawl and in the one admission batch; rows beyond the cap are logged `detail_unconfirmed`, not saved, and read by a later crawl. This replaces reopening every job page of a 1–50 candidate listing on every crawl, and covers listings above 50.
 - **Known jobs' pages,** within each crawl's budget: reopened when the job's deadline is within 3 days or has just passed, so an extension is caught, plus a slow rotation through all other known jobs.
 - The UNICEF skip and the UNDP behaviour stay until platform readers replace them (ledger W-19).
+- Built on 11 November 2026 (ledger W-36): the cap is 40 new pages and 10 saved jobs' pages a crawl, deadlines first; "near or just passed" is within 3 days of the run's day either side; each saved job's rotation turn comes once in seven crawls, and when more qualify than the cap the order's start moves on each crawl (each turn, for the rotation). "Too thin" covers a vacancy link without location, deadline or contract type and a structured posting from the listing without them: both a page can cure, and both may be observed. Rows with any other rejection are not opened, since no page can change it.
 
 #### C5. Exit on the six sites
 

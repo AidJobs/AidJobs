@@ -266,6 +266,8 @@ def test_place_job_counts_only_a_true_remote_flag():
 
 
 class _Run:
+    token = "run-1"
+
     def __init__(self):
         self.saved = []
 
@@ -288,6 +290,7 @@ def test_the_crawl_reads_countries_before_saving(monkeypatch):
     crawler.extraction_logger = None
     crawler.html_storage = None
     crawler.quality_scorer = None
+    crawler._saved_jobs_for_pages = lambda source_id, run_token: ({}, 0, None)
     rows = [
         {"title": "Officer", "apply_url": "https://jobs.example/job/1/officer",
          "location_raw": "Democratic Republic of Congo"},

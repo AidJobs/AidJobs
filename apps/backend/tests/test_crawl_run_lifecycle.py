@@ -94,11 +94,22 @@ def test_the_record_of_a_complete_crawl():
         "listing_expected": 266,
         "listing_stop": "no More Jobs link",
         "valid_count": 266,
+        "observed": 0,
         "failed_saves": 0,
         "unrecorded": 0,
         "matched_active": 232,
         "counted": True,
     }
+
+
+def test_saved_jobs_seen_through_thin_rows_are_valid_rows():
+    result = {"counts": {"observed": 12}, "listing": COMPLETE, "valid": 0}
+    record = run_lifecycle(result, active_at_start=16, matched_active=12)
+    assert (record["valid_count"], record["observed"]) == (0, 12)
+    assert record["counted"] is True, "12 observed, 12 of 16 open jobs matched"
+    no_rows = run_lifecycle({"counts": {}, "listing": COMPLETE, "valid": 0},
+                            active_at_start=0, matched_active=0)
+    assert no_rows["counted"] is False
 
 
 def test_unrecorded_rows_are_recorded_and_stop_the_crawl_counting():
