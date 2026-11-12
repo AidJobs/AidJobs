@@ -555,6 +555,22 @@ def test_r6_keeps_the_latest_allowed_capture_of_each_reliefweb_job():
     assert len(adverts.select_r6(rows, lambda url: "allowed", n=1)) == 1
 
 
+def test_a_failed_reliefweb_robots_read_is_retried_only_an_hour_later(tmp_path):
+    from datetime import UTC, datetime, timedelta
+    record = tmp_path / "abc.json"
+    first = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+    assert adverts.r6_may_retry(record, first)                       # never tried
+    record.write_text(json.dumps({"status": None, "read_at": first.isoformat()}), encoding="utf-8")
+    assert not adverts.r6_may_retry(record, first + timedelta(minutes=59)) and record.exists()
+    assert adverts.r6_may_retry(record, first + timedelta(hours=1))
+    assert not record.exists() and (tmp_path / "abc.failed-1.json").exists()   # kept aside, not replayed
+    second = first + timedelta(hours=1, minutes=5)
+    record.write_text(json.dumps({"status": None, "read_at": second.isoformat()}), encoding="utf-8")
+    assert not adverts.r6_may_retry(record, second + timedelta(minutes=30))
+    record.write_text(json.dumps({"status": 200, "read_at": second.isoformat()}), encoding="utf-8")
+    assert adverts.r6_may_retry(record, second) and record.exists()  # an answer is replayed, not asked again
+
+
 def test_a_reliefweb_employer_outside_the_list_is_estimated_international():
     ad = {"employer": "Acme Relief Alliance", "url": "https://reliefweb.int/job/4100001/x", "system": "reliefweb"}
     oid, basis, t = adverts.board_identity(ad, roles.Organisations(), {})

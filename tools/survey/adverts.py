@@ -39,7 +39,7 @@ import statistics
 import sys
 import zlib
 from collections import Counter, defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
@@ -60,7 +60,10 @@ ORG_CAP, FRENCH_CAP = 30, 60     # decision 21: per parent organisation; French 
 WAVE_LANGUAGES = ("eng", "fra")  # wave 1 reads English and French (section 11)
 SHELL_HOSTS = re.compile(r"(?:^|\.)(?:myworkdayjobs\.com|myworkdaysite\.com|taleo\.net|workable\.com)$")
 BATCH_CAPS = {"r1": 60, "r2": 2300, "r3": 235, "r4": 10, "r5": 26,
-              "r6": 349, "r6-live": 1}   # R6 (approved 12 November 2026): ReliefWeb, about 350 in all
+              "r6": 349, "r6-live": 3}   # R6 (approved 12 November 2026): ReliefWeb, about 350 in all;
+# its robots.txt one request, and two more attempts after the first failed to connect (12 November 2026),
+# at least R6_RETRY_GAP apart
+R6_RETRY_GAP = timedelta(hours=1)
 MIN_ADVERT_WORDS = 150          # below this a page is not counted as an advert
 
 ADVERT_FIELDS = [
@@ -792,12 +795,32 @@ def board_pages(run: LiveRun, name: str, cfg: dict, rng: random.Random) -> tuple
     return seen_pages, links
 
 
+def r6_may_retry(record: Path, now: datetime) -> bool:
+    """An earlier attempt that did not connect is kept aside (not replayed from disk) so the robots.txt
+    may be asked again, once R6_RETRY_GAP has passed since every earlier attempt; an answer is final."""
+    if record.exists() and json.loads(record.read_text(encoding="utf-8")).get("status") is not None:
+        return True                                      # answered: replayed from disk, no request
+    tried = sorted(record.parent.glob(record.stem + "*.json"))
+    for p in tried:
+        meta = json.loads(p.read_text(encoding="utf-8"))
+        if now - datetime.fromisoformat(meta["read_at"]) < R6_RETRY_GAP:
+            print(f"r6: the last attempt was at {meta['read_at']}; the next may be made "
+                  f"{R6_RETRY_GAP} after it")
+            return False
+    if record.exists():
+        record.rename(record.with_name(f"{record.stem}.failed-{len(tried)}.json"))
+    return True
+
+
 def fetch_r6_robots() -> int:
     """R6's one live request: ReliefWeb's robots.txt through the fetch policy, kept in R0's form so
     the plan and the archive reader judge each archived page by it."""
     folder = READING / "r6"
+    url = f"https://{RELIEFWEB}/robots.txt"
+    if not r6_may_retry(folder / "live" / "bodies" / f"{page_id(url)}.json", datetime.now(UTC)):
+        return 1
     run = LiveRun("r6", BATCH_CAPS["r6-live"], folder=folder / "live")
-    meta = run.get(f"https://{RELIEFWEB}/robots.txt", f"robots.txt {RELIEFWEB}")
+    meta = run.get(url, f"robots.txt {RELIEFWEB}")
     if not meta or meta.get("status") is None:
         print(f"r6: ReliefWeb's robots.txt not read ({(meta or {}).get('error') or run.stopped}); its pages are not read")
         return 1
