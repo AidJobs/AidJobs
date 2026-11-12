@@ -97,7 +97,8 @@ def test_deadline_expiry_covers_every_row_hidden_or_not():
 
 def test_a_description_is_dropped_90_days_after_its_job_closed():
     assert expiry.DESCRIPTION_WHERE == (
-        "description IS NOT NULL AND status = 'expired'"
+        "description IS NOT NULL AND (status = 'expired' OR (status = 'active'"
+        " AND deadline IS NOT NULL AND deadline < CURRENT_DATE))"
         " AND LEAST(deadline, expired_at::date) <= CURRENT_DATE - 90"
     )
     assert "SET description = NULL" in expiry.DROP_DESCRIPTIONS_SQL
@@ -481,7 +482,7 @@ def test_the_preview_only_reads():
         assert "UPDATE" not in sql and "DELETE" not in sql and "INSERT" not in sql
     assert "SET LOCAL statement_timeout = '20s'" in cursor.statements
     text = "\n".join(lines)
-    assert "would expire by absence at the next counting run's finish: 1" in text
+    assert "next counting run's finish (at least; that run adds one more counting run): 1" in text
     assert "https://jobs.unicef.org/en-us/job/1" in text
 
 

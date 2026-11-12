@@ -110,7 +110,10 @@ def preview(cursor, out) -> None:
         total_absent += len(absent)
         missed = _one(cursor, MISSED_ONCE_SQL, params)
         out(f"  missed by at least one counting run since last seen: {missed}")
-        out(f"  would expire by absence at the next counting run's finish: {len(absent)}")
+        out(
+            f"  would expire by absence at the next counting run's finish (at least; that run"
+            f" adds one more counting run): {len(absent)}"
+        )
         for title, link, last_seen, deadline, created in absent:
             out(
                 f"    - {title} | {link} | last seen {_day(last_seen)}"

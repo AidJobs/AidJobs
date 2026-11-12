@@ -54,8 +54,10 @@ DEADLINE_WHERE = "status = 'active' AND deadline IS NOT NULL AND deadline < CURR
 # The day a job closed: its passed deadline, or the day it expired by absence.
 CLOSED_DAY = "LEAST(deadline, expired_at::date)"
 
+# A closed job: expired, or due to expire by its deadline (the pass expires those first, so the
+# preview, run before the pass, counts the same rows).
 DESCRIPTION_WHERE = (
-    f"description IS NOT NULL AND status = 'expired'"
+    f"description IS NOT NULL AND (status = 'expired' OR ({DEADLINE_WHERE}))"
     f" AND {CLOSED_DAY} <= CURRENT_DATE - {DESCRIPTION_DAYS}"
 )
 

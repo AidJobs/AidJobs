@@ -2350,6 +2350,36 @@ def test_a_run_that_does_not_count_expires_nothing(db, second):
     assert {state[0] for state in _lifecycle_states().values()} == {"active"}
 
 
+def _counting_rows(source_id, hours=(50, 25)):
+    """Finished counting runs of the source, `hours` ago."""
+    for ago in hours:
+        _sql(
+            "INSERT INTO crawl_logs (source_id, ran_at, found, inserted, updated, skipped,"
+            " status, message, counted) VALUES (%s, NOW() - make_interval(hours => %s),"
+            " 0, 0, 0, 0, 'ok', 'Found jobs', TRUE)",
+            (source_id, ago),
+        )
+
+
+@pytest.mark.parametrize("finish, expires", [
+    pytest.param(lambda: _listing_crawl([1, 2, 3], PARTIAL), False, id="partial"),
+    pytest.param(lambda: _zero_jobs, False, id="zero-jobs"),
+    pytest.param(lambda: _listing_crawl([1], COMPLETE), False, id="fewer-than-half-matched"),
+    pytest.param(lambda: _failing, False, id="failed"),
+    pytest.param(lambda: _listing_crawl([1, 2, 3], COMPLETE), True, id="counting"),
+])
+def test_only_a_counting_run_applies_expiry_already_due(db, finish, expires):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    _counting_rows(source["id"])
+    run_id = _manual_run(source, finish())
+    assert _lifecycle(run_id)["counted"] is expires
+    assert _expiry_record(run_id) == ((1 if expires else 0), 0)
+    assert (_lifecycle_states()["Programme Officer 4"][0] == "expired") is expires
+
+
 def test_a_job_seen_by_any_crawl_since_is_not_expired(db):
     source = _add_source()
     for n in (1, 2, 3, 4):
@@ -2545,6 +2575,16 @@ def test_the_daily_pass_expires_every_passed_deadline_and_drops_descriptions_aft
     assert orch._daily_pass_once() is None, "once per database day"
 
 
+def test_the_preview_counts_the_descriptions_the_daily_pass_drops(db):
+    from tests.test_expiry import expiry_preview
+
+    source = _add_source()
+    _daily_pass_jobs(source["id"])
+    previewed = _sql(expiry_preview.DESCRIPTIONS_SQL)[0][0]
+    outcome = _orch()._daily_pass_once()
+    assert previewed == outcome["descriptions_dropped"] == 3, "5 (still active), 7 and 9"
+
+
 def test_the_daily_pass_skips_a_row_a_crawl_holds_and_finishes_it_on_the_next_round(db):
     source = _add_source()
     for n in (1, 2):
@@ -2610,7 +2650,7 @@ def test_the_preview_selects_exactly_what_the_finish_would_expire(db):
     assert previewed == expired == [f"Programme Officer {n}" for n in (4, 5, 6)]
     text = "\n".join(lines)
     assert "missed by at least one counting run since last seen: 4" in text, "3 missed one"
-    assert "would expire by absence at the next counting run's finish: 3" in text
+    assert "next counting run's finish (at least; that run adds one more counting run): 3" in text
     assert "would expire by absence, all sources: 3" in text
     assert "Example: 1 (0)" in text, "job 8's passed deadline, for the daily pass"
     assert {state[0] for state in _lifecycle_states().values()} == {"active"}
