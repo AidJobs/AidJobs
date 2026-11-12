@@ -44,7 +44,7 @@ Local work and tests use PostgreSQL 17 on this machine (security plan, stage 6).
 
 ## Secrets on this machine
 
-Production secrets live on Render (the backend's) and Vercel (the frontend's). Two stay on this machine, in Microsoft's free SecretStore vault for PowerShell, read by scripts only while a command runs: the read-only database login (`AIDJOBS_READONLY_DB_URL`) and the Vercel preview bypass key (`VERCEL_AUTOMATION_BYPASS_SECRET`). Once stage 6 is done, no env file holds a production secret.
+Production secrets live on Render (the backend's) and Vercel (the frontend's). Two stay on this machine, in Microsoft's free SecretStore vault for PowerShell, read by scripts only while a command runs: the read-only database login (`AIDJOBS_READONLY_DB_URL`) and the Vercel preview bypass key (`VERCEL_AUTOMATION_BYPASS_SECRET`). The vault also keeps the local database's `postgres` password (`AIDJOBS_LOCAL_PG_SUPERUSER_PASSWORD`, local only) and the employer demo's OpenRouter key (`AIDJOBS_OPENROUTER_API_KEY`, W-51). No env file holds a production secret, and production's `postgres` password is kept nowhere (security plan, stage 6, done 13 November 2026): if it is ever needed, for a restore for example, reset it in Supabase.
 
 Once, in PowerShell:
 
@@ -61,6 +61,8 @@ With `-Authentication None` the vault is encrypted for your Windows account and 
 - To use them, from a PowerShell prompt: `& .\scripts\with-readonly-db.ps1 -- <command>` and `& .\scripts\with-secret.ps1 -Name VERCEL_AUTOMATION_BYPASS_SECRET -- <command>`. The read-only check: `& .\scripts\with-readonly-db.ps1 -- apps\backend\.venv311\Scripts\python.exe apps\backend\scripts\db_readonly_check.py`.
 - To move a stored value into a dashboard (stage 6, step 5: the application login into Render), never displaying it: `& .\scripts\copy-secret-to-clipboard.ps1 AIDJOBS_APP_DB_URL`. It refuses while Windows' clipboard history (Win+V) or cloud clipboard is on, waits for Enter after you paste, then clears the clipboard.
 - To see what is stored, by name only: `Get-SecretInfo | Select-Object Name`.
+- The weekly backup, and the one before each database change (ledger, W-43), through the read-only login, without the four personal-data tables, with PostgreSQL 17's `pg_dump` (`C:\Program Files\PostgreSQL\17\bin`), to a file outside the repository:
+  `& .\scripts\with-readonly-db.ps1 -Libpq -- pg_dump --format=custom --schema=public --no-owner --no-privileges --exclude-table=public.users --exclude-table=public.payments --exclude-table=public.find_earn_submissions --exclude-table=public.findearn_submissions --file=<backup file>`.
 
 ## Backend dependencies
 

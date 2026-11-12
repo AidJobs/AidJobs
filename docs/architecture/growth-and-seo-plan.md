@@ -307,7 +307,7 @@ Free plans now; the code works on both.
 
 A keep-alive monitor every 5 minutes (UX-08 item 5) was skipped by the user until after launch (21 October 2026); using it earlier is the user's decision. It works only while this is the workspace's one free web service, and it delays the paid plan but adds no memory.
 
-**Supabase:** free now. A manual database backup (`pg_dump`, run on the user's machine) weekly and before every database change. The connection string stays on the user's machine and is never printed, and the `pg_dump` client must be at least the server's version (PostgreSQL 17). Move to Pro (about $25 a month) at about 400 MB, or when backups need to be automatic. Expected size: thousands of jobs with descriptions, roughly 40 to 80 MB; at full scale about 1 GB a year without the 90-day description rule (decision 5).
+**Supabase:** free now. A manual database backup (`pg_dump`, run on the user's machine) weekly and before every database change, through the read-only login since 13 November 2026 (security plan, stage 6; README, "Secrets on this machine"). The connection string stays in the vault and is never printed, and the `pg_dump` client must be at least the server's version (PostgreSQL 17). Move to Pro (about $25 a month) at about 400 MB, or when backups need to be automatic. Expected size: thousands of jobs with descriptions, roughly 40 to 80 MB; at full scale about 1 GB a year without the 90-day description rule (decision 5).
 
 **Vercel:** Hobby stays valid while there are no ads and no income other than donations.
 
