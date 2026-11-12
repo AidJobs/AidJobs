@@ -227,6 +227,9 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
 /** What the window says to the AI when it asks it to go on by itself: write the part the job has reached. */
 export const GO_ON = 'Go on with the next step: write it now.';
 
+/** What the window says when a language version is added with the AI on (the user's decision, 12 November 2026): the AI writes it. */
+export const writeVersion = (label: string) => `Write the ${label} version now: every section in context.job.versionInView, in ${label}.`;
+
 /**
  * Sends one message to the AI and carries out its answer. Returns what was applied, or null when the AI is off or failed, in which
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.

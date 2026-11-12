@@ -14,7 +14,7 @@ import { ReachEditor } from './Reach';
 import { planCount } from './invites';
 import { ReviewForm } from './Review';
 import type { ChatMsg } from './types';
-import { aiOn, askAi, GO_ON, probeAi, useAi } from './ai';
+import { aiOn, askAi, GO_ON, probeAi, useAi, writeVersion } from './ai';
 import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
 import { readJobFile } from './readFile';
 import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL } from './walkChat';
@@ -803,6 +803,16 @@ function JobWindow({ id }: { id: string }) {
       if (now?.kind === 'write' && now.sections.filter((k) => !FIXED_SECTIONS.includes(k)).join(',') === writeKey) writeNow(job.id);
     });
   }, [writeKey, reading, s.reviewerAs, busyAi, ai.status, job.id]);
+
+  // A language version added with the AI on is written by the AI (the user's decision, 12 November 2026); if it cannot, the table's draft stays.
+  const toWrite = ai.status === 'on' ? versionsOf(job).find((k) => { const t = job.translations?.[k]; return t && !t.reviewed && !t.sections.some((x) => x.ai); }) : undefined;
+  const askedVersion = useRef<string[]>([]);
+  useEffect(() => {
+    if (!toWrite || reading || s.reviewerAs || busyAi || askedVersion.current.includes(`${job.id}:${toWrite}`)) return;
+    askedVersion.current.push(`${job.id}:${toWrite}`);
+    const label = langOf(toWrite).label;
+    void askAi(job.id, writeVersion(label), { silent: `the ${label} version`, version: toWrite, open: (x) => openRef.current(x) });
+  }, [toWrite, reading, s.reviewerAs, busyAi, job.id]);
 
   const reviewing = Boolean(s.reviewerAs);
   const inVersion = tab.startsWith('lang:') && job.translations?.[tab.slice(5) as JobLang] ? (tab.slice(5) as JobLang) : undefined;

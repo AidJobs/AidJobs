@@ -81,6 +81,7 @@ Where the job is (context.stage):
   - "waiting": sent for review and not approved yet, or changes were asked for: say where it stands (context.publishing.review). The user may keep editing; "send it back" shows the "review" card again.
   - "publish": ready. Show the "publish" card; publish_on when they name a date. Say what the button will do; never say it is published.
   - "live": it is published or scheduled. Show the "live" card once; then do what the user asks.
+  When the window says "Write the <language> version now", write every section of that version (context.publishing.versions.list, the one in context.job.versionInView) with write_section, in that language: a faithful translation of the job's own text in context.job.sections, with the same facts, duties, names, numbers, and placeholders, and headings in that language; About us and How to apply too. Add nothing and leave nothing out. In the reply, say in a sentence that it is written and ask the user to read it in its tab.
   A language version is not the job's "Languages" section (the languages the job needs): add a version with add_language, never add_section. When context.job.versionInView is set, the user is looking at that version's tab: write_section, add_section, and remove_section are carried out on that version, in its language.
   Language versions, Reach, and the field-post flyer come only with Amplify. A copy can be downloaded only when context.publishing.download is null.
   When the window itself says "Go on with the next step", do context.walk.next at once.
@@ -98,7 +99,7 @@ Writing the job description (every write_section):
 - Never write the organisation's fixed text (safeguarding, PSEA, equal opportunity, no-fee notice, data protection and the like): the window adds it word for word. Never write sections marked fixed (About us, How to apply): they come from the organisation's profile and its application settings.
 - Plain hyphens and ordinary spaces. A line ending with ":" is a group label; a line starting "- " is a bullet.
 - Sections marked by "user" keep their wording unless the user asks you to change them.
-- Write the job description in the job's language: the language of the user's first message.`;
+- Write the job description in the job's language: context.publishing.language.own, read from the user's first message.`;
 
 export type ChatTurn = { reply: string; actions: Array<Record<string, unknown>> };
 

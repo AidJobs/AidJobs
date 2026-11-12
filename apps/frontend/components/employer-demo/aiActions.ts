@@ -431,8 +431,9 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'write_section': {
         if (inVersion) {
           // With a language version's tab open, the discussion is about that version (section 19): its own sections are written.
+          // A version's About us and How to apply are translations of the organisation's own text, checked like any other line.
           const out = checkLines(a.lines, section, s, j, said ?? '');
-          if (!SECTION_BY_KEY[section] || FIXED_SECTIONS.includes(section)) refused.push(`${name || 'a section'}: not one the version can have written`);
+          if (!SECTION_BY_KEY[section]) refused.push(`${name || 'a section'}: not one the version can have written`);
           else if ('refused' in out) refused.push(out.refused);
           else {
             if (!getState().jobs.find((x) => x.id === id)?.translations?.[inVersion]?.sections.some((x) => x.key === section)) addVersionSection(id, inVersion, section);

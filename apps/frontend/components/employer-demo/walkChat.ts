@@ -146,7 +146,7 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
     case 'keep':
       return keepPrompt(s, job, step.what, key);
     default:
-      return laterPrompt(s, job, step, key);
+      return laterPrompt(s, job, step, key, aiOn);
   }
 }
 
@@ -180,7 +180,7 @@ export function amplifyLine(s: State): string {
 }
 
 /** Steps 8 and 9 (section 19): what the rules say when the AI is off or leaves a step unasked. */
-function laterPrompt(s: State, job: DemoJob, step: Step, key: string): ChatMsg[] {
+function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = false): ChatMsg[] {
   const own = langOf(jobLang(job)).label;
   switch (step.kind) {
     case 'plan': {
@@ -211,7 +211,8 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string): ChatMsg[]
     }
     case 'version': {
       const label = langOf(step.lang).label;
-      return [stepMsg(`The ${label} version is drafted in its tab. In the demo the headings, standard sentences, dates, and places are translated, and lines still in ${own} are marked. Change anything there or ask me here, then mark it as reviewed: only reviewed versions appear.`, key, [MARK_REVIEWED, `Remove ${label}`])];
+      const how = job.translations?.[step.lang]?.sections.some((x) => x.ai) ? `written by the AI from the ${own}` : aiOn ? 'being written by the AI; meanwhile the demo’s own draft is there, with lines still in ' + own + ' marked' : `drafted: in the demo the headings, standard sentences, dates, and places are translated, and lines still in ${own} are marked`;
+      return [stepMsg(`The ${label} version is in its tab, ${how}. Change anything there or ask me here, then mark it as reviewed: only reviewed versions appear.`, key, [MARK_REVIEWED, `Remove ${label}`])];
     }
     case 'flyer':
       return [stepMsg('A one-page flyer with a QR code to the job, for notice boards in field offices, clinics, and community centres, in any reviewed language. Shall I show it?', key, [SHOW_FLYER, NO_THANKS])];

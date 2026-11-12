@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 import { setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
-import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi } from '../../components/employer-demo/ai';
+import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi, writeVersion } from '../../components/employer-demo/ai';
 import { addDays } from '../../components/employer-demo/engine';
 import { checkPoints, nextStep } from '../../components/employer-demo/flow';
 
@@ -271,6 +271,21 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
     const fr = job('job-comms').translations!.fr!;
     expect(fr.sections.find((x) => x.key === 'conditions')?.lines).toEqual(['Le stage est basé à Nairobi.']);
     expect(fr.sections.some((x) => x.key === 'offer')).toBe(false);
+  });
+
+  it('with the AI on, a version added is written by the AI: asked with the version in view, its sections land on the version', async () => {
+    resetAi('on', [{ key: 'terra', label: 'GPT-6.1 Terra' }]);
+    const sent: Array<{ silent?: boolean; context: { job: { versionInView: unknown } } }> = [];
+    stubFetch(async (_url, init) => {
+      sent.push(JSON.parse(init?.body ?? '{}'));
+      return { ok: true, status: 200, json: async () => ({ reply: 'The French version is written; read it in its tab.', actions: [{ type: 'write_section', section: 'about', lines: ['Riverstone Aid est une ONG internationale fictive.'] }], model: 'terra' }) };
+    });
+    turn('job-comms', 'amplify, and French', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'add_language', language: 'fr' }]);
+    const english = job('job-comms').sections.find((x) => x.key === 'about')?.lines;
+    await askAi('job-comms', writeVersion('French'), { silent: 'the French version', version: 'fr', open });
+    expect(sent[0]).toMatchObject({ silent: true, context: { job: { versionInView: { key: 'fr', label: 'French' } } } });
+    expect(job('job-comms').translations?.fr?.sections.find((x) => x.key === 'about')).toMatchObject({ lines: ['Riverstone Aid est une ONG internationale fictive.'], ai: true });
+    expect(job('job-comms').sections.find((x) => x.key === 'about')?.lines).toEqual(english);
   });
 
   it('a date to publish on is checked: a free job goes live within its own month', () => {
