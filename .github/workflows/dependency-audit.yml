@@ -1,8 +1,9 @@
 name: Dependency audit
 
 # Weekly, so a new advisory against unchanged code shows up without a pull request (security
-# plan, stage 3A, part 3); also runnable by hand. Kept out of ci.yml because gitleaks scans the
-# whole history on scheduled runs, and older history holds values rotated on 23 October 2026.
+# plan, stage 3A, part 3); also runnable by hand. Kept out of the CI workflows because gitleaks
+# scans the whole history on scheduled runs, and older history holds values rotated on
+# 23 October 2026. It also covers the CI dependency checks skipped when no dependency changed.
 on:
   schedule:
     - cron: '23 3 * * 1'
