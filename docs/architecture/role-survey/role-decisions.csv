@@ -1,0 +1,4 @@
+action,key,value,reason,label
+org-type,iati:GB-COH-1100897,foundation,"Aga Khan Foundation: a foundation of the Aga Khan Development Network, named as the example foundation in role-survey.md section 4; the register lists it as an NGO",Fact
+org-type,irs:521231983,foundation,"Aga Khan Foundation USA: as above",Fact
+org-type,cra:100072586RR0001,foundation,"Aga Khan Foundation Canada: as above",Fact

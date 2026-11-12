@@ -1,0 +1,89 @@
+normalised_title,function,sector,level,language,organisations,count
+accounting assistant,finance,none,assistant,en,2,2
+accounting manager,finance,none,coordinator_manager,en,3,3
+administrative assistant,administration,none,assistant,en,6,6
+administrative coordinator,administration,none,coordinator_manager,fr,2,2
+administrative officer,administration,none,officer,en,2,2
+analyst,policy_research,none,officer,en,3,6
+assistant e administratif ve,administration,none,assistant,en,2,2
+business analyst,policy_research,none,officer,en,2,2
+business controller,finance,none,unknown,en,2,3
+business development manager,grants_partnerships,none,coordinator_manager,en,2,2
+chauffeur,drivers_support,none,assistant,en,2,2
+chief of party,leadership,none,head_adviser,en,3,3
+communications intern,communications_advocacy,none,intern_fellow,en,3,3
+communications officer,communications_advocacy,none,officer,en,4,4
+community mobilization assistant,community_field,none,assistant,en,2,2
+comptable senior,finance,none,officer,fr,2,4
+coordinateur administratif et logistique,supply_chain,none,coordinator_manager,fr,2,2
+country director,leadership,none,head_adviser,en,5,5
+country director burkina faso,leadership,none,head_adviser,en,2,2
+country manager,leadership,none,coordinator_manager,en,2,2
+data analyst,meal,none,officer,en,3,3
+data engineer,ict,none,officer,en,2,2
+director individual giving,grants_partnerships,none,head_adviser,en,2,2
+director of engineering,engineering,none,head_adviser,en,2,2
+driver,drivers_support,none,assistant,en,4,4
+emergency coordinator,humanitarian_coordination,none,coordinator_manager,fr,2,2
+events coordinator,communications_advocacy,none,coordinator_manager,nl,2,5
+executive assistant,administration,none,assistant,en,2,3
+field officer,community_field,none,officer,en,2,2
+field operations manager,administration,none,coordinator_manager,en,2,2
+finance and administration officer,finance,none,officer,en,2,2
+finance assistant,finance,none,assistant,en,4,5
+finance associate,finance,none,officer,en,3,3
+finance coordinator,finance,none,coordinator_manager,nl,2,2
+finance manager,finance,none,coordinator_manager,en,6,6
+finance officer,finance,none,officer,en,9,12
+financial controller,finance,none,unknown,en,2,2
+grant accountant,finance,none,officer,en,2,2
+grants manager,grants_partnerships,none,coordinator_manager,en,2,2
+graphic designer,communications_advocacy,none,unknown,en,2,3
+human resources assistant,hr,none,assistant,en,3,4
+human resources associate,hr,none,officer,en,2,2
+human resources officer,hr,none,officer,en,4,5
+ict officer,ict,none,officer,en,2,2
+information management officer,meal,none,officer,en,2,3
+junior graphic designer,communications_advocacy,none,unknown,en,3,4
+legal fellow,legal,none,intern_fellow,en,2,2
+logistic officer,supply_chain,none,officer,en,2,2
+major gifts officer,grants_partnerships,none,officer,en,2,6
+meal manager,meal,none,coordinator_manager,en,2,3
+meal officer,meal,none,officer,en,2,3
+media relations coordinator,communications_advocacy,none,coordinator_manager,nl,2,2
+monitoring and evaluation assistant,meal,none,assistant,en,2,2
+monitoring and evaluation officer,meal,none,officer,en,2,2
+monitoring evaluation accountability and learning meal officer,meal,none,officer,en,3,3
+monitoring evaluation and learning mel officer,meal,none,officer,en,2,2
+monitoring evaluation and learning officer,meal,none,officer,en,3,3
+monitoring officer,meal,none,officer,en,2,2
+operations manager,administration,none,coordinator_manager,en,3,3
+our recruitment process,hr,none,unknown,en,2,2
+procurement officer,supply_chain,none,officer,en,6,7
+product manager,commercial,none,coordinator_manager,en,3,3
+programme assistant,programme_management,none,assistant,en,2,2
+programme associate,programme_management,none,officer,en,3,3
+programme intern,programme_management,none,intern_fellow,en,2,2
+programme manager,programme_management,none,coordinator_manager,en,10,10
+programme officer,programme_management,none,officer,en,7,8
+project accountant,finance,none,officer,en,3,3
+project coordinator,programme_management,none,coordinator_manager,nl,2,3
+project manager,programme_management,none,coordinator_manager,en,10,14
+project officer,programme_management,none,officer,en,5,5
+protection assistant,technical,protection,assistant,en,2,2
+public health specialist,technical,health,officer,en,2,2
+research analyst,policy_research,none,officer,en,2,2
+research assistant,policy_research,none,assistant,en,3,3
+researcher,policy_research,none,officer,en,2,2
+senior accountant,finance,none,officer,en,2,2
+senior data analyst,meal,none,officer,en,2,3
+senior driver,drivers_support,none,assistant,en,2,3
+senior finance manager,finance,none,coordinator_manager,en,2,3
+senior financial accountant,finance,none,officer,en,2,2
+senior human resources officer,hr,none,officer,en,2,4
+senior programme manager,programme_management,none,coordinator_manager,en,4,4
+senior programme officer,programme_management,none,officer,en,5,6
+senior researcher,policy_research,none,officer,en,2,5
+senior software engineer,ict,none,officer,en,4,8
+social media manager,communications_advocacy,none,coordinator_manager,en,2,2
+software engineer,ict,none,officer,en,2,2
