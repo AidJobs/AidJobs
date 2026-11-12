@@ -42,6 +42,17 @@ def test_page_text_keeps_the_advert_and_drops_site_furniture():
     assert any(t.startswith("Manage a fleet") for t in texts)
 
 
+def test_a_wrapper_with_a_furniture_like_class_keeps_the_advert():
+    body = " ".join(f"Run task {i} with the partners in the district every month." for i in range(40))
+    page = (f'<html><body><nav class="menu">Home Jobs</nav><div class="page job-entry with-sticky-share">'
+            f'<h1>Finance Officer</h1><p>{body}</p></div></body></html>')
+    lines = adverts.html_lines(page)
+    assert adverts.words_of(" ".join(ln["text"] for ln in lines)) > 300
+    assert not any(ln["text"] == "Home Jobs" for ln in lines)
+    aspnet = f'<html><body><form id="aspnetForm"><h1>Finance Officer</h1><p>{body}</p></form></body></html>'
+    assert adverts.words_of(" ".join(ln["text"] for ln in adverts.html_lines(aspnet))) > 300
+
+
 def test_emails_and_phone_numbers_are_removed_but_years_and_dates_stay():
     s = adverts.scrub("Write to a.b@acme.example or call +254 712 345 678; 5 years; 30 November 2026; 2025-2026")
     assert "@" not in s and "712" not in s

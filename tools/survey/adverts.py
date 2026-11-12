@@ -801,6 +801,7 @@ BLOCK_TAGS = {"p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", 
               "article", "br", "dd", "dt", "blockquote", "header", "td", "th"}
 DROP_TAGS = ["script", "style", "noscript", "nav", "footer", "header", "aside", "form", "svg", "iframe",
              "button", "select", "template"]
+FURNITURE_WORDS = 300
 DROP_ATTR = re.compile(r"(?:^|[-_ ])(?:nav|navbar|menu|footer|header|cookie|breadcrumbs?|sidebar|share|"
                        r"social|related|newsletter|banner|modal|skip)(?:$|[-_ ])", re.IGNORECASE)
 
@@ -819,12 +820,17 @@ def html_lines(html: str) -> list[dict]:
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "lxml")
     for tag in soup(DROP_TAGS):
+        # A page built inside one form (ASP.NET sites) keeps its content; a short form is furniture.
+        if tag.name == "form" and len(tag.get_text(" ", strip=True).split()) > FURNITURE_WORDS:
+            continue
         tag.decompose()
     for tag in soup.find_all(True):
         if getattr(tag, "decomposed", False) or tag.attrs is None:
             continue
         attrs = " ".join([str(tag.get("id") or "")] + [str(c) for c in (tag.get("class") or [])])
-        if attrs and DROP_ATTR.search(attrs) and tag.name not in ("body", "main", "article"):
+        # Furniture is short: a wrapper holding the advert ("job-entry with-sticky-share") is kept.
+        if attrs and DROP_ATTR.search(attrs) and tag.name not in ("body", "main", "article") and \
+                len(tag.get_text(" ", strip=True).split()) <= FURNITURE_WORDS:
             tag.decompose()
     root = soup.find("main") or soup.find("article") or soup.body or soup
     lines = []
