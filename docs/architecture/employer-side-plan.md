@@ -502,8 +502,43 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **Checks:** 936 tests pass (897 before); new tests for each rule, shown failing on the earlier code. Tests that drove the old page through its links were moved to the window (the Amplify button in Manage jobs, the earlier workspace's steps); none removed. The tests of the old order were rewritten to the new steps. Type check, lint, and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark, by a headless browser driven outside the repository; they found the Free or Amplify choice shown twice (the chat's cards are now compact), an old card showing the job as it is now (only the latest is live), the upgrade offered before it was asked for, and a stray reply added to the text and resetting an approval (a short reply the rules cannot read is now asked again).
   **Real-AI walk** (locally, with the demo key from the vault into the dev server only): GPT-6.1 Terra through steps 6 to 9 four times and a version written in full, and Claude Sonnet 5.5 through review and scheduling; about 35 calls answered, 2 to 10 seconds each. Spent: about US$0.40 by the earlier rounds' per-call costs (an estimate; OpenRouter's page has the exact figure). OpenRouter answered some calls with 429 (rate limited); the rules answered those, as designed, and the route's log now says why a call gave no text, without any text. The walk found, all fixed and tested: the AI adding the job's Languages section when asked for versions; the walk going on after publishing; "leave that one too" at the basic check added to the text; "that is all" not ending the languages; addresses typed at Reach not added by the rules; the AI unable to reword the invitation without its text; a request in a version's tab changing the job's own text when the rules answered.
   **Left for phase 4:** the reviewer's own view in this window, editing a job in its state, returning employers (the usual template and the job profiles saved now), and removing the old workspace and Check and publish page. **Left for phase 5:** the AI still sometimes answers one step ahead (Sonnet settled review while the flyer was still to be answered); at the approve step a short sentence is still added to the section in view, as in phase 2.)
-- [ ] **Phase 4, returning employers and job states:** the usual template and job profiles, jobs opened for writing or editing in their state, reviewers; the old workspace and publish page removed.
+- [ ] **Phase 4, returning employers and job states:** the usual template and job profiles, jobs opened for writing or editing in their state, reviewers; the old workspace and publish page archived (the user, 12 November 2026: "keep the old pages archived, and accessible in case we want to use or refer to them later on"). The plan below was approved by the user on 12 November 2026; built in a new chat (the project's rule), with this section and the ledger as the handover. The user will assess the whole demo as a user journey after it is built, and has further changes to phases 1 to 3 to give then.
 - [ ] **Phase 5, polish:** the round's checks across all screen sizes, then the independent review of the round and its fixes.
+
+### Phase 4 plan (approved by the user, 12 November 2026)
+
+**Found in the code (read-only survey, 12 November 2026):** more than 25 controls still open the earlier workspace (`go('create', id)`): Continue, Edit, Hire again, and Open for unpublished jobs in Manage jobs (`Jobs.tsx`), the Overview briefing and its chat box (`Home.tsx`, which also starts jobs outside the window), the first screen's "+" menu (`ComposerTools.tsx`), "View the demo as" (`EmployerDemo.tsx`), `Checks.tsx`, and the window's own "Earlier workspace" button and reviewer note (`Window.tsx`). Nothing links to the old publish page any more; it opens only by its address. Saved job profiles (`profiles`, saved in `publish()`) are never read. A reviewer in the window can comment on sections but has no decision, summary, or list of remarks (`Window.tsx` hides the part card and the chat for reviewers). The window adds no message for a job's state on opening; jobs without `walk` (all sample jobs) get no steps; a closed job with `walk` reads "It's live". `hireAgain` copies the job whole, including `walk`, `choice`, `part`, `paidVia`, and `langsPaid`. The tests that route to `#create/<id>` and `#publish/<id>` are listed in that survey (`employer-demo-no-fetch.test.tsx`, about 18 tests).
+
+1. **A returning employer's new job:**
+   - **The usual template** is the one the organisation has used most for its jobs (else its house format), recommended first with its reason ("your usual template, used for 4 of your jobs").
+   - **Steps 2 and 3 become one confirmation:** "I'll use your INGO role profile, in your style (warm, plain English), one section at a time as last time. Shall I start?", with Start or Change something.
+   - **A saved job profile** that matches the role is offered first ("Same as your last Juba Finance Officer?"): its template, sections, facts (contract, grade, eligibility, languages, safeguarding, salary, the way to apply), style, and fixed text. Dates and positions are always asked. Start fresh goes to the usual template.
+   - **Hire again and Continue a draft open the window**, from the first screen's "+" menu, Manage jobs, Overview, and Overview's chat box (which starts jobs in the window).
+   - **Hire again (the user's choice):** the copy keeps the text; the chat asks first what changes (the dates, positions, and place), then each section for a quick "keep as is". The copy does not carry the old job's approvals, plan choice, part, or language payments.
+2. **Jobs opened in their state:**
+   - Every Continue, Edit, and Open opens the window at the matching part.
+   - The chat opens with one message for the state and offers exactly section 17's actions for it, with its permission rules:
+     - **draft:** picks up where it left off;
+     - **in review:** who it waits for, the due date, and the Remind card; an edit sends it back to review, as today;
+     - **approved:** ready to publish, with the publish card;
+     - **scheduled:** edits are kept for the go-live; Publish now, Change the date, Back to draft, Delete;
+     - **live:** edits go live at once, the page says Updated; Extend, Share, Amplify (free jobs), Position filled, Close now, Withdraw, Delete;
+     - **closed:** Reopen, Hire again, Download; and the correct words for a closed job.
+   - **Nothing changes a job's state from the chat itself:** each answer opens its existing dialog or card, whose button does it.
+   - Jobs saved before the window (the sample jobs) are brought forward on load, with their written sections approved and their questions settled.
+   - The AI is told the job's state and the actions allowed; it has no action that changes a state, only opening its dialog.
+3. **Reviewers in the window:**
+   - The chat column becomes the Review panel: status, round, rule, due date, each reviewer's decision; changed since the last round; every comment; a comment or suggestion tied to the part open on the line; Approve or Request changes with a note.
+   - The author's chat is not shown; the line cannot reorder; "View the demo as" opens the window.
+4. **The old pages archived (the user's choice: fully working):**
+   - The earlier workspace and the Check and publish page keep working at their addresses on the same demo data.
+   - Nothing links to them except an "Archived screens" page, reached from the demo controls at the bottom of the side menu, beside Reset demo.
+   - Each carries a banner, "Archived screen, kept for reference", with "Open this job in the new window".
+   - The window's "Earlier workspace" button and the chat's "Open the earlier workspace" go.
+   - Their tests keep running; new tests check that every former link opens the window.
+5. **Checks as before:** tests for each rule (shown failing on the earlier code), type check, lint, a production build, screens at 1366, 412, 390, and 360 px in light and dark, a push for the preview, and this record and the ledger.
+
+**Later:** managing saved profiles (their page); the AI answering one step ahead (phase 5); the user's journey assessment of the whole demo.
 
 ### Phase 3, revised (the user's decisions, 12 November 2026)
 
