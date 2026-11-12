@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, remindReviewers, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
@@ -470,7 +470,24 @@ function ChatCardView({ kind, job, s, open }: { kind: NonNullable<ChatMsg['card'
           </button>
         </div>
       )}
-      {kind === 'review' && (
+      {kind === 'review' && job.review.state === 'open' && (
+        <div className="flex flex-col items-start gap-1.5">
+          <span className="aj-muted">
+            Waiting for {job.review.reviewers.filter((r) => !r.decision).map((r) => r.name.split(' ')[0]).join(' and ') || 'your reviewers'}. Remind emails them again (simulated).
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {job.review.reviewers.some((r) => !r.decision) && (
+              <button type="button" className="aj-ink-btn" onClick={() => remindReviewers(job.id)}>
+                Remind
+              </button>
+            )}
+            <button type="button" className="aj-pill" onClick={() => open.part('review')}>
+              Open Review
+            </button>
+          </div>
+        </div>
+      )}
+      {kind === 'review' && job.review.state !== 'open' && (
         <div className="flex flex-col items-start gap-1.5">
           <span className="aj-muted">Who reviews it, by when, under which rule, and the email they get.</span>
           <button type="button" className="aj-ink-btn" onClick={() => open.tab('reviewmail')}>
@@ -894,6 +911,7 @@ function JobWindow({ id }: { id: string }) {
   const closeTab = (k: string) => {
     setExtra((x) => x.filter((y) => y !== k));
     setTab('doc');
+    requestAnimationFrame(() => (document.getElementById('ej-wtab-doc') ?? document.getElementById('ej-w-panel'))?.focus({ preventScroll: true }));
   };
   const opener: Opener = { tab: openTab, part: (k) => goPart(k), preview: openPreview };
   const toJob = () => {
@@ -920,6 +938,10 @@ function JobWindow({ id }: { id: string }) {
   /** The window's own requests, exact and at once; everything else goes to the AI when it is on, or to the rules. */
   const send = (text: string) => {
     const t = text.toLowerCase().trim();
+    const last = job.chat[job.chat.length - 1];
+    // An answer offered by the last message, and a typed choice of Free or Amplify, belong to that step, not to the window's shortcuts.
+    const answer = last?.from === 'ai' && Boolean(last.quick?.includes(text));
+    const planChoice = !job.choice && /\b(free|amplify|package)\b/.test(t);
     if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
     if (text === SHOW_FLYER) openTab('flyer');
     if (text === INVITE) openTab('reach');
@@ -943,15 +965,14 @@ function JobWindow({ id }: { id: string }) {
       if (!no) setDeleteOpen(true);
       return chatNote(job.id, text, no ? `${no}.` : 'Confirm in the dialog: it lists what is deleted and what is kept.');
     }
-    if (PUBLISH.test(t) && !job.setup && job.sections.length) {
+    if (PUBLISH.test(t) && !answer && !planChoice && !job.setup && job.sections.length) {
       goPart('publish');
       return chatNote(job.id, text, isPublished(job) && job.plan !== 'free' ? 'It is already published.' : 'Here it is, with anything still needed first. The button says exactly what happens, and nothing goes out until you press it.', undefined, 'publish');
     }
-    if (REVIEW.test(t) && isReviewable(job) && job.sections.length) {
+    if (REVIEW.test(t) && !answer && isReviewable(job) && job.sections.length) {
       goPart('review');
       return chatNote(job.id, text, 'Choose who reviews it, by when, and under which rule; the email they get is shown before you send.', undefined, 'review');
     }
-    const last = job.chat[job.chat.length - 1];
     if (text === CHOOSE_SDGS) setFact('sdgs');
     const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
     if (aiOn() && !rulesAnswer) {

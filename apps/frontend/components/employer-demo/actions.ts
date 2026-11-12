@@ -1141,8 +1141,7 @@ function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof n
       return false;
     case 'waiting':
       if (t === REMIND || /^remind\b/i.test(t)) {
-        remindReviewers(j.id);
-        say('Reminded them (simulated).');
+        say('Here it is: Remind emails them again (simulated), and nothing is sent until you press it.', undefined, 'review');
         return true;
       }
       if (/^send round \d+$/i.test(t) || /^send (?:it )?(?:back|again)\b/i.test(t)) {
@@ -1828,11 +1827,11 @@ export function setJobLang(id: string, lang: JobLang) {
 export function buyLanguages(id: string, n: number, beforePublishing = false): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
-  if (!j || s.reviewerAs || n < 1 || (beforePublishing ? j.choice !== 'amplify' : j.plan !== 'amplify')) return false;
+  if (!j || s.reviewerAs || n < 1 || (beforePublishing ? j.plan === 'amplify' : j.plan !== 'amplify')) return false;
   const item = `${n} more language ${n === 1 ? 'version' : 'versions'}: ${j.facts.title}`;
   update((st) => ({
     ...st,
-    // Before publishing the count is added when it is published, with the job's own payment.
+    // Before the job is amplified (published with Amplify, or a free job upgraded) the count is added by that step.
     jobs: st.jobs.map((x) => (x.id === id ? { ...x, langsPaid: (x.langsPaid ?? 0) + (beforePublishing ? 0 : n), audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Paid for ${item.split(':')[0]} (simulated)` }] } : x)),
     receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item, amount: `${usd(n * LANGUAGE_PRICE)} (placeholder)` }, ...st.receipts],
   }));
@@ -1935,7 +1934,7 @@ export function setChoice(id: string, plan: Plan, said?: string): boolean {
     choice: plan,
     ...(plan === 'free' && x.publishOn && freeMonthBlock(s, x.publishOn) ? { publishOn: undefined } : {}),
     walk: x.walk ? { ...x.walk, settled: Array.from(new Set([...x.walk.settled, 'plan'])) } : x.walk,
-    chat: said ? [...x.chat, msg('user', said), msg('ai', plan === 'free' ? "Free it is. A free job is used only when it's published." : "Amplify it is. Let's go through what it adds, one at a time.")] : x.chat,
+    chat: said ? [...x.chat, msg('user', said), msg('ai', plan === 'free' ? "Free it is. A free job is used only when it goes live; scheduled, it holds its month's place until then." : "Amplify it is. Let's go through what it adds, one at a time.")] : x.chat,
   }));
   ensureAsk(id);
   return true;
@@ -2040,6 +2039,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
   if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
+  if (o.plan === 'free' && j.paidFor) return 'It is already paid for, so it goes out with Amplify';
   if (o.plan === 'free' && freeMonthBlock(s, o.schedule)) return freeMonthBlock(s, o.schedule);
   if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
   if (o.plan === 'amplify' && j.paidFor) return null;
@@ -2622,8 +2622,9 @@ export function hireAgain(id: string, place?: string): string | null {
  */
 export function downloadBlock(j: DemoJob): string | null {
   if (!j.sections.length) return 'There is no job description to download yet';
-  if (isPublished(j) || j.paidFor) return null;
-  return 'A copy can be downloaded once the job is published, or with Amplify as soon as it is paid';
+  // A scheduled free job has used nothing yet (its place is given back if the date is taken back), so its copy waits until it is live.
+  if (j.status === 'live' || j.status === 'closed' || j.paidFor) return null;
+  return j.status === 'scheduled' ? 'A copy can be downloaded once the job is live, or with Amplify as soon as it is paid' : 'A copy can be downloaded once the job is published, or with Amplify as soon as it is paid';
 }
 
 /** Downloads a copy when it may be downloaded; otherwise says when it can be (`say`), and returns false. */

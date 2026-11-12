@@ -239,6 +239,8 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
   it('prepares Reach only with addresses the user gave, and team emails only on the organisation’s domain', () => {
     turn('job-comms', 'invite people', [{ type: 'reach', candidates: ['someone@example.org'] }]);
     expect(lastAi('job-comms')?.text).toContain('Not done: email addresses that were not given');
+    turn('job-comms', 'invite maria.data@example.org', [{ type: 'reach', candidates: ['data@example.org'] }]);
+    expect(lastAi('job-comms')?.text).toContain('Not done: email addresses that were not given');
     turn('job-comms', 'invite ana@example.org and my colleague bo@gmail.example.org', [{ type: 'reach', candidates: ['ana@example.org'], team: ['bo@gmail.example.org'] }]);
     expect(lastAi('job-comms')?.text).toContain('Not done: team emails outside @riverstone.example.org');
     turn('job-comms', 'invite ana@example.org', [{ type: 'reach', candidates: ['ana@example.org'], candidateMessage: { body: 'Come and work with us.' } }]);
@@ -253,6 +255,16 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
     update((s) => ({ ...s, me: { ...s.me, role: 'owner' } }));
     turn('job-comms', 'keep it for every job', [{ type: 'keep', what: 'fixed', all: true }]);
     expect(getState().org.keptFixed).toEqual(job('job-comms').commitments);
+    const kept = getState().org.keptFixed;
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, commitments: j.commitments.slice(0, 1) } : j)) }));
+    turn('job-comms', 'keep these for every job instead', [{ type: 'keep', what: 'fixed', all: true }]);
+    expect(getState().org.keptFixed).toEqual(kept);
+    expect(lastAi('job-comms')?.text).toContain('changed only in Organisation settings');
+    update((s) => ({ ...s, org: { ...s.org, styleKept: true } }));
+    turn('job-comms', 'and keep a formal style for all', [{ type: 'keep_style', all: true }]);
+    expect(lastAi('job-comms')?.text).toContain('it is kept already');
+    turn('job-comms', 'skip the plan', [{ type: 'settle', fact: 'plan' }]);
+    expect(lastAi('job-comms')?.text).toContain('Free or Amplify is settled by choosing one');
     turn('job-comms', 'write it in Spanish', [{ type: 'set_language', language: 'es' }]);
     expect(job('job-comms').lang).toBe('es');
   });

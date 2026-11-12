@@ -1226,9 +1226,13 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     route(`#job/${id}`);
     click('See all formats');
     const panel = () => container.querySelector('section.ej-float') as HTMLElement;
+    expect(document.activeElement).toBe(panel());
     act(() => byLabel('Close the template panel').click());
     expect(panel()).toBeNull();
     expect(job(id).setup).toBe('template');
+    click('Browse templates');
+    act(() => panel().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(panel()).toBeNull();
     click('Browse templates');
     const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
     choose(panel().querySelector('select[aria-label="Template"]') as HTMLSelectElement, un.key);
@@ -1592,6 +1596,31 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(network).toEqual([]);
   });
 
+  it('tapping "Publish free" in the chat chooses Free; the window does not take it as a request to publish (the independent review, 12 November 2026)', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Logistics Officer in Goma, fixed-term, closing 30 December 2026", undefined, [], true);
+      applyTemplate(id, job(id).format);
+      chooseStyle(id, ['Warm']);
+      setPace(id, 'all');
+      update((st) => ({ ...st, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
+      const points = checkPoints(job(id), getState()).map((p) => p.key);
+      update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
+      goOn(id);
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    expect(currentLabel()).toBe('Free or Amplify');
+    const chip = Array.from(container.querySelectorAll('[role="log"] button')).find((b) => b.textContent?.trim() === 'Publish free') as HTMLElement;
+    act(() => chip.click());
+    expect(job(id).choice).toBe('free');
+    expect(job(id).walk?.settled).toContain('plan');
+    expect(job(id).status).toBe('draft');
+    expect(network).toEqual([]);
+  });
+
   it('on phones the template is chosen in the job description itself: a slim question line, the headings, and a strip of cards', () => {
     fresh();
     let id = '';
@@ -1877,7 +1906,7 @@ describe('employer demo: source has no network path', () => {
       }
       expect({ f, lib: /from ['"](axios|swr|@tanstack)/.test(src) }).toEqual({ f, lib: false });
       expect({ f, data: /lib\/site\/loadJobs|lib\/shortlist|PublicSite/.test(src) }).toEqual({ f, data: false });
-      expect({ f, stream: /\bEventSource\b|\bWebSocket\b/.test(src) }).toEqual({ f, stream: false });
+      expect({ f, stream: /\bEventSource\b|\bWebSocket\b|\bXMLHttpRequest\b|\bsendBeacon\b/.test(src) }).toEqual({ f, stream: false });
       expect({ f, ai: AI_SDK.test(src) }).toEqual({ f, ai: false });
     }
   });

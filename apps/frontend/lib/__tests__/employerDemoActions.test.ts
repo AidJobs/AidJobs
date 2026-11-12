@@ -80,7 +80,8 @@ import { canReopen, pageRemoved, purgeDeleted } from '../../components/employer-
 import { detectLang, langOf, langRequest, publicLangs, stale, untranslated } from '../../components/employer-demo/translate';
 import { addMonths, canGoFree, currentMonth, delisted, firstOfNextMonth, freeLeft, LANGUAGE_PRICE, langSlots, langsToPay, listedUntil, listingEnd, listingEndsIn, paidJobsLeft, rollBilling, singlePrice, usd } from '../../components/employer-demo/plans';
 import { changesSince, tellOffer } from '../../components/employer-demo/changes';
-import { getState, resetDemo, undo, update } from '../../components/employer-demo/store';
+import { getState, normalise, resetDemo, undo, update } from '../../components/employer-demo/store';
+import type { DemoJob } from '../../components/employer-demo/types';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const blocked = (id: string) => approvalRequired(getState(), job(id)) && !isApproved(job(id));
@@ -1030,6 +1031,27 @@ describe('free jobs and downloads (section 19, 8 November 2026)', () => {
     expect(downloadBlock(job('job-fin'))).toBeNull();
     const live = getState().jobs.find((j) => j.status === 'live')!;
     expect(downloadBlock(live)).toBeNull();
+  });
+
+  it('a scheduled free job has used nothing, so its copy waits until it is live (the independent review, 12 November 2026)', () => {
+    const j = job('job-fin');
+    const scheduled = { ...j, status: 'scheduled' as const, plan: 'free' as const, scheduledFor: '2026-12-01', paidFor: undefined };
+    expect(downloadBlock(scheduled)).toMatch(/once the job is live/);
+    expect(downloadBlock({ ...scheduled, plan: 'amplify' as const, paidFor: true })).toBeNull();
+    expect(downloadBlock({ ...scheduled, status: 'live' as const })).toBeNull();
+  });
+
+  it('data saved by earlier versions: only jobs that went live keep a free job used, and versions already public stay public', () => {
+    const s = getState();
+    const month = s.freeUses[0].month;
+    const draft = s.jobs.find((j) => j.status === 'draft')!;
+    const old = { ...s.jobs.find((j) => j.status === 'live')!, id: 'job-old-amp', plan: 'amplify' as const, paidVia: undefined, langsPaid: undefined, translations: { fr: { sections: [], reviewed: true }, es: { sections: [], reviewed: true } } } as unknown as DemoJob;
+    const out = normalise({ ...s, jobs: [...s.jobs, old], freeUses: [...s.freeUses, { jobId: draft.id, month }] });
+    expect(out.freeUses.some((u) => u.jobId === draft.id)).toBe(false);
+    expect(out.freeUses.length).toBe(s.freeUses.length);
+    const kept = out.jobs.find((j) => j.id === 'job-old-amp')!;
+    expect(kept.paidVia).toBe('single');
+    expect(langSlots(kept)).toBe(2);
   });
 });
 

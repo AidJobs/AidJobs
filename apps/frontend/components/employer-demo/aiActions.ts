@@ -45,7 +45,7 @@ import {
 } from './actions';
 import { approvalRequired } from './approval';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
-import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
+import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
 import { planFor } from './invites';
 import { isPublished } from './lifecycle';
 import { sdgsOf, STYLES } from './setup';
@@ -55,6 +55,12 @@ import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, JobLang, Message, Re
 
 const LANG_KEYS: JobLang[] = ['en', 'fr', 'ar', 'es', 'pt'];
 const EMAIL = /^[\w.+-]+@[\w-]+(?:\.[\w-]+)+$/;
+
+/** An address or link given whole in the text, not as part of a longer one ("data@x.org" is not in "maria.data@x.org"). */
+function givenWhole(text: string, token: string): boolean {
+  const esc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\w.+-])${esc}(?![\\w/-]|\\.[\\w-])`).test(text);
+}
 
 /**
  * The Reach invitations from a reach action: only addresses the user gave, team emails only on the organisation's own domain (the
@@ -67,7 +73,7 @@ function reachIn(a: Record<string, unknown>, s: State, j: DemoJob, said: string)
     if (v === undefined) return current;
     if (!Array.isArray(v) || v.length > 50) return null;
     const out = v.filter((e): e is string => typeof e === 'string').map((e) => e.trim().toLowerCase());
-    return out.every((e) => EMAIL.test(e) && given.includes(e)) ? Array.from(new Set(out)) : null;
+    return out.every((e) => EMAIL.test(e) && givenWhole(given, e)) ? Array.from(new Set(out)) : null;
   };
   const candidates = list(a.candidates, base.candidates);
   const team = list(a.team, base.team);
@@ -403,7 +409,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       }
       case 'keep_style':
-        if (a.all === true && j.style) keepStyleForAll(id);
+        if (a.all === true && s.org.styleKept) refused.push('keeping the style for every job: it is kept already, and changed only in Organisation settings');
+        else if (a.all === true && j.style) keepStyleForAll(id);
         break;
       case 'add_section':
         if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
@@ -466,6 +473,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'keep': {
         const what = oneOf(a.what, ['fixed', 'apply'] as const);
         if (!what || typeof a.all !== 'boolean' || s.me.role !== 'owner') refused.push('keeping it for every job: only the owner can change what every job starts with');
+        else if (keepToOffer(j, s) !== what) refused.push('keeping it for every job: it is offered once, at its step; afterwards it is changed only in Organisation settings');
         else keepForAll(id, what, a.all);
         break;
       }
@@ -539,8 +547,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'write_version_section': {
         const l = oneOf(a.language, LANG_KEYS);
         const t = l ? getState().jobs.find((x) => x.id === id)?.translations?.[l] : undefined;
+        // As with a version's tab open: its About us and How to apply are translations, checked like any other line.
         if (!l || !t) refused.push('a version that does not exist');
-        else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
         else if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
         else {
           if (!t.sections.some((x) => x.key === section)) addVersionSection(id, l, section);
@@ -569,14 +577,14 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'settle': {
         const what = typeof a.fact === 'string' ? a.fact : '';
-        if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER] as string[]).includes(what) || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"`);
+        if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
         else settleQuestion(id, what);
         break;
       }
       case 'set_apply': {
         const method = oneOf(a.method, METHODS);
         const address = a.address === undefined ? undefined : str(a.address, 120);
-        const given = address ? known(s, j, said ?? '').includes(address.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')) : true;
+        const given = address ? givenWhole(known(s, j, said ?? ''), address.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')) : true;
         if (!method) refused.push('the way to apply');
         else if (a.address !== undefined && (!address || !given)) refused.push('an application address that was not given');
         else {

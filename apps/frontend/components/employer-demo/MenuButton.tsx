@@ -23,7 +23,8 @@ function placeFor(el: HTMLElement, align: 'left' | 'right', up: boolean): CSSPro
   const above = r.top - 12;
   const goUp = up ? above > 160 || above > below : below < 200 && above > below;
   const maxWidth = Math.min(360, vw - 16);
-  const side: CSSProperties = align === 'right' ? { right: Math.max(8, vw - r.right) } : { left: Math.min(Math.max(8, r.left), Math.max(8, vw - maxWidth - 8)) };
+  const right = align === 'right' && r.right >= Math.min(maxWidth, 220) + 8;
+  const side: CSSProperties = right ? { right: Math.max(8, vw - r.right) } : { left: Math.min(Math.max(8, r.left), Math.max(8, vw - maxWidth - 8)) };
   return { ...side, ...(goUp ? { bottom: vh - r.top + 6 } : { top: r.bottom + 6 }), maxWidth, maxHeight: Math.max(120, goUp ? above : below) };
 }
 

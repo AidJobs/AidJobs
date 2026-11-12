@@ -189,7 +189,7 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
       const onHand = paidJobsLeft(s);
       const free = canGoFree(s, job.id, job.publishOn ?? null);
       const price = singlePrice(s);
-      const freeText = free ? `**Free**: listed ${LISTED_DAYS.free} days, standard placement, in ${own} only; ${left} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}, used only when it is published.` : `Both free jobs for ${monthName(month)} are used, so it goes out with **Amplify** or a package job.`;
+      const freeText = free ? `**Free**: listed ${LISTED_DAYS.free} days, standard placement, in ${own} only; ${left} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}, used only when it goes live.` : `Both free jobs for ${monthName(month)} are used, so it goes out with **Amplify** or a package job.`;
       const ampText = s.org.verified ? `**Amplify** (${onHand ? `uses 1 of your ${onHand} package ${onHand === 1 ? 'job' : 'jobs'}` : usd(price.amount)}): ${amplifyLine(s)}.` : 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.';
       const quick = [...(free ? [PUBLISH_FREE] : []), ...(s.org.verified ? [onHand ? USE_PACKAGE : AMPLIFY] : [])];
       return [stepMsg(`The job description is ready. Next, how it goes out.\n${freeText}\n${ampText}\nWhich one? Both are side by side in the panel, with the packages.`, key, quick)];
@@ -231,7 +231,7 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
         const notes = askers.filter((a) => a.note).map((a) => `“${a.note}”`).join(' ');
         return [stepMsg(`${askers.map((a) => a.name.split(' ')[0]).join(' and ')} asked for changes${notes ? `: ${notes}` : '.'} Make them here or in the text, then send round ${r.round + 1}: they see only what changed.`, key, [`Send round ${r.round + 1}`, ...skip])];
       }
-      return [stepMsg(`Sent for review. Waiting for ${waiting.join(' and ') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}; their comments and decisions appear in Review. You can keep working on it meanwhile.`, key, [REMIND, ...skip])];
+      return [{ ...stepMsg(`Sent for review. Waiting for ${waiting.join(' and ') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}; their comments and decisions appear in Review. You can keep working on it meanwhile.`, key, skip), card: 'review' }];
     }
     case 'publish': {
       const free = job.choice !== 'amplify';

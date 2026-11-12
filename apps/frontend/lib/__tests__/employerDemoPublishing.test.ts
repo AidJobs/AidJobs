@@ -49,7 +49,7 @@ describe('step 8: free or Amplify (section 19)', () => {
   it('after the check, the chat offers both, with the month’s free jobs and what Amplify includes', () => {
     const id = toPlan();
     expect(step(id)).toEqual({ kind: 'plan' });
-    expect(last(id)?.text).toMatch(/1 of 2 free jobs left in \w+, used only when it is published/);
+    expect(last(id)?.text).toMatch(/1 of 2 free jobs left in \w+, used only when it goes live/);
     expect(last(id)?.text).toContain('**Amplify** (US$28.40)');
     expect(last(id)?.text).toContain('1 language version besides its own (more at US$5 each)');
     expect(last(id)?.quick).toEqual(['Publish free', 'Amplify']);
@@ -128,9 +128,11 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
     goOn(id);
     expect(step(id)).toEqual({ kind: 'waiting' });
     expect(last(id)?.text).toMatch(/^Sent for review\. Waiting for Amina/);
-    expect(last(id)?.quick).toEqual(['Remind them', 'Publish without approval']);
-    sendChat(id, 'Remind them');
-    expect(job(id).review.reminded).toBeDefined();
+    expect(last(id)).toMatchObject({ quick: ['Publish without approval'], card: 'review' });
+    sendChat(id, 'remind them');
+    expect(job(id).review.reminded).toBeUndefined();
+    expect(last(id)).toMatchObject({ card: 'review' });
+    expect(job(id).chat.some((m) => /nothing is sent until you press it/.test(m.text))).toBe(true);
     expect(publish(id, { plan: 'free', schedule: null })).toBe(false);
     update((s) => ({ ...s, reviewerAs: 'amina' }));
     reviewerDecision(id, 'approved', '');

@@ -2019,6 +2019,15 @@ button.ej-step:hover {
   box-shadow: 0 18px 48px -18px rgba(0, 0, 0, 0.35);
 }
 
+.ej-float:focus {
+  outline: none;
+}
+
+.ej-float:focus-visible {
+  outline: 2px solid var(--sage-6);
+  outline-offset: 2px;
+}
+
 .ej-float-bar {
   display: flex;
   flex-shrink: 0;

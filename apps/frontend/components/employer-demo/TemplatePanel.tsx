@@ -135,8 +135,36 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
   );
 }
 
-/** A template being created: sections added, removed, renamed, and put in order within their group (the handle takes the arrow keys). */
-export function HeadingsEditor({ order, onChange, recommended }: { order: Format['order']; onChange: (o: Format['order']) => void; recommended: string[] }) {
+/** A heading changed on the job itself: applied when the field is left or Enter is pressed, so it can be cleared and retyped. */
+function LazyHeading({ value, label, onCommit }: { value: string; label: string; onCommit: (v: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft !== null && draft.trim() && draft.trim() !== value) onCommit(draft.trim());
+    setDraft(null);
+  };
+  return (
+    <input
+      className="ej-heading-input"
+      value={draft ?? value}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape' && draft !== null) {
+          e.stopPropagation();
+          setDraft(null);
+        }
+      }}
+      aria-label={label}
+    />
+  );
+}
+
+/**
+ * A template's sections: added, removed, renamed, and put in order within their group (the handle takes the arrow keys). `headingOf`
+ * names a section added; `lazy` applies a rename only when its field is left.
+ */
+export function HeadingsEditor({ order, onChange, recommended, headingOf: nameOf = (k) => SECTION_BY_KEY[k]?.label ?? k, lazy = false }: { order: Format['order']; onChange: (o: Format['order']) => void; recommended: string[]; headingOf?: (key: string) => string; lazy?: boolean }) {
   const sorted = outlineOrder(order.map((o) => o.key));
   const rename = (key: string, heading: string) => onChange(order.map((o) => (o.key === key ? { ...o, heading } : o)));
   return (
@@ -162,7 +190,11 @@ export function HeadingsEditor({ order, onChange, recommended }: { order: Format
               >
                 {(k) => (
                   <div className="ej-outline-row min-w-0 flex-1">
-                    <input className="ej-heading-input" value={order.find((o) => o.key === k)?.heading ?? ''} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
+                    {lazy ? (
+                      <LazyHeading value={order.find((o) => o.key === k)?.heading ?? ''} label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} onCommit={(v) => rename(k, v)} />
+                    ) : (
+                      <input className="ej-heading-input" value={order.find((o) => o.key === k)?.heading ?? ''} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
+                    )}
                     <span className="ej-row-tools">
                       <Tip label="Remove this section">
                         <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${order.find((o) => o.key === k)?.heading ?? k}`}>
@@ -178,7 +210,7 @@ export function HeadingsEditor({ order, onChange, recommended }: { order: Format
               <div className="flex flex-wrap gap-1">
                 {missing.map((d) => (
                   <Tip key={d.key} label={`${d.hint}${recommended.includes(d.key) ? ' · recommended for this job' : ''}`}>
-                    <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => onChange([...order, { key: d.key, heading: d.label }])} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
+                    <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => onChange([...order, { key: d.key, heading: nameOf(d.key) }])} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
                       {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
                       {d.label}
                     </button>
@@ -284,7 +316,7 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
       <span className="aj-faint" style={{ fontSize: 12, marginTop: -8 }}>
         Rename, remove, add, and drag the sections before you use it; the job description shows them as you go.
       </span>
-      <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommendSections(f, job.facts)} />
+      <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommendSections(f, job.facts)} headingOf={(k) => headingFor(k, f)} />
     </div>
   );
 }
@@ -299,7 +331,7 @@ function JobOutline({ s, job }: { s: State; job: DemoJob }) {
       <span className="aj-faint" style={{ fontSize: 12 }}>
         Rename, remove, add, and drag this job&apos;s sections; each change applies at once, and text already written is kept where its section stays.
       </span>
-      <HeadingsEditor order={order} onChange={(next) => applyOutline(job.id, next)} recommended={recommendSections(formatOf(s, job.format), job.facts)} />
+      <HeadingsEditor order={order} onChange={(next) => applyOutline(job.id, next)} recommended={recommendSections(formatOf(s, job.format), job.facts)} headingOf={(k) => headingFor(k, formatOf(s, job.format))} lazy />
     </div>
   );
 }
@@ -363,6 +395,15 @@ export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }
   const [view, setView] = useState(viewport);
   const [small, setSmall] = useState(false);
   const drag = useRef<{ kind: 'move' | 'size'; dx: number; dy: number } | null>(null);
+  const self = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    self.current?.focus({ preventScroll: true });
+    return () => {
+      const at = document.activeElement;
+      if (opener?.isConnected && (!at || at === document.body || !at.isConnected)) opener.focus({ preventScroll: true });
+    };
+  }, []);
   const clamp = (b: Box): Box => {
     const w = Math.min(Math.max(MIN.w, b.w), view.w - 16);
     const h = Math.min(Math.max(MIN.h, b.h), view.h - 16);
@@ -419,7 +460,18 @@ export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }
     keep(kind === 'move' ? { ...at, x: at.x + d[0], y: at.y + d[1] } : { ...at, w: at.w + d[0], h: at.h + d[1] });
   };
   return (
-    <section className="ej-float aj-card" style={{ left: at.x, top: at.y, width: at.w, height: small ? undefined : at.h }} aria-label={title}>
+    <section
+      ref={self}
+      tabIndex={-1}
+      className="ej-float aj-card"
+      style={{ left: at.x, top: at.y, width: at.w, height: small ? undefined : at.h }}
+      aria-label={title}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape' || self.current?.querySelector('[aria-controls][aria-expanded="true"]')) return;
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       <div
         className="ej-float-bar"
         onPointerDown={(e) => {

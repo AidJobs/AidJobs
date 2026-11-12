@@ -406,7 +406,7 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
   const paid = (key: PackageKey | 'extra' | 'langs') => {
     setCheckout(null);
     if (key === 'langs') {
-      buyLanguages(job.id, langs, !upgrade);
+      buyLanguages(job.id, langs, true);
       return goLive(prepaid ? 'direct' : 'onHand');
     }
     buy(key, job.facts.title, langs);
@@ -496,7 +496,7 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
       )}
       {upgrade && !compact && (
         <span className="aj-muted">
-          Free and {job.status === 'live' ? 'live' : `scheduled for ${longDate(job.scheduledFor ?? '')}`}, listed until {longDate(listedUntil(job, s.today))}. Amplified, it is listed {LISTED_DAYS.amplify} days from publishing, featured, with the market check, language versions, the flyer, and Reach. The free job it used stays used.
+          Free and {job.status === 'live' ? 'live' : `scheduled for ${longDate(job.scheduledFor ?? '')}`}, listed until {longDate(listedUntil(job, s.today))}. Amplified, it is listed {LISTED_DAYS.amplify} days from publishing, featured, with the market check, language versions, the flyer, and Reach. {job.status === 'live' ? 'The free job it used stays used.' : 'The free job it holds is given back.'}
         </span>
       )}
       {payment && chosen === 'amplify' && !prepaid && !onHand && <Packages job={job} s={s} />}

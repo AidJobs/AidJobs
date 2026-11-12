@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { rollBilling } from './plans';
+import { LANGS_INCLUDED, rollBilling } from './plans';
 import { goLive } from './invites';
 import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
@@ -33,7 +33,10 @@ export function normalise(s0: State): State {
     // Saved before jobs kept a copy of what went live: today's text is the starting point for "changed since publishing".
     const j2 = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;
     // A job still choosing its template or style when saved by an earlier version is written step by step from here.
-    const j = j2.setup && !j2.walk ? { ...j2, walk: { approved: [], settled: [] } } : j2;
+    const j3 = j2.setup && !j2.walk ? { ...j2, walk: { approved: [], settled: [] } } : j2;
+    // Amplified before versions were counted (12 November 2026): the versions it already has stay public, as paid for.
+    const n = Object.keys(j3.translations ?? {}).length;
+    const j = j3.plan === 'amplify' && !j3.paidVia ? { ...j3, paidVia: 'single' as const, langsPaid: Math.max(j3.langsPaid ?? 0, n - LANGS_INCLUDED.single) } : j3;
     if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;
@@ -41,6 +44,11 @@ export function normalise(s0: State): State {
     }
     return j;
   });
+  // Saved by earlier versions, which counted a free job when it was scheduled, sent for review, or downloaded: only a job that went
+  // live keeps its use; a scheduled one holds its place again, and the others give theirs back.
+  const neverLive = (id: string) => jobs.some((j) => j.id === id && !j.publishedAt && j.status !== 'live' && j.status !== 'closed');
+  const freeUses = s.freeUses.filter((u) => !neverLive(u.jobId));
+  if (freeUses.length !== s.freeUses.length) return { ...s, jobs, freeUses };
   return changed ? { ...s, jobs } : s;
 }
 
