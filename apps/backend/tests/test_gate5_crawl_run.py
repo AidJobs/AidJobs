@@ -103,6 +103,8 @@ class RecordingCursor:
         self.source_row = source_row if source_row is not None else _source_row()
         self.owns_run = owns_run
         self._row = None
+        self.expired_rows = []
+        self.expiry_error = None
 
     def __enter__(self):
         return self
@@ -114,6 +116,8 @@ class RecordingCursor:
         compact = " ".join(sql.split())
         self.statements.append((compact, params))
         self._row = None
+        if compact.startswith("UPDATE jobs j SET status = 'expired'") and self.expiry_error:
+            raise self.expiry_error
         if compact.startswith("UPDATE crawl_logs") and self.owns_run:
             # The finish's ownership check returns the run's id and its open jobs at the start.
             self._row = (params[-1], 0)
@@ -122,6 +126,9 @@ class RecordingCursor:
 
     def fetchone(self):
         return self._row
+
+    def fetchall(self):
+        return list(self.expired_rows)
 
 
 class RecordingConn:
@@ -438,16 +445,65 @@ def test_the_lifecycle_record_is_written_after_the_ownership_check_in_the_same_t
     assert finished is True
     assert conn.commits == 1
     updates = [(sql, p) for sql, p in statements if sql.startswith("UPDATE crawl_logs")]
-    assert len(updates) == 2
-    ownership, record = updates
+    assert len(updates) == 3
+    ownership, record, expiry = updates
     assert "status = 'running' RETURNING id, active_at_start" in ownership[0]
     assert "counted = %s" in record[0] and "status" not in record[0]
     assert record[1][-1] == "run-9"
-    # No listing report in this result: not complete, so it does not count.
+    # No listing report in this result: not complete, so it does not count, and expires nothing.
     assert record[1][0] is None and record[1][-2] is False
+    assert expiry == ("UPDATE crawl_logs SET expired = %s, returned = %s WHERE id = %s",
+                      (0, 0, "run-9"))
+    assert not any(sql.startswith("UPDATE jobs") for sql, _p in statements)
     order = [i for i, (sql, _p) in enumerate(statements) if sql.startswith("UPDATE crawl_logs")]
     lock = next(i for i, (sql, _p) in enumerate(statements) if sql.startswith("DELETE FROM"))
-    assert order[1] < lock
+    assert order[2] < lock
+
+
+def _counting_finish(cursor):
+    """Finish a run whose listing was complete, through the recording cursor."""
+    conn = RecordingConn(cursor)
+    orch = CrawlerOrchestrator("postgresql://example")
+    orch._get_db_conn = lambda: conn
+    orch.health_score = lambda source_id: None
+    orch.compute_next_run = lambda *args, **kwargs: datetime(2026, 10, 6)
+    result = {
+        "status": "ok", "message": "Found 2 jobs", "duration_ms": 4, "valid": 2,
+        "counts": {"found": 2, "inserted": 0, "updated": 0, "skipped": 0},
+        "listing": {"complete": True, "expected": 2, "stop": "no next-page link"},
+        "returned": 1,
+    }
+    finished = asyncio.run(orch.finish_run(_source(), "run-9", result))
+    return finished, conn
+
+
+def test_a_counting_run_expires_by_absence_inside_its_finish_before_its_lock_is_released():
+    cursor = RecordingCursor()
+    cursor.expired_rows = [("job-1",), ("job-2",)]
+    finished, conn = _counting_finish(cursor)
+    assert finished is True and conn.commits == 1
+    sqls = [sql for sql, _p in cursor.statements]
+    expire = next(i for i, sql in enumerate(sqls) if sql.startswith("UPDATE jobs j SET"))
+    record = next(i for i, sql in enumerate(sqls) if "counted = %s" in sql)
+    lock = sqls.index(next(sql for sql in sqls if sql.startswith("DELETE FROM crawl_locks")))
+    ownership = next(i for i, sql in enumerate(sqls) if "AND status = 'running' RETURNING" in sql)
+    assert ownership < record < expire < lock
+    assert cursor.statements[expire][1] == {"source_id": _source()["id"]}
+    assert cursor.statements[expire + 2] == (
+        "UPDATE crawl_logs SET expired = %s, returned = %s WHERE id = %s", (2, 1, "run-9")
+    )
+
+
+def test_a_failed_expiry_is_rolled_back_alone_and_the_run_still_finishes():
+    cursor = RecordingCursor()
+    cursor.expiry_error = RuntimeError("statement timeout")
+    finished, conn = _counting_finish(cursor)
+    assert finished is True and conn.commits == 1 and conn.rollbacks == 0
+    sqls = [sql for sql, _p in cursor.statements]
+    assert "ROLLBACK TO SAVEPOINT run_expiry" in sqls
+    assert ("UPDATE crawl_logs SET expired = %s, returned = %s WHERE id = %s",
+            (None, 1, "run-9")) in cursor.statements
+    assert any(sql.startswith("UPDATE sources") for sql in sqls)
 
 
 def test_failed_and_fail_both_increment_failures():

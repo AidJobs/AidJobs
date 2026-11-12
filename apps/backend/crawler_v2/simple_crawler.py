@@ -1577,6 +1577,7 @@ class SimpleCrawler:
         attempted = 0  # jobs that reached their write, or failed on the way to it
         seen_active = []  # ids of open jobs matched, for the run's lifecycle record
         not_open = []
+        returned = []  # ids of expired jobs this save made open again (contract §6)
         recorded = []
         failed_inserts = []  # Track failed inserts for logging
         
@@ -1592,6 +1593,7 @@ class SimpleCrawler:
                     recorded_mark = len(recorded)
                     seen_mark = len(seen_active)
                     not_open_mark = len(not_open)
+                    returned_mark = len(returned)
                     try:
                         title = job.get('title', '').strip()
                         apply_url = job.get('apply_url', '').strip()
@@ -1766,6 +1768,7 @@ class SimpleCrawler:
                             seen=seen_active,
                             not_open=not_open,
                             open_on=open_on,
+                            returned=returned,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                         in_savepoint = False
@@ -1794,6 +1797,7 @@ class SimpleCrawler:
                             del recorded[recorded_mark:]
                             del seen_active[seen_mark:]
                             del not_open[not_open_mark:]
+                            del returned[returned_mark:]
                         else:
                             attempted += 1
                         error_msg = f"Unexpected error processing job: {stored_text(e)}"
@@ -1824,6 +1828,7 @@ class SimpleCrawler:
                 for row in thin:
                     seen_mark = len(seen_active)
                     not_open_mark = len(not_open)
+                    returned_mark = len(returned)
                     cur.execute("SAVEPOINT job_observe")
                     attempted += 1
                     try:
@@ -1836,12 +1841,14 @@ class SimpleCrawler:
                             open_on=open_on,
                             seen=seen_active,
                             not_open=not_open,
+                            returned=returned,
                         )
                         cur.execute("RELEASE SAVEPOINT job_observe")
                     except Exception as e:
                         cur.execute("ROLLBACK TO SAVEPOINT job_observe")
                         del seen_active[seen_mark:]
                         del not_open[not_open_mark:]
+                        del returned[returned_mark:]
                         failed += 1
                         logger.error("Error observing a known job: %s", redact_exception(e))
                         continue
@@ -1906,6 +1913,7 @@ class SimpleCrawler:
             'seen_active': seen_active,
             'not_open_ids': not_open,
             'created_ids': created_ids(recorded),
+            'returned_ids': returned,
         }
     
     def _saved_jobs_for_pages(self, source_id: str, run_token) -> Tuple[Dict, int, Any]:

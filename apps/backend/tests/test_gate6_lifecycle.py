@@ -1,4 +1,5 @@
-"""Gate 6 lifecycle. No expiry, and absence is not inferred."""
+"""Gate 6 lifecycle. Expiry only under the approved policy (contract §6), written only in
+contracts/expiry.py; nothing deletes a job or clears its hiding."""
 import inspect
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,6 +102,27 @@ def test_finish_and_cleanup_do_not_expire_jobs():
         assert "delete from jobs" not in collapsed
         assert "status='expired'" not in collapsed
         assert "deleted_at=null" not in collapsed
+
+
+def test_lifecycle_sql_is_written_only_in_the_expiry_module():
+    paths = [
+        ROOT / "orchestrator.py",
+        ROOT / "app" / "crawler_admin.py",
+        ROOT / "contracts" / "persist.py",
+        ROOT / "contracts" / "upsert.py",
+        ROOT / "crawler_v2" / "simple_crawler.py",
+        ROOT / "crawler_v2" / "rss_crawler.py",
+        ROOT / "crawler_v2" / "api_crawler.py",
+    ]
+    for path in paths:
+        collapsed = path.read_text(encoding="utf-8").lower().replace(" ", "")
+        assert "status='expired'" not in collapsed, path.name
+        assert "expired_at=" not in collapsed, path.name
+        assert "deletefromjobs" not in collapsed, path.name
+    expiry = (ROOT / "contracts" / "expiry.py").read_text(encoding="utf-8")
+    collapsed = expiry.lower().replace(" ", "")
+    assert "deletefrom" not in collapsed and "deleted_at=" not in collapsed
+    assert "deleted_by" not in collapsed and "deletion_reason" not in collapsed
 
 
 def test_persist_sql_does_not_expire_or_reactivate():

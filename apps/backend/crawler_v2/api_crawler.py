@@ -224,6 +224,7 @@ class SimpleAPICrawler:
         validated = 0
         seen_active = []
         not_open = []
+        returned = []
         recorded = []
         unrecorded = 0  # rows whose sighting was not recorded (a hidden job seen again is)
         
@@ -255,6 +256,7 @@ class SimpleAPICrawler:
                     recorded_mark = len(recorded)
                     seen_mark = len(seen_active)
                     not_open_mark = len(not_open)
+                    returned_mark = len(returned)
                     cur.execute("SAVEPOINT job_save")
                     try:
                         outcome = persist_candidate(
@@ -269,6 +271,7 @@ class SimpleAPICrawler:
                             seen=seen_active,
                             not_open=not_open,
                             open_on=open_on,
+                            returned=returned,
                         )
                         cur.execute("RELEASE SAVEPOINT job_save")
                     except Exception as exc:
@@ -277,6 +280,7 @@ class SimpleAPICrawler:
                         del recorded[recorded_mark:]
                         del seen_active[seen_mark:]
                         del not_open[not_open_mark:]
+                        del returned[returned_mark:]
                         failed += 1
                         logger.error("API job failed to save: %s", redact_exception(exc))
                         continue
@@ -310,6 +314,7 @@ class SimpleAPICrawler:
             'seen_active': seen_active,
             'not_open_ids': not_open,
             'created_ids': created_ids(recorded),
+            'returned_ids': returned,
         }
     
     async def crawl_source(self, source: Dict, run=None) -> Dict:
