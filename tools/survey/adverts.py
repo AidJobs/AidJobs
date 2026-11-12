@@ -59,7 +59,8 @@ SEED = 20261111
 ORG_CAP, FRENCH_CAP = 30, 60     # decision 21: per parent organisation; French adverts up to 60
 WAVE_LANGUAGES = ("eng", "fra")  # wave 1 reads English and French (section 11)
 SHELL_HOSTS = re.compile(r"(?:^|\.)(?:myworkdayjobs\.com|myworkdaysite\.com|taleo\.net|workable\.com)$")
-BATCH_CAPS = {"r1": 60, "r2": 2300, "r3": 235, "r4": 10, "r5": 26}
+BATCH_CAPS = {"r1": 60, "r2": 2300, "r3": 235, "r4": 10, "r5": 26,
+              "r6": 349, "r6-live": 1}   # R6 (approved 12 November 2026): ReliefWeb, about 350 in all
 MIN_ADVERT_WORDS = 150          # below this a page is not counted as an advert
 
 ADVERT_FIELDS = [
@@ -219,10 +220,94 @@ def plan_batch(batch: str, pages: list[dict], verdicts: RobotsVerdicts, done: se
     return [c for c in capped(allowed, first=done) if c["page_id"] not in done]
 
 
+RELIEFWEB = "reliefweb.int"
+R6_CRAWLS = ["CC-MAIN-2026-43", "CC-MAIN-2026-39", "CC-MAIN-2026-34"]   # index maps on disk (step E)
+R6_INDEX_READS, R6_PAGES = 40, 300
+R6_PREFIX = "int,reliefweb)/job/"
+RELIEFWEB_JOB = re.compile(r"^https?://reliefweb\.int/job/(\d+)(?:[/?#]|$)", re.IGNORECASE)
+
+
+def r6_index(_args=None) -> int:
+    """R6's index lookups: ReliefWeb's job pages in Common Crawl's index for the crawls whose index
+    maps are on disk, by byte range through the archive reader (counted in R6's size); at most
+    R6_INDEX_READS reads."""
+    import careers
+    folder = READING / "r6"
+    reader = ArchiveReader(folder, BATCH_CAPS["r6"])
+    reads = 0
+    try:
+        for crawl in R6_CRAWLS:
+            target = folder / "index" / f"{crawl}.cdx.gz"
+            if target.exists():
+                continue
+            cluster = careers.ClusterIndex.read(ARCHIVE / "step-e-2026-11-05" / "commoncrawl" / crawl / "cluster.idx")
+            ranges = cluster.ranges(cluster.blocks_for(R6_PREFIX))
+            if reads + len(ranges) > R6_INDEX_READS:
+                print(f"{crawl}: {len(ranges)} index reads would pass R6's {R6_INDEX_READS}; not read")
+                continue
+            rows = []
+            for name, first, last, count in ranges:
+                body = reader.get(f"cc-index/collections/{crawl}/indexes/{name}", first, last - first + 1,
+                                  f"r6 index {crawl} ({count} blocks)")
+                reads += 1
+                if body is None:
+                    rows = None
+                    break
+                text = gzip.decompress(body).decode("utf-8", errors="replace")
+                rows += [line for line in text.splitlines() if line.startswith(R6_PREFIX)]
+            if rows is not None:
+                careers._save_rows(target, rows)
+                print(f"{crawl}: {len(rows)} index rows")
+    except Stopped as stop:
+        print(stop)
+    print(f"r6 index: {reads} reads this run; {requests_sent(folder)} requests in R6 (size {BATCH_CAPS['r6']})")
+    return 0
+
+
+def select_r6(rows: list[dict], verdict, n: int = R6_PAGES, seed: int = SEED) -> list[dict]:
+    """ReliefWeb's distinct job pages (latest capture of each job id, status 200, HTML, English or
+    French), only those its robots.txt allows the survey, n of them at random."""
+    best = {}
+    for m in rows:
+        url = m.get("url", "")
+        job = RELIEFWEB_JOB.match(url)
+        if not job or m.get("status") != "200" or "html" not in (m.get("mime") or ""):
+            continue
+        if not in_wave_language(m.get("languages", "")) or verdict(url) != "allowed":
+            continue
+        if job.group(1) not in best or m["filename"] > best[job.group(1)]["filename"]:
+            best[job.group(1)] = m
+    pages = [{"page_id": page_id(m["url"]), "org_id": "board-employer:reliefweb", "system": "reliefweb",
+              "host": RELIEFWEB, "crawl": m["filename"].split("/")[1], "languages": m.get("languages", ""),
+              "filename": m["filename"], "offset": m["offset"], "length": m["length"], "url": m["url"]}
+             for m in best.values()]
+    pages.sort(key=lambda c: c["page_id"])
+    random.Random(seed + 6).shuffle(pages)
+    return pages[:n]
+
+
+def plan_r6() -> int:
+    import confirm
+    folder = READING / "r6"
+    robots = folder / "robots" / f"{RELIEFWEB}.json"
+    if not robots.exists():
+        print("r6: ReliefWeb's robots.txt has not been read (fetch-live --batch r6 first); nothing planned")
+        return 1
+    rec = json.loads(robots.read_text(encoding="utf-8"))
+    rows = list(roles.index_rows(sorted((folder / "index").glob("*.cdx.gz"))))
+    chosen = select_r6(rows, lambda url: confirm.robots_verdict(rec["status"], rec["text"], url))
+    write_local(folder / "plan.csv", PLAN_FIELDS, chosen)
+    for name in ("held-hosts.txt", "held-orgs.txt"):
+        (folder / name).write_text("\n", encoding="utf-8")
+    print(f"r6: {len(rows)} index rows; {len(chosen)} ReliefWeb job pages planned (at most {R6_PAGES}); "
+          f"French {sum(1 for c in chosen if is_french(c['languages']))}")
+    return 0
+
+
 def saved_pages() -> dict[str, Path]:
     """page id -> saved archived record, across the batches and the earlier test pages."""
     out = {}
-    for b in ("r1", "r2"):
+    for b in ("r1", "r2", "r6"):
         for p in (READING / b / "pages").glob("*.warc.gz"):
             out[p.name.split(".")[0]] = p
     for folder in EARLIER_PAGES:
@@ -257,6 +342,8 @@ def held_organisations(pages: list[dict], orgs: roles.Organisations) -> set[str]
 
 
 def plan(args) -> int:
+    if args.batch == "r6":
+        return plan_r6()
     orgs = roles.Organisations.load(decisions=_decisions(), pools=roles.pools_of())
     pages = candidates(orgs=orgs)
     verdicts = RobotsVerdicts()
@@ -417,7 +504,8 @@ def fetch_archive(args) -> int:
     rows = read_csv(folder / "plan.csv")
     out = folder / "pages"
     out.mkdir(parents=True, exist_ok=True)
-    verdicts = RobotsVerdicts()
+    # R6's pages are judged by ReliefWeb's own robots.txt, read in R6; the others by R0's.
+    verdicts = RobotsVerdicts(folder / "robots") if batch == "r6" else RobotsVerdicts()
     if not (folder / "held-hosts.txt").exists() or not (folder / "held-orgs.txt").exists():
         print(f"{batch}: the plan has no list of held UN organisations and hosts; run plan again first")
         return 1
@@ -704,8 +792,30 @@ def board_pages(run: LiveRun, name: str, cfg: dict, rng: random.Random) -> tuple
     return seen_pages, links
 
 
+def fetch_r6_robots() -> int:
+    """R6's one live request: ReliefWeb's robots.txt through the fetch policy, kept in R0's form so
+    the plan and the archive reader judge each archived page by it."""
+    folder = READING / "r6"
+    run = LiveRun("r6", BATCH_CAPS["r6-live"], folder=folder / "live")
+    meta = run.get(f"https://{RELIEFWEB}/robots.txt", f"robots.txt {RELIEFWEB}")
+    if not meta or meta.get("status") is None:
+        print(f"r6: ReliefWeb's robots.txt not read ({(meta or {}).get('error') or run.stopped}); its pages are not read")
+        return 1
+    text = (meta["body"] or b"").decode("utf-8", "replace") if meta["status"] == 200 else ""
+    (folder / "robots").mkdir(parents=True, exist_ok=True)
+    (folder / "robots" / f"{RELIEFWEB}.json").write_text(
+        json.dumps({"host": RELIEFWEB, "status": meta["status"], "error": meta.get("error", ""), "text": text}),
+        encoding="utf-8")
+    import confirm
+    verdict = confirm.robots_verdict(meta["status"], text, f"https://{RELIEFWEB}/job/1234567/example")
+    print(f"r6: ReliefWeb's robots.txt answered {meta['status']}; a job page is {verdict} for the survey")
+    return 0
+
+
 def fetch_live(args) -> int:
     batch = args.batch
+    if batch == "r6":
+        return fetch_r6_robots()
     cap = min(args.cap or BATCH_CAPS[batch], BATCH_CAPS[batch])
     run = LiveRun(batch, cap)
     if batch == "r3":
@@ -1023,7 +1133,7 @@ def extract(_args=None) -> int:
     out = WORK / "adverts"
     out.mkdir(parents=True, exist_ok=True)
     plans = {}
-    for b in ("r1", "r2"):
+    for b in ("r1", "r2", "r6"):
         p = READING / b / "plan.csv"
         if p.exists():
             for r in read_csv(p):
@@ -1040,9 +1150,13 @@ def extract(_args=None) -> int:
         meta = plans.get(pid, {})
         ad.update(id=pid, source="archive", batch=meta.get("batch", "earlier"), system=system_of(uri) or "own site",
                   crawl=meta.get("crawl", ""), languages=meta.get("languages", ""))
+        if meta.get("batch") == "r6":
+            # ReliefWeb republishes employers' adverts: a board's copy, its employer read from the page.
+            ad.update(source="board", system="reliefweb", employer=board_employer(ad.get("employer", ""), html,
+                                                                                  "reliefweb"))
         _save_advert(out, ad)
         n += 1
-        kinds[ad["method"]] += 1
+        kinds["reliefweb" if meta.get("batch") == "r6" else ad["method"]] += 1
     for batch in ("r3", "r4", "r5"):
         for meta_path in sorted((READING / batch / "bodies").glob("*.json")):
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -1921,7 +2035,7 @@ def is_advert(ad: dict) -> bool:
 
 
 BOARD_NAMES = {"myjobmag": "myjobmag", "groundzero": "groundzero", "ngoportal": "ngojobsafrica",
-               "ngojobsinafrica": "ngojobsinafrica"}
+               "ngojobsinafrica": "ngojobsinafrica", "reliefweb": "reliefweb"}
 ORG_LINK = re.compile(r"href=[\"'][^\"']*/(?:organi[sz]ations?|company|companies|employers?|jobs-at)/([^\"'/?#]+)",
                       re.IGNORECASE)
 
@@ -1952,14 +2066,16 @@ def org_names(orgs: roles.Organisations) -> dict[str, str]:
 
 def board_identity(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tuple[str, str, str]:
     """(organisation id, basis, type or '') of a board's advert. An employer outside the survey's list
-    is typed by the name rules (Red Cross, UN, foundation, research), otherwise by the boards' own
-    market, national NGOs in the Global South (an estimate); '' leaves the list's type."""
+    is typed by the name rules (Red Cross, UN, foundation, research), otherwise by the board's own
+    market (an estimate): national NGOs in the Global South for the African boards, international
+    NGOs for ReliefWeb; '' leaves the list's type."""
     oid, basis = board_org(ad, orgs, names)
     if not oid.startswith("board-employer:"):
         return oid, basis, ""
     t = roles.org_type_of({"name": ad.get("employer", ""), "kind": "", "country": ""})
     if t in ("other", "ingo"):
-        t, basis = "national_ngo_south", "board default (Estimate)"
+        t = "ingo" if ad.get("system") == "reliefweb" else "national_ngo_south"
+        basis = "board default (Estimate)"
     return oid, basis, t
 
 
@@ -2167,7 +2283,7 @@ LISTS = {"facts_given": set(FACTS), "facts_missing": set(FACTS), "standards": se
 FORMS = {   # free-text columns: identifiers and codes only, never words from an advert
     "advert_id": re.compile(r"[0-9a-f]{16}"), "org_id": re.compile(r"[\w.:/-]{1,80}"),
     "system": re.compile(r"[A-Za-z][A-Za-z .()]{0,40}"), "grade": re.compile(r"(?:[A-Z]{1,4}-[0-9A-E]{1,2})?"),
-    "period": re.compile(r"(?:\d{4}-\d{2})?"), "batch": re.compile(r"r[1-5]|step-f|earlier"),
+    "period": re.compile(r"(?:\d{4}-\d{2})?"), "batch": re.compile(r"r[1-6]|step-f|earlier"),
     "org_type_basis": re.compile(r"rule|matched by name|board, employer not in the list|board default \(Estimate\)|"
                                  r"decision"),
     "standard_basis": re.compile(r"recurring|known texts only \(Estimate\)"),
@@ -2237,14 +2353,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
-    p.add_argument("--batch", choices=["r1", "r2"], required=True)
+    p.add_argument("--batch", choices=["r1", "r2", "r6"], required=True)
     p.set_defaults(func=plan)
+    p = sub.add_parser("index")
+    p.add_argument("--batch", choices=["r6"], required=True)
+    p.set_defaults(func=r6_index)
     p = sub.add_parser("fetch-archive")
-    p.add_argument("--batch", choices=["r1", "r2"], required=True)
+    p.add_argument("--batch", choices=["r1", "r2", "r6"], required=True)
     p.add_argument("--cap", type=int, default=0)
     p.set_defaults(func=fetch_archive)
     p = sub.add_parser("fetch-live")
-    p.add_argument("--batch", choices=["r3", "r4", "r5"], required=True)
+    p.add_argument("--batch", choices=["r3", "r4", "r5", "r6"], required=True)
     p.add_argument("--cap", type=int, default=0)
     p.add_argument("--un-terms-decided", action="store_true",
                    help="only once the user has decided that UN pages may be read (19.11)")

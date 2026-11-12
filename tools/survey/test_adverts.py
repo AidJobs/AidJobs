@@ -537,6 +537,34 @@ def test_a_board_that_names_itself_gives_way_to_the_pages_organisation_link():
     assert adverts.board_org(ad, roles.Organisations(), names) == ("org:acf", "matched by name")
 
 
+def test_r6_keeps_the_latest_allowed_capture_of_each_reliefweb_job():
+    def row(url, crawl, status="200", mime="text/html", lang="eng"):
+        return {"url": url, "status": status, "mime": mime, "languages": lang, "offset": "1", "length": "2",
+                "filename": f"crawl-data/{crawl}/segments/x.warc.gz"}
+    rows = [row("https://reliefweb.int/job/4100001/finance-officer", "CC-MAIN-2026-34"),
+            row("https://reliefweb.int/job/4100001/finance-officer", "CC-MAIN-2026-43"),
+            row("https://reliefweb.int/job/4100002/chargee-de-programme", "CC-MAIN-2026-39", lang="fra"),
+            row("https://reliefweb.int/job/4100003/x", "CC-MAIN-2026-39", lang="deu"),
+            row("https://reliefweb.int/job/4100004/x", "CC-MAIN-2026-39", status="301"),
+            row("https://reliefweb.int/jobs?search=x", "CC-MAIN-2026-39"),
+            row("https://reliefweb.int/job/4100005/x", "CC-MAIN-2026-39")]
+    chosen = adverts.select_r6(rows, lambda url: "forbidden" if "4100005" in url else "allowed")
+    assert sorted(c["url"].split("/")[4] for c in chosen) == ["4100001", "4100002"]
+    assert {c["crawl"] for c in chosen if "4100001" in c["url"]} == {"CC-MAIN-2026-43"}
+    assert all(c["org_id"] == "board-employer:reliefweb" and c["system"] == "reliefweb" for c in chosen)
+    assert len(adverts.select_r6(rows, lambda url: "allowed", n=1)) == 1
+
+
+def test_a_reliefweb_employer_outside_the_list_is_estimated_international():
+    ad = {"employer": "Acme Relief Alliance", "url": "https://reliefweb.int/job/4100001/x", "system": "reliefweb"}
+    oid, basis, t = adverts.board_identity(ad, roles.Organisations(), {})
+    assert oid.startswith("board-employer:h") and t == "ingo" and basis == "board default (Estimate)"
+    oid, basis, t = adverts.board_identity(dict(ad, system="myjobmag"), roles.Organisations(), {})
+    assert t == "national_ngo_south"
+    page = '<a href="https://reliefweb.int/organization/acme-relief">Acme Relief</a>'
+    assert adverts.board_employer("ReliefWeb", page, "reliefweb") == "acme relief"
+
+
 def test_a_board_copy_with_at_employer_is_still_a_copy():
     body = [{"text": " ".join(f"word{i}" for i in range(80)), "heading": False, "tag": "p"}]
     ads = [{"id": "a1", "source": "archive", "title": "Finance Officer", "lines": body},
