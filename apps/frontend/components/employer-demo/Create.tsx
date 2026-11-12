@@ -7,6 +7,7 @@ import Tip from '@/components/site/Tip';
 import { approvalRequired, approvedFor, downloadCopy, isReviewable, openWindowAt, updateBaseFromJob } from './actions';
 import { changesSince, changeSummary, tellOffer } from './changes';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
+import { ArchivedBanner } from './Archive';
 import { openPoints } from './Checks';
 import { canGoFree } from './plans';
 import { ChatPanel, DocumentView, TitleEditor } from './DocPane';
@@ -307,6 +308,7 @@ export default function Create({ id }: { id?: string }) {
   if (phone) {
     return (
       <div className="flex h-full min-h-0 flex-col">
+        <ArchivedBanner id={job.id} />
         {docPane}
         {sheet === 'outline' && (
           <Dialog title="JD outline" subtitle={`${job.tags.length} sections`} onClose={() => setSheet(null)} half>
@@ -347,7 +349,9 @@ export default function Create({ id }: { id?: string }) {
   const showChat = shown === 'chat';
   const panelName = shown === 'chat' ? 'Chat with AidJobs' : shown === 'review' ? 'Review' : 'JD outline';
   return (
-    <div ref={box} className="flex h-full min-h-0" style={{ userSelect: dragging ? 'none' : undefined }}>
+    <div className="flex h-full min-h-0 flex-col">
+    <ArchivedBanner id={job.id} />
+    <div ref={box} className="flex min-h-0 flex-1" style={{ userSelect: dragging ? 'none' : undefined }}>
       <div className="min-h-0 min-w-0" style={{ width: shown ? `${split}%` : undefined, flex: shown ? undefined : 1 }}>
         {docPane}
       </div>
@@ -414,6 +418,7 @@ export default function Create({ id }: { id?: string }) {
       {reviewOpen && <ReviewDialog job={job} s={s} onClose={() => setReviewOpen(false)} />}
       {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
       {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go('create')} />}
+    </div>
     </div>
   );
 }

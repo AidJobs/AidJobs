@@ -52,6 +52,7 @@ import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUn
 import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
+import { ArchivedBanner } from './Archive';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
@@ -864,7 +865,19 @@ export function PayerDialog({ job, s, onPaid, onClose }: { job: DemoJob; s: Stat
 type Tab = 'checks' | 'page' | 'google' | 'share';
 
 /** The publish panel: the preview beside the choices, and one button that says what happens (employer-side plan, section 16). */
+/** Check and publish, archived (section 19, phase 4): it works as before, under the archive's banner; nothing but the archive links to it. */
 export default function Publish({ id }: { id?: string }) {
+  const s = useDemo();
+  const job = s.jobs.find((j) => j.id === id);
+  return (
+    <>
+      {job && <ArchivedBanner id={job.id} />}
+      <PublishPage key={id} id={id} />
+    </>
+  );
+}
+
+function PublishPage({ id }: { id?: string }) {
   const s = useDemo();
   const job = s.jobs.find((j) => j.id === id);
   const [plan, setPlan] = useState<Plan>(() => (job && canGoFree(s, job.id, null) ? 'free' : 'amplify'));

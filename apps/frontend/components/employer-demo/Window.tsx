@@ -4,25 +4,25 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, remindReviewers, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, hireAgain, isReviewable, LINK_REPLY, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
-import { isPublished } from './lifecycle';
+import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
+import { JobDialog, type Kind } from './Jobs';
 import { jobUrl } from './links';
 import { SkipDialog } from './Publish';
 import { LangsPart, LiveCard, FullPart, MarketPart, PaymentPanel, PlanChoice, PublishCard, ReviewPart, type Opener } from './PublishSteps';
 import { ReachEditor } from './Reach';
 import { planCount } from './invites';
-import { ReviewForm } from './Review';
+import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
 import { aiOn, askAi, GO_ON, probeAi, useAi, writeVersion } from './ai';
 import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
 import { readJobFile } from './readFile';
-import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL } from './walkChat';
-import type { OpenTarget } from './aiActions';
+import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
+import { STATE_DIALOGS, type OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
-import { READING_KEY } from './CreateEntry';
 import { ApplyFields, AskAnswer, DocumentView, rich, TitleEditor } from './DocPane';
 import { arrangementLabel, completeText, headingFor, longDate, PLACES, salaryText } from './engine';
 import { FactDialog, typeLabel, type FactKey } from './FactBar';
@@ -35,7 +35,7 @@ import { canGoFree } from './plans';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
-import { getState, go, goBack, useDemo } from './store';
+import { getState, go, goBack, READING_KEY, useDemo } from './store';
 import Structure, { Commitments } from './Structure';
 import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
@@ -53,7 +53,23 @@ const OWN = /\b(own|scratch|myself|build|custom)\b/i;
 const OTHERS = /\b(other|others|more|show|options|different|alternatives?|else)\b|\bsee all\b/i;
 const LINK = /^\s*(?:https?:\/\/|www\.)\S+\s*$/i;
 const EXTRA_TABS: Record<string, string> = { flyer: 'Flyer', reach: 'Reach emails', reviewmail: 'Review email', payment: 'Payment' };
-const OPEN_EARLIER = 'Open the earlier workspace';
+/** Requests about a published job's state (section 17's actions); each opens its dialog or shows its button, never acts on its own. */
+const STATE_ASKS: Array<[RegExp, StateAction]> = [
+  [/^(?:please\s+)?(?:publish|put) it (?:live )?now\b|^(?:please\s+)?go live now\b/, 'publishNow'],
+  [/^(?:please\s+)?(?:change|move) the (?:publishing |go-live )?date\b|^(?:please\s+)?reschedule\b/, 'reschedule'],
+  [/^(?:please\s+)?(?:take it |put it |move it )?back to (?:a )?draft\b|^(?:please\s+)?unschedule\b/, 'backToDraft'],
+  [/^(?:please\s+)?extend\b/, 'extend'],
+  [/^(?:please\s+)?share (?:it|the job|this job|the link)\b/, 'share'],
+  [/^(?:please\s+)?amplify(?: it| this job)?[.!]?$/, 'amplify'],
+  [/^(?:the )?(?:position|post|role|job) (?:is |was |has been )?filled\b|^(?:please\s+)?mark (?:it|the position) (?:as )?filled\b/, 'filled'],
+  [/^(?:please\s+)?close (?:it|the job|this job)(?: now| early)?[.!]?$/, 'close'],
+  [/^(?:please\s+)?withdraw\b/, 'withdraw'],
+  [/^(?:please\s+)?re-?open\b/, 'reopen'],
+  [/^(?:please\s+)?hire (?:for it )?again\b|^(?:please\s+)?repost\b/, 'hire'],
+];
+const STATE_WORD: Record<string, string> = { draft: 'a draft', review: 'a job in review', approved: 'an approved job', scheduled: 'a scheduled job', live: 'a live job', closed: 'a closed job' };
+/** The window's dialogs for section 17's actions. */
+const DIALOGS: Partial<Record<StateAction, Kind>> = { publishNow: 'publishNow', reschedule: 'reschedule', backToDraft: 'backToDraft', extend: 'extend', share: 'share', filled: 'filled', withdraw: 'withdraw', reopen: 'reopen' };
 const SPLIT_KEY = 'aidjobs.employerDemo.windowSplit';
 const BOX_KEY = 'aidjobs.employerDemo.chatBox';
 
@@ -316,7 +332,7 @@ function SdgDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
 }
 
 /** A part's own fields, in the panel above the job description, so it can be set without the chat. */
-function PartFields({ part, job, s, onClose, onFact, open }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; open: Opener }) {
+function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; open: Opener; act: (a: StateAction) => void }) {
   const points = job.sections.length ? openPoints(job, s, false) : [];
   const head: Record<string, [string, string]> = {
     details: ['Details', 'The facts the job description and Google use'],
@@ -372,7 +388,19 @@ function PartFields({ part, job, s, onClose, onFact, open }: { part: string; job
       </div>
     );
   else if (part === 'review') body = <ReviewPart job={job} s={s} open={open} />;
-  else if (part === 'publish') body = <PublishCard job={job} s={s} open={open} />;
+  else if (part === 'publish')
+    body = (
+      <div className="flex flex-col gap-3">
+        <PublishCard job={job} s={s} open={open} />
+        {/* A published job's actions stay here too, not only on the chat's card (section 19: nothing depends on the chat alone). */}
+        {isPublished(job) && stateActionsOf(s, job).length > 0 && (
+          <div className="flex flex-col gap-1.5 border-t pt-3 aj-hair" role="group" aria-label="What you can do">
+            <span className="aj-muted">{stateOffer(s, job)}</span>
+            <StateCard job={job} s={s} act={act} />
+          </div>
+        )}
+      </div>
+    );
   return (
     <section id="ej-part-card" className="aj-card ej-part-card flex flex-col gap-3 p-4" aria-label={title} style={{ scrollMarginTop: 12 }}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -458,11 +486,33 @@ function BoxGrip({ height, onChange }: { height: number; onChange: (h: number) =
  * The guide: the whole conversation, answers inside the questions, and the box, with the part in view as its subject. With the AI on,
  * a message waits in the conversation while the AI thinks, and a note says where messages go.
  */
+/**
+ * Section 17's actions for the job's state (section 19, phase 4), on the card under the chat's message: the next step first, and each
+ * button opens its own dialog, or is the action itself where section 17 has no dialog (Close now, with Undo).
+ */
+function StateCard({ job, s, act }: { job: DemoJob; s: State; act: (a: StateAction) => void }) {
+  const actions = stateActionsOf(s, job);
+  const left = job.facts.deadline ? Math.round((new Date(`${job.facts.deadline}T12:00:00`).getTime() - s.today) / 86_400_000) : null;
+  const main: StateAction | undefined = job.status === 'live' ? (left !== null && left <= 7 ? 'extend' : 'share') : actions[0];
+  const order = main ? [main, ...actions.filter((a) => a !== main)] : actions;
+  if (!order.length) return <span className="aj-muted">Nothing to do from here for now.</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {order.map((a) => (
+        <button key={a} type="button" className={a === main ? 'aj-ink-btn' : 'aj-pill'} style={a === 'delete' ? { color: 'var(--red)' } : undefined} onClick={() => act(a)}>
+          {STATE_LABEL[a]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** A card under the chat's message (section 19, steps 8 and 9): the one place, with the part on the line, where it is published, paid, or sent. */
-function ChatCardView({ kind, job, s, open }: { kind: NonNullable<ChatMsg['card']>; job: DemoJob; s: State; open: Opener }) {
-  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published' }[kind];
+function ChatCardView({ kind, job, s, open, act }: { kind: NonNullable<ChatMsg['card']>; job: DemoJob; s: State; open: Opener; act: (a: StateAction) => void }) {
+  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published', state: 'What you can do' }[kind];
   return (
     <section className="aj-card ej-chat-card mt-2 flex flex-col gap-2 p-3" aria-label={label}>
+      {kind === 'state' && <StateCard job={job} s={s} act={act} />}
       {kind === 'plan' && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="aj-pill" onClick={() => open.part('plan')}>
@@ -501,7 +551,23 @@ function ChatCardView({ kind, job, s, open }: { kind: NonNullable<ChatMsg['card'
   );
 }
 
-function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean; open: Opener }) {
+/**
+ * Reviewers in the window (section 19, phase 4): the chat column becomes the Review panel, with the status, the round, the rule, the due
+ * date, each reviewer's decision, what changed since the last round, every comment, a comment or suggestion tied to the part open on the
+ * line, and Approve or Request changes with a note. The author's chat is not shown, and nothing can be edited from here.
+ */
+function ReviewColumn({ job, s, on, onSection }: { job: DemoJob; s: State; on?: string; onSection: (key: string) => void }) {
+  return (
+    <div className="aj-scroll flex h-full min-h-0 flex-col" role="region" aria-label="Review">
+      <ReviewPanel job={job} s={s} onSend={() => {}} on={on} onSection={onSection} />
+      <p className="aj-faint m-0 px-3 pb-3" style={{ fontSize: 11.5 }}>
+        Reviewers comment, suggest, and decide; only the author changes the job.
+      </p>
+    </div>
+  );
+}
+
+function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open, act }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean; open: Opener; act: (a: StateAction) => void }) {
   const [text, setText] = useState('');
   const [tapped, setTapped] = useState<string | null>(null);
   const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
@@ -558,7 +624,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open 
               </div>
             )}
             {m.from === 'ai' && m === last && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
-            {m.from === 'ai' && m.card && i === lastCard && i > lastUser && !reviewing && <ChatCardView kind={m.card} job={job} s={s} open={open} />}
+            {m.from === 'ai' && m.card && i === lastCard && i > lastUser && !reviewing && (m.card !== 'state' || !m.state || m.state === job.status) && <ChatCardView kind={m.card} job={job} s={s} open={open} act={act} />}
           </div>
         ))}
         {reading && (
@@ -584,14 +650,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open 
         <div ref={end} />
       </div>
       <div className="shrink-0 border-t px-3 pb-2.5 aj-hair">
-        {reviewing ? (
-          <div className="flex flex-col gap-2 pt-2.5">
-            <span className="aj-muted">You are looking as a reviewer. For now, comments and approval are in the earlier workspace.</span>
-            <button type="button" className="aj-pill self-start" onClick={() => go('create', job.id)}>
-              {OPEN_EARLIER}
-            </button>
-          </div>
-        ) : (
+        {!reviewing && (
           <>
             <BoxGrip
               height={box}
@@ -676,6 +735,7 @@ function JobWindow({ id }: { id: string }) {
   const [fact, setFact] = useState<RowKey | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [jobDialog, setJobDialog] = useState<Kind | null>(null);
   const [partsOpen, setPartsOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [unseen, setUnseen] = useState(false);
@@ -701,6 +761,15 @@ function JobWindow({ id }: { id: string }) {
   }
 
   const openRef = useRef<(t: OpenTarget) => void>(() => {});
+
+  // A published job whose state changes here (published now, closed, reopened, back to a draft) says so the same way.
+  const status = job?.status;
+  const seenStatus = useRef(status);
+  useEffect(() => {
+    const was = seenStatus.current;
+    seenStatus.current = status;
+    if (was && was !== status && ['scheduled', 'live', 'closed'].includes(was)) greetState(id);
+  }, [status, id]);
 
   // "Reading your role…" shows for at least a moment; with the AI on, until the AI has written the first reply in place of the rules'.
   useEffect(() => {
@@ -786,6 +855,16 @@ function JobWindow({ id }: { id: string }) {
     if (askId) setPart(job.id, 'details');
   }, [askId, job]);
 
+  // A job opened in its state says where it stands and what fits (section 19, phase 4); a draft picks up where it left off.
+  useEffect(() => {
+    if (reading) return;
+    greetState(id);
+    // Opened at a part (Check, Review, a section), the job stays there even when the chat's next question is a fact.
+    const j = getState().jobs.find((x) => x.id === id);
+    const l = j?.chat[j.chat.length - 1];
+    if (j?.part && l?.from === 'ai' && l.ask) seenAsk.current = l.id;
+  }, [id, reading]);
+
   // The line follows a new employer's writing: each step brings its part into view; a language version to review opens its tab.
   const step = nextStep(job, s);
   const stepNow = stepKey(step);
@@ -865,6 +944,11 @@ function JobWindow({ id }: { id: string }) {
   const goPart = (key: string) => {
     settleAsk(job.id);
     setPartsOpen(false);
+    // Reviewers read the outline in the job description itself; they cannot reorder it.
+    if (key === 'outline' && reviewing) {
+      if (phone) setView('job');
+      return scrollToId(`ej-sec-${job.tags[0]}`);
+    }
     if (key === 'outline') {
       if (phone && !job.setup) return setOutlineOpen(true);
       return openPick(job.setup ? 'templates' : 'sections');
@@ -919,10 +1003,31 @@ function JobWindow({ id }: { id: string }) {
     if (phone) setView('job');
     requestAnimationFrame(() => document.getElementById('ej-w-panel')?.focus());
   };
+  /**
+   * One of section 17's actions for the job's state, from its card (section 19, phase 4): its dialog opens, and its button does it;
+   * Close now, Amplify, Hire again, and Download are their own buttons, as in Manage jobs. Nothing outside the state's actions is done.
+   */
+  const act = (a: StateAction) => {
+    const st = getState();
+    const j = st.jobs.find((x) => x.id === job.id);
+    if (!j || !stateActionsOf(st, j).includes(a)) return;
+    const dialog = DIALOGS[a];
+    if (dialog) return setJobDialog(dialog);
+    if (a === 'close') return closeJob(j.id, 'early');
+    if (a === 'delete') return setDeleteOpen(true);
+    if (a === 'download') return void downloadCopy(j, st.org.name, true);
+    if (a === 'amplify') {
+      setChoice(j.id, 'amplify');
+      return goPart('publish');
+    }
+    const copy = hireAgain(j.id);
+    if (copy) go('job', copy);
+  };
   /** What the AI asked to bring into view; a delete only opens its confirmation. */
   const openTarget = (t: OpenTarget) => {
     const j = getState().jobs.find((x) => x.id === job.id);
     if (!j) return;
+    if (STATE_DIALOGS[t]) return act(STATE_DIALOGS[t]);
     if (t === 'templates' || t === 'own') return openPick(t);
     if (t === 'preview') return j.sections.length ? openPreview() : undefined;
     if (t === 'versions') return j.versions.length ? setVersionsOpen(true) : undefined;
@@ -942,7 +1047,16 @@ function JobWindow({ id }: { id: string }) {
     // An answer offered by the last message, and a typed choice of Free or Amplify, belong to that step, not to the window's shortcuts.
     const answer = last?.from === 'ai' && Boolean(last.quick?.includes(text));
     const planChoice = !job.choice && /\b(free|amplify|package)\b/.test(t);
-    if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
+    const asked = isPublished(job) && !answer ? STATE_ASKS.find(([re]) => re.test(t))?.[1] : undefined;
+    if (isPublished(job) && !answer && /^(?:so )?what (?:else )?(?:can|could) (?:i|we) do\b|^what now\b|^(?:show (?:me )?)?(?:the )?options\b/.test(t)) return chatNote(job.id, text, stateOffer(s, job) || 'Nothing to do from here for now.', undefined, 'state');
+    if (asked) {
+      if (!stateActionsOf(s, job).includes(asked)) return chatNote(job.id, text, `${STATE_LABEL[asked]} is not for ${STATE_WORD[job.status]}. ${stateOffer(s, job)}`.trim(), undefined, 'state');
+      if (DIALOGS[asked]) {
+        act(asked);
+        return chatNote(job.id, text, 'Confirm in the dialog: it says exactly what happens.');
+      }
+      return chatNote(job.id, text, `Here it is: ${STATE_LABEL[asked]} is on the card below, and nothing changes until you press it.`, undefined, 'state');
+    }
     if (text === SHOW_FLYER) openTab('flyer');
     if (text === INVITE) openTab('reach');
     if (text === SKIP_APPROVAL) return setSkipOpen(true);
@@ -1026,7 +1140,7 @@ function JobWindow({ id }: { id: string }) {
     headings
   ) : (
     <div className="flex flex-col gap-3">
-      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} open={opener} />}
+      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} open={opener} act={act} />}
       {job.status === 'live' && changesSince(job).length > 0 && (
         <div className="aj-card px-3 py-2" role="status" aria-label="Changed since publishing">
           <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
@@ -1095,7 +1209,7 @@ function JobWindow({ id }: { id: string }) {
       )}
     </span>
   );
-  const chat = <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} open={opener} />;
+  const chat = reviewing ? <ReviewColumn job={job} s={s} on={focus ?? undefined} onSection={(k) => goPart(`s:${k}`)} /> : <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} open={opener} act={act} />;
   const titleBox = (
     <span className="ej-w-titlebox">
       <h1 className="ej-w-title">{job.facts.title || 'Untitled job'}</h1>
@@ -1132,7 +1246,8 @@ function JobWindow({ id }: { id: string }) {
         />
       )}
       {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
-      {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go('create')} />}
+      {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go(isPublished(job) ? 'jobs' : 'create')} />}
+      {jobDialog && <JobDialog job={job} s={s} kind={jobDialog} onClose={() => setJobDialog(null)} onDeleted={() => go('jobs')} />}
       {skipOpen && (
         <SkipDialog
           job={job}
@@ -1156,7 +1271,7 @@ function JobWindow({ id }: { id: string }) {
           {titleBox}
           <div className="ej-switch shrink-0" role="group" aria-label="Show">
             <button type="button" className="ej-switch-btn" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>
-              Chat
+              {reviewing ? 'Review' : 'Chat'}
             </button>
             <button
               type="button"
@@ -1235,14 +1350,9 @@ function JobWindow({ id }: { id: string }) {
         {titleBox}
         <span className="min-w-0 flex-1" />
         {tools}
-        <Tip label="The workspace before this round, kept until this window has everything" side="bottom">
-          <button type="button" className="aj-text-btn shrink-0" style={{ height: 30 }} onClick={() => go('create', job.id)}>
-            Earlier workspace
-          </button>
-        </Tip>
       </div>
       <div ref={bodyRef} className="relative flex min-h-0 flex-1" style={{ userSelect: dragging ? 'none' : undefined }}>
-        <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label="Chat with AidJobs">
+        <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label={reviewing ? 'Review' : 'Chat with AidJobs'}>
           {chat}
         </section>
         <div

@@ -41,14 +41,17 @@ import {
   setPayWith,
   setPublishOn,
   setReachPlan,
+  startAsUsual,
+  startFromProfile,
   writeVersionSection,
 } from './actions';
 import { approvalRequired } from './approval';
+import { profileFor } from './profiles';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
 import { planFor } from './invites';
-import { isPublished } from './lifecycle';
-import { sdgsOf, STYLES } from './setup';
+import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
+import { sdgsOf, STYLES, usualTemplate } from './setup';
 import { getState } from './store';
 import { jobLang, langOf } from './translate';
 import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, JobLang, Message, ReachPlan, State } from './types';
@@ -102,8 +105,10 @@ export { FIXED_SECTIONS };
  * checks, and the free and paid rules stay exact. Anything unknown or unsafe is refused, and the reply says what was not done.
  */
 export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'payment', 'publish', 'preview', 'versions', 'download', 'delete'] as const;
-export type OpenTarget = (typeof OPEN_TARGETS)[number] | `section:${string}` | `lang:${string}`;
-const CARDS = ['plan', 'publish', 'review', 'live'] as const;
+/** The dialogs of section 17's actions (section 19, phase 4): the AI may open one the job's state allows, never act on its own. */
+export const STATE_DIALOGS: Record<string, StateAction> = { publish_now: 'publishNow', reschedule: 'reschedule', back_to_draft: 'backToDraft', extend: 'extend', share: 'share', filled: 'filled', withdraw: 'withdraw', reopen: 'reopen' };
+export type OpenTarget = (typeof OPEN_TARGETS)[number] | 'publish_now' | 'reschedule' | 'back_to_draft' | 'extend' | 'share' | 'filled' | 'withdraw' | 'reopen' | `section:${string}` | `lang:${string}`;
+const CARDS = ['plan', 'publish', 'review', 'live', 'state'] as const;
 const PACKAGE_KEYS = ['one', 'three', 'five', 'always'] as const;
 
 const ENGAGEMENT_KEYS: Engagement[] = ['job', 'consultancy', 'internship', 'volunteer'];
@@ -113,6 +118,8 @@ const ORDER = [
   'set_facts',
   'set_apply',
   'settle',
+  'use_profile',
+  'start',
   'use_template',
   'set_style',
   'keep_style',
@@ -393,6 +400,16 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         if (j.walk) for (const k of asksOf(Object.keys(patch))) settleQuestion(id, k);
         break;
       }
+      case 'use_profile': {
+        const p = profileFor(s, j);
+        if (j.setup !== 'template' || !p || a.profile !== p.id) refused.push('a saved job profile that is not offered for this job');
+        else startFromProfile(id, p.id);
+        break;
+      }
+      case 'start':
+        if (j.setup !== 'template' || !usualTemplate(s, id)) refused.push('starting as usual: there is no usual template yet');
+        else startAsUsual(id);
+        break;
       case 'use_template': {
         const key = typeof a.template === 'string' ? a.template : '';
         if (!s.formats.some((f) => f.key === key && !f.key.startsWith('pasted-'))) refused.push('a template the demo does not have');
@@ -458,7 +475,12 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'open': {
         const t = typeof a.target === 'string' ? a.target : '';
-        const ok = (OPEN_TARGETS as readonly string[]).includes(t) || (t.startsWith('section:') && j.tags.includes(t.slice(8))) || (t.startsWith('lang:') && Boolean(j.translations?.[t.slice(5) as JobLang]));
+        const dialog = STATE_DIALOGS[t];
+        if (dialog && !stateActionsOf(s, j).includes(dialog)) {
+          refused.push(`${STATE_LABEL[dialog].toLowerCase()}: not for a job that is ${j.status === 'review' ? 'in review' : j.status}`);
+          break;
+        }
+        const ok = Boolean(dialog) || (OPEN_TARGETS as readonly string[]).includes(t) || (t.startsWith('section:') && j.tags.includes(t.slice(8))) || (t.startsWith('lang:') && Boolean(j.translations?.[t.slice(5) as JobLang]));
         if (ok && !opened.length) opened.push(t as OpenTarget);
         else if (!ok) refused.push(`opening "${t.slice(0, 30)}"`);
         break;
@@ -577,7 +599,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'settle': {
         const what = typeof a.fact === 'string' ? a.fact : '';
-        if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
+        if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER, ...(j.walk.again ? ['again'] : [])] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
         else settleQuestion(id, what);
         break;
       }

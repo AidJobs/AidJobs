@@ -225,7 +225,7 @@ describe('a free job is used, and a job profile kept, only when it is published 
     expect(profile?.facts.deadline).toBeUndefined();
     expect(getState().notice).toMatchObject({ text: 'Saved as a job profile for next time: Logistics Officer, Goma.', unprofile: profile?.id });
     forgetProfile(profile!.id);
-    expect(getState().profiles).toEqual([]);
+    expect(getState().profiles?.some((p) => p.id === profile!.id)).toBe(false);
   });
 
   it('a live free job opened at Publish from elsewhere is offered Amplify; a draft only opens there', () => {

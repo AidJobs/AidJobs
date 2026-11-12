@@ -30,7 +30,7 @@ import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { changeSummary, tellOffer } from './changes';
 import { currentMonth, delisted, FREE_PER_MONTH, freeLeft, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn, monthName } from './plans';
 import { reachMoment } from './invites';
-import { go, useDemo } from './store';
+import { go, READING_KEY, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
 import { Lifeline, PlanBadge, Section, stageOf } from './ui';
 
@@ -78,9 +78,10 @@ export function needsYou(s: State, j: DemoJob): boolean {
   return false;
 }
 
+/** A published job opens its own page under Manage jobs; one still being written opens in the window, where it left off. */
 export function openJob(j: DemoJob) {
   if (j.status === 'live' || j.status === 'closed' || j.status === 'scheduled') go('jobs', j.id);
-  else go('create', j.id);
+  else go('job', j.id);
 }
 
 function briefing(s: State): Brief[] {
@@ -100,11 +101,11 @@ function briefing(s: State): Brief[] {
             : 'Publish now?',
         actions: [
           { label: 'Publish', run: () => openWindowAt(j.id, 'publish'), primary: true },
-          { label: 'Open', run: () => go('create', j.id) },
+          { label: 'Open', run: () => openWindowAt(j.id, 'review') },
         ],
       });
     } else if (j.review.state === 'changes' && isReviewable(j)) {
-      out.push({ id: `chg-${j.id}`, icon: <MessageSquareWarning size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />, title: `Changes requested on ${j.facts.title}`, body: 'See the comments on the sections.', actions: [{ label: 'Open', run: () => go('create', j.id), primary: true }] });
+      out.push({ id: `chg-${j.id}`, icon: <MessageSquareWarning size={16} strokeWidth={1.8} style={{ color: 'var(--amber)' }} />, title: `Changes requested on ${j.facts.title}`, body: 'See the comments on the sections.', actions: [{ label: 'Open', run: () => openWindowAt(j.id, 'review'), primary: true }] });
     }
     if (j.status === 'live' && left !== null && left <= 3 && !s.inbox.some((i) => i.jobId === j.id && i.kind === 'deadline' && i.done)) {
       out.push({
@@ -133,7 +134,7 @@ function briefing(s: State): Brief[] {
               label: 'Hire again',
               run: () => {
                 const id = hireAgain(j.id);
-                if (id) go('create', id);
+                if (id) go('job', id);
               },
             },
           ],
@@ -213,7 +214,7 @@ function briefing(s: State): Brief[] {
     }
   }
   const unwritten = s.jobs.find((j) => j.status === 'draft');
-  if (unwritten) out.push({ id: `dr-${unwritten.id}`, icon: <FileText size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />, title: `${unwritten.facts.title || 'A draft'} is waiting`, body: unwritten.sections.length ? 'Pick up where you left off.' : 'Not written yet.', actions: [{ label: 'Continue', run: () => go('create', unwritten.id), primary: true }] });
+  if (unwritten) out.push({ id: `dr-${unwritten.id}`, icon: <FileText size={16} strokeWidth={1.8} style={{ color: 'var(--text-2)' }} />, title: `${unwritten.facts.title || 'A draft'} is waiting`, body: unwritten.sections.length ? 'Pick up where you left off.' : 'Not written yet.', actions: [{ label: 'Continue', run: () => go('job', unwritten.id), primary: true }] });
   return out;
 }
 
@@ -296,9 +297,15 @@ export default function Home() {
       else setNoMatch(true);
       return;
     }
-    const id = startJob(v);
+    // A role described here starts in the window, like one described on the Create a job page (section 19, phase 4).
+    const id = startJob(v, undefined, [], true);
+    try {
+      localStorage.setItem(READING_KEY, id);
+    } catch {
+      /* storage unavailable */
+    }
     setText('');
-    go('create', id);
+    go('job', id);
   };
 
   return (
@@ -387,7 +394,7 @@ export default function Home() {
                     const id = runIntent(intent);
                     setIntent(null);
                     setText('');
-                    if (id) go('create', id);
+                    if (id) go('job', id);
                   }}
                 >
                   Confirm

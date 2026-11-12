@@ -5,11 +5,16 @@ import { LANGS_INCLUDED, rollBilling } from './plans';
 import { goLive } from './invites';
 import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
+import { broughtForward } from './flow';
+import { profilesFromJobs } from './profiles';
 import { initialState } from './sample';
 import type { DemoJob, Recipient, State } from './types';
 
 /** Everything the demo keeps lives in this browser only, under its own keys, apart from the public site's. */
 export const STORAGE_KEY = 'aidjobs.employerDemo.v4';
+
+/** The job just started with Enter: its window opens at once and shows "Reading your role…" before the first replies. */
+export const READING_KEY = 'aidjobs.employerDemo.reading';
 
 const listeners = new Set<() => void>();
 let current: State | null = null;
@@ -36,7 +41,8 @@ export function normalise(s0: State): State {
     const j3 = j2.setup && !j2.walk ? { ...j2, walk: { approved: [], settled: [] } } : j2;
     // Amplified before versions were counted (12 November 2026): the versions it already has stay public, as paid for.
     const n = Object.keys(j3.translations ?? {}).length;
-    const j = j3.plan === 'amplify' && !j3.paidVia ? { ...j3, paidVia: 'single' as const, langsPaid: Math.max(j3.langsPaid ?? 0, n - LANGS_INCLUDED.single) } : j3;
+    const j4 = j3.plan === 'amplify' && !j3.paidVia ? { ...j3, paidVia: 'single' as const, langsPaid: Math.max(j3.langsPaid ?? 0, n - LANGS_INCLUDED.single) } : j3;
+    const j = broughtForward(j4, s);
     if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;
@@ -48,8 +54,16 @@ export function normalise(s0: State): State {
   // live keeps its use; a scheduled one holds its place again, and the others give theirs back.
   const neverLive = (id: string) => jobs.some((j) => j.id === id && !j.publishedAt && j.status !== 'live' && j.status !== 'closed');
   const freeUses = s.freeUses.filter((u) => !neverLive(u.jobId));
-  if (freeUses.length !== s.freeUses.length) return { ...s, jobs, freeUses };
+  // Published before job profiles were saved (section 19, phase 4): each published job leaves the profile it would have saved.
+  const profiles = s.profiles ?? profilesFromJobs(jobs);
+  if (freeUses.length !== s.freeUses.length || profiles !== s.profiles) return { ...s, jobs, freeUses, profiles };
   return changed ? { ...s, jobs } : s;
+}
+
+/** The sample data as the window takes it on: its jobs brought forward and its published jobs' profiles kept. */
+function sample(today: number): State {
+  const s = initialState(today);
+  return { ...s, jobs: s.jobs.map((j) => broughtForward(j, s)), profiles: profilesFromJobs(s.jobs) };
 }
 
 function load(): State {
@@ -66,7 +80,7 @@ function load(): State {
   } catch {
     /* unreadable: start again */
   }
-  return initialState(today);
+  return sample(today);
 }
 
 function snapshot(): State {
@@ -106,7 +120,7 @@ export function resetDemo() {
   } catch {
     /* nothing to remove */
   }
-  current = initialState(startOfDay(Date.now()));
+  current = sample(startOfDay(Date.now()));
   trail.length = 0;
   listeners.forEach((l) => l());
 }

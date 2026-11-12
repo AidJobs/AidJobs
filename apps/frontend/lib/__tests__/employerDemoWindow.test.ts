@@ -157,7 +157,12 @@ describe('the window: hand edits and its own replies', () => {
   });
 });
 
+/** A new employer: no job written yet, so no usual template and no saved profile (section 19, phase 4). */
+const asNewEmployer = () => update((s) => ({ ...s, jobs: [], profiles: [] }));
+
 describe('the window, revised: the template comes first, then the style, then the writing', () => {
+  beforeEach(asNewEmployer);
+
   it('a job started in the window waits for its template: nothing is written and no fact is asked yet', () => {
     const id = startJob('We are hiring a Nutrition Officer, 12-month fixed-term', undefined, [], true);
     expect(job(id).setup).toBe('template');
@@ -233,6 +238,7 @@ describe('the window, revised: the template comes first, then the style, then th
 });
 
 describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to 7', () => {
+  beforeEach(asNewEmployer);
   const ask = (id: string) => job(id).chat.at(-1)?.ask;
   const step = (id: string) => nextStep(job(id), getState());
   const ready = (text: string, pace: 'step' | 'all') => {
@@ -442,13 +448,19 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(job(fromDoc).sections).toEqual([]);
     expect(formatOf(getState(), job(fromDoc).format).order.map((o) => o.key)).toEqual(['purpose', 'responsibilities', 'apply']);
   });
+});
 
-  it('a job saved by an earlier version while choosing its template is brought forward; jobs already written are left as they are', () => {
+describe('jobs saved before the window', () => {
+  it('a job saved while choosing its template is brought forward; one written before the window has its sections approved and its questions settled (section 19, phase 4); published jobs are left as they are', () => {
     const s = getState();
-    const old = { ...s.jobs[0], id: 'old-window', setup: 'style' as const, walk: undefined };
-    const out = normalise({ ...s, jobs: [old, ...s.jobs] });
+    const before = s.jobs.map((j) => ({ ...j, walk: undefined }));
+    const old = { ...before[0], id: 'old-window', setup: 'style' as const };
+    const out = normalise({ ...s, jobs: [old, ...before] });
     expect(out.jobs[0].walk).toEqual({ approved: [], settled: [] });
-    expect(out.jobs.slice(1).every((j) => !j.walk)).toBe(true);
+    const comms = out.jobs.find((j) => j.id === 'job-comms')!;
+    expect(comms.walk).toMatchObject({ pace: 'all', approved: comms.tags, settled: expect.arrayContaining(['grade', 'eligibility', 'method', 'details', 'fixed']) });
+    expect(nextStep(comms, out)).toEqual({ kind: 'ask', fact: 'deadline' });
+    expect(out.jobs.slice(1).filter((j) => ['live', 'scheduled', 'closed'].includes(j.status)).every((j) => !j.walk)).toBe(true);
   });
 });
 

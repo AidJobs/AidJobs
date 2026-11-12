@@ -6,16 +6,15 @@ import { LINK_REPLY, startFromDocument, startJob } from './actions';
 import Composer, { type ComposerHandle } from './Composer';
 import { FactSlot, PlusMenu } from './ComposerTools';
 import { article, completeText, detectRole, extractFacts, PLACES, recognise, ROLE_FAMILIES } from './engine';
-import { go, useDemo } from './store';
+import { go, READING_KEY, useDemo } from './store';
 import { readJobFile } from './readFile';
 import type { State } from './types';
 import UploadDialog from './Upload';
 
+export { READING_KEY };
+
 /** Set when a job starts from this screen, so its workspace opens once with the chat open and focused. */
 export const OPEN_CHAT_KEY = 'aidjobs.employerDemo.openChat';
-
-/** The job just started with Enter: its window opens at once and shows "Reading your role…" before the first replies. */
-export const READING_KEY = 'aidjobs.employerDemo.reading';
 
 const LINK = /^\s*(?:https?:\/\/|www\.)\S+\s*$/i;
 

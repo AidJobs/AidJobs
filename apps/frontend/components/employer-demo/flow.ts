@@ -4,7 +4,7 @@ import { isPublished } from './lifecycle';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './market';
 import { inferSdgs } from './setup';
 import { versionsOf } from './translate';
-import type { AskKind, DemoJob, Format, GroupKey, JobLang, State } from './types';
+import type { AskKind, DemoJob, Format, GroupKey, JobLang, State, Walk } from './types';
 
 /**
  * A new employer's writing, in order (employer-side plan, section 19, steps 3 to 7): each fact just before the first section that uses
@@ -90,6 +90,7 @@ export function asksOf(fields: string[]): AskKind[] {
 export type Step =
   | { kind: 'setup'; stage: 'template' | 'style' | 'pace' }
   | { kind: 'change' }
+  | { kind: 'again' }
   | { kind: 'genuine'; point: string }
   | { kind: 'ask'; fact: AskKind; section?: string }
   | { kind: 'write'; sections: string[] }
@@ -194,6 +195,8 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   if (job.setup) return { kind: 'setup', stage: job.setup };
   if (w.pending) return { kind: 'change' };
   if (w.awaiting) return { kind: 'genuine', point: w.awaiting.point };
+  // Hire again (section 19, phase 4): what changes comes first, then each section for a quick "keep as is".
+  if (w.again && !w.settled.includes('again')) return { kind: 'again' };
   if (!isSettled('title', job)) return { kind: 'ask', fact: 'title' };
   const unwritten = job.tags.filter((k) => !isWritten(job, k));
   const all = w.pace === 'all';
@@ -263,6 +266,7 @@ export function partOfStep(step: Step | null, job: DemoJob): string | null {
       return job.walk?.pending?.changes[0] ? `s:${job.walk.pending.changes[0].key}` : null;
     case 'details':
     case 'sdgs':
+    case 'again':
       return 'details';
     case 'fixed':
       return 'fixed';
@@ -288,6 +292,21 @@ export function partOfStep(step: Step | null, job: DemoJob): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * A job written before the window (the sample jobs, and jobs saved by earlier versions), brought forward when the demo loads (section 19,
+ * phase 4): its written sections approved and its questions settled, so the window takes it on from where it stands. A fact it still
+ * lacks (a closing date, say) is asked, as before. A job in review or approved has been read by its reviewers, so the basic check's
+ * points are left as they are. Published jobs need no steps.
+ */
+export function broughtForward(job: DemoJob, s: State): DemoJob {
+  if (job.walk || job.setup || isPublished(job) || !job.sections.length) return job;
+  const walk: Walk = { pace: 'all', approved: job.tags.filter((k) => isWritten(job, k)), settled: [...DECLINABLE, ...LEFT] };
+  const base: DemoJob = { ...job, walk };
+  if (job.status === 'draft') return base;
+  const skipped = checkPoints(base, s).map((p) => p.key);
+  return skipped.length ? { ...base, walk: { ...walk, skipped } } : base;
 }
 
 /** The step after this section is approved, so the AI can go straight on. */

@@ -2,12 +2,11 @@
 
 import { AlertCircle, BarChart3, CheckCircle2, ChevronDown, FileCheck2, Languages, Lock, Printer, UserCheck } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, isReviewable, keepTranslation, refreshTranslation, remindReviewers, removeTranslation, reviewTranslation } from './actions';
+import { addTranslation, applyFix, approvalRequired, editTranslation, isApproved, isReviewable, keepTranslation, openWindowAt, refreshTranslation, remindReviewers, removeTranslation, reviewTranslation } from './actions';
 import { ReviewDialog } from './Review';
 import { shortDate } from './engine';
 import { FlyerDialog } from './Flyer';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, MIN_SIMILAR, type Point } from './market';
-import { go } from './store';
 import { jobLang, langOf, stale, totalLines, untranslated, versionChoices, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
 import { Dialog, inputStyle } from './ui';
@@ -29,7 +28,7 @@ function PointRow({ p, job, owner }: { p: Point; job: DemoJob; owner: boolean })
               </button>
             )}
             {!p.fix && p.section && (
-              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
+              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => openWindowAt(job.id, `s:${p.section}`)}>
                 Look at it in the job description
               </button>
             )}
@@ -300,9 +299,9 @@ export default function BeforePublish({
           <span className="aj-muted">AidJobs drafts each version; you review it before it appears. Each is its own version of the job page, for people reading and searching in that language.</span>
           {versions.length > 0 && job.status !== 'live' && owner && (
             <span className="aj-faint">
-              You can also edit each version in the workspace, like the English.{' '}
-              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => go('create', job.id)}>
-                Open the workspace
+              You can also edit each version in its tab of the job&apos;s window, like the job&apos;s own language.{' '}
+              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => openWindowAt(job.id, 'langs')}>
+                Open the window
               </button>
             </span>
           )}

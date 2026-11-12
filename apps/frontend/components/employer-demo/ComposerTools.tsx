@@ -116,16 +116,16 @@ export function PlusMenu({ s, onUpload }: { s: State; onUpload: () => void }) {
         <MenuItem
           key={j.id}
           title={j.facts.title}
-          tip={`${j.facts.location ? `${j.facts.location}. ` : ''}Starts from last time's job description, with new dates.`}
+          tip={`${j.facts.location ? `${j.facts.location}. ` : ''}Starts from last time's job description; the chat asks what changes.`}
           onClick={() => {
             const id = hireAgain(j.id);
-            if (id) go('create', id);
+            if (id) go('job', id);
           }}
         />
       ))}
       {drafts.length > 0 && <span className="ej-menu-label">Continue a job draft</span>}
       {drafts.slice(0, 5).map((j) => (
-        <MenuItem key={j.id} title={j.facts.title || 'Untitled job draft'} tip={statusLine(s, j)} onClick={() => go('create', j.id)} />
+        <MenuItem key={j.id} title={j.facts.title || 'Untitled job draft'} tip={statusLine(s, j)} onClick={() => go('job', j.id)} />
       ))}
       {drafts.length > 5 && <MenuItem title={`All ${drafts.length} job drafts`} tip="Opens Manage jobs, where every job draft is listed." onClick={() => go('jobs')} />}
     </ClickMenu>

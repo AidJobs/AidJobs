@@ -1,10 +1,11 @@
 'use client';
 
-import { Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
+import { Archive, Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { chooseAiModel, probeAi, useAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Billing from './Billing';
+import ArchivedScreens from './Archive';
 import { currentMonth, FREE_PER_MONTH, freeLeft, monthName, paidJobsLeft } from './plans';
 import Create from './Create';
 import Home from './Home';
@@ -58,14 +59,22 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
     if (!id) return;
     const name = s.team.find((p) => p.id === id)?.name;
     const target = s.jobs.find((j) => j.review.state !== 'none' && j.review.reviewers.some((r) => r.name === name));
-    if (target) go('create', target.id);
+    if (target) go('job', target.id);
   };
-  const reset = (
-    <Tip label="Reset the demo to its sample data" side={inHeader ? 'bottom' : collapsed ? 'right' : 'top'}>
-      <button type="button" className="aj-icon-btn" onClick={onReset} aria-label="Reset demo">
-        <RotateCcw size={14} strokeWidth={1.8} />
-      </button>
-    </Tip>
+  const side = inHeader ? 'bottom' : collapsed ? 'right' : 'top';
+  const tools = (
+    <>
+      <Tip label="Archived screens: the earlier workspace and Check and publish" side={side}>
+        <button type="button" className="aj-icon-btn" onClick={() => go('archive')} aria-label="Archived screens">
+          <Archive size={14} strokeWidth={1.8} />
+        </button>
+      </Tip>
+      <Tip label="Reset the demo to its sample data" side={side}>
+        <button type="button" className="aj-icon-btn" onClick={onReset} aria-label="Reset demo">
+          <RotateCcw size={14} strokeWidth={1.8} />
+        </button>
+      </Tip>
+    </>
   );
   if (collapsed) {
     return (
@@ -78,7 +87,7 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
           actions={[{ label: `${s.me.name.split(' ')[0]} (you)`, current: !s.reviewerAs, run: () => pick(null) }, ...reviewers.map((p) => ({ label: `${p.name.split(' ')[0]} (reviewer)`, current: s.reviewerAs === p.id, run: () => pick(p.id) }))]}
         />
         <ModelChoice collapsed inHeader={inHeader} />
-        {reset}
+        {tools}
       </>
     );
   }
@@ -95,7 +104,7 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
             </option>
           ))}
         </select>
-        {reset}
+        {tools}
       </span>
       <ModelChoice collapsed={false} inHeader={inHeader} />
     </>
@@ -143,7 +152,7 @@ export default function EmployerDemo() {
   ];
 
   const workspace = (route.screen === 'create' || route.screen === 'studio' || route.screen === 'job') && Boolean(route.id);
-  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing'].includes(route.screen);
+  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing', 'archive'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
     case 'create':
@@ -176,6 +185,9 @@ export default function EmployerDemo() {
       break;
     case 'billing':
       screen = <Billing />;
+      break;
+    case 'archive':
+      screen = <ArchivedScreens />;
       break;
     default:
       screen = <Create />;

@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
 import Tip from '@/components/site/Tip';
-import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, openWindowAt, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
+import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, openToEdit, openWindowAt, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
 import { invitedCount, reachRoom } from './invites';
 import { Checkout } from './Pricing';
 import { changesSince, changeSummary, tellOffer } from './changes';
@@ -222,7 +222,7 @@ function VariantDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: (
             onClick={() => {
               const id = hireAgain(job.id, place.trim());
               onClose();
-              if (id) go('create', id);
+              if (id) go('job', id);
             }}
           >
             Create the copy
@@ -276,21 +276,23 @@ function ShareDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   );
 }
 
-type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete' | 'publishNow' | 'reschedule' | 'backToDraft' | 'tell' | 'reopen';
+export type Kind = 'extend' | 'filled' | 'variant' | 'share' | 'withdraw' | 'delete' | 'publishNow' | 'reschedule' | 'backToDraft' | 'tell' | 'reopen';
 type Open = (job: DemoJob, kind: Kind) => void;
 
+/** Review, in the window (section 19, phase 4): its part on the line, with the panel to send it or read the answers. */
 function openReview(job: DemoJob) {
-  try {
-    localStorage.setItem('aidjobs.employerDemo.panel', 'review');
-  } catch {
-    /* storage unavailable: the job opens with its usual panel */
-  }
-  go('create', job.id);
+  openWindowAt(job.id, 'review');
 }
 
+/** Hire again: a new draft from the job, opened in the window, where the chat asks first what changes. */
 function hire(job: DemoJob) {
   const id = hireAgain(job.id);
-  if (id) go('create', id);
+  if (id) go('job', id);
+}
+
+/** Continue a job not yet published, in the window, where it left off. */
+function goOnWith(job: DemoJob) {
+  go('job', job.id);
 }
 
 /** The one next step on a card (plan section 17): what needs the user first, then what fits the job's state. */
@@ -300,7 +302,7 @@ export function nextStep(s: State, job: DemoJob, open: Open): { label: string; r
   if (job.review.state === 'changes' && isReviewable(job)) return { label: 'See request', run: () => openReview(job) };
   if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => openWindowAt(job.id, 'publish') };
   if (job.status === 'review' && job.review.reviewers.some((r) => !r.decision)) return { label: 'Remind', run: () => remindReviewers(job.id) };
-  if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => go('create', job.id) };
+  if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => goOnWith(job) };
   if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
   if (job.status === 'live' && tellOffer(job)) return { label: 'Tell invitees', run: () => open(job, 'tell') };
   if (listingEndsIn(job, s.today) !== null) return { label: 'Choose', run: () => go('jobs', job.id) };
@@ -317,21 +319,21 @@ export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
   const copy: MenuAction = { label: 'Download a copy', run: () => downloadCopy(job, s.org.name, true) };
   const variant: MenuAction = { label: 'Same role, another place', run: () => open(job, 'variant') };
   if (job.status === 'draft' || job.status === 'review' || job.status === 'approved') {
-    return [{ label: 'Continue', run: () => go('create', job.id) }, ...(job.sections.length ? [{ label: 'Send for review', run: () => openReview(job) }, copy] : []), del];
+    return [{ label: 'Continue', run: () => goOnWith(job) }, ...(job.sections.length ? [{ label: 'Send for review', run: () => openReview(job) }, copy] : []), del];
   }
   if (job.status === 'scheduled') {
     return [
       { label: 'Publish now', run: () => open(job, 'publishNow') },
       { label: 'Change the date', run: () => open(job, 'reschedule') },
       { label: 'Back to draft', run: () => open(job, 'backToDraft') },
-      { label: 'Edit', run: () => go('create', job.id) },
+      { label: 'Edit', run: () => openToEdit(job) },
       del,
     ];
   }
   if (job.status === 'live') {
     return [
       { label: 'Extend', run: () => open(job, 'extend') },
-      { label: 'Edit', run: () => go('create', job.id) },
+      { label: 'Edit', run: () => openToEdit(job) },
       { label: 'Share', run: () => open(job, 'share') },
       ...(job.plan === 'free' ? [{ label: 'Amplify', run: () => openWindowAt(job.id, 'publish') }] : []),
       { label: 'Position filled', run: () => open(job, 'filled') },
@@ -344,7 +346,8 @@ export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
   return [...(canReopen(job, s.today) ? [{ label: 'Reopen', run: () => open(job, 'reopen') }] : []), { label: 'Hire again', run: () => hire(job) }, copy, variant, del];
 }
 
-function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: State; kind: Kind; onClose: () => void; onDeleted?: () => void }) {
+/** The dialog of one action on a job (section 17), on its page, in the list, and in the window. */
+export function JobDialog({ job, s, kind, onClose, onDeleted }: { job: DemoJob; s: State; kind: Kind; onClose: () => void; onDeleted?: () => void }) {
   if (kind === 'extend') return <ExtendDialog job={job} s={s} onClose={onClose} />;
   if (kind === 'filled') return <FilledDialog job={job} onClose={onClose} />;
   if (kind === 'variant') return <VariantDialog job={job} s={s} onClose={onClose} />;
@@ -577,7 +580,7 @@ function mainAction(s: State, job: DemoJob, open: Open): { label: string; run: (
   if (job.status === 'live') return { label: 'Extend', run: () => open(job, 'extend') };
   if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
   if (job.status === 'closed') return canReopen(job, s.today) ? { label: 'Reopen', run: () => open(job, 'reopen') } : { label: 'Hire again', run: () => hire(job) };
-  return { label: 'Continue', run: () => go('create', job.id) };
+  return { label: 'Continue', run: () => goOnWith(job) };
 }
 
 function JobDetail({ job, s }: { job: DemoJob; s: State }) {

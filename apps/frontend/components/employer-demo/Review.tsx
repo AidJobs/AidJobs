@@ -215,7 +215,7 @@ export function ReviewSummary({ job, s }: { job: DemoJob; s: State }) {
   );
 }
 
-function goToSection(key: string) {
+function scrollToSection(key: string) {
   const el = document.getElementById(`ej-sec-${key}`);
   scrollInside(el, 'center');
 }
@@ -224,23 +224,31 @@ function titleOf(job: DemoJob, key: string): string {
   return job.sections.find((x) => x.key === key)?.title ?? key;
 }
 
-/** A reviewer's comment or suggestion from the panel, on a section chosen from a list (also possible on the section itself). */
-function AddRemark({ job }: { job: DemoJob }) {
-  const [section, setSection] = useState(job.sections[0]?.key ?? '');
+/**
+ * A reviewer's comment or suggestion from the panel, on a section chosen from a list (also possible on the section itself). `on`: in
+ * the window, the section open on the line, which the comment is tied to (section 19, phase 4).
+ */
+function AddRemark({ job, on }: { job: DemoJob; on?: string }) {
+  const [picked, setSection] = useState(job.sections[0]?.key ?? '');
+  const tied = Boolean(on && job.sections.some((x) => x.key === on));
+  const section = tied && on ? on : picked;
   const [kind, setKind] = useState<'comment' | 'suggestion'>('comment');
   const [text, setText] = useState('');
   const [suggest, setSuggest] = useState('');
   return (
     <div className="aj-card flex flex-col gap-2 p-3">
-      <span style={{ fontWeight: 650 }}>Add a comment</span>
+      <span style={{ fontWeight: 650 }}>{tied ? `Comment on ${titleOf(job, section)}` : 'Add a comment'}</span>
+      {tied && <span className="aj-faint">The part open in the job description; choose another on the line to comment on it.</span>}
       <div className="flex flex-wrap items-center gap-1.5">
-        <select style={{ ...inputStyle, width: 'auto', minHeight: 32, flex: 1 }} value={section} onChange={(e) => setSection(e.target.value)} aria-label="Section">
-          {job.sections.map((sec) => (
-            <option key={sec.key} value={sec.key}>
-              {sec.title}
-            </option>
-          ))}
-        </select>
+        {!tied && (
+          <select style={{ ...inputStyle, width: 'auto', minHeight: 32, flex: 1 }} value={section} onChange={(e) => setSection(e.target.value)} aria-label="Section">
+            {job.sections.map((sec) => (
+              <option key={sec.key} value={sec.key}>
+                {sec.title}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="button" className="aj-pill" style={{ height: 32 }} data-active={kind === 'comment'} onClick={() => setKind('comment')}>
           Comment
         </button>
@@ -270,8 +278,9 @@ function AddRemark({ job }: { job: DemoJob }) {
  * Review in the workspace's right-hand panel (plan section 16, phase 4), for the author and the reviewer: the status, what changed since the
  * last round, every comment and suggestion with its section, and the decision.
  */
-export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend: () => void }) {
+export function ReviewPanel({ job, s, onSend, on, onSection }: { job: DemoJob; s: State; onSend: () => void; on?: string; onSection?: (key: string) => void }) {
   const [settledOpen, setSettledOpen] = useState(false);
+  const goToSection = (k: string) => (onSection ? onSection(k) : scrollToSection(k));
   const reviewing = Boolean(s.reviewerAs);
   const open = job.review.remarks.filter((r) => r.state === 'open');
   const settled = job.review.remarks.filter((r) => r.state !== 'open');
@@ -361,7 +370,7 @@ export function ReviewPanel({ job, s, onSend }: { job: DemoJob; s: State; onSend
           </>
         )}
       </div>
-      {reviewing && job.sections.length > 0 && <AddRemark job={job} />}
+      {reviewing && job.sections.length > 0 && <AddRemark job={job} on={on} />}
       {!reviewing && isReviewable(job) && (job.review.state === 'changes' || job.review.reviewers.some((r) => r.decision === 'changes')) && (
         <div className="flex flex-col gap-1.5">
           <span className="aj-muted">When you have made the changes, send it back: the reviewers see only what changed.</span>

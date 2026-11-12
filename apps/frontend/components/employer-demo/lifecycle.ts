@@ -39,6 +39,38 @@ export function textDropped(j: DemoJob, today: number): boolean {
   return j.status === 'closed' && j.closedAt !== undefined && today >= j.closedAt + TEXT_DROPPED_DAYS * DAY;
 }
 
+/** An action on a job in its state (section 17's menu), as the window offers it: each opens its own dialog, or is its own button. */
+export type StateAction = 'publishNow' | 'reschedule' | 'backToDraft' | 'extend' | 'share' | 'amplify' | 'filled' | 'close' | 'withdraw' | 'reopen' | 'hire' | 'download' | 'delete';
+
+export const STATE_LABEL: Record<StateAction, string> = {
+  publishNow: 'Publish now',
+  reschedule: 'Change the date',
+  backToDraft: 'Back to draft',
+  extend: 'Extend',
+  share: 'Share',
+  amplify: 'Amplify',
+  filled: 'Position filled',
+  close: 'Close now',
+  withdraw: 'Withdraw',
+  reopen: 'Reopen',
+  hire: 'Hire again',
+  download: 'Download a copy',
+  delete: 'Delete',
+};
+
+/**
+ * The actions a job opened in the window offers for its state (section 19, phase 4, from section 17's menu), with its permission rules:
+ * only the owner deletes a published job, and reviewers have none. Editing is the window itself, and a draft's steps are the chat's.
+ */
+export function stateActionsOf(s: State, j: DemoJob): StateAction[] {
+  if (s.reviewerAs) return [];
+  const del: StateAction[] = s.me.role === 'owner' ? ['delete'] : [];
+  if (j.status === 'scheduled') return ['publishNow', 'reschedule', 'backToDraft', ...del];
+  if (j.status === 'live') return ['extend', 'share', ...(j.plan === 'free' && s.org.verified ? (['amplify'] as const) : []), 'filled', 'close', 'withdraw', ...del];
+  if (j.status === 'closed') return [...(canReopen(j, s.today) ? (['reopen'] as const) : []), 'hire', 'download'];
+  return [];
+}
+
 export function erasedOn(at: number): number {
   return at + KEEP_DELETED_DAYS * DAY;
 }

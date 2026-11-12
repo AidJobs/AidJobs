@@ -39,11 +39,12 @@ import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, planFor, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, versionChoices, versionsOf } from './translate';
-import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
-import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
-import { INVITE, KEEP_ALL, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, REMIND, SEND_REVIEW, SHOW_FLYER, THIS_JOB } from './walkChat';
+import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
+import { profileFor, profileName, profileOf } from './profiles';
+import { aiWrites, ASKS, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
+import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, JobProfile, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
+import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -196,7 +197,8 @@ function ensurePrompt(id: string) {
     }
     const key = stepKey(step);
     const last = j.chat[j.chat.length - 1];
-    if (step.kind === 'live' ? j.chat.some((m) => m.step === 'live') : last?.from === 'ai' && last.step === key) return;
+    // After publishing, the link is said once; a job opened later in its state has its own message (greetState).
+    if (step.kind === 'live' ? j.chat.some((m) => m.step === 'live' || m.state) : last?.from === 'ai' && last.step === key) return;
     const prompts = promptFor(s, j, formatOf(s, j.format), step, key, aiWrites());
     if (prompts.length) updateJob(id, (x) => ({ ...x, chat: [...x.chat, ...prompts] }));
     return;
@@ -285,12 +287,12 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
   const id = nextId('job');
   const { facts, role, engagement } = extractFacts(text, s.today);
   if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
-  const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? defaultFormatKey(s));
+  const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? (inWindow ? usualTemplate(s)?.key : undefined) ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   if (inWindow) {
     const lang = detectLang(text);
     const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] }, ...(lang !== 'en' ? { lang } : {}) };
-    waiting.chat = [msg('user', text), ...templateQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
+    waiting.chat = [msg('user', text), ...firstQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
     update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
     return id;
   }
@@ -313,33 +315,143 @@ function addedFor(format: Format, facts: Facts): string[] {
   return orderSections(recommendSections(format, facts), format).filter((k) => !format.order.some((o) => o.key === k) && TYPE_REASONS[k]);
 }
 
+/** "Got it: **Nutrition Officer** in Juba. I read it as a job, fixed-term." and the market line: how the window's first answers begin. */
+function readBack(j: DemoJob, typeClear: boolean): string {
+  const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'a new job';
+  const type = `${ENGAGEMENTS.find((e) => e.key === j.facts.engagement)?.label.toLowerCase() ?? 'job'}${j.facts.contract ? `, ${j.facts.contract.toLowerCase()}` : ''}`;
+  const sector = roleByKey(j.family).sector.toLowerCase();
+  const market = j.facts.title ? `\n\n${MARKET_SAMPLE.similar} similar ${sector} roles are on AidJobs: usually ${MARKET_SAMPLE.grade}, ${MARKET_SAMPLE.showPay}% show a salary, open about ${MARKET_SAMPLE.daysOpen} days (sample figures in the demo).` : '';
+  return `Got it: ${what}. I read it as a ${type}${typeClear ? '' : ", though I couldn't tell the contract: tap it in the sentence at the top of the template panel, or tell me"}.${market}`;
+}
+
+function titleHint(j: DemoJob): ChatMsg[] {
+  const better = j.facts.title ? suggestTitle(j.facts.title) : null;
+  return better ? [msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`])] : [];
+}
+
 /**
  * The first question in the window: which template, with the recommendation and its reason, the sections this role adds, the market
- * line (sample figures), and the close matches as answers; the job type read so far.
+ * line (sample figures), and the close matches as answers; the job type read so far. `again`: asked after "Change something", so the
+ * job is not read back a second time.
  */
-function templateQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
+function templateQuestion(s: State, j: DemoJob, typeClear: boolean, again = false): ChatMsg[] {
   const rec = recommendation(s, j.format);
   const format = formatOf(s, rec.key);
   const count = orderSections(recommendSections(format, j.facts), format).length;
-  const what = j.facts.title ? `**${j.facts.title}**${j.facts.location ? ` in ${j.facts.location}` : ''}` : 'a new job';
-  const type = `${ENGAGEMENTS.find((e) => e.key === j.facts.engagement)?.label.toLowerCase() ?? 'job'}${j.facts.contract ? `, ${j.facts.contract.toLowerCase()}` : ''}`;
   const added = addedFor(format, j.facts);
   const adds = added.length ? `, with ${added.map((k) => `**${headingFor(k, format)}** (${TYPE_REASONS[k].charAt(0).toLowerCase()}${TYPE_REASONS[k].slice(1)})`).join(' and ')}` : '';
-  const sector = roleByKey(j.family).sector.toLowerCase();
-  const market = j.facts.title ? `\n\n${MARKET_SAMPLE.similar} similar ${sector} roles are on AidJobs: usually ${MARKET_SAMPLE.grade}, ${MARKET_SAMPLE.showPay}% show a salary, open about ${MARKET_SAMPLE.daysOpen} days (sample figures in the demo).` : '';
-  const out: ChatMsg[] = [];
-  const better = j.facts.title ? suggestTitle(j.facts.title) : null;
-  if (better) out.push(msg('ai', `Did you mean **${better}**?`, [`Use "${better}"`]));
   const others = rec.others.slice(0, 2).map((k) => formatOf(s, k).label);
-  out.push({
-    ...msg(
-      'ai',
-      `Got it: ${what}. I read it as a ${type}${typeClear ? '' : ", though I couldn't tell the contract: tap it in the sentence at the top of the template panel, or tell me"}.${market}\n\nFirst, the template. I'd use **${format.label}**, ${rec.reason}: ${count} sections for this job${adds}, about ${wordsFor(count)} words. Shall I use it, or one of the others?`,
-      [`Use ${format.label}`, ...others.map((l) => `Use ${l}`), SEE_ALL, CREATE_OWN, USE_MINE],
-    ),
-    step: 'setup:template',
-  });
-  return out;
+  return [
+    ...(again ? [] : titleHint(j)),
+    {
+      ...msg(
+        'ai',
+        `${again ? 'Then the template first.' : `${readBack(j, typeClear)}\n\nFirst, the template.`} I'd use **${format.label}**, ${rec.reason}: ${count} sections for this job${adds}, about ${wordsFor(count)} words. Shall I use it, or one of the others?`,
+        [`Use ${format.label}`, ...others.map((l) => `Use ${l}`), SEE_ALL, CREATE_OWN, USE_MINE],
+      ),
+      step: 'setup:template',
+    },
+  ];
+}
+
+export const START = 'Start';
+export const CHANGE_SOMETHING = 'Change something';
+export const SAME_AS_LAST = 'Same as last time';
+export const START_FRESH = 'Start fresh';
+
+/** The pace a returning employer starts with: the one chosen last time, else one section at a time. */
+function usualPace(s: State): Pace {
+  return s.pace ?? 'step';
+}
+
+/**
+ * A returning employer's first question (section 19, phase 4): steps 2 and 3 as one confirmation, the organisation's usual template in
+ * its style at the pace of last time. "Change something" goes to the template step of a new employer.
+ */
+function usualQuestion(s: State, j: DemoJob, lead: string): ChatMsg {
+  const usual = usualTemplate(s, j.id);
+  const format = formatOf(s, usual?.key ?? j.format);
+  const count = orderSections(recommendSections(format, j.facts), format).length;
+  const used = usual ? ` (${usual.count} of your jobs use it)` : '';
+  const pace = usualPace(s) === 'step' ? 'one section at a time' : 'all of it first, then through it with you';
+  return { ...msg('ai', `${lead}I'll use your **${format.label}**${used}: ${count} sections for this job, in your style (${styleWords(proposedStyle(s))}), ${pace}${s.pace ? ' as last time' : ''}. Shall I start?`, [START, CHANGE_SOMETHING]), step: 'setup:usual' };
+}
+
+/** A saved job profile for this role, offered first (section 19, phase 4): its template, facts, style, and fixed text; dates and positions are asked. */
+function profileQuestion(s: State, j: DemoJob, lead: string): ChatMsg | null {
+  const p = profileFor(s, j);
+  if (!p) return null;
+  const format = formatOf(s, p.format);
+  return { ...msg('ai', `${lead}Same as your last **${profileName(p)}**? I'd start from it: ${format.label} with its ${p.tags.length} sections, the contract, grade, pay, who can apply, languages, how to apply, the style, and the fixed text. You give the dates and the number of positions.`, [SAME_AS_LAST, START_FRESH]), step: 'setup:profile' };
+}
+
+/** What the window asks first: a saved profile for this role, else the usual template as one confirmation, else the template step. */
+function firstQuestion(s: State, j: DemoJob, typeClear: boolean): ChatMsg[] {
+  if (!usualTemplate(s, j.id)) return templateQuestion(s, j, typeClear);
+  const lead = `${readBack(j, typeClear)}\n\n`;
+  const offer = profileQuestion(s, j, lead) ?? usualQuestion(s, j, lead);
+  return [...titleHint(j), offer];
+}
+
+/** "Start": the usual template, the organisation's style, and the pace of last time, in one step; writing begins. */
+export function startAsUsual(id: string, said?: string) {
+  if (!ownerOnly()) return;
+  const pace = usualPace(getState());
+  update((s) => ({
+    ...s,
+    pace,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || j.setup !== 'template' || !j.walk) return j;
+      const format = formatOf(s, usualTemplate(s, j.id)?.key ?? j.format);
+      const style = proposedStyle(s);
+      const tags = outlineOrder(orderSections(recommendSections(format, j.facts), format));
+      const base: DemoJob = { ...j, format: format.key, tone: toneOf(style), style, tags, commitments: fixedFor(s, format), part: undefined, walk: { ...j.walk, pace } };
+      const reply = `Starting with your ${format.label}, written ${describeStyle(style)}, ${pace === 'step' ? 'one section at a time' : 'all of it first'}. Say "${pace === 'step' ? 'write it all' : 'one section at a time'}", or ask for another template, whenever you like.`;
+      return { ...startWriting(s, base, pace), chat: [...j.chat, ...(said ? [msg('user', said)] : []), msg('ai', reply)] };
+    }),
+  }));
+  ensureAsk(id);
+}
+
+/**
+ * "Same as last time": the job starts from a saved profile, its template, sections, facts, the way to apply, style, and fixed text. The
+ * place and dates typed now are kept; the closing date and the positions are asked.
+ */
+export function startFromProfile(id: string, profileId: string, said?: string) {
+  const p0 = getState().profiles?.find((p) => p.id === profileId);
+  if (!ownerOnly() || !p0) return;
+  const pace = usualPace(getState());
+  update((s) => ({
+    ...s,
+    pace,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || j.setup !== 'template' || !j.walk) return j;
+      const p = p0;
+      const format = formatOf(s, p.format);
+      const typed = j.facts.location ? { location: j.facts.location, country: j.facts.country, iso: j.facts.iso, timezone: j.facts.timezone } : {};
+      const facts: Facts = { ...j.facts, ...p.facts, ...typed, title: j.facts.title || p.title, deadline: j.facts.deadline, closingTime: j.facts.closingTime, startDate: j.facts.startDate, positions: j.facts.positions };
+      const style = p.style ?? proposedStyle(s);
+      const settled = Array.from(new Set([...j.walk.settled, 'title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'fixed']));
+      const base: DemoJob = {
+        ...j,
+        facts,
+        family: p.family,
+        format: format.key,
+        tags: outlineOrder(p.tags.filter((k) => SECTION_BY_KEY[k])),
+        style,
+        tone: toneOf(style),
+        apply: { ...p.apply },
+        commitments: [...p.commitments],
+        ...(p.lang ? { lang: p.lang as JobLang } : {}),
+        part: undefined,
+        walk: { ...j.walk, pace, settled },
+        audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Started from the job profile of ${profileName(p)}` }],
+      };
+      const reply = `Starting from your last ${profileName(p)}: ${format.label}, its facts and the way to apply, written ${describeStyle(style)}, ${pace === 'step' ? 'one section at a time' : 'all of it first'}. Change anything in Details or here; I'll ask for the closing date and the number of positions.`;
+      return { ...startWriting(s, base, pace), chat: [...j.chat, ...(said ? [msg('user', said)] : []), msg('ai', reply)] };
+    }),
+  }));
+  ensureAsk(id);
 }
 
 /** The pace is chosen: the fixed sections are written from the settings, and the writing begins. */
@@ -558,6 +670,35 @@ function templateIn(s: State, text: string): string | null {
 
 const YES = /^(yes|yep|yeah|ok|okay|sure|fine|go ahead|sounds good|use it|that one|do it|please do|perfect|great)\b/i;
 
+/**
+ * A returning employer's answer to the first question (section 19, phase 4): the saved profile, Start fresh, Start, or Change something.
+ * A plain yes answers the question the window asked last.
+ */
+function returningTurn(s: State, j: DemoJob, text: string): boolean {
+  const t = text.trim();
+  const asked = [...j.chat].reverse().find((m) => m.from === 'ai' && m.step?.startsWith('setup:'))?.step;
+  const profile = profileFor(s, j);
+  const yes = YES.test(t);
+  if (profile && (t === SAME_AS_LAST || /\bsame as (?:last time|before|the last one)\b/i.test(t) || (asked === 'setup:profile' && yes))) {
+    startFromProfile(j.id, profile.id, text);
+    return true;
+  }
+  if (!usualTemplate(s, j.id)) return false;
+  if (t === START_FRESH || /^start (?:fresh|afresh|again)\b/i.test(t)) {
+    updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), usualQuestion(s, x, 'Fresh, then. ')] }));
+    return true;
+  }
+  if (t === START || /^(?:start|let'?s start)\b/i.test(t) || (asked === 'setup:usual' && yes)) {
+    startAsUsual(j.id, text);
+    return true;
+  }
+  if (t === CHANGE_SOMETHING || ((asked === 'setup:usual' || asked === 'setup:profile') && /^(?:no\b|change|something else|another|a different)/i.test(t))) {
+    updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), ...templateQuestion(s, x, true, true)] }));
+    return true;
+  }
+  return false;
+}
+
 /** A message while the job waits for its template or its style. Returns true when it was handled. */
 function setupTurn(s: State, j: DemoJob, text: string): boolean {
   const userMsg = msg('user', text);
@@ -583,6 +724,7 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
       say(LINK_REPLY);
       return true;
     }
+    if (returningTurn(s, j, text)) return true;
     if (text.trim() === USE_MINE) {
       say("Paste it here, or drop the file (text, Word, or PDF) in the box. Then I'll ask whether to use only its headings or its wording too.");
       return true;
@@ -818,7 +960,7 @@ export function sendChat(id: string, text: string, focus?: string, version?: Job
 /** A request the window answers itself (open the preview, earlier versions): the message and the reply join the conversation. */
 export function chatNote(id: string, said: string, reply: string, quick?: string[], card?: ChatMsg['card']) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), { ...msg('ai', reply, quick), ...(card ? { card } : {}) }] }));
+  updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), { ...msg('ai', reply, quick), ...(card ? { card } : {}), ...(card === 'state' ? { state: x.status } : {}) }] }));
   if (!card) ensureAsk(id);
 }
 
@@ -835,6 +977,31 @@ export function openWindowAt(id: string, part: string) {
   const amplifyIt = (j: DemoJob) => part === 'publish' && j.plan === 'free' && (j.status === 'live' || j.status === 'scheduled');
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, part, ...(amplifyIt(j) ? { choice: 'amplify' as const } : {}) } : j)) }), true);
   go('job', id);
+}
+
+/**
+ * A job opened in the window in its state (section 19, phase 4): the chat says once where it stands and what an edit does, with section
+ * 17's actions for it on its card; opened again after more conversation, it says so again. A draft picks up where it left off with the
+ * chat's own next question. Not for reviewers, who see the Review panel instead of the chat.
+ */
+export function greetState(id: string) {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || s.reviewerAs || j.setup) return;
+  if (j.status === 'draft') {
+    if (j.walk) ensureAsk(id);
+    return;
+  }
+  const last = j.chat[j.chat.length - 1];
+  const step = j.walk ? stepKey(nextStep(j, s)) : undefined;
+  if (last?.state === j.status || (step && step !== 'live' && last?.from === 'ai' && last.step === step)) return;
+  const m = stateMessage(s, j);
+  if (m) updateJob(id, (x) => ({ ...x, chat: [...x.chat, { ...m, ...(step ? { step } : {}) }] }));
+}
+
+/** Continue, Edit, and Open (section 19, phase 4): the job in the window, at its part; Edit at the section last open, else the first. */
+export function openToEdit(j: DemoJob) {
+  openWindowAt(j.id, j.part?.startsWith('s:') ? j.part : `s:${j.tags[0] ?? ''}`);
 }
 
 const ASK_SET: Record<AskKind, string> = { title: 'job title', place: 'duty station', deadline: 'closing date', contract: 'contract', grade: 'grade', eligibility: 'who can apply', languages: 'languages', safeguarding: 'safeguarding level', salary: 'pay', method: 'way to apply' };
@@ -913,9 +1080,11 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     }
     case 'approve':
       if (t === ALL_GOOD || /\bapprove (?:all|the rest|everything)\b/i.test(t)) approveRest(j.id, text);
-      else if (t === GOOD || APPROVE.test(t)) approveSection(j.id, step.section, text);
+      else if (t === GOOD || t === KEEP_AS_IS || APPROVE.test(t) || /^keep (?:it )?as (?:it )?is\b/i.test(t)) approveSection(j.id, step.section, text);
       else return false;
       return true;
+    case 'again':
+      return againTurn(s, j, text);
     case 'details': {
       if (t === NONE_OF_THESE || NO_MORE.test(t)) {
         settle(j.id, 'details', text);
@@ -1025,6 +1194,45 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     default:
       return laterTurn(s, j, step, text);
   }
+}
+
+/**
+ * Hire again's first step (section 19, phase 4): what changes, read by the rules: the closing date, the place, and the positions, each
+ * from its answer or typed in a message; "Nothing else changes" goes on to the sections. A message that changes none of them goes on to
+ * the chat as a request.
+ */
+function againTurn(s: State, j: DemoJob, text: string): boolean {
+  const t = text.trim();
+  const said = (reply: string, ask?: AskKind) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', reply, undefined, ask), step: 'again' }] }));
+  if (t === NOTHING_ELSE || NO_MORE.test(t) || /^(?:keep (?:them|these|it)|that'?s it|all good|nothing (?:else )?changes)\b/i.test(t)) {
+    settle(j.id, 'again', text, 'Good. Now the text, section by section: keep each as it is, or change it.');
+    return true;
+  }
+  if (t === AGAIN_DATE) {
+    said('When do applications close?', 'deadline');
+    return true;
+  }
+  if (t === AGAIN_PLACE) {
+    said('Where is the job based?', 'place');
+    return true;
+  }
+  if (t === AGAIN_POSITIONS) {
+    said('How many positions?');
+    return true;
+  }
+  const last = j.chat[j.chat.length - 1];
+  const asked = last?.from === 'ai' ? last.ask : undefined;
+  const lastAsked = last?.from === 'ai' && last.text === 'How many positions?';
+  const read = extractFacts(asked === 'deadline' && !/clos/i.test(t) ? `closing ${t}` : asked === 'place' && t.split(/\s+/).length <= 5 ? `based in ${t}` : t, s.today, emptyFacts()).facts;
+  const patch: Partial<Facts> = {};
+  if (read.deadline) patch.deadline = read.deadline;
+  if (read.location) Object.assign(patch, { location: read.location, country: read.country, iso: read.iso, timezone: read.timezone || j.facts.timezone });
+  const positions = readDetails(t).positions ?? (lastAsked && /^\d{1,3}$/.test(t) ? t : undefined);
+  if (positions) patch.positions = positions;
+  if (!Object.keys(patch).length) return false;
+  const what = [patch.deadline ? `closes on ${longDate(patch.deadline)}` : '', patch.location ? `is based in ${patch.location}` : '', patch.positions ? `has ${patch.positions} ${patch.positions === '1' ? 'position' : 'positions'}` : ''].filter(Boolean);
+  update((st) => ({ ...st, jobs: st.jobs.map((x) => (x.id === j.id ? { ...withFacts(st, x, { ...x.facts, ...patch }), chat: [...x.chat, msg('user', text), msg('ai', `Changed: it ${what.join(' and ')}.`)] } : x)) }));
+  return true;
 }
 
 const FREE_WORDS = /^(?:publish (?:it )?free|free|the free one|go free|free,? please)\b/i;
@@ -2110,15 +2318,6 @@ export function publish(id: string, o: PublishOptions): boolean {
   return true;
 }
 
-/**
- * A job profile (section 19, step 10): the role's facts and choices, saved automatically when the job is published, with a visible
- * note and Undo, for the next job like it. The closing date, dates, and positions are left out: they change from job to job.
- */
-function profileOf(j: DemoJob): JobProfile {
-  const { deadline: _deadline, closingTime: _time, startDate: _start, positions: _positions, ...facts } = j.facts;
-  return { id: `pf-${j.id}-${Date.now()}`, from: j.id, title: j.facts.title, location: j.facts.location, family: j.family, format: j.format, tags: [...j.tags], facts, style: j.style, apply: j.apply, commitments: [...j.commitments], lang: j.lang, at: Date.now() };
-}
-
 /** Undo for a job profile just saved. */
 export function forgetProfile(profileId: string) {
   update((s) => ({ ...s, profiles: (s.profiles ?? []).filter((p) => p.id !== profileId), notice: { text: 'The job profile was not kept.' } }));
@@ -2572,7 +2771,11 @@ export function restoreDeleted(id: string): boolean {
   return true;
 }
 
-/** A new draft from an earlier job: same text, fresh dates; optionally for another duty station. */
+/**
+ * A new draft from an earlier job (the user's choice, 12 November 2026): it keeps the text and opens in the window, where the chat asks
+ * first what changes (the closing date, the positions, and the place), then each section for a quick "keep as is". The copy does not
+ * carry the old job's approvals, plan choice, part, or language versions and their payments. `place`: for another duty station.
+ */
 export function hireAgain(id: string, place?: string): string | null {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
@@ -2583,14 +2786,22 @@ export function hireAgain(id: string, place?: string): string | null {
     const { facts: f } = extractFacts(place, s.today, emptyFacts());
     facts = { ...facts, location: f.location || place, country: f.country, iso: f.iso, timezone: f.timezone || facts.timezone };
   }
-  const base: DemoJob = { ...j, id: nid, facts };
+  const from = `${j.facts.title}${j.facts.location ? `, ${j.facts.location.split(',')[0]}` : ''}`;
+  const base: DemoJob = { ...j, id: nid, facts, walk: undefined, setup: undefined };
   const copy: DemoJob = {
     ...rebuilt(s, base),
     status: 'draft',
     plan: null,
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [msg('ai', place ? `A copy of ${j.facts.title} for ${facts.location}. Check the duty-station details, then publish.` : `A new draft from ${j.facts.title}, with a new closing date, ${longDate(facts.deadline)}.`)],
+    chat: [],
+    walk: { pace: 'all', approved: [], settled: [...ASKS, 'details', 'sdgs', 'fixed', 'suggest'], again: from },
+    choice: undefined,
+    publishOn: undefined,
+    payWith: undefined,
+    paidVia: undefined,
+    langsPaid: undefined,
+    part: undefined,
     createdAt: Date.now(),
     publishedAt: undefined,
     closedAt: undefined,
@@ -2613,6 +2824,7 @@ export function hireAgain(id: string, place?: string): string | null {
   };
   copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Hired again', sections: copy.sections }];
   update((st) => ({ ...st, jobs: [copy, ...st.jobs] }));
+  ensureAsk(nid);
   return nid;
 }
 

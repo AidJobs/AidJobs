@@ -811,7 +811,8 @@ describe('employer demo: managing jobs', () => {
     route('#jobs');
     const openRow = (title: string) => act(() => (Array.from(container.querySelectorAll('.ej-jobrow-main')).find((b) => b.textContent?.includes(title)) as HTMLElement).click());
     openRow('Finance Officer');
-    expect(window.location.hash).toBe('#create/job-fin');
+    // A job not yet published opens in the window (phase 4); the archived workspace still works at its address.
+    expect(window.location.hash).toBe('#job/job-fin');
     route('#create/job-fin');
     shows('Next: check and publish');
     expect(container.querySelector('section[aria-label="Next step"]')).not.toBeNull();
@@ -1179,6 +1180,12 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       resetDemo();
       update((st) => ({ ...st, signedIn: true }));
     });
+  /** A new employer: no job written yet, so the window asks for the template itself (a returning one gets one confirmation, phase 4). */
+  const freshNew = () =>
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true, jobs: [], profiles: [] }));
+    });
   const write = (label: string, text: string, enter = true) => {
     const ta = container.querySelector(`textarea[aria-label="${label}"]`) as HTMLTextAreaElement;
     act(() => {
@@ -1216,7 +1223,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     });
 
   it('any template can be adjusted before it is used, and the panel can be closed, moved, and resized at any time', () => {
-    fresh();
+    freshNew();
     let id = '';
     act(() => {
       id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
@@ -1263,7 +1270,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
   });
 
   it('Enter opens the window at once; the chat asks for the template first, the panel stays empty, and nothing is written until the template and the style are chosen', () => {
-    fresh();
+    freshNew();
     phone = false;
     render();
     route('#create');
@@ -1312,7 +1319,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
   });
 
   it('the template panel: the job-type sentence, live headings in the job description panel, and Create your own', () => {
-    fresh();
+    freshNew();
     let id = '';
     act(() => {
       id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
@@ -1501,10 +1508,11 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('[role="log"] section[aria-label="Publish"] .ej-main-cta')).not.toBeNull();
     expect(job(id).part).toBe('publish');
     expect(job(id).status).toBe('draft');
-    click('Earlier workspace');
-    expect(window.location.hash).toBe(`#create/${id}`);
-    route(window.location.hash);
+    // The earlier workspace is archived (phase 4): the window no longer links to it, and it still works at its address.
+    expect(Array.from(container.querySelectorAll('button')).some((b) => /Earlier workspace/.test(b.textContent ?? ''))).toBe(false);
+    route(`#create/${id}`);
     expect(container.querySelector('[aria-label="JD outline"], [aria-label="Panels"]')).not.toBeNull();
+    shows('Archived screen, kept for reference');
   });
 
   it('on phones the chat fills the screen, the job is one tap away, and the line opens as a short list', () => {
@@ -1622,7 +1630,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
   });
 
   it('on phones the template is chosen in the job description itself: a slim question line, the headings, and a strip of cards', () => {
-    fresh();
+    freshNew();
     let id = '';
     act(() => {
       id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
@@ -1885,6 +1893,241 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     await flush();
     shows("The AI could not answer just now, so the demo's own rules did.");
     expect(job().chat.at(-1)?.ai).toBeUndefined();
+    expect(network).toEqual([]);
+  });
+});
+
+describe('employer demo: round 7, phase 4 (returning employers, jobs in their state, reviewers, the old pages archived)', () => {
+  const fresh = () =>
+    act(() => {
+      resetDemo();
+      update((st) => ({ ...st, signedIn: true }));
+    });
+  const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
+  const byLabel = (label: string) => container.querySelector(`[aria-label="${label}"]`) as HTMLElement | null;
+  const press = (el: Element | null | undefined) => {
+    if (!el) throw new Error(`Nothing to press on the screen: ${container.textContent?.slice(0, 300)}`);
+    act(() => (el as HTMLElement).click());
+  };
+  const write = (label: string, text: string) => {
+    const ta = container.querySelector(`textarea[aria-label="${label}"]`) as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(ta, text);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
+  const say = (text: string) => write('Message AidJobs about this job', text);
+  const menu = (title: string, item: string) => {
+    press(byLabel(`Actions for ${title}`));
+    click(item);
+  };
+  const opened = (id: string, part?: string) => {
+    expect(window.location.hash).toBe(`#job/${id}`);
+    if (part) expect(job(id).part).toBe(part);
+  };
+  const part = (label: string) => press(Array.from(document.querySelectorAll('nav[aria-label="Parts of this job"] button')).find((x) => x.querySelector('.ej-line-label')?.textContent === label));
+  const escape = () => act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+
+  it('every former link to the earlier workspace or Check and publish opens the window instead, and only the archive links to them', () => {
+    fresh();
+    phone = false;
+    render();
+    route('#jobs');
+    const row = (title: string) => Array.from(container.querySelectorAll('.ej-jobitem')).find((li) => li.querySelector('.ej-jobrow-main')?.textContent?.includes(title));
+    press(row('Communications Intern')?.querySelector('button.ej-next'));
+    opened('job-comms');
+    route('#jobs');
+    menu('Communications Intern', 'Send for review');
+    opened('job-comms', 'review');
+    route('#jobs');
+    menu('Child Protection Specialist', 'Edit');
+    expect(window.location.hash).toBe('#job/job-cps');
+    expect(job('job-cps').part).toMatch(/^s:/);
+    route('#jobs');
+    press(row('Logistics Assistant')?.querySelector('button.ej-next'));
+    expect(job(window.location.hash.replace('#job/', '')).walk?.again).toBe('Logistics Assistant, Kampala');
+
+    route('#home');
+    press(Array.from(container.querySelectorAll('button.aj-card')).find((b) => b.textContent?.includes('Communications Intern')));
+    opened('job-comms');
+    route('#home');
+    const approved = Array.from(container.querySelectorAll('[aria-label="Briefing"] li')).find((li) => li.textContent?.includes('approved Finance Officer'));
+    press(Array.from(approved?.querySelectorAll('button') ?? []).find((b) => b.textContent === 'Open'));
+    opened('job-fin', 'review');
+    route('#home');
+    write('Ask AidJobs to do something, or describe a role', "We're hiring a Shelter Officer in Goma");
+    expect(window.location.hash).toMatch(/^#job\//);
+    expect(job(window.location.hash.replace('#job/', '')).setup).toBe('template');
+
+    route('#create');
+    press(byLabel('Upload a job description, hire again, or continue a job draft'));
+    click('Communications Intern');
+    opened('job-comms');
+    route('#create');
+    press(byLabel('Upload a job description, hire again, or continue a job draft'));
+    click('Health Officer');
+    expect(job(window.location.hash.replace('#job/', '')).walk?.again).toBe('Health Officer, Goma');
+
+    const viewAs = container.querySelector('select[aria-label="View the demo as"]') as HTMLSelectElement;
+    act(() => {
+      viewAs.value = 'amina';
+      viewAs.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    opened('job-fin');
+    act(() => update((st) => ({ ...st, reviewerAs: null })));
+
+    act(() => {
+      update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === 'job-fin' ? { ...j, paidFor: true } : j)) }));
+      addTranslation('job-fin', 'fr');
+    });
+    route('#publish/job-fin');
+    press(container.querySelector('#ej-row-languages'));
+    click('Open the window');
+    opened('job-fin', 'langs');
+
+    const dir = join(__dirname, '..', '..', 'components', 'employer-demo');
+    for (const f of readdirSync(dir).filter((n) => /\.tsx?$/.test(n) && !['Archive.tsx', 'Create.tsx', 'Publish.tsx'].includes(n))) {
+      expect({ f, links: /go\(\s*'(create|publish)'\s*,/.test(readFileSync(join(dir, f), 'utf8')) }).toEqual({ f, links: false });
+    }
+    expect(network).toEqual([]);
+  });
+
+  it('the archived screens are reached from the demo controls and keep working, each with its banner and a way back to the window', () => {
+    fresh();
+    phone = false;
+    render();
+    route('#home');
+    press(byLabel('Archived screens'));
+    expect(window.location.hash).toBe('#archive');
+    route('#archive');
+    shows('Nothing else in the demo links to them.');
+    expect(byLabel('Check and publish: Child Protection Specialist')).toBeNull();
+    press(byLabel('Earlier workspace: Finance Officer'));
+    expect(window.location.hash).toBe('#create/job-fin');
+    route('#create/job-fin');
+    shows('Archived screen, kept for reference');
+    expect(container.querySelector('[aria-label="JD outline"], [aria-label="Panels"]')).not.toBeNull();
+    click('Open this job in the new window');
+    opened('job-fin');
+    route('#archive');
+    press(byLabel('Check and publish: Finance Officer'));
+    route('#publish/job-fin');
+    shows('Archived screen, kept for reference');
+    shows('Check and publish');
+    expect(container.querySelector('#ej-row-review')).not.toBeNull();
+    expect(network).toEqual([]);
+  });
+
+  it('a returning employer: Enter offers the usual template, style, and pace as one confirmation; a saved profile comes first', () => {
+    fresh();
+    phone = false;
+    render();
+    route('#create');
+    write('Describe the role', "We're hiring a Nutrition Officer in Juba");
+    route(window.location.hash);
+    const id = window.location.hash.replace('#job/', '');
+    act(() => jest.advanceTimersByTime(1000));
+    shows("I'll use your Riverstone format (7 of your jobs use it)");
+    shows('Shall I start?');
+    click('Start');
+    expect(job(id).setup).toBeUndefined();
+    expect(container.querySelector('[aria-label="The job"] article[aria-label="Job description"]')).not.toBeNull();
+    route('#create');
+    write('Describe the role', "We're hiring a Child Protection Specialist in Kampala");
+    route(window.location.hash);
+    const cp = window.location.hash.replace('#job/', '');
+    act(() => jest.advanceTimersByTime(1000));
+    shows('Same as your last Kampala Child Protection Specialist?');
+    click('Same as last time');
+    expect(job(cp).facts).toMatchObject({ grade: 'C1', safeguarding: 'high' });
+    shows('Starting from your last Kampala Child Protection Specialist');
+    expect(network).toEqual([]);
+  });
+
+  it('Hire again opens the window, where the chat asks what changes first, then each section for a quick "keep as is"', () => {
+    fresh();
+    phone = false;
+    render();
+    route('#jobs/job-log');
+    click('Hire again');
+    const id = window.location.hash.replace('#job/', '');
+    expect(id).not.toBe('job-log');
+    route(window.location.hash);
+    shows('A new job from your Logistics Assistant, Kampala, with its text. First, what changes?');
+    click('Nothing else changes');
+    shows('as in your Logistics Assistant, Kampala: keep it as it is, or change something?');
+    click('Keep as is');
+    expect(job(id).walk?.approved).toContain('about');
+  });
+
+  it("a job opened in its state: one message for it, section 17's actions on a card, each opening its dialog; the chat never changes the state itself", () => {
+    fresh();
+    phone = false;
+    render();
+    route('#jobs');
+    menu('Child Protection Specialist', 'Edit');
+    route(window.location.hash);
+    shows('This job is live: edits go live at once, and its page says Updated.');
+    const card = () => Array.from(container.querySelectorAll('[role="log"] section[aria-label="What you can do"]')).at(-1) as HTMLElement;
+    const buttons = () => Array.from(card().querySelectorAll('button')).map((b) => b.textContent);
+    expect(buttons()).toEqual(['Extend', 'Share', 'Position filled', 'Close now', 'Withdraw', 'Delete']);
+    expect(card().querySelector('.aj-ink-btn')?.textContent).toBe('Extend');
+    press(Array.from(card().querySelectorAll('button')).find((b) => b.textContent === 'Extend'));
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Extend the closing date');
+    escape();
+    say('close it');
+    expect(job('job-cps').status).toBe('live');
+    shows('Close now is on the card below, and nothing changes until you press it.');
+    say('reopen it');
+    shows('Reopen is not for a live job. You can extend it');
+    say('withdraw it');
+    shows('Confirm in the dialog: it says exactly what happens.');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Withdraw');
+    escape();
+    expect(job('job-cps').status).toBe('live');
+    say('what can I do?');
+    press(Array.from(card().querySelectorAll('button')).find((b) => b.textContent === 'Close now'));
+    expect(job('job-cps').status).toBe('closed');
+    shows('This job closed on');
+    expect(buttons()).toEqual(['Reopen', 'Hire again', 'Download a copy']);
+    part('Publish');
+    expect(Array.from(container.querySelectorAll('#ej-part-card [role="group"][aria-label="What you can do"] button')).map((b) => b.textContent)).toEqual(['Reopen', 'Hire again', 'Download a copy']);
+    expect(network).toEqual([]);
+  });
+
+  it('reviewers see the Review panel in the window: their decision, and comments tied to the part open on the line; no chat, no reordering', () => {
+    fresh();
+    phone = false;
+    render();
+    act(() => update((st) => ({ ...st, reviewerAs: 'daniel' })));
+    route('#job/job-fin');
+    expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).toBeNull();
+    const panel = () => container.querySelector('[role="region"][aria-label="Review"]') as HTMLElement;
+    expect(panel().textContent).toContain('Reviewing as Daniel Mwangi');
+    expect(panel().textContent).toContain('Round 1');
+    const resp = job('job-fin').sections.find((x) => x.key === 'responsibilities')!;
+    part(resp.title);
+    expect(panel().textContent).toContain(`Comment on ${resp.title}`);
+    const area = panel().querySelector('textarea[aria-label="Your comment"]') as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(area, 'Please name the two field offices');
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    press(Array.from(panel().querySelectorAll('button')).find((b) => b.textContent === `Add to ${resp.title}`));
+    expect(job('job-fin').review.remarks.at(-1)).toMatchObject({ section: 'responsibilities', author: 'Daniel Mwangi', text: 'Please name the two field offices' });
+    part(formatOf(getState(), job('job-fin').format).label);
+    expect(container.querySelector('section.ej-float')).toBeNull();
+    press(Array.from(panel().querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Approve'));
+    expect(job('job-fin').review.reviewers.find((r) => r.name === 'Daniel Mwangi')?.decision).toBe('approved');
+    expect(job('job-fin').chat.some((m) => m.state)).toBe(false);
+    phone = true;
+    render();
+    route('#home');
+    route('#job/job-fin');
+    expect(Array.from(container.querySelectorAll('[aria-label="Show"] button')).map((b) => b.textContent?.trim())).toEqual(['Review', 'Job']);
+    phone = false;
+    act(() => update((st) => ({ ...st, reviewerAs: null })));
     expect(network).toEqual([]);
   });
 });

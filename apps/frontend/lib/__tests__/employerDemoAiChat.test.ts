@@ -167,7 +167,8 @@ describe('the AI chat: the demo carries out the actions', () => {
     expect([after.sections, after.facts, after.format, after.tags]).toEqual([before.sections, before.facts, before.format, before.tags]);
     expect(open).not.toHaveBeenCalled();
     expect(lastAi('job-comms')?.text).toMatch(/^All done\.\n\nNot done: an action the demo does not have \("publish_now"\); the closing date; a template the demo does not have\.$/);
-    expect(after.chat.at(-1)).toMatchObject({ text: 'When do applications close?', ask: 'deadline' });
+    // The sample draft is brought forward into the window's steps (section 19, phase 4), so the rules ask its missing date in their words.
+    expect(after.chat.at(-1)).toMatchObject({ text: 'For the listing: When do applications close?', ask: 'deadline' });
     expect(after.chat.at(-1)?.ai).toBeUndefined();
   });
 

@@ -92,11 +92,28 @@ export function contentOf(format: Format, orgType: State['org']['orgType']): str
   return CONTENT[format.key] ?? `your own headings in your order, each written to the depth of ${FAMILY_OF[orgType]}'s job descriptions`;
 }
 
+/**
+ * The organisation's usual template (section 19, phase 4): the one it has used most for its jobs, its base JD format on a tie; null
+ * for an organisation with no job written yet. `except`: the job being started.
+ */
+export function usualTemplate(s: State, except?: string): { key: string; count: number } | null {
+  const counts = new Map<string, number>();
+  for (const j of s.jobs) if (j.id !== except && j.sections.length && s.formats.some((f) => f.key === j.format && !f.key.startsWith('pasted-'))) counts.set(j.format, (counts.get(j.format) ?? 0) + 1);
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] === 'house' ? -1 : b[0] === 'house' ? 1 : 0))[0];
+  return best ? { key: best[0], count: best[1] } : null;
+}
+
+/** The writing style as the chat names it: "warm, plain English, speaks as "we"". */
+export function styleWords(style: string[]): string {
+  return style.map((x) => (x === 'Plain English' ? 'plain English' : `${x.charAt(0).toLowerCase()}${x.slice(1)}`)).join(', ');
+}
+
 /** The template the chat recommends, with its reason, and the close matches it offers next. */
 export function recommendation(s: State, defaultKey: string): { key: string; reason: string; others: string[] } {
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const rec = usable.find((f) => f.key === defaultKey) ?? usable[0];
-  const reason = rec.family === 'Your organisation' ? 'your own format' : `the format most organisations like yours use`;
+  const usual = usualTemplate(s);
+  const reason = usual?.key === rec.key ? `your usual template, used for ${usual.count} of your jobs` : rec.family === 'Your organisation' ? 'your own format' : `the format most organisations like yours use`;
   const family = usable.find((f) => f.family !== 'Your organisation' && f.key !== rec.key && f.family === rec.family)?.family ?? 'INGO and humanitarian';
   const others = [...usable.filter((f) => f.key !== rec.key && f.family === family), ...usable.filter((f) => f.key !== rec.key && f.family !== family)]
     .sort((a, b) => FAMILIES_ORDER.indexOf(a.family) - FAMILIES_ORDER.indexOf(b.family))

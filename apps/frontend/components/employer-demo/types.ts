@@ -140,13 +140,14 @@ export type AskKind = 'title' | 'place' | 'contract' | 'grade' | 'eligibility' |
  * model that wrote it, shown under the reply while two models are compared in the preview. `step`: the step of a new employer's
  * writing this message asks about, so the same question is not asked twice.
  */
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: AskKind; ai?: boolean; by?: string; step?: string; card?: ChatCard };
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: AskKind; ai?: boolean; by?: string; step?: string; card?: ChatCard; state?: JobStatus };
 
 /**
  * A card under a message, with the one button that does what it says (section 19, steps 8 and 9): anything that publishes, pays, or
- * sends something to someone is done from a button that states the whole outcome, never by the chat on its own.
+ * sends something to someone is done from a button that states the whole outcome, never by the chat on its own. `state`: the actions
+ * section 17 allows for the job's state, each opening its own dialog (section 19, phase 4).
  */
-export type ChatCard = 'plan' | 'publish' | 'review' | 'live';
+export type ChatCard = 'plan' | 'publish' | 'review' | 'live' | 'state';
 
 /** "One section at a time", or "write it all, then I'll review". */
 export type Pace = 'step' | 'all';
@@ -165,6 +166,8 @@ export type Walk = {
   pending?: { what: string; changes: Array<{ key: string; lines: string[] }> };
   /** A job description the user brought (pasted or a file), read into sections, until they say how to use it. */
   doc?: Section[];
+  /** Hire again: the job this one copies ("Logistics Assistant, Kampala"); the chat asks first what changes. */
+  again?: string;
 };
 
 export type Remark = {

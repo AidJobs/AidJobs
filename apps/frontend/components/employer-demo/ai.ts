@@ -4,13 +4,14 @@ import { useSyncExternalStore } from 'react';
 import { downloadBlock, formatOf, missingFacts } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { planCount, planFor } from './invites';
-import { isPublished } from './lifecycle';
+import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
+import { profileFor, profileName } from './profiles';
 import { canGoFree, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, monthFor, monthName, PACKAGES, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
 import { afterApproval, FIXED_SECTIONS, nextStep, setAiWrites, type Step } from './flow';
-import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, wordsFor } from './setup';
+import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { getState } from './store';
 import type { DemoJob, Facts, Format, JobLang, State } from './types';
 
@@ -137,9 +138,28 @@ function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Recor
       return { kind: step.kind, point: { key: step.point.key, title: step.point.title, detail: step.point.detail ?? null, fix: step.point.fix?.label ?? null } };
     case 'version':
       return { kind: 'version', language: step.lang };
+    case 'again':
+      return { kind: 'again', from: j.walk?.again ?? null, now: { deadline: j.facts.deadline || null, positions: Number(j.facts.positions) || 1, location: j.facts.location || null } };
     default:
       return { ...step };
   }
+}
+
+/** Section 17's actions for the job's state, as the AI names them in its open action (section 19, phase 4). */
+const AI_ACTION: Record<StateAction, string> = { publishNow: 'publish_now', reschedule: 'reschedule', backToDraft: 'back_to_draft', extend: 'extend', share: 'share', amplify: 'amplify', filled: 'filled', close: 'close', withdraw: 'withdraw', reopen: 'reopen', hire: 'hire_again', download: 'download', delete: 'delete' };
+
+/** A returning employer's start (section 19, phase 4), while the job waits for its template: the saved profile, else the usual template. */
+function returningFor(s: State, j: DemoJob) {
+  if (j.setup !== 'template') return null;
+  const usual = usualTemplate(s, j.id);
+  if (!usual) return null;
+  const p = profileFor(s, j);
+  return {
+    usual: { key: usual.key, label: formatOf(s, usual.key).label, jobs: usual.count },
+    style: proposedStyle(s),
+    pace: s.pace ?? null,
+    profile: p ? { id: p.id, name: profileName(p), template: formatOf(s, p.format).label } : null,
+  };
 }
 
 /**
@@ -191,6 +211,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     },
     job: {
       status: j.status,
+      stateActions: stateActionsOf(s, j).map((a) => ({ key: AI_ACTION[a], label: STATE_LABEL[a] })),
       facts: filled(j.facts),
       missingFacts: missingFacts(j.facts),
       template: { key: format.key, label: format.label, family: format.family, usedBy: format.usedBy, content: contentOf(format, s.org.orgType), words: wordsFor(j.tags.length) },
@@ -206,6 +227,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     },
     walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,
     publishing: publishingFor(s, j),
+    returning: returningFor(s, j),
     recommendation: {
       key: rec.key,
       label: recFormat.label,

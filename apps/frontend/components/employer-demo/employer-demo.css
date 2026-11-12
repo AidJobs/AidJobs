@@ -2273,3 +2273,10 @@ button.ej-step:hover {
 .ej-box-grip:focus-visible > span {
   background: var(--sage-5);
 }
+
+/* An archived screen (section 19, phase 4): the earlier workspace and Check and publish, kept for reference. */
+.ej-archived {
+  background: var(--amber-bg);
+  border-bottom: 1px solid var(--hair);
+  color: var(--text);
+}

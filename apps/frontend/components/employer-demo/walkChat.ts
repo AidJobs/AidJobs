@@ -1,11 +1,12 @@
 import { approvalRequired } from './approval';
-import { commitmentText, COMMITMENTS, extractFacts, headingFor, LANGUAGES, longDate, placeOf, SECTION_BY_KEY, salarySuggestion } from './engine';
+import { commitmentText, COMMITMENTS, extractFacts, headingFor, isoDay, LANGUAGES, longDate, placeOf, SECTION_BY_KEY, salarySuggestion } from './engine';
 import { isWritten, type Step } from './flow';
+import { canReopen, graceEnds, stateActionsOf, type StateAction } from './lifecycle';
 import { marketCheck, workingDay } from './market';
 import { BADGE, canGoFree, FREE_PER_MONTH, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langSlots, LISTED_DAYS, monthFor, monthName, nextPaidJob, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
 import { contentOf, describeStyle, proposedStyle, wordsFor } from './setup';
 import { jobLang, langOf, versionChoices, versionsOf } from './translate';
-import type { ApplySettings, AskKind, ChatMsg, DemoJob, Facts, Format, State } from './types';
+import type { ApplySettings, AskKind, ChatCard, ChatMsg, DemoJob, Facts, Format, State } from './types';
 
 /**
  * The rules' side of a new employer's writing (employer-side plan, section 19, steps 3 to 7): what the chat says at each step when the
@@ -26,6 +27,11 @@ export const OTHER_WORDING = 'Suggest other wording';
 export const OPEN_PUBLISH = 'Open Check and publish';
 export const CHOOSE_SDGS = 'Choose them myself';
 export const NO_SDGS = 'No SDGs';
+export const KEEP_AS_IS = 'Keep as is';
+export const NOTHING_ELSE = 'Nothing else changes';
+export const AGAIN_DATE = 'Change the closing date';
+export const AGAIN_PLACE = 'Change the place';
+export const AGAIN_POSITIONS = 'Change the positions';
 
 /** "SDG 3, 6, 16": the organisation's goals, at most three, as the Details row names them. */
 export function orgGoals(s: State): string {
@@ -69,9 +75,18 @@ const plain = (l: string) => l.replace(/^- /, '');
 /** What the rules say for a step; `aiOn` offers the AI's own help where it has some (other wording for a check point). */
 export function promptFor(s: State, job: DemoJob, format: Format, step: Step, key: string, aiOn: boolean): ChatMsg[] {
   const all = job.walk?.pace === 'all';
+  const again = job.walk?.again;
   const draftShown = job.chat.some((m) => m.text.startsWith(DRAFT_INTRO));
-  const intro = all && !job.walk?.approved.length && !draftShown ? `${DRAFT_INTRO}, written ${describeStyle(job.style ?? [])}. Let's go through it. ` : '';
+  const intro = all && !again && !job.walk?.approved.length && !draftShown ? `${DRAFT_INTRO}, written ${describeStyle(job.style ?? [])}. Let's go through it. ` : '';
   switch (step.kind) {
+    case 'again': {
+      const f = job.facts;
+      const n = Number(f.positions) || 1;
+      const now = `it closes on ${f.deadline ? longDate(f.deadline) : '[Closing date]'}, for ${n} ${n === 1 ? 'position' : 'positions'}, in ${f.location || (f.arrangement === 'remote' ? 'no duty station (remote)' : 'no duty station yet')}`;
+      const first = !job.chat.some((m) => m.step === key);
+      const text = first ? `A new job from your ${again}, with its text. First, what changes? For now ${now}.` : `Anything else that changes? Now ${now}.`;
+      return [stepMsg(text, key, [NOTHING_ELSE, AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS])];
+    }
     case 'setup':
       if (step.stage === 'style') return [stepMsg(overview(format, job.tags.length, wordsFor(job.tags.length), contentOf(format, s.org.orgType), styleQuestion(s)), key, STYLE_QUICK)];
       if (step.stage !== 'pace') return [];
@@ -105,6 +120,10 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       return [];
     case 'approve': {
       const name = heading(job, format, step.section);
+      const copied = job.versions[0]?.sections.find((x) => x.key === step.section)?.lines;
+      if (again && JSON.stringify(copied) === JSON.stringify(job.sections.find((x) => x.key === step.section)?.lines)) {
+        return [stepMsg(`**${name}**, as in your ${again}: keep it as it is, or change something?`, key, [KEEP_AS_IS, ALL_GOOD])];
+      }
       const quick = all ? [GOOD, ALL_GOOD] : [GOOD];
       const firstWritten = job.versions.find((v) => v.sections.some((x) => x.key === step.section && x.lines.length))?.sections.find((x) => x.key === step.section)?.lines;
       const edited = Boolean(firstWritten) && JSON.stringify(firstWritten) !== JSON.stringify(job.sections.find((x) => x.key === step.section)?.lines);
@@ -238,10 +257,87 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
       return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ` A free job is used when it goes live; scheduled, it holds its month's place until then.` : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
     }
     case 'live':
+      if (job.status === 'closed') return [stateMessage(s, job) ?? stepMsg('This job is closed.', key)];
       return [{ ...stepMsg(job.status === 'scheduled' ? `Scheduled for ${longDate(job.scheduledFor ?? '')}. It goes live that day${job.plan === 'amplify' ? ', and Reach sends then' : ''}.` : `It's live on AidJobs.${job.plan === 'amplify' ? '' : ' Visitors can share it from the job page.'} A copy can now be downloaded.`, key), card: 'live' }];
     default:
       return [];
   }
+}
+
+const ACTION_WORDS: Record<StateAction, string> = {
+  publishNow: 'publish it now',
+  reschedule: 'change the date',
+  backToDraft: 'take it back to a draft',
+  extend: 'extend it',
+  share: 'share it',
+  amplify: 'amplify it',
+  filled: 'mark the position filled',
+  close: 'close it now',
+  withdraw: 'withdraw it',
+  reopen: 'reopen it',
+  hire: 'hire again',
+  download: 'download a copy',
+  delete: 'delete it',
+};
+
+/** "a, b, or c". */
+function either(words: string[], last = 'or'): string {
+  return words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')}${words.length > 2 ? ',' : ''} ${last} ${words[words.length - 1]}`;
+}
+
+/** The actions a job's state allows, as the chat says them ("You can extend it, share it, or delete it."). */
+export function stateOffer(s: State, job: DemoJob): string {
+  const actions = stateActionsOf(s, job);
+  return actions.length ? `You can ${either(actions.map((a) => ACTION_WORDS[a]))}.` : '';
+}
+
+/**
+ * The chat's one message when a job is opened in its state (section 19, phase 4): where it stands, what an edit does, and section 17's
+ * actions for it, on a card whose buttons open their dialogs. None for a draft, whose next step is the chat's own question.
+ */
+export function stateMessage(s: State, job: DemoJob): ChatMsg | null {
+  const first = (n: string) => n.split(' ')[0];
+  const r = job.review;
+  const can = stateOffer(s, job);
+  let text: string;
+  let card: ChatCard;
+  switch (job.status) {
+    case 'review': {
+      const askers = r.reviewers.filter((x) => x.decision === 'changes');
+      const waiting = r.reviewers.filter((x) => !x.decision).map((x) => first(x.name));
+      const notes = askers.filter((a) => a.note).map((a) => `“${a.note}”`).join(' ');
+      text = askers.length
+        ? `${either(askers.map((a) => first(a.name)), 'and')} asked for changes${notes ? `: ${notes}` : '.'} Make them here or in the text, then send round ${r.round + 1}: they see only what changed.`
+        : `This job is in review: waiting for ${either(waiting, 'and') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}. You can keep editing; an edit resets any approval already given.`;
+      card = 'review';
+      break;
+    }
+    case 'approved': {
+      const by = r.reviewers.filter((x) => x.decision === 'approved').map((x) => first(x.name));
+      text = `Approved${by.length ? ` by ${either(by, 'and')}` : ''}: ready to publish. An edit sends it back to review.`;
+      card = 'publish';
+      break;
+    }
+    case 'scheduled':
+      text = `Scheduled for ${longDate(job.scheduledFor ?? '')}; it goes live that day${job.plan === 'amplify' ? ', and Reach sends then' : ''}. Edits are kept for the go-live. ${can}`;
+      card = 'state';
+      break;
+    case 'live':
+      text = `This job is live: edits go live at once, and its page says Updated. ${can}`;
+      card = 'state';
+      break;
+    case 'closed': {
+      const why = { filled: 'the position was filled', withdrawn: 'it was withdrawn', early: 'it was closed early', deadline: 'it reached its closing date' }[job.closeReason ?? 'deadline'];
+      const end = graceEnds(job);
+      const reopen = canReopen(job, s.today) && end ? ` It can be reopened until ${longDate(isoDay(end))}.` : '';
+      text = `This job closed${job.closedAt ? ` on ${longDate(isoDay(job.closedAt))}` : ''}: ${why}, so candidates can no longer apply.${reopen} ${can}`;
+      card = 'state';
+      break;
+    }
+    default:
+      return null;
+  }
+  return { ...stepMsg(text.trim(), `state:${job.status}`), card, state: job.status };
 }
 
 /** Who may publish without approval: where approval is required and not given, only the owner, unless nobody may skip it. */

@@ -342,7 +342,7 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
   const published = isPublished(job);
   // A live or scheduled free job is amplified only once Amplify is asked for; until then its part shows the link and what comes next.
   const upgrade = (job.status === 'live' || job.status === 'scheduled') && job.plan === 'free' && job.choice === 'amplify';
-  if (job.status === 'closed') return <p className="aj-muted m-0">This job is closed. Hire again from Manage jobs to publish it anew.</p>;
+  if (job.status === 'closed') return <p className="aj-muted m-0">This job is closed. Hire again to publish it anew, as a new job.</p>;
   if (published && !upgrade) return <LiveCard job={job} s={s} open={open} compact={compact} />;
 
   const owner = !s.reviewerAs;
