@@ -70,6 +70,15 @@ def test_an_advert_is_read_from_its_page_with_contacts_removed():
     assert "jobs@acme.example" not in joined and "812 345" not in joined
 
 
+def test_the_title_is_read_from_the_page_not_its_generic_heading():
+    page = ('<html><head><title>Logistics Officer | Acme Relief</title></head><body><h1>Job Details</h1>'
+            '<p>text</p></body></html>')
+    assert adverts.page_title(page, adverts.html_lines(page), "https://acme.example/jobs/1") == "Logistics Officer"
+    gh = '<html><head><title>Job Application for Finance Manager at Acme</title></head><body></body></html>'
+    assert adverts.page_title(gh, [], "https://job-boards.greenhouse.io/acme/jobs/1") == "Finance Manager"
+    assert adverts.clean_title("Job Application for Grants Officer at Acme Relief") == "Grants Officer"
+
+
 def test_job_posting_data_is_used_where_the_page_has_it():
     desc = "<p>" + "Coordinate the team's monthly reporting and field visits. " * 20 + "</p>"
     page = ('<html><body><script type="application/ld+json">' + json.dumps({
@@ -332,6 +341,12 @@ def test_duty_lines_and_their_specificity():
     lines = adverts.duty_lines(adverts.advert_from_html(PAGE, "https://www.acme.example/jobs/x"))
     assert any(t.startswith("Manage a fleet") for t in lines)
     assert not any("bachelor" in t for t in lines)                 # requirements are not duties
+    mixed = {"lines": [{"text": "Key responsibilities", "heading": True, "tag": "h2"},
+                       {"text": "Prepare the monthly donor financial reports for the programme.", "heading": False,
+                        "tag": "li"},
+                       {"text": "4+ years of financial and accounting experience in an NGO.", "heading": False,
+                        "tag": "li"}]}
+    assert adverts.duty_lines(mixed) == ["Prepare the monthly donor financial reports for the programme."]
     assert adverts.specificity("Liaise with stakeholders as needed.")[0] == 0
     score, kinds = adverts.specificity("Submit a monthly report to the donor on the 12 sites using Kobo.")
     assert score == 3 and {"number", "frequency", "standard_or_tool"} <= set(kinds)

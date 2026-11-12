@@ -913,6 +913,34 @@ def posting_facts(p: dict) -> dict:
             "pay": bool(sal) and bool(re.search(r"\d", _text(sal)))}
 
 
+def page_title(html: str, lines: list[dict], url: str) -> str:
+    """The job's title on a page: the first of its main heading, its social-media title, the parts of
+    its <title>, and its address that reads like a job title; a page's own name ("Job Details",
+    "Careers", the organisation's name) does not. Greenhouse's "Job Application for X at Y" gives X."""
+    found = []
+    h1 = next((ln["text"] for ln in lines if ln["tag"] == "h1"), "")
+    found.append(h1)
+    m = re.search(r"<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)", html, re.IGNORECASE)
+    found.append(roles.clean_text(m.group(1)) if m else "")
+    m = re.search(r"<title[^>]*>(.*?)</title>", html, re.DOTALL | re.IGNORECASE)
+    if m:
+        found += re.split(r"\s+[|–—-]\s+|\s*\|\s*", roles.clean_text(m.group(1)))
+    found.append(roles.address_title(url))
+    for raw in found:
+        t = clean_title(raw or "")
+        if t and len(t.split()) <= 18 and roles.looks_like_title(t) and roles.classify(t).function:
+            return t[:200]
+    return clean_title(h1 or next((t for t in found if t), ""))
+
+
+def clean_title(title: str) -> str:
+    """Greenhouse's "Job Application for X at Y" gives X."""
+    if re.match(r"\s*job application for\s+", title, re.IGNORECASE):
+        title = re.sub(r"^\s*job application for\s+", "", title, flags=re.IGNORECASE)
+        title = re.split(r"\s+at\s+", title, maxsplit=1)[0]
+    return title.strip()
+
+
 def advert_from_html(html: str, url: str) -> dict:
     postings = [p for p in jsonld_postings(html) if len(re.sub(r"<[^>]+>", " ", _text(p.get("description"))).split()) >= 100]
     title = ""
@@ -926,11 +954,8 @@ def advert_from_html(html: str, url: str) -> dict:
     else:
         lines = html_lines(html)
         method, facts, employer = "html", {}, ""
-        h1 = next((ln["text"] for ln in lines if ln["tag"] == "h1"), "")
-        if not h1:
-            m = re.search(r"<title[^>]*>(.*?)</title>", html, re.DOTALL | re.IGNORECASE)
-            h1 = roles.clean_text(m.group(1)).split(" | ")[0].split(" - ")[0] if m else ""
-        title = h1
+        title = page_title(html, lines, url)
+    title = clean_title(title)
     for ln in lines:
         ln["text"] = scrub(ln["text"])
     return {"url": url, "title": scrub(title)[:200], "lines": lines, "method": method, "facts": facts,
@@ -1095,7 +1120,8 @@ def read_saved_titles(orgs: roles.Organisations | None = None):
                     orgs.types[oid] = t
             elif orgs and ad["source"] == "feed" and ad.get("org_site"):
                 oid = orgs.of_url("https://" + ad["org_site"] + "/")
-            yield ad["source"], snap, ad["url"], ad["title"], oid
+            source = "archive-advert" if ad["source"] == "archive" else ad["source"]
+            yield source, snap, ad["url"], ad["title"], oid
     # R5's UN listing pages give titles only, from their job links (read only if the user allows UN pages).
     from confirm import JOB_LINK
     for meta_path in sorted((READING / "r5" / "bodies").glob("*.json")):
@@ -1568,11 +1594,13 @@ def specificity(line: str) -> tuple[int, list[str]]:
 
 
 def duty_lines(ad: dict) -> list[str]:
-    """The lines of an advert's responsibilities sections, 5 to 60 words each."""
+    """The lines of an advert's responsibilities sections, 5 to 60 words each; a line that asks for
+    years of experience or a degree is a requirement in a mistyped section, not a duty."""
     out = []
     for s in sections_of(ad["lines"]):
         if s["type"] in ("responsibilities", "deliverables"):
-            out += [t for t in s["lines"] if 5 <= words_of(t) <= 60]
+            out += [t for t in s["lines"] if 5 <= words_of(t) <= 60 and not years_asked(t)[0]
+                    and not degree_asked(t)]
     return out
 
 

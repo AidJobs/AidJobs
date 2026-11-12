@@ -203,6 +203,22 @@ def test_the_role_map_caps_each_organisation_and_weights_the_un_system():
     assert m[("hr", "all", "ingo")][7] == f"{10 / 40:.4f}"
 
 
+def test_a_page_read_in_a_batch_is_counted_once(tmp_path, monkeypatch):
+    work, docs = tmp_path / "work", tmp_path / "docs"
+    work.mkdir()
+    with (work / "titles.csv").open("w", newline="", encoding="utf-8") as h:
+        w = csv.writer(h, lineterminator="\n")
+        w.writerow(roles.LOCAL_TITLE_FIELDS)
+        w.writerow(["archive", "cc-2026", "seed:1", "finance officer kampala", "p1", "ingo"])
+        w.writerow(["archive-advert", "r2", "seed:1", "Finance Officer", "p1", "ingo"])
+        w.writerow(["archive", "cc-2026", "seed:1", "logistics officer goma", "p2", "ingo"])
+    monkeypatch.setattr(roles, "WORK", work)
+    monkeypatch.setattr(roles, "ROLES", docs)
+    roles.counts(None)
+    rows = list(csv.DictReader((docs / "role-counts.csv").open(encoding="utf-8")))
+    assert sum(int(r["count"]) for r in rows) == 2
+
+
 def test_build_writes_the_role_map_from_the_committed_counts(tmp_path):
     rows = counts([{"org_id": "a", "org_type": "ingo", "function": "finance", "count": "3"}])
     with (tmp_path / "role-counts.csv").open("w", newline="", encoding="utf-8") as h:

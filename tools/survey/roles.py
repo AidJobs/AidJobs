@@ -326,7 +326,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                       r"(?:pays|ex[ée]cuti[fv]e?|g[ée]n[ée]ral)|\bchef de (?:mission|base|bureau|"
                       r"d[ée]l[ée]gation)\b|\bcountry lead\b|\bpresident\b|\bfield coordinator\b|"
                       r"\bhead of country\b|\bcountry coordinator\b|\boffice director\b|"
-                      r"\barea (?:coordinator|manager|director)\b")),
+                      r"\barea (?:coordinator|manager|director)\b|\bcoordinat(?:eur|rice) (?:r[ée]gional|g[ée]n[ée]ral)e?\b|"
+                      r"\bresponsable (?:pays|r[ée]gional)e?\b")),
     ("meal", _r(r"\bmonitoring\b|\bevaluation\b|\bmeal\b|\bmel\b|\bmerl?\b|\binformation management\b|"
                 r"\bim (?:officer|assistant|specialist|manager)\b|\bdata (?:analyst|officer|manager|"
                 r"specialist|scientist|management|assistant|collector)\b|\baccountability\b|"
@@ -345,7 +346,8 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                                r"\bnew business\b|\bcorporate (?:relations|engagement)\b|"
                                r"^(?:senior )?development (?:officer|coordinator|manager|director|"
                                r"associate|assistant|executive)\b|\badvancement\b|\bdonations?\b|"
-                               r"\bgifts?\b|\bsponsorship\b|\bawards?\b")),
+                               r"\bgifts?\b|\bsponsorship\b|\bawards?\b|\bdonat(?:eurs?|rices?)\b|\bm[ée]c[ée]nat\b|"
+                               r"\bmovement cooperation\b")),
     ("commercial", _r(r"\bsales\b|\bretail\b|\bcustomer\b|\baccount (?:manager|executive)\b|"
                       r"\bclient (?:relations|services|success)\b|\bshop (?:manager|assistant)\b|"
                       r"\bacquisition\b|\bchannel\b|\bdistributor\b|\bmerchandis|\bcommercial\b|"
@@ -357,7 +359,7 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
               r"lead|business partner|director|services)\b|\btalent\b|\brecruit|\blearning and "
               r"development\b|\bressources humaines\b|\bstaff (?:welfare|care|development)\b|"
               r"\bcompensation and benefits\b|\bhr\b|\bpersonnel\b|\b(?:staff|employee) wellbeing\b|\bdiversity\b|"
-              r"\bpeople (?:division|team|function)\b")),
+              r"\bpeople (?:division|team|function)\b|\b(?:relations|affaires) sociales\b|\bpaie\b")),
     ("ict", _r(r"\binformation technology\b|\bict\b|\bsoftware\b|\bdeveloper\b|\bdata engineer|"
                r"\bsystems? (?:administrator|analyst|engineer)\b|\bnetwork (?:engineer|administrator|technician|security|infrastructure|"
                r"specialist)\b|\binformatique\b|"
@@ -406,7 +408,7 @@ FUNCTIONS: list[tuple[str, re.Pattern]] = [
                         r"\bvolunteer (?:coordinator|manager|lead)\b|\bfoster|\bpastor|\bchaplain|"
                         r"\bministry\b|\byouth\b|\bchildren(?:'s)? (?:services|and youth)\b|"
                         r"\bintegration support\b|\bresettlement (?:officer|caseworker|specialist)\b")),
-    ("community_field", _r(r"\bcommunity\b|"
+    ("community_field", _r(r"\bcommunity\b|\bcommunautaire\b|\bmobilisation\b|"
                            r"\bfield (?:officers?|workers?|monitors?|assistants?|agents?|staff|"
                            r"facilitators?|supervisors?|technicians?)\b|\bcase (?:manager|specialist|"
                            r"management|work)|\boutreach\b|\banimat(?:eur|rice)\b|"
@@ -473,7 +475,7 @@ SECTORS: list[tuple[str, re.Pattern]] = [
     ("climate_environment", _r(r"\bclimat|\benvironment|\bbiodiversity\b|\bconservation\b|"
                                r"\benergy\b|\bforest|\bwildlife\b|\bmarine\b|\bocean|\bcarbon\b|"
                                r"\bnature\b|\bsustainab|\brenewable|\bemission|\bwaste\b|"
-                               r"\bnatural resource|\becolog|\bland(?:scape)?\b|\bfisher")),
+                               r"\bnatural resource|\becolog|\bland(?:scape)?\b|\bfisher|\bclean cooking\b")),
     ("agriculture", _r(r"\bagricultur|\bagronom|\bfarm|\blivestock\b|\bagricole\b|\bseed|\bcrop|"
                        r"\bhorticult|\bagri|\bagro|\bveterinar|\birrigation\b|\bvalue chain|\bbreed")),
     ("gender", _r(r"\bgender\b(?![- ]based)|\bwomen'?s?\b|\bgenre\b|\bgirls?\b|\bfeminis")),
@@ -870,6 +872,10 @@ def counts(args) -> int:
     by_title = decision_map(decisions + (read_csv(local) if local.exists() else []))
     orgs = Organisations.load(decisions=decisions, pools=pools_of())
     rows = read_csv(WORK / "titles.csv")
+    # One title per page: an advert's own title (read from the page) wins over the one read from its
+    # address, so a page read in a batch is not counted twice.
+    from_pages = {(r["org_id"], r["page"]) for r in rows if r["source"] == "archive-advert" and r["page"]}
+    rows = [r for r in rows if not (r["source"] == "archive" and (r["org_id"], r["page"]) in from_pages)]
     agg = Counter()
     variants = defaultdict(lambda: {"orgs": set(), "count": 0, "role": None})
     unplaced = defaultdict(set)
