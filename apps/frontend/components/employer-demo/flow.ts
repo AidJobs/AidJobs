@@ -189,6 +189,8 @@ export function suggestionsFor(job: DemoJob, s: State): string[] {
 export function nextStep(job: DemoJob, s: State): Step | null {
   const w = job.walk;
   if (!w) return null;
+  // Once published, the writing is over: editing a job in its state is phase 4's (section 19, "A returning employer").
+  if (isPublished(job)) return { kind: 'live' };
   if (job.setup) return { kind: 'setup', stage: job.setup };
   if (w.pending) return { kind: 'change' };
   if (w.awaiting) return { kind: 'genuine', point: w.awaiting.point };

@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import { downloadBlock, formatOf, missingFacts } from './actions';
 import { approvalRequired, approvedFor } from './approval';
-import { planCount } from './invites';
+import { planCount, planFor } from './invites';
 import { isPublished } from './lifecycle';
 import { canGoFree, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, monthFor, monthName, PACKAGES, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
@@ -12,7 +12,7 @@ import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, 
 import { afterApproval, FIXED_SECTIONS, nextStep, setAiWrites, type Step } from './flow';
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
-import type { DemoJob, Facts, Format, State } from './types';
+import type { DemoJob, Facts, Format, JobLang, State } from './types';
 
 /**
  * The AI chat's one way out of the browser: the demo's own route, and nothing else (employer-side plan, section 19, "The AI chat in
@@ -159,13 +159,16 @@ function publishingFor(s: State, j: DemoJob) {
     amplify: { verified: s.org.verified, price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? 'one', packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
     versions: { included: LANGS_INCLUDED[via], extraPrice: usd(LANGUAGE_PRICE), toPay: langsToPay(j, 'amplify', via), list: versionsOf(j).map((k) => ({ key: k, label: langOf(k).label, reviewed: Boolean(j.translations?.[k]?.reviewed), behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)), sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) })) },
     review: { required: approvalRequired(s, j), approved: approvedFor(s, j), state: j.review.state, reviewers: j.review.reviewers.map((r) => ({ name: r.name, decision: r.decision ?? null, note: r.note ?? null })), team: s.team.filter((p) => p.id !== s.me.id).map((p) => ({ name: p.name, role: p.role })) },
-    reach: { planned: planCount(j, j.reachPlan), domain: s.org.domain },
+    reach: (() => {
+      const plan = j.reachPlan ?? planFor(j, s.org);
+      return { planned: planCount(j, j.reachPlan), domain: s.org.domain, candidates: plan.candidates, team: plan.team, candidateMessage: plan.candidateMsg, teamMessage: plan.teamMsg };
+    })(),
     download: downloadBlock(j),
   };
 }
 
 /** What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation. */
-export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean) {
+export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean, version?: JobLang) {
   const format = formatOf(s, j.format);
   const rec = recommendation(s, j.format);
   const recFormat = formatOf(s, rec.key);
@@ -194,6 +197,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       style: j.style ?? null,
       proposedStyle: proposedStyle(s),
       inView: focus ?? null,
+      versionInView: version && j.translations?.[version] ? { key: version, label: langOf(version).label } : null,
       canUndo: Boolean(j.lastChange),
       sections: j.tags.map((k) => {
         const sec = j.sections.find((x) => x.key === k);
@@ -228,7 +232,7 @@ export const GO_ON = 'Go on with the next step: write it now.';
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.
  * `silent`: the window asks the AI to go on by itself (to write the next section), named in the chat while it writes.
  */
-export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; open: (t: OpenTarget) => void }): Promise<Applied | null> {
+export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; open: (t: OpenTarget) => void }): Promise<Applied | null> {
   const first = Boolean(opts.first);
   const silent = opts.silent;
   const s = getState();
@@ -241,7 +245,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const res = await fetch(AI_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first), ...(snap.model ? { model: snap.model } : {}) }),
+      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first, opts.version), ...(snap.model ? { model: snap.model } : {}) }),
       signal: stop.signal,
       cache: 'no-store',
     });
@@ -249,7 +253,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
-    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by);
+    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version);
   } catch {
     set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;

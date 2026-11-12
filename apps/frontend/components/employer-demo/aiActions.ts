@@ -350,7 +350,8 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
  * null for the reply to the first message, and empty when the window asked the AI to go on by itself (to write the next section). `open`
  * brings a part, a panel, or a dialog into view in the window.
  */
-export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string): Applied {
+export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang): Applied {
+  const inVersion = inVersionTab && getState().jobs.find((j) => j.id === id)?.translations?.[inVersionTab] ? inVersionTab : undefined;
   const refused: string[] = [];
   const opened: OpenTarget[] = [];
   const job = () => getState().jobs.find((j) => j.id === id);
@@ -406,10 +407,13 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'add_section':
         if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
+        else if (inVersion) addVersionSection(id, inVersion, section);
+        else if (section === 'languages' && ['langs', 'version'].includes(nextStep(j, s)?.kind ?? '')) refused.push('the Languages section: a language version is added by naming the language');
         else if (!j.tags.includes(section)) toggleSection(id, section);
         break;
       case 'remove_section':
-        if (!j.tags.includes(section) || j.tags.length < 2) refused.push(`removing ${name || 'a section'}`);
+        if (inVersion) removeVersionSection(id, inVersion, section);
+        else if (!j.tags.includes(section) || j.tags.length < 2) refused.push(`removing ${name || 'a section'}`);
         else toggleSection(id, section);
         break;
       case 'reorder_sections': {
@@ -425,7 +429,16 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       }
       case 'write_section': {
-        if (j.setup) refused.push(`${name}: written before the template and style are chosen`);
+        if (inVersion) {
+          // With a language version's tab open, the discussion is about that version (section 19): its own sections are written.
+          const out = checkLines(a.lines, section, s, j, said ?? '');
+          if (!SECTION_BY_KEY[section] || FIXED_SECTIONS.includes(section)) refused.push(`${name || 'a section'}: not one the version can have written`);
+          else if ('refused' in out) refused.push(out.refused);
+          else {
+            if (!getState().jobs.find((x) => x.id === id)?.translations?.[inVersion]?.sections.some((x) => x.key === section)) addVersionSection(id, inVersion, section);
+            writeVersionSection(id, inVersion, section, out.lines);
+          }
+        } else if (j.setup) refused.push(`${name}: written before the template and style are chosen`);
         else if (!j.tags.includes(section)) refused.push(`${name || 'a section'}: not in this job`);
         else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
         else {

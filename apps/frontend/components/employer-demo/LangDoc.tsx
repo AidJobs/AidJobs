@@ -86,7 +86,7 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: J
         {t.sections.map((sec) => {
           const src = job.sections.find((x) => x.key === sec.key);
           return (
-            <section key={sec.key} className="flex flex-col gap-1.5">
+            <section key={sec.key} id={`ej-ver-${sec.key}`} className="flex flex-col gap-1.5" style={{ scrollMarginTop: 12 }}>
               <input className="ej-tr-head" value={sec.title} readOnly={readOnly} onChange={(e) => editTranslation(job.id, lang, sec.key, 'title', e.target.value)} aria-label={`Heading: ${src?.title ?? sec.key}`} />
               {sec.lines.length === 0 && <span className="aj-faint px-2">Empty: write it here in the chat.</span>}
               {sec.lines.map((line, i) => {

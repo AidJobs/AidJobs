@@ -140,6 +140,74 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
   });
 });
 
+describe('found on the real-AI walk (12 November 2026)', () => {
+  it('a published job is no longer walked through: a section left unapproved is not asked about after publishing', () => {
+    const id = toPlan();
+    sendChat(id, 'Publish free');
+    sendChat(id, 'No review');
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: j.walk!.approved.slice(1) } } : j)) }));
+    expect(step(id)?.kind).toBe('approve');
+    expect(publish(id, { plan: 'free', schedule: null })).toBe(true);
+    expect(step(id)).toEqual({ kind: 'live' });
+  });
+
+  it('at the basic check, "leave that one too" leaves the point, and a short reply the rules cannot read is asked again, not added to the text', () => {
+    const id = startJob("We're hiring a Logistics Officer in Goma, fixed-term", undefined, [], true);
+    applyTemplate(id, job(id).format);
+    chooseStyle(id, ['Warm']);
+    setPace(id, 'all');
+    update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
+    goOn(id);
+    const first = step(id);
+    expect(first?.kind).toBe('check');
+    const before = JSON.stringify(job(id).sections);
+    sendChat(id, 'what now');
+    expect(JSON.stringify(job(id).sections)).toBe(before);
+    expect(last(id)?.text).toBe("I didn't catch that for this step. Pick an answer, or tell me in your own words.");
+    sendChat(id, 'Leave that one too');
+    expect(JSON.stringify(job(id).sections)).toBe(before);
+    expect(step(id)).not.toEqual(first);
+  });
+
+  it('Reach: the addresses given in the chat are added, the organisation’s own to the team, and “can you publish it” shows the card', () => {
+    const id = toPlan();
+    sendChat(id, 'Amplify');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    sendChat(id, 'No other languages');
+    sendChat(id, 'No, thanks');
+    expect(step(id)).toEqual({ kind: 'reach' });
+    sendChat(id, 'Invite ana.lopez@example.org, and my colleague amina@riverstone.example.org');
+    expect(job(id).reachPlan).toMatchObject({ candidates: ['ana.lopez@example.org'], team: ['amina@riverstone.example.org'] });
+    expect(job(id).chat.find((m) => m.text.startsWith('Added 1 to invite and 1 from your team'))).toBeDefined();
+    sendChat(id, 'No review');
+    sendChat(id, 'Can you publish it on Monday?');
+    expect(last(id)).toMatchObject({ card: 'publish' });
+    expect(job(id).status).toBe('draft');
+  });
+
+  it('with a language version’s tab open, the rules leave the job’s own text alone', () => {
+    const id = toPlan();
+    sendChat(id, 'Amplify');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    sendChat(id, 'Add French');
+    sendChat(id, 'No other languages');
+    const before = JSON.stringify(job(id).sections);
+    sendChat(id, 'Add a short section about the conditions, saying the post is based in Goma', undefined, 'fr');
+    expect(JSON.stringify(job(id).sections)).toBe(before);
+    expect(job(id).chat.at(-2)?.text).toMatch(/^That is about the French version/);
+    sendChat(id, 'Mark it as reviewed', undefined, 'fr');
+    expect(job(id).translations?.fr?.reviewed).toBe(true);
+  });
+
+  it('"that is all" ends the languages', () => {
+    const id = toPlan();
+    sendChat(id, 'Amplify');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    sendChat(id, 'That is all for languages');
+    expect(step(id)).toEqual({ kind: 'flyer' });
+  });
+});
+
 describe('a free job is used, and a job profile kept, only when it is published (section 19)', () => {
   it('publishing free uses one free job and saves a job profile, with Undo', () => {
     const id = toPlan();

@@ -36,7 +36,7 @@ import { workingDay, type Fix } from './market';
 import { MARKET_SAMPLE } from './sample';
 import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
-import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
+import { addRound, invitedCount, planFor, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
 import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
@@ -773,9 +773,18 @@ function isRequest(text: string): boolean {
   return Boolean(toneRequest(text) || lengthRequest(text.toLowerCase()) || UNDO.test(text.toLowerCase().trim()));
 }
 
-/** `focus`: the section open in the window, which a request that names no section is about. */
-export function sendChat(id: string, text: string, focus?: string) {
+/**
+ * `focus`: the section open in the window, which a request that names no section is about. `version`: a language version's tab is
+ * open, so a request is about that version (section 19); the rules answer the step's own answers, and leave the job's text alone.
+ */
+export function sendChat(id: string, text: string, focus?: string, version?: JobLang) {
   if (!ownerOnly()) return;
+  const j = getState().jobs.find((x) => x.id === id);
+  if (version && j?.translations?.[version]) {
+    if (!(j.walk && walkTurn(getState(), j, text))) updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `That is about the ${langOf(version).label} version: change its lines in its tab, and add or remove its sections from the line. The AI can write it for you when it is on.`)] }));
+    ensureAsk(id);
+    return;
+  }
   chatTurn(id, text, focus);
   ensureAsk(id);
 }
@@ -822,7 +831,7 @@ export function setPart(id: string, part: string) {
 }
 
 const APPROVE = /^(?:yes|yep|yeah|ok|okay|good|great|fine|perfect|lovely|looks good|that'?s (?:good|fine|great)|that works|next|approve(?:d)?|done|all good|happy with (?:it|that)|move on|go on|continue)(?:[,.!\s]+(?:thanks|thank you|next|please|move on|go on|good))*[.!]?$/i;
-const NO_MORE = /^(?:none|no|nope|nothing|skip|not now|that'?s all|no,? thanks?)\b/i;
+const NO_MORE = /^(?:none|no|nope|nothing|skip|not now|that'?s all|that is all|all done|no more|no,? thanks?)\b/i;
 const OTHER_DATE = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d\d)\b/i;
 const FILL = /\[(?!Duty station\]|Closing date\])[^\]\n]{2,40}\]/;
 
@@ -940,7 +949,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     }
     case 'check': {
       const p = step.point;
-      if (t === LEAVE_IT || /^(?:leave it|keep it|it'?s fine|ignore)\b/i.test(t)) {
+      if (t === LEAVE_IT || /^(?:leave(?! out\b)|ignore|skip)\b|^(?:keep it|it'?s fine)\b/i.test(t)) {
         leavePoint(j.id, p.key, text);
         return true;
       }
@@ -981,11 +990,11 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
             const at = ls.findIndex((l) => FILL.test(l));
             return ls.map((l, i) => (i === at ? l.replace(FILL, value) : l));
           }, 'Filled in a placeholder');
-        } else return false;
+        } else return unclear(j, step, text);
         updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Changed in **${x.sections.find((y) => y.key === sec)?.title ?? sec}**.`)] }));
         return true;
       }
-      return false;
+      return unclear(j, step, text);
     }
     default:
       return laterTurn(s, j, step, text);
@@ -1010,6 +1019,14 @@ function langsNamed(j: DemoJob, text: string): JobLang[] {
 function laterTurn(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, text: string): boolean {
   const handled = laterAnswer(s, j, step, text);
   if (handled || !['plan', 'market', 'full', 'langs', 'version', 'flyer', 'reach', 'review', 'waiting', 'publish'].includes(step.kind)) return handled;
+  return unclear(j, step, text);
+}
+
+/**
+ * A short reply the rules cannot read at a step where no section is being written (the basic check, steps 8 and 9): asked again with
+ * the step's answers, never added to the text as a sentence. A request about the text, or a longer message, goes on to the chat.
+ */
+function unclear(j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, text: string): boolean {
   const t = text.trim();
   if (EDIT_WORDS.test(t) || isRequest(t) || t.split(/\s+/).length > 6) return false;
   const last = [...j.chat].reverse().find((m) => m.from === 'ai' && m.step === stepKey(step));
@@ -1071,11 +1088,21 @@ function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof n
       else if (t === NO_THANKS || NO_MORE.test(t)) settle(j.id, 'flyer', text, 'Fine. It stays on the line as Flyer if you want it later.');
       else return false;
       return true;
-    case 'reach':
+    case 'reach': {
+      const emails = Array.from(new Set((t.match(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g) ?? []).map((e) => e.toLowerCase())));
+      if (emails.length) {
+        const base = j.reachPlan ?? planFor(j, s.org);
+        const team = emails.filter((e) => e.endsWith(`@${s.org.domain}`));
+        const candidates = emails.filter((e) => !team.includes(e));
+        setReachPlan(j.id, { ...base, candidates: Array.from(new Set([...base.candidates, ...candidates])), team: Array.from(new Set([...base.team, ...team])) });
+        settle(j.id, 'reach', text, `Added ${[candidates.length ? `${candidates.length} to invite` : '', team.length ? `${team.length} from your team` : ''].filter(Boolean).join(' and ')}. They get the emails when the job goes live; both are in the Reach tab, to check or change.`);
+        return true;
+      }
       if (t === INVITE || /^(?:yes|ok|okay|sure|invite)\b/i.test(t)) settle(j.id, 'reach', text, 'The invitations are in the Reach tab: add the people, check both emails, and save. They go when the job goes live.');
       else if (t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
       else return false;
       return true;
+    }
     case 'review':
       if (t === NO_REVIEW || (!approvalRequired(s, j) && NO_MORE.test(t))) {
         settle(j.id, 'review', text, 'Fine: no review.');
@@ -1098,7 +1125,7 @@ function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof n
       }
       return false;
     case 'publish':
-      if (/^(?:publish|post it|go live|schedule|yes|ok|okay)\b/i.test(t)) {
+      if (/^(?:yes|ok|okay)\b|\b(?:publish|post it|go live|schedule)\b/i.test(t)) {
         say('Here it is: the button says exactly what happens, and nothing goes out until you press it.', undefined, 'publish');
         return true;
       }

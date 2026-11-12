@@ -53,9 +53,14 @@ export async function callOpenRouter(messages: ChatMessage[], apiKey: string, mo
       cache: 'no-store',
     });
     if (!res.ok) return { ok: false, status: res.status, code: await errorCode(res) };
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
-    const content = data.choices?.[0]?.message?.content;
-    return typeof content === 'string' ? { ok: true, content } : { ok: false, status: 502 };
+    const data = (await res.json()) as { error?: { code?: unknown }; choices?: Array<{ finish_reason?: unknown; error?: { code?: unknown }; message?: { content?: unknown } }> };
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content;
+    if (typeof content === 'string' && content.trim()) return { ok: true, content };
+    // Why there is no text, without any of the text: the reason the model stopped and an error's number.
+    const reason = typeof choice?.finish_reason === 'string' ? choice.finish_reason.slice(0, 20) : 'none';
+    const err = choice?.error?.code ?? data.error?.code;
+    return { ok: false, status: 502, code: `no text, finish ${reason}${typeof err === 'number' || typeof err === 'string' ? `, code ${String(err).slice(0, 12)}` : ''}` };
   } catch {
     return { ok: false, status: 0 };
   }

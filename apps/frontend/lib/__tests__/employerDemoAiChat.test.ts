@@ -4,7 +4,7 @@ import { setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi } from '../../components/employer-demo/ai';
 import { addDays } from '../../components/employer-demo/engine';
-import { nextStep } from '../../components/employer-demo/flow';
+import { checkPoints, nextStep } from '../../components/employer-demo/flow';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const lastAi = (id: string) => job(id).chat.filter((m) => m.ai).at(-1);
@@ -255,6 +255,22 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
     expect(getState().org.keptFixed).toEqual(job('job-comms').commitments);
     turn('job-comms', 'write it in Spanish', [{ type: 'set_language', language: 'es' }]);
     expect(job('job-comms').lang).toBe('es');
+  });
+
+  it('a language version is never the job’s Languages section; with a version’s tab open, section actions are carried out on the version', () => {
+    turn('job-comms', 'amplify, and French', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'add_language', language: 'fr' }]);
+    update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, walk: { pace: 'step', approved: [...j.tags], settled: ['title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'deadline', 'method', 'details', 'sdgs', 'fixed', 'suggest', 'plan', 'market', 'full'], skipped: [] } } : j)) }));
+    const skipped = checkPoints(job('job-comms'), getState()).map((p) => p.key);
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, walk: { ...j.walk!, skipped } } : j)) }));
+    expect(nextStep(job('job-comms'), getState())?.kind).toBe('langs');
+    const tags = [...job('job-comms').tags];
+    applyAiTurn('job-comms', 'and Portuguese', { reply: 'Done.', actions: [{ type: 'add_section', section: 'languages' }] }, open);
+    expect(job('job-comms').tags).toEqual(tags);
+    applyAiTurn('job-comms', 'add a conditions section', { reply: 'Done.', actions: [{ type: 'write_section', section: 'conditions', lines: ['Le stage est basé à Nairobi.'] }, { type: 'remove_section', section: 'offer' }] }, open, undefined, 'fr');
+    expect(job('job-comms').tags).toEqual(tags);
+    const fr = job('job-comms').translations!.fr!;
+    expect(fr.sections.find((x) => x.key === 'conditions')?.lines).toEqual(['Le stage est basé à Nairobi.']);
+    expect(fr.sections.some((x) => x.key === 'offer')).toBe(false);
   });
 
   it('a date to publish on is checked: a free job goes live within its own month', () => {

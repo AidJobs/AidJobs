@@ -805,8 +805,12 @@ function JobWindow({ id }: { id: string }) {
   }, [writeKey, reading, s.reviewerAs, busyAi, ai.status, job.id]);
 
   const reviewing = Boolean(s.reviewerAs);
-  const parts = partsOf(job, s);
-  const current = currentPart(job, s, parts);
+  const inVersion = tab.startsWith('lang:') && job.translations?.[tab.slice(5) as JobLang] ? (tab.slice(5) as JobLang) : undefined;
+  const version = inVersion ? job.translations?.[inVersion] : undefined;
+  // In a language tab the line shows that version's own sections (section 19, "Free jobs, downloads, and languages").
+  const jobParts = partsOf(job, s);
+  const parts = version ? [...jobParts.filter((p) => !p.section), ...version.sections.map((x): Part => ({ key: `s:${x.key}`, label: x.title, section: x.key, done: version.reviewed }))].sort((a, b) => (a.key === 'outline' ? -1 : b.key === 'outline' ? 1 : a.section && !b.section ? -1 : !a.section && b.section ? 1 : 0)) : jobParts;
+  const current = currentPart(job, s, jobParts);
   const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : job.setup === 'pace' ? 'Pace' : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = versionsOf(job).map((k) => langOf(k));
@@ -830,6 +834,10 @@ function JobWindow({ id }: { id: string }) {
     if (key === 'outline') {
       if (phone && !job.setup) return setOutlineOpen(true);
       return openPick(job.setup ? 'templates' : 'sections');
+    }
+    if (inVersion && sectionOf(key)) {
+      if (phone) setView('job');
+      return scrollToId(`ej-ver-${sectionOf(key)}`);
     }
     setPart(job.id, key);
     setTab('doc');
@@ -926,7 +934,7 @@ function JobWindow({ id }: { id: string }) {
     if (text === CHOOSE_SDGS) setFact('sdgs');
     const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
     if (aiOn() && !rulesAnswer) {
-      void askAi(job.id, text, { focus: focus ?? undefined, open: (x) => openRef.current(x) }).then((done) => {
+      void askAi(job.id, text, { focus: focus ?? undefined, version: inVersion, open: (x) => openRef.current(x) }).then((done) => {
         if (!done) byRules(text);
       });
       return;
@@ -941,7 +949,7 @@ function JobWindow({ id }: { id: string }) {
       if (OWN.test(t)) openPick('own');
       else if (OTHERS.test(t)) openPick('templates');
     }
-    sendChat(j.id, text, sectionOf(currentPart(j, getState(), partsOf(j, getState()))) ?? undefined);
+    sendChat(j.id, text, sectionOf(currentPart(j, getState(), partsOf(j, getState()))) ?? undefined, inVersion);
   };
 
   const pickOrder = pick ? previewOrder(s, job, pick) : null;
