@@ -13,6 +13,7 @@ on:
       - 'infra/**'
       - 'tools/survey/**'
       - 'docs/architecture/source-survey/**'
+      - 'docs/architecture/role-survey/**'
       - '.github/scripts/**'
       - '.github/audit-exceptions.json'
       - '.github/workflows/ci.yml'
@@ -23,6 +24,7 @@ on:
       - 'infra/**'
       - 'tools/survey/**'
       - 'docs/architecture/source-survey/**'
+      - 'docs/architecture/role-survey/**'
       - '.github/scripts/**'
       - '.github/audit-exceptions.json'
       - '.github/workflows/ci.yml'
@@ -268,6 +270,20 @@ jobs:
           python -m pytest tools/survey/test_confirm.py -q -p no:cacheprovider
           python tools/survey/confirm.py build
           git diff --exit-code -- docs/architecture/source-survey/step-f-confirmed.csv docs/architecture/source-survey/step-f-systems.csv
+
+      # The role-content survey (W-54): its tests; the role map must be exactly what the committed
+      # counts produce, and the broad layer's committed files must pass their form check (no advert
+      # text, title, address, email or phone number). Reading and measuring run only on the user's
+      # machine.
+      - name: Role survey
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: .
+        run: |
+          ruff check tools/survey/roles.py tools/survey/test_roles.py tools/survey/adverts.py tools/survey/test_adverts.py
+          python -m pytest tools/survey/test_roles.py tools/survey/test_adverts.py -q -p no:cacheprovider
+          python tools/survey/roles.py build
+          git diff --exit-code -- docs/architecture/role-survey/role-map.csv
+          python tools/survey/adverts.py check
 
       # The committed lock files must be exactly what scripts/lock.sh produces from the .in files.
       - name: Lock files are up to date
