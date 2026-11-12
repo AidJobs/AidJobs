@@ -2322,7 +2322,7 @@ def test_two_counting_runs_less_than_24_hours_apart_expire_nothing(db):
     assert _lifecycle_states()["Programme Officer 4"] == ("active", False, False)
 
 
-def _zero_jobs(src, run):
+async def _zero_jobs(src, run):
     return {"status": "ok", "message": "Found 0 jobs", "listing": COMPLETE, "valid": 0,
             "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0}}
 
@@ -2583,6 +2583,18 @@ def test_the_preview_counts_the_descriptions_the_daily_pass_drops(db):
     previewed = _sql(expiry_preview.DESCRIPTIONS_SQL)[0][0]
     outcome = _orch()._daily_pass_once()
     assert previewed == outcome["descriptions_dropped"] == 3, "5 (still active), 7 and 9"
+
+
+def test_an_active_job_is_judged_on_its_deadline_alone_for_the_description_drop(db):
+    from tests.test_expiry import expiry_preview
+
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _sql("UPDATE jobs SET description = 'The full advert', deadline = CURRENT_DATE - 2,"
+         " expired_at = NOW() - interval '200 days'")
+    assert _sql(expiry_preview.DESCRIPTIONS_SQL)[0][0] == 0
+    assert _orch()._daily_pass_once() == {"expired": 1, "descriptions_dropped": 0, "left": 0}
+    assert _job_fields("Programme Officer 1") == ("expired", True, False, True)
 
 
 def test_the_daily_pass_skips_a_row_a_crawl_holds_and_finishes_it_on_the_next_round(db):

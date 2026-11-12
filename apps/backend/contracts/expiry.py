@@ -55,10 +55,11 @@ DEADLINE_WHERE = "status = 'active' AND deadline IS NOT NULL AND deadline < CURR
 CLOSED_DAY = "LEAST(deadline, expired_at::date)"
 
 # A closed job: expired, or due to expire by its deadline (the pass expires those first, so the
-# preview, run before the pass, counts the same rows).
+# preview, run before the pass, counts the same rows; for those only the deadline is read).
 DESCRIPTION_WHERE = (
-    f"description IS NOT NULL AND (status = 'expired' OR ({DEADLINE_WHERE}))"
-    f" AND {CLOSED_DAY} <= CURRENT_DATE - {DESCRIPTION_DAYS}"
+    f"description IS NOT NULL AND ("
+    f"(status = 'expired' AND {CLOSED_DAY} <= CURRENT_DATE - {DESCRIPTION_DAYS})"
+    f" OR ({DEADLINE_WHERE} AND deadline <= CURRENT_DATE - {DESCRIPTION_DAYS}))"
 )
 
 # The daily pass skips rows a crawl's open transaction holds, so it never waits on a crawl and
@@ -74,8 +75,7 @@ DROP_DESCRIPTIONS_SQL = f"""
 """
 
 PASS_LEFT_SQL = f"""
-    SELECT (SELECT COUNT(*) FROM jobs WHERE {DEADLINE_WHERE})
-         + (SELECT COUNT(*) FROM jobs WHERE {DESCRIPTION_WHERE})
+    SELECT COUNT(*) FROM jobs WHERE ({DEADLINE_WHERE}) OR ({DESCRIPTION_WHERE})
 """
 
 # An expired job seen again. Expired by absence (its deadline before this reading had not

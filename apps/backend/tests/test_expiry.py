@@ -97,9 +97,10 @@ def test_deadline_expiry_covers_every_row_hidden_or_not():
 
 def test_a_description_is_dropped_90_days_after_its_job_closed():
     assert expiry.DESCRIPTION_WHERE == (
-        "description IS NOT NULL AND (status = 'expired' OR (status = 'active'"
-        " AND deadline IS NOT NULL AND deadline < CURRENT_DATE))"
-        " AND LEAST(deadline, expired_at::date) <= CURRENT_DATE - 90"
+        "description IS NOT NULL AND ("
+        "(status = 'expired' AND LEAST(deadline, expired_at::date) <= CURRENT_DATE - 90)"
+        " OR (status = 'active' AND deadline IS NOT NULL AND deadline < CURRENT_DATE"
+        " AND deadline <= CURRENT_DATE - 90))"
     )
     assert "SET description = NULL" in expiry.DROP_DESCRIPTIONS_SQL
 
