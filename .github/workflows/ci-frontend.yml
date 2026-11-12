@@ -1,0 +1,86 @@
+name: CI frontend
+
+# Runs only when something it checks changes, to stay within GitHub's free Actions minutes
+# (decided by the user, 11 November 2026). Branch work is checked through its pull request;
+# pushes run only on main, after a merge. The secret scan runs on every push (secrets.yml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/frontend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.cursor/hooks/**'
+      - '.cursor/hooks.json'
+      - 'scripts/**'
+      - '.github/scripts/**'
+      - '.github/audit-exceptions.json'
+      - '.github/workflows/ci-frontend.yml'
+  pull_request:
+    paths:
+      - 'apps/frontend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.cursor/hooks/**'
+      - '.cursor/hooks.json'
+      - 'scripts/**'
+      - '.github/scripts/**'
+      - '.github/audit-exceptions.json'
+      - '.github/workflows/ci-frontend.yml'
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the run it replaces; runs on main are kept.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      # Next.js 16's build no longer lints. The ceiling is the reviewed baseline (progress ledger, W-47);
+      # more warnings fail the job, and it only goes down.
+      - name: Frontend lint
+        run: npm run lint --workspace=@aidjobs/frontend -- --max-warnings 37
+
+      - name: Frontend tests
+        run: npm run test --workspace=@aidjobs/frontend
+
+      # Security plan, stage 5: the agent secret guard, its registration in .cursor/hooks.json,
+      # and the settings checker. An edit that unhooks or weakens the guard fails here.
+      - name: Secret guard tests
+        if: ${{ !cancelled() }}
+        run: node --test .cursor/hooks/secret-guard.test.mjs scripts/env_check.test.mjs
+
+      # Security plan, stage 3A, part 3: each high or critical advisory in a runtime package fails,
+      # unless .github/audit-exceptions.json accepts it. A missing or broken audit also fails.
+      - name: Dependency audit gate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python3 .github/scripts/audit_gate.py npm --output audit/npm-audit-runtime.json
+
+      # Report only: development tools are cleaned up in a later step, and Dependabot alerts on them.
+      - name: Development tools audit (report only)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: mkdir -p audit && (npm audit --json > audit/npm-audit-full.json || true)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: frontend-dependency-audit
+          path: audit/
