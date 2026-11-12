@@ -246,9 +246,9 @@ export function initialState(today: number): State {
     jobs: sampleJobs(today),
     formats: allFormats(),
     inbox: sampleInbox(today),
-    // The Communications Intern was scheduled free this month and taken back to a draft, so one of the month's two free jobs stays used; the MEAL Coordinator used last month's, the Livelihoods Officer one in the month it went live.
+    // A free job went live this month and was later deleted, so one of the month's two free jobs stays used; the MEAL Coordinator used last month's, the Livelihoods Officer one in the month it went live.
     freeUses: [
-      { jobId: 'job-comms', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) },
+      { jobId: 'job-deleted-sample', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) },
       { jobId: 'job-meal', month: monthOf(lastMonth(today), orgZone(SAMPLE_ORG).zone) },
       { jobId: 'job-liv', month: monthOf(today - 55 * DAY, orgZone(SAMPLE_ORG).zone) },
     ],

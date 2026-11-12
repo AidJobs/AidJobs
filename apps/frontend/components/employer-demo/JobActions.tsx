@@ -3,6 +3,7 @@
 import { MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
+import Tip from '@/components/site/Tip';
 import { backToDraft, canDelete, closeJob, declineTell, deleteJob, involved, publishNow, reschedule, rescheduleBlock, tellInvited, type Tell } from './actions';
 import { changeSummary, tellOffer } from './changes';
 import { addDays, isoDay, longDate } from './engine';
@@ -29,9 +30,11 @@ export function JobMenu({ job, actions }: { job: DemoJob; actions: MenuAction[] 
   if (!phone) return <MenuButton label={label} trigger={<MoreHorizontal size={15} strokeWidth={1.8} />} actions={actions} />;
   return (
     <>
-      <button type="button" className="aj-icon-btn" aria-label={label} aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        <MoreHorizontal size={15} strokeWidth={1.8} />
-      </button>
+      <Tip label={label}>
+        <button type="button" className="aj-icon-btn" aria-label={label} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+          <MoreHorizontal size={15} strokeWidth={1.8} />
+        </button>
+      </Tip>
       {open && (
         <Dialog title={job.facts.title || 'Untitled job'} subtitle="Actions" onClose={() => setOpen(false)} half>
           <div className="flex flex-col gap-1">
@@ -119,6 +122,7 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
           <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
             <li>Receipts and invoices, which the law requires.</li>
             {freeMonth && hasFreeUse(s, job.id) && <li>The free job it used still counts for {monthName(freeMonth)}.</li>}
+            {!freeMonth && job.status === 'scheduled' && job.plan === 'free' && job.scheduledFor && <li>Nothing else: the free job it held in {monthName(job.scheduledFor.slice(0, 7))} is given back.</li>}
             <li>One line in your organisation&apos;s activity log: who deleted it, and when. Never public.</li>
             {published && <li>Links already shared open a page saying &ldquo;This vacancy is no longer available&rdquo;.</li>}
           </ul>
@@ -272,14 +276,13 @@ export function RescheduleDialog({ job, s, onClose }: { job: DemoJob; s: State; 
 /** A scheduled job back to a draft: nothing goes live, nothing is lost. */
 export function BackToDraftDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
   const waiting = waitingFor(job);
-  const counted = s.freeUses.find((u) => u.jobId === job.id)?.month;
   return (
     <Dialog title="Back to a draft?" subtitle={job.facts.title} onClose={onClose} half footer={<Footer onClose={onClose} label="Back to a draft" run={() => backToDraft(job.id) && onClose()} />}>
       <div className="flex flex-col gap-2">
         <p style={{ margin: 0 }}>It will not go live on {job.scheduledFor ? longDate(job.scheduledFor) : 'its date'}. You can edit it and publish it again at any time.</p>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} stay prepared, unsent.</span>}
         {job.payRequest && <span className="aj-muted">The request to {job.payRequest.name} to pay {job.payRequest.amount} is cancelled.</span>}
-        <span className="aj-muted">{job.plan === 'amplify' ? 'It stays paid for: publishing it again costs nothing.' : `The free job it counted stays counted${counted ? ` for ${monthName(counted)}` : ''}.`}</span>
+        <span className="aj-muted">{job.plan === 'amplify' ? 'It stays paid for: publishing it again costs nothing.' : `The free job it held${job.scheduledFor ? ` in ${monthName(job.scheduledFor.slice(0, 7))}` : ''} is given back: a free job is used only when it goes live.`}</span>
       </div>
     </Dialog>
   );

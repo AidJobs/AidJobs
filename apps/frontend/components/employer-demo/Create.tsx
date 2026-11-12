@@ -212,19 +212,25 @@ export default function Create({ id }: { id?: string }) {
         {phone ? (
           <span className="ml-auto flex shrink-0 items-center gap-1">
             {!menu && (
-              <button type="button" className="aj-icon-btn" onClick={() => setSheet('outline')} aria-label="JD outline">
-                <ListTree size={15} strokeWidth={1.8} />
-              </button>
+              <Tip label="JD outline" side="bottom">
+                <button type="button" className="aj-icon-btn" onClick={() => setSheet('outline')} aria-label="JD outline">
+                  <ListTree size={15} strokeWidth={1.8} />
+                </button>
+              </Tip>
             )}
-            <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('review')} aria-label={reviewBadge ? `Review, ${reviewBadge} waiting` : 'Review'}>
-              <UserCheck size={15} strokeWidth={1.8} />
-              {reviewBadge ? <span className="ej-rail-badge">{reviewBadge}</span> : null}
-            </button>
-            {!reviewing && (
-              <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('chat')} aria-label={waiting ? 'Chat, 1 question waiting' : 'Chat'}>
-                <MessagesSquare size={15} strokeWidth={1.8} />
-                {waiting ? <span className="ej-rail-badge">1</span> : null}
+            <Tip label={reviewBadge ? `Review, ${reviewBadge} waiting` : 'Review'} side="bottom">
+              <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('review')} aria-label={reviewBadge ? `Review, ${reviewBadge} waiting` : 'Review'}>
+                <UserCheck size={15} strokeWidth={1.8} />
+                {reviewBadge ? <span className="ej-rail-badge">{reviewBadge}</span> : null}
               </button>
+            </Tip>
+            {!reviewing && (
+              <Tip label={waiting ? 'Chat, 1 question waiting' : 'Chat'} side="bottom">
+                <button type="button" className="aj-icon-btn relative" onClick={() => setSheet('chat')} aria-label={waiting ? 'Chat, 1 question waiting' : 'Chat'}>
+                  <MessagesSquare size={15} strokeWidth={1.8} />
+                  {waiting ? <span className="ej-rail-badge">1</span> : null}
+                </button>
+              </Tip>
             )}
             {actions}
           </span>

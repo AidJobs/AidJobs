@@ -3,7 +3,7 @@
 import { Receipt as ReceiptIcon } from 'lucide-react';
 import { useState } from 'react';
 import { buy, cancelSubscription, resumeSubscription } from './actions';
-import { currentMonth, EXTRA_JOB, FREE_PER_MONTH, freeLeft, monthName, ONE_JOB, packageOf, PACKAGES, resetText, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { currentMonth, EXTRA_JOB, FREE_PER_MONTH, freeHolds, freeLeft, monthName, ONE_JOB, packageOf, PACKAGES, resetText, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
 import { daysUntil, longDate } from './engine';
 import { Checkout, FreeTerms } from './Pricing';
 import { notify, useDemo } from './store';
@@ -16,6 +16,7 @@ export default function Billing() {
   const month = currentMonth(s);
   const left = freeLeft(s, month);
   const used = s.freeUses.filter((u) => u.month === month).map((u) => (s.jobs.find((j) => j.id === u.jobId) ?? s.deleted?.find((d) => d.job.id === u.jobId)?.job)?.facts.title || 'a deleted job');
+  const held = freeHolds(s, month).map((j) => `${j.facts.title || 'Untitled job'} (goes live on ${longDate(j.scheduledFor ?? '')})`);
   const sub = s.subscription;
   const packs = s.packs.filter((p) => p.left > 0);
   const soon = (ends: string) => {
@@ -40,6 +41,7 @@ export default function Billing() {
           </div>
           <span className="aj-muted">Resets on {resetText(s)}.</span>
           {used.length > 0 && <span className="aj-muted">Used this month: {used.join(', ')}.</span>}
+          {held.length > 0 && <span className="aj-muted">Held, used on the day it goes live: {held.join(', ')}. Taken back to a draft, its place is given back.</span>}
           <FreeTerms s={s} />
         </div>
       </Section>

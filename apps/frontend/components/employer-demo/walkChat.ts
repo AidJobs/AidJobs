@@ -235,7 +235,7 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
     }
     case 'publish': {
       const free = job.choice !== 'amplify';
-      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ` A free job is used when it is published or scheduled.` : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
+      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ` A free job is used when it goes live; scheduled, it holds its month's place until then.` : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
     }
     case 'live':
       return [{ ...stepMsg(job.status === 'scheduled' ? `Scheduled for ${longDate(job.scheduledFor ?? '')}. It goes live that day${job.plan === 'amplify' ? ', and Reach sends then' : ''}.` : `It's live on AidJobs.${job.plan === 'amplify' ? '' : ' Visitors can share it from the job page.'} A copy can now be downloaded.`, key), card: 'live' }];

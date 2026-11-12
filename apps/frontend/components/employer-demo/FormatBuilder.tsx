@@ -129,9 +129,11 @@ export default function CreateFormatDialog({
                 return (
                   <>
                     <input style={{ ...inputStyle, minHeight: 32, padding: '4px 10px' }} value={o.heading} onChange={(e) => setOrder(order.map((x, n) => (n === i ? { ...x, heading: e.target.value } : x)))} aria-label={`Heading ${i + 1}`} />
-                    <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => toggle(o.key)} aria-label={`Remove ${o.heading}`}>
-                      <X size={13} strokeWidth={2} />
-                    </button>
+                    <Tip label={`Remove ${o.heading}`}>
+                      <button type="button" className="aj-icon-btn shrink-0" style={{ width: 28, height: 28 }} onClick={() => toggle(o.key)} aria-label={`Remove ${o.heading}`}>
+                        <X size={13} strokeWidth={2} />
+                      </button>
+                    </Tip>
                   </>
                 );
               }}

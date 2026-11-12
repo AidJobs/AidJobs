@@ -128,8 +128,17 @@ export function monthFor(s: State, schedule: string | null): string {
   return schedule ? schedule.slice(0, 7) : currentMonth(s);
 }
 
+/**
+ * Free jobs held for a month (the user, 12 November 2026): a free job scheduled for that month holds a place, so the month is never
+ * overbooked, but is used only on the day it goes live. Taken back to a draft, deleted, withdrawn, or amplified, it holds nothing.
+ */
+export function freeHolds(s: State, month: string): DemoJob[] {
+  return s.jobs.filter((j) => j.status === 'scheduled' && j.plan === 'free' && j.scheduledFor?.slice(0, 7) === month && !s.freeUses.some((u) => u.jobId === j.id && u.month === month));
+}
+
+/** The month's free jobs taken: used (gone live) and held (scheduled). */
 export function freeUsed(s: State, month: string): number {
-  return s.freeUses.filter((u) => u.month === month).length;
+  return s.freeUses.filter((u) => u.month === month).length + freeHolds(s, month).length;
 }
 
 export function freeLeft(s: State, month = currentMonth(s)): number {
@@ -140,9 +149,9 @@ export function hasFreeUse(s: State, jobId: string): boolean {
   return s.freeUses.some((u) => u.jobId === jobId);
 }
 
-/** Whether the job already counts against `month`'s free jobs: published or scheduled for that month. */
+/** Whether the job already takes one of `month`'s free jobs: it went live that month, or it is scheduled free for it. */
 export function countedFor(s: State, jobId: string, month: string): boolean {
-  return s.freeUses.some((u) => u.jobId === jobId && u.month === month);
+  return s.freeUses.some((u) => u.jobId === jobId && u.month === month) || freeHolds(s, month).some((j) => j.id === jobId);
 }
 
 /**

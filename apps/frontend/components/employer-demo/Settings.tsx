@@ -505,9 +505,11 @@ export function Team() {
             </select>
             </Tip>
             {p.id !== s.me.id && (
-              <button type="button" className="aj-icon-btn" onClick={() => removeMember(p.id)} aria-label={`Remove ${p.name}`}>
-                <Trash2 size={14} strokeWidth={1.8} />
-              </button>
+              <Tip label={`Remove ${p.name}`}>
+                <button type="button" className="aj-icon-btn" onClick={() => removeMember(p.id)} aria-label={`Remove ${p.name}`}>
+                  <Trash2 size={14} strokeWidth={1.8} />
+                </button>
+              </Tip>
             )}
           </li>
         ))}
@@ -671,9 +673,11 @@ export function Styles() {
                         Duplicate
                       </button>
                       {f.family === 'Your organisation' && f.key !== 'house' && (
-                        <button type="button" className="aj-icon-btn" onClick={() => update((x) => ({ ...x, formats: x.formats.filter((y) => y.key !== f.key) }))} aria-label={`Delete ${f.label}`}>
-                          <Trash2 size={14} strokeWidth={1.8} />
-                        </button>
+                        <Tip label={`Delete ${f.label}`}>
+                          <button type="button" className="aj-icon-btn" onClick={() => update((x) => ({ ...x, formats: x.formats.filter((y) => y.key !== f.key) }))} aria-label={`Delete ${f.label}`}>
+                            <Trash2 size={14} strokeWidth={1.8} />
+                          </button>
+                        </Tip>
                       )}
                     </div>
                   </li>

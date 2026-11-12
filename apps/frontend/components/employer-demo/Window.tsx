@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
@@ -40,7 +40,7 @@ import Structure, { Commitments } from './Structure';
 import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
-import { Dialog, radioKeys } from './ui';
+import { Dialog, radioKeys, scrollInside } from './ui';
 
 /** Requests the window answers itself; everything else goes to the writer. */
 const PREVIEW = /^(please\s+)?((show|open|see)( me)?( the)?( job page)? preview|preview( it)?|how (will|does) it look)\b/;
@@ -85,7 +85,7 @@ function save(key: string, v: number) {
 }
 
 function scrollToId(id: string) {
-  requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
+  requestAnimationFrame(() => scrollInside(document.getElementById(id)));
 }
 
 /** A message as one plain line, for the phone's slim question line. */
@@ -95,20 +95,23 @@ function plain(text: string): string {
 
 function PartButton({ part, current, onGo }: { part: Part; current: boolean; onGo: (k: string) => void }) {
   const state = current ? 'current' : part.done ? 'done' : 'todo';
-  const button = (
-    <button type="button" className="ej-line-part" data-state={state} aria-current={current ? 'step' : undefined} onClick={() => onGo(part.key)}>
-      <span className="ej-line-label">{part.label}</span>
-      <span className="sr-only">{part.done ? ', done' : ', to do'}</span>
-    </button>
+  return (
+    <Tip label={`${part.label} · ${current ? 'in view' : part.done ? 'done' : 'to do'}`} side="bottom">
+      <button type="button" className="ej-line-part" data-state={state} aria-current={current ? 'step' : undefined} onClick={() => onGo(part.key)}>
+        <span className="ej-pline-dot" aria-hidden />
+        <span className="ej-line-label">{part.label}</span>
+        <span className="sr-only">{part.done ? ', done' : ', to do'}</span>
+      </button>
+    </Tip>
   );
-  return part.label.length < 22 ? button : <Tip label={part.label} side="bottom">{button}</Tip>;
 }
 
 /**
- * The progress line, in the header row: every part of the job, current, done, or to do, starting with the template's name. Whatever
- * does not fit goes into "+N", so nothing is out of sight; the part in view always stays on the line.
+ * The progress line at the top of the panel (the user, 12 November 2026): a thin line with a small dot for every part of the job,
+ * current, done, or to do, starting with the template's name, each with its tooltip. Whatever does not fit goes into "+N", so nothing
+ * is out of sight; the part in view always stays on the line.
  */
-function HeaderLine({ parts, current, onGo }: { parts: Part[]; current: string; onGo: (k: string) => void }) {
+function PanelLine({ parts, current, onGo }: { parts: Part[]; current: string; onGo: (k: string) => void }) {
   const row = useRef<HTMLDivElement>(null);
   const measure = useRef<HTMLOListElement>(null);
   const [fit, setFit] = useState(parts.length);
@@ -129,6 +132,7 @@ function HeaderLine({ parts, current, onGo }: { parts: Part[]; current: string; 
         {parts.map((p) => (
           <li key={p.key}>
             <span className="ej-line-part">
+              <span className="ej-pline-dot" />
               <span className="ej-line-label">{p.label}</span>
             </span>
           </li>
@@ -234,7 +238,7 @@ function FactRows({ job, s, onFact }: { job: DemoJob; s: State; onFact: (k: RowK
             onClick={() => {
               if (r.key !== 'title') return onFact(r.key);
               const el = document.getElementById('ej-title-edit');
-              el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+              scrollInside(el, 'center');
               el?.focus();
             }}
           >
@@ -493,7 +497,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open 
   const firstUser = job.chat.findIndex((m) => m.from === 'user');
   const shown = reading ? job.chat.slice(0, firstUser + 1) : job.chat;
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'end' });
+    scrollInside(end.current, 'end', false);
   }, [shown.length, thinking, waiting?.silent]);
   const reviewing = Boolean(s.reviewerAs);
   const lastUser = shown.map((m) => m.from).lastIndexOf('user');
@@ -662,7 +666,7 @@ function JobWindow({ id }: { id: string }) {
   const [pick, setPick] = useState<Pick | null>(null);
   const [chatW, setChatW] = useState(() => readNumber(SPLIT_KEY, 400));
   const [dragging, setDragging] = useState(false);
-  const [body, setBody] = useState({ w: 0, h: 0 });
+  const [body, setBody] = useState({ w: 0, h: 0, left: 220, top: 120 });
   const bodyRef = useRef<HTMLDivElement>(null);
   const changeKey = job?.lastChange?.keys.length ? `${job.versions.length}:${job.lastChange.keys.join()}` : '';
   const lastMsg = job?.chat[job.chat.length - 1];
@@ -714,7 +718,10 @@ function JobWindow({ id }: { id: string }) {
   useEffect(() => {
     const el = bodyRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const watch = new ResizeObserver(() => setBody({ w: el.clientWidth, h: el.clientHeight }));
+    const watch = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setBody({ w: el.clientWidth, h: el.clientHeight, left: r.left, top: r.top });
+    });
     watch.observe(el);
     return () => watch.disconnect();
   }, [phone]);
@@ -863,8 +870,12 @@ function JobWindow({ id }: { id: string }) {
       const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)));
       if (wasSetup) applyTemplate(job.id, key, undefined, pick.order.map((o) => o.key));
       else applyFormat(job.id, key);
-    } else if (wasSetup) applyTemplate(job.id, pick.key);
-    else applyFormat(job.id, pick.key);
+    } else {
+      // The template as adjusted in the panel: its sections, their order, and any heading renamed for this job.
+      if (wasSetup) applyTemplate(job.id, pick.key, undefined, pick.order.map((o) => o.key));
+      else if (pick.key !== job.format) applyFormat(job.id, pick.key);
+      applyOutline(job.id, pick.order);
+    }
     setPick(null);
     if (phone) setView(wasSetup ? 'chat' : 'job');
   };
@@ -1201,7 +1212,7 @@ function JobWindow({ id }: { id: string }) {
       <div className="ej-w-head">
         {back}
         {titleBox}
-        <HeaderLine parts={parts} current={current} onGo={goPart} />
+        <span className="min-w-0 flex-1" />
         {tools}
         <Tip label="The workspace before this round, kept until this window has everything" side="bottom">
           <button type="button" className="aj-text-btn shrink-0" style={{ height: 30 }} onClick={() => go('create', job.id)}>
@@ -1236,6 +1247,9 @@ function JobWindow({ id }: { id: string }) {
           }}
         />
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="The job">
+          <div className="ej-pline">
+            <PanelLine parts={parts} current={current} onGo={goPart} />
+          </div>
           {tabs.length > 1 && (
             <div className="shrink-0 border-b aj-hair">
               <PanelTabs tabs={tabs} active={active} onPick={setTab} />
@@ -1251,8 +1265,7 @@ function JobWindow({ id }: { id: string }) {
             setPick={setPick}
             onApply={applyPick}
             onClose={() => setPick(null)}
-            bounds={{ w: body.w || 1200, h: body.h || 700 }}
-            start={{ x: 12, y: Math.round((body.h || 700) * 0.24), w: Math.min(460, Math.max(340, chatW - 24)), h: Math.round((body.h || 700) * 0.76) - 12 }}
+            start={{ x: body.left + 12, y: Math.round(body.top + (body.h || 700) * 0.08), w: Math.min(520, Math.max(360, chatW - 24)), h: Math.round((body.h || 700) * 0.88) - 12 }}
           />
         )}
       </div>

@@ -938,6 +938,7 @@ button.ej-step:hover {
   width: max-content;
   min-width: 220px;
   max-width: min(320px, 100%);
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--hair);
@@ -946,9 +947,13 @@ button.ej-step:hover {
   box-shadow: 0 14px 36px rgba(20, 30, 20, 0.14);
 }
 
-.ej-menu[data-align='right'] {
+/* A menu opened from a button anywhere: fixed to the screen, so a scrolling or clipped box around it never cuts its text. */
+.ej-menu[data-fixed] {
+  position: fixed;
+  top: auto;
   left: auto;
-  right: 0;
+  z-index: 80;
+  min-width: 200px;
 }
 
 .aj-root .ej-menu-item[data-danger='true'] {
@@ -1030,6 +1035,8 @@ button.ej-step:hover {
   color: var(--text);
   font-size: 13px;
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -1743,6 +1750,101 @@ button.ej-step:hover {
   font-size: 12px;
 }
 
+/* The progress line at the top of the panel (the user, 12 November 2026): a thin line with small dots and small labels, each a link. */
+.ej-pline {
+  flex-shrink: 0;
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.ej-pline .ej-line {
+  position: relative;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.ej-pline .ej-line:not(.ej-measure)::before {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  left: 10px;
+  height: 1px;
+  background: var(--hair-strong, var(--hair));
+  content: '';
+}
+
+.aj-root .ej-pline .ej-line-part {
+  position: relative;
+  max-width: 104px;
+  height: auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 2px;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.aj-root .ej-pline .ej-line-part:hover,
+.aj-root .ej-pline .ej-line-part[aria-current] {
+  background: transparent;
+}
+
+.aj-root .ej-pline .ej-line-part:hover .ej-line-label {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.aj-root .ej-pline .ej-line-part:focus-visible {
+  outline: 2px solid var(--sage-6);
+  outline-offset: 1px;
+}
+
+.ej-pline-dot {
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  margin-top: 3px;
+  border: 1.5px solid var(--text-3);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+[data-state='done'] > .ej-pline-dot {
+  border-color: var(--sage-6);
+  background: var(--sage-6);
+}
+
+[aria-current] > .ej-pline-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 2px;
+  border-color: var(--sage-7);
+  background: var(--sage-7);
+  box-shadow: 0 0 0 3px var(--sage-2);
+}
+
+.aj-root .ej-pline .ej-line-part[aria-current] .ej-line-label {
+  color: var(--sage-8);
+  font-weight: 650;
+}
+
+.ej-pline .ej-line-label {
+  max-width: 96px;
+  white-space: nowrap;
+}
+
+.aj-root .ej-pline .ej-line-more {
+  height: 22px;
+  margin-top: -2px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
 /* On phones the line is a short list in a sheet. */
 .ej-line-list {
   display: flex;
@@ -1908,8 +2010,8 @@ button.ej-step:hover {
 
 /* The template panel on wider screens: it floats over the chat column and is moved by its title bar. */
 .ej-float {
-  position: absolute;
-  z-index: 30;
+  position: fixed;
+  z-index: 60;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1949,12 +2051,47 @@ button.ej-step:hover {
 /* "This is a job · fixed-term · for one post now": each word opens its choices; one AidJobs could not read is amber. */
 .ej-type-sentence {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px 6px;
+  gap: 4px;
   margin: 0;
+  overflow-x: auto;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.ej-type-sentence::-webkit-scrollbar {
+  display: none;
+}
+
+.ej-type-sentence > * {
+  flex-shrink: 0;
+}
+
+.aj-root .ej-type-sentence .ej-word {
+  height: 24px;
+  padding: 0 5px;
+}
+
+/* The template panel is resized from its corner: dragged, or with the arrow keys on the handle. */
+.aj-root .ej-float-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: linear-gradient(135deg, transparent 50%, var(--text-3) 50%, var(--text-3) 58%, transparent 58%, transparent 70%, var(--text-3) 70%, var(--text-3) 78%, transparent 78%);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.aj-root .ej-float-resize:focus-visible {
+  outline: 2px solid var(--sage-6);
 }
 
 .aj-root .ej-word {

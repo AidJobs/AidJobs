@@ -472,6 +472,32 @@ export function renameSection(id: string, key: string, heading: string) {
   updateJob(id, (j) => (j.tags.includes(key) ? { ...touched(j), renamed: { ...j.renamed, [key]: heading }, sections: j.sections.map((x) => (x.key === key ? { ...x, title: heading } : x)) } : j));
 }
 
+/** A section's heading as the job shows it: its own, a rename for this job, or the template's. */
+export function headingOf(s: State, j: DemoJob, key: string): string {
+  return j.sections.find((x) => x.key === key)?.title ?? j.renamed?.[key] ?? headingFor(key, formatOf(s, j.format));
+}
+
+/**
+ * The job's outline as edited in the template panel (the user, 12 November 2026: any template can be adjusted, as in the earlier
+ * outline editor): sections added, removed, put in order within their groups, and renamed for this job. Text already written is kept
+ * where its section stays.
+ */
+export function applyOutline(id: string, order: Format['order']) {
+  if (!ownerOnly()) return;
+  const job = () => getState().jobs.find((x) => x.id === id);
+  const start = job();
+  if (!start) return;
+  const want = order.map((o) => o.key);
+  for (const k of start.tags) if (!want.includes(k) && (job()?.tags.length ?? 0) > 1) toggleSection(id, k);
+  for (const k of want) if (!job()?.tags.includes(k)) toggleSection(id, k);
+  reorderSections(id, want.filter((k) => job()?.tags.includes(k)));
+  for (const o of order) {
+    const j = job();
+    const heading = o.heading.trim();
+    if (j && heading && heading !== headingOf(getState(), j, o.key)) renameSection(id, o.key, heading);
+  }
+}
+
 /**
  * Sections written by the AI chat: kept when the facts change, with a version, and shown as the last change with its undo. With no
  * draft yet, the other sections are written by the rules so the job description is whole.
@@ -1493,12 +1519,20 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   return key;
 }
 /**
- * A free job is used only when it is published or scheduled, against the month it goes live in (section 19, 8 November 2026): writing,
- * sending for review, and exploring are free. One counted in an earlier month stays used there and does not carry over.
+ * A free job is used only when it goes live, against the month it goes live in (section 19, 8 November 2026, and the user, 12 November
+ * 2026): writing, sending for review, and scheduling are free; a scheduled one only holds its month's place. One used in an earlier
+ * month stays used there and does not carry over.
  */
 function useFree(s: State, id: string, month = currentMonth(s)): State {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || j.plan === 'amplify' || countedFor(s, id, month) || freeLeft(s, month) === 0) return s;
+  return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
+}
+
+/** A scheduled free job going live now: its hold becomes a use, in the month it goes live in. */
+function holdToUse(s: State, id: string, month = currentMonth(s)): State {
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j || j.plan !== 'free' || s.freeUses.some((u) => u.jobId === id && u.month === month)) return s;
   return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
 }
 
@@ -2035,7 +2069,8 @@ export function publish(id: string, o: PublishOptions): boolean {
   let told: string | undefined;
   update((s0) => {
     const prepaid = o.plan === 'amplify' && Boolean(s0.jobs.find((x) => x.id === id)?.paidFor);
-    let s = o.plan === 'free' ? useFree(s0, id, monthFor(s0, o.schedule)) : s0;
+    // A free job scheduled holds its month's place (plans.freeHolds); it is used only when it goes live.
+    let s = o.plan === 'free' && !o.schedule ? useFree(s0, id) : s0;
     if (o.plan === 'amplify' && o.paid === 'onHand' && !prepaid) s = takePaidJob(s);
     const how = o.plan === 'amplify' ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
@@ -2271,7 +2306,8 @@ export function publishNow(id: string): boolean {
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
   const waiting = waitingEmails(j);
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
-  update((st) => {
+  update((st0) => {
+    const st = holdToUse(st0, id);
     const queue = (r: Recipient): Recipient => (r.status === 'waiting' ? { ...r, status: 'queued' } : r);
     return {
       ...st,

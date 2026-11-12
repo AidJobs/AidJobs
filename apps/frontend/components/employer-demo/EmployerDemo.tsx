@@ -212,9 +212,11 @@ export default function EmployerDemo() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
           <span className="lg:hidden">
-            <button type="button" className="aj-icon-btn" onClick={() => setDrawer(true)} aria-label="Open menu">
-              <Menu size={16} strokeWidth={1.8} />
-            </button>
+            <Tip label="Open menu" side="bottom">
+              <button type="button" className="aj-icon-btn" onClick={() => setDrawer(true)} aria-label="Open menu">
+                <Menu size={16} strokeWidth={1.8} />
+              </button>
+            </Tip>
           </span>
           <span className="min-w-0 truncate" style={{ fontWeight: 700 }}>
             {s.org.name}
@@ -235,7 +237,7 @@ export default function EmployerDemo() {
             </button>
           </div>
         )}
-        <main className={full ? 'min-h-0 flex-1' : 'aj-scroll min-h-0 flex-1'}>
+        <main className={route.screen === 'job' ? 'min-h-0 flex-1 overflow-hidden' : full ? 'min-h-0 flex-1' : 'aj-scroll min-h-0 flex-1'}>
           <HeaderSlotContext.Provider value={slot}>{screen}</HeaderSlotContext.Provider>
         </main>
       </div>

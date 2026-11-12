@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Sparkles, Trash2
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
+import Tip from '@/components/site/Tip';
 import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, openWindowAt, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
 import { invitedCount, reachRoom } from './invites';
 import { Checkout } from './Pricing';
@@ -588,9 +589,11 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 pb-5 lg:px-8 lg:pb-8">
       <div className="top-0 z-10 -mx-4 flex flex-col gap-3 px-4 pb-1 pt-4 aj-hair lg:sticky lg:-mx-8 lg:border-b lg:px-8 lg:pb-3 lg:pt-6" style={{ background: 'var(--page)' }}>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
-          <ArrowLeft size={15} strokeWidth={1.8} />
-        </button>
+        <Tip label="Back" side="bottom">
+          <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
+            <ArrowLeft size={15} strokeWidth={1.8} />
+          </button>
+        </Tip>
         <div className="min-w-0 flex-1 basis-[220px]">
           <div className="truncate" style={{ fontWeight: 700, fontSize: 15 }}>
             {job.facts.title}
@@ -670,9 +673,11 @@ function RecentlyDeleted({ s }: { s: State }) {
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-4 py-5 lg:px-8 lg:py-8">
       <div className="flex items-center gap-2">
-        <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
-          <ArrowLeft size={15} strokeWidth={1.8} />
-        </button>
+        <Tip label="Back" side="bottom">
+          <button type="button" className="aj-icon-btn" onClick={() => goBack('jobs')} aria-label="Back">
+            <ArrowLeft size={15} strokeWidth={1.8} />
+          </button>
+        </Tip>
         <h1 className="aj-display aj-h1" style={{ margin: 0 }}>
           Recently deleted
         </h1>

@@ -2,17 +2,21 @@
 
 import { ChevronDown, GripHorizontal, MessagesSquare, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { formatOf, setFacts } from './actions';
+import Tip from '@/components/site/Tip';
+import { applyOutline, createFormat, formatOf, headingOf, setFacts as changeFacts } from './actions';
 import DragList, { moveItem } from './DragList';
 import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, outlineOrder, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
 import MenuButton from './MenuButton';
 import { recommendation, TYPE_REASONS, wordsFor } from './setup';
-import Structure from './Structure';
+import { getState } from './store';
 import type { DemoJob, Format, Recruitment, State } from './types';
 import { inputStyle } from './ui';
 
-/** What the template panel shows: this job's sections (once written), the templates, or one being created. */
-export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order'] };
+/**
+ * What the template panel shows: this job's sections (once written), a template with its sections as adjusted, or one being created.
+ * `from`: the template Create your own started from, or blank.
+ */
+export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order']; from?: string };
 
 /** A template's headings for this job: its own sections and those the job type calls for. */
 export function orderFor(s: State, job: DemoJob, key: string): Format['order'] {
@@ -22,11 +26,28 @@ export function orderFor(s: State, job: DemoJob, key: string): Format['order'] {
 
 export function startPick(s: State, job: DemoJob, tab: Pick['tab']): Pick {
   const key = job.setup ? recommendation(s, job.format).key : job.format;
-  return { tab, key, name: '', order: orderFor(s, job, key) };
+  return { tab, key, name: '', order: orderFor(s, job, key), from: key };
 }
 
-export function previewOrder(s: State, job: DemoJob, pick: Pick): Format['order'] {
-  return pick.tab === 'own' ? pick.order : orderFor(s, job, pick.key);
+/**
+ * The template's sections after the job type changed: unedited, they follow the new type; edited, the sections the old type brought
+ * and the new one does not are taken out, the ones the new type brings are added, and every rename is kept.
+ */
+export function refitPick(s: State, before: DemoJob, after: DemoJob, pick: Pick): Pick {
+  if (pick.tab !== 'templates') return pick;
+  const was = orderFor(s, before, pick.key);
+  const now = orderFor(s, after, pick.key);
+  if (JSON.stringify(pick.order) === JSON.stringify(was)) return { ...pick, order: now };
+  const gone = was.filter((o) => !now.some((n) => n.key === o.key)).map((o) => o.key);
+  const kept = pick.order.filter((o) => !gone.includes(o.key));
+  const added = now.filter((n) => !was.some((o) => o.key === n.key) && !kept.some((o) => o.key === n.key));
+  const all = [...kept, ...added];
+  return { ...pick, order: outlineOrder(all.map((o) => o.key)).map((k) => all.find((o) => o.key === k)!) };
+}
+
+/** The headings the job description shows while choosing: the template's sections as adjusted, or the ones being created. */
+export function previewOrder(_s: State, _job: DemoJob, pick: Pick): Format['order'] {
+  return pick.order;
 }
 
 const RECRUITMENT: Array<{ key: Recruitment; said: string }> = [
@@ -36,8 +57,13 @@ const RECRUITMENT: Array<{ key: Recruitment; said: string }> = [
 ];
 
 /** "This is a job · fixed-term · for one post now": each word opens its choices; a word AidJobs could not read is marked. */
-export function JobTypeSentence({ job, s }: { job: DemoJob; s: State }) {
+export function JobTypeSentence({ job, s, onChanged }: { job: DemoJob; s: State; onChanged?: (after: DemoJob) => void }) {
   const f = job.facts;
+  const setFacts = (id: string, patch: Partial<DemoJob['facts']>) => {
+    changeFacts(id, patch);
+    const after = getState().jobs.find((j) => j.id === id);
+    if (after) onChanged?.(after);
+  };
   const ro = Boolean(s.reviewerAs);
   const engagement = ENGAGEMENTS.find((e) => e.key === f.engagement) ?? ENGAGEMENTS[0];
   const recruitment = RECRUITMENT.find((r) => r.key === f.recruitment) ?? RECRUITMENT[0];
@@ -138,9 +164,11 @@ export function HeadingsEditor({ order, onChange, recommended }: { order: Format
                   <div className="ej-outline-row min-w-0 flex-1">
                     <input className="ej-heading-input" value={order.find((o) => o.key === k)?.heading ?? ''} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
                     <span className="ej-row-tools">
-                      <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${order.find((o) => o.key === k)?.heading ?? k}`}>
-                        <X size={12} strokeWidth={2} />
-                      </button>
+                      <Tip label="Remove this section">
+                        <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${order.find((o) => o.key === k)?.heading ?? k}`}>
+                          <X size={12} strokeWidth={2} />
+                        </button>
+                      </Tip>
                     </span>
                   </div>
                 )}
@@ -149,10 +177,12 @@ export function HeadingsEditor({ order, onChange, recommended }: { order: Format
             {missing.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {missing.map((d) => (
-                  <button key={d.key} type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => onChange([...order, { key: d.key, heading: d.label }])} title={undefined} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
-                    {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
-                    {d.label}
-                  </button>
+                  <Tip key={d.key} label={`${d.hint}${recommended.includes(d.key) ? ' · recommended for this job' : ''}`}>
+                    <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => onChange([...order, { key: d.key, heading: d.label }])} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
+                      {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
+                      {d.label}
+                    </button>
+                  </Tip>
                 ))}
               </div>
             )}
@@ -163,53 +193,113 @@ export function HeadingsEditor({ order, onChange, recommended }: { order: Format
   );
 }
 
+/** "Started from": blank, or any template's sections, for Create your own (the earlier "Create your own JD format" pop-up). */
+function StartFrom({ s, job, value, onPick }: { s: State; job: DemoJob; value: string; onPick: (key: string) => void }) {
+  const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="ej-panel-label">Start from</span>
+      <select className="ej-select" value={value} onChange={(e) => onPick(e.target.value)} aria-label="Start from">
+        <option value="">Blank</option>
+        {FAMILIES_ORDER.map((fam) => {
+          const list = usable.filter((f) => f.family === fam);
+          return list.length ? (
+            <optgroup key={fam} label={fam}>
+              {list.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </optgroup>
+          ) : null;
+        })}
+      </select>
+      <span className="aj-faint" style={{ fontSize: 11.5 }}>
+        {value ? `${orderFor(s, job, value).length} sections from ${formatOf(s, value).label}` : 'No sections yet: add them below'}
+      </span>
+    </label>
+  );
+}
+
 function OwnFields({ job, s, pick, setPick }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void }) {
-  const recommended = recommendSections(formatOf(s, pick.key), job.facts);
+  const recommended = recommendSections(formatOf(s, pick.key || job.format), job.facts);
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="aj-muted">Name</span>
+        <span className="ej-panel-label">Name</span>
         <input style={inputStyle} value={pick.name} onChange={(e) => setPick({ ...pick, name: e.target.value })} placeholder="For example: Riverstone field roles" />
       </label>
-      <span className="aj-faint" style={{ fontSize: 12 }}>
-        Started from {formatOf(s, pick.key).label}. Add, remove, rename, and order the sections; the job description shows them as you go.
+      <StartFrom s={s} job={job} value={pick.from ?? ''} onPick={(key) => setPick({ ...pick, from: key, order: key ? orderFor(s, job, key) : [] })} />
+      <span className="ej-panel-label">Sections, in order</span>
+      <span className="aj-faint" style={{ fontSize: 12, marginTop: -8 }}>
+        Add, remove, rename, and drag the sections; the job description shows them as you go. At least 3.
       </span>
       <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommended} />
     </div>
   );
 }
 
-function Cards({ s, job, pick, setPick }: { s: State; job: DemoJob; pick: Pick; setPick: (p: Pick) => void }) {
+/**
+ * Choosing a template, as in the earlier outline editor (the user, 12 November 2026): the template from a list by family, then its
+ * sections for this job, which can be renamed, removed, added, and put in order before it is used.
+ */
+function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pick: Pick; setPick: (p: Pick) => void }) {
   const rec = recommendation(s, job.format).key;
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
+  const f = formatOf(s, pick.key);
+  const edited = JSON.stringify(pick.order) !== JSON.stringify(orderFor(s, job, pick.key));
   return (
     <div className="flex flex-col gap-3">
-      {FAMILIES_ORDER.map((fam) => {
-        const list = usable.filter((f) => f.family === fam).sort((a, b) => Number(b.key === rec) - Number(a.key === rec));
-        if (!list.length) return null;
-        return (
-          <section key={fam} className="flex flex-col gap-1.5" aria-label={fam}>
-            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              {fam}
-            </span>
-            {list.map((f) => (
-              <button key={f.key} type="button" className="ej-template-card" aria-pressed={pick.key === f.key} onClick={() => setPick({ ...pick, key: f.key, order: orderFor(s, job, f.key) })}>
-                <span className="flex items-center gap-1.5">
-                  <span style={{ fontWeight: 650 }}>{f.label}</span>
-                  {f.key === rec && (
-                    <span className="aj-chip" data-tone="sage" style={{ height: 20 }}>
-                      Recommended
-                    </span>
-                  )}
-                </span>
-                <span className="aj-faint" style={{ fontSize: 12 }}>
-                  {orderFor(s, job, f.key).length} sections · about {wordsFor(orderFor(s, job, f.key).length)} words · {f.usedBy}
-                </span>
-              </button>
-            ))}
-          </section>
-        );
-      })}
+      <label className="flex flex-col gap-1">
+        <span className="ej-panel-label">Template</span>
+        <select className="ej-select" value={pick.key} onChange={(e) => setPick({ ...pick, key: e.target.value, order: orderFor(s, job, e.target.value) })} aria-label="Template">
+          {FAMILIES_ORDER.map((fam) => {
+            const list = usable.filter((x) => x.family === fam).sort((a, b) => Number(b.key === rec) - Number(a.key === rec));
+            return list.length ? (
+              <optgroup key={fam} label={fam}>
+                {list.map((x) => (
+                  <option key={x.key} value={x.key}>
+                    {x.label}
+                    {x.key === rec ? ' (recommended)' : ''}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null;
+          })}
+        </select>
+        <span className="aj-faint" style={{ fontSize: 11.5 }}>
+          {f.usedBy} · {pick.order.length} sections · about {wordsFor(pick.order.length)} words
+        </span>
+      </label>
+      <div className="flex items-center gap-2">
+        <span className="ej-panel-label min-w-0 flex-1">Its sections for this job</span>
+        {edited && (
+          <Tip label={`Back to ${f.label}'s own sections`}>
+            <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setPick({ ...pick, order: orderFor(s, job, pick.key) })}>
+              Reset
+            </button>
+          </Tip>
+        )}
+      </div>
+      <span className="aj-faint" style={{ fontSize: 12, marginTop: -8 }}>
+        Rename, remove, add, and drag the sections before you use it; the job description shows them as you go.
+      </span>
+      <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommendSections(f, job.facts)} />
+    </div>
+  );
+}
+
+/** This job's own sections, edited directly once a template is in use: each change applies at once, text written is kept. */
+function JobOutline({ s, job }: { s: State; job: DemoJob }) {
+  const order = job.tags.map((k) => ({ key: k, heading: headingOf(s, job, k) }));
+  const ro = Boolean(s.reviewerAs);
+  if (ro) return <HeadingsPreview order={order} title={formatOf(s, job.format).label} note="Read only for reviewers" />;
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="aj-faint" style={{ fontSize: 12 }}>
+        Rename, remove, add, and drag this job&apos;s sections; each change applies at once, and text already written is kept where its section stays.
+      </span>
+      <HeadingsEditor order={order} onChange={(next) => applyOutline(job.id, next)} recommended={recommendSections(formatOf(s, job.format), job.facts)} />
     </div>
   );
 }
@@ -239,126 +329,182 @@ function PanelTabs({ tabs, pick, setPick }: { tabs: Array<[Pick['tab'], string]>
 export function applyLabel(s: State, job: DemoJob, pick: Pick): { label: string; disabled: boolean } {
   if (pick.tab === 'own') return { label: `Use ${pick.name.trim() || 'this template'}`, disabled: !pick.name.trim() || pick.order.length < 3 };
   const f = formatOf(s, pick.key);
+  if (pick.order.length < 3) return { label: 'Keep at least 3 sections', disabled: true };
   if (job.setup) return { label: `Use ${f.label}`, disabled: false };
-  return { label: pick.key === job.format ? 'This is the template in use' : `Change to ${f.label}`, disabled: pick.key === job.format };
+  const edited = JSON.stringify(pick.order) !== JSON.stringify(orderFor(s, job, pick.key));
+  if (pick.key === job.format) return { label: edited ? 'Use these sections' : 'This is the template in use', disabled: !edited };
+  return { label: `Change to ${f.label}`, disabled: false };
 }
 
 type Box = { x: number; y: number; w: number; h: number };
-const POS_KEY = 'aidjobs.employerDemo.templatePanel';
+const BOX_KEY = 'aidjobs.employerDemo.templatePanelBox';
+const MIN = { w: 340, h: 280 };
 
-function savedPos(): { x: number; y: number } | null {
+function savedBox(): Box | null {
   try {
-    const v = JSON.parse(localStorage.getItem(POS_KEY) ?? 'null');
-    return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null;
+    const v = JSON.parse(localStorage.getItem(BOX_KEY) ?? 'null');
+    return v && [v.x, v.y, v.w, v.h].every(Number.isFinite) ? v : null;
   } catch {
     return null;
   }
 }
 
+function viewport(): { w: number; h: number } {
+  return typeof window === 'undefined' ? { w: 1366, h: 860 } : { w: window.innerWidth, h: window.innerHeight };
+}
+
 /**
- * The template panel on wider screens: it opens over the chat column, so the job description stays in full view, and is moved by its
- * title bar (with the mouse, or the arrow keys on its handle); its place is remembered and kept on screen.
+ * The template panel on wider screens (the user, 12 November 2026): it floats over the whole screen, moved by its title bar (or the
+ * arrow keys on its handle), resized from its corner (dragged, or the arrow keys on that handle), and closed at any time; its place and
+ * size are remembered and kept on screen. Closing it while the first template is chosen leaves the chat's question open.
  */
-export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, bounds, start }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void; onApply: () => void; onClose: () => void; bounds: { w: number; h: number }; start: Box }) {
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => savedPos() ?? { x: start.x, y: start.y });
+export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void; onApply: () => void; onClose: () => void; start: Box }) {
+  const [box, setBox] = useState<Box>(() => savedBox() ?? start);
+  const [view, setView] = useState(viewport);
   const [small, setSmall] = useState(false);
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
-  const w = Math.min(start.w, Math.max(300, bounds.w - 24));
-  const h = Math.min(start.h, Math.max(240, bounds.h - 24));
-  const clamp = (p: { x: number; y: number }) => ({ x: Math.min(Math.max(8, p.x), Math.max(8, bounds.w - w - 8)), y: Math.min(Math.max(8, p.y), Math.max(8, bounds.h - (small ? 48 : 160))) });
-  const at = clamp(pos);
-  const keep = (p: { x: number; y: number }) => {
-    const c = clamp(p);
-    setPos(c);
+  const drag = useRef<{ kind: 'move' | 'size'; dx: number; dy: number } | null>(null);
+  const clamp = (b: Box): Box => {
+    const w = Math.min(Math.max(MIN.w, b.w), view.w - 16);
+    const h = Math.min(Math.max(MIN.h, b.h), view.h - 16);
+    return { w, h, x: Math.min(Math.max(8, b.x), Math.max(8, view.w - w - 8)), y: Math.min(Math.max(8, b.y), Math.max(8, view.h - (small ? 48 : 120))) };
+  };
+  const at = clamp(box);
+  const keep = (b: Box) => {
+    const c = clamp(b);
+    setBox(c);
     try {
-      localStorage.setItem(POS_KEY, JSON.stringify(c));
+      localStorage.setItem(BOX_KEY, JSON.stringify(c));
     } catch {
       /* storage unavailable */
     }
   };
   useEffect(() => {
-    const move = (e: PointerEvent) => drag.current && setPos(clamp({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy }));
+    const resize = () => setView(viewport());
+    const move = (e: PointerEvent) => {
+      const d = drag.current;
+      if (!d) return;
+      setBox((b) => (d.kind === 'move' ? { ...b, x: e.clientX - d.dx, y: e.clientY - d.dy } : { ...b, w: e.clientX - d.dx, h: e.clientY - d.dy }));
+    };
     const up = () => {
       if (!drag.current) return;
       drag.current = null;
-      setPos((p) => {
+      setBox((b) => {
         try {
-          localStorage.setItem(POS_KEY, JSON.stringify(p));
+          localStorage.setItem(BOX_KEY, JSON.stringify(b));
         } catch {
           /* storage unavailable */
         }
-        return p;
+        return b;
       });
     };
+    window.addEventListener('resize', resize);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => {
+      window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
-  });
+  }, []);
   const setup = Boolean(job.setup);
   const ro = Boolean(s.reviewerAs);
   const tabs: Array<[Pick['tab'], string]> = setup ? [['templates', 'Templates'], ['own', 'Create your own']] : [['sections', "This job's sections"], ['templates', 'Templates'], ['own', 'Create your own']];
   const main = applyLabel(s, job, pick);
   const title = setup ? 'Choose a template' : `Template: ${formatOf(s, job.format).label}`;
+  const arrows = (e: ReactKeyboardEvent<HTMLElement>, kind: 'move' | 'size') => {
+    const step = e.shiftKey ? 64 : 24;
+    const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    keep(kind === 'move' ? { ...at, x: at.x + d[0], y: at.y + d[1] } : { ...at, w: at.w + d[0], h: at.h + d[1] });
+  };
   return (
-    <section className="ej-float aj-card" style={{ left: at.x, top: at.y, width: w, height: small ? undefined : h }} aria-label={title}>
+    <section className="ej-float aj-card" style={{ left: at.x, top: at.y, width: at.w, height: small ? undefined : at.h }} aria-label={title}>
       <div
         className="ej-float-bar"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest('button:not(.ej-float-grip)')) return;
-          drag.current = { dx: e.clientX - at.x, dy: e.clientY - at.y };
+          drag.current = { kind: 'move', dx: e.clientX - at.x, dy: e.clientY - at.y };
           e.preventDefault();
         }}
       >
-        <button
-          type="button"
-          className="ej-float-grip"
-          aria-label="Move the template panel with the arrow keys"
-          onKeyDown={(e) => {
-            const step = e.shiftKey ? 64 : 24;
-            const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-            if (!d) return;
-            e.preventDefault();
-            keep({ x: at.x + d[0], y: at.y + d[1] });
-          }}
-        >
-          <GripHorizontal size={14} strokeWidth={1.8} />
-        </button>
+        <Tip label="Drag to move it anywhere; or use the arrow keys" side="bottom">
+          <button type="button" className="ej-float-grip" aria-label="Move the template panel with the arrow keys" onKeyDown={(e) => arrows(e, 'move')}>
+            <GripHorizontal size={14} strokeWidth={1.8} />
+          </button>
+        </Tip>
         <span className="min-w-0 flex-1 truncate" style={{ fontWeight: 700 }}>
           {title}
         </span>
-        <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setSmall(!small)} aria-label={small ? 'Open the template panel' : 'Fold the template panel'} aria-expanded={!small}>
-          <ChevronDown size={14} strokeWidth={2} style={{ transform: small ? 'rotate(180deg)' : 'none' }} />
-        </button>
-        {!setup && (
+        <Tip label={small ? 'Open it again' : 'Fold it to its title'} side="bottom">
+          <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setSmall(!small)} aria-label={small ? 'Open the template panel' : 'Fold the template panel'} aria-expanded={!small}>
+            <ChevronDown size={14} strokeWidth={2} style={{ transform: small ? 'rotate(180deg)' : 'none' }} />
+          </button>
+        </Tip>
+        <Tip label={setup ? 'Close it; the chat keeps the question open' : 'Close'} side="bottom">
           <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={onClose} aria-label="Close the template panel">
             <X size={14} strokeWidth={1.8} />
           </button>
-        )}
+        </Tip>
       </div>
       {!small && (
         <>
           <div className="shrink-0 px-4 pt-2">
-            <JobTypeSentence job={job} s={s} />
+            <JobTypeSentence job={job} s={s} onChanged={(after) => setPick(refitPick(s, job, after, pick))} />
           </div>
           <div className="shrink-0 border-b aj-hair">
             <PanelTabs tabs={tabs} pick={pick} setPick={setPick} />
           </div>
           <div className="aj-scroll min-h-0 flex-1 px-4 py-3" role="tabpanel" aria-labelledby={`ej-tp-${pick.tab}`}>
-            {pick.tab === 'sections' ? <Structure job={job} s={s} bare hideCommitments /> : pick.tab === 'own' ? <OwnFields job={job} s={s} pick={pick} setPick={setPick} /> : <Cards s={s} job={job} pick={pick} setPick={setPick} />}
+            {pick.tab === 'sections' ? <JobOutline s={s} job={job} /> : pick.tab === 'own' ? <OwnFields job={job} s={s} pick={pick} setPick={setPick} /> : <TemplateFields s={s} job={job} pick={pick} setPick={setPick} />}
           </div>
           {pick.tab !== 'sections' && (
-            <div className="shrink-0 border-t px-4 py-2.5 aj-hair">
+            <div className="flex shrink-0 flex-col gap-1.5 border-t px-4 py-2.5 aj-hair">
               <button type="button" className="aj-ink-btn w-full justify-center" disabled={main.disabled || ro} onClick={onApply}>
                 {main.label}
               </button>
+              {pick.tab === 'templates' && !ro && <SaveAsOurs s={s} pick={pick} />}
             </div>
           )}
+          <button type="button" className="ej-float-resize" aria-label="Resize the template panel: drag, or use the arrow keys" title="Drag to make it bigger or smaller" onKeyDown={(e) => arrows(e, 'size')} onPointerDown={(e) => {
+            drag.current = { kind: 'size', dx: e.clientX - at.w, dy: e.clientY - at.h };
+            e.preventDefault();
+          }} />
         </>
       )}
     </section>
+  );
+}
+
+/** "Save as one of our templates": the sections as adjusted, kept for reuse under Your organisation (offered, never automatic). */
+function SaveAsOurs({ s, pick }: { s: State; pick: Pick }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const taken = s.formats.some((f) => f.label.toLowerCase() === name.trim().toLowerCase());
+  if (!open)
+    return (
+      <Tip label="Keep these sections as one of your organisation's templates, for any job">
+        <button type="button" className="aj-text-btn self-center" style={{ height: 26 }} onClick={() => setOpen(true)}>
+          Save as one of our templates
+        </button>
+      </Tip>
+    );
+  return (
+    <div className="flex items-center gap-1.5">
+      <input style={{ ...inputStyle, minHeight: 32 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Its name" aria-label="Name of the template" autoFocus />
+      <button
+        type="button"
+        className="aj-pill shrink-0"
+        disabled={!name.trim() || taken || pick.order.length < 3}
+        onClick={() => {
+          createFormat(name.trim(), pick.order, formatOf(s, pick.key).tone);
+          setOpen(false);
+          setName('');
+        }}
+      >
+        {taken ? 'Name in use' : 'Save'}
+      </button>
+    </div>
   );
 }
 
@@ -403,7 +549,7 @@ export function PhoneTemplate({ job, s, pick, setPick, onApply, onChat, onCancel
       </button>
       <div className="aj-scroll min-h-0 flex-1 px-3 py-3">
         <div className="mb-2 px-1">
-          <JobTypeSentence job={job} s={s} />
+          <JobTypeSentence job={job} s={s} onChanged={(after) => setPick(refitPick(s, job, after, pick))} />
         </div>
         {pick.tab === 'own' ? (
           <div className="aj-card p-4">

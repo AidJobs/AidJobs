@@ -265,9 +265,11 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               See in chat
             </button>
           )}
-          <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
-            <X size={12} strokeWidth={2} />
-          </button>
+          <Tip label="Hide this note">
+            <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
+              <X size={12} strokeWidth={2} />
+            </button>
+          </Tip>
         </div>
       )}
       {notes.map((n) => (

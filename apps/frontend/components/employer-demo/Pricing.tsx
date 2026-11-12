@@ -13,7 +13,7 @@ export function FreeTerms({ s }: { s: State }) {
       <li>
         {FREE_PER_MONTH} free jobs a calendar month for {s.org.name}, in {orgZone(s.org).city} time; unused ones do not carry over
       </li>
-      <li>A job counts only when it is published or scheduled; writing it and sending it for review are free</li>
+      <li>A job counts only when it goes live; scheduled, it holds its month&apos;s place, given back if the date is taken back; writing and review are free</li>
       <li>Listed {LISTED_DAYS.free} days, or until its closing date if that is sooner; standard placement</li>
       <li>One language, the one it is written in; a copy can be downloaded once it is published</li>
     </ul>

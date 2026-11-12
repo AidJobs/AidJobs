@@ -97,7 +97,7 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
       {!job.paidFor && (
         <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => pick('free')} disabled={!owner}>
           <span className="aj-muted" style={{ fontWeight: 600 }}>
-            {counted ? `It already counts as one of ${monthName(month)}'s free jobs, so publishing it free uses no other.` : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}; one is used only when it is published.`}
+            {counted ? `It already has one of ${monthName(month)}'s free jobs, so publishing it free uses no other.` : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}; one is used only when the job goes live, and a scheduled one holds its place until then.`}
           </span>
           <FreeTerms s={s} />
           {!freeOk && <span style={{ color: 'var(--amber)' }}>Both free jobs for {monthName(month)} are used: Amplify or a package job publishes it now.</span>}

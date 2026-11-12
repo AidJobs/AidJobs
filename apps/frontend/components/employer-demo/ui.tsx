@@ -10,6 +10,22 @@ import { jobUrl } from './links';
 import { dismissNotice, notify, undo, useDemo } from './store';
 import type { DemoJob, JobStatus } from './types';
 
+/**
+ * Brings an element into view by scrolling only its nearest scrolling box, never the page around it, so the window's header stays in
+ * place (scrollIntoView would scroll every scrollable ancestor too).
+ */
+export function scrollInside(el: Element | null | undefined, where: 'start' | 'center' | 'end' = 'start', smooth = true) {
+  if (!el || typeof window === 'undefined') return;
+  let box = el.parentElement;
+  while (box && !/(auto|scroll)/.test(window.getComputedStyle(box).overflowY)) box = box.parentElement;
+  if (!box) return;
+  const r = el.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  const offset = r.top - b.top + box.scrollTop;
+  const top = where === 'start' ? offset - 12 : where === 'center' ? offset - (box.clientHeight - r.height) / 2 : offset - box.clientHeight + r.height + 12;
+  box.scrollTo?.({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+}
+
 /** Arrow keys move between the options of a radio group and choose the one they land on; nested groups keep their own options. */
 export function radioKeys(e: ReactKeyboardEvent<HTMLElement>) {
   const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
@@ -232,9 +248,11 @@ export function Dialog({ title, subtitle, onClose, footer, children, wide, half 
             {title}
           </span>
           {subtitle && <span className="aj-faint min-w-0 truncate">{subtitle}</span>}
-          <button type="button" className="aj-icon-btn ml-auto" onClick={onClose} aria-label="Close">
-            <X size={15} strokeWidth={1.8} />
-          </button>
+          <Tip label="Close" side="bottom" className="ml-auto">
+            <button type="button" className="aj-icon-btn" onClick={onClose} aria-label="Close">
+              <X size={15} strokeWidth={1.8} />
+            </button>
+          </Tip>
         </div>
         <div className="aj-scroll min-h-0 flex-1 px-5 pb-4">{children}</div>
         {footer && <div className="border-t px-5 py-3 aj-hair">{footer}</div>}

@@ -67,9 +67,11 @@ function ClickMenu({ label, trigger, icon, children }: { label: string; trigger:
 
   return (
     <div ref={wrap} className="flex min-w-0">
-      <button ref={button} type="button" className="ej-tool" data-icon={icon ? 'true' : undefined} aria-label={label} aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={toggle}>
-        {trigger}
-      </button>
+      <Tip label={label} className="min-w-0">
+        <button ref={button} type="button" className="ej-tool" data-icon={icon ? 'true' : undefined} aria-label={label} aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={toggle}>
+          {trigger}
+        </button>
+      </Tip>
       {open && (
         <div
           id={menuId}

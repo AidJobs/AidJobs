@@ -1117,7 +1117,7 @@ export default function Publish({ id }: { id?: string }) {
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
                   {counted
-                    ? `This job already counts as one of ${monthName(month)}'s free jobs: it was scheduled before, and that stays used.`
+                    ? `This job already has one of ${monthName(month)}'s free jobs: it went live then.`
                     : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}${earlier ? `. It counted against ${monthName(earlier)}'s free jobs, which stays used; going live in ${monthName(month)} uses one of ${monthName(month)}'s` : ''}`}
                 </span>
                 <FreeTerms s={s} />

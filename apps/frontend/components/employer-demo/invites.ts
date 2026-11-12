@@ -95,9 +95,13 @@ export function addRound(job: DemoJob, plan: ReachPlan, why: string, sendsOn: st
 export function goLive(s: State): State {
   const today = isoDay(s.today);
   let changed = false;
+  const uses = [...s.freeUses];
   const jobs = s.jobs.map((j) => {
     if (j.status !== 'scheduled' || !j.scheduledFor || j.scheduledFor > today) return j;
     changed = true;
+    // A free job's hold becomes a use on the day it goes live (the user, 12 November 2026).
+    const month = j.scheduledFor.slice(0, 7);
+    if (j.plan === 'free' && !uses.some((u) => u.jobId === j.id && u.month === month)) uses.push({ jobId: j.id, month });
     const sent = (r: Recipient): Recipient => (r.status === 'waiting' ? { ...r, status: 'sent' } : r);
     return {
       ...j,
@@ -108,7 +112,7 @@ export function goLive(s: State): State {
       audit: [...j.audit, { at: s.today, who: 'AidJobs', what: `Went live on ${longDate(j.scheduledFor)}${j.reach?.rounds.some((r) => r.sendsOn) ? '; the Reach emails were sent (simulated)' : ''}` }],
     };
   });
-  return changed ? { ...s, jobs } : s;
+  return changed ? { ...s, jobs, freeUses: uses } : s;
 }
 
 export type Moment = { key: string; title: string; body: string; why: string };

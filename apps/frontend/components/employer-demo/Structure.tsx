@@ -9,12 +9,12 @@ import { COMMITMENTS, commitmentText, FAMILIES_ORDER, GROUPS, headingFor, recomm
 import BasePrompt from './BasePrompt';
 import CreateFormatDialog from './FormatBuilder';
 import type { DemoJob, State } from './types';
-import { Dialog } from './ui';
+import { Dialog, scrollInside } from './ui';
 
 const CREATE = '__create';
 
 function scrollToSection(key: string) {
-  document.getElementById(`ej-sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollInside(document.getElementById(`ej-sec-${key}`));
 }
 
 /** `hideCommitments`: in the window, the fixed text is its own part on the progress line. */

@@ -7,7 +7,7 @@ import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { statusLine } from './Home';
 import { update } from './store';
 import type { DemoJob, State } from './types';
-import { Dialog, Field, inputStyle, RecipientInput } from './ui';
+import { Dialog, Field, inputStyle, RecipientInput, scrollInside } from './ui';
 
 export function setReviewer(id: string | null) {
   update((s) => ({ ...s, reviewerAs: id }));
@@ -217,7 +217,7 @@ export function ReviewSummary({ job, s }: { job: DemoJob; s: State }) {
 
 function goToSection(key: string) {
   const el = document.getElementById(`ej-sec-${key}`);
-  el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  scrollInside(el, 'center');
 }
 
 function titleOf(job: DemoJob, key: string): string {

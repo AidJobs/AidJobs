@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
+﻿import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ReactNode } from 'react';
@@ -1204,6 +1204,59 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
   const currentLabel = () => line().querySelector('[aria-current="step"] .ej-line-label')?.textContent;
   const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
   const byLabel = (label: string) => document.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+  const choose = (sel: HTMLSelectElement, value: string) =>
+    act(() => {
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  const typeInto = (input: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+  it('any template can be adjusted before it is used, and the panel can be closed, moved, and resized at any time', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    click('See all formats');
+    const panel = () => container.querySelector('section.ej-float') as HTMLElement;
+    act(() => byLabel('Close the template panel').click());
+    expect(panel()).toBeNull();
+    expect(job(id).setup).toBe('template');
+    click('Browse templates');
+    const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
+    choose(panel().querySelector('select[aria-label="Template"]') as HTMLSelectElement, un.key);
+    const inputs = () => Array.from(panel().querySelectorAll('.ej-heading-input')) as HTMLInputElement[];
+    const first = un.order[0].key;
+    typeInto(inputs()[0], 'Our mandate');
+    const dropped = un.order[un.order.length - 1];
+    act(() => (panel().querySelector(`[aria-label="Remove ${dropped.heading}"]`) as HTMLElement).click());
+    expect(panel().textContent).toContain('Reset');
+    act(() => byLabel('Engagement: job. Change it').click());
+    click('Consultancy');
+    expect(inputs()[0].value).toBe('Our mandate');
+    expect(panel().querySelector('[aria-label="Heading for Deliverables"]')).not.toBeNull();
+    expect(panel().querySelector(`[aria-label="Remove ${dropped.heading}"]`)).toBeNull();
+    const before = panel().style.width;
+    act(() => byLabel('Resize the template panel: drag, or use the arrow keys').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+    expect(panel().style.width).not.toBe(before);
+    const left = panel().style.left;
+    act(() => byLabel('Move the template panel with the arrow keys').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    expect(panel().style.left).not.toBe(left);
+    act(() => (panel().querySelector('.aj-ink-btn') as HTMLElement).click());
+    expect(job(id).format).toBe(un.key);
+    expect(job(id).tags).not.toContain(dropped.key);
+    expect(job(id).renamed?.[first]).toBe('Our mandate');
+    expect(job(id).setup).toBe('style');
+    expect(panel()).toBeNull();
+    expect(network).toEqual([]);
+  });
 
   it('Enter opens the window at once; the chat asks for the template first, the panel stays empty, and nothing is written until the template and the style are chosen', () => {
     fresh();
@@ -1226,7 +1279,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(currentLabel()).toBe(format.label);
     expect(container.querySelector('.ej-w-head .ej-w-title')?.textContent).toBe('Nutrition Officer');
     expect(container.querySelector('.ej-w-head .ej-w-status')?.textContent).toMatch(/^Draft/);
-    expect(container.querySelector('.ej-w-head nav[aria-label="Parts of this job"]')).not.toBeNull();
+    expect(container.querySelector('.ej-w-head nav[aria-label="Parts of this job"]')).toBeNull();
+    expect(container.querySelector('.ej-pline nav[aria-label="Parts of this job"]')).not.toBeNull();
+    expect(line().querySelectorAll('.ej-pline-dot').length).toBeGreaterThan(0);
     expect(container.querySelector('[role="tab"]')).toBeNull();
     expect(container.querySelector('.ej-line-mark')).toBeNull();
     shows('similar nutrition roles are on AidJobs');
@@ -1266,7 +1321,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(panel().getAttribute('aria-label')).toBe('Choose a template');
     expect(container.querySelector('article[aria-label$=": its sections"]')).not.toBeNull();
     const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
-    act(() => (Array.from(panel().querySelectorAll('.ej-template-card')).find((b) => b.textContent?.startsWith(un.label)) as HTMLElement).click());
+    choose(panel().querySelector('select[aria-label="Template"]') as HTMLSelectElement, un.key);
     expect(container.querySelector(`article[aria-label="${un.label}: its sections"]`)).not.toBeNull();
     act(() => byLabel('Engagement: job. Change it').click());
     click('Consultancy');
