@@ -244,8 +244,15 @@ def write_local(path: Path, fields: list[str], rows: list[dict]) -> None:
 PLAN_FIELDS = ["page_id", "org_id", "system", "host", "crawl", "languages", "filename", "offset", "length", "url"]
 
 
+# The user's decision of 12 November 2026 (role-survey.md 19.12): UN pages are read for analysis, as
+# any employer's, since the library is AidJobs' own work, not a compilation or derivative of them.
+UN_PAGES_ALLOWED = True
+
+
 def held_organisations(pages: list[dict], orgs: roles.Organisations) -> set[str]:
-    """The UN system's organisations, held until the user decides on the UN's terms of use (19.11)."""
+    """The UN system's organisations, held while UN pages are not allowed (19.11, 19.12)."""
+    if UN_PAGES_ALLOWED:
+        return set()
     return {c["org_id"] for c in pages if roles.un_system(orgs.type_of(c["org_id"]), c["host"])}
 
 
@@ -395,7 +402,8 @@ def row_still_allowed(r: dict, verdicts: RobotsVerdicts, held_hosts: set[str],
         return "shell host"
     if not in_wave_language(r["languages"]):
         return "language outside wave 1"
-    if host in held_hosts or roles.UN_HOSTS.search(host) or r.get("org_id", "") in held_orgs:
+    if host in held_hosts or (not UN_PAGES_ALLOWED and roles.UN_HOSTS.search(host)) or \
+            r.get("org_id", "") in held_orgs:
         return "held: the UN's terms of use"
     if verdicts.verdict(r["url"]) != "allowed":
         return "not allowed by R0"
@@ -719,8 +727,8 @@ def fetch_live(args) -> int:
             if run.stopped:
                 break
     elif batch == "r5":
-        if not args.un_terms_decided:
-            print("r5: held until the user decides on the UN's terms of use (role-survey.md, 19.11); no request")
+        if not (UN_PAGES_ALLOWED or args.un_terms_decided):
+            print("r5: held while UN pages are not allowed (role-survey.md, 19.11); no request")
             return 0
         for name, url in UN_PAGES.items():
             host = urlsplit(url).hostname
@@ -1998,7 +2006,8 @@ def measure(_args=None) -> int:
         if not ad["org_id"]:
             dropped["no organisation"] += 1
             continue
-        if roles.un_system(board_types.get(ad["org_id"]) or orgs.type_of(ad["org_id"]), urlsplit(ad["url"]).hostname or ""):
+        if not UN_PAGES_ALLOWED and roles.un_system(board_types.get(ad["org_id"]) or orgs.type_of(ad["org_id"]),
+                                                    urlsplit(ad["url"]).hostname or ""):
             dropped["held: the UN's terms of use (19.11)"] += 1
             continue
         adverts.append(ad)

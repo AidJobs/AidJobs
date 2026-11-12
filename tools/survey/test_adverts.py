@@ -615,7 +615,8 @@ def test_a_403_stops_the_archive_batch_for_good(tmp_path):
         pass
 
 
-def test_a_planned_row_is_checked_again_before_it_is_read():
+def test_a_planned_row_is_checked_again_before_it_is_read(monkeypatch):
+    monkeypatch.setattr(adverts, "UN_PAGES_ALLOWED", False)       # the hold, as it stood until 12 November 2026
     v = FakeVerdicts({"https://a.example/jobs/x-y-z"})
     ok = {"url": "https://a.example/jobs/x-y-z", "filename": "crawl-data/x", "languages": "eng"}
     assert adverts.row_still_allowed(ok, v, set()) == ""
@@ -624,6 +625,15 @@ def test_a_planned_row_is_checked_again_before_it_is_read():
     assert adverts.row_still_allowed(dict(ok, languages="deu"), v, set()) == "language outside wave 1"
     assert adverts.row_still_allowed(dict(ok, url="https://jobs.ilo.org/x"), v, set()).startswith("held")
     assert adverts.row_still_allowed(ok, v, {"a.example"}).startswith("held")
+
+
+def test_un_pages_are_read_since_the_users_decision():
+    assert adverts.UN_PAGES_ALLOWED
+    v = FakeVerdicts({"https://jobs.ilo.org/jobs/x-y-z"})
+    row = {"url": "https://jobs.ilo.org/jobs/x-y-z", "filename": "crawl-data/x", "languages": "eng"}
+    assert adverts.row_still_allowed(row, v, set()) == ""
+    pages = [{"org_id": "un:1", "host": "jobs.ilo.org"}]
+    assert adverts.held_organisations(pages, roles.Organisations()) == set()
 
 
 class FakeFetcher:
@@ -817,9 +827,10 @@ def test_the_next_page_must_be_the_next_number(tmp_path):
     assert "https://board.example/page/3/" not in f.urls
 
 
-def test_r5_is_held_until_the_un_terms_are_decided(tmp_path, monkeypatch):
+def test_r5_is_held_while_un_pages_are_not_allowed(tmp_path, monkeypatch):
     import argparse
     monkeypatch.setattr(adverts, "READING", tmp_path)
+    monkeypatch.setattr(adverts, "UN_PAGES_ALLOWED", False)
     assert adverts.fetch_live(argparse.Namespace(batch="r5", cap=0, un_terms_decided=False)) == 0
     assert adverts.live_requests_sent(tmp_path / "r5") == 0
 
@@ -914,9 +925,10 @@ def test_measure_drops_un_pages_and_keeps_held_out_adverts_beside_the_cap(tmp_pa
     (work / "ai-test-set.json").write_text(json.dumps({"pilot": [], "test": held}), encoding="utf-8")
     monkeypatch.setattr(adverts, "WORK", work)
     monkeypatch.setattr(adverts, "ROLES_DIR", docs)
+    monkeypatch.setattr(adverts, "UN_PAGES_ALLOWED", False)
     assert adverts.measure() == 0
     rows = list(csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8")))
-    assert all(r["org_id"] != "site:jobs.ilo.org" for r in rows)       # held for the UN terms decision
+    assert all(r["org_id"] != "site:jobs.ilo.org" for r in rows)       # held while UN pages are not allowed
     assert len(rows) == 32 and sum(r["held_out"] == "true" for r in rows) == 2   # 30 evidence + 2 held
 
 
