@@ -1,7 +1,12 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { formatOf, missingFacts } from './actions';
+import { downloadBlock, formatOf, missingFacts } from './actions';
+import { approvalRequired, approvedFor } from './approval';
+import { planCount } from './invites';
+import { isPublished } from './lifecycle';
+import { canGoFree, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, monthFor, monthName, PACKAGES, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
+import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
 import { afterApproval, FIXED_SECTIONS, nextStep, setAiWrites, type Step } from './flow';
@@ -127,9 +132,36 @@ function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Recor
       return { kind: 'suggest', sections: step.sections.map((k) => ({ key: k, heading: headingFor(k, format), why: SECTION_BY_KEY[k]?.hint })) };
     case 'check':
       return { kind: 'check', point: { key: step.point.key, title: step.point.title, detail: step.point.detail ?? null, section: step.point.section ?? null, line: step.point.line ?? null, canBeGenuine: Boolean(step.point.hit) } };
+    case 'market':
+    case 'full':
+      return { kind: step.kind, point: { key: step.point.key, title: step.point.title, detail: step.point.detail ?? null, fix: step.point.fix?.label ?? null } };
+    case 'version':
+      return { kind: 'version', language: step.lang };
     default:
       return { ...step };
   }
+}
+
+/**
+ * Steps 8 and 9 as the AI is told them (section 19): the plan and what it allows, the language versions, review, and Reach. Figures
+ * are the rules' own; the AI words them and never works out a price, an allowance, or a date itself.
+ */
+function publishingFor(s: State, j: DemoJob) {
+  const month = monthFor(s, j.publishOn ?? null);
+  const via = viaFor(s, j);
+  const onHand = paidJobsLeft(s);
+  return {
+    language: { own: langOf(jobLang(j)).label, offered: ALL_LANGS.map((l) => ({ key: l.key, label: l.label })) },
+    published: isPublished(j) ? { plan: j.plan, status: j.status } : null,
+    choice: j.choice ?? null,
+    publishOn: j.publishOn ?? null,
+    free: { canGoFree: canGoFree(s, j.id, j.publishOn ?? null), left: freeLeft(s, month), month: monthName(month), listedDays: LISTED_DAYS.free },
+    amplify: { verified: s.org.verified, price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? 'one', packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
+    versions: { included: LANGS_INCLUDED[via], extraPrice: usd(LANGUAGE_PRICE), toPay: langsToPay(j, 'amplify', via), list: versionsOf(j).map((k) => ({ key: k, label: langOf(k).label, reviewed: Boolean(j.translations?.[k]?.reviewed), behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)), sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) })) },
+    review: { required: approvalRequired(s, j), approved: approvedFor(s, j), state: j.review.state, reviewers: j.review.reviewers.map((r) => ({ name: r.name, decision: r.decision ?? null, note: r.note ?? null })), team: s.team.filter((p) => p.id !== s.me.id).map((p) => ({ name: p.name, role: p.role })) },
+    reach: { planned: planCount(j, j.reachPlan), domain: s.org.domain },
+    download: downloadBlock(j),
+  };
 }
 
 /** What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation. */
@@ -169,6 +201,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       }),
     },
     walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,
+    publishing: publishingFor(s, j),
     recommendation: {
       key: rec.key,
       label: recFormat.label,

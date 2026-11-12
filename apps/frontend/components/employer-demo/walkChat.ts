@@ -1,7 +1,10 @@
+import { approvalRequired } from './approval';
 import { commitmentText, COMMITMENTS, extractFacts, headingFor, LANGUAGES, longDate, placeOf, SECTION_BY_KEY, salarySuggestion } from './engine';
 import { isWritten, type Step } from './flow';
-import { workingDay } from './market';
+import { marketCheck, workingDay } from './market';
+import { BADGE, canGoFree, FREE_PER_MONTH, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langSlots, LISTED_DAYS, monthFor, monthName, nextPaidJob, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
 import { contentOf, describeStyle, proposedStyle, wordsFor } from './setup';
+import { jobLang, langOf, versionChoices, versionsOf } from './translate';
 import type { ApplySettings, AskKind, ChatMsg, DemoJob, Facts, Format, State } from './types';
 
 /**
@@ -120,7 +123,7 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const starter = items.filter((i) => !i.own).map((i) => i.label);
       return [
         stepMsg(
-          `Then your organisation's fixed text, added word for word from your settings: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''} Keep these for this job, or tell me which to leave out.`,
+          `Then your organisation's fixed text, added word for word from your settings: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''}${jobLang(job) !== 'en' && !s.org.fixedLangs?.includes(jobLang(job)) ? ` This is the first ${langOf(jobLang(job)).label} job: confirming them here keeps them for every ${langOf(jobLang(job)).label} job (in the demo their wording stays as your settings have it).` : ''} Keep these for this job, or tell me which to leave out.`,
           key,
           [KEEP_FIXED],
         ),
@@ -140,9 +143,109 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       if (p.key.startsWith('fill-')) return [stepMsg(`${head} Fill it in with the pencil, or tell me what it should say.`, key, [LEAVE_IT])];
       return [stepMsg(head, key, [LEAVE_IT])];
     }
-    case 'done':
-      return [stepMsg("That's the basic check done. Next come free or Amplify, review, and publishing, which for now are on the Check and publish page.", key, [OPEN_PUBLISH])];
+    case 'keep':
+      return keepPrompt(s, job, step.what, key);
+    default:
+      return laterPrompt(s, job, step, key);
   }
+}
+
+export const KEEP_ALL = 'Keep for every job';
+export const THIS_JOB = 'Only this job';
+
+/** Step 10: the first time the fixed text or the way to apply comes up, the offer to keep it for every job. */
+export function keepPrompt(s: State, job: DemoJob, what: 'fixed' | 'apply', key: string): ChatMsg[] {
+  const how = what === 'fixed' ? `these fixed texts (${job.commitments.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')})` : `this way to apply (${{ system: 'through your careers site', email: `by email${job.apply.address ? ` to ${job.apply.address}` : ''}`, form: 'with an online form', formOnly: 'with an online form, without CVs' }[job.apply.method]})`;
+  return [stepMsg(`Shall I keep ${how} for every job? Each new job then starts with them, and they can be locked in Organisation settings, the only place they are changed afterwards. Jobs already published keep their own.`, key, [KEEP_ALL, THIS_JOB])];
+}
+
+export const PUBLISH_FREE = 'Publish free';
+export const AMPLIFY = 'Amplify';
+export const USE_PACKAGE = 'Use a package job';
+export const NO_MORE_LANGS = 'No other languages';
+export const MARK_REVIEWED = 'Mark it as reviewed';
+export const SHOW_FLYER = 'Show the flyer';
+export const INVITE = 'Invite people';
+export const NOT_NOW = 'Not now';
+export const SEND_REVIEW = 'Send for review';
+export const NO_REVIEW = 'No review';
+export const REMIND = 'Remind them';
+export const SKIP_APPROVAL = 'Publish without approval';
+export const SHOW_PREVIEW = 'Show the preview';
+
+/** What Amplify adds, in a line, with how many language versions it includes. */
+export function amplifyLine(s: State): string {
+  const package_ = nextPaidJob(s);
+  return `listed ${LISTED_DAYS.amplify} days, featured with the “${BADGE}” badge, the market check, the full advert check, ${package_ ? LANGS_INCLUDED.package : LANGS_INCLUDED.single} language ${(package_ ? LANGS_INCLUDED.package : LANGS_INCLUDED.single) === 1 ? 'version' : 'versions'} besides its own (more at ${usd(LANGUAGE_PRICE)} each), a field-post flyer, and Reach emails when it goes live`;
+}
+
+/** Steps 8 and 9 (section 19): what the rules say when the AI is off or leaves a step unasked. */
+function laterPrompt(s: State, job: DemoJob, step: Step, key: string): ChatMsg[] {
+  const own = langOf(jobLang(job)).label;
+  switch (step.kind) {
+    case 'plan': {
+      const month = monthFor(s, job.publishOn ?? null);
+      const left = freeLeft(s, month);
+      const onHand = paidJobsLeft(s);
+      const free = canGoFree(s, job.id, job.publishOn ?? null);
+      const price = singlePrice(s);
+      const freeText = free ? `**Free**: listed ${LISTED_DAYS.free} days, standard placement, in ${own} only; ${left} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}, used only when it is published.` : `Both free jobs for ${monthName(month)} are used, so it goes out with **Amplify** or a package job.`;
+      const ampText = s.org.verified ? `**Amplify** (${onHand ? `uses 1 of your ${onHand} package ${onHand === 1 ? 'job' : 'jobs'}` : usd(price.amount)}): ${amplifyLine(s)}.` : 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.';
+      const quick = [...(free ? [PUBLISH_FREE] : []), ...(s.org.verified ? [onHand ? USE_PACKAGE : AMPLIFY] : [])];
+      return [stepMsg(`The job description is ready. Next, how it goes out.\n${freeText}\n${ampText}\nWhich one? Both are side by side in the panel, with the packages.`, key, quick)];
+    }
+    case 'market':
+    case 'full': {
+      const p = step.point;
+      const where = step.kind === 'market' ? `From the market check (sample figures, ${marketCheck(job, s, job.publishOn ?? null).count} similar open jobs)` : 'From the full advert check, compared with similar jobs';
+      return [stepMsg(`${where}: **${p.title}**.${p.detail ? ` ${p.detail}` : ''}`, key, [...(p.fix ? [p.fix.label] : []), LEAVE_IT])];
+    }
+    case 'langs': {
+      const have = versionsOf(job);
+      const offer = versionChoices(job).filter((l) => !have.includes(l.key));
+      const included = langSlots(job, 'amplify', viaFor(s, job));
+      const lead = have.length
+        ? `Added: ${have.map((k) => langOf(k).label).join(', ')}. Any other language?${have.length >= included ? ` Each further one is ${usd(LANGUAGE_PRICE)}.` : ''}`
+        : `It is written in ${own}. Amplify includes ${included} language ${included === 1 ? 'version' : 'versions'} besides it; each further one is ${usd(LANGUAGE_PRICE)}. Each version can have its own sections where another country needs other content; the facts stay the same. Which languages?`;
+      return [stepMsg(lead, key, [...offer.map((l) => `Add ${l.label}`), NO_MORE_LANGS])];
+    }
+    case 'version': {
+      const label = langOf(step.lang).label;
+      return [stepMsg(`The ${label} version is drafted in its tab. In the demo the headings, standard sentences, dates, and places are translated, and lines still in ${own} are marked. Change anything there or ask me here, then mark it as reviewed: only reviewed versions appear.`, key, [MARK_REVIEWED, `Remove ${label}`])];
+    }
+    case 'flyer':
+      return [stepMsg('A one-page flyer with a QR code to the job, for notice boards in field offices, clinics, and community centres, in any reviewed language. Shall I show it?', key, [SHOW_FLYER, NO_THANKS])];
+    case 'reach':
+      return [stepMsg('Reach invites people by email when the job goes live: candidates you know, and your team to pass it on. Shall I prepare the invitations? You choose who gets them and edit both emails in their tab.', key, [INVITE, NOT_NOW])];
+    case 'review': {
+      if (approvalRequired(s, job)) return [{ ...stepMsg('Your organisation asks for approval on this job before it is published. Who should review it?', key), card: 'review' }];
+      return [stepMsg('Would anyone like to read it before it goes out? Review is optional here: they comment and approve, and publishing does not wait for them.', key, [SEND_REVIEW, NO_REVIEW])];
+    }
+    case 'waiting': {
+      const r = job.review;
+      const askers = r.reviewers.filter((x) => x.decision === 'changes');
+      const waiting = r.reviewers.filter((x) => !x.decision).map((x) => x.name.split(' ')[0]);
+      const skip = canSkip(s, job) ? [SKIP_APPROVAL] : [];
+      if (askers.length) {
+        const notes = askers.filter((a) => a.note).map((a) => `“${a.note}”`).join(' ');
+        return [stepMsg(`${askers.map((a) => a.name.split(' ')[0]).join(' and ')} asked for changes${notes ? `: ${notes}` : '.'} Make them here or in the text, then send round ${r.round + 1}: they see only what changed.`, key, [`Send round ${r.round + 1}`, ...skip])];
+      }
+      return [stepMsg(`Sent for review. Waiting for ${waiting.join(' and ') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}; their comments and decisions appear in Review. You can keep working on it meanwhile.`, key, [REMIND, ...skip])];
+    }
+    case 'publish': {
+      const free = job.choice !== 'amplify';
+      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ` A free job is used when it is published or scheduled.` : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
+    }
+    case 'live':
+      return [{ ...stepMsg(job.status === 'scheduled' ? `Scheduled for ${longDate(job.scheduledFor ?? '')}. It goes live that day${job.plan === 'amplify' ? ', and Reach sends then' : ''}.` : `It's live on AidJobs.${job.plan === 'amplify' ? '' : ' Visitors can share it from the job page.'} A copy can now be downloaded.`, key), card: 'live' }];
+    default:
+      return [];
+  }
+}
+
+/** Who may publish without approval: where approval is required and not given, only the owner, unless nobody may skip it. */
+function canSkip(s: State, j: DemoJob): boolean {
+  return !s.reviewerAs && s.me.role === 'owner' && !s.org.noSkip && approvalRequired(s, j);
 }
 
 /** A typed answer to a question, read by the rules: the facts it gives, the method, or that the default is kept. Null when unreadable. */

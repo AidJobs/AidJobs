@@ -11,6 +11,7 @@ import {
   declineTell,
   dismissMoment,
   downloadCopy,
+  openWindowAt,
   extend,
   hireAgain,
   isApproved,
@@ -98,7 +99,7 @@ function briefing(s: State): Brief[] {
             ? 'Approval was required, and it is in. Publish now?'
             : 'Publish now?',
         actions: [
-          { label: 'Publish', run: () => go('publish', j.id), primary: true },
+          { label: 'Publish', run: () => openWindowAt(j.id, 'publish'), primary: true },
           { label: 'Open', run: () => go('create', j.id) },
         ],
       });
@@ -150,7 +151,7 @@ function briefing(s: State): Brief[] {
         body: `Asked ${new Date(req.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}. The job ${j.status === 'live' ? 'is amplified' : 'publishes'} once they have paid.`,
         actions: [
           { label: 'Remind', run: () => remindPayer(j.id), primary: true },
-          { label: 'Open', run: () => go('publish', j.id) },
+          { label: 'Open', run: () => openWindowAt(j.id, 'publish') },
         ],
       });
     }
@@ -163,7 +164,7 @@ function briefing(s: State): Brief[] {
         title: `${j.facts.title}: its free listing ends ${ends === 0 ? 'today' : ends === 1 ? 'tomorrow' : `in ${ends} days`}`,
         body: `A free job is listed ${LISTED_DAYS.free} days; this one closes on ${longDate(j.facts.deadline)}. Amplify keeps it listed until ${listedUntil({ ...j, plan: 'amplify' }, s.today) === j.facts.deadline ? 'then' : longDate(listedUntil({ ...j, plan: 'amplify' }, s.today))}, or close it on ${longDate(end)}, or let it leave AidJobs' lists (its page still opens from links).`,
         actions: [
-          { label: 'Amplify', run: () => go('publish', j.id), primary: true },
+          { label: 'Amplify', run: () => openWindowAt(j.id, 'publish'), primary: true },
           { label: `Close on ${shortDate(end)}`, run: () => closeAtListingEnd(j.id) },
           { label: 'Let it leave the list', run: () => letLeaveList(j.id) },
         ],

@@ -3,10 +3,11 @@
 import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, Sparkles, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Tip from '@/components/site/Tip';
-import { forgetBase, invite, removeMember, setRole } from './actions';
-import { FAMILIES_ORDER, SECTIONS } from './engine';
+import { forgetBase, invite, removeMember, setKeptApply, setKeptFixed, setRole, stopKeeping } from './actions';
+import { COMMITMENTS, FAMILIES_ORDER, SECTIONS } from './engine';
 import { nextId, update, useDemo } from './store';
-import type { ApprovalSetting, Format, Org, OrgType, Person, Tone } from './types';
+import { langOf } from './translate';
+import type { ApplySettings, ApprovalSetting, Format, JobLang, Org, OrgType, Person, Tone } from './types';
 import BasePrompt from './BasePrompt';
 import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
@@ -189,6 +190,62 @@ function StandardTexts({ org }: { org: Org }) {
   );
 }
 
+const METHOD_LABELS: Record<ApplySettings['method'], string> = { system: 'Through your careers site', email: 'By email', form: 'An online form', formOnly: 'An online form, without CVs' };
+
+/**
+ * Kept for every job (section 19, step 10): the fixed text and the way to apply the owner chose to keep from the chat. Each new job
+ * starts with them; this is the only place they are changed afterwards. Jobs already published keep their own.
+ */
+function KeptForEveryJob({ org }: { org: Org }) {
+  const s = useDemo();
+  const owner = s.me.role === 'owner' && !s.reviewerAs;
+  const kept = org.keptFixed;
+  const apply = org.keptApply;
+  if (!kept && !apply) return <p className="aj-muted m-0">Nothing yet. The first time you write a job, AidJobs offers to keep its fixed text and its way to apply for every job.</p>;
+  return (
+    <div className="flex flex-col gap-4">
+      {kept && (
+        <Field label="Fixed text on every new job">
+          <div className="flex flex-col gap-1">
+            {COMMITMENTS.filter((c) => c.key !== 'mds' || org.mdsMember).map((c) => (
+              <label key={c.key} className="flex items-center gap-2">
+                <input type="checkbox" checked={kept.includes(c.key)} disabled={!owner} onChange={() => setKeptFixed(kept.includes(c.key) ? kept.filter((k) => k !== c.key) : [...kept, c.key])} />
+                {c.label}
+              </label>
+            ))}
+            {owner && (
+              <button type="button" className="aj-text-btn self-start" onClick={() => stopKeeping('fixed')}>
+                Stop keeping it: each job starts from its template
+              </button>
+            )}
+          </div>
+        </Field>
+      )}
+      {apply && (
+        <Field label="How people apply, on every new job">
+          <div className="flex flex-col gap-1.5">
+            <select style={{ ...inputStyle, width: 'auto' }} value={apply.method} disabled={!owner} onChange={(e) => setKeptApply({ method: e.target.value as ApplySettings['method'] })} aria-label="How people apply">
+              {(Object.keys(METHOD_LABELS) as Array<ApplySettings['method']>).map((k) => (
+                <option key={k} value={k}>
+                  {METHOD_LABELS[k]}
+                </option>
+              ))}
+            </select>
+            {apply.method === 'email' && <input style={inputStyle} value={apply.address} disabled={!owner} onChange={(e) => setKeptApply({ address: e.target.value })} aria-label="Application email address" />}
+            {owner && (
+              <button type="button" className="aj-text-btn self-start" onClick={() => stopKeeping('apply')}>
+                Stop keeping it
+              </button>
+            )}
+          </div>
+        </Field>
+      )}
+      {(org.fixedLangs ?? []).length > 0 && <span className="aj-faint">Fixed text confirmed in: {(org.fixedLangs ?? []).map((k) => langOf(k as JobLang).label).join(', ')}.</span>}
+      <span className="aj-faint">Jobs already published keep their own text.</span>
+    </div>
+  );
+}
+
 function ApprovalSettingView({ org }: { org: Org }) {
   const opts: Array<{ key: ApprovalSetting; label: string; hint: string }> = [
     { key: 'off', label: 'Off', hint: 'Anyone who can publish publishes directly; review stays available' },
@@ -341,6 +398,7 @@ const STEPS = [
   { key: 'brand', label: 'Brand style', View: BrandStyle },
   { key: 'sectors', label: 'Sectors and SDGs', View: Sectors },
   { key: 'standard', label: 'Standard text', View: StandardTexts },
+  { key: 'kept', label: 'Kept for every job', View: KeptForEveryJob },
   { key: 'approval', label: 'Approval', View: ApprovalSettingView },
   { key: 'verify', label: 'Verification', View: Verification },
 ] as const;

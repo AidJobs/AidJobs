@@ -30,6 +30,12 @@ export function langSlots(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia =
   return plan === 'amplify' ? LANGS_INCLUDED[via] + (j.langsPaid ?? 0) : 0;
 }
 
+/** How the job is, or will be, paid for: already paid, a package job on hand, or the package chosen; otherwise on its own. */
+export function viaFor(s: State, j: DemoJob): PaidVia {
+  if (j.plan === 'amplify' || j.paidFor) return j.paidVia ?? 'single';
+  return nextPaidJob(s) || (j.payWith && j.payWith !== 'one') ? 'package' : 'single';
+}
+
 /** The versions beyond what is included and already paid for: added to the job's checkout, or bought on their own after publishing. */
 export function langsToPay(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia = j.paidVia ?? 'single'): number {
   return plan === 'amplify' ? Math.max(0, Object.keys(j.translations ?? {}).length - langSlots(j, plan, via)) : 0;

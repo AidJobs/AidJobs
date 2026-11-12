@@ -510,7 +510,7 @@ function ApprovalBlock({ job, s, onSkip }: { job: DemoJob; s: State; onSkip: () 
 const first = (name: string) => name.split(' ')[0];
 
 /** Under "any one reviewer": approved, and someone then asked for changes. The person publishing decides, with the situation in front of them. */
-function ChangesNote({ job, onPublishAnyway }: { job: DemoJob; onPublishAnyway: () => void }) {
+export function ChangesNote({ job, onPublishAnyway, onLook }: { job: DemoJob; onPublishAnyway: () => void; onLook?: () => void }) {
   const open = changesAfterApproval(job);
   if (!open) return null;
   const askers = open.askers.map((a) => first(a.name)).join(' and ');
@@ -532,6 +532,7 @@ function ChangesNote({ job, onPublishAnyway }: { job: DemoJob; onPublishAnyway: 
           type="button"
           className="aj-pill"
           onClick={() => {
+            if (onLook) return onLook();
             try {
               localStorage.setItem('aidjobs.employerDemo.panel', 'review');
             } catch {
@@ -550,7 +551,7 @@ function ChangesNote({ job, onPublishAnyway }: { job: DemoJob; onPublishAnyway: 
   );
 }
 
-function OverruleDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
+export function OverruleDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
   const [reason, setReason] = useState('');
   const askers = (changesAfterApproval(job)?.askers ?? []).map((a) => first(a.name)).join(' and ');
   return (
@@ -587,7 +588,7 @@ function OverruleDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => 
   );
 }
 
-function SkipDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
+export function SkipDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void; onClose: () => void }) {
   const [reason, setReason] = useState('');
   const asked = job.review.reviewers.map((r) => r.name.split(' ')[0]);
   return (
@@ -618,7 +619,7 @@ function SkipDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () => void
   );
 }
 
-function TermsDialog({ s, action, onAccept, onClose }: { s: State; action: string; onAccept: () => void; onClose: () => void }) {
+export function TermsDialog({ s, action, onAccept, onClose }: { s: State; action: string; onAccept: () => void; onClose: () => void }) {
   return (
     <Dialog
       title="Free jobs: the terms"
@@ -644,7 +645,7 @@ function TermsDialog({ s, action, onAccept, onClose }: { s: State; action: strin
 }
 
 /** One choice, Free or Amplify: the radio is the heading button; the terms under it are information. */
-function Choice({ on, title, price, onSelect, children, amplified, disabled }: { on: boolean; title: string; price: string; onSelect: () => void; children: ReactNode; amplified?: boolean; disabled?: boolean }) {
+export function Choice({ on, title, price, onSelect, children, amplified, disabled }: { on: boolean; title: string; price: string; onSelect: () => void; children: ReactNode; amplified?: boolean; disabled?: boolean }) {
   return (
     <div className={`${amplified ? 'ej-amplified ' : ''}aj-card flex flex-col gap-2 p-4`} style={{ borderColor: on ? 'var(--sage-5)' : undefined, boxShadow: on ? '0 0 0 1px var(--sage-5)' : undefined }}>
       <button type="button" role="radio" aria-checked={on} disabled={disabled} onClick={onSelect} className="flex w-full items-center gap-2 text-left" style={{ border: 'none', background: 'transparent', padding: 0, cursor: disabled ? 'default' : 'pointer', color: 'inherit', font: 'inherit' }}>
@@ -731,13 +732,13 @@ function Success({ job, s, onAmplify }: { job: DemoJob; s: State; onAmplify: () 
   );
 }
 
-function jobLabel(job: DemoJob): string {
+export function jobLabel(job: DemoJob): string {
   const city = job.facts.location.split(',')[0];
   return `${job.facts.title}${city ? ` – ${city}` : ''}`;
 }
 
 /** "Ask to pay": choose who holds the card, see what they receive, send. */
-function AskToPayDialog({ job, s, request, onClose }: { job: DemoJob; s: State; request: Omit<PayRequest, 'at' | 'name' | 'email' | 'note'>; onClose: () => void }) {
+export function AskToPayDialog({ job, s, request, onClose }: { job: DemoJob; s: State; request: Omit<PayRequest, 'at' | 'name' | 'email' | 'note'>; onClose: () => void }) {
   const people = s.team.filter((p) => p.id !== s.me.id && p.role !== 'reviewer');
   const [picked, setPicked] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -812,7 +813,7 @@ function AskToPayDialog({ job, s, request, onClose }: { job: DemoJob; s: State; 
 }
 
 /** The payer's page, reached from the link in their email (simulated in the demo). */
-function PayerDialog({ job, s, onPaid, onClose }: { job: DemoJob; s: State; onPaid: () => void; onClose: () => void }) {
+export function PayerDialog({ job, s, onPaid, onClose }: { job: DemoJob; s: State; onPaid: () => void; onClose: () => void }) {
   const [declined, setDeclined] = useState(false);
   const req = job.payRequest;
   if (!req) return null;

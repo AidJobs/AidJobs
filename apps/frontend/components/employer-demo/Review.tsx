@@ -14,37 +14,28 @@ export function setReviewer(id: string | null) {
 }
 
 export function ReviewDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () => void }) {
+  return (
+    <Dialog title="Send for review" subtitle="Optional" onClose={onClose}>
+      <ReviewForm job={job} s={s} onSent={onClose} />
+    </Dialog>
+  );
+}
+
+/**
+ * Who reviews, by when, under which rule, and a note, with the email they get: in a dialog, or in the window's Review email tab and
+ * the chat's card (section 19, step 9). `preset`: people named in the chat, by name.
+ */
+export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State; onSent: () => void; preset?: string[] }) {
   const candidates = s.team.filter((p) => p.id !== s.me.id);
-  const [picked, setPicked] = useState<string[]>(candidates.filter((p) => p.role === 'reviewer').map((p) => p.id));
+  const named = preset?.length ? candidates.filter((p) => preset.some((n) => p.name.toLowerCase().startsWith(n.toLowerCase()))).map((p) => p.id) : [];
+  const [picked, setPicked] = useState<string[]>(named.length ? named : candidates.filter((p) => p.role === 'reviewer').map((p) => p.id));
   const [outside, setOutside] = useState<string[]>([]);
   const [due, setDue] = useState(3);
   const [rule, setRule] = useState<'any' | 'all'>(s.org.approvalRule);
   const [note, setNote] = useState('');
   const total = picked.length + outside.length;
+  const names = [...candidates.filter((p) => picked.includes(p.id)).map((p) => p.name.split(' ')[0]), ...outside];
   return (
-    <Dialog
-      title="Send for review"
-      subtitle="Optional"
-      onClose={onClose}
-      footer={
-        <div className="flex items-center justify-between gap-2">
-          <span className="aj-faint">
-            {total} {total === 1 ? 'reviewer' : 'reviewers'} · simulated, nothing is sent
-          </span>
-          <button
-            type="button"
-            className="aj-ink-btn"
-            disabled={total === 0}
-            onClick={() => {
-              sendForReview(job.id, [...candidates.filter((p) => picked.includes(p.id)).map((p) => ({ name: p.name, email: p.email, outside: false })), ...outside.map((e) => ({ name: e, email: e, outside: true }))], addDays(s.today, due), rule, note);
-              onClose();
-            }}
-          >
-            <Send size={14} strokeWidth={2} /> Send
-          </button>
-        </div>
-      }
-    >
       <div className="flex flex-col gap-4">
         <Field label="Your team">
           <div className="flex flex-wrap gap-1.5">
@@ -79,11 +70,34 @@ export function ReviewDialog({ job, s, onClose }: { job: DemoJob; s: State; onCl
         <Field label="Note (optional)">
           <textarea style={{ ...inputStyle, minHeight: 64 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything they should look at" />
         </Field>
+        <div className="flex flex-col gap-1 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
+          <span className="aj-faint">The email they get</span>
+          <strong>
+            {s.me.name} asks you to review {job.facts.title || 'a job'} by {longDate(addDays(s.today, due))}
+          </strong>
+          {note.trim() && <span className="aj-muted">&ldquo;{note.trim()}&rdquo;</span>}
+          <span className="aj-muted">A link opens the job to read, comment, suggest changes, and approve or ask for changes{outside.length ? '; outside reviewers get a private link that expires in 7 days, with no account' : ''}.</span>
+        </div>
         <p className="aj-faint" style={{ margin: 0 }}>
           Reviewers can comment, suggest edits, approve, or ask for changes. You get each answer by email and in your decision inbox. An approval covers this version; a later content change resets it.
         </p>
+        <div className="flex items-center justify-between gap-2 border-t pt-3 aj-hair">
+          <span className="aj-faint">
+            {total} {total === 1 ? 'reviewer' : 'reviewers'} · simulated, nothing is sent
+          </span>
+          <button
+            type="button"
+            className="aj-ink-btn"
+            disabled={total === 0}
+            onClick={() => {
+              sendForReview(job.id, [...candidates.filter((p) => picked.includes(p.id)).map((p) => ({ name: p.name, email: p.email, outside: false })), ...outside.map((e) => ({ name: e, email: e, outside: true }))], addDays(s.today, due), rule, note);
+              onSent();
+            }}
+          >
+            <Send size={14} strokeWidth={2} /> {total ? `Send to ${names.length > 2 ? `${names.length} reviewers` : names.join(' and ')}` : 'Send'}
+          </button>
+        </div>
       </div>
-    </Dialog>
   );
 }
 

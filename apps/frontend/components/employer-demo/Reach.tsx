@@ -69,6 +69,18 @@ function EmailEditor({ kind, msg, onChange, job, s, to }: { kind: 'candidate' | 
  * on a live job ("Invite more") it is sent now.
  */
 export function ReachDialog({ job, s, mode, why = 'Invited more', momentKey, sendsOn, live = false, onClose }: { job: DemoJob; s: State; mode: 'plan' | 'send'; why?: string; momentKey?: string; sendsOn?: string | null; live?: boolean; onClose: () => void }) {
+  return (
+    <Dialog title={mode === 'send' ? 'Invite more people' : `Reach: invite people ${live ? 'as you amplify' : 'when it goes live'}`} subtitle="Simulated · nothing is sent" onClose={onClose} wide>
+      <ReachEditor job={job} s={s} mode={mode} why={why} momentKey={momentKey} sendsOn={sendsOn} live={live} onDone={onClose} onCancel={onClose} />
+    </Dialog>
+  );
+}
+
+/**
+ * The people and the two emails, edited in their preview: in a dialog, or in the window's Reach tab (section 19). The first draft is
+ * the user's brief wording; the AI may rewrite it in the chat, and the words stay the user's to change.
+ */
+export function ReachEditor({ job, s, mode, why = 'Invited more', momentKey, sendsOn, live = false, onDone, onCancel }: { job: DemoJob; s: State; mode: 'plan' | 'send'; why?: string; momentKey?: string; sendsOn?: string | null; live?: boolean; onDone: () => void; onCancel?: () => void }) {
   const [plan, setPlan] = useState<ReachPlan>(() => planFor(job, s.org));
   const [tab, setTab] = useState<'candidate' | 'team'>('candidate');
   const used = reachUsed(job);
@@ -78,40 +90,9 @@ export function ReachDialog({ job, s, mode, why = 'Invited more', momentKey, sen
   const colleagues = s.team.filter((p) => p.id !== s.me.id && p.email.endsWith(`@${s.org.domain}`)).map((p) => p.email);
   const missing = colleagues.filter((e) => !plan.team.includes(e));
   const goesLive = live ? 'as soon as it is amplified' : sendsOn ? `on ${longDate(sendsOn)}, when it goes live` : 'when it goes live';
+  const saved = JSON.stringify(job.reachPlan ?? null) === JSON.stringify(plan);
   return (
-    <Dialog
-      title={mode === 'send' ? 'Invite more people' : `Reach: invite people ${live ? 'as you amplify' : 'when it goes live'}`}
-      subtitle="Simulated · nothing is sent"
-      onClose={onClose}
-      wide
-      footer={
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="aj-faint mr-auto">
-            {used + count} of {REACH_EMAILS} Reach emails for this job
-          </span>
-          <button type="button" className="aj-pill" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="aj-ink-btn"
-            disabled={mode === 'send' && !count}
-            onClick={() => {
-              setReachPlan(job.id, plan);
-              if (mode === 'send') {
-                const sent = sendReach(job.id, why);
-                if (sent && momentKey) dismissMoment(job.id, momentKey);
-                notify(`${sent} ${sent === 1 ? 'email' : 'emails'} queued (simulated)`);
-              }
-              onClose();
-            }}
-          >
-            {mode === 'send' ? `Send now to ${count} ${count === 1 ? 'person' : 'people'}` : count ? `Save · ${count} ${count === 1 ? 'person' : 'people'} ${goesLive}` : 'Save'}
-          </button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
         <div className="aj-switch self-start" role="radiogroup" onKeyDown={radioKeys} aria-label="Which email">
           <button type="button" role="radio" aria-checked={tab === 'candidate'} data-active={tab === 'candidate'} onClick={() => setTab('candidate')}>
             Invite people to apply · {candidates.length}
@@ -142,8 +123,33 @@ export function ReachDialog({ job, s, mode, why = 'Invited more', momentKey, sen
         <span className="aj-faint">
           {mode === 'send' ? 'Sent now; the job is live, so the link works.' : `Sent ${goesLive}, so the link works.`} Recipients are never added to an AidJobs list, never see each other, and can unsubscribe in one click. Team emails go only to @{s.org.domain} addresses. AidJobs wrote the first draft; the words are yours to change.
         </span>
-      </div>
-    </Dialog>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3 aj-hair">
+          <span className="aj-faint mr-auto">
+            {used + count} of {REACH_EMAILS} Reach emails for this job
+          </span>
+          {onCancel && (
+            <button type="button" className="aj-pill" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button
+            type="button"
+            className="aj-ink-btn"
+            disabled={(mode === 'send' && !count) || (mode === 'plan' && !onCancel && saved)}
+            onClick={() => {
+              setReachPlan(job.id, plan);
+              if (mode === 'send') {
+                const sent = sendReach(job.id, why);
+                if (sent && momentKey) dismissMoment(job.id, momentKey);
+                notify(`${sent} ${sent === 1 ? 'email' : 'emails'} queued (simulated)`);
+              }
+              onDone();
+            }}
+          >
+            {mode === 'send' ? `Send now to ${count} ${count === 1 ? 'person' : 'people'}` : !onCancel && saved ? 'Saved' : count ? `Save · ${count} ${count === 1 ? 'person' : 'people'} ${goesLive}` : 'Save'}
+          </button>
+        </div>
+    </div>
   );
 }
 

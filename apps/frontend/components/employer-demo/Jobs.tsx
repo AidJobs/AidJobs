@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Copy, History, MapPin, Search, Sparkles, Trash2
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Flag from '@/components/site/Flag';
-import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
+import { approvedFor, buy, canDelete, canRestore, closeAtListingEnd, closeJob, downloadCopy, extend, hireAgain, isReviewable, letLeaveList, openWindowAt, remindPayer, remindReviewers, reopen, reopenBlock, restoreDeleted } from './actions';
 import { invitedCount, reachRoom } from './invites';
 import { Checkout } from './Pricing';
 import { changesSince, changeSummary, tellOffer } from './changes';
@@ -297,13 +297,13 @@ export function nextStep(s: State, job: DemoJob, open: Open): { label: string; r
   const left = job.facts.deadline ? daysUntil(s.today, job.facts.deadline) : null;
   if (job.payRequest && job.status !== 'closed') return { label: 'Remind payer', run: () => remindPayer(job.id) };
   if (job.review.state === 'changes' && isReviewable(job)) return { label: 'See request', run: () => openReview(job) };
-  if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => go('publish', job.id) };
+  if (job.status === 'approved' || (job.status === 'review' && approvedFor(s, job))) return { label: 'Publish', run: () => openWindowAt(job.id, 'publish') };
   if (job.status === 'review' && job.review.reviewers.some((r) => !r.decision)) return { label: 'Remind', run: () => remindReviewers(job.id) };
   if (job.status === 'draft' || job.status === 'review') return { label: 'Continue', run: () => go('create', job.id) };
   if (job.status === 'scheduled') return { label: 'Publish now', run: () => open(job, 'publishNow') };
   if (job.status === 'live' && tellOffer(job)) return { label: 'Tell invitees', run: () => open(job, 'tell') };
   if (listingEndsIn(job, s.today) !== null) return { label: 'Choose', run: () => go('jobs', job.id) };
-  if (delisted(job, s.today)) return { label: 'Amplify', run: () => go('publish', job.id) };
+  if (delisted(job, s.today)) return { label: 'Amplify', run: () => openWindowAt(job.id, 'publish') };
   if (job.status === 'live') return left !== null && left <= 7 ? { label: 'Extend', run: () => open(job, 'extend') } : { label: 'Share', run: () => open(job, 'share') };
   if (canReopen(job, s.today)) return { label: 'Reopen', run: () => open(job, 'reopen') };
   return { label: 'Hire again', run: () => hire(job) };
@@ -332,7 +332,7 @@ export function menuActions(s: State, job: DemoJob, open: Open): MenuAction[] {
       { label: 'Extend', run: () => open(job, 'extend') },
       { label: 'Edit', run: () => go('create', job.id) },
       { label: 'Share', run: () => open(job, 'share') },
-      ...(job.plan === 'free' ? [{ label: 'Amplify', run: () => go('publish', job.id) }] : []),
+      ...(job.plan === 'free' ? [{ label: 'Amplify', run: () => openWindowAt(job.id, 'publish') }] : []),
       { label: 'Position filled', run: () => open(job, 'filled') },
       { label: 'Close now', run: () => closeJob(job.id, 'early') },
       { label: 'Withdraw', run: () => open(job, 'withdraw') },
@@ -530,7 +530,7 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
           <span className="aj-muted">It closes on {longDate(job.facts.deadline)}. After {longDate(end)} it leaves AidJobs&apos; lists and search; its page still opens from links, with the apply button.</span>
           {owner && (
             <div className="flex flex-wrap gap-1.5">
-              <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
+              <button type="button" className="aj-ink-btn" onClick={() => openWindowAt(job.id, 'publish')}>
                 Amplify: listed until {shortDate(listedUntil({ ...job, plan: 'amplify' }, s.today))}
               </button>
               <button type="button" className="aj-pill" onClick={() => closeAtListingEnd(job.id)}>
@@ -556,7 +556,7 @@ function NowPart({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
         </div>
       )}
       {job.status === 'live' && job.plan === 'free' && ends === null && owner && (
-        <button type="button" className="aj-text-btn self-start" onClick={() => go('publish', job.id)}>
+        <button type="button" className="aj-text-btn self-start" onClick={() => openWindowAt(job.id, 'publish')}>
           {delisted(job, s.today) ? 'Amplify to list it again until it closes' : 'Amplify this job'}
         </button>
       )}
@@ -639,11 +639,11 @@ function JobDetail({ job, s }: { job: DemoJob; s: State }) {
           )}
         </Part>
         <Part title="Reach" className="lg:col-start-2 lg:row-start-2">
-          <ReachLog job={job} s={s} onAmplify={() => go('publish', job.id)} />
+          <ReachLog job={job} s={s} onAmplify={() => openWindowAt(job.id, 'publish')} />
         </Part>
         {improve && (
           <Part title="Improve" className="lg:col-start-2 lg:row-start-3">
-            <BeforePublish job={job} s={s} amplify schedule={null} url={jobUrl(job)} onChooseAmplify={() => go('publish', job.id)} label={null} />
+            <BeforePublish job={job} s={s} amplify schedule={null} url={jobUrl(job)} onChooseAmplify={() => openWindowAt(job.id, 'publish')} label={null} />
           </Part>
         )}
         <Part title="History" icon={<History size={12} strokeWidth={2} />} className={`lg:col-start-2 ${improve ? 'lg:row-start-4' : 'lg:row-start-3'}`}>

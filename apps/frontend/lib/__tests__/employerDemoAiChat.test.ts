@@ -203,6 +203,69 @@ describe('the AI chat: the demo carries out the actions', () => {
   });
 });
 
+describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing goes out but by a button', () => {
+  const turn = (id: string, said: string, actions: unknown[]) => applyAiTurn(id, said, { reply: 'Done.', actions }, open);
+
+  it('cannot publish, pay, or send: it shows the card whose button does that', () => {
+    turn('job-comms', 'publish it now', [{ type: 'publish' }, { type: 'pay' }, { type: 'send_review' }, { type: 'show', card: 'publish' }]);
+    expect(job('job-comms').status).toBe('draft');
+    expect(lastAi('job-comms')).toMatchObject({ card: 'publish' });
+    expect(lastAi('job-comms')?.text).toMatch(/Not done: an action the demo does not have \("publish"\); an action the demo does not have \("pay"\); an action the demo does not have \("send_review"\)\.$/);
+  });
+
+  it('chooses the plan under the rules: Amplify only for a verified organisation', () => {
+    update((s) => ({ ...s, org: { ...s.org, verified: false } }));
+    turn('job-comms', 'amplify it', [{ type: 'choose_plan', plan: 'amplify' }]);
+    expect(job('job-comms').choice).toBeUndefined();
+    expect(lastAi('job-comms')?.text).toContain('Not done: Amplify is for verified organisations');
+    update((s) => ({ ...s, org: { ...s.org, verified: true } }));
+    turn('job-comms', 'amplify it', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'pay_with', package: 'three' }]);
+    expect(job('job-comms')).toMatchObject({ choice: 'amplify', payWith: 'three' });
+  });
+
+  it('adds language versions only with Amplify, and writes a version’s section under the same checks as the job', () => {
+    turn('job-comms', 'add French', [{ type: 'add_language', language: 'fr' }]);
+    expect(job('job-comms').translations?.fr).toBeUndefined();
+    turn('job-comms', 'amplify, and French', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'add_language', language: 'fr' }, { type: 'add_language', language: 'en' }]);
+    expect(job('job-comms').translations?.fr).toBeDefined();
+    expect(job('job-comms').translations?.en).toBeUndefined();
+    turn('job-comms', 'write the conditions in French', [{ type: 'write_version_section', language: 'fr', section: 'conditions', lines: ['Salaire : USD 7,350 par mois.'] }]);
+    expect(lastAi('job-comms')?.text).toMatch(/it named pay that was not given/);
+    turn('job-comms', 'write the conditions in French', [{ type: 'write_version_section', language: 'fr', section: 'conditions', lines: ['Le poste est basé à Nairobi.'] }]);
+    expect(job('job-comms').translations?.fr?.sections.find((x) => x.key === 'conditions')?.lines).toEqual(['Le poste est basé à Nairobi.']);
+    expect(job('job-comms').tags).not.toContain('conditions');
+  });
+
+  it('prepares Reach only with addresses the user gave, and team emails only on the organisation’s domain', () => {
+    turn('job-comms', 'invite people', [{ type: 'reach', candidates: ['someone@example.org'] }]);
+    expect(lastAi('job-comms')?.text).toContain('Not done: email addresses that were not given');
+    turn('job-comms', 'invite ana@example.org and my colleague bo@gmail.example.org', [{ type: 'reach', candidates: ['ana@example.org'], team: ['bo@gmail.example.org'] }]);
+    expect(lastAi('job-comms')?.text).toContain('Not done: team emails outside @riverstone.example.org');
+    turn('job-comms', 'invite ana@example.org', [{ type: 'reach', candidates: ['ana@example.org'], candidateMessage: { body: 'Come and work with us.' } }]);
+    expect(job('job-comms').reachPlan).toMatchObject({ candidates: ['ana@example.org'], candidateMsg: { body: 'Come and work with us.' } });
+  });
+
+  it('keeps text for every job only for the owner, and changes the job’s language only when asked', () => {
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
+    turn('job-comms', 'keep it for every job', [{ type: 'keep', what: 'fixed', all: true }]);
+    expect(getState().org.keptFixed).toBeUndefined();
+    expect(lastAi('job-comms')?.text).toContain('only the owner can change what every job starts with');
+    update((s) => ({ ...s, me: { ...s.me, role: 'owner' } }));
+    turn('job-comms', 'keep it for every job', [{ type: 'keep', what: 'fixed', all: true }]);
+    expect(getState().org.keptFixed).toEqual(job('job-comms').commitments);
+    turn('job-comms', 'write it in Spanish', [{ type: 'set_language', language: 'es' }]);
+    expect(job('job-comms').lang).toBe('es');
+  });
+
+  it('a date to publish on is checked: a free job goes live within its own month', () => {
+    const [y, m] = new Date(getState().today).toISOString().slice(0, 7).split('-').map(Number);
+    const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-03`;
+    turn('job-comms', 'publish it next month', [{ type: 'publish_on', date: next }]);
+    expect(job('job-comms').publishOn).toBeUndefined();
+    expect(lastAi('job-comms')?.text).toMatch(/Not done: publishing on that date: a free job goes live within/);
+  });
+});
+
 describe('the AI chat: one message through the route, and the fallback', () => {
   it('sends nothing while the AI is off or not yet known', async () => {
     const f = answer(200, { reply: 'x', actions: [] });

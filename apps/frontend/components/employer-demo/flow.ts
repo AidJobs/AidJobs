@@ -1,7 +1,10 @@
+import { approvalRequired, approvedFor } from './approval';
 import { addSuggestions, SECTION_BY_KEY } from './engine';
-import { basicAdvertCheck, type Point } from './market';
+import { isPublished } from './lifecycle';
+import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './market';
 import { inferSdgs } from './setup';
-import type { AskKind, DemoJob, Format, GroupKey, State } from './types';
+import { versionsOf } from './translate';
+import type { AskKind, DemoJob, Format, GroupKey, JobLang, State } from './types';
 
 /**
  * A new employer's writing, in order (employer-side plan, section 19, steps 3 to 7): each fact just before the first section that uses
@@ -29,6 +32,9 @@ export const DECLINABLE: AskKind[] = ['grade', 'eligibility', 'languages', 'safe
 
 /** The parts of step 6 that are settled once answered. */
 export const LEFT = ['details', 'sdgs', 'fixed', 'suggest'] as const;
+
+/** The parts of steps 8 and 9 that are settled once answered: the plan, Amplify's parts, and review where it is optional. */
+export const LATER = ['plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review'] as const;
 
 let aiWriting = false;
 
@@ -91,9 +97,77 @@ export type Step =
   | { kind: 'details' }
   | { kind: 'sdgs' }
   | { kind: 'fixed' }
+  | { kind: 'keep'; what: 'fixed' | 'apply' }
   | { kind: 'suggest'; sections: string[] }
   | { kind: 'check'; point: Point }
-  | { kind: 'done' };
+  | { kind: 'plan' }
+  | { kind: 'market'; point: Point }
+  | { kind: 'full'; point: Point }
+  | { kind: 'langs' }
+  | { kind: 'version'; lang: JobLang }
+  | { kind: 'flyer' }
+  | { kind: 'reach' }
+  | { kind: 'review' }
+  | { kind: 'waiting' }
+  | { kind: 'publish' }
+  | { kind: 'live' };
+
+/** Amplify's parts, each on the line once Amplify is chosen; settled when answered, even with "no thanks". */
+export const AMPLIFY_PARTS = ['market', 'full', 'langs', 'flyer', 'reach'] as const;
+
+/** The market check's points still open, without those left as they are; none when there are too few similar jobs. */
+export function marketPoints(job: DemoJob, s: State): Point[] {
+  const m = marketCheck(job, s, job.publishOn ?? null);
+  return m.thin ? [] : m.points.filter((p) => !p.ok && !job.walk?.skipped?.includes(`market:${p.key}`));
+}
+
+/** The full advert check's points still open (requirements and pay, against similar jobs), without those left as they are. */
+export function fullPoints(job: DemoJob, s: State): Point[] {
+  const f = fullAdvertCheck(job, s);
+  return f.thin ? [] : f.points.filter((p) => !p.ok && !job.walk?.skipped?.includes(`full:${p.key}`));
+}
+
+/**
+ * Kept for next time (section 19, step 10): the first time the fixed text and the way to apply come up, the chat offers to keep them for
+ * every job; only to the owner, the one who may change Organisation settings in the demo. For others they apply to this job only.
+ */
+export function keepToOffer(job: DemoJob, s: State): 'fixed' | 'apply' | null {
+  if (s.me.role !== 'owner' || s.reviewerAs || isPublished(job)) return null;
+  const offered = s.org.keepOffered ?? [];
+  if (!offered.includes('fixed') && !s.org.keptFixed && job.commitments.length) return 'fixed';
+  if (!offered.includes('apply') && !s.org.keptApply) return 'apply';
+  return null;
+}
+
+/** Whether the job goes out with Amplify: chosen before publishing, or already published with it. */
+export function amplifying(job: DemoJob): boolean {
+  return isPublished(job) ? job.plan === 'amplify' : job.choice === 'amplify';
+}
+
+/**
+ * Steps 8 and 9 (section 19): Free or Amplify; with Amplify, its parts one at a time (the market check, the full advert check, the
+ * language versions and their review, the flyer, Reach); then review, where it is asked for or required; then publishing; then the
+ * link. Each is answered in the chat or from its part on the line.
+ */
+function afterCheck(job: DemoJob, s: State): Step {
+  if (isPublished(job)) return { kind: 'live' };
+  if (!isSettled('plan', job)) return { kind: 'plan' };
+  if (job.choice === 'amplify') {
+    const market = marketPoints(job, s)[0];
+    if (market && !isSettled('market', job)) return { kind: 'market', point: market };
+    const full = fullPoints(job, s)[0];
+    if (full && !isSettled('full', job)) return { kind: 'full', point: full };
+    if (!isSettled('langs', job)) return { kind: 'langs' };
+    const draft = versionsOf(job).find((k) => !job.translations?.[k]?.reviewed);
+    if (draft) return { kind: 'version', lang: draft };
+    if (!isSettled('flyer', job)) return { kind: 'flyer' };
+    if (!isSettled('reach', job)) return { kind: 'reach' };
+  }
+  const required = approvalRequired(s, job);
+  if (required && !approvedFor(s, job)) return job.review.state === 'none' ? { kind: 'review' } : { kind: 'waiting' };
+  if (!required && job.review.state === 'none' && !isSettled('review', job)) return { kind: 'review' };
+  return { kind: 'publish' };
+}
 
 export function isWritten(job: DemoJob, key: string): boolean {
   return job.sections.some((x) => x.key === key && x.lines.length > 0);
@@ -134,11 +208,13 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   if (!isSettled('details', job)) return { kind: 'details' };
   if (!isSettled('sdgs', job) && !job.sdgs && !inferSdgs(job).length && s.org.sdgs.length) return { kind: 'sdgs' };
   if (!isSettled('fixed', job)) return { kind: 'fixed' };
+  const keep = keepToOffer(job, s);
+  if (keep) return { kind: 'keep', what: keep };
   const offered = suggestionsFor(job, s);
   if (!isSettled('suggest', job) && offered.length) return { kind: 'suggest', sections: offered };
   const point = checkPoints(job, s)[0];
-  if (point) return { kind: 'check', point };
-  return { kind: 'done' };
+  if (point && !isPublished(job)) return { kind: 'check', point };
+  return afterCheck(job, s);
 }
 
 /** The step as a short key, stored on the message that asks about it. */
@@ -159,6 +235,13 @@ export function stepKey(step: Step | null): string {
       return `suggest:${step.sections.join(',')}`;
     case 'check':
       return `check:${step.point.key}`;
+    case 'market':
+    case 'full':
+      return `${step.kind}:${step.point.key}`;
+    case 'version':
+      return `version:${step.lang}`;
+    case 'keep':
+      return `keep:${step.what}`;
     default:
       return step.kind;
   }
@@ -181,10 +264,25 @@ export function partOfStep(step: Step | null, job: DemoJob): string | null {
       return 'details';
     case 'fixed':
       return 'fixed';
+    case 'keep':
+      return step.what === 'fixed' ? 'fixed' : 's:apply';
     case 'check':
       return step.point.section ? `s:${step.point.section}` : 'check';
-    case 'done':
-      return 'check';
+    case 'plan':
+    case 'market':
+    case 'full':
+    case 'langs':
+    case 'flyer':
+    case 'reach':
+      return step.kind;
+    case 'version':
+      return 'langs';
+    case 'review':
+    case 'waiting':
+      return 'review';
+    case 'publish':
+    case 'live':
+      return 'publish';
     default:
       return null;
   }

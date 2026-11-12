@@ -1290,7 +1290,7 @@ describe('a request for changes after an approval', () => {
     overruleChanges('job-fin', 'Minor, fixed in the next round');
     expect(publish('job-fin', { plan: 'free', schedule: null })).toBe(true);
     expect(job('job-fin').audit.some((a) => a.what === "Published with Daniel's request for changes still open. Reason: \"Minor, fixed in the next round\"; Daniel told (simulated)")).toBe(true);
-    expect(getState().notice?.text).toBe('Daniel is told it was published with their request for changes open (simulated).');
+    expect(getState().notice?.text).toMatch(/^Daniel is told it was published with their request for changes open \(simulated\)\. Saved as a job profile for next time: /);
   });
 
   it('with "Any request for changes pauses publishing", the request withdraws the approval until it is dealt with', () => {

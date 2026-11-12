@@ -1,8 +1,10 @@
 import { formatOf, missingFacts } from './actions';
+import { approvalRequired, approvedFor } from './approval';
 import { openPoints } from './Checks';
 import { headingFor } from './engine';
-import { ASKS, checkPoints, isSettled } from './flow';
-import { canGoFree } from './plans';
+import { amplifying, ASKS, checkPoints, fullPoints, isSettled, marketPoints } from './flow';
+import { isPublished } from './lifecycle';
+import { versionsOf } from './translate';
 import type { DemoJob, State } from './types';
 
 /** One part of a job on the window's progress line: the JD outline, each section, the details, the fixed text, the check, publishing. */
@@ -22,8 +24,25 @@ export function sectionOf(part: string): string | null {
  */
 export function partsOf(job: DemoJob, s: State): Part[] {
   const format = formatOf(s, job.format);
-  const amplify = Boolean(job.paidFor) || !canGoFree(s, job.id, null);
+  const amplify = amplifying(job);
+  const published = isPublished(job);
   const walk = job.walk;
+  const settled = (k: string) => published || isSettled(k, job);
+  const required = approvalRequired(s, job);
+  const planLabel = (published ? job.plan : job.choice) === 'amplify' ? 'Amplify' : (published ? job.plan : job.choice) === 'free' ? 'Free' : 'Free or Amplify';
+  const later: Part[] = [
+    { key: 'plan', label: planLabel, done: published || Boolean(job.choice) },
+    ...(amplify
+      ? [
+          { key: 'market', label: 'Market check', done: settled('market') || marketPoints(job, s).length === 0 },
+          { key: 'full', label: 'Full check', done: settled('full') || fullPoints(job, s).length === 0 },
+          { key: 'langs', label: 'Languages', done: settled('langs') && versionsOf(job).every((k) => job.translations?.[k]?.reviewed) },
+          { key: 'flyer', label: 'Flyer', done: settled('flyer') },
+          { key: 'reach', label: 'Reach', done: settled('reach') || Boolean(job.reachPlan) },
+        ]
+      : []),
+    { key: 'review', label: 'Review', done: published || (required ? approvedFor(s, job) : settled('review') || job.review.state !== 'none') },
+  ];
   const sections = job.tags.map((k): Part => {
     const sec = job.sections.find((x) => x.key === k);
     const written = Boolean(sec?.lines.length);
@@ -34,8 +53,9 @@ export function partsOf(job: DemoJob, s: State): Part[] {
     ...sections,
     { key: 'details', label: 'Details', done: walk ? ASKS.every((k) => isSettled(k, job)) && isSettled('details', job) : missingFacts(job.facts).length === 0 },
     { key: 'fixed', label: 'Fixed text', done: walk ? isSettled('fixed', job) : job.commitments.length > 0 },
-    { key: 'check', label: 'Check', done: walk ? job.sections.length > 0 && !job.setup && checkPoints(job, s).length === 0 : job.sections.length > 0 && openPoints(job, s, amplify).length === 0 },
-    { key: 'publish', label: 'Publish', done: ['scheduled', 'live', 'closed'].includes(job.status) },
+    { key: 'check', label: 'Check', done: walk ? job.sections.length > 0 && !job.setup && checkPoints(job, s).length === 0 : job.sections.length > 0 && openPoints(job, s, false).length === 0 },
+    ...later,
+    { key: 'publish', label: 'Publish', done: published },
   ];
 }
 
@@ -67,5 +87,5 @@ export function onLine(parts: Part[], fit: number, current: string): { shown: Pa
 
 /** Parts that open their own fields in the panel, so they can be set without the chat; the template opens its own panel. */
 export function hasFields(part: string): boolean {
-  return ['details', 'fixed', 'check', 'publish', 's:apply'].includes(part);
+  return ['details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish', 's:apply'].includes(part);
 }

@@ -80,8 +80,15 @@ describe("the model's answer", () => {
 
   it("says when the window, not the user, asks the AI to go on, and tells it each step of a new employer's writing", () => {
     expect(messagesFor({ stage: 'writing' }, 'Go on with the next step: write it now.', false, true)[1].content).toMatch(/The window says \(the user wrote nothing new\):\nGo on with the next step: write it now\.$/);
-    for (const kind of ['"ask"', '"write"', '"approve"', '"change"', '"genuine"', '"details"', '"sdgs"', '"fixed"', '"suggest"', '"check"', '"done"']) expect(SYSTEM).toContain(`  - ${kind}:`);
+    for (const kind of ['"ask"', '"write"', '"approve"', '"change"', '"genuine"', '"details"', '"sdgs"', '"fixed"', '"suggest"', '"check"']) expect(SYSTEM).toContain(`  - ${kind}:`);
     for (const action of ['set_pace', 'approve_section', 'settle', 'set_apply', 'fixed_text', 'use_org_sdgs', 'leave_point', 'accept_point', 'confirm_change']) expect(SYSTEM).toContain(`{"type":"${action}"`);
+  });
+
+  it('tells the AI steps 8 and 9, and that publishing, paying, and sending happen only from a card’s own button', () => {
+    for (const kind of ['"plan"', '"market" and "full"', '"langs"', '"version"', '"flyer"', '"reach"', '"review"', '"waiting"', '"publish"', '"live"']) expect(SYSTEM).toContain(`  - ${kind}:`);
+    for (const action of ['show', 'set_language', 'choose_plan', 'pay_with', 'publish_on', 'fix_point', 'leave_amplify_point', 'add_language', 'version_sections', 'write_version_section', 'update_version', 'review_version', 'reach']) expect(SYSTEM).toContain(`{"type":"${action}"`);
+    expect(SYSTEM).toMatch(/happen only when the user presses the card's own button/);
+    expect(SYSTEM).toMatch(/Never say any of these is done/);
   });
 });
 

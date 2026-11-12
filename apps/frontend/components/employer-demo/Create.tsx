@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, FileText, History, ListTree, Maximize2, Messages
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { approvalRequired, approvedFor, downloadCopy, isReviewable, updateBaseFromJob } from './actions';
+import { approvalRequired, approvedFor, downloadCopy, isReviewable, openWindowAt, updateBaseFromJob } from './actions';
 import { changesSince, changeSummary, tellOffer } from './changes';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { openPoints } from './Checks';
@@ -246,7 +246,7 @@ export default function Create({ id }: { id?: string }) {
         <span className="aj-faint min-w-0 flex-1" style={{ fontSize: 11 }}>
           {statusLine(s, job)}
         </span>
-        {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => goToPart('publish', job.id, n === 3 ? 'publish' : null) : undefined} />}
+        {!reviewing && isReviewable(job) && <Steps current={1} badge={checks.length} onStep={job.sections.length ? (n) => openWindowAt(job.id, n === 3 ? 'publish' : 'check') : undefined} />}
       </div>
       {job.sections.length > 0 && versionsOf(job).length > 0 && (
         <div className="shrink-0 px-3 pt-2 lg:px-5">
@@ -289,7 +289,7 @@ export default function Create({ id }: { id?: string }) {
             <span className="aj-muted">
               Check your job against similar ones, add language versions, {approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.
             </span>
-            <button type="button" className="aj-ink-btn self-start" onClick={() => go('publish', job.id)}>
+            <button type="button" className="aj-ink-btn self-start" onClick={() => openWindowAt(job.id, 'publish')}>
               Next: check and publish <ArrowRight size={14} strokeWidth={2} />
             </button>
           </section>

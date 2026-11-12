@@ -4,11 +4,20 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyTemplate, bringDocument, canDelete, chatNote, createFormat, downloadBlock, downloadCopy, formatOf, goOn, isReviewable, LINK_REPLY, sendChat, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { FlyerPanel } from './Flyer';
+import { isPublished } from './lifecycle';
+import { jobUrl } from './links';
+import { SkipDialog } from './Publish';
+import { LangsPart, LiveCard, FullPart, MarketPart, PaymentPanel, PlanChoice, PublishCard, ReviewPart, type Opener } from './PublishSteps';
+import { ReachEditor } from './Reach';
+import { planCount } from './invites';
+import { ReviewForm } from './Review';
+import type { ChatMsg } from './types';
 import { aiOn, askAi, GO_ON, probeAi, useAi } from './ai';
 import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
 import { readJobFile } from './readFile';
-import { CHOOSE_SDGS, OTHER_WORDING } from './walkChat';
+import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL } from './walkChat';
 import type { OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
@@ -43,7 +52,7 @@ const REVIEW = /^(please\s+)?(send|submit|ask)\b.*\breview/;
 const OWN = /\b(own|scratch|myself|build|custom)\b/i;
 const OTHERS = /\b(other|others|more|show|options|different|alternatives?|else)\b|\bsee all\b/i;
 const LINK = /^\s*(?:https?:\/\/|www\.)\S+\s*$/i;
-const OPEN_PUBLISH = 'Open Check and publish';
+const EXTRA_TABS: Record<string, string> = { flyer: 'Flyer', reach: 'Reach emails', reviewmail: 'Review email', payment: 'Payment' };
 const OPEN_EARLIER = 'Open the earlier workspace';
 const SPLIT_KEY = 'aidjobs.employerDemo.windowSplit';
 const BOX_KEY = 'aidjobs.employerDemo.chatBox';
@@ -303,14 +312,19 @@ function SdgDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
 }
 
 /** A part's own fields, in the panel above the job description, so it can be set without the chat. */
-function PartFields({ part, job, s, onClose, onFact, onPreview }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; onPreview: () => void }) {
-  const amplify = Boolean(job.paidFor) || !canGoFree(s, job.id, null);
-  const points = job.sections.length ? openPoints(job, s, amplify) : [];
-  const reviewable = isReviewable(job);
+function PartFields({ part, job, s, onClose, onFact, open }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; open: Opener }) {
+  const points = job.sections.length ? openPoints(job, s, false) : [];
   const head: Record<string, [string, string]> = {
     details: ['Details', 'The facts the job description and Google use'],
     fixed: ['Fixed text', "Your organisation's commitments, word for word"],
     check: ['Check', 'Clarity, inclusive language, placeholders, and dates'],
+    plan: ['Free or Amplify', 'How it goes out; the free terms and the packages'],
+    market: ['Market check', 'How your job compares with similar open jobs'],
+    full: ['Full check', 'Requirements and pay, compared with similar jobs'],
+    langs: ['Languages', 'Versions of the job page in other languages'],
+    flyer: ['Flyer', 'A one-page notice with a QR code'],
+    reach: ['Reach', 'Invite people by email when it goes live'],
+    review: ['Review', 'Comments, suggestions, and approval'],
     publish: ['Publish', statusLine(s, job)],
     's:apply': ['How to apply', 'The section below is written from these'],
   };
@@ -331,35 +345,30 @@ function PartFields({ part, job, s, onClose, onFact, onPreview }: { part: string
         ) : (
           <p className="m-0">Nothing to look at in the basic check.</p>
         )}
-        <p className="aj-muted m-0">For now, the market check, the full advert check, and language versions are on the Check and publish page.</p>
-        {reviewable && (
-          <button type="button" className="aj-pill self-start" onClick={() => go('publish', job.id)}>
-            {OPEN_PUBLISH}
-          </button>
-        )}
+        <p className="aj-muted m-0">With Amplify, the market check and the full advert check follow as parts of their own.</p>
       </div>
     );
-  else if (part === 'publish')
-    body = reviewable ? (
-      <div className="flex flex-col gap-2">
-        <p className="aj-muted m-0">For now, Free or Amplify, payment, and publishing are on the Check and publish page, and review is in the earlier workspace.</p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" className="aj-ink-btn" onClick={() => go('publish', job.id)}>
-            Check and publish
-          </button>
-          <button type="button" className="aj-pill" onClick={onPreview}>
-            Preview
-          </button>
-          <button type="button" className="aj-text-btn" onClick={() => go('create', job.id)}>
-            Review, in the earlier workspace
-          </button>
-        </div>
-      </div>
-    ) : (
-      <button type="button" className="aj-pill self-start" onClick={() => go('jobs', job.id)}>
-        Open it in Manage jobs
+  else if (part === 'plan') body = isPublished(job) ? <LiveCard job={job} s={s} open={open} /> : <PlanChoice job={job} s={s} />;
+  else if (part === 'market') body = <MarketPart job={job} s={s} />;
+  else if (part === 'full') body = <FullPart job={job} s={s} />;
+  else if (part === 'langs') body = <LangsPart job={job} s={s} open={open} />;
+  else if (part === 'flyer')
+    body = (
+      <button type="button" className="aj-pill self-start" onClick={() => open.tab('flyer')}>
+        Show the flyer
       </button>
     );
+  else if (part === 'reach')
+    body = (
+      <div className="flex flex-col items-start gap-1.5">
+        <span className="aj-muted">{job.reachPlan ? `${planCount(job, job.reachPlan)} people, with the emails you checked. They go when the job goes live.` : 'Optional: candidates you know, and your team to pass it on, by email when it goes live.'}</span>
+        <button type="button" className="aj-pill" onClick={() => open.tab('reach')}>
+          {job.reachPlan ? 'Open the invitations' : 'Prepare the invitations'}
+        </button>
+      </div>
+    );
+  else if (part === 'review') body = <ReviewPart job={job} s={s} open={open} />;
+  else if (part === 'publish') body = <PublishCard job={job} s={s} open={open} />;
   return (
     <section id="ej-part-card" className="aj-card ej-part-card flex flex-col gap-3 p-4" aria-label={title} style={{ scrollMarginTop: 12 }}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -445,7 +454,33 @@ function BoxGrip({ height, onChange }: { height: number; onChange: (h: number) =
  * The guide: the whole conversation, answers inside the questions, and the box, with the part in view as its subject. With the AI on,
  * a message waits in the conversation while the AI thinks, and a note says where messages go.
  */
-function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean }) {
+/** A card under the chat's message (section 19, steps 8 and 9): the one place, with the part on the line, where it is published, paid, or sent. */
+function ChatCardView({ kind, job, s, open }: { kind: NonNullable<ChatMsg['card']>; job: DemoJob; s: State; open: Opener }) {
+  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published' }[kind];
+  return (
+    <section className="aj-card ej-chat-card mt-2 flex flex-col gap-2 p-3" aria-label={label}>
+      {kind === 'plan' && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button type="button" className="aj-pill" onClick={() => open.part('plan')}>
+            Compare Free and Amplify
+          </button>
+        </div>
+      )}
+      {kind === 'review' && (
+        <div className="flex flex-col items-start gap-1.5">
+          <span className="aj-muted">Who reviews it, by when, under which rule, and the email they get.</span>
+          <button type="button" className="aj-ink-btn" onClick={() => open.tab('reviewmail')}>
+            Choose the reviewers
+          </button>
+        </div>
+      )}
+      {kind === 'publish' && <PublishCard job={job} s={s} open={open} compact />}
+      {kind === 'live' && <LiveCard job={job} s={s} open={open} compact />}
+    </section>
+  );
+}
+
+function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean; open: Opener }) {
   const [text, setText] = useState('');
   const [tapped, setTapped] = useState<string | null>(null);
   const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
@@ -462,6 +497,8 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
   }, [shown.length, thinking, waiting?.silent]);
   const reviewing = Boolean(s.reviewerAs);
   const lastUser = shown.map((m) => m.from).lastIndexOf('user');
+  // Only the latest card is live: an older one would show the job as it is now under words written for an earlier moment.
+  const lastCard = shown.map((m) => Boolean(m.card)).lastIndexOf(true);
   const last = shown[shown.length - 1];
   const own = [...s.jobs.map((j) => j.facts.title).filter(Boolean), ...s.org.countries.flatMap((c) => PLACES.filter((p) => p.country === c).map((p) => `${p.city}, ${p.country}`))];
   return (
@@ -500,6 +537,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus }: { j
               </div>
             )}
             {m.from === 'ai' && m === last && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
+            {m.from === 'ai' && m.card && i === lastCard && i > lastUser && !reviewing && <ChatCardView kind={m.card} job={job} s={s} open={open} />}
           </div>
         ))}
         {reading && (
@@ -611,6 +649,8 @@ function JobWindow({ id }: { id: string }) {
   const [view, setView] = useState<'chat' | 'job'>('chat');
   const [tab, setTab] = useState('doc');
   const [preview, setPreview] = useState(false);
+  const [extra, setExtra] = useState<string[]>([]);
+  const [skipOpen, setSkipOpen] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
   const [fact, setFact] = useState<RowKey | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -722,10 +762,15 @@ function JobWindow({ id }: { id: string }) {
     if (askId) setPart(job.id, 'details');
   }, [askId, job]);
 
-  // The line follows a new employer's writing: each step brings its part into view.
+  // The line follows a new employer's writing: each step brings its part into view; a language version to review opens its tab.
   const step = nextStep(job, s);
   const stepNow = stepKey(step);
   const seenStep = useRef(stepNow);
+  const [versionShown, setVersionShown] = useState('');
+  if (step?.kind === 'version' && versionShown !== stepNow && !reading) {
+    setVersionShown(stepNow);
+    setTab(`lang:${step.lang}`);
+  }
   useEffect(() => {
     if (stepNow === seenStep.current || reading) return;
     seenStep.current = stepNow;
@@ -765,7 +810,12 @@ function JobWindow({ id }: { id: string }) {
   const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : job.setup === 'pace' ? 'Pace' : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = versionsOf(job).map((k) => langOf(k));
-  const tabs: TabDef[] = [{ key: 'doc', label: 'Job description' }, ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })), ...(preview ? [{ key: 'preview', label: 'Preview' }] : [])];
+  const tabs: TabDef[] = [
+    { key: 'doc', label: 'Job description' },
+    ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })),
+    ...(preview ? [{ key: 'preview', label: 'Preview' }] : []),
+    ...extra.map((k) => ({ key: k, label: EXTRA_TABS[k] ?? k })),
+  ];
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
   const card = !reviewing && !job.setup && hasFields(current) && hidden !== current;
   const previewing = Boolean(job.setup) || (pick !== null && pick.tab !== 'sections');
@@ -805,6 +855,18 @@ function JobWindow({ id }: { id: string }) {
     setTab('preview');
     if (phone) setView('job');
   };
+  /** A panel tab opened only when needed (section 19): a language version, the flyer, the Reach emails, the review email, payment. */
+  const openTab = (k: string) => {
+    if (!k.startsWith('lang:') && !extra.includes(k)) setExtra((x) => (x.includes(k) ? x : [...x, k]));
+    setTab(k);
+    if (phone) setView('job');
+    requestAnimationFrame(() => document.getElementById(`ej-wtab-${k}`)?.focus({ preventScroll: true }));
+  };
+  const closeTab = (k: string) => {
+    setExtra((x) => x.filter((y) => y !== k));
+    setTab('doc');
+  };
+  const opener: Opener = { tab: openTab, part: (k) => goPart(k), preview: openPreview };
   const toJob = () => {
     setTab('doc');
     if (phone) setView('job');
@@ -819,7 +881,8 @@ function JobWindow({ id }: { id: string }) {
     if (t === 'versions') return j.versions.length ? setVersionsOpen(true) : undefined;
     if (t === 'download') return void downloadCopy(j, getState().org.name);
     if (t === 'delete') return canDelete(getState(), j) ? undefined : setDeleteOpen(true);
-    if (t === 'review') return goPart('publish');
+    if (t === 'flyer' || t === 'reach' || t === 'payment') return openTab(t);
+    if (t.startsWith('lang:')) return j.translations?.[t.slice(5) as JobLang] ? openTab(t) : undefined;
     goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
   };
   useEffect(() => {
@@ -828,8 +891,10 @@ function JobWindow({ id }: { id: string }) {
   /** The window's own requests, exact and at once; everything else goes to the AI when it is on, or to the rules. */
   const send = (text: string) => {
     const t = text.toLowerCase().trim();
-    if (t === OPEN_PUBLISH.toLowerCase()) return go('publish', job.id);
     if (t === OPEN_EARLIER.toLowerCase()) return go('create', job.id);
+    if (text === SHOW_FLYER) openTab('flyer');
+    if (text === INVITE) openTab('reach');
+    if (text === SKIP_APPROVAL) return setSkipOpen(true);
     if (LINK.test(t)) return chatNote(job.id, text, LINK_REPLY);
     if (PREVIEW.test(t) && !job.setup) {
       openPreview();
@@ -849,8 +914,14 @@ function JobWindow({ id }: { id: string }) {
       if (!no) setDeleteOpen(true);
       return chatNote(job.id, text, no ? `${no}.` : 'Confirm in the dialog: it lists what is deleted and what is kept.');
     }
-    if (PUBLISH.test(t)) return chatNote(job.id, text, 'For now, publishing is on the Check and publish page.', isReviewable(job) ? [OPEN_PUBLISH] : undefined);
-    if (REVIEW.test(t)) return chatNote(job.id, text, 'For now, review is in the earlier workspace, in its Review panel.', [OPEN_EARLIER]);
+    if (PUBLISH.test(t) && !job.setup && job.sections.length) {
+      goPart('publish');
+      return chatNote(job.id, text, isPublished(job) && job.plan !== 'free' ? 'It is already published.' : 'Here it is, with anything still needed first. The button says exactly what happens, and nothing goes out until you press it.', undefined, 'publish');
+    }
+    if (REVIEW.test(t) && isReviewable(job) && job.sections.length) {
+      goPart('review');
+      return chatNote(job.id, text, 'Choose who reviews it, by when, and under which rule; the email they get is shown before you send.', undefined, 'review');
+    }
     const last = job.chat[job.chat.length - 1];
     if (text === CHOOSE_SDGS) setFact('sdgs');
     const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
@@ -905,7 +976,7 @@ function JobWindow({ id }: { id: string }) {
     headings
   ) : (
     <div className="flex flex-col gap-3">
-      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} onPreview={openPreview} />}
+      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} open={opener} />}
       {job.status === 'live' && changesSince(job).length > 0 && (
         <div className="aj-card px-3 py-2" role="status" aria-label="Changed since publishing">
           <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
@@ -938,6 +1009,19 @@ function JobWindow({ id }: { id: string }) {
         />
       ) : lang ? (
         <LangDoc job={job} lang={lang} readOnly={reviewing} />
+      ) : EXTRA_TABS[active] ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <span className="ej-panel-label min-w-0 flex-1">{EXTRA_TABS[active]}</span>
+            <button type="button" className="aj-text-btn inline-flex items-center gap-1" style={{ height: 28 }} onClick={() => closeTab(active)}>
+              <X size={13} strokeWidth={2} aria-hidden /> Close
+            </button>
+          </div>
+          {active === 'flyer' && <FlyerPanel job={job} s={s} url={jobUrl(job)} />}
+          {active === 'reach' && <ReachEditor key={job.id} job={job} s={s} mode={isPublished(job) && job.plan === 'amplify' && job.status === 'live' ? 'send' : 'plan'} sendsOn={job.publishOn ?? null} live={job.status === 'live'} onDone={() => goOn(job.id)} />}
+          {active === 'reviewmail' && (isReviewable(job) ? <ReviewForm job={job} s={s} onSent={() => closeTab('reviewmail')} /> : <p className="aj-muted m-0">Review happens before publishing.</p>)}
+          {active === 'payment' && <PaymentPanel job={job} s={s} open={opener} />}
+        </div>
       ) : (
         doc
       )}
@@ -961,7 +1045,7 @@ function JobWindow({ id }: { id: string }) {
       )}
     </span>
   );
-  const chat = <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} />;
+  const chat = <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} open={opener} />;
   const titleBox = (
     <span className="ej-w-titlebox">
       <h1 className="ej-w-title">{job.facts.title || 'Untitled job'}</h1>
@@ -999,6 +1083,16 @@ function JobWindow({ id }: { id: string }) {
       )}
       {versionsOpen && <VersionsDialog job={job} readOnly={reviewing} onClose={() => setVersionsOpen(false)} />}
       {deleteOpen && <DeleteDialog job={job} s={s} onClose={() => setDeleteOpen(false)} onDeleted={() => go('create')} />}
+      {skipOpen && (
+        <SkipDialog
+          job={job}
+          onClose={() => setSkipOpen(false)}
+          onDone={() => {
+            setSkipOpen(false);
+            windowSays(job.id, null, 'Approval skipped, with your reason in the job’s history. The reviewers you asked are told when it is published.');
+          }}
+        />
+      )}
     </>
   );
 

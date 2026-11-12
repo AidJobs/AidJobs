@@ -26,6 +26,8 @@ import { currentMonth } from '@/components/employer-demo/plans';
 import { getState, go, goBack, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 import { AI_ROUTE, resetAi } from '@/components/employer-demo/ai';
+import { applyTemplate, chooseStyle, goOn, setPace } from '@/components/employer-demo/actions';
+import { ASKS, checkPoints, LEFT, nextStep } from '@/components/employer-demo/flow';
 
 const network: string[] = [];
 let container: HTMLDivElement;
@@ -233,8 +235,10 @@ describe('employer demo: never calls the network', () => {
 
     route(`#jobs/${id}`);
     click('Amplify this job');
+    expect(window.location.hash).toBe(`#job/${id}`);
     route(window.location.hash);
-    shows('Amplify a live free job');
+    expect(getState().jobs.find((j) => j.id === id)?.part).toBe('publish');
+    shows('Amplified, it is listed 100 days from publishing');
     click('Amplify this job · US$28.40');
     click('Pay US$28.40');
     expect(getState().jobs.find((j) => j.id === id)?.plan).toBe('amplify');
@@ -851,7 +855,8 @@ describe('employer demo: managing jobs', () => {
     const badge = step('Check')?.querySelector('.ej-count-badge')?.textContent ?? '';
     expect(badge).toMatch(/^\d+ to look at$/);
     act(() => step('Check')!.click());
-    expect(window.location.hash).toBe('#publish/job-comms');
+    expect(window.location.hash).toBe('#job/job-comms');
+    expect(getState().jobs.find((j) => j.id === 'job-comms')?.part).toBe('check');
     route('#publish/job-comms');
     expect(container.querySelector('[aria-label="Where the job stands"]')?.textContent).toContain(`${parseInt(badge, 10)} checks to look at`);
     const scroll = jest.fn();
@@ -884,10 +889,9 @@ describe('employer demo: managing jobs', () => {
     act(() => step('Write')!.click());
     expect(window.location.hash).toBe('#create/job-comms');
     route('#create/job-comms');
-    scroll.mockClear();
     act(() => step('Publish')!.click());
-    route('#publish/job-comms');
-    expect(scroll.mock.instances).toContain(document.getElementById('ej-publish-panel'));
+    expect(window.location.hash).toBe('#job/job-comms');
+    expect(getState().jobs.find((j) => j.id === 'job-comms')?.part).toBe('publish');
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
     phone = true;
     render();
@@ -1333,7 +1337,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     route(`#job/${id}`);
     expect(currentLabel()).toBe(title(b));
     const labels = Array.from(line().querySelectorAll('ol:not([aria-hidden]) .ej-line-label')).map((x) => x.textContent);
-    expect(labels).toEqual([formatOf(getState(), job(id).format).label, ...job(id).tags.map((k) => title(k)), 'Details', 'Fixed text', 'Check', 'Publish']);
+    expect(labels).toEqual([formatOf(getState(), job(id).format).label, ...job(id).tags.map((k) => title(k)), 'Details', 'Fixed text', 'Check', 'Free or Amplify', 'Review', 'Publish']);
     expect(line().querySelector('button[aria-expanded]')).toBeNull();
   });
 
@@ -1378,12 +1382,18 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     click('Hide');
     expect(container.querySelector('#ej-part-card')).toBeNull();
     part('Check');
-    shows('For now, the market check, the full advert check, and language versions are on the Check and publish page.');
+    shows('With Amplify, the market check and the full advert check follow as parts of their own.');
+    part('Free or Amplify');
+    act(() => (container.querySelector('#ej-part-card [role="radio"][aria-checked="false"]') as HTMLElement).click());
+    expect(job(id).choice).toBeDefined();
+    act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, choice: 'free' } : j)) })));
     part('Publish');
-    click('Check and publish');
-    expect(window.location.hash).toBe(`#publish/${id}`);
-    route(window.location.hash);
-    shows('Before you publish');
+    const main = () => container.querySelector('#ej-part-card .ej-main-cta') as HTMLButtonElement;
+    expect(main().textContent).toBe('Publish free');
+    click('On a date');
+    expect(job(id).publishOn).toBeDefined();
+    expect(main().textContent).toMatch(/^Schedule free for /);
+    expect(window.location.hash).toBe(`#job/${id}`);
   });
 
   it('opens the preview and language versions as tabs; answers are buttons, disabled once answered; hand edits and requests that do not fit get a reply', () => {
@@ -1428,15 +1438,14 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     shows('by hand');
 
     say('publish it');
-    shows('For now, publishing is on the Check and publish page.');
+    shows('nothing goes out until you press it');
+    expect(container.querySelector('[role="log"] section[aria-label="Publish"] .ej-main-cta')).not.toBeNull();
+    expect(job(id).part).toBe('publish');
     expect(job(id).status).toBe('draft');
     click('Earlier workspace');
     expect(window.location.hash).toBe(`#create/${id}`);
     route(window.location.hash);
     expect(container.querySelector('[aria-label="JD outline"], [aria-label="Panels"]')).not.toBeNull();
-    route(`#job/${id}`);
-    click('Open Check and publish');
-    expect(window.location.hash).toBe(`#publish/${id}`);
   });
 
   it('on phones the chat fills the screen, the job is one tap away, and the line opens as a short list', () => {
@@ -1458,7 +1467,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).toBeNull();
     expect(container.querySelector('nav[aria-label="Parts of this job"]')).toBeNull();
     click(/done$/);
-    expect(document.querySelectorAll('nav[aria-label="Parts of this job"] li').length).toBe(job(id).tags.length + 5);
+    expect(document.querySelectorAll('nav[aria-label="Parts of this job"] li').length).toBe(job(id).tags.length + 7);
     part('Details');
     expect(document.querySelector('nav[aria-label="Parts of this job"]')).toBeNull();
     expect(job(id).part).toBe('details');
@@ -1466,6 +1475,65 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     click('Chat');
     expect(container.querySelector('.ej-subject')?.textContent).toBe('About: Details');
     phone = false;
+    expect(network).toEqual([]);
+  });
+
+  it('steps 8 and 9 in the window: the tabs open when needed, only the latest card is live, and only its button publishes', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Logistics Officer in Goma, fixed-term, closing 30 December 2026", undefined, [], true);
+      applyTemplate(id, job(id).format);
+      chooseStyle(id, ['Warm']);
+      setPace(id, 'all');
+      update((st) => ({ ...st, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
+      const points = checkPoints(job(id), getState()).map((p) => p.key);
+      update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
+      goOn(id);
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    const click = (text: string) => {
+      const el = Array.from(container.querySelectorAll('button')).filter((b) => !b.disabled && b.textContent?.trim() === text).pop();
+      if (!el) throw new Error(`No button "${text}" on the screen`);
+      act(() => el.click());
+    };
+    expect(currentLabel()).toBe('Free or Amplify');
+    expect(container.querySelector('#ej-part-card [role="radiogroup"][aria-label="Free or Amplify"]')).not.toBeNull();
+    click('Amplify');
+    expect(job(id).choice).toBe('amplify');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(nextStep(job(id), getState())?.kind ?? ''); i++) click('Leave it');
+    click('Add French');
+    const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
+    expect(tabs()).toContain('Français');
+    click('No other languages');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Français');
+    click('Mark it as reviewed');
+    click('Show the flyer');
+    expect(tabs()).toContain('Flyer');
+    shows('A one-page notice with a QR code to the job');
+    click('Invite people');
+    expect(tabs()).toContain('Reach emails');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Reach emails');
+    click('No review');
+    expect(job(id).chat.at(-1)?.card).toBe('publish');
+    const cards = () => container.querySelectorAll('[role="log"] section.ej-chat-card');
+    expect(cards()).toHaveLength(1);
+    say('publish it');
+    expect(cards()).toHaveLength(1);
+    expect(job(id).status).toBe('draft');
+    const main = () => container.querySelector('[role="log"] section.ej-chat-card .ej-main-cta') as HTMLButtonElement;
+    expect(main().textContent).toBe('Amplify and publish · US$28.40');
+    click('Payment options');
+    expect(tabs()).toContain('Payment');
+    act(() => main().click());
+    shows('Simulated · no card is charged');
+    click('Pay US$28.40');
+    expect(job(id)).toMatchObject({ status: 'live', plan: 'amplify', paidVia: 'single' });
+    expect(job(id).chat.at(-1)).toMatchObject({ step: 'live', card: 'live' });
+    expect(cards()).toHaveLength(1);
+    shows('Saved as a job profile for next time: Logistics Officer, Goma.');
     expect(network).toEqual([]);
   });
 

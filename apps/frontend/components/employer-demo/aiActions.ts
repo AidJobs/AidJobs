@@ -23,12 +23,70 @@ import {
   toggleSection,
   undoLastChange,
   writeSections,
+  addTranslation,
+  addVersionSection,
+  applyFix,
+  chooseBlock,
+  freeMonthBlock,
+  keepForAll,
+  keepTranslation,
+  leaveAmplifyPoint,
+  refreshTranslation,
+  removeTranslation,
+  removeVersionSection,
+  reviewTranslation,
+  scheduleBlock,
+  setChoice,
+  setJobLang,
+  setPayWith,
+  setPublishOn,
+  setReachPlan,
+  writeVersionSection,
 } from './actions';
+import { approvalRequired } from './approval';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
-import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, isSettled, isWritten, LEFT, nextStep, stepKey } from './flow';
+import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
+import { planFor } from './invites';
+import { isPublished } from './lifecycle';
 import { sdgsOf, STYLES } from './setup';
 import { getState } from './store';
-import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, State } from './types';
+import { jobLang, langOf } from './translate';
+import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, JobLang, Message, ReachPlan, State } from './types';
+
+const LANG_KEYS: JobLang[] = ['en', 'fr', 'ar', 'es', 'pt'];
+const EMAIL = /^[\w.+-]+@[\w-]+(?:\.[\w-]+)+$/;
+
+/**
+ * The Reach invitations from a reach action: only addresses the user gave, team emails only on the organisation's own domain (the
+ * rules drop others too), and the two messages checked like any text the AI writes: no pay or contacts nobody gave.
+ */
+function reachIn(a: Record<string, unknown>, s: State, j: DemoJob, said: string): { plan: ReachPlan } | { refused: string } {
+  const base = j.reachPlan ?? planFor(j, s.org);
+  const given = known(s, j, said);
+  const list = (v: unknown, current: string[]): string[] | null => {
+    if (v === undefined) return current;
+    if (!Array.isArray(v) || v.length > 50) return null;
+    const out = v.filter((e): e is string => typeof e === 'string').map((e) => e.trim().toLowerCase());
+    return out.every((e) => EMAIL.test(e) && given.includes(e)) ? Array.from(new Set(out)) : null;
+  };
+  const candidates = list(a.candidates, base.candidates);
+  const team = list(a.team, base.team);
+  if (!candidates || !team) return { refused: 'email addresses that were not given' };
+  if (team.some((e) => !e.endsWith(`@${s.org.domain}`))) return { refused: `team emails outside @${s.org.domain}` };
+  const message = (v: unknown, current: Message, label: string): Message | string => {
+    if (v === undefined) return current;
+    if (!v || typeof v !== 'object') return `the ${label}`;
+    const m = v as Record<string, unknown>;
+    const next = { subject: typeof m.subject === 'string' ? m.subject.slice(0, 160) : current.subject, body: typeof m.body === 'string' ? m.body.slice(0, 2000) : current.body, closing: typeof m.closing === 'string' ? m.closing.slice(0, 600) : current.closing };
+    const out = checkLines([next.subject, ...next.body.split('\n'), ...next.closing.split('\n')].filter((l) => l.trim()), 'about', s, j, said);
+    return 'refused' in out ? `the ${label}: ${out.refused.replace(/^[^:]+: /, '')}` : next;
+  };
+  const candidateMsg = message(a.candidateMessage, base.candidateMsg, 'invitation');
+  const teamMsg = message(a.teamMessage, base.teamMsg, 'team email');
+  if (typeof candidateMsg === 'string') return { refused: candidateMsg };
+  if (typeof teamMsg === 'string') return { refused: teamMsg };
+  return { plan: { candidates, team, candidateMsg, teamMsg } };
+}
 
 export { FIXED_SECTIONS };
 
@@ -37,8 +95,10 @@ export { FIXED_SECTIONS };
  * checks each action it returns against the job and carries it out with its existing functions, so dates, prices, the fixed text, the
  * checks, and the free and paid rules stay exact. Anything unknown or unsafe is refused, and the reply says what was not done.
  */
-export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 'check', 'publish', 'preview', 'versions', 'download', 'delete', 'review'] as const;
-export type OpenTarget = (typeof OPEN_TARGETS)[number] | `section:${string}`;
+export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'payment', 'publish', 'preview', 'versions', 'download', 'delete'] as const;
+export type OpenTarget = (typeof OPEN_TARGETS)[number] | `section:${string}` | `lang:${string}`;
+const CARDS = ['plan', 'publish', 'review', 'live'] as const;
+const PACKAGE_KEYS = ['one', 'three', 'five', 'always'] as const;
 
 const ENGAGEMENT_KEYS: Engagement[] = ['job', 'consultancy', 'internship', 'volunteer'];
 const ORDER = [
@@ -61,7 +121,22 @@ const ORDER = [
   'use_org_sdgs',
   'leave_point',
   'accept_point',
+  'keep',
+  'set_language',
+  'choose_plan',
+  'pay_with',
+  'publish_on',
+  'fix_point',
+  'leave_amplify_point',
+  'add_language',
+  'remove_language',
+  'version_sections',
+  'write_version_section',
+  'update_version',
+  'review_version',
+  'reach',
   'open',
+  'show',
   'ask',
 ];
 const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
@@ -288,6 +363,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const writes: Array<{ key: string; lines: string[] }> = [];
   const note = said ? said.slice(0, 60) : 'Written by AidJobs';
   let ask: { fact?: ChatMsg['ask']; quick?: string[] } = {};
+  let card: ChatMsg['card'];
   for (const a of actions) {
     // The text is written before anything that follows it in the order, so a section written and approved in one answer is approved as written.
     if (writes.length && ORDER.indexOf(String(a.type)) > ORDER.indexOf('write_section')) writeSections(id, writes.splice(0), note);
@@ -361,9 +437,109 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'open': {
         const t = typeof a.target === 'string' ? a.target : '';
-        const ok = (OPEN_TARGETS as readonly string[]).includes(t) || (t.startsWith('section:') && j.tags.includes(t.slice(8)));
+        const ok = (OPEN_TARGETS as readonly string[]).includes(t) || (t.startsWith('section:') && j.tags.includes(t.slice(8))) || (t.startsWith('lang:') && Boolean(j.translations?.[t.slice(5) as JobLang]));
         if (ok && !opened.length) opened.push(t as OpenTarget);
         else if (!ok) refused.push(`opening "${t.slice(0, 30)}"`);
+        break;
+      }
+      case 'show': {
+        // Publishing, paying, and sending happen only from the card's own button, which states the whole outcome.
+        const c = oneOf(a.card, CARDS);
+        if (!c) refused.push('a card the window does not have');
+        else card = c;
+        break;
+      }
+      case 'keep': {
+        const what = oneOf(a.what, ['fixed', 'apply'] as const);
+        if (!what || typeof a.all !== 'boolean' || s.me.role !== 'owner') refused.push('keeping it for every job: only the owner can change what every job starts with');
+        else keepForAll(id, what, a.all);
+        break;
+      }
+      case 'set_language': {
+        const l = oneOf(a.language, LANG_KEYS);
+        if (!l) refused.push('the job’s language');
+        else setJobLang(id, l);
+        break;
+      }
+      case 'choose_plan': {
+        const p = oneOf(a.plan, ['free', 'amplify'] as const);
+        const no = p ? chooseBlock(s, j, p) : 'Free or Amplify';
+        if (no || !p) refused.push(no ?? 'the plan');
+        else setChoice(id, p);
+        break;
+      }
+      case 'pay_with': {
+        const k = oneOf(a.package, PACKAGE_KEYS);
+        if (!k || j.paidFor || isPublished(j)) refused.push('how it is paid');
+        else setPayWith(id, k);
+        break;
+      }
+      case 'publish_on': {
+        const d = a.date === null ? null : typeof a.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.date) ? a.date : undefined;
+        const no = d === undefined ? 'the date' : d && (scheduleBlock(s, j, d) ?? (j.choice !== 'amplify' ? freeMonthBlock(s, d) : null));
+        if (no) refused.push(`publishing on that date: ${no.toString().toLowerCase()}`);
+        else setPublishOn(id, d ?? null);
+        break;
+      }
+      case 'fix_point':
+      case 'leave_amplify_point': {
+        const kind = oneOf(a.check, ['market', 'full'] as const);
+        const point = kind ? (kind === 'market' ? marketPoints(j, s) : fullPoints(j, s)).find((p) => p.key === a.point) : undefined;
+        if (!kind || !point || j.choice !== 'amplify') refused.push('a check point that is not open');
+        else if (a.type === 'leave_amplify_point') leaveAmplifyPoint(id, kind, point.key);
+        else if (!point.fix) refused.push(`${point.title}: it has no one-tap fix`);
+        else applyFix(id, point.fix.fix, point.fix.label);
+        break;
+      }
+      case 'add_language':
+      case 'remove_language':
+      case 'review_version':
+      case 'update_version': {
+        const l = oneOf(a.language, LANG_KEYS);
+        if (!l || l === jobLang(j)) refused.push('a language version in that language');
+        else if (a.type === 'add_language') {
+          if (j.choice !== 'amplify' && j.plan !== 'amplify') refused.push('a language version: they come with Amplify');
+          else addTranslation(id, l);
+        } else if (!j.translations?.[l]) refused.push(`the ${langOf(l).label} version: there is none`);
+        else if (a.type === 'remove_language') removeTranslation(id, l);
+        else if (a.type === 'review_version') reviewTranslation(id, l);
+        else if (a.apply === true) refreshTranslation(id, l);
+        else if (a.apply === false) keepTranslation(id, l);
+        else refused.push('updating the version');
+        break;
+      }
+      case 'version_sections': {
+        const l = oneOf(a.language, LANG_KEYS);
+        const t = l ? j.translations?.[l] : undefined;
+        const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+        if (!l || !t) refused.push('the sections of a version that does not exist');
+        else {
+          for (const k of keys(a.remove)) if (t.sections.some((x) => x.key === k)) removeVersionSection(id, l, k);
+          for (const k of keys(a.add)) {
+            if (!SECTION_BY_KEY[k] || FIXED_SECTIONS.includes(k)) refused.push(`a section the demo does not have ("${k.slice(0, 30)}")`);
+            else addVersionSection(id, l, k);
+          }
+        }
+        break;
+      }
+      case 'write_version_section': {
+        const l = oneOf(a.language, LANG_KEYS);
+        const t = l ? getState().jobs.find((x) => x.id === id)?.translations?.[l] : undefined;
+        if (!l || !t) refused.push('a version that does not exist');
+        else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
+        else if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
+        else {
+          if (!t.sections.some((x) => x.key === section)) addVersionSection(id, l, section);
+          const out = checkLines(a.lines, section, s, j, said ?? '');
+          if ('refused' in out) refused.push(out.refused);
+          else writeVersionSection(id, l, section, out.lines);
+        }
+        break;
+      }
+      case 'reach': {
+        const plan = reachIn(a, s, j, said ?? '');
+        if ('refused' in plan) refused.push(plan.refused);
+        else setReachPlan(id, plan.plan);
         break;
       }
       case 'set_pace': {
@@ -379,7 +555,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'settle': {
         const what = typeof a.fact === 'string' ? a.fact : '';
-        if (!j.walk || !([...DECLINABLE, ...LEFT] as string[]).includes(what)) refused.push(`settling "${what.slice(0, 30)}"`);
+        if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER] as string[]).includes(what) || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"`);
         else settleQuestion(id, what);
         break;
       }
@@ -442,10 +618,10 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   if (!now) return { refused, opened };
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
-  const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask');
-  // A reply that asks a question stands for the step the job is now at, so the rules do not ask it again.
+  const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask') || Boolean(card);
+  // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again.
   const step = asks && now.walk ? stepKey(nextStep(now, getState())) : undefined;
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ask.quick, ask: ask.fact, by, step }, !asks);
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ask.quick, ask: ask.fact, by, step, card }, !asks);
   for (const t of opened) open(t);
   return { refused, opened };
 }

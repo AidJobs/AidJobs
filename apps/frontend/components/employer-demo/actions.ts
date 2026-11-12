@@ -1,6 +1,7 @@
 'use client';
 
 import { applyLines, defaultApply } from './apply';
+import { approvalRequired, approvedFor, isApproved, pausedByChanges } from './approval';
 import {
   addDays,
   applyEdit,
@@ -30,18 +31,19 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, LANGUAGE_PRICE, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, viaFor, type PackageKey } from './plans';
 import { workingDay, type Fix } from './market';
 import { MARKET_SAMPLE } from './sample';
 import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
-import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation } from './translate';
+import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, toneOf, TYPE_REASONS, wordsFor } from './setup';
 import { aiWrites, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
+import { INVITE, KEEP_ALL, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, REMIND, SEND_REVIEW, SHOW_FLYER, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
+import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, JobProfile, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -124,15 +126,7 @@ function ownerOnly(): boolean {
   return !getState().reviewerAs;
 }
 
-export function approvalRequired(s: State, j: DemoJob): boolean {
-  if (s.org.approval === 'all') return true;
-  if (s.org.approval === 'senior') return /^(P[45]|D\d)/.test(j.facts.grade);
-  return false;
-}
-
-export function isApproved(j: DemoJob): boolean {
-  return j.review.state === 'approved' || (j.review.rule === 'any' ? j.review.reviewers.some((r) => r.decision === 'approved') : j.review.reviewers.length > 0 && j.review.reviewers.every((r) => r.decision === 'approved'));
-}
+export { approvalRequired, approvedFor, isApproved, pausedByChanges };
 
 /** The four facts the earlier workspace asks for, in order. */
 type LegacyAsk = 'title' | 'place' | 'deadline' | 'contract';
@@ -202,7 +196,7 @@ function ensurePrompt(id: string) {
     }
     const key = stepKey(step);
     const last = j.chat[j.chat.length - 1];
-    if (step.kind === 'done' ? j.chat.some((m) => m.step === 'done') : last?.from === 'ai' && last.step === key) return;
+    if (step.kind === 'live' ? j.chat.some((m) => m.step === 'live') : last?.from === 'ai' && last.step === key) return;
     const prompts = promptFor(s, j, formatOf(s, j.format), step, key, aiWrites());
     if (prompts.length) updateJob(id, (x) => ({ ...x, chat: [...x.chat, ...prompts] }));
     return;
@@ -253,6 +247,11 @@ function memoryHint(s: State, title: string): string | null {
   return past ? `You hired ${article(past.facts.title)} ${past.facts.title} before (${past.facts.location}). Say "start from last time" to reuse it.` : null;
 }
 
+/** The fixed text a job starts with: what the organisation kept for every job, or the template's own. */
+function fixedFor(s: State, format: Format): string[] {
+  return s.org.keptFixed ? [...s.org.keptFixed] : format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember);
+}
+
 function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: string): DemoJob {
   const format = formatOf(s, formatKey);
   return {
@@ -264,8 +263,8 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
     tags: orderSections(recommendSections(format, facts), format),
     format: format.key,
     tone: format.tone,
-    commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember),
-    apply: defaultApply(s.org.orgType, s.org.careersUrl),
+    commitments: fixedFor(s, format),
+    apply: s.org.keptApply ? { ...s.org.keptApply } : defaultApply(s.org.orgType, s.org.careersUrl),
     genuine: {},
     sections: [],
     versions: [],
@@ -381,7 +380,7 @@ export function applyTemplate(id: string, formatKey: string, said?: string, tags
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
       const keys = outlineOrder(tags ?? orderSections(recommendSections(format, j.facts), format));
-      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), part: undefined };
+      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, commitments: fixedFor(s, format), part: undefined };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
       const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
@@ -514,8 +513,8 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
  * along the way. `said` is null for the first reply, whose message is already there. `askNext`: a reply that asks nothing is followed
  * by the next missing fact's question, as the rules do.
  */
-export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string; step?: string }, askNext = true) {
-  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}), ...(reply.step ? { step: reply.step } : {}) }] }));
+export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string; step?: string; card?: ChatMsg['card'] }, askNext = true) {
+  updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}), ...(reply.step ? { step: reply.step } : {}), ...(reply.card ? { card: reply.card } : {}) }] }));
   if (askNext || getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
 }
 
@@ -782,10 +781,25 @@ export function sendChat(id: string, text: string, focus?: string) {
 }
 
 /** A request the window answers itself (open the preview, earlier versions): the message and the reply join the conversation. */
-export function chatNote(id: string, said: string, reply: string, quick?: string[]) {
+export function chatNote(id: string, said: string, reply: string, quick?: string[], card?: ChatMsg['card']) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), msg('ai', reply, quick)] }));
+  updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), { ...msg('ai', reply, quick), ...(card ? { card } : {}) }] }));
+  if (!card) ensureAsk(id);
+}
+
+/** After something done by a button (published, paid, sent for review), the chat goes on to what comes next. */
+export function goOn(id: string) {
   ensureAsk(id);
+}
+
+/**
+ * Opens the window at one of its parts: what Overview, Manage jobs, and the earlier workspace link to (section 19, Scope). For a live
+ * or scheduled free job, publishing can only mean amplifying it, so that is what its Publish part then offers.
+ */
+export function openWindowAt(id: string, part: string) {
+  const amplifyIt = (j: DemoJob) => part === 'publish' && j.plan === 'free' && (j.status === 'live' || j.status === 'scheduled');
+  update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, part, ...(amplifyIt(j) ? { choice: 'amplify' as const } : {}) } : j)) }), true);
+  go('job', id);
 }
 
 const ASK_SET: Record<AskKind, string> = { title: 'job title', place: 'duty station', deadline: 'closing date', contract: 'contract', grade: 'grade', eligibility: 'who can apply', languages: 'languages', safeguarding: 'safeguarding level', salary: 'pay', method: 'way to apply' };
@@ -886,7 +900,9 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       return true;
     case 'fixed': {
       if (t === KEEP_FIXED || /^(?:yes|ok|okay|keep|fine|good|sure)\b/i.test(t)) {
-        settle(j.id, 'fixed', text, 'Kept, word for word.');
+        const lang = jobLang(j);
+        if (lang !== 'en' && !s.org.fixedLangs?.includes(lang)) update((st) => ({ ...st, org: { ...st.org, fixedLangs: [...(st.org.fixedLangs ?? []), lang] } }));
+        settle(j.id, 'fixed', text, lang !== 'en' && !s.org.fixedLangs?.includes(lang) ? `Kept, word for word, and confirmed for every ${langOf(lang).label} job.` : 'Kept, word for word.');
         return true;
       }
       if (t === 'Add them') {
@@ -904,6 +920,11 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       settle(j.id, 'fixed', text, `Left out for this job: ${out.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')}.`);
       return true;
     }
+    case 'keep':
+      if (t === KEEP_ALL || /^(?:yes|ok|okay|sure|keep (?:it|them)|every job|all jobs)\b/i.test(t)) keepForAll(j.id, step.what, true, text);
+      else if (t === THIS_JOB || /^(?:no|just this|only this|this job)\b/i.test(t)) keepForAll(j.id, step.what, false, text);
+      else return false;
+      return true;
     case 'suggest': {
       const add = step.sections.find((k) => t.toLowerCase() === `add ${headingFor(k, format).toLowerCase()}` || new RegExp(`\\badd\\b.*\\b${(SECTION_BY_KEY[k]?.label ?? k).toLowerCase()}\\b`).test(t.toLowerCase()));
       if (add) {
@@ -966,6 +987,122 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       }
       return false;
     }
+    default:
+      return laterTurn(s, j, step, text);
+  }
+}
+
+const FREE_WORDS = /^(?:publish (?:it )?free|free|the free one|go free|free,? please)\b/i;
+const AMPLIFY_WORDS = /^(?:amplify|use a package job|amplify it|go with amplify|the paid one|paid)\b/i;
+
+/** The language versions named in a message ("Add French", "French and Spanish"), not the job's own. */
+function langsNamed(j: DemoJob, text: string): JobLang[] {
+  const t = text.toLowerCase();
+  return versionChoices(j)
+    .filter((l) => new RegExp(`\\b${l.label.toLowerCase()}\\b`).test(t) || t.includes(l.native.toLowerCase()))
+    .map((l) => l.key);
+}
+
+/**
+ * Answers to steps 8 and 9 (section 19), read by the rules. Anything that publishes, pays, or sends is left to its card's button. A
+ * short reply the rules cannot read is asked again rather than taken as text for the job description, since no section is in view.
+ */
+function laterTurn(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, text: string): boolean {
+  const handled = laterAnswer(s, j, step, text);
+  if (handled || !['plan', 'market', 'full', 'langs', 'version', 'flyer', 'reach', 'review', 'waiting', 'publish'].includes(step.kind)) return handled;
+  const t = text.trim();
+  if (EDIT_WORDS.test(t) || isRequest(t) || t.split(/\s+/).length > 6) return false;
+  const last = [...j.chat].reverse().find((m) => m.from === 'ai' && m.step === stepKey(step));
+  updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', "I didn't catch that for this step. Pick an answer, or tell me in your own words.", last?.quick), step: stepKey(step), ...(last?.card ? { card: last.card } : {}) }] }));
+  return true;
+}
+
+function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, text: string): boolean {
+  const t = text.trim();
+  const say = (reply: string, quick?: string[], card?: ChatMsg['card']) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', reply, quick), ...(card ? { card } : {}) }] }));
+  switch (step.kind) {
+    case 'plan':
+      if (FREE_WORDS.test(t)) return setChoice(j.id, 'free', text) || true;
+      if (AMPLIFY_WORDS.test(t)) return setChoice(j.id, 'amplify', text) || true;
+      return false;
+    case 'market':
+    case 'full': {
+      const p = step.point;
+      if (t === LEAVE_IT || /^(?:leave it|keep it|it'?s fine|ignore|no)\b/i.test(t)) {
+        leaveAmplifyPoint(j.id, step.kind, p.key, text);
+        return true;
+      }
+      if (p.fix && (t === p.fix.label || /^(?:yes|ok|okay|do it|fix it|apply it|sure)\b/i.test(t))) {
+        applyFix(j.id, p.fix.fix, p.fix.label);
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Done: ${p.fix!.label.charAt(0).toLowerCase()}${p.fix!.label.slice(1)}. Undo is in the notice.`)] }));
+        return true;
+      }
+      return false;
+    }
+    case 'langs': {
+      if (t === NO_MORE_LANGS || NO_MORE.test(t)) {
+        settle(j.id, 'langs', text, versionsOf(j).length ? 'Fine.' : `Fine: ${langOf(jobLang(j)).label} only.`);
+        return true;
+      }
+      const named = langsNamed(j, t).filter((k) => !j.translations?.[k]);
+      if (!named.length) return false;
+      for (const k of named) addTranslation(j.id, k);
+      const now = getState().jobs.find((x) => x.id === j.id);
+      const extra = now ? langsToPay(now, 'amplify', viaFor(s, now)) : 0;
+      updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Drafted ${named.map((k) => langOf(k).label).join(' and ')}, each in its own tab.${extra ? ` That is ${extra} beyond what Amplify includes: ${usd(extra * LANGUAGE_PRICE)}, added to the payment.` : ''}`)] }));
+      return true;
+    }
+    case 'version': {
+      const label = langOf(step.lang).label;
+      if (t === MARK_REVIEWED || /^(?:mark (?:it )?(?:as )?reviewed|reviewed|it'?s (?:good|fine)|looks good|approve it)\b/i.test(t)) {
+        reviewTranslation(j.id, step.lang);
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `The ${label} version is reviewed.`)] }));
+        return true;
+      }
+      if (t === `Remove ${label}` || new RegExp(`^(?:remove|drop|delete)\\b.*\\b${label}\\b`, 'i').test(t)) {
+        removeTranslation(j.id, step.lang);
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', `Removed the ${label} version.`)] }));
+        return true;
+      }
+      return false;
+    }
+    case 'flyer':
+      if (t === SHOW_FLYER || /^(?:yes|ok|okay|show|sure)\b/i.test(t)) settle(j.id, 'flyer', text, 'The flyer is in its tab: print it, or save it as a PDF from the print window.');
+      else if (t === NO_THANKS || NO_MORE.test(t)) settle(j.id, 'flyer', text, 'Fine. It stays on the line as Flyer if you want it later.');
+      else return false;
+      return true;
+    case 'reach':
+      if (t === INVITE || /^(?:yes|ok|okay|sure|invite)\b/i.test(t)) settle(j.id, 'reach', text, 'The invitations are in the Reach tab: add the people, check both emails, and save. They go when the job goes live.');
+      else if (t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
+      else return false;
+      return true;
+    case 'review':
+      if (t === NO_REVIEW || (!approvalRequired(s, j) && NO_MORE.test(t))) {
+        settle(j.id, 'review', text, 'Fine: no review.');
+        return true;
+      }
+      if (t === SEND_REVIEW || /\breview\b|^(?:yes|ok|okay|sure)\b/i.test(t) || s.team.some((p) => new RegExp(`\\b${p.name.split(' ')[0]}\\b`, 'i').test(t))) {
+        say('Choose who reviews it, by when, and under which rule; the email they get is shown before you send.', undefined, 'review');
+        return true;
+      }
+      return false;
+    case 'waiting':
+      if (t === REMIND || /^remind\b/i.test(t)) {
+        remindReviewers(j.id);
+        say('Reminded them (simulated).');
+        return true;
+      }
+      if (/^send round \d+$/i.test(t) || /^send (?:it )?(?:back|again)\b/i.test(t)) {
+        say('Send it back: they see only what changed since the last round.', undefined, 'review');
+        return true;
+      }
+      return false;
+    case 'publish':
+      if (/^(?:publish|post it|go live|schedule|yes|ok|okay)\b/i.test(t)) {
+        say('Here it is: the button says exactly what happens, and nothing goes out until you press it.', undefined, 'publish');
+        return true;
+      }
+      return false;
     default:
       return false;
   }
@@ -1159,7 +1296,7 @@ export function applyFormat(id: string, formatKey: string) {
       const format = formatOf(s, formatKey);
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      const next = { ...touched(j), renamed: undefined, format: format.key, tone: format.tone, tags, commitments: format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      const next = { ...touched(j), renamed: undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));
@@ -1627,14 +1764,15 @@ export function setJobLang(id: string, lang: JobLang) {
  * Further language versions bought after publishing, from the chat (section 19): a small checkout of their own, simulated; the receipt
  * goes to Billing. Before publishing they join the job's own checkout instead.
  */
-export function buyLanguages(id: string, n: number): boolean {
+export function buyLanguages(id: string, n: number, beforePublishing = false): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
-  if (!j || s.reviewerAs || n < 1 || j.plan !== 'amplify') return false;
+  if (!j || s.reviewerAs || n < 1 || (beforePublishing ? j.choice !== 'amplify' : j.plan !== 'amplify')) return false;
   const item = `${n} more language ${n === 1 ? 'version' : 'versions'}: ${j.facts.title}`;
   update((st) => ({
     ...st,
-    jobs: st.jobs.map((x) => (x.id === id ? { ...x, langsPaid: (x.langsPaid ?? 0) + n, audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Paid for ${item.split(':')[0]} (simulated)` }] } : x)),
+    // Before publishing the count is added when it is published, with the job's own payment.
+    jobs: st.jobs.map((x) => (x.id === id ? { ...x, langsPaid: (x.langsPaid ?? 0) + (beforePublishing ? 0 : n), audit: [...x.audit, { at: Date.now(), who: st.me.name, what: `Paid for ${item.split(':')[0]} (simulated)` }] } : x)),
     receipts: [{ id: `rc${Date.now()}`, at: Date.now(), item, amount: `${usd(n * LANGUAGE_PRICE)} (placeholder)` }, ...st.receipts],
   }));
   return true;
@@ -1670,16 +1808,6 @@ export function changesAfterApproval(j: DemoJob): { approvers: string[]; askers:
   const approvers = j.review.reviewers.filter((r) => r.decision === 'approved').map((r) => r.name);
   const askers = j.review.reviewers.filter((r) => r.decision === 'changes').map((r) => ({ name: r.name, note: r.note }));
   return approvers.length && askers.length && isApproved(j) ? { approvers, askers } : null;
-}
-
-/** "Any request for changes pauses publishing": with that setting, an open request withdraws an approval that is required. */
-export function pausedByChanges(s: State, j: DemoJob): boolean {
-  return Boolean(s.org.changesPause) && approvalRequired(s, j) && j.review.reviewers.some((r) => r.decision === 'changes');
-}
-
-/** Approved, as far as publishing is concerned. */
-export function approvedFor(s: State, j: DemoJob): boolean {
-  return isApproved(j) && !pausedByChanges(s, j);
 }
 
 /** "Publish anyway" over a request for changes: the reason (optional) goes into the history when it is published. */
@@ -1718,6 +1846,111 @@ export type Paid = 'direct' | 'onHand';
 
 /** `langs`: language versions beyond those included, paid in the same checkout. */
 export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid; langs?: number };
+
+/**
+ * Free or Amplify, chosen before publishing (section 19, step 8), in the chat or from its part on the line. Amplify only for a verified
+ * organisation; Free only while the month has a free job for it. Choosing Free after Amplify keeps Amplify's work, hidden until it is
+ * chosen again. The reason when it cannot be chosen.
+ */
+export function chooseBlock(s: State, j: DemoJob, plan: Plan): string | null {
+  if (s.reviewerAs) return 'Reviewers cannot choose how it is published';
+  if (plan === 'amplify' && !s.org.verified) return 'Amplify is for verified organisations: verify yours in Organisation settings';
+  if (plan === 'free' && j.paidFor) return 'It is already paid for, so it goes out with Amplify';
+  if (plan === 'free' && !canGoFree(s, j.id, j.publishOn ?? null)) return `Both free jobs for ${monthName(monthFor(s, j.publishOn ?? null))} are used: Amplify, or a package job, publishes it now`;
+  return null;
+}
+
+export function setChoice(id: string, plan: Plan, said?: string): boolean {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  if (!j) return false;
+  const no = chooseBlock(s, j, plan);
+  if (no) {
+    if (said) updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), msg('ai', `${no}.`)] }));
+    return false;
+  }
+  updateJob(id, (x) => ({
+    ...x,
+    choice: plan,
+    ...(plan === 'free' && x.publishOn && freeMonthBlock(s, x.publishOn) ? { publishOn: undefined } : {}),
+    walk: x.walk ? { ...x.walk, settled: Array.from(new Set([...x.walk.settled, 'plan'])) } : x.walk,
+    chat: said ? [...x.chat, msg('user', said), msg('ai', plan === 'free' ? "Free it is. A free job is used only when it's published." : "Amplify it is. Let's go through what it adds, one at a time.")] : x.chat,
+  }));
+  ensureAsk(id);
+  return true;
+}
+
+/** The date to publish on, or none for now; checked again when it is published. */
+export function setPublishOn(id: string, date: string | null) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, publishOn: date ?? undefined }));
+}
+
+/** How Amplify is paid: one job, a pack, or the subscription. */
+export function setPayWith(id: string, key: PackageKey) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({ ...j, payWith: key }));
+}
+
+/**
+ * Kept for next time (section 19, step 10): the fixed text or the way to apply, kept for every job or for this one only. Offered once;
+ * only the owner may keep it. Each new job starts with what is kept; jobs already published keep their own.
+ */
+export function keepForAll(id: string, what: 'fixed' | 'apply', keep: boolean, said?: string) {
+  const s0 = getState();
+  const j0 = s0.jobs.find((x) => x.id === id);
+  if (!j0 || s0.reviewerAs || s0.me.role !== 'owner') return;
+  update((s) => ({
+    ...s,
+    org: {
+      ...s.org,
+      keepOffered: Array.from(new Set([...(s.org.keepOffered ?? []), what])),
+      ...(keep && what === 'fixed' ? { keptFixed: [...j0.commitments] } : {}),
+      ...(keep && what === 'apply' ? { keptApply: { ...j0.apply } } : {}),
+    },
+    jobs: s.jobs.map((x) => (x.id === id && said ? { ...x, chat: [...x.chat, msg('user', said), msg('ai', keep ? 'Kept for every job. You can change or lock it in Organisation settings.' : 'Fine: this job only.')] } : x)),
+  }));
+  ensureAsk(id);
+}
+
+/** What is kept no longer applies to new jobs (from Organisation settings). */
+export function stopKeeping(what: 'fixed' | 'apply') {
+  if (getState().me.role !== 'owner') return;
+  update((s) => ({ ...s, org: { ...s.org, ...(what === 'fixed' ? { keptFixed: undefined } : { keptApply: undefined }) } }));
+}
+
+/** The fixed texts kept for every job, edited in Organisation settings. */
+export function setKeptFixed(keys: string[]) {
+  if (getState().me.role !== 'owner') return;
+  update((s) => ({ ...s, org: { ...s.org, keptFixed: keys } }));
+}
+
+/** The way to apply kept for every job, edited in Organisation settings. */
+export function setKeptApply(patch: Partial<ApplySettings>) {
+  if (getState().me.role !== 'owner') return;
+  update((s) => (s.org.keptApply ? { ...s, org: { ...s.org, keptApply: { ...s.org.keptApply, ...patch } } } : s));
+}
+
+/** A part of steps 8 and 9 answered ("No other languages", "No thanks", "No review"), with the reply. */
+export function settleLater(id: string, what: string, said?: string, reply?: string) {
+  if (!ownerOnly()) return;
+  settle(id, what, said ?? '', reply);
+  ensureAsk(id);
+}
+
+/** A market or full advert check point left as it is: nothing changes, and the check moves on. */
+export function leaveAmplifyPoint(id: string, kind: 'market' | 'full', key: string, said?: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, skipped: Array.from(new Set([...(j.walk.skipped ?? []), `${kind}:${key}`])) }, chat: said ? [...j.chat, msg('user', said), msg('ai', 'Left as it is.')] : j.chat } : j));
+  ensureAsk(id);
+}
+
+/** A message from the window itself (a tab opened, a step done by a button), so the chat says what happened and goes on. */
+export function windowSays(id: string, said: string | null, reply: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (x) => ({ ...x, chat: [...x.chat, ...(said ? [msg('user', said)] : []), msg('ai', reply)] }));
+  ensureAsk(id);
+}
 
 /** A job paid directly is one job (one language version included); a pack or subscription job includes two. */
 function viaOf(paid: Paid | undefined, j: DemoJob): DemoJob['paidVia'] {
@@ -1800,10 +2033,33 @@ export function publish(id: string, o: PublishOptions): boolean {
       sending = Boolean(reach.reach && !o.schedule);
       return { ...next, ...reach };
     });
-    return { ...s, jobs, notice: told ? { text: told } : s.notice };
+    const out = jobs.find((x) => x.id === id);
+    if (!out) return { ...s, jobs };
+    const profile = profileOf(out);
+    const saved = `Saved as a job profile for next time: ${out.facts.title}${out.facts.location ? `, ${out.facts.location.split(',')[0]}` : ''}.`;
+    return {
+      ...s,
+      jobs,
+      profiles: [profile, ...(s.profiles ?? []).filter((p) => !(p.title === profile.title && p.location === profile.location))],
+      notice: { text: told ? `${told} ${saved}` : saved, unprofile: profile.id },
+    };
   });
   if (sending) simulateDelivery(id);
   return true;
+}
+
+/**
+ * A job profile (section 19, step 10): the role's facts and choices, saved automatically when the job is published, with a visible
+ * note and Undo, for the next job like it. The closing date, dates, and positions are left out: they change from job to job.
+ */
+function profileOf(j: DemoJob): JobProfile {
+  const { deadline: _deadline, closingTime: _time, startDate: _start, positions: _positions, ...facts } = j.facts;
+  return { id: `pf-${j.id}-${Date.now()}`, from: j.id, title: j.facts.title, location: j.facts.location, family: j.family, format: j.format, tags: [...j.tags], facts, style: j.style, apply: j.apply, commitments: [...j.commitments], lang: j.lang, at: Date.now() };
+}
+
+/** Undo for a job profile just saved. */
+export function forgetProfile(profileId: string) {
+  update((s) => ({ ...s, profiles: (s.profiles ?? []).filter((p) => p.id !== profileId), notice: { text: 'The job profile was not kept.' } }));
 }
 
 /** Saves the people and the messages for the next Reach round. Team emails go only to the organisation's own domain. */

@@ -62,6 +62,32 @@ export type Org = {
   freeTermsAccepted: boolean;
   /** The writing style was kept for every job from the chat, so it is not offered again. */
   styleKept?: boolean;
+  /**
+   * Kept for every job (section 19, step 10): the fixed text put on each new job, and how people apply; changed afterwards only in
+   * Organisation settings. `keepOffered`: what the chat has already offered to keep, so it is offered only the first time.
+   */
+  keptFixed?: string[];
+  keptApply?: ApplySettings;
+  keepOffered?: Array<'fixed' | 'apply'>;
+  /** Languages whose fixed text the organisation has confirmed, once per language, for reuse. */
+  fixedLangs?: string[];
+};
+
+/** A job's facts and choices, saved automatically when it is published, for the next job like it (managed with the profiles page, later). */
+export type JobProfile = {
+  id: string;
+  from: string;
+  title: string;
+  location: string;
+  family: string;
+  format: string;
+  tags: string[];
+  facts: Partial<Facts>;
+  style?: string[];
+  apply: ApplySettings;
+  commitments: string[];
+  lang?: string;
+  at: number;
 };
 
 export type Engagement = 'job' | 'consultancy' | 'internship' | 'volunteer';
@@ -114,7 +140,13 @@ export type AskKind = 'title' | 'place' | 'contract' | 'grade' | 'eligibility' |
  * model that wrote it, shown under the reply while two models are compared in the preview. `step`: the step of a new employer's
  * writing this message asks about, so the same question is not asked twice.
  */
-export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: AskKind; ai?: boolean; by?: string; step?: string };
+export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: string[]; ask?: AskKind; ai?: boolean; by?: string; step?: string; card?: ChatCard };
+
+/**
+ * A card under a message, with the one button that does what it says (section 19, steps 8 and 9): anything that publishes, pays, or
+ * sends something to someone is done from a button that states the whole outcome, never by the chat on its own.
+ */
+export type ChatCard = 'plan' | 'publish' | 'review' | 'live';
 
 /** "One section at a time", or "write it all, then I'll review". */
 export type Pace = 'step' | 'all';
@@ -283,6 +315,13 @@ export type DemoJob = {
   listingChoice?: 'leave';
   /** A paid job taken back to a draft: publishing it again costs nothing. */
   paidFor?: boolean;
+  /**
+   * Before publishing, in the window (section 19, steps 8 and 9): Free or Amplify as chosen so far, the date to publish on (none for
+   * now), and how to pay for Amplify. `plan` is set only when it is published. "Publish free instead" keeps Amplify's work, hidden.
+   */
+  choice?: Plan;
+  publishOn?: string;
+  payWith?: 'one' | 'three' | 'five' | 'always';
   /** How an amplified job was paid: as one job, or as a package or subscription job, which includes more language versions. */
   paidVia?: 'single' | 'package';
   /** Language versions paid for beyond those included. */
@@ -325,8 +364,8 @@ export type Pack = { id: string; jobs: number; left: number; ends: string; at: n
 /** "Always hiring": a number of jobs each month; unused ones lapse at renewal; cancelled, it runs to the renewal date. */
 export type Subscription = { since: string; renews: string; left: number; cancelled: boolean };
 
-/** `restore` offers to bring back a job just deleted (it is in Recently deleted). */
-export type Notice = { text: string; undo?: DemoJob[]; restore?: string } | null;
+/** `restore` offers to bring back a job just deleted (it is in Recently deleted); `unprofile` to forget a job profile just saved. */
+export type Notice = { text: string; undo?: DemoJob[]; restore?: string; unprofile?: string } | null;
 
 /** A deleted job, restorable for 14 days, then erased (plan section 17, decision 2). */
 export type DeletedJob = { job: DemoJob; at: number; by: string; told: string[]; was?: JobStatus };
@@ -359,4 +398,6 @@ export type State = {
   gone?: string[];
   /** The pace chosen last time, used for the next new job. */
   pace?: Pace;
+  /** Job profiles saved when jobs are published, the newest first. */
+  profiles?: JobProfile[];
 };
