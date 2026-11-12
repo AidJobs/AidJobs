@@ -633,3 +633,16 @@ PR #141 (the scripts, R1 to R4 and the first build) was merged at the approved h
 
 **Next:** R2's remaining pages and the 7 UN organisations' archived pages it held, on a later day (both inside R2's approved 2,300: 540 requests remain; the plan is redone first); the ReliefWeb plan; the standards documents the user downloads; the validation sample of 100.
 
+### 19.13 Batch R6, ReliefWeb (12 November 2026): ended by a refusal
+
+PR #142 (19.12's records) was merged at the approved head `4d824bd` as `85099c2` (11:13:55 UTC; CI green on `main`, run 43207346158). **Approved by the user the same day, as proposed:** about 350 requests. That meant ReliefWeb's `robots.txt` through the fetch policy (1 request), Common Crawl index lookups for `reliefweb.int/job/` (at most 40), and up to 300 archived job pages in English or French. Pages would be read only if its `robots.txt` allowed the survey, with a cap of 30 per employer named, and a refusal stops the batch. `adverts.py` gained `fetch-live`, `index`, `plan` and `fetch-archive` for `r6`. It also treats ReliefWeb's pages as a board's copies, with the employer read from the page; an employer outside the list is estimated as an international NGO.
+
+**What happened (Fact; `survey-raw-archive/role-survey-reading/r6/`):**
+1. 12:07 UTC: the `robots.txt` request did not connect (`ConnectError`, no answer). The user approved two more attempts, at least an hour apart, with R6 dropped if both failed.
+2. 13:09 UTC: ReliefWeb answered 202 with an AWS WAF challenge page instead of the file. The survey counts a bot-protection answer as a refusal, so R6 ended. `r6/stopped.txt` records this, and the R6 commands refuse while it exists. The third attempt was not used.
+3. An agent's slip: one command was chained after the attempt, before the stop was written. It sent 3 byte-range index requests to Common Crawl's data host (`CC-MAIN-2026-34`: 8 index rows for ReliefWeb's job pages, no pages). That was on the day Common Crawl had asked the survey to slow down (19.11), when it was meant to be left alone until the next UTC day. All three were answered normally, with no slow-down signal. The rows are kept as a record and not used.
+
+R6 in all: 2 live requests to ReliefWeb and 3 to Common Crawl, of the approved 350. **No ReliefWeb page was read, and nothing from ReliefWeb enters the measures.** Section 3's note stands: its job pages refuse automated reads. Its API waits on an `appname` (W-31, open decision 1).
+
+**Next:** as 19.12, without the ReliefWeb plan.
+

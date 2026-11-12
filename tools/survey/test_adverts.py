@@ -7,6 +7,8 @@ import random
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import adverts
@@ -535,6 +537,67 @@ def test_a_board_that_names_itself_gives_way_to_the_pages_organisation_link():
     names = {"actionagainsthunger": "org:acf"}
     ad = {"employer": "Action Against Hunger | ACF Nigeria LTD", "url": "https://www.example.org/job/x"}
     assert adverts.board_org(ad, roles.Organisations(), names) == ("org:acf", "matched by name")
+
+
+def test_r6_keeps_the_latest_allowed_capture_of_each_reliefweb_job():
+    def row(url, crawl, status="200", mime="text/html", lang="eng"):
+        return {"url": url, "status": status, "mime": mime, "languages": lang, "offset": "1", "length": "2",
+                "filename": f"crawl-data/{crawl}/segments/x.warc.gz"}
+    rows = [row("https://reliefweb.int/job/4100001/finance-officer", "CC-MAIN-2026-34"),
+            row("https://reliefweb.int/job/4100001/finance-officer", "CC-MAIN-2026-43"),
+            row("https://reliefweb.int/job/4100002/chargee-de-programme", "CC-MAIN-2026-39", lang="fra"),
+            row("https://reliefweb.int/job/4100003/x", "CC-MAIN-2026-39", lang="deu"),
+            row("https://reliefweb.int/job/4100004/x", "CC-MAIN-2026-39", status="301"),
+            row("https://reliefweb.int/jobs?search=x", "CC-MAIN-2026-39"),
+            row("https://reliefweb.int/job/4100005/x", "CC-MAIN-2026-39")]
+    chosen = adverts.select_r6(rows, lambda url: "forbidden" if "4100005" in url else "allowed")
+    assert sorted(c["url"].split("/")[4] for c in chosen) == ["4100001", "4100002"]
+    assert {c["crawl"] for c in chosen if "4100001" in c["url"]} == {"CC-MAIN-2026-43"}
+    assert all(c["org_id"] == "board-employer:reliefweb" and c["system"] == "reliefweb" for c in chosen)
+    assert len(adverts.select_r6(rows, lambda url: "allowed", n=1)) == 1
+
+
+def test_a_failed_reliefweb_robots_read_is_retried_only_an_hour_later(tmp_path):
+    from datetime import UTC, datetime, timedelta
+    record = tmp_path / "abc.json"
+    first = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+    assert adverts.r6_may_retry(record, first)                       # never tried
+    record.write_text(json.dumps({"status": None, "read_at": first.isoformat()}), encoding="utf-8")
+    assert not adverts.r6_may_retry(record, first + timedelta(minutes=59)) and record.exists()
+    assert adverts.r6_may_retry(record, first + timedelta(hours=1))
+    assert not record.exists() and (tmp_path / "abc.failed-1.json").exists()   # kept aside, not replayed
+    second = first + timedelta(hours=1, minutes=5)
+    record.write_text(json.dumps({"status": None, "read_at": second.isoformat()}), encoding="utf-8")
+    assert not adverts.r6_may_retry(record, second + timedelta(minutes=30))
+    record.write_text(json.dumps({"status": 200, "read_at": second.isoformat()}), encoding="utf-8")
+    assert adverts.r6_may_retry(record, second) and record.exists()  # an answer is replayed, not asked again
+
+
+def test_a_refused_reliefweb_robots_answer_on_disk_ends_r6_without_a_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(adverts, "READING", tmp_path)
+    bodies = tmp_path / "r6" / "live" / "bodies"
+    bodies.mkdir(parents=True)
+    (tmp_path / "r6" / "live" / "state.json").write_text(json.dumps(
+        {"refusals": [["reliefweb.int", "aws"]], "failures": 0, "blocked_hosts": ["reliefweb.int"]}), encoding="utf-8")
+    (bodies / f"{adverts.page_id('https://reliefweb.int/robots.txt')}.json").write_text(json.dumps(
+        {"status": 202, "error": "", "protection": "AWS WAF", "read_at": "2026-11-12T13:09:32+00:00"}),
+        encoding="utf-8")
+    assert adverts.fetch_r6_robots() == 1
+    assert "R6 ends" in (tmp_path / "r6" / "stopped.txt").read_text(encoding="utf-8")
+    assert adverts.live_requests_sent(tmp_path / "r6" / "live") == 0
+    assert adverts.r6_index() == 0 and adverts.requests_sent(tmp_path / "r6") == 0
+    with pytest.raises(adverts.Stopped):
+        adverts.plan_r6()
+
+
+def test_a_reliefweb_employer_outside_the_list_is_estimated_international():
+    ad = {"employer": "Acme Relief Alliance", "url": "https://reliefweb.int/job/4100001/x", "system": "reliefweb"}
+    oid, basis, t = adverts.board_identity(ad, roles.Organisations(), {})
+    assert oid.startswith("board-employer:h") and t == "ingo" and basis == "board default (Estimate)"
+    oid, basis, t = adverts.board_identity(dict(ad, system="myjobmag"), roles.Organisations(), {})
+    assert t == "national_ngo_south"
+    page = '<a href="https://reliefweb.int/organization/acme-relief">Acme Relief</a>'
+    assert adverts.board_employer("ReliefWeb", page, "reliefweb") == "acme relief"
 
 
 def test_a_board_copy_with_at_employer_is_still_a_copy():
