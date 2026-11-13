@@ -472,6 +472,29 @@ def test_round_two_leaves_out_round_one_and_holds_its_rules(round2, monkeypatch)
         v.load_draw()
 
 
+def test_a_round_two_draw_must_record_its_strata_and_rules(round2):
+    path = v.VALID / "draw.json"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    for k in ("strata", "rules"):
+        saved.pop(k)
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(SystemExit, match="does not record"):
+        v.load_draw()
+
+
+def test_an_earlier_rounds_committed_results_are_never_scored_over(round2):
+    v.use_round(1)
+    v.OUTPUT.write_text("round 1's results", encoding="utf-8")
+    assert v.score() == 1 and v.OUTPUT.read_text(encoding="utf-8") == "round 1's results"
+
+
+def test_round_two_is_scored_only_on_a_set_reconciled_with_the_frozen_guide(round2):
+    path = v.VALID / "reconciled.json"
+    path.write_text(json.dumps({"guide": "another", "items": {}}), encoding="utf-8")
+    (v.VALID / "reconciled.sha256").write_text(v.sha256(path) + "\n", encoding="utf-8")
+    assert v.score() == 1 and not v.OUTPUT.exists()
+
+
 def test_round_one_survives_a_rebuild_of_measures_through_its_commits_file(work, monkeypatch):
     rows = draw_rows()
     write_csv(roles.ROLES / "broad-adverts.csv", rows)

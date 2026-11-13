@@ -91,7 +91,7 @@ def test_a_one_line_advert_is_cut_at_the_headings_it_carries():
 
 def test_two_job_fact_lines_before_any_heading_are_the_header_facts():
     lines = [line("Location: Goma"), line("Contract type: Fixed-term"), line(DUTIES)]
-    assert types(lines)[0] == "header_facts"
+    assert types(lines) == ["header_facts", "preamble"]          # the text after the run is not a job fact
     assert "header_facts" not in types([line("Location: Goma"), line(DUTIES)])
     assert "header_facts" not in types([line("Location Goma"), line(DUTIES)])
 
@@ -135,7 +135,7 @@ def test_contract_type_needs_a_type_named():
 
 def test_a_title_that_names_the_engagement_gives_the_contract_type():
     for title, named in (("Evaluation Consultant", True), ("Communications Intern", True),
-                         ("Volunteer Coordinator", False)):
+                         ("Volunteer Coordinator", False), ("Technical Expertise Lead", False)):
         ad = {"title": title, "lines": [line(DUTIES)]}
         assert ("contract_type" in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))) is named, title
 
@@ -146,6 +146,7 @@ def test_a_supervisor_alone_is_not_a_reporting_line():
 
 def test_a_reporting_line_needs_the_post_named():
     assert "reports_to" in adverts.facts_of("The post reports to the Head of Finance.")
+    assert "reports_to" in adverts.facts_of("The post reports to the Manager, Finance and Grants.")
     assert "reports_to" in adverts.facts_of("Reporting to\nCountry Director")
     assert "reports_to" not in adverts.facts_of("The post reports to the line manager.")
     assert "reports_to" not in adverts.facts_of("Reports to: Supervisor")
@@ -155,6 +156,9 @@ def test_the_employers_own_budget_and_a_portfolio_without_a_figure_are_not_the_j
     ad = {"title": "Grants Officer", "lines": [
         line("About us", "h2", True), line("Our yearly budget of USD 166 million funds work in nine countries."),
         line("Key responsibilities", "h2", True), line("Track a portfolio of grants with the finance team.")]}
+    assert "budget" not in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))
+    ad = {"title": "Grants Officer", "lines": [line("Context", "h2", True),
+                                               line("The wider response has a budget of USD 40 million this year.")]}
     assert "budget" not in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))
     assert "budget" in adverts.facts_of("You will hold a budget of USD 2 million for the response.")
 
@@ -178,6 +182,9 @@ def test_a_closing_date_needs_a_calendar_date():
     assert "closing_date" not in adverts.facts_of("Open until filled; closing soon.")
     assert "closing_date" in adverts.facts_of("Closing date: 30 November 2026")
     assert "closing_date" in adverts.facts_of("Deadline\n30/11/2026")
+    # "before" and a date is a deadline for applications only when the sentence is about applying.
+    assert "closing_date" not in adverts.facts_of("The project began before 1 March 2019 in two districts.")
+    assert "closing_date" in adverts.facts_of("Submit the form before 30 November 2026.")
 
 
 def test_how_to_apply_needs_a_how():
@@ -188,6 +195,8 @@ def test_how_to_apply_needs_a_how():
                 "Send your papers by mail to [email]."):
         assert "how_to_apply" in adverts.facts_of(how), how
     assert "how_to_apply" not in adverts.facts_of("For questions about the role, write to [email].")
+    assert "how_to_apply" not in adverts.facts_of("The officer will screen each CV received by the unit.")
+    assert "how_to_apply" in adverts.facts_of("Please attach a CV of two pages.")
 
 
 def test_direct_reports_keep_round_ones_rule():
@@ -236,6 +245,7 @@ def test_a_contract_length_written_as_an_end_date():
     assert "contract_length" in adverts.facts_of("The contract runs until 31 March 2027.")
     assert "contract_length" in adverts.facts_of("From 1 May 2026 to 30 April 2027, based in Goma.")
     assert "contract_length" not in adverts.facts_of("Applications are open until 30 November 2026.")
+    assert "contract_length" not in adverts.facts_of("The role is open until 31 March 2027.")
 
 
 def test_renewal_subject_to_funding():
@@ -279,6 +289,9 @@ def test_months_count_as_a_share_of_a_year():
 def test_the_employers_own_years_are_not_asked():
     text = "We have over 30 years of experience in the region.\nYou have 4 years of experience in logistics."
     assert adverts.years_required([], text)[0] == "4"
+    text = "The organisation has 30 years of experience in the region.\nYou need 4 years of experience."
+    assert adverts.years_required([], text)[0] == "4"
+    assert adverts.years_required([], "Four years of experience in an NGO with refugees.")[0] == "4"
 
 
 # --- 7. level from a labelled grade -----------------------------------------------------------------

@@ -320,6 +320,8 @@ def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str], earlie
         problems.append(f"{len(missing)} drawn adverts are not in broad-adverts.csv")
     if saved.get("seed") != SEED:
         problems.append(f"the draw's seed {saved.get('seed')} is not {SEED}")
+    if ROUND > 1 and not ("strata" in saved and "rules" in saved):
+        problems.append(f"round {ROUND}'s draw does not record its strata and rules")
     if "strata" in saved:
         if saved["strata"] != strata_hash(rows):
             problems.append("broad-adverts.csv has changed since the draw was made (its adverts or strata)")
@@ -918,6 +920,9 @@ def error_rows(ids: list[str], script: list[dict], truth: list[dict], codes: dic
 
 
 def score(_args=None) -> int:
+    if ROUND < max(ROUNDS) and OUTPUT.exists():
+        print(f"score: round {ROUND}'s committed results stand as the record of its rules; use recheck")
+        return 1
     return score_to(OUTPUT, VALID / "errors.csv")
 
 
@@ -935,6 +940,9 @@ def score_to(output: Path, errors: Path, local: bool = False) -> int:
     path, seal = VALID / "reconciled.json", VALID / "reconciled.sha256"
     if not path.exists() or not seal.exists() or seal.read_text(encoding="utf-8").strip() != sha256(path):
         print("score: the reconciled set is not frozen with a matching seal; nothing scored")
+        return 1
+    if ROUND > 1 and json.loads(path.read_text(encoding="utf-8")).get("guide") != FROZEN_GUIDE:
+        print("score: the reconciled set was not made on guide 1.1 as frozen; nothing scored")
         return 1
     codes = load_draw()
     truth_by = json.loads(path.read_text(encoding="utf-8"))["items"]

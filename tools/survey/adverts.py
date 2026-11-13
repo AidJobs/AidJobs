@@ -1599,6 +1599,8 @@ def sections_of(lines: list[dict], title: str = "") -> list[dict]:
                 continue
             if out[-1]["type"] == "preamble" and value_line(text) and value_line(nxt):
                 start("header_facts", "")
+        if out[-1]["type"] == "header_facts" and not out[-1]["heading"] and not value_line(text):
+            start("preamble", "")          # the facts run ends: the text after it still precedes any heading
         out[-1]["lines"].append(text)
     for s in out:
         s["words"] = sum(words_of(t) for t in s["lines"])
@@ -1805,7 +1807,8 @@ def sentence_at(text: str, start: int, end: int) -> str:
 # Who a reporting line names, when it names no post (the coding guide: vague).
 GENERIC_BOSS = re.compile(r"^\s*:?\s*(?:the|a|an|his|her|their|its|his/her|his or her|du|de la|de l'|au|[àa] la|le|la)?\s*"
                           r"(?:(?:direct|immediate|line|designated|assigned)\s+)?(?:line manager|manager|supervisor|"
-                          r"responsable(?: hi[ée]rarchique)?|sup[ée]rieure? hi[ée]rarchique|n\+1)?\s*(?:[,;.)]|$)",
+                          r"responsable(?: hi[ée]rarchique)?|sup[ée]rieure? hi[ée]rarchique|n\+1)?\s*"
+                          r"(?:,(?!\s*(?-i:[A-Z]))|[;.)]|$)",       # "the Manager, Finance" names a post
                           re.IGNORECASE)
 ONLY_SHORTLISTED = re.compile(r"\bonly (?:the )?short-?listed\b|\bshort-?listed (?:candidates|applicants) only\b|"
                               r"\bseul(?:e)?s (?:les )?(?:candidat\w*|personnes) (?:pr[ée]s[ée]lectionn|retenu)",
@@ -1813,7 +1816,13 @@ ONLY_SHORTLISTED = re.compile(r"\bonly (?:the )?short-?listed\b|\bshort-?listed 
 NOT_RECRUITMENT_INTERVIEW = re.compile(r"\b(?:key informant|household|beneficiar\w*|focus group|conduct\w*|exit|media|"
                                        r"radio|survey|semi-structured|qualitative)\s*$", re.IGNORECASE)
 CLOSING_WORDS = re.compile(r"\b(?:appl\w*|closing|deadline|cl[ôo]ture|date limite|submi\w*|candidat\w*|postul\w*|"
-                           r"due|no later than|before|avant|expir\w*|cv)\b", re.IGNORECASE)
+                           r"due|no later than|before|avant|expir\w*|cv|open until|accepted until)\b", re.IGNORECASE)
+APPLICATION_WORDS = re.compile(r"\b(?:appl\w*|submi\w*|candidat\w*|postul\w*|cv|r[ée]sum[ée]|resume|dossier|send|sent|"
+                               r"envoy\w*|recruit\w*|vacanc\w*|position|post|offre)\b", re.IGNORECASE)
+DOCUMENT_WORDS = re.compile(r"^(?:cv|resume|cover(?:ing)? letter|letter of motivation|lettre de motivation)$", re.IGNORECASE)
+APPLY_VERBS = re.compile(r"\b(?:send|sent|submit\w*|attach\w*|includ\w*|upload\w*|email\w*|e-mail\w*|enclos\w*|"
+                         r"provid\w*|apply\w*|application|appl(?:y|ying|icants?)|accompan\w*|together with|along with|"
+                         r"envoy\w*|joindre|adress\w*)\b|\[email\]", re.IGNORECASE)
 
 
 def fact_counts(kind: str, m: re.Match, text: str) -> bool:
@@ -1836,9 +1845,14 @@ def fact_counts(kind: str, m: re.Match, text: str) -> bool:
             return False                     # interviews the job conducts are duties, not selection
     if kind == "closing_time":
         return bool(CLOSING_WORDS.search(sentence_at(text, m.start(), m.end())))
+    if kind == "closing_date" and re.match(r"(?:before|no later than|avant le|au plus tard le|expires?)\b", m.group(0),
+                                           re.IGNORECASE):
+        return bool(APPLICATION_WORDS.search(sentence_at(text, m.start(), m.end())))    # a deadline for applications
     if kind == "how_to_apply" and m.group(0) == "[email]":
         return bool(re.search(r"\b(?:appl\w*|cv|r[ée]sum[ée]|resume|cover|letter|submi\w*|send|sent|candidat\w*|"
                               r"postul\w*|lettre)\b", sentence_at(text, m.start(), m.end()), re.IGNORECASE))
+    if kind == "how_to_apply" and DOCUMENT_WORDS.match(m.group(0)):
+        return bool(APPLY_VERBS.search(sentence_at(text, m.start(), m.end())))          # documents to send
     return True
 
 
@@ -1885,18 +1899,18 @@ def title_reference(title: str) -> bool:
 
 def title_engagement(title: str) -> bool:
     """A title that names the engagement ("Consultant", "Intern") gives the contract type (the
-    coding guide), by the title rules' consultant context and intern level."""
-    role = roles.classify(title or "")
-    return role.contexts.get("staff_consultant") == "consultant" or role.level == "intern_fellow"
+    coding guide): a consultant word, or the title rules' intern level."""
+    return bool(re.search(r"\bconsult(?:ant|ancy|ants|ante)\b|\bindividual contractor\b|\bfreelance\b", title or "",
+                          re.IGNORECASE)) or roles.classify(title or "").level == "intern_fellow"
 
 
 def facts_given(ad: dict, secs: list[dict]) -> set[str]:
     """The facts an advert gives: its text by FACTS; a budget only outside the employer's own
-    description; any language named in a languages section; a country or a reference number in the
+    description and the context; any language named in a languages section; a country or a reference number in the
     title; and the job-posting data's values by the coding guide's table."""
     texts = [ln["text"] for ln in ad["lines"]]
     given = facts_of("\n".join(texts))
-    own = {t for s in secs if s["type"] == "about_organisation" for t in s["lines"]}
+    own = {t for s in secs if s["type"] in ("about_organisation", "context") for t in s["lines"]}
     if "budget" in given and own:
         role_text = "\n".join(t for t in texts if t not in own)
         if not any(fact_counts("budget", m, role_text) for m in FACTS["budget"].finditer(role_text)):
@@ -2176,7 +2190,9 @@ def years_asked(text: str, largest: bool = False, requirements: bool = False) ->
 MONTHS_ASKED = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?\+?\s*months?(?:'|’)?\s+(?:of\s+)?(?:[\w-]+\s+){0,3}?"
                           r"experience|\bexperience\s+of\s+(?:at least\s+)?" + NUM + r"\s*months?\b|" + NUM +
                           r"\s*mois d'exp[ée]rience", re.IGNORECASE)
-EMPLOYER_CUE = re.compile(r"\b(?:we|our|nous|notre|founded|established|since)\b", re.IGNORECASE)
+EMPLOYER_CUE = re.compile(r"\b(?:we|our|nous|notre|founded|established|since)\b|\b(?:organi[sz]ation|company|agency|"
+                          r"institution|association|foundation|charity|ngo|network|group)\s+(?:has|have|brings|"
+                          r"possesses|poss[èe]de|compte)\b", re.IGNORECASE)
 
 
 def _years_text(n: float) -> str:
