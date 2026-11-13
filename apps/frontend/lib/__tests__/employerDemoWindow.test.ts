@@ -95,7 +95,7 @@ describe('the window: the progress line', () => {
     const j = job('job-comms');
     const keys = partsOf(j, getState()).map((p) => p.key);
     expect(keys).toEqual(['outline', ...j.tags.map(sectionPart), 'details', 'fixed', 'check', 'plan', 'review', 'publish']);
-    expect(partsOf({ ...j, choice: 'amplify' }, getState()).map((p) => p.key).slice(-8)).toEqual(['plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish']);
+    expect(partsOf({ ...j, choice: 'amplify' }, getState()).map((p) => p.key).slice(-8)).toEqual(['plan', 'market', 'full', 'langs', 'review', 'reach', 'flyer', 'publish']);
     expect(sectionOf('s:apply')).toBe('apply');
     expect(sectionOf('details')).toBeNull();
   });

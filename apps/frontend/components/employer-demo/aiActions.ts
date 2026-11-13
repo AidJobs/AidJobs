@@ -48,7 +48,7 @@ import { approvalRequired } from './approval';
 import { canAmplifyFree } from './plans';
 import { profileFor } from './profiles';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
-import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
+import { amplifying, ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, reachOpen, stepKey } from './flow';
 import { planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { sdgsOf, STYLES, usualTemplate } from './setup';
@@ -481,7 +481,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
           break;
         }
         const ok = Boolean(dialog) || (OPEN_TARGETS as readonly string[]).includes(t) || (t.startsWith('section:') && j.tags.includes(t.slice(8))) || (t.startsWith('lang:') && Boolean(j.translations?.[t.slice(5) as JobLang]));
-        if (ok && !opened.length) opened.push(t as OpenTarget);
+        if ((t === 'reach' || t === 'flyer') && !reachOpen(j, s)) refused.push(`the ${t === 'reach' ? 'Reach invitations' : 'flyer'}: ${amplifying(j) ? 'they open once review is done' : 'they come only with Amplify'}`);
+        else if (ok && !opened.length) opened.push(t as OpenTarget);
         else if (!ok) refused.push(`opening "${t.slice(0, 30)}"`);
         break;
       }
@@ -583,7 +584,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'reach': {
         const plan = reachIn(a, s, j, said ?? '');
-        if ('refused' in plan) refused.push(plan.refused);
+        if (!reachOpen(j, s)) refused.push(amplifying(j) ? 'Reach: it opens once review is done' : 'Reach: it comes only with Amplify');
+        else if ('refused' in plan) refused.push(plan.refused);
         else setReachPlan(id, plan.plan);
         break;
       }

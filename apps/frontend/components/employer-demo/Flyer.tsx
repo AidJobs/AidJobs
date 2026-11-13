@@ -4,6 +4,7 @@ import { Printer } from 'lucide-react';
 import qrcode from 'qrcode-generator';
 import { useMemo, useState } from 'react';
 import { inOutlineOrder } from './engine';
+import { amplifying, flyerStale, reachOpen } from './flow';
 import { countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
 import { Dialog, OrgMark, radioKeys } from './ui';
@@ -143,6 +144,17 @@ export function FlyerPanel({ job, s, url }: { job: DemoJob; s: State; url: strin
   });
   const [lang, setLang] = useState<JobLang | null>(null);
   const waiting = versionsOf(job).filter((k) => !ready.includes(k)).map((k) => langOf(k).label);
+  if (!reachOpen(job, s)) {
+    return (
+      <p className="aj-muted m-0" role="status">
+        {!amplifying(job)
+          ? 'The flyer comes with Amplify.'
+          : flyerStale(job, s)
+            ? 'Out of date: the job changed, or changes were asked for, since this flyer was made. It opens again once review is done; print it again then.'
+            : 'The flyer opens once review is done, so it shows the text your reviewers saw.'}
+      </p>
+    );
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">

@@ -1581,13 +1581,16 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     click('No other languages');
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Français');
     click('Mark it as reviewed');
-    click('Show the flyer');
-    expect(tabs()).toContain('Flyer');
-    shows('A one-page notice with a QR code to the job');
+    // Phase 5's order: review, then Reach, then the flyer.
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'review' });
+    click('No review');
     click('Invite people');
     expect(tabs()).toContain('Reach emails');
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Reach emails');
-    click('No review');
+    click('Show the flyer');
+    expect(tabs()).toContain('Flyer');
+    shows('A one-page notice with a QR code to the job');
+    expect(job(id).flyerMade).toBeDefined();
     expect(job(id).chat.at(-1)?.card).toBe('publish');
     const cards = () => container.querySelectorAll('[role="log"] section.ej-chat-card');
     expect(cards()).toHaveLength(1);

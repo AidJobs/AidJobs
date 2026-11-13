@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, hireAgain, isReviewable, LINK_REPLY, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -16,7 +16,7 @@ import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
 import { aiOn, askAi, GO_ON, probeAi, useAi, writeVersion } from './ai';
-import { FIXED_SECTIONS, nextStep, partOfStep, stepKey } from './flow';
+import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, partOfStep, reachOpen, stepKey } from './flow';
 import { readJobFile } from './readFile';
 import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
 import { STATE_DIALOGS, type OpenTarget } from './aiActions';
@@ -31,7 +31,6 @@ import { DeleteDialog } from './JobActions';
 import { LangDoc } from './LangDoc';
 import MenuButton from './MenuButton';
 import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part } from './parts';
-import { canGoFree } from './plans';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
@@ -372,6 +371,22 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
   else if (part === 'market') body = <MarketPart job={job} s={s} />;
   else if (part === 'full') body = <FullPart job={job} s={s} />;
   else if (part === 'langs') body = <LangsPart job={job} s={s} open={open} />;
+  else if ((part === 'flyer' || part === 'reach') && !reachOpen(job, s))
+    body = (
+      <p className="aj-muted m-0">
+        {flyerStale(job, s) && part === 'flyer'
+          ? 'Out of date: the job changed, or changes were asked for, since the flyer was made. It opens again once review is done.'
+          : `${part === 'reach' ? 'Reach' : 'The flyer'} opens once review is done: approved, or no review where your organisation does not ask for one.`}
+      </p>
+    );
+  else if ((part === 'flyer' || part === 'reach') && !reachOpen(job, s))
+    body = (
+      <p className="aj-muted m-0">
+        {flyerStale(job, s) && part === 'flyer'
+          ? 'Out of date: the job changed, or changes were asked for, since the flyer was made. It opens again once review is done.'
+          : `${part === 'reach' ? 'Reach' : 'The flyer'} opens once review is done: approved, or no review where your organisation does not ask for one.`}
+      </p>
+    );
   else if (part === 'flyer')
     body = (
       <button type="button" className="aj-pill self-start" onClick={() => open.tab('flyer')}>
@@ -987,6 +1002,7 @@ function JobWindow({ id }: { id: string }) {
   };
   /** A panel tab opened only when needed (section 19): a language version, the flyer, the Reach emails, the review email, payment. */
   const openTab = (k: string) => {
+    if (k === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
     if (!k.startsWith('lang:') && !extra.includes(k)) setExtra((x) => (x.includes(k) ? x : [...x, k]));
     setTab(k);
     if (phone) setView('job');
@@ -1033,6 +1049,7 @@ function JobWindow({ id }: { id: string }) {
     if (t === 'versions') return j.versions.length ? setVersionsOpen(true) : undefined;
     if (t === 'download') return void downloadCopy(j, getState().org.name);
     if (t === 'delete') return canDelete(getState(), j) ? undefined : setDeleteOpen(true);
+    if ((t === 'flyer' || t === 'reach') && !reachOpen(j, getState())) return goPart(t);
     if (t === 'flyer' || t === 'reach' || t === 'payment') return openTab(t);
     if (t.startsWith('lang:')) return j.translations?.[t.slice(5) as JobLang] ? openTab(t) : undefined;
     goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
@@ -1057,8 +1074,8 @@ function JobWindow({ id }: { id: string }) {
       }
       return chatNote(job.id, text, `Here it is: ${STATE_LABEL[asked]} is on the card below, and nothing changes until you press it.`, undefined, 'state');
     }
-    if (text === SHOW_FLYER) openTab('flyer');
-    if (text === INVITE) openTab('reach');
+    if (text === SHOW_FLYER && reachOpen(job, s)) openTab('flyer');
+    if (text === INVITE && reachOpen(job, s)) openTab('reach');
     if (text === SKIP_APPROVAL) return setSkipOpen(true);
     if (LINK.test(t)) return chatNote(job.id, text, LINK_REPLY);
     if (PREVIEW.test(t) && !job.setup) {
@@ -1182,7 +1199,8 @@ function JobWindow({ id }: { id: string }) {
             </button>
           </div>
           {active === 'flyer' && <FlyerPanel job={job} s={s} url={jobUrl(job)} />}
-          {active === 'reach' && <ReachEditor key={job.id} job={job} s={s} mode={isPublished(job) && job.plan === 'amplify' && job.status === 'live' ? 'send' : 'plan'} sendsOn={job.publishOn ?? null} live={job.status === 'live'} onDone={() => goOn(job.id)} />}
+          {active === 'reach' && !reachOpen(job, s) && <p className="aj-muted m-0" role="status">{amplifying(job) ? 'Reach opens once review is done: approved, or no review where your organisation does not ask for one. The invitations you prepared are kept.' : 'Reach comes with Amplify.'}</p>}
+          {active === 'reach' && reachOpen(job, s) && <ReachEditor key={job.id} job={job} s={s} mode={isPublished(job) && job.plan === 'amplify' && job.status === 'live' ? 'send' : 'plan'} sendsOn={job.publishOn ?? null} live={job.status === 'live'} onDone={() => goOn(job.id)} />}
           {active === 'reviewmail' && (isReviewable(job) ? <ReviewForm job={job} s={s} onSent={() => closeTab('reviewmail')} /> : <p className="aj-muted m-0">Review happens before publishing.</p>)}
           {active === 'payment' && <PaymentPanel job={job} s={s} open={opener} />}
         </div>

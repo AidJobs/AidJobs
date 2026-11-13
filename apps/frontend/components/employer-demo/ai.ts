@@ -10,7 +10,7 @@ import { allowance, canAmplifyFree, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, l
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
-import { afterApproval, FIXED_SECTIONS, nextStep, setAiWrites, type Step } from './flow';
+import { afterApproval, FIXED_SECTIONS, nextStep, reviewDone, setAiWrites, type Step } from './flow';
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { getState } from './store';
 import type { DemoJob, Facts, Format, JobLang, State } from './types';
@@ -177,6 +177,7 @@ function publishingFor(s: State, j: DemoJob) {
     free: { canGoFree: canGoFree(s, j.id), standard: allowance(s, 'standard').state, listedDays: LISTED_DAYS.free },
     amplify: { verified: s.org.verified, freeAmplify: allowance(s, 'amplify').state, usesFreeAmplify: usesFreeAmplify(s, j), price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? (canAmplifyFree(s, j.id) ? 'free' : 'one'), packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
     versions: { included: LANGS_INCLUDED[via], extraPrice: usd(LANGUAGE_PRICE), toPay: langsToPay(j, 'amplify', via), list: versionsOf(j).map((k) => ({ key: k, label: langOf(k).label, reviewed: Boolean(j.translations?.[k]?.reviewed), behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)), sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) })) },
+    reviewDone: reviewDone(j, s),
     review: { required: approvalRequired(s, j), approved: approvedFor(s, j), state: j.review.state, reviewers: j.review.reviewers.map((r) => ({ name: r.name, decision: r.decision ?? null, note: r.note ?? null })), team: s.team.filter((p) => p.id !== s.me.id).map((p) => ({ name: p.name, role: p.role })) },
     reach: (() => {
       const plan = j.reachPlan ?? planFor(j, s.org);

@@ -1,4 +1,4 @@
-import { approvalRequired, approvedFor } from './approval';
+import { approvalRequired, approvedFor, isApproved } from './approval';
 import { addSuggestions, SECTION_BY_KEY } from './engine';
 import { isPublished } from './lifecycle';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './market';
@@ -34,7 +34,7 @@ export const DECLINABLE: AskKind[] = ['grade', 'eligibility', 'languages', 'safe
 export const LEFT = ['details', 'sdgs', 'fixed', 'suggest'] as const;
 
 /** The parts of steps 8 and 9 that are settled once answered: the plan, Amplify's parts, and review where it is optional. */
-export const LATER = ['plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review'] as const;
+export const LATER = ['plan', 'market', 'full', 'langs', 'review', 'reach', 'flyer'] as const;
 
 let aiWriting = false;
 
@@ -113,8 +113,29 @@ export type Step =
   | { kind: 'publish' }
   | { kind: 'live' };
 
-/** Amplify's parts, each on the line once Amplify is chosen; settled when answered, even with "no thanks". */
-export const AMPLIFY_PARTS = ['market', 'full', 'langs', 'flyer', 'reach'] as const;
+/** Amplify's parts, each on the line once Amplify is chosen; settled when answered, even with "no thanks". Review comes between languages and Reach. */
+export const AMPLIFY_PARTS = ['market', 'full', 'langs', 'reach', 'flyer'] as const;
+
+/**
+ * Review comes before Reach and the flyer (section 19, phase 5, C): it is done once approved (or the owner skipped a required approval),
+ * or, where approval is not required, once the user chose no review. While it is open or changes are asked for, nothing after it is
+ * offered; an edit after approval opens it again, as today.
+ */
+export function reviewDone(job: DemoJob, s: State): boolean {
+  if (approvalRequired(s, job)) return approvedFor(s, job);
+  return job.review.state === 'none' ? isSettled('review', job) : isApproved(job);
+}
+
+/** Reach and the flyer: only with Amplify, and before publishing only once review is done. A free job never has them, by any route. */
+export function reachOpen(job: DemoJob, s: State): boolean {
+  if (!amplifying(job)) return false;
+  return isPublished(job) || reviewDone(job, s);
+}
+
+/** A flyer made before an edit or a request for changes: out of date until the job is approved again. */
+export function flyerStale(job: DemoJob, s: State): boolean {
+  return Boolean(job.flyerMade) && !isPublished(job) && !reviewDone(job, s);
+}
 
 /** The market check's points still open, without those left as they are; none when there are too few similar jobs. */
 export function marketPoints(job: DemoJob, s: State): Point[] {
@@ -146,14 +167,15 @@ export function amplifying(job: DemoJob): boolean {
 }
 
 /**
- * Steps 8 and 9 (section 19): Free or Amplify; with Amplify, its parts one at a time (the market check, the full advert check, the
- * language versions and their review, the flyer, Reach); then review, where it is asked for or required; then publishing; then the
- * link. Each is answered in the chat or from its part on the line.
+ * Steps 8 and 9 (section 19, in phase 5's order): Free or Amplify; with Amplify, the market check, the full advert check, and the
+ * language versions, each written and marked reviewed so reviewers see them; then review, where it is asked for or required; then, with
+ * Amplify, Reach and the flyer; then publishing; then the link. Each is answered in the chat or from its part on the line.
  */
 function afterCheck(job: DemoJob, s: State): Step {
   if (isPublished(job)) return { kind: 'live' };
   if (!isSettled('plan', job)) return { kind: 'plan' };
-  if (job.choice === 'amplify') {
+  const amplify = job.choice === 'amplify';
+  if (amplify) {
     const market = marketPoints(job, s)[0];
     if (market && !isSettled('market', job)) return { kind: 'market', point: market };
     const full = fullPoints(job, s)[0];
@@ -161,12 +183,12 @@ function afterCheck(job: DemoJob, s: State): Step {
     if (!isSettled('langs', job)) return { kind: 'langs' };
     const draft = versionsOf(job).find((k) => !job.translations?.[k]?.reviewed);
     if (draft) return { kind: 'version', lang: draft };
-    if (!isSettled('flyer', job)) return { kind: 'flyer' };
-    if (!isSettled('reach', job)) return { kind: 'reach' };
   }
-  const required = approvalRequired(s, job);
-  if (required && !approvedFor(s, job)) return job.review.state === 'none' ? { kind: 'review' } : { kind: 'waiting' };
-  if (!required && job.review.state === 'none' && !isSettled('review', job)) return { kind: 'review' };
+  if (!reviewDone(job, s)) return job.review.state === 'none' ? { kind: 'review' } : { kind: 'waiting' };
+  if (amplify) {
+    if (!isSettled('reach', job)) return { kind: 'reach' };
+    if (!isSettled('flyer', job)) return { kind: 'flyer' };
+  }
   return { kind: 'publish' };
 }
 

@@ -299,6 +299,8 @@ export type DemoJob = {
   reachReminders?: boolean;
   /** Reminder moments answered with "Not now". */
   reachDismissed?: string[];
+  /** When the field-post flyer was first shown for this job; out of date while review is open again (section 19, phase 5, C). */
+  flyerMade?: number;
   chat: ChatMsg[];
   createdAt: number;
   publishedAt?: number;

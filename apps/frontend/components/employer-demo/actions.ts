@@ -2391,6 +2391,13 @@ export function completePayRequest(id: string): boolean {
   return true;
 }
 
+/** The flyer shown for the first time: it goes out of date if review opens again before publishing. */
+export function markFlyerMade(id: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  if (!j || j.flyerMade || !ownerOnly()) return;
+  updateJob(id, (x) => ({ ...x, flyerMade: Date.now() }));
+}
+
 /** "Not now" on a reminder: it does not come back; the next moment still does. */
 export function dismissMoment(id: string, key: string) {
   updateJob(id, (j) => ({ ...j, reachDismissed: [...(j.reachDismissed ?? []), key] }));
@@ -2828,6 +2835,7 @@ export function hireAgain(id: string, place?: string): string | null {
     reachPlan: undefined,
     reachDismissed: undefined,
     reachReminders: undefined,
+    flyerMade: undefined,
     scheduledFor: undefined,
     payRequest: undefined,
     lastChange: undefined,

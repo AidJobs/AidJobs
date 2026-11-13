@@ -29,7 +29,7 @@ import {
 } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { addDays, longDate, shortDate } from './engine';
-import { fullPoints, marketPoints } from './flow';
+import { fullPoints, marketPoints, reviewDone } from './flow';
 import { deliveryText, planCount } from './invites';
 import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
@@ -459,6 +459,11 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
         </div>
       )}
       {!compact && !blocked && !upgrade && <ChangesNote job={job} onPublishAnyway={() => setOverrule(true)} onLook={() => open.part('review')} />}
+      {!compact && !blocked && !upgrade && chosen === 'amplify' && !reviewDone(job, s) && job.review.state !== 'none' && (
+        <span className="aj-muted" role="status">
+          Review is still open: Reach and the flyer open once it is approved, so they match what your reviewers saw.
+        </span>
+      )}
       {!compact && request && (
         <div className="flex flex-col gap-1.5 rounded-xl p-3" style={{ background: 'var(--sage-1)' }} role="status">
           <span style={{ fontWeight: 650 }}>

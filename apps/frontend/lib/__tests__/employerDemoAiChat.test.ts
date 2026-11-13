@@ -3,7 +3,7 @@ import { getState, resetDemo, update } from '../../components/employer-demo/stor
 import { setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi, writeVersion } from '../../components/employer-demo/ai';
-import { addDays } from '../../components/employer-demo/engine';
+import { addDays, isoDay } from '../../components/employer-demo/engine';
 import { checkPoints, nextStep } from '../../components/employer-demo/flow';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
@@ -237,7 +237,17 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
     expect(job('job-comms').tags).not.toContain('conditions');
   });
 
+  it('prepares Reach only with Amplify and once review is done (phase 5, C)', () => {
+    turn('job-comms', 'invite ana@example.org', [{ type: 'reach', candidates: ['ana@example.org'] }]);
+    expect(lastAi('job-comms')?.text).toContain('Not done: Reach: it comes only with Amplify');
+    turn('job-comms', 'amplify, and invite ana@example.org', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'reach', candidates: ['ana@example.org'] }, { type: 'open', target: 'flyer' }]);
+    expect(lastAi('job-comms')?.text).toContain('Reach: it opens once review is done');
+    expect(lastAi('job-comms')?.text).toContain('the flyer: they open once review is done');
+    expect(job('job-comms').reachPlan).toBeUndefined();
+  });
+
   it('prepares Reach only with addresses the user gave, and team emails only on the organisation’s domain', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, choice: 'amplify', walk: { ...j.walk!, settled: [...j.walk!.settled, 'plan', 'review'] } } : j)) }));
     turn('job-comms', 'invite people', [{ type: 'reach', candidates: ['someone@example.org'] }]);
     expect(lastAi('job-comms')?.text).toContain('Not done: email addresses that were not given');
     turn('job-comms', 'invite maria.data@example.org', [{ type: 'reach', candidates: ['data@example.org'] }]);
@@ -301,12 +311,14 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
     expect(job('job-comms').sections.find((x) => x.key === 'about')?.lines).toEqual(english);
   });
 
-  it('a date to publish on is checked: a free job goes live within its own month', () => {
-    const [y, m] = new Date(getState().today).toISOString().slice(0, 7).split('-').map(Number);
-    const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-03`;
-    turn('job-comms', 'publish it next month', [{ type: 'publish_on', date: next }]);
+  it('a date to publish on is checked: from tomorrow and before it closes; a free job has no month limit since phase 5', () => {
+    turn('job-comms', 'publish it yesterday', [{ type: 'publish_on', date: isoDay(getState().today - 86_400_000) }]);
     expect(job('job-comms').publishOn).toBeUndefined();
-    expect(lastAi('job-comms')?.text).toMatch(/Not done: publishing on that date: a free job goes live within/);
+    expect(lastAi('job-comms')?.text).toMatch(/Not done: publishing on that date: choose a date from tomorrow/);
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, facts: { ...j.facts, deadline: isoDay(s.today + 90 * 86_400_000) } } : j)) }));
+    const later = isoDay(getState().today + 40 * 86_400_000);
+    turn('job-comms', 'publish it in six weeks', [{ type: 'publish_on', date: later }]);
+    expect(job('job-comms').publishOn).toBe(later);
   });
 });
 

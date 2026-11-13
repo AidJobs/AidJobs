@@ -5,8 +5,11 @@ import {
   chooseStyle,
   forgetProfile,
   goOn,
+  editSection,
   keepForAll,
+  markFlyerMade,
   openWindowAt,
+  overrideApproval,
   publish,
   reviewerDecision,
   sendChat,
@@ -16,7 +19,7 @@ import {
   startJob,
   stopKeeping,
 } from '../../components/employer-demo/actions';
-import { ASKS, checkPoints, keepToOffer, LEFT, nextStep } from '../../components/employer-demo/flow';
+import { ASKS, checkPoints, flyerStale, keepToOffer, LEFT, nextStep, reachOpen } from '../../components/employer-demo/flow';
 import { partsOf } from '../../components/employer-demo/parts';
 import { publicLangs } from '../../components/employer-demo/translate';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
@@ -73,7 +76,7 @@ describe('step 8: free or Amplify (section 19)', () => {
 });
 
 describe('Amplify’s parts, review, and publishing, in order (section 19, steps 8 and 9)', () => {
-  it('walks the market check, the full check, the languages and their review, the flyer, Reach, then review and publishing', () => {
+  it('walks the market check, the full check, the languages and their review, then review, Reach, the flyer, and publishing (phase 5, C)', () => {
     const id = toPlan();
     sendChat(id, 'Amplify');
     expect(job(id).choice).toBe('amplify');
@@ -89,13 +92,14 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
     expect(step(id)).toEqual({ kind: 'version', lang: 'es' });
     sendChat(id, 'Remove Spanish');
     expect(job(id).translations?.es).toBeUndefined();
-    expect(step(id)).toEqual({ kind: 'flyer' });
-    sendChat(id, 'No, thanks');
-    expect(step(id)).toEqual({ kind: 'reach' });
-    sendChat(id, 'Not now');
     expect(step(id)).toEqual({ kind: 'review' });
     expect(last(id)?.quick).toEqual(['Send for review', 'No review']);
+    expect(last(id)?.text).toContain('Reach and the flyer come after review');
     sendChat(id, 'No review');
+    expect(step(id)).toEqual({ kind: 'reach' });
+    sendChat(id, 'Not now');
+    expect(step(id)).toEqual({ kind: 'flyer' });
+    sendChat(id, 'No, thanks');
     expect(step(id)).toEqual({ kind: 'publish' });
     expect(last(id)).toMatchObject({ step: 'publish', card: 'publish' });
     sendChat(id, 'publish it');
@@ -145,6 +149,138 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
   });
 });
 
+describe('review before Reach and the flyer: each review state (section 19, phase 5, C)', () => {
+  const amina = { name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false };
+  const daniel = { name: 'Daniel Mwangi', email: 'daniel@riverstone.example.org', outside: false };
+  const P5 = "We're hiring a Head of Programmes, P5, in Goma, fixed-term, closing 30 December 2026";
+  /** An Amplify job past its checks and languages: the next step is review. */
+  const toReview = (text?: string) => {
+    const id = toPlan(text);
+    sendChat(id, 'Amplify');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    sendChat(id, 'No other languages');
+    return id;
+  };
+  const as = (who: string, decision: 'approved' | 'changes', note = '') => {
+    update((s) => ({ ...s, reviewerAs: who }));
+    reviewerDecision(job(lastId).id, decision, note);
+    update((s) => ({ ...s, reviewerAs: null }));
+  };
+  let lastId = '';
+  const open = (id: string) => reachOpen(job(id), getState());
+
+  it('open: waiting, with Remind; nothing after review is offered, and Reach and the flyer stay closed by every route', () => {
+    const id = (lastId = toReview());
+    expect(step(id)).toEqual({ kind: 'review' });
+    expect(open(id)).toBe(false);
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    goOn(id);
+    expect(step(id)).toEqual({ kind: 'waiting' });
+    expect(last(id)).toMatchObject({ card: 'review' });
+    expect(last(id)?.text).toContain('Reach and the flyer stay closed until it is approved.');
+    expect(open(id)).toBe(false);
+    const parts = partsOf(job(id), getState()).map((p) => p.key);
+    expect(parts.indexOf('review')).toBeLessThan(parts.indexOf('reach'));
+    expect(parts.indexOf('reach')).toBeLessThan(parts.indexOf('flyer'));
+  });
+
+  it('changes requested: the author edits and sends the next round; Reach and the flyer stay closed, and a flyer already made is out of date', () => {
+    const id = (lastId = toReview());
+    sendChat(id, 'No review');
+    sendChat(id, 'Not now');
+    expect(step(id)).toEqual({ kind: 'flyer' });
+    markFlyerMade(id);
+    expect(flyerStale(job(id), getState())).toBe(false);
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    as('amina', 'changes', 'Shorten the duties');
+    goOn(id);
+    expect(step(id)).toEqual({ kind: 'waiting' });
+    expect(last(id)?.text).toMatch(/^Amina asked for changes: “Shorten the duties”\. Make them here/);
+    expect(last(id)?.text).toContain('The flyer made earlier is out of date.');
+    expect(open(id)).toBe(false);
+    expect(flyerStale(job(id), getState())).toBe(true);
+    expect(partsOf(job(id), getState()).find((p) => p.key === 'flyer')?.label).toBe('Flyer (out of date)');
+  });
+
+  it('approved: Reach, then the flyer, then publish', () => {
+    const id = (lastId = toReview());
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    as('amina', 'approved');
+    goOn(id);
+    expect(open(id)).toBe(true);
+    expect(step(id)).toEqual({ kind: 'reach' });
+    sendChat(id, 'Not now');
+    expect(step(id)).toEqual({ kind: 'flyer' });
+    sendChat(id, 'No, thanks');
+    expect(step(id)).toEqual({ kind: 'publish' });
+  });
+
+  it('approved, then a request for changes: the approval stands under "any one reviewer", and the chat says so', () => {
+    const id = (lastId = toReview());
+    sendForReview(id, [amina, daniel], '2026-12-01', 'any', '');
+    as('amina', 'approved');
+    as('daniel', 'changes', 'One more thing');
+    goOn(id);
+    expect(open(id)).toBe(true);
+    expect(step(id)).toEqual({ kind: 'reach' });
+    expect(last(id)?.text).toMatch(/^Daniel asked for changes after Amina approved\. Under your organisation’s rule one approval is enough, so it stands/);
+  });
+
+  it('approved, then a request for changes, where any request pauses publishing: it waits, and the chat says why', () => {
+    const id = (lastId = toReview(P5));
+    update((s) => ({ ...s, org: { ...s.org, changesPause: true } }));
+    sendForReview(id, [amina, daniel], '2026-12-01', 'any', '');
+    as('amina', 'approved');
+    as('daniel', 'changes', 'One more thing');
+    goOn(id);
+    expect(open(id)).toBe(false);
+    expect(step(id)).toEqual({ kind: 'waiting' });
+    expect(last(id)?.text).toContain('any request for changes pauses publishing');
+  });
+
+  it('skipped by the owner where approval is required: Reach and the flyer, then publish, recorded as today', () => {
+    const id = (lastId = toReview(P5));
+    expect(step(id)).toEqual({ kind: 'review' });
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    expect(overrideApproval(id, 'The deadline cannot move')).toBe(true);
+    goOn(id);
+    expect(open(id)).toBe(true);
+    expect(step(id)).toEqual({ kind: 'reach' });
+  });
+
+  it('not required and not asked: straight to Reach', () => {
+    const id = (lastId = toReview());
+    sendChat(id, 'No review');
+    expect(step(id)).toEqual({ kind: 'reach' });
+    expect(open(id)).toBe(true);
+  });
+
+  it('an edit after approval reopens review and closes Reach and the flyer until the next approval', () => {
+    const id = (lastId = toReview());
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    as('amina', 'approved');
+    goOn(id);
+    expect(open(id)).toBe(true);
+    editSection(id, job(id).tags.find((k) => !['about', 'apply'].includes(k))!, 'A line changed after approval.');
+    expect(open(id)).toBe(false);
+    goOn(id);
+    expect(step(id)).toEqual({ kind: 'waiting' });
+  });
+
+  it('a free standard job is never offered Reach or the flyer, by any route, including Publish without approval', () => {
+    const id = (lastId = toPlan(P5));
+    sendChat(id, 'Publish free');
+    expect(step(id)).toEqual({ kind: 'review' });
+    sendForReview(id, [amina], '2026-12-01', 'any', '');
+    expect(overrideApproval(id, 'The deadline cannot move')).toBe(true);
+    goOn(id);
+    expect(step(id)).toEqual({ kind: 'publish' });
+    expect(open(id)).toBe(false);
+    expect(partsOf(job(id), getState()).some((p) => ['market', 'full', 'langs', 'reach', 'flyer'].includes(p.key))).toBe(false);
+    expect(job(id).chat.some((m) => m.step === 'reach' || m.step === 'flyer')).toBe(false);
+  });
+});
+
 describe('found on the real-AI walk (12 November 2026)', () => {
   it('a published job is no longer walked through: a section left unapproved is not asked about after publishing', () => {
     const id = toPlan();
@@ -179,12 +315,12 @@ describe('found on the real-AI walk (12 November 2026)', () => {
     sendChat(id, 'Amplify');
     for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
     sendChat(id, 'No other languages');
-    sendChat(id, 'No, thanks');
+    sendChat(id, 'No review');
     expect(step(id)).toEqual({ kind: 'reach' });
     sendChat(id, 'Invite ana.lopez@example.org, and my colleague amina@riverstone.example.org');
     expect(job(id).reachPlan).toMatchObject({ candidates: ['ana.lopez@example.org'], team: ['amina@riverstone.example.org'] });
     expect(job(id).chat.find((m) => m.text.startsWith('Added 1 to invite and 1 from your team'))).toBeDefined();
-    sendChat(id, 'No review');
+    sendChat(id, 'No, thanks');
     sendChat(id, 'Can you publish it on Monday?');
     expect(last(id)).toMatchObject({ card: 'publish' });
     expect(job(id).status).toBe('draft');
@@ -209,7 +345,7 @@ describe('found on the real-AI walk (12 November 2026)', () => {
     sendChat(id, 'Amplify');
     for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
     sendChat(id, 'That is all for languages');
-    expect(step(id)).toEqual({ kind: 'flyer' });
+    expect(step(id)).toEqual({ kind: 'review' });
   });
 });
 

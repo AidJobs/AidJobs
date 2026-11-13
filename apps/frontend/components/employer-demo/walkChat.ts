@@ -1,4 +1,4 @@
-import { approvalRequired } from './approval';
+import { approvalRequired, pausedByChanges } from './approval';
 import { commitmentText, COMMITMENTS, extractFacts, headingFor, isoDay, LANGUAGES, longDate, placeOf, SECTION_BY_KEY, salarySuggestion } from './engine';
 import { isWritten, type Step } from './flow';
 import { canReopen, graceEnds, stateActionsOf, type StateAction } from './lifecycle';
@@ -198,6 +198,18 @@ export function amplifyLine(s: State, freeAmp = false): string {
   return `listed ${LISTED_DAYS.amplify} days, featured with the “${BADGE}” badge, the market check, the full advert check, ${n} language ${n === 1 ? 'version' : 'versions'} besides its own (more at ${usd(LANGUAGE_PRICE)} each), a field-post flyer, and Reach emails when it goes live`;
 }
 
+/**
+ * Approved, then a request for changes (section 19, phase 5, C): the approval stands, unless the organisation chose that any request
+ * pauses publishing (then the job waits instead); the chat says which, at the first step after review.
+ */
+function standsNote(s: State, job: DemoJob): string {
+  const name = (r: { name: string }) => r.name.split(' ')[0];
+  const approvers = job.review.reviewers.filter((r) => r.decision === 'approved').map(name);
+  const askers = job.review.reviewers.filter((r) => r.decision === 'changes').map(name);
+  if (!approvers.length || !askers.length) return '';
+  return `${askers.join(' and ')} asked for changes after ${approvers.join(' and ')} approved. Under your organisation’s rule one approval is enough, so it stands; their comments are in Review. `;
+}
+
 /** Steps 8 and 9 (section 19): what the rules say when the AI is off or leaves a step unasked. */
 function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = false): ChatMsg[] {
   const own = langOf(jobLang(job)).label;
@@ -238,25 +250,29 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
     case 'flyer':
       return [stepMsg('A one-page flyer with a QR code to the job, for notice boards in field offices, clinics, and community centres, in any reviewed language. Shall I show it?', key, [SHOW_FLYER, NO_THANKS])];
     case 'reach':
-      return [stepMsg('Reach invites people by email when the job goes live: candidates you know, and your team to pass it on. Shall I prepare the invitations? You choose who gets them and edit both emails in their tab.', key, [INVITE, NOT_NOW])];
+      return [stepMsg(`${standsNote(s, job)}Reach invites people by email when the job goes live: candidates you know, and your team to pass it on. Shall I prepare the invitations? You choose who gets them and edit both emails in their tab.`, key, [INVITE, NOT_NOW])];
     case 'review': {
-      if (approvalRequired(s, job)) return [{ ...stepMsg('Your organisation asks for approval on this job before it is published. Who should review it?', key), card: 'review' }];
-      return [stepMsg('Would anyone like to read it before it goes out? Review is optional here: they comment and approve, and publishing does not wait for them.', key, [SEND_REVIEW, NO_REVIEW])];
+      const after = job.choice === 'amplify' ? ' Reach and the flyer come after review, so they match what was approved.' : '';
+      if (approvalRequired(s, job)) return [{ ...stepMsg(`Your organisation asks for approval on this job before it is published. Who should review it?${after}`, key), card: 'review' }];
+      return [stepMsg(`Would anyone like to read it before it goes out? Review is optional here: they comment and approve.${after}`, key, [SEND_REVIEW, NO_REVIEW])];
     }
     case 'waiting': {
       const r = job.review;
       const askers = r.reviewers.filter((x) => x.decision === 'changes');
       const waiting = r.reviewers.filter((x) => !x.decision).map((x) => x.name.split(' ')[0]);
       const skip = canSkip(s, job) ? [SKIP_APPROVAL] : [];
+      const closed = job.choice === 'amplify' ? ' Reach and the flyer stay closed until it is approved.' : '';
       if (askers.length) {
         const notes = askers.filter((a) => a.note).map((a) => `“${a.note}”`).join(' ');
-        return [stepMsg(`${askers.map((a) => a.name.split(' ')[0]).join(' and ')} asked for changes${notes ? `: ${notes}` : '.'} Make them here or in the text, then send round ${r.round + 1}: they see only what changed.`, key, [`Send round ${r.round + 1}`, ...skip])];
+        const paused = pausedByChanges(s, job) && r.reviewers.some((x) => x.decision === 'approved') ? ' Under your organisation’s rule, any request for changes pauses publishing, so the approval no longer counts.' : '';
+        const stale = job.flyerMade ? ' The flyer made earlier is out of date.' : '';
+        return [stepMsg(`${askers.map((a) => a.name.split(' ')[0]).join(' and ')} asked for changes${notes ? `: ${notes}${/[.!?]”$/.test(notes) ? '' : '.'}` : '.'}${paused} Make them here or in the text, then send round ${r.round + 1}: they see only what changed.${closed}${stale}`, key, [`Send round ${r.round + 1}`, ...skip])];
       }
-      return [{ ...stepMsg(`Sent for review. Waiting for ${waiting.join(' and ') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}; their comments and decisions appear in Review. You can keep working on it meanwhile.`, key, skip), card: 'review' }];
+      return [{ ...stepMsg(`Sent for review. Waiting for ${waiting.join(' and ') || 'your reviewers'}${r.due ? `, due ${longDate(r.due)}` : ''}; their comments and decisions appear in Review. You can keep working on it meanwhile.${closed}`, key, skip), card: 'review' }];
     }
     case 'publish': {
       const free = job.choice !== 'amplify';
-      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ' Your free standard listing is used when it goes live; scheduled, the job holds it until then.' : usesFreeAmplify(s, job) ? ' Your free Amplify is used when it goes live; scheduled, the job holds it until then.' : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
+      return [{ ...stepMsg(`${free ? standsNote(s, job) : ''}Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ' Your free standard listing is used when it goes live; scheduled, the job holds it until then.' : usesFreeAmplify(s, job) ? ' Your free Amplify is used when it goes live; scheduled, the job holds it until then.' : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
     }
     case 'live':
       if (job.status === 'closed') return [stateMessage(s, job) ?? stepMsg('This job is closed.', key)];

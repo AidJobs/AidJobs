@@ -2,7 +2,7 @@ import { formatOf, missingFacts } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { openPoints } from './Checks';
 import { headingFor } from './engine';
-import { amplifying, ASKS, checkPoints, fullPoints, isSettled, marketPoints } from './flow';
+import { amplifying, ASKS, checkPoints, flyerStale, fullPoints, isSettled, marketPoints, reachOpen, reviewDone } from './flow';
 import { isPublished } from './lifecycle';
 import { versionsOf } from './translate';
 import type { DemoJob, State } from './types';
@@ -30,6 +30,8 @@ export function partsOf(job: DemoJob, s: State): Part[] {
   const settled = (k: string) => published || isSettled(k, job);
   const required = approvalRequired(s, job);
   const planLabel = (published ? job.plan : job.choice) === 'amplify' ? 'Amplify' : (published ? job.plan : job.choice) === 'free' ? 'Free' : 'Free or Amplify';
+  // Phase 5's order (section 19, C): Amplify's checks and languages, then review, then Reach and the flyer, which open once review is done.
+  const open = reachOpen(job, s);
   const later: Part[] = [
     { key: 'plan', label: planLabel, done: published || Boolean(job.choice) },
     ...(amplify
@@ -37,11 +39,15 @@ export function partsOf(job: DemoJob, s: State): Part[] {
           { key: 'market', label: 'Market check', done: settled('market') || marketPoints(job, s).length === 0 },
           { key: 'full', label: 'Full check', done: settled('full') || fullPoints(job, s).length === 0 },
           { key: 'langs', label: 'Languages', done: settled('langs') && versionsOf(job).every((k) => job.translations?.[k]?.reviewed) },
-          { key: 'flyer', label: 'Flyer', done: settled('flyer') },
-          { key: 'reach', label: 'Reach', done: settled('reach') || Boolean(job.reachPlan) },
         ]
       : []),
-    { key: 'review', label: 'Review', done: published || (required ? approvedFor(s, job) : settled('review') || job.review.state !== 'none') },
+    { key: 'review', label: 'Review', done: published || (required ? approvedFor(s, job) : reviewDone(job, s)) },
+    ...(amplify
+      ? [
+          { key: 'reach', label: 'Reach', done: open && (settled('reach') || Boolean(job.reachPlan)) },
+          { key: 'flyer', label: flyerStale(job, s) ? 'Flyer (out of date)' : 'Flyer', done: open && settled('flyer') },
+        ]
+      : []),
   ];
   const sections = job.tags.map((k): Part => {
     const sec = job.sections.find((x) => x.key === k);
