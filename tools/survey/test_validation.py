@@ -72,9 +72,31 @@ def test_allocate_never_gives_a_cell_more_than_it_holds():
 
 
 def test_a_cell_held_back_by_the_organisation_cap_passes_its_places_on():
-    rows = draw_rows()
+    rows = draw_rows() + [{"advert_id": f"5{i:015x}", "org_id": "solo-org", "source": "board", "system": "solo",
+                           "language": "en", "held_out": "false"} for i in range(300)]
+    assert v.quotas([r for r in rows if r["held_out"] == "false"])[("board", "solo", False)] > 3
     chosen = v.draw_sample(rows, set())
-    assert sum(1 for r in chosen if r["system"] == "groundzero") <= 3      # one organisation only
+    assert len(chosen) == 100 and v.draw_problems(chosen, rows, set()) == []
+    assert sum(1 for r in chosen if r["system"] == "solo") == 3      # one organisation, capped at 3
+
+
+def test_a_big_system_left_short_by_the_organisation_cap_stops_the_draw():
+    def row(i, system, org):
+        return {"advert_id": f"{system[:2]}{i:014x}", "org_id": org, "source": "archive", "system": system,
+                "language": "fr" if i % 4 == 0 else "en", "held_out": "false"}
+
+    # The 50 adverts of "zz" belong to the same three organisations as the cell drawn before it.
+    rows = [row(i, "own site", f"o{i % 3}") for i in range(300)] + [row(i, "zz", f"o{i % 3}") for i in range(50)]
+    rows += [row(i, "other", f"p{i}") for i in range(200)]
+    with pytest.raises(SystemExit, match="under 3"):
+        v.draw_sample(rows, set(), n=40, french=10)
+
+
+def test_quotas_stop_moving_places_when_no_cell_can_give_one():
+    rows = [{"advert_id": f"{s}{i:015x}", "org_id": f"{s}{i}", "source": "archive", "system": s, "language": "en",
+             "held_out": "false"} for s in "abc" for i in range(50)]
+    q = v.quotas(rows, n=6, french=0)
+    assert sum(q.values()) == 6
 
 
 def test_a_draw_that_breaks_a_rule_is_reported():
@@ -115,6 +137,25 @@ def test_a_draw_once_made_is_frozen(work):
     assert (v.VALID / "draw.json").read_text(encoding="utf-8") == first
     codes = json.loads(first)["codes"]
     assert sorted(codes) == [f"V{i:03d}" for i in range(1, 101)]
+    assert v.load_draw() == codes
+
+
+def test_a_frozen_draw_is_refused_once_its_source_or_its_ids_change(work):
+    rows = draw_rows()
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    v.draw()
+    saved = json.loads((v.VALID / "draw.json").read_text(encoding="utf-8"))
+    rows[-1]["system"] = "Changed"
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    with pytest.raises(SystemExit, match="changed since"):
+        v.load_draw()
+    assert v.draw() == 1
+    write_csv(roles.ROLES / "broad-adverts.csv", draw_rows())
+    held = next(r["advert_id"] for r in draw_rows() if r["held_out"] == "true")
+    saved["codes"]["V001"]["advert_id"] = held
+    (v.VALID / "draw.json").write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(SystemExit, match="AI test set"):
+        v.load_draw()
 
 
 def test_neutral_ids_put_a_spread_pilot_first_then_four_batches():
@@ -176,6 +217,7 @@ def test_answers_in_the_guides_form_pass_and_others_are_named():
         "function": answer(function="logistics"),
         "restrictions": answer(restrictions=["gender"]),
         "keys": {k: x for k, x in answer().items() if k != "level"},
+        "boolean line": answer(headings=[[True, "scope"]]),
     }
     for name, a in cases.items():
         assert v.answer_problems(a, 5), name
@@ -232,6 +274,16 @@ def test_disagreements_need_a_decision_with_a_one_line_reason():
     assert not next(r for r in v.disagreement_rows(a, b, ["V001"], rows) if r["item"] == "years_min")["decision"]
     rows[0]["decision"] = "maybe"
     assert v.reconciled_items(a, b, ["V001"], rows)[1]
+
+
+def test_a_reconciled_years_pair_must_keep_the_guides_form():
+    a, b = {"V001": answer(years_min=5, years_alt=7)}, {"V001": answer(years_min=5, years_alt=6)}
+    rows = v.disagreement_rows(a, b, ["V001"])
+    rows[0]["decision"], rows[0]["reason"] = "4", "a slip"
+    _items, problems = v.reconciled_items(a, b, ["V001"], rows)
+    assert problems == ["V001: years_alt needs a smaller years_min"]
+    rows[0]["decision"] = "7"
+    assert v.reconciled_items(a, b, ["V001"], rows)[1] == []
 
 
 def test_parse_decision_takes_only_the_items_values():
@@ -309,8 +361,15 @@ def test_family_and_restrictions_are_judged_on_the_scripts_own_positives():
     truth = [v.items_of(answer(function="finance"))] * 15 + [v.items_of(answer(function="hr"))] * 5
     r = v.score_measure("family", script, truth)
     assert (r["script_positives"], r["positive_cases"]) == (16, 20)
-    assert r["precision"] == pytest.approx(15 / 16) and r["recall"] == pytest.approx(15 / 20)
+    assert r["precision"] == pytest.approx(15 / 16, abs=1e-3) and r["recall"] == pytest.approx(15 / 20)
     assert r["result"] == "validated"
+    wash = v.script_items(script_row(function="programme_management", sector="wash",
+                                     family_id="programme_management.wash"), set())
+    truth = [v.items_of(answer(function="programme_management", sector="wash"))] * 15 + \
+        [v.items_of(answer(function="programme_management", sector="none"))] * 5
+    r = v.score_measure("family", [wash] * 20, truth)
+    assert r["precision"] == pytest.approx(0.75) and r["result"] == "Estimate"
+    assert v.score_measure("function", [wash] * 20, truth)["precision"] == 1
     script = [v.script_items(script_row(restrictions="age"), set())] * 3 + [v.script_items(script_row(), set())] * 97
     truth = [v.items_of(answer(restrictions=["age"]))] * 3 + [v.items_of(answer())] * 97
     r = v.score_measure("restriction:age", script, truth)
@@ -332,6 +391,11 @@ def test_the_committed_file_passes_its_form_check_and_a_bad_one_fails(tmp_path):
     adverts.write_dicts(good, v.FIELDS, rows)
     assert v.check_problems(good) == []
     assert v.check(path=good) == 0
+    assert v.check(path=tmp_path / "missing.csv") == 1
+    broken = [dict(r) for r in rows]
+    broken[0]["result"] = "validated"                    # 0 positive cases cannot be validated
+    adverts.write_dicts(good, v.FIELDS, broken)
+    assert any("what its counts give" in p for p in v.check_problems(good))
     for k, bad in (("result", "maybe"), ("precision", "95%"), ("positive_cases", "x"), ("kappa", "2.000"),
                    ("measure", "fact:salary"), ("recall", "jobs@acme.example")):
         broken = [dict(r) for r in rows]

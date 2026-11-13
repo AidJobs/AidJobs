@@ -127,11 +127,14 @@ def quotas(pool: list[dict], n: int = SAMPLE, french: int = FRENCH_MIN) -> dict:
 
     for s in sorted(big):
         while system_total(s) < min(SYSTEM_FLOOR, per_system[s]):
-            add = max((c for c in q if c[1] == s and q[c] < sizes[c]), key=lambda c: (sizes[c] - q[c], str(c)))
-            take = max((c for c in q if c[2] == add[2] and c[1] != s and q[c] > 0 and
-                        not (c[1] in big and system_total(c[1]) <= SYSTEM_FLOOR)), key=lambda c: (q[c], str(c)))
+            adds = [c for c in q if c[1] == s and q[c] < sizes[c]]
+            add = max(adds, key=lambda c: (sizes[c] - q[c], str(c))) if adds else None
+            takes = [c for c in q if add and c[2] == add[2] and c[1] != s and q[c] > 0 and
+                     not (c[1] in big and system_total(c[1]) <= SYSTEM_FLOOR)]
+            if not takes:
+                break                  # no place to move: draw_problems reports the system as short
             q[add] += 1
-            q[take] -= 1
+            q[max(takes, key=lambda c: (q[c], str(c)))] -= 1
     return q
 
 
@@ -176,6 +179,10 @@ def draw_sample(rows: list[dict], exclude: set[str], seed: int = SEED, n: int = 
             k -= take(c, k)
         if k:
             raise SystemExit(f"draw: {k} places could not be filled within the caps")
+    per_system, drawn = Counter(r["system"] for r in pool), Counter(r["system"] for r in chosen)
+    short_systems = [s for s, v in per_system.items() if v >= BIG_SYSTEM and drawn[s] < SYSTEM_FLOOR]
+    if short_systems:
+        raise SystemExit(f"draw: the organisation cap left {sorted(short_systems)} under {SYSTEM_FLOOR} adverts")
     return chosen
 
 
@@ -227,16 +234,32 @@ def codes_for(chosen: list[dict], seed: int = SEED) -> dict[str, dict]:
     return out
 
 
+def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str]) -> list[str]:
+    """A frozen draw must still be the one made: its seed, the broad file it was drawn from, and every
+    rule of the draw."""
+    by_id = {r["advert_id"]: r for r in rows}
+    codes = saved.get("codes", {})
+    missing = [c["advert_id"] for c in codes.values() if c["advert_id"] not in by_id]
+    chosen = [by_id[c["advert_id"]] for c in codes.values() if c["advert_id"] in by_id]
+    problems = draw_problems(chosen, rows, exclude)
+    if missing:
+        problems.append(f"{len(missing)} drawn adverts are not in broad-adverts.csv")
+    if saved.get("seed") != SEED:
+        problems.append(f"the draw's seed {saved.get('seed')} is not {SEED}")
+    if saved.get("drawn_from") != sha256(roles.ROLES / "broad-adverts.csv"):
+        problems.append("broad-adverts.csv has changed since the draw was made")
+    if sorted(codes) != [f"V{i:03d}" for i in range(1, SAMPLE + 1)]:
+        problems.append("the neutral ids are not V001 to V100")
+    return problems
+
+
 def draw(_args=None) -> int:
     rows = read_rows(roles.ROLES / "broad-adverts.csv")
     exclude = test_set_ids()
     path = VALID / "draw.json"
     if path.exists():
         saved = json.loads(path.read_text(encoding="utf-8"))
-        by_id = {r["advert_id"]: r for r in rows}
-        missing = [c["advert_id"] for c in saved["codes"].values() if c["advert_id"] not in by_id]
-        chosen = [by_id[c["advert_id"]] for c in saved["codes"].values() if c["advert_id"] in by_id]
-        problems = draw_problems(chosen, rows, exclude) + [f"{len(missing)} drawn adverts are gone"] * bool(missing)
+        problems = saved_draw_problems(saved, rows, exclude)
         print(f"draw: frozen since {saved['made_at']}, kept as it is; {len(problems)} problems")
         for p in problems:
             print(p)
@@ -258,7 +281,12 @@ def draw(_args=None) -> int:
 
 
 def load_draw() -> dict[str, dict]:
-    return json.loads((VALID / "draw.json").read_text(encoding="utf-8"))["codes"]
+    """The frozen draw, refused unless it still holds every rule and was drawn from today's file."""
+    saved = json.loads((VALID / "draw.json").read_text(encoding="utf-8"))
+    problems = saved_draw_problems(saved, read_rows(roles.ROLES / "broad-adverts.csv"), test_set_ids())
+    if problems:
+        raise SystemExit("the frozen draw is refused: " + "; ".join(problems))
+    return saved["codes"]
 
 
 # --- the coders' packets ----------------------------------------------------------------------------
@@ -368,7 +396,8 @@ def answer_problems(a: dict, lines: int | None) -> list[str]:
         p.append(f"{vid}: not an advert of this packet")
     seen = set()
     for h in a["headings"] if isinstance(a["headings"], list) else [None]:
-        if not (isinstance(h, list) and len(h) == 2 and isinstance(h[0], int) and h[1] in HEADING_TYPES):
+        if not (isinstance(h, list) and len(h) == 2 and isinstance(h[0], int) and not isinstance(h[0], bool)
+                and h[1] in HEADING_TYPES):
             p.append(f"{vid}: heading {h!r} is not [line, section type]")
         elif (lines is not None and not 1 <= h[0] <= lines) or h[0] in seen:
             p.append(f"{vid}: heading line {h[0]} is outside the advert or given twice")
@@ -613,8 +642,23 @@ def reconciled_items(a: dict, b: dict, ids: list[str], rows: list[dict]) -> tupl
                 items[k] = parse_decision(k, r["decision"])
             except ValueError:
                 problems.append(f"{vid} {k}: {r['decision']!r} is not a value of this item")
+        if set(items) == set(ITEM_KEYS):
+            problems += [f"{vid}: {p}" for p in item_problems(items)]
         out[vid] = items
     return out, problems
+
+
+def item_problems(items: dict) -> list[str]:
+    """The guide's form for one advert's reconciled items, the years pair included."""
+    p = []
+    for k, x in items.items():
+        try:
+            parse_decision(k, show(x))
+        except ValueError:
+            p.append(f"{k}={x!r} is not a value of this item")
+    if items["years_alt"] is not None and (items["years_min"] is None or items["years_alt"] <= items["years_min"]):
+        p.append("years_alt needs a smaller years_min")
+    return p
 
 
 def reconcile(_args=None) -> int:
@@ -708,6 +752,8 @@ def score_measure(measure: str, script: list[dict], truth: list[dict]) -> dict:
         positives, script_positives = sum(map(bool, t)), sum(map(bool, s))
         precision = tp / script_positives if script_positives else None
         recall = tp / positives if positives else None
+    # Judged on the shares as committed (three decimals), so the form check can recompute the result.
+    precision, recall, within = (None if x is None else round(x, 3) for x in (precision, recall, within))
     return {"measure": measure, "positive_cases": positives, "script_positives": script_positives,
             "precision": precision, "recall": recall, "within_one_year": within,
             "result": judged(measure, positives, script_positives, precision, recall, within)}
@@ -803,11 +849,19 @@ def check_problems(path: Path) -> list[str]:
                 problems.append(f"{path.name}:{i}: kappa={v!r} is not a kappa")
             if k == "result" and v not in RESULTS:
                 problems.append(f"{path.name}:{i}: result={v!r} is not one of {sorted(RESULTS)}")
+        try:
+            share = {k: float(r[k]) if r[k] else None for k in ("precision", "recall", "within_one_year")}
+            expected = judged(r["measure"], int(r["positive_cases"]), int(r["script_positives"]), share["precision"],
+                              share["recall"], share["within_one_year"])
+        except (ValueError, TypeError):
+            continue
+        if r["result"] != expected:
+            problems.append(f"{path.name}:{i}: result {r['result']!r} is not what its counts give ({expected!r})")
     return problems
 
 
 def check(_args=None, path: Path = OUTPUT) -> int:
-    problems = check_problems(path) if path.exists() else []
+    problems = check_problems(path) if path.exists() else [f"{path.name} is missing"]
     for p in problems[:50]:
         print(p)
     print(f"check: {len(problems)} problems")
