@@ -244,8 +244,8 @@ A paid job is not a listing but a hiring campaign that AidJobs writes, checks ag
 
 ### Decisions
 
-1. **Free:** 2 jobs per calendar month, in the organisation's time zone (from its headquarters); counted at first use (published, sent for review, or downloaded); per organisation, not per person; no carry-over; listed 60 days; standard placement. The terms are shown on the Free choice itself, with a one-time "I understand" the first time an organisation publishes a free job, and on the Billing page. Replaces "2 free jobs live at a time" and "3 job descriptions a month". A free job is published or scheduled within its own month (decided by the user, 7 November 2026, replacing "scheduling for the 1st of next month uses that month's allowance"): a date next month shows a notice to create and publish it next month, or to choose Amplify to schedule it now. *Amended 8 November 2026 (section 19, the user's decision): a free job is counted only when it is published (or scheduled); sending for review no longer counts; a free job can be downloaded only after it is published.* *Amended 12 November 2026 (the user's decision, section 19, "Phase 3, revised"): a free job is used only when it goes live; a scheduled one holds one of its month's places until then, given back if the date is taken back (back to a draft, withdrawn, deleted, or amplified).*
-2. **Free or paid, nothing in between:** no paid Standard job, no credit packs. Beyond the two free jobs, every job is paid.
+1. **Free:** 2 jobs per calendar month, in the organisation's time zone (from its headquarters); counted at first use (published, sent for review, or downloaded); per organisation, not per person; no carry-over; listed 60 days; standard placement. The terms are shown on the Free choice itself, with a one-time "I understand" the first time an organisation publishes a free job, and on the Billing page. Replaces "2 free jobs live at a time" and "3 job descriptions a month". A free job is published or scheduled within its own month (decided by the user, 7 November 2026, replacing "scheduling for the 1st of next month uses that month's allowance"): a date next month shows a notice to create and publish it next month, or to choose Amplify to schedule it now. *Amended 8 November 2026 (section 19, the user's decision): a free job is counted only when it is published (or scheduled); sending for review no longer counts; a free job can be downloaded only after it is published.* *Amended 12 November 2026 (the user's decision, section 19, "Phase 3, revised"): a free job is used only when it goes live; a scheduled one holds one of its month's places until then, given back if the date is taken back (back to a draft, withdrawn, deleted, or amplified).* *Amended 13 November 2026 (the user's decision, section 19, "Phase 5 plan"): the monthly allowance is replaced by two separate allowances, each once per organisation and never renewed: one standard listing free, and one Amplify listing free. The calendar month, the "goes live this month" block, and the monthly reset are dropped. A date still has to be from tomorrow and before the closing date. Each allowance is used when that job goes live; scheduled, it holds that one place; taken back before go-live, the place returns; after go-live it stays used.*
+2. **Free or paid, nothing in between:** no paid Standard job, no credit packs. Beyond the one free standard listing, every further job is Amplify, a package, or the subscription. *Amended 13 November 2026 (section 19, "Phase 5 plan"): the one free Amplify does not use the free standard allowance, and a package or a subscription does not use either. Amplify, free or paid, still needs a verified organisation.*
 3. **The paid offer:** US$28.40 per job; listed 100 days; featured placement; Reach emails; the market check, the full advert check, language versions, and the field-post notice. Working name **Amplify** ("Publish free", "Amplify and publish"); the user may still rename it. "Reach" stays the name of the outreach feature inside it.
 4. **Public badge: "Actively hiring".** A paid job tells candidates the employer is looking now, the job comes straight from a verified organisation, and its details are checked. The paid placement is still disclosed, consistently: the badge's hover text reads "Promoted by the employer · posted directly by a verified organisation · details checked by AidJobs".
 5. **Packages (placeholders):**
@@ -508,7 +508,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **Reviewers:** the chat column becomes the Review panel (status, round, rule, due date, each reviewer's decision; changed since the last round; every comment; a comment or suggestion tied to the part open on the line; Approve or Request changes with a note). The author's chat is not shown; the line cannot reorder; "View the demo as" opens the window.
   **Archived screens:** the earlier workspace and Check and publish keep working at their addresses on the same demo data, each with a banner and "Open this job in the new window"; nothing else links to them except the Archived screens page (demo controls, beside Reset demo). The window's "Earlier workspace" button and the chat's "Open the earlier workspace" are gone.
   **Checks:** 964 tests pass (941 before); new tests for each rule, shown failing on the earlier code. Tests that drove the old pages through their former links now open the window; the old pages' own tests keep running; none removed. Type check, lint, and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark, by a headless browser driven outside the repository: state cards and their actions, the Review panel, the archive banner, and the Archived screens page; no sideways page scroll; no stray "Earlier workspace" outside the archive page.
-- [ ] **Phase 5, polish:** the round's checks across all screen sizes, then the independent review of the round and its fixes.
+- [ ] **Phase 5, polish and the revisions of 13 November 2026:** the leftovers already in this section (the model settling a later step, a sentence added on "Good", the context cap, the round's screen checks, then the independent review of the round), plus the user's decisions of 13 November 2026 recorded in "Phase 5 plan" below, rewritten after two independent reviews the same day (Grok, then Composer; changes needed both times, every finding taken). The rewritten plan was approved by the user on 13 November 2026; not built yet.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
 
@@ -543,7 +543,134 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
    - Their tests keep running; new tests check that every former link opens the window.
 5. **Checks as before:** tests for each rule (shown failing on the earlier code), type check, lint, a production build, screens at 1366, 412, 390, and 360 px in light and dark, a push for the preview, and this record and the ledger.
 
-**Later:** managing saved profiles (their page); the AI answering one step ahead (phase 5); the user's journey assessment of the whole demo.
+**Later:** managing saved profiles (their page); the user's journey assessment of the whole demo, which waits until phase 5 and its review are done.
+
+### Phase 5 plan (approved by the user, 13 November 2026, rewritten after both reviews)
+
+**Status.** The user approved eleven decisions on 13 November 2026, including a new free-listing rule, and asked what else belongs in phase 5, and how a link can fill About us or a project now that the demo's AI is on, together with the role survey as context for a role-specific job description. The draft had two independent reviews the same day, each by a separate read-only agent: Grok 4.7 ([first review](9ec6244c-e0d7-4576-8c43-bfdbfea3b1e8): changes needed, 8 must-fix, 5 should-fix, 5 minor) and then Composer 2.5 ([second review](cb3ff074-1b8d-4770-979a-ac45ee87bf84): changes needed, 3 must-fix, 7 should-fix, 3 minor). Claude, GPT, and Gemini were refused for this account's subagents ("not included in your weekly usage"). This is the plan rewritten with every finding of both reviews built in. No code in this step. The user approved this rewritten plan on 13 November 2026 ("approve plan"); it is built in a new chat (the project's rule), with this section and the ledger as the handover. The merge rule does not apply, because `demo/employer` is never merged.
+
+**What phase 5 does, in one list.**
+
+1. The AI gets real context: the organisation's own page and, per job, the project, read once and only with the user's say.
+2. Suggestions instead of blanks, each with its source, and never a number the model made up.
+3. About us becomes part of the job, editable by the user and the AI.
+4. The outline becomes fully editable: headings, suggested titles, sub-sections, and moving sections anywhere.
+5. Social links are kept by the organisation and chosen per job.
+6. Review comes before Reach and the flyer.
+7. One free standard listing and one free Amplify, once each.
+8. The chat looks plain, and text appears as it is written.
+9. Focus rings follow each control's rounded corners; the review date is optional.
+10. Phase 5's original leftovers: the open question only, "Good" adds nothing, a tighter AI cap, the round's screens, then the round's independent review.
+
+#### A. Context for the AI
+
+**Where the context comes from.** Three sources, in this order of authority: what the user says and accepts; the organisation's and the project's own text, once accepted; and the survey card, which supplies questions and labelled sample figures only. The model writes from these and nothing else.
+
+**The organisation's page.** An optional website field, asked once the first time a job is written and always in Organisation settings. On it, the demo reads one page and the model drafts About us from that page alone. The draft is shown with a short note of what was used and what the page does not say; the user accepts, edits, or rejects it. Accepting fills this job's About us. "Save as the organisation's About us" is its own button, offered once in the chat when the organisation has none, and otherwise on the section. Later jobs start from the organisation's About us.
+
+**The project.** Per job: a link, pasted text, or an upload. The model drafts About the project from it alone, shown the same way. It stays on that job and is not saved in Organisation settings. If the project text names a country, donor, or dates that differ from a fact already set, the chat asks which to keep. Changing the project later marks the sections that used it and offers their changed lines for a yes or no, as a changed fact already does.
+
+**Reading a page, safely.** The model never browses. A demo-only route, beside the chat route and behind the same gate (never production; on Vercel only `demo/employer`), takes one `https` address by POST, only from the website field or the project field, never from a chat message. It resolves the address once, refuses it if any resolved IPv4 or IPv6 address is loopback, private, link-local, unique-local, multicast, unspecified, mapped from one of those, or a cloud-metadata address, and connects only to an address it checked, with the original name for TLS. Each redirect is checked the same way, stays on `https`, and stops at three. It reads at most about 500 KB, keeps HTML only, drops script, style, and navigation, removes email addresses and phone numbers, and keeps 8,000 characters of visible text. It logs a status only, never the address or the text. It follows no links: one page, no crawl, no AidJobs crawler, no jobs database. A PDF, a login page, or a page with no real text returns "this page could not be read", and the user pastes or uploads. An upload uses the demo's existing file reading, with the same 8,000-character cut. A link pasted as a job description is still refused, as today.
+
+**What the model may do with that text.** Draft About us or About the project, in the job's language and the organisation's style, with every kept sentence taken from the page. Name what the page does not say. Never fill a gap with a likely programme, country, or donor. If the page is in another language, say so and write in the job's language. Page text is used only for that draft: a later section may use a fact from the page only after the user accepts it, and duties, requirements, and pay are never copied from a page. Social addresses found in the page are offered for Organisation settings, never saved silently.
+
+**The context pack**, kept on the job and sent with every later request: the accepted About us, the accepted project text, and the accepted facts, each with its source ("you told us", "your website", "the project page", "your salary scale", "similar jobs in this place (sample)"). The raw page is sent only while its draft is written. It is never stored in the chat history.
+
+**The survey card.** W-54's role library is not validated, so it is not imported and the demo's role families are not replaced. The card holds only what the demo already has, for the role family it already recognises (Nutrition Officer included): the questions it already asks, the pay and experience figures from `salarySuggestion` and the market sample (labelled sample figures), the existing checks on years and on the length of the essentials list, and the writing guide's length band. No list of what adverts leave out, no master's-degree prompt, no results at 3, 6, and 12 months, no typical week: those wait for the validated library. The organisation's own job profile, when one is accepted, comes before the card.
+
+**Suggestions, not inventions.** Where the demo has a real basis, it suggests rather than leaving a blank: pay and years of experience from the organisation's scale or the labelled sample; About us and the project from accepted text. A suggestion appears as a card with its source and its reason (for pay: why showing pay helps), and stays off the job until the user accepts, edits, or rejects it. Accepted, it becomes a fact the user gave. Rejected, it is not offered again on that job. Names, donor, team size, benefits, visa, and safeguarding level are asked or left blank; closing date, number of posts, and duty station are asked. A duty may use a number only when the user or the pack has it; otherwise the placeholder the check already flags stays. The basic check's acronym point is unchanged.
+
+**How the source is enforced in code.** The model offers a fact with a new action, `suggest_fact`, carrying the fact and its source. `aiActions.ts` refuses it unless the source is one of the named kinds, a sample or scale figure equals what `salarySuggestion` or the market sample returns for this job, and a page fact appears in the accepted text. Only the user's Accept turns it into `set_facts`. A `set_facts` from the model still carries only what the user typed. The check on drafts (`quality.ts`, "numbers nobody gave") also accepts numbers in the accepted About us, the accepted project text, and accepted suggestions, and still refuses the rest.
+
+**The size of what is sent.** The route's limit drops from 200,000 to 80,000 characters. To fit normal use: only the language version in view is sent in full (the others as key, label, reviewed, and behind); templates are sent as key, label, family, and section count, with headings only for the recommended template and the one in use; the last 14 messages are each cut to 1,500 characters, as today. The writing guide is added on the server. A test checks that a full amplified job (every section, two reviewed versions, review open, Reach prepared) stays under the limit, and that one character over is refused.
+
+#### B. Writing and editing the job
+
+**About us is part of the job.** Today About us and How to apply are fixed: the AI is refused both, and its instructions say never to write them. In phase 5 About us leaves that list (`FIXED_SECTIONS`) and becomes a normal section the AI may write and the user may edit. How to apply stays from the application settings, and the organisation's fixed texts (safeguarding, equal opportunity, and the rest) still go in word for word, lockable and confirmed once. A language version translates the job's own About us, and uses the organisation's only when the job has none.
+
+**Headings and titles.** Any heading can be edited, or replaced from two or three suggested titles for the section in view; a suggestion applies only when chosen. Sections can be added. Text stays with its section.
+
+**Sub-sections (new).** One level: a sub-heading inside a section with its own lines, added, renamed, moved within its section, or removed in the outline. A language version translates them; a template the organisation saves keeps them.
+
+**Moving sections anywhere.** Today the demo re-sorts every job by its five groups on each change and on load, and tells the AI to reorder only within a group. In phase 5 a template, and a section added without a place, still follow the group order; once the user moves a section, the job keeps that order through reloads. This changes `outlineOrder`, `normalise`, `reorderSections`, the template panel, and the AI's instructions. The AI may move a section across groups only when the user asked. Before a template is applied, the template panel does the same.
+
+**The open question.** The AI may ask only the question the window is on, and may not settle a later one; a request to do something else (rename, add, move, answer a fact early, open a part) is carried out, then the open question is asked again. Opening a part never publishes, pays, sends, or passes a required approval. "Good" approves the section and adds nothing; a sentence is added only when the user asks for a change.
+
+#### C. From the check to publishing
+
+**Amplify, paid or the free one:**
+
+1. Free or Amplify.
+2. Market check, full advert check, and languages, each version written and marked reviewed, so reviewers see them.
+3. Review, where the organisation asks for it or requires it.
+4. Then Reach, then the flyer, then publish.
+
+**Review states on that path:**
+
+| State | What comes next |
+| --- | --- |
+| Open | Waiting, with Remind; nothing after review is offered |
+| Changes requested | The author edits and sends the next round; Reach and the flyer stay closed, and a flyer already made is marked out of date |
+| Approved | Reach, the flyer, publish |
+| Approved, then a request for changes | As today: the approval stands unless the organisation chose that any request pauses publishing; the chat says which |
+| Skipped by the owner, where approval is required | "Publish without approval" with its reason, then Reach and the flyer, then publish, recorded as today |
+| Not required and not asked | Straight to Reach |
+
+An edit after approval resets it, as today, and closes Reach and the flyer until the next approval. A changed language version is an edit like any other. A scheduled Amplify job sends Reach on its date.
+
+**A free standard job:** the choice, then review if it applies, then publish. Only the writer and the basic check: no market check, full check, extra language, flyer, or Reach, by any route, including "Publish without approval".
+
+**Publishing, paying, and sending** stay the card's own button; the chat never does them.
+
+#### D. Free listings (replaces section 16's two a month)
+
+**The rule.** One standard listing free and one Amplify listing free, each once per organisation, ever, never renewed, separate from each other. A package, the subscription, or a paid job uses neither, and an unused allowance stays available whatever else is published first. There is still no paid standard listing: after the free one, a job is Amplify, a package job, or the subscription. A second Amplify job costs US$28.40, or a package job.
+
+**What each gives.** The free standard listing: 60 days, standard placement, the job's own language only. The free Amplify: everything a paid Amplify job has, including Reach with the same email allowance and the same listing length. The choice reads "Free once for your organisation · after this, US$28.40 a job or part of a package", and says the free standard listing is separate and still available if unused. The one-time "I understand" stays, reworded.
+
+**Verification.** Amplify, free or paid, still needs a verified organisation, by every route. Riverstone, the sample organisation, is verified, so the preview shows the full free Amplify.
+
+**When it counts.** Used when that job goes live. Scheduled, it holds that one place; taken back to a draft, withdrawn, deleted, or amplified before going live, the place returns. After going live it stays used, even if the job is later paid for or upgraded.
+
+**Amplifying a live free job.** Today that needs a payment. In phase 5 the free Amplify is a third way, with no payment: used at once on a live job, held until the date on a scheduled one. It does not give back the free standard. While the free Amplify is available, Ask to pay is not offered.
+
+**Old data.** Jobs in the sample use neither allowance, so each offer can be seen once. In a save from an earlier preview: if any free job went live, the free standard is used; a scheduled free job holds it only when none went live; no old amplified job uses the free Amplify.
+
+**In the code.** The monthly count goes: `FREE_PER_MONTH`, `freeMonthBlock`, the month on each free use, the month test in `canGoFree`, `freeLeft`, the headquarters' time zone for the allowance, and the monthly words in the chat, the publish choice, the free terms, Billing, the side menu's plan line, and the Back to draft and Delete dialogs. In its place, one record per allowance: available, held by a scheduled job, or used. A date must still be from tomorrow and before the closing date. Billing shows "Free standard: used or available" and "Free Amplify: used or available".
+
+#### E. Look and feel
+
+**Social links.** Optional the first time a job is written, and always in Organisation settings; saved on the organisation; each job includes or leaves out each link, and that choice affects only that job. Shown as a row on the public job page, not inside About us.
+
+**Text appearing as it is written.** The AI's answer is still checked whole before anything happens: the reply's actions run only once the full answer has been parsed. The window then reveals the reply's text progressively, and the same for a section once its text is stored, whether the AI or the rules wrote it. With reduced motion on, the text appears at once. A screen reader hears the finished message. A new message finishes the reveal at once; it does not undo anything already done.
+
+**The chat.** No black box for the user's message: both sides share the chat background, with a faint "You" over the user's message. The AI's reply has no box or outline. The answer buttons keep their size and selected state, with no fill until chosen.
+
+**Focus.** Fields already show a soft ring. Every other focused control (buttons, pills, menus, tabs, the chat box) still shows a square outline; it is replaced by a ring that follows the control's own corners, in light and dark mode.
+
+**Answer by.** The review form today offers only 2, 3, or 5 days ahead and always puts a date in the email. It gains "No date" and a date to pick; the email names a date only when one was chosen.
+
+#### F. Build order
+
+Each step on `demo/employer`, with its tests, before the next:
+
+1. The free listings (section D), because publishing, Billing, and the chat's wording depend on it.
+2. The new order and review states (section C).
+3. About us in the job, the outline, sub-sections, and moving sections (section B).
+4. The page-reading route and its tests, then the website and project fields, the context pack, `suggest_fact`, and the survey card (section A).
+5. The open question, "Good", and the size limit.
+6. Social links, the chat's look, text appearing, focus, and the review date (section E).
+7. Then the round's checks, the push for the preview, and this record and the ledger.
+
+A real-AI walk on the preview's model, as in phases 2 and 3, checks the page drafts, suggestions, and the new order, within about US$1 of the demo key.
+
+#### G. Checks
+
+Tests for each rule, each shown failing on the earlier code, including: About us written by the AI and How to apply still refused; a version translating the job's About us; a section moved across groups surviving a reload; a sub-section; `suggest_fact` refused without a source and with a figure that differs from the sample; every case of the page route (non-https, private IPv4 and IPv6, a name with one public and one private address, a redirect to a private address, a second lookup that changes, a non-HTML page, a page over the size limit), with the lookup and the fetch stubbed, never a real site; the no-network test allowing the page route beside the AI route and nothing else; a full job under the size limit; each review state against Reach and the flyer; a free standard job never offered Reach or the flyer; the free Amplify on a live job without payment; both allowances through scheduling, taking back, going live, deleting, and an older save. Type check, lint, and a production build. Screens at 1366, 412, 390, and 360 px, light and dark: the text appearing with reduced motion on and off, the plain chat, a suggestion card, the page-draft card, the Amplify order, a free standard job without Reach or the flyer, and both allowances in Billing. Keyboard and screen reader. Then the preview on `demo/employer`, never merged, and one independent review of the whole round, then its fixes.
+
+#### H. Not in this phase
+
+Managing saved profiles; a projects list in Organisation settings; replacing the role families with the survey's library; Hindi and other local languages; token allowances; vouching; reading more than one page of a site; a public title suggested for an internal code; the user's assessment of the whole demo, which follows this phase and its review.
 
 ### Phase 3, revised (the user's decisions, 12 November 2026)
 
