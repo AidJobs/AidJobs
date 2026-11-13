@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { signRequest } from '../employerDemoAi/sigv4';
 import { callModel, ENDPOINT, messagesFor, MODEL, readModelReply, SYSTEM } from '../employerDemoAi/model';
 import { GET, POST } from '../../app/employer-demo/chat/route';
+import { MAX_BODY } from '../employerDemoAi/quality';
 import { OPENROUTER_ENDPOINT } from '../employerDemoAi/openrouter';
 
 const creds = { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' };
@@ -192,7 +193,11 @@ describe('the route', () => {
     expect((await post({ ...turn, message: '' })).status).toBe(400);
     expect((await post({ ...turn, message: 'x'.repeat(4001) })).status).toBe(400);
     expect((await post({ ...turn, context: [1] })).status).toBe(400);
-    expect((await post({ ...turn, context: { pad: 'x'.repeat(200_001) } })).status).toBe(413);
+    // The limit is 80,000 characters since phase 5: one character over is refused; at the limit the body is read (here, not JSON).
+    expect(MAX_BODY).toBe(80_000);
+    expect((await post('x'.repeat(MAX_BODY + 1))).status).toBe(413);
+    expect((await post('x'.repeat(MAX_BODY))).status).toBe(400);
+    expect((await post({ ...turn, context: { pad: 'x'.repeat(80_001) } })).status).toBe(413);
   });
 
   it("returns the model's reply and actions; on a failure, logs the status only, never the message", async () => {

@@ -113,7 +113,7 @@ function filled(f: Facts): Partial<Facts> {
 const headingOf = (j: DemoJob, format: Format, k: string) => j.sections.find((x) => x.key === k)?.title ?? j.renamed?.[k] ?? headingFor(k, format);
 
 /** The step a job written step by step is at, as the AI is told it: plain data, with headings in place of keys where it helps. */
-function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Record<string, unknown> | null {
+function stepFor(step: Step | null, j: DemoJob, s: State, format: Format, depth = 0): Record<string, unknown> | null {
   if (!step) return null;
   switch (step.kind) {
     case 'ask':
@@ -121,7 +121,8 @@ function stepFor(step: Step | null, j: DemoJob, s: State, format: Format): Recor
     case 'write':
       return { kind: 'write', sections: step.sections.filter((k) => !FIXED_SECTIONS.includes(k)).map((k) => ({ key: k, heading: headingOf(j, format, k) })) };
     case 'approve':
-      return { kind: 'approve', section: step.section, heading: headingOf(j, format, step.section), then: stepFor(afterApproval(j, s, step.section), j, s, format) };
+      // What comes once this one is approved, one step ahead only: two sections waiting for approval would otherwise point at each other.
+      return { kind: 'approve', section: step.section, heading: headingOf(j, format, step.section), then: depth ? null : stepFor(afterApproval(j, s, step.section), j, s, format, 1) };
     case 'change':
       return { kind: 'change', what: j.walk?.pending?.what, changes: (j.walk?.pending?.changes ?? []).map((c) => ({ heading: headingOf(j, format, c.key), now: c.lines.join('\n') })) };
     case 'genuine':
@@ -167,7 +168,7 @@ function returningFor(s: State, j: DemoJob) {
  * Steps 8 and 9 as the AI is told them (section 19): the plan and what it allows, the language versions, review, and Reach. Figures
  * are the rules' own; the AI words them and never works out a price, an allowance, or a date itself.
  */
-function publishingFor(s: State, j: DemoJob) {
+function publishingFor(s: State, j: DemoJob, version?: JobLang) {
   const via = viaFor(s, j);
   const onHand = paidJobsLeft(s);
   return {
@@ -177,7 +178,19 @@ function publishingFor(s: State, j: DemoJob) {
     publishOn: j.publishOn ?? null,
     free: { canGoFree: canGoFree(s, j.id), standard: allowance(s, 'standard').state, listedDays: LISTED_DAYS.free },
     amplify: { verified: s.org.verified, freeAmplify: allowance(s, 'amplify').state, usesFreeAmplify: usesFreeAmplify(s, j), price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? (canAmplifyFree(s, j.id) ? 'free' : 'one'), packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
-    versions: { included: LANGS_INCLUDED[via], extraPrice: usd(LANGUAGE_PRICE), toPay: langsToPay(j, 'amplify', via), list: versionsOf(j).map((k) => ({ key: k, label: langOf(k).label, reviewed: Boolean(j.translations?.[k]?.reviewed), behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)), sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) })) },
+    // Only the version in view is sent in full (section 19, phase 5, the size of what is sent); the others as key, label, reviewed, and behind.
+    versions: {
+      included: LANGS_INCLUDED[via],
+      extraPrice: usd(LANGUAGE_PRICE),
+      toPay: langsToPay(j, 'amplify', via),
+      list: versionsOf(j).map((k) => ({
+        key: k,
+        label: langOf(k).label,
+        reviewed: Boolean(j.translations?.[k]?.reviewed),
+        behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)),
+        ...(k === version ? { sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) } : {}),
+      })),
+    },
     reviewDone: reviewDone(j, s),
     review: { required: approvalRequired(s, j), approved: approvedFor(s, j), state: j.review.state, reviewers: j.review.reviewers.map((r) => ({ name: r.name, decision: r.decision ?? null, note: r.note ?? null })), team: s.team.filter((p) => p.id !== s.me.id).map((p) => ({ name: p.name, role: p.role })) },
     reach: (() => {
@@ -245,7 +258,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     card: surveyCard(s, j),
     suggestions: (j.suggestions ?? []).map((x) => ({ fact: x.fact, value: x.value, source: x.source, state: x.state })),
     ...(page ? { page } : {}),
-    publishing: publishingFor(s, j),
+    publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
     recommendation: {
       key: rec.key,
@@ -256,7 +269,8 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       added: recKeys.filter((k) => !recFormat.order.some((o) => o.key === k) && TYPE_REASONS[k]).map((k) => ({ heading: headingFor(k, recFormat), why: TYPE_REASONS[k] })),
       others: rec.others.map((k) => ({ key: k, label: formatOf(s, k).label, usedBy: formatOf(s, k).usedBy })),
     },
-    templates: s.formats.filter((f) => !f.key.startsWith('pasted-')).map((f) => ({ key: f.key, label: f.label, family: f.family, usedBy: f.usedBy, headings: f.order.map((o) => o.heading) })),
+    // Templates as key, label, family, and section count; headings only for the recommended one and the one in use.
+    templates: s.formats.filter((f) => !f.key.startsWith('pasted-')).map((f) => ({ key: f.key, label: f.label, family: f.family, sections: f.order.length, ...(f.key === rec.key || f.key === j.format ? { headings: f.order.map((o) => o.heading) } : {}) })),
     sectionTypes: SECTIONS.map((x) => ({ key: x.key, label: x.label, group: x.group, hint: x.hint })),
     styles: STYLES,
     contracts: CONTRACTS,

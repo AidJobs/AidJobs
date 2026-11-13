@@ -44,6 +44,8 @@ import {
   startFromProfile,
   writeVersionSection,
   changeSub,
+  headingOf,
+  isApprovalReply,
 } from './actions';
 import { approvalRequired } from './approval';
 import { checkSuggestion, offerSuggestion, showPageDraft } from './context';
@@ -162,6 +164,49 @@ const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
 
 /** The user asked to move or reorder something, so the AI may move a section across groups. */
 const MOVE_ASKED = /\b(move|put|place|before|after|order|first|last|top|bottom|above|below|swap|earlier|later|higher|lower)\b/i;
+
+/** The user approved every section at once. */
+const ALL_ASKED = /\b(all|the rest|everything|every section|both)\b/i;
+
+/** Words that name a later question, so the user's own answer to it ahead of time can settle it. */
+const SETTLE_WORDS: Record<string, RegExp> = {
+  details: /\b(position|direct report|start|donor|details?)\b/i,
+  sdgs: /\b(sdgs?|goals?)\b/i,
+  fixed: /\b(fixed text|safeguarding|psea|commitments?|misconduct|equal opportunit)/i,
+  suggest: /\b(suggest|sections?)\b/i,
+  market: /\bmarket\b/i,
+  full: /\b(full|advert) check\b/i,
+  langs: /\b(languages?|translat|versions?|french|arabic|spanish|portuguese|english)\b/i,
+  review: /\breview/i,
+  reach: /\b(reach|invit)/i,
+  flyer: /\bflyer\b/i,
+  again: /\b(nothing else|no other changes?|same as before)\b/i,
+};
+
+/**
+ * Whether the AI's question is not the one the window is on (section 19, phase 5: the open question): a fact asked other than the one
+ * open, or, at an approve step, a reply that does not name the section being approved. The rules then ask the open question again.
+ */
+export function asksAhead(reply: string, askFact: AskKind | undefined, want: ReturnType<typeof nextStep>, heading: string, wrote: string[] = []): boolean {
+  if (!want) return false;
+  if (want.kind === 'ask') return askFact ? askFact !== want.fact : !FACT_WORDS[want.fact].test(reply);
+  // A reply in the turn that wrote the section being approved is about that section.
+  if (want.kind === 'approve') return Boolean(askFact) || (!wrote.includes(want.section) && !reply.toLowerCase().includes(heading.toLowerCase()));
+  return false;
+}
+
+const FACT_WORDS: Record<AskKind, RegExp> = {
+  title: /\btitle\b/i,
+  place: /\b(based|where|duty station|location|city|place)\b/i,
+  contract: /\b(contract|fixed-term|permanent|consultan)/i,
+  grade: /\bgrade\b/i,
+  eligibility: /\b(who can apply|eligib|nationals|right to work|anyone)\b/i,
+  languages: /\blanguages?\b/i,
+  safeguarding: /\bsafeguard/i,
+  salary: /\b(pay|salary|range)\b/i,
+  deadline: /\b(clos|deadline|applications? close)/i,
+  method: /\b(apply|application|careers site|email|form)\b/i,
+};
 
 const PAY = /(?:\b(?:USD|US\$|EUR|GBP|KES|UGX|TZS|ETB|NGN|ZAR|INR|BDT|PKR|AUD|CAD|CHF|SEK|NOK|DKK|XOF|XAF)|[$€£])\s?\d[\d,.]*\s?k?\b/gi;
 const CONTACT = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b|\bhttps?:\/\/[^\s)]+|\bwww\.[^\s)]+/gi;
@@ -386,6 +431,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const actions = valid.filter((a) => ORDER.includes(String(a.type))).sort((a, b) => ORDER.indexOf(String(a.type)) - ORDER.indexOf(String(b.type)));
   for (const a of valid) if (!ORDER.includes(String(a.type))) refused.push(`an action the demo does not have ("${String(a.type).slice(0, 30)}")`);
   const writes: Array<{ key: string; lines: string[] }> = [];
+  const wrote: string[] = [];
   const note = said ? said.slice(0, 60) : 'Written by AidJobs';
   let ask: { fact?: ChatMsg['ask']; quick?: string[] } = {};
   let card: ChatMsg['card'];
@@ -504,10 +550,15 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         } else if (j.setup) refused.push(`${name}: written before the template and style are chosen`);
         else if (!j.tags.includes(section)) refused.push(`${name || 'a section'}: not in this job`);
         else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
+        // "Good" approves the section and adds nothing (section 19, phase 5): no text goes into the section being approved.
+        else if (said && isApprovalReply(said) && (() => { const on = nextStep(j, s); return on?.kind === 'approve' && on.section === section; })()) refused.push(`${name}: you approved it as it is, so nothing was added`);
         else {
           const out = checkLines(a.lines, section, s, j, said ?? '');
           if ('refused' in out) refused.push(out.refused);
-          else writes.push({ key: section, lines: out.lines });
+          else {
+            writes.push({ key: section, lines: out.lines });
+            wrote.push(section);
+          }
         }
         break;
       }
@@ -660,13 +711,22 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         else setPace(id, pace);
         break;
       }
-      case 'approve_section':
+      case 'approve_section': {
+        // Only the section the window is on, unless the user approved them all (section 19, phase 5: the open question).
+        const on = nextStep(j, s);
         if (!j.walk || !j.tags.includes(section) || !isWritten(j, section)) refused.push(`approving ${name || 'a section'}: it is not written yet`);
+        else if (!(on?.kind === 'approve' && on.section === section) && !ALL_ASKED.test(said ?? '')) refused.push(`approving ${name}: the open question comes first`);
         else approveSection(id, section);
         break;
+      }
       case 'settle': {
         const what = typeof a.fact === 'string' ? a.fact : '';
+        const on = nextStep(j, s);
+        const onKind = on?.kind === 'version' ? 'langs' : on?.kind === 'waiting' ? 'review' : on?.kind;
+        const later = ([...LEFT, ...LATER, 'again'] as string[]).includes(what);
         if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER, ...(j.walk.again ? ['again'] : [])] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
+        // The AI may not settle a later question; only the user, by naming it, answers one early.
+        else if (later && what !== onKind && !(SETTLE_WORDS[what] ?? /$^/).test(said ?? '')) refused.push(`settling "${what}": the open question comes first`);
         else settleQuestion(id, what);
         break;
       }
@@ -730,9 +790,12 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
   const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask') || Boolean(card);
-  // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again.
-  const step = asks && now.walk ? stepKey(nextStep(now, getState())) : undefined;
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ask.quick, ask: ask.fact, by, step, card }, !asks);
+  // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again; unless it
+  // asked about another step than the open one (section 19, phase 5), when the rules ask the open question after it.
+  const want = now.walk ? nextStep(now, getState()) : null;
+  const ahead = asks && !card && want ? asksAhead(turn.reply, ask.fact, want, want.kind === 'approve' ? headingOf(getState(), now, want.section) : '', wrote) : false;
+  const step = asks && now.walk && !ahead ? stepKey(want) : undefined;
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ahead ? undefined : ask.quick, ask: ahead ? undefined : ask.fact, by, step, card }, !asks || ahead);
   for (const t of opened) open(t);
   return { refused, opened };
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callModel, messagesFor, type ChatMessage, type ModelResult } from '@/lib/employerDemoAi/model';
 import { AI_MODELS, callOpenRouter, DEFAULT_MODEL, modelKeyOf, type AiModelKey } from '@/lib/employerDemoAi/openrouter';
-import { answerWithChecks } from '@/lib/employerDemoAi/quality';
+import { answerWithChecks, MAX_BODY } from '@/lib/employerDemoAi/quality';
 
 /**
  * The employer demo's one AI route (employer-side plan, section 19, "The AI chat in the demo"), beside the demo's page rather than
@@ -13,7 +13,6 @@ import { answerWithChecks } from '@/lib/employerDemoAi/quality';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_BODY = 200_000;
 const MAX_MESSAGE = 4000;
 const noStore = { 'Cache-Control': 'no-store' };
 

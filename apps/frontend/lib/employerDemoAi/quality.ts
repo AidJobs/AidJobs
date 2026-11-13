@@ -25,6 +25,9 @@ const FRENCH = /\b(le|la|les|des|du|une|nous|vous|pour|avec|recrutons|poste|est)
 const QUANTITY = /(\d[\d,.]*)\s+(?:[\p{L}-]+\s+)?(?:years?|ans|days?|jours|weeks?|semaines|months?|mois|households?|ménages|volunteers?|bénévoles|relais|promoters?|promoteurs?|partners?|partenaires|staff|officers?|people|personnes|members?|membres|sites?|clinics?|cliniques|schools?|écoles|facilities|villages?|districts?|communities|communautés)\b/giu;
 const MAX_PROBLEMS = 8;
 
+/** The chat route's size limit for one request (section 19, phase 5): the window sends only what the model needs, so a full job fits. */
+export const MAX_BODY = 80_000;
+
 const plainNumbers = (t: string) => t.replace(/(\d)[,.\s](?=\d{3}\b)/g, '$1');
 
 function stats(lines: string[]) {

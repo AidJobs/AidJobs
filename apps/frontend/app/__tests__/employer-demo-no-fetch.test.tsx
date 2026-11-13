@@ -1921,6 +1921,10 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     say('No grade');
     await flush();
     expect(job().walk?.settled).toContain('grade');
+    // About us is part of the job since phase 5: the window asks the AI to write it in its turn, then it comes up for approval.
+    await flush();
+    await flush();
+    expect(job().sections.find((x) => x.key === 'about')).toMatchObject({ lines: ['Written by the stand-in model for about.'], ai: true });
     expect(job().chat.at(-1)).toMatchObject({ ai: true, step: 'approve:about' });
 
     say('Good');

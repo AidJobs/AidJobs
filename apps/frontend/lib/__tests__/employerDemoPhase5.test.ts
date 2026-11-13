@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyTemplate, approveSection, changeSub, chooseStyle, createFormat, editSection, reorderSections, setFacts, setPace, startJob, toggleSection, writeSections } from '../../components/employer-demo/actions';
+import { addTranslation, applyTemplate, approveSection, changeSub, chooseStyle, createFormat, editSection, goOn, reorderSections, sendChat, setFacts, setPace, startJob, toggleSection, writeSections } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { contextFor, resetAi } from '../../components/employer-demo/ai';
 import { acceptPageDraft, acceptSuggestion, checkSuggestion, extractDraft, payBasis, rejectPageDraft, rejectSuggestion, saveAboutForOrg, surveyCard, yearsBasis } from '../../components/employer-demo/context';
@@ -138,6 +138,128 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     expect(sec('job-comms', 'responsibilities').subs?.[0].lines).toEqual(['- Send a short report to your manager each month']);
   });
 });
+
+/** A job in the window at its first approve step (About us), written by the rules. */
+function atFirstApproval(text = "We're hiring a WASH Officer in Goma, fixed-term"): string {
+  const id = startJob(text, undefined, [], true);
+  applyTemplate(id, job(id).format);
+  chooseStyle(id, ['Warm']);
+  setPace(id, 'step');
+  for (let i = 0; i < 6 && nextStep(job(id), getState())?.kind === 'ask'; i++) {
+    const f = nextStep(job(id), getState());
+    if (f?.kind === 'ask' && f.fact === 'grade') setFacts(id, { grade: 'C1' });
+    else if (f?.kind === 'ask' && f.fact === 'contract') setFacts(id, { contract: 'Fixed-term' });
+    else if (f?.kind === 'ask' && f.fact === 'place') setFacts(id, { location: 'Goma, DR Congo', country: 'DR Congo' });
+  }
+  goOn(id);
+  return id;
+}
+
+describe('the open question, "Good", and the size of what is sent (section 19, phase 5)', () => {
+  it('"Good" in any short form approves the section and adds nothing; a short reply that is neither is asked again', () => {
+    const id = atFirstApproval();
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
+    const before = JSON.stringify(job(id).sections);
+    sendChat(id, 'Looks great, thanks!');
+    expect(job(id).walk?.approved).toContain('about');
+    expect(JSON.stringify(job(id).sections.filter((x) => x.key === 'about'))).toBe(JSON.stringify(JSON.parse(before).filter((x: { key: string }) => x.key === 'about')));
+    const next = nextStep(job(id), getState());
+    if (next?.kind !== 'approve') return;
+    const text = JSON.stringify(sec(id, next.section));
+    sendChat(id, 'hmm ok');
+    expect(job(id).walk?.approved).toContain(next.section);
+    const after = nextStep(job(id), getState());
+    if (after?.kind !== 'approve') return;
+    const t2 = JSON.stringify(sec(id, after.section));
+    sendChat(id, 'erm');
+    expect(JSON.stringify(sec(id, after.section))).toBe(t2);
+    expect(job(id).chat.at(-1)?.text).toMatch(/^I didn't catch that\. Is \*\*.+\*\* good as it is, or what should change\?$/);
+    expect(text).toBeTruthy();
+  });
+
+  it('with the AI, "Good" adds nothing: a sentence written into the section being approved is refused', () => {
+    const id = atFirstApproval();
+    const before = sec(id, 'about').lines;
+    applyAiTurn(id, 'Good', { reply: 'Approved.', actions: [{ type: 'write_section', section: 'about', lines: [...before, 'Good.'] }, { type: 'approve_section', section: 'about' }] }, open);
+    expect(sec(id, 'about').lines).toEqual(before);
+    expect(job(id).walk?.approved).toContain('about');
+    expect(job(id).chat.filter((m) => m.ai).at(-1)?.text).toContain('you approved it as it is, so nothing was added');
+  });
+
+  it('the AI may not settle or approve a later question; the user naming it answers it early', () => {
+    const id = atFirstApproval();
+    applyAiTurn(id, 'ok', { reply: 'Noted.', actions: [{ type: 'settle', fact: 'details' }, { type: 'settle', fact: 'flyer' }, { type: 'approve_section', section: 'apply' }] }, open);
+    expect(job(id).walk?.settled).not.toContain('details');
+    expect(job(id).walk?.settled).not.toContain('flyer');
+    expect(job(id).walk?.approved).not.toContain('apply');
+    expect(job(id).chat.filter((m) => m.ai).at(-1)?.text).toContain('settling "details": the open question comes first');
+    applyAiTurn(id, 'no flyer for this one, thanks', { reply: 'No flyer.', actions: [{ type: 'settle', fact: 'flyer' }] }, open);
+    expect(job(id).walk?.settled).toContain('flyer');
+  });
+
+  it('a question the AI asks about another step than the open one is followed by the open question', () => {
+    const id = atFirstApproval();
+    applyAiTurn(id, 'can you rename The role to Your role?', { reply: 'Renamed. Is the grade right?', actions: [{ type: 'rename_section', section: 'purpose', heading: 'Your role' }] }, open);
+    expect(headingOfJob(id, 'purpose')).toBe('Your role');
+    const lastTwo = job(id).chat.slice(-2);
+    expect(lastTwo[0]).toMatchObject({ ai: true, text: 'Renamed. Is the grade right?' });
+    expect(lastTwo[0].step).toBeUndefined();
+    expect(lastTwo[1]).toMatchObject({ step: 'approve:about' });
+    applyAiTurn(id, 'and About us?', { reply: 'About us is ready. Good, or change something?', actions: [] }, open);
+    expect(job(id).chat.at(-1)).toMatchObject({ ai: true, step: 'approve:about' });
+  });
+
+  it('the AI is told the step after an approval one step ahead only, even when sections wait for approval out of order (found while building phase 5)', () => {
+    const id = startJob("We're hiring a WASH Officer in Goma, fixed-term, grade C1", undefined, [], true);
+    applyTemplate(id, job(id).format);
+    chooseStyle(id, ['Warm']);
+    setPace(id, 'all');
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, settled: [...j.walk!.settled, 'grade', 'contract', 'place', 'title'] } } : j)) }));
+    const next = (contextFor(getState(), job(id), undefined, false) as { walk: { next: { kind: string; then?: { kind: string; then?: unknown } } } }).walk.next;
+    expect(next.kind).toBe('approve');
+    expect(next.then?.then ?? null).toBeNull();
+  });
+
+  it('opening a part never publishes, pays, sends, or passes a required approval', () => {
+    const before = { status: job('job-fin').status, review: job('job-fin').review.state, receipts: getState().receipts.length };
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, status: 'review', review: { ...j.review, state: 'open', reviewers: j.review.reviewers.map((r) => ({ ...r, decision: undefined })) } } : j)) }));
+    for (const target of ['publish', 'payment', 'review', 'reach', 'flyer', 'plan']) applyAiTurn('job-fin', `open ${target}`, { reply: 'Here it is.', actions: [{ type: 'open', target }] }, open);
+    expect(job('job-fin')).toMatchObject({ status: 'review', review: expect.objectContaining({ state: 'open' }) });
+    expect(getState().receipts.length).toBe(before.receipts);
+    expect(job('job-fin').reach).toBeNull();
+  });
+
+  it('a full amplified job (every section, two reviewed versions, review open, Reach prepared) fits within 80,000 characters', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, choice: 'amplify' } : j)) }));
+    for (const k of ['about', 'team', 'background', 'setting', 'purpose', 'responsibilities', 'deliverables', 'relationships', 'firstweeks', 'requirements', 'competencies', 'languages', 'practical', 'offer', 'conditions', 'funding', 'apply', 'assessment']) if (!job('job-fin').tags.includes(k)) toggleSection('job-fin', k);
+    for (const l of ['fr', 'es'] as const) addTranslation('job-fin', l);
+    const long = 'A long message from the hiring manager about the role and what it needs, repeated to fill the space. '.repeat(20);
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) =>
+        j.id === 'job-fin'
+          ? {
+              ...j,
+              translations: Object.fromEntries(Object.entries(j.translations ?? {}).map(([k, t]) => [k, { ...t!, reviewed: true }])),
+              review: { ...j.review, state: 'open' },
+              reachPlan: { candidates: Array.from({ length: 30 }, (_, i) => `person${i}@example.org`), team: ['amina@riverstone.example.org'], candidateMsg: { subject: 'An invitation', body: long, closing: 'Best wishes' }, teamMsg: { subject: 'Please share', body: long, closing: 'Thanks' } },
+              chat: Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, from: i % 2 ? ('ai' as const) : ('user' as const), text: long })),
+            }
+          : j,
+      ),
+    }));
+    const body = JSON.stringify({ message: 'Make the responsibilities longer, please.', first: false, context: contextFor(getState(), job('job-fin'), 'responsibilities', false, 'fr'), model: 'terra' });
+    expect(body.length).toBeLessThan(80_000);
+    const versions = (contextFor(getState(), job('job-fin'), undefined, false, 'fr') as { publishing: { versions: { list: Array<{ key: string; sections?: unknown }> } } }).publishing.versions.list;
+    expect(versions.find((v) => v.key === 'fr')?.sections).toBeDefined();
+    expect(versions.find((v) => v.key === 'es')?.sections).toBeUndefined();
+    const templates = (contextFor(getState(), job('job-fin'), undefined, false) as { templates: Array<{ key: string; headings?: string[] }> }).templates;
+    expect(templates.filter((t) => t.headings).map((t) => t.key)).toContain(job('job-fin').format);
+    expect(templates.filter((t) => t.headings).length).toBeLessThanOrEqual(2);
+  });
+});
+
+const headingOfJob = (id: string, key: string) => job(id).sections.find((x) => x.key === key)?.title ?? job(id).renamed?.[key];
 
 const ABOUT_PAGE = [
   'About Riverstone Aid',

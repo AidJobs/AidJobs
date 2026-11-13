@@ -1095,6 +1095,18 @@ export function setPart(id: string, part: string) {
 
 const APPROVE = /^(?:yes|yep|yeah|ok|okay|good|great|fine|perfect|lovely|looks good|that'?s (?:good|fine|great)|that works|next|approve(?:d)?|done|all good|happy with (?:it|that)|move on|go on|continue)(?:[,.!\s]+(?:thanks|thank you|next|please|move on|go on|good))*[.!]?$/i;
 const NO_MORE = /^(?:none|no|nope|nothing|skip|not now|that'?s all|that is all|all done|no more|no,? thanks?)\b/i;
+const POSITIVE = /\b(?:good|great|fine|perfect|lovely|nice|excellent|brilliant|ok|okay|yes|yep|yeah|sounds good|looks (?:good|great|fine|right)|happy|approve[ds]?|go ahead|next|all set|that works|no changes?|keep it)\b/i;
+const BUT = /\b(?:but|not|instead|except|however|change|rather|though|although|missing|wrong)\b/i;
+
+/**
+ * "Good" at the approve step approves the section and adds nothing (section 19, phase 5): a short, positive reply with no change asked
+ * for. A sentence is added to a section only when the user asks for a change.
+ */
+export function isApprovalReply(text: string): boolean {
+  const t = text.trim();
+  if (t === GOOD || t === KEEP_AS_IS || APPROVE.test(t) || /^keep (?:it )?as (?:it )?is\b/i.test(t)) return true;
+  return t.split(/\s+/).length <= 8 && POSITIVE.test(t) && !BUT.test(t) && !EDIT_WORDS.test(t.replace(/\bkeep it\b/i, ''));
+}
 const OTHER_DATE = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d\d)\b/i;
 const FILL = /\[(?!Duty station\]|Closing date\])[^\]\n]{2,40}\]/;
 
@@ -1150,7 +1162,10 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     }
     case 'approve':
       if (t === ALL_GOOD || /\bapprove (?:all|the rest|everything)\b/i.test(t)) approveRest(j.id, text);
-      else if (t === GOOD || t === KEEP_AS_IS || APPROVE.test(t) || /^keep (?:it )?as (?:it )?is\b/i.test(t)) approveSection(j.id, step.section, text);
+      else if (isApprovalReply(t)) approveSection(j.id, step.section, text);
+      // A short reply that is neither an approval nor a change is asked again; it is never added to the text.
+      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 3)
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', `I didn't catch that. Is **${headingOf(s, x, step.section)}** good as it is, or what should change?`, [GOOD]), step: stepKey(step) }] }));
       else return false;
       return true;
     case 'again':
