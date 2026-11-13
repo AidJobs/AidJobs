@@ -13,6 +13,7 @@ type Ctx = {
   org?: { orgType?: string };
   walk?: { next?: { kind?: string; sections?: Array<{ key: string }> } | null } | null;
   conversation?: Array<{ from?: string; text?: string }>;
+  pack?: { about?: { text?: string } | null; project?: { text?: string } | null; facts?: Array<{ value?: string }> };
 };
 
 const FILLER = ['relevant stakeholders', 'as appropriate', 'in line with applicable procedures', 'ensure effective', 'robust', 'dynamic', 'passionate', 'etc.'];
@@ -99,7 +100,9 @@ export function draftProblems(turn: ChatTurn, ctx: Ctx, message: string): string
   }
 
   const gradeYears = key.startsWith('un-') ? ' 0 1 2 5 7 10 ' : '';
-  const allowed = plainNumbers(`${user} ${JSON.stringify(ctx.job?.facts ?? {})}${gradeYears}`).toLowerCase();
+  // Numbers in the accepted About us, the accepted project text, and accepted suggestions were given too (section 19, phase 5, A).
+  const pack = ctx.pack ? `${ctx.pack.about?.text ?? ''} ${ctx.pack.project?.text ?? ''} ${(ctx.pack.facts ?? []).map((f) => f.value ?? '').join(' ')}` : '';
+  const allowed = plainNumbers(`${user} ${JSON.stringify(ctx.job?.facts ?? {})}${gradeYears} ${pack}`).toLowerCase();
   const strange = Array.from(new Set(plainNumbers(text).match(/\d+/g) ?? [])).filter((n) => !allowed.includes(n));
   if (strange.length) problems.push(`Remove numbers that were not given: ${strange.slice(0, 8).join(', ')}.`);
   const history = text.match(HISTORY);

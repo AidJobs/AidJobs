@@ -698,8 +698,12 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
       );
       const keys = changedKeys(x.sections, sections);
       if (!keys.length) return x;
+      // Sections written once the project is accepted used it: they are offered for an update if the project changes (phase 5, A).
+      const project = x.pack?.project;
+      const pack = project ? { ...x.pack, project: { ...project, usedBy: Array.from(new Set([...(project.usedBy ?? []), ...keys.filter((k) => k !== 'background' && k !== 'apply')])) } } : x.pack;
       return {
         ...reopenApproval(x),
+        pack,
         sections,
         ...liveEdit(x),
         versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note, sections }],
@@ -963,6 +967,8 @@ export function settleQuestion(id: string, what: string) {
 /** A section the user is happy with; the chat goes on to the next step. Also from the section's own button. */
 export function approveSection(id: string, key: string, said?: string) {
   if (!ownerOnly()) return;
+  // About us approved as it is: the website field was offered with it, once (section 19, phase 5, A).
+  if (key === 'about' && !getState().org.websiteAsked) update((s) => ({ ...s, org: { ...s.org, websiteAsked: true } }));
   updateJob(id, (j) => (!j.walk || !isWritten(j, key) || j.walk.approved.includes(key) ? j : { ...j, walk: { ...j.walk, approved: [...j.walk.approved, key] }, chat: said ? [...j.chat, msg('user', said)] : j.chat }));
   ensureAsk(id);
 }
@@ -970,6 +976,7 @@ export function approveSection(id: string, key: string, said?: string) {
 /** "All good, approve the rest": every section written so far. */
 export function approveRest(id: string, said?: string) {
   if (!ownerOnly()) return;
+  if (!getState().org.websiteAsked) update((s) => ({ ...s, org: { ...s.org, websiteAsked: true } }));
   updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, approved: Array.from(new Set([...j.walk.approved, ...j.tags.filter((k) => isWritten(j, k))])) }, chat: said ? [...j.chat, msg('user', said)] : j.chat } : j));
   ensureAsk(id);
 }

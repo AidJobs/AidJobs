@@ -127,13 +127,22 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const quick = all ? [GOOD, ALL_GOOD] : [GOOD];
       const firstWritten = job.versions.find((v) => v.sections.some((x) => x.key === step.section && x.lines.length))?.sections.find((x) => x.key === step.section)?.lines;
       const edited = Boolean(firstWritten) && JSON.stringify(firstWritten) !== JSON.stringify(job.sections.find((x) => x.key === step.section)?.lines);
-      if (step.section === 'about' && !edited && !job.sections.find((x) => x.key === 'about')?.ai) return [stepMsg(`${intro}**${name}** starts from your organisation's About us. Good as it is, or change it for this job?`, key, quick)];
+      if (step.section === 'about' && !edited && !job.sections.find((x) => x.key === 'about')?.ai) {
+        // The website field is offered once, the first time a job is written (section 19, phase 5, A), as the card under this message.
+        const m = stepMsg(`${intro}**${name}** starts from your organisation's About us. Good as it is, or change it for this job?`, key, quick);
+        return [s.org.websiteAsked ? m : { ...m, card: 'website' }];
+      }
       if (step.section === 'apply') return [stepMsg(`${intro}**${name}** is written from your application settings. Good, or change something?`, key, quick)];
       const text = edited ? `**${name}**: good now, or change something else?` : intro ? `${intro}First, **${name}**: good, or change something?` : `Here is **${name}**. Good, or change something?`;
       return [stepMsg(text, key, quick)];
     }
     case 'details':
-      return [stepMsg('Anything else for the listing: the number of positions, direct reports, the start date, or the donor?', key, [NONE_OF_THESE])];
+      return [
+        {
+          ...stepMsg(`Anything else for the listing: the number of positions, direct reports, the start date, or the donor?${job.pack?.project ? '' : ' If this job is for a project, its page, its text, or a file (below) lets me write About the project.'}`, key, [NONE_OF_THESE]),
+          ...(job.pack?.project ? {} : { card: 'project' as const }),
+        },
+      ];
     case 'sdgs':
       return [stepMsg(`No SDG is clear from this role. Shall I use your organisation's goals (${orgGoals(s)})? The job page then says ${s.org.name} works towards them.`, key, [orgGoalsAnswer(s), CHOOSE_SDGS, NO_SDGS])];
     case 'fixed': {

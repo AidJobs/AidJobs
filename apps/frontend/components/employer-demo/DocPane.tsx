@@ -6,6 +6,7 @@ import Tip from '@/components/site/Tip';
 import { addRemark, answerFact, approveSection, changedSinceLastRound, dismissChange, editSection, formatOf, markGenuine, sendChat, setApply, setFacts, setMethod, settleRemark, undoLastChange } from './actions';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
+import { saveAboutForOrg } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
@@ -238,6 +239,13 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>
+        )}
+        {!reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
+          <Tip label="Each new job's About us starts from it; jobs already written keep theirs">
+            <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={() => saveAboutForOrg(job.id)}>
+              Save as our About us
+            </button>
+          </Tip>
         )}
         {!reviewing && sec.key === 'apply' && (
           <Tip label="Set up how to apply">

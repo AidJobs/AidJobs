@@ -93,5 +93,5 @@ export function onLine(parts: Part[], fit: number, current: string): { shown: Pa
 
 /** Parts that open their own fields in the panel, so they can be set without the chat; the template opens its own panel. */
 export function hasFields(part: string): boolean {
-  return ['details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish', 's:apply'].includes(part);
+  return ['details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish', 's:apply', 's:about'].includes(part);
 }

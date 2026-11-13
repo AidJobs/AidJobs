@@ -170,6 +170,12 @@ function essentialRange(lines: string[]): { from: number; to: number } | null {
   return { from: from + 1, to: desirable > from ? desirable : lines.length };
 }
 
+/** Years of experience similar open jobs ask for (their median, sample figures in the demo); null when there are too few to compare. */
+export function typicalYears(job: DemoJob, s: State): number | null {
+  const similar = similarJobs(job, s);
+  return similar.length < MIN_SIMILAR ? null : median(similar.map((x) => x.years));
+}
+
 /** The full advert check (Amplify): unrealistic requirements and missing pay information, compared with similar jobs. */
 export function fullAdvertCheck(job: DemoJob, s: State): { thin: boolean; points: Point[] } {
   const similar = similarJobs(job, s);

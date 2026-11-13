@@ -12,6 +12,8 @@ import { jobUrl } from './links';
 import { SkipDialog } from './Publish';
 import { LangsPart, LiveCard, FullPart, MarketPart, PaymentPanel, PlanChoice, PublishCard, ReviewPart, type Opener } from './PublishSteps';
 import { ReachEditor } from './Reach';
+import { PageDraftCard, PageField, SuggestionCard } from './ContextCards';
+import { KEEP_PROFILE_ABOUT, keepProfileAbout, projectConflicts, resolveConflict } from './context';
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
@@ -346,10 +348,23 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
     review: ['Review', 'Comments, suggestions, and approval'],
     publish: ['Publish', statusLine(s, job)],
     's:apply': ['How to apply', 'The section below is written from these'],
+    's:about': ['About us', 'Part of this job: edit it below, or draft it from your organisation’s page'],
   };
   const [title, hint] = head[part] ?? ['', ''];
   let body: ReactNode = null;
-  if (part === 'details') body = <FactRows job={job} s={s} onFact={onFact} />;
+  const aiOpen = (t: OpenTarget) => open.part(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
+  if (part === 'details')
+    body = (
+      <div className="flex flex-col gap-3">
+        <FactRows job={job} s={s} onFact={onFact} />
+        <div className="flex flex-col gap-1.5 border-t pt-3 aj-hair">
+          <span className="ej-panel-label">The project</span>
+          {job.pack?.project && <span className="aj-muted">In the job, from {job.pack.project.source}: About the project.</span>}
+          <PageField job={job} s={s} kind="project" open={aiOpen} />
+        </div>
+      </div>
+    );
+  else if (part === 's:about') body = <PageField job={job} s={s} kind="about" open={aiOpen} />;
   else if (part === 'fixed') body = <Commitments job={job} s={s} />;
   else if (part === 's:apply') body = <ApplyFields job={job} />;
   else if (part === 'check')
@@ -524,10 +539,15 @@ function StateCard({ job, s, act }: { job: DemoJob; s: State; act: (a: StateActi
 
 /** A card under the chat's message (section 19, steps 8 and 9): the one place, with the part on the line, where it is published, paid, or sent. */
 function ChatCardView({ kind, job, s, open, act }: { kind: NonNullable<ChatMsg['card']>; job: DemoJob; s: State; open: Opener; act: (a: StateAction) => void }) {
-  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published', state: 'What you can do' }[kind];
+  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published', state: 'What you can do', website: 'Your organisation’s page', project: 'The project', page: 'Draft', suggest: 'Suggestion' }[kind];
+  const aiOpen = (t: OpenTarget) => open.part(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
   return (
     <section className="aj-card ej-chat-card mt-2 flex flex-col gap-2 p-3" aria-label={label}>
       {kind === 'state' && <StateCard job={job} s={s} act={act} />}
+      {kind === 'website' && <PageField job={job} s={s} kind="about" open={aiOpen} />}
+      {kind === 'project' && <PageField job={job} s={s} kind="project" open={aiOpen} />}
+      {kind === 'page' && <PageDraftCard job={job} s={s} />}
+      {kind === 'suggest' && <SuggestionCard job={job} s={s} />}
       {kind === 'plan' && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="aj-pill" onClick={() => open.part('plan')}>
@@ -1073,6 +1093,20 @@ function JobWindow({ id }: { id: string }) {
         return chatNote(job.id, text, 'Confirm in the dialog: it says exactly what happens.');
       }
       return chatNote(job.id, text, `Here it is: ${STATE_LABEL[asked]} is on the card below, and nothing changes until you press it.`, undefined, 'state');
+    }
+    // Phase 5's context (section 19, A): the profile's About us kept, the project's conflicts, and the sections that used an earlier project.
+    if (answer && text === KEEP_PROFILE_ABOUT) return keepProfileAbout(job.id, text);
+    if (answer && (text.startsWith('Keep ') || text.startsWith('Use ')) && job.pack?.project) {
+      const hit = projectConflicts(job, job.pack.project.text, s.today).find((c) => text === `Use ${c.page}` || text === `Keep ${c.now}`);
+      if (hit) {
+        if (text.startsWith('Use ')) resolveConflict(job.id, hit.fact, hit.page);
+        return chatNote(job.id, text, text.startsWith('Use ') ? `Done: the job now says ${hit.page}.` : `Kept: the job still says ${hit.now}.`);
+      }
+    }
+    if (answer && text === 'Keep them as they are') return chatNote(job.id, text, 'Kept as they are.');
+    if (answer && text === 'Update them') {
+      const used = job.pack?.project?.usedBy ?? [];
+      if (!aiOn()) return chatNote(job.id, text, `The AI is off here, so I can't rewrite them: edit ${used.length === 1 ? 'it' : 'them'} by hand with the pencil, using the new project.`);
     }
     if (text === SHOW_FLYER && reachOpen(job, s)) openTab('flyer');
     if (text === INVITE && reachOpen(job, s)) openTab('reach');

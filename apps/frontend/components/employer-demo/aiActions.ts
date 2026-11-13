@@ -46,6 +46,8 @@ import {
   changeSub,
 } from './actions';
 import { approvalRequired } from './approval';
+import { checkSuggestion, offerSuggestion, showPageDraft } from './context';
+import { pageFor } from './pageMemory';
 import { canAmplifyFree } from './plans';
 import { profileFor } from './profiles';
 import { COMMITMENTS, CONTRACTS, crossesGroups, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
@@ -109,7 +111,7 @@ export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 
 /** The dialogs of section 17's actions (section 19, phase 4): the AI may open one the job's state allows, never act on its own. */
 export const STATE_DIALOGS: Record<string, StateAction> = { publish_now: 'publishNow', reschedule: 'reschedule', back_to_draft: 'backToDraft', extend: 'extend', share: 'share', filled: 'filled', withdraw: 'withdraw', reopen: 'reopen' };
 export type OpenTarget = (typeof OPEN_TARGETS)[number] | 'publish_now' | 'reschedule' | 'back_to_draft' | 'extend' | 'share' | 'filled' | 'withdraw' | 'reopen' | `section:${string}` | `lang:${string}`;
-const CARDS = ['plan', 'publish', 'review', 'live', 'state'] as const;
+const CARDS = ['plan', 'publish', 'review', 'live', 'state', 'website', 'project'] as const;
 const PACKAGE_KEYS = ['one', 'three', 'five', 'always'] as const;
 
 const ENGAGEMENT_KEYS: Engagement[] = ['job', 'consultancy', 'internship', 'volunteer'];
@@ -150,6 +152,8 @@ const ORDER = [
   'update_version',
   'review_version',
   'reach',
+  'page_draft',
+  'suggest_fact',
   'open',
   'show',
   'ask',
@@ -338,7 +342,9 @@ const plainNumbers = (t: string) => t.replace(/(\d)[,.\s](?=\d{3}\b)/g, '$1');
 
 /** Everything the job, the organisation, and the user already say, which a written section may quote; `said`: the message being answered. */
 function known(s: State, job: DemoJob, said = ''): string {
-  return [JSON.stringify(job.facts), JSON.stringify(job.apply), s.org.website, s.org.careersUrl, s.org.domain, s.org.about, ...job.chat.filter((m) => m.from === 'user').map((m) => m.text), said].join(' ').toLowerCase();
+  // What the user gave, and what they accepted (section 19, phase 5, A): the About us and project text, and accepted suggestions.
+  const pack = [job.pack?.about?.text ?? '', job.pack?.project?.text ?? '', ...(job.pack?.facts ?? []).map((f) => f.value)];
+  return [JSON.stringify(job.facts), JSON.stringify(job.apply), s.org.website, s.org.careersUrl, s.org.domain, s.org.about, ...pack, ...job.chat.filter((m) => m.from === 'user').map((m) => m.text), said].join(' ').toLowerCase();
 }
 
 /** A written section's lines, cleaned, or the reason it is refused. */
@@ -611,6 +617,32 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
           const out = checkLines(a.lines, section, s, j, said ?? '');
           if ('refused' in out) refused.push(out.refused);
           else writeVersionSection(id, l, section, out.lines);
+        }
+        break;
+      }
+      case 'page_draft': {
+        // A draft from the page the window is reading for this job, and nothing else: its numbers must be the page's own.
+        const page = pageFor(id);
+        const out = page ? checkLines(a.lines, page.kind === 'about' ? 'about' : 'background', s, j, `${said ?? ''} ${page.text}`) : null;
+        if (!page || !out) refused.push('a draft from a page: no page is being read');
+        else if ('refused' in out) refused.push(out.refused);
+        else {
+          const text = plainNumbers(page.text);
+          const strange = (plainNumbers(out.lines.join(' ')).match(/\d+/g) ?? []).filter((n) => !text.includes(n));
+          if (strange.length) refused.push(`the draft: a number the page does not give (${strange[0]})`);
+          else {
+            showPageDraft(id, { kind: page.kind, lines: out.lines, used: str(a.used, 300) || 'The page.', missing: str(a.missing, 300) ?? '', source: page.source, social: page.social }, '');
+            card = 'page';
+          }
+        }
+        break;
+      }
+      case 'suggest_fact': {
+        const sg = checkSuggestion(s, j, a);
+        if (typeof sg === 'string') refused.push(sg);
+        else {
+          offerSuggestion(id, sg);
+          card = 'suggest';
         }
         break;
       }

@@ -25,6 +25,7 @@ import DemoRecovery from '@/components/employer-demo/Recover';
 import { getState, go, goBack, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 import { AI_ROUTE, resetAi } from '@/components/employer-demo/ai';
+import { PAGE_ROUTE } from '@/components/employer-demo/pages';
 import { applyTemplate, chooseStyle, goOn, setPace } from '@/components/employer-demo/actions';
 import { ASKS, checkPoints, LEFT, nextStep } from '@/components/employer-demo/flow';
 
@@ -37,6 +38,9 @@ let phone = false;
 type Answer = { status: number; body: unknown };
 let aiRoute: (method: string, body: string) => Answer | Promise<Answer> = (method) => (method === 'GET' ? { status: 200, body: { ai: false } } : { status: 503, body: { error: 'off' } });
 const aiCalls: Array<{ method: string; body: string }> = [];
+/** The demo's page route is the only other address allowed (section 19, phase 5, A); by default it cannot read the page. */
+let pageRoute: (body: string) => Answer | Promise<Answer> = () => ({ status: 200, body: { ok: false, reason: 'this page could not be read' } });
+const pageCalls: string[] = [];
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -46,6 +50,12 @@ beforeAll(() => {
     throw new Error(`The employer demo must not use the network: ${what}`);
   };
   const fetchStub = async (url: unknown, init?: { method?: string; body?: unknown }) => {
+    if (url === PAGE_ROUTE) {
+      const body = typeof init?.body === 'string' ? init.body : '';
+      pageCalls.push(body);
+      const a = await pageRoute(body);
+      return { ok: a.status >= 200 && a.status < 300, status: a.status, json: async () => a.body };
+    }
     if (url !== AI_ROUTE) return deny(`fetch ${String(url)}`)();
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? init.body : '';
@@ -1636,6 +1646,47 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(network).toEqual([]);
   });
 
+  it('About us from a page (phase 5, A): a link in the chat is never read; its field reads one page; the draft goes on the job only when accepted', async () => {
+    fresh();
+    resetAi('off');
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    pageCalls.length = 0;
+    say('https://riverstone.example.org/about');
+    expect(pageCalls).toEqual([]);
+    shows("I can't read links here");
+    const about = job(id).sections.find((x) => x.key === 'about')!;
+    part(about.title);
+    const address = byLabel('Your organisation’s page address') as HTMLInputElement;
+    expect(address).not.toBeNull();
+    typeInto(address, 'https://riverstone.example.org/about');
+    pageRoute = () => ({ status: 200, body: { ok: true, text: 'Riverstone Aid is an international NGO that works with communities in East Africa on water, sanitation, and health.\nWe work through local partners and community committees in every country where we work.', social: [] } });
+    click('Read this page');
+    await act(async () => {
+      for (let i = 0; i < 30; i++) await Promise.resolve();
+    });
+    expect(pageCalls.map((b) => JSON.parse(b))).toEqual([{ url: 'https://riverstone.example.org/about', field: 'website' }]);
+    expect(job(id).sections.find((x) => x.key === 'about')?.lines).toEqual(about.lines);
+    shows('From your website');
+    click('Accept');
+    expect(job(id).sections.find((x) => x.key === 'about')?.lines[0]).toMatch(/^Riverstone Aid is an international NGO/);
+    expect(job(id).pack?.about?.source).toBe('your website');
+    pageRoute = () => ({ status: 200, body: { ok: false, reason: 'this page could not be read' } });
+    part(job(id).sections.find((x) => x.key === 'about')!.title);
+    typeInto(byLabel('Your organisation’s page address') as HTMLInputElement, 'https://riverstone.example.org/members-only');
+    click('Read this page');
+    await act(async () => {
+      for (let i = 0; i < 30; i++) await Promise.resolve();
+    });
+    shows('This page could not be read: paste its text below, or upload the file.');
+    expect(network).toEqual([]);
+  }, 20_000);
+
   it('on phones the template is chosen in the job description itself: a slim question line, the headings, and a strip of cards', () => {
     freshNew();
     let id = '';
@@ -2142,7 +2193,7 @@ describe('employer demo: round 7, phase 4 (returning employers, jobs in their st
 const AI_SDK = /from ['"](openai|ai|@ai-sdk\/[\w-]+|@anthropic-ai\/[\w-]+|@google\/(generative-ai|genai)|@mistralai\/[\w-]+|cohere-ai|groq-sdk|ollama|langchain|@langchain\/[\w-]+)['"]/;
 
 describe('employer demo: source has no network path', () => {
-  it('no demo file calls fetch, an AidJobs API path, or a request library, except the AI chat, which reaches only its own route', () => {
+  it('no demo file calls fetch, an AidJobs API path, or a request library, except the AI chat and the page reader, each reaching only its own route', () => {
     const dir = join(__dirname, '..', '..', 'components', 'employer-demo');
     for (const f of readdirSync(dir)) {
       const src = readFileSync(join(dir, f), 'utf8');
@@ -2151,6 +2202,10 @@ describe('employer demo: source has no network path', () => {
         expect(AI_ROUTE).toBe('/employer-demo/chat');
         expect(src.match(/['"`]\/[\w-]+\/[^'"`\s]*['"`]/g)).toEqual([`'${AI_ROUTE}'`]);
         expect(src.match(/\bfetch\s*\(([^,]+),/g)).toEqual(['fetch(AI_ROUTE,', 'fetch(AI_ROUTE,']);
+      } else if (f === 'pages.ts') {
+        expect(PAGE_ROUTE).toBe('/employer-demo/page');
+        expect(src.match(/['"`]\/[\w-]+\/[^'"`\s]*['"`]/g)).toEqual([`'${PAGE_ROUTE}'`]);
+        expect(src.match(/\bfetch\s*\(([^,]+),/g)).toEqual(['fetch(PAGE_ROUTE,']);
       } else {
         expect({ f, fetch: /\bfetch\s*\(/.test(src) }).toEqual({ f, fetch: false });
       }
@@ -2174,6 +2229,18 @@ describe('employer demo: source has no network path', () => {
     const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
     expect(deps.filter((d) => /^(@aws-sdk\/|aws-sdk$|aws4$|openai$|ai$|@ai-sdk\/)/.test(d))).toEqual([]);
+  });
+
+  it('the page route reads pages only through its own reader: no AI or request package, no address written in, no text logged', () => {
+    const lib = join(__dirname, '..', '..', 'lib', 'employerDemoPage');
+    const server = [join(__dirname, '..', 'employer-demo', 'page', 'route.ts'), ...readdirSync(lib).map((f) => join(lib, f))];
+    expect(server.length).toBe(3);
+    for (const f of server) {
+      const src = readFileSync(f, 'utf8');
+      expect({ f, ai: AI_SDK.test(src), lib: /from ['"](axios|got|node-fetch|undici|request)['"]/.test(src) }).toEqual({ f, ai: false, lib: false });
+      expect({ f, urls: src.match(/https:\/\/[^\s'"`]+/g) ?? [] }).toEqual({ f, urls: [] });
+      expect({ f, logsText: /console\.\w+\([^)]*\b(message|content|context|body|raw|url|address|html)\b/.test(src) }).toEqual({ f, logsText: false });
+    }
   });
 
   it('the page fixes "do not index" in its own layout', () => {

@@ -71,6 +71,8 @@ export type Org = {
   keepOffered?: Array<'fixed' | 'apply'>;
   /** Languages whose fixed text the organisation has confirmed, once per language, for reuse. */
   fixedLangs?: string[];
+  /** The website field was offered for About us, once, the first time a job is written (section 19, phase 5, A). */
+  websiteAsked?: boolean;
 };
 
 /** A job's facts and choices, saved automatically when it is published, for the next job like it (managed with the profiles page, later). */
@@ -129,6 +131,35 @@ export type Facts = {
   keyPersonnel: boolean;
 };
 
+/** Where an accepted text or fact came from (section 19, phase 5, A); the AI is told it with each, and the cards show it. */
+export type Source = 'you told us' | 'your website' | 'the project page' | 'your salary scale' | 'similar jobs in this place (sample)';
+
+/**
+ * The context pack, kept on the job and sent with every later request: the accepted About us, the accepted project text, and the
+ * accepted facts, each with its source. `usedBy`: the sections written after the project was accepted, offered for an update if the
+ * project changes.
+ */
+export type ContextPack = {
+  about?: { text: string; source: Source };
+  project?: { text: string; source: Source; at: number; usedBy?: string[] };
+  facts?: Array<{ fact: string; value: string; source: Source }>;
+};
+
+/** A draft of About us or About the project from one page or text, shown with what was used and what it does not say, until accepted or rejected. */
+export type PageDraft = { kind: 'about' | 'project'; lines: string[]; used: string; missing: string; source: Source; social?: string[] };
+
+/** A suggestion with a real basis (pay, years of experience), off the job until the user accepts, edits, or rejects it. */
+export type Suggestion = {
+  id: string;
+  fact: 'salary' | 'experience';
+  value: string;
+  source: Source;
+  reason: string;
+  state: 'open' | 'accepted' | 'rejected';
+  pay?: { min: number; max: number; currency: string; period: Period };
+  years?: number;
+};
+
 /** A sub-heading inside a section with its own lines (section 19, phase 5, B): one level only. */
 export type Sub = { id: string; title: string; lines: string[] };
 
@@ -156,7 +187,7 @@ export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: s
  * sends something to someone is done from a button that states the whole outcome, never by the chat on its own. `state`: the actions
  * section 17 allows for the job's state, each opening its own dialog (section 19, phase 4).
  */
-export type ChatCard = 'plan' | 'publish' | 'review' | 'live' | 'state';
+export type ChatCard = 'plan' | 'publish' | 'review' | 'live' | 'state' | 'website' | 'project' | 'page' | 'suggest';
 
 /** "One section at a time", or "write it all, then I'll review". */
 export type Pace = 'step' | 'all';
@@ -369,6 +400,12 @@ export type DemoJob = {
   ordered?: boolean;
   /** Sub-sections set in the outline for sections not written yet; they join their section when it is written. */
   subsPlan?: Record<string, Array<{ id: string; heading: string }>>;
+  /** What the AI is told for every later request (section 19, phase 5, A). */
+  pack?: ContextPack;
+  /** A draft from a page or a text, waiting for Accept, Edit, or Reject. */
+  pageDraft?: PageDraft;
+  /** Suggestions offered on this job; one rejected is not offered again. */
+  suggestions?: Suggestion[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

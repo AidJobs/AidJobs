@@ -12,6 +12,7 @@ import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
 import { afterApproval, FIXED_SECTIONS, nextStep, reviewDone, setAiWrites, type Step } from './flow';
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
+import { surveyCard } from './context';
 import { getState } from './store';
 import type { DemoJob, Facts, Format, JobLang, State } from './types';
 
@@ -187,8 +188,11 @@ function publishingFor(s: State, j: DemoJob) {
   };
 }
 
-/** What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation. */
-export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean, version?: JobLang) {
+/**
+ * What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation; the
+ * context pack and the survey card (section 19, phase 5, A); and a page's text only while its draft is written.
+ */
+export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean, version?: JobLang, page?: { kind: string; text: string }) {
   const format = formatOf(s, j.format);
   const rec = recommendation(s, j.format);
   const recFormat = formatOf(s, rec.key);
@@ -207,6 +211,8 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       countries: s.org.countries,
       style: s.org.voice,
       styleKept: Boolean(s.org.styleKept),
+      website: s.org.website || null,
+      websiteAsked: Boolean(s.org.websiteAsked),
       fixedTexts: COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => ({ key: c.key, label: c.label })),
     },
     job: {
@@ -235,6 +241,10 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       }),
     },
     walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,
+    pack: { about: j.pack?.about ?? null, project: j.pack?.project ? { text: j.pack.project.text, source: j.pack.project.source, usedBy: j.pack.project.usedBy ?? [] } : null, facts: j.pack?.facts ?? [] },
+    card: surveyCard(s, j),
+    suggestions: (j.suggestions ?? []).map((x) => ({ fact: x.fact, value: x.value, source: x.source, state: x.state })),
+    ...(page ? { page } : {}),
     publishing: publishingFor(s, j),
     returning: returningFor(s, j),
     recommendation: {
@@ -266,7 +276,7 @@ export const writeVersion = (label: string) => `Write the ${label} version now: 
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.
  * `silent`: the window asks the AI to go on by itself (to write the next section), named in the chat while it writes.
  */
-export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; open: (t: OpenTarget) => void }): Promise<Applied | null> {
+export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; page?: { kind: string; text: string }; open: (t: OpenTarget) => void }): Promise<Applied | null> {
   const first = Boolean(opts.first);
   const silent = opts.silent;
   const s = getState();
@@ -279,7 +289,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const res = await fetch(AI_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first, opts.version), ...(snap.model ? { model: snap.model } : {}) }),
+      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first, opts.version, opts.page), ...(snap.model ? { model: snap.model } : {}) }),
       signal: stop.signal,
       cache: 'no-store',
     });
