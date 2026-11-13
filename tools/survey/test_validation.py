@@ -278,6 +278,19 @@ def test_disagreements_need_a_decision_with_a_one_line_reason():
     assert v.reconciled_items(a, b, ["V001"], rows)[1]
 
 
+def test_an_advert_one_coder_could_not_code_takes_a_decision_on_every_item():
+    a, b = {"V001": answer()}, {}
+    rows = v.disagreement_rows(a, b, ["V001"])
+    assert len(rows) == len(v.ITEM_KEYS) and {r["coder_b"] for r in rows} == {"not coded"}
+    items, problems = v.reconciled_items(a, b, ["V001"], rows)
+    assert len(problems) == len(v.ITEM_KEYS)
+    for r in rows:
+        r["decision"], r["reason"] = r["coder_a"], "checked against the advert"
+    items, problems = v.reconciled_items(a, b, ["V001"], rows)
+    assert problems == [] and items["V001"] == v.items_of(answer())
+    assert v.reconciled_items({}, {}, ["V001"], rows)[1] == ["V001: coded by neither coder"]
+
+
 def test_a_reconciled_years_pair_must_keep_the_guides_form():
     a, b = {"V001": answer(years_min=5, years_alt=7)}, {"V001": answer(years_min=5, years_alt=6)}
     rows = v.disagreement_rows(a, b, ["V001"])

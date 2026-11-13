@@ -596,13 +596,22 @@ def parse_decision(item: str, text: str):
     return t
 
 
+NOT_CODED = "not coded"
+
+
+def coded_items(answers: dict, vid: str) -> dict:
+    """An advert's items from one coder, or "not coded" for every item when that coder could not
+    code it: each item then needs the reconciler's decision."""
+    return items_of(answers[vid]) if vid in answers else dict.fromkeys(ITEM_KEYS, NOT_CODED)
+
+
 def disagreement_rows(a: dict, b: dict, ids: list[str], earlier: list[dict] = ()) -> list[dict]:
-    """Every item the two coders answered differently, keeping a decision already written for the
-    same answers."""
+    """Every item the two coders answered differently (every item of an advert one coder could not
+    code), keeping a decision already written for the same answers."""
     kept = {(r["id"], r["item"], r["coder_a"], r["coder_b"]): r for r in earlier}
     rows = []
     for vid in ids:
-        ia, ib = items_of(a[vid]), items_of(b[vid])
+        ia, ib = coded_items(a, vid), coded_items(b, vid)
         for k in ITEM_KEYS:
             if ia[k] != ib[k]:
                 key = (vid, k, show(ia[k]), show(ib[k]))
@@ -614,7 +623,7 @@ def disagreement_rows(a: dict, b: dict, ids: list[str], earlier: list[dict] = ()
 
 def disagreements(_args=None) -> int:
     codes, a, b = load_draw(), coder_answers("a"), coder_answers("b")
-    ids = sorted(v for v in codes if v in a and v in b)
+    ids = sorted(v for v in codes if v in a or v in b)
     path = VALID / "disagreements.csv"
     rows = disagreement_rows(a, b, ids, read_rows(path) if path.exists() else [])
     adverts.write_local(path, DIS_FIELDS, rows)
@@ -625,14 +634,17 @@ def disagreements(_args=None) -> int:
 
 def reconciled_items(a: dict, b: dict, ids: list[str], rows: list[dict]) -> tuple[dict, list[str]]:
     """The reconciled set: an item the coders agree on stands; any other takes the reconciler's
-    decision, which needs a one-line reason."""
+    decision, which needs a one-line reason. An advert neither coder coded is refused."""
     decided = {(r["id"], r["item"]): r for r in rows}
     out, problems = {}, []
     for vid in ids:
-        ia, ib = items_of(a[vid]), items_of(b[vid])
+        if vid not in a and vid not in b:
+            problems.append(f"{vid}: coded by neither coder")
+            continue
+        ia, ib = coded_items(a, vid), coded_items(b, vid)
         items = {}
         for k in ITEM_KEYS:
-            if ia[k] == ib[k]:
+            if ia[k] == ib[k] and ia[k] != NOT_CODED:
                 items[k] = ia[k]
                 continue
             r = decided.get((vid, k))
@@ -670,10 +682,9 @@ def reconcile(_args=None) -> int:
         return 0 if ok else 1
     codes, a, b = load_draw(), coder_answers("a"), coder_answers("b")
     ids = sorted(codes)
-    missing = [v for v in ids if v not in a or v not in b]
-    if missing:
-        print(f"reconcile: {len(missing)} adverts lack an answer from one coder")
-        return 1
+    single = [v for v in ids if (v in a) != (v in b)]
+    if single:
+        print(f"reconcile: {single} coded by one coder only; every item of theirs takes a decision")
     items, problems = reconciled_items(a, b, ids, read_rows(VALID / "disagreements.csv"))
     for p in problems[:30]:
         print(p)
@@ -807,7 +818,7 @@ def score(_args=None) -> int:
     truth = [truth_by[v] for v in ids]
     a, b = coder_answers("a"), coder_answers("b")
     _pilot, main = pilot_and_main(codes)
-    out = score_rows(script, truth, agreement_table(main, a, b))
+    out = score_rows(script, truth, agreement_table([i for i in main if i in a and i in b], a, b))
     adverts.write_dicts(OUTPUT, FIELDS, out)
     adverts.write_local(VALID / "errors.csv", ["id", "advert_id", "measure", "script", "reconciled",
                                                "reconciled_detail"], error_rows(ids, script, truth, codes))
