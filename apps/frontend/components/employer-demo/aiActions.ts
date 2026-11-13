@@ -162,11 +162,24 @@ const ORDER = [
 ];
 const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
 
-/** The user asked to move or reorder something, so the AI may move a section across groups. */
-const MOVE_ASKED = /\b(move|put|place|before|after|order|first|last|top|bottom|above|below|swap|earlier|later|higher|lower)\b/i;
+/** The user asked to move or reorder something, so the AI may move a section across groups: a verb of moving, not a word like "first". */
+export const MOVE_ASKED = /\b(?:move|moving|put|place|swap|switch|reorder|re-order|rearrange)\b|\b(?:come|go|goes|be|sit)s? (?:first|last|before|after|above|below|earlier|later|at the (?:top|bottom|end|start))\b/i;
 
-/** The user approved every section at once. */
-const ALL_ASKED = /\b(all|the rest|everything|every section|both)\b/i;
+/** The user approved every section at once: "approve the rest", "all of them are good", not "all good" about one section. */
+export const ALL_ASKED = /\bapprove (?:them )?all\b|\bapprove (?:the rest|everything|every section|both|all (?:of them|the sections|sections))\b|\b(?:all (?:of them|the sections|sections)|the rest|everything|every section|both) (?:is |are |looks? )?(?:good|fine|ok|okay|approved)\b/i;
+
+/** The order of `after` puts some section on the other side of a section of another group than in `before`: a move across groups. */
+export function movesAcrossGroups(before: string[], after: string[]): boolean {
+  const group = (k: string) => SECTION_BY_KEY[k]?.group ?? k;
+  const at = new Map(after.map((k, i) => [k, i]));
+  for (let i = 0; i < before.length; i++)
+    for (let n = i + 1; n < before.length; n++) {
+      const a = before[i];
+      const b = before[n];
+      if (group(a) !== group(b) && (at.get(a) ?? 0) > (at.get(b) ?? 0)) return true;
+    }
+  return false;
+}
 
 /** Words that name a later question, so the user's own answer to it ahead of time can settle it. */
 const SETTLE_WORDS: Record<string, RegExp> = {
@@ -181,6 +194,12 @@ const SETTLE_WORDS: Record<string, RegExp> = {
   reach: /\b(reach|invit)/i,
   flyer: /\bflyer\b/i,
   again: /\b(nothing else|no other changes?|same as before)\b/i,
+  grade: /\b(grade|band|level|scale)\b/i,
+  eligibility: /\b(eligib\w*|who can apply|anyone|nationals?|right to work|internal)\b/i,
+  languages: /\b(languages?|french|arabic|spanish|portuguese|english|swahili)\b/i,
+  safeguarding: /\bsafeguard/i,
+  salary: /\b(pay|salary|salaries|wage|remuneration|range)\b/i,
+  method: /\b(apply|application|careers? (?:site|page)|e-?mail|form)\b/i,
 };
 
 /**
@@ -419,7 +438,7 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
  * null for the reply to the first message, and empty when the window asked the AI to go on by itself (to write the next section). `open`
  * brings a part, a panel, or a dialog into view in the window.
  */
-export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang): Applied {
+export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang, fromPage?: boolean): Applied {
   const inVersion = inVersionTab && getState().jobs.find((j) => j.id === id)?.translations?.[inVersionTab] ? inVersionTab : undefined;
   const refused: string[] = [];
   const opened: OpenTarget[] = [];
@@ -436,6 +455,11 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   let ask: { fact?: ChatMsg['ask']; quick?: string[] } = {};
   let card: ChatMsg['card'];
   for (const a of actions) {
+    // A turn that read an outside page may only draft from it: the page's text never changes the job by itself (section 19, phase 5, A).
+    if (fromPage && a.type !== 'page_draft') {
+      refused.push(`${String(a.type).replace(/_/g, ' ')}: a page is used only for its draft`);
+      continue;
+    }
     // The text is written before anything that follows it in the order, so a section written and approved in one answer is approved as written.
     if (writes.length && ORDER.indexOf(String(a.type)) > ORDER.indexOf('write_section')) writeSections(id, writes.splice(0), note);
     const s = getState();
@@ -503,7 +527,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const after = j.tags.map((t) => (order.includes(t) ? (queue.shift() ?? t) : t));
         if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => j.tags.includes(k))) refused.push('the new order');
         // Across groups only when the user asked to move something (section 19, phase 5, B); within its group as before.
-        else if (crossesGroups(after) && !crossesGroups(j.tags) && !MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
+        else if (movesAcrossGroups(j.tags, after) && !MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
         else reorderSections(id, order);
         break;
       }
@@ -678,8 +702,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         if (!page || !out) refused.push('a draft from a page: no page is being read');
         else if ('refused' in out) refused.push(out.refused);
         else {
-          const text = plainNumbers(page.text);
-          const strange = (plainNumbers(out.lines.join(' ')).match(/\d+/g) ?? []).filter((n) => !text.includes(n));
+          const given = new Set(plainNumbers(page.text).match(/\d+/g) ?? []);
+          const strange = (plainNumbers(out.lines.join(' ')).match(/\d+/g) ?? []).filter((n) => !given.has(n));
           if (strange.length) refused.push(`the draft: a number the page does not give (${strange[0]})`);
           else {
             showPageDraft(id, { kind: page.kind, lines: out.lines, used: str(a.used, 300) || 'The page.', missing: str(a.missing, 300) ?? '', source: page.source, social: page.social }, '');
@@ -723,7 +747,9 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const what = typeof a.fact === 'string' ? a.fact : '';
         const on = nextStep(j, s);
         const onKind = on?.kind === 'version' ? 'langs' : on?.kind === 'waiting' ? 'review' : on?.kind;
-        const later = ([...LEFT, ...LATER, 'again'] as string[]).includes(what);
+        // A declinable fact is open only while its own question is asked; any other step makes it "later" for this rule.
+        const openFact = on?.kind === 'ask' ? on.fact : undefined;
+        const later = ([...LEFT, ...LATER, 'again'] as string[]).includes(what) || ((DECLINABLE as string[]).includes(what) && what !== openFact);
         if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER, ...(j.walk.again ? ['again'] : [])] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
         // The AI may not settle a later question; only the user, by naming it, answers one early.
         else if (later && what !== onKind && !(SETTLE_WORDS[what] ?? /$^/).test(said ?? '')) refused.push(`settling "${what}": the open question comes first`);

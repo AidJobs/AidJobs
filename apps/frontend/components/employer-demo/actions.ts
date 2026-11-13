@@ -127,12 +127,12 @@ function reopenApproval(j: DemoJob): DemoJob {
 }
 
 /** Any change to a job's content: reopens an approval, and the last chat change can no longer be undone on its own. */
-function touched(j: DemoJob): DemoJob {
+export function touched(j: DemoJob): DemoJob {
   return { ...reopenApproval(j), lastChange: undefined };
 }
 
 /** A change to a live job: the public page says "Updated", with the day. */
-function liveEdit(j: DemoJob): Partial<DemoJob> {
+export function liveEdit(j: DemoJob): Partial<DemoJob> {
   return j.status === 'live' ? { updatedAfterPublish: true, editedAt: Date.now() } : {};
 }
 
@@ -1072,6 +1072,13 @@ export function greetState(id: string) {
   const last = j.chat[j.chat.length - 1];
   const step = j.walk ? stepKey(nextStep(j, s)) : undefined;
   if (last?.state === j.status || (step && step !== 'live' && last?.from === 'ai' && last.step === step)) return;
+  // Approved with Amplify, Reach and the flyer still come before publishing (section 19, phase 5, C): the walk asks them next.
+  if (j.status === 'approved' && (step === 'reach' || step === 'flyer')) {
+    const by = j.review.reviewers.filter((x) => x.decision === 'approved').map((x) => x.name.split(' ')[0]);
+    updateJob(id, (x) => ({ ...x, chat: [...x.chat, { ...msg('ai', `Approved${by.length ? ` by ${by.join(' and ')}` : ''}. Before it goes out: ${step === 'reach' ? 'Reach, then the flyer' : 'the flyer'}. An edit sends it back to review.`), state: j.status }] }));
+    ensurePrompt(id);
+    return;
+  }
   const m = stateMessage(s, j);
   if (m) updateJob(id, (x) => ({ ...x, chat: [...x.chat, { ...m, ...(step ? { step } : {}) }] }));
 }
@@ -1651,8 +1658,10 @@ export function applyFormat(id: string, formatKey: string) {
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
-      const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      const next = { ...touched(j), renamed: undefined, ordered: undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      const wanted = orderSections([...format.order.map((o) => o.key), ...extras], format);
+      // A job the user has put in their own order keeps it: its sections stay where they are, and the new template's go in by placeIn.
+      const tags = j.ordered ? wanted.filter((k) => !j.tags.includes(k)).reduce((acc, k) => placeIn(acc, k), j.tags.filter((k) => wanted.includes(k))) : wanted;
+      const next = { ...touched(j), renamed: undefined, ordered: (j.ordered && crossesGroups(tags)) || undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));
@@ -2029,7 +2038,7 @@ export function addTranslation(id: string, lang: JobLang) {
   const j0 = s.jobs.find((x) => x.id === id);
   if (!j0 || lang === jobLang(j0) || j0.translations?.[lang]) return;
   const english = englishFor(s, j0);
-  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang, english, s.org.about) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
+  updateJob(id, (j) => ({ ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: draftTranslation(j, lang, english, s.org.about) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
 }
 
 /** "Update the French too": brings a version up to date with the job's own text, keeping the wording of lines whose source did not change. */
@@ -2041,7 +2050,7 @@ export function refreshTranslation(id: string, lang: JobLang) {
   const english = englishFor(s, j0);
   updateJob(id, (j) => {
     const t = j.translations?.[lang];
-    return t ? { ...j, translations: { ...j.translations, [lang]: redraftTranslation(j, t, lang, english) } } : j;
+    return t ? { ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: redraftTranslation(j, t, lang, english) } } : j;
   });
 }
 
@@ -2057,15 +2066,19 @@ export function keepTranslation(id: string, lang: JobLang) {
 export function removeTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
+    if (!j.translations?.[lang]) return j;
     const rest = { ...j.translations };
     delete rest[lang];
-    return { ...j, translations: rest };
+    return { ...touched(j), ...liveEdit(j), translations: rest };
   });
 }
 
+/** A changed language version is an edit like any other (section 19, phase 5, C): it reopens an approval, and a live job says "Updated". */
 function withVersion(j: DemoJob, lang: JobLang, fn: (t: Translation) => Translation): DemoJob {
   const t = j.translations?.[lang];
-  return t ? { ...j, translations: { ...j.translations, [lang]: { ...fn(t), reviewed: false } } } : j;
+  if (!t) return j;
+  const next = fn(t);
+  return next === t ? j : { ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: { ...next, reviewed: false } } };
 }
 
 /** An edit to a version needs a new review. */

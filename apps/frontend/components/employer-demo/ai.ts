@@ -55,6 +55,18 @@ export function aiState(): Snapshot {
   return snap;
 }
 
+/** Resolves once nothing is being answered for this job: a second caller waits for the answer already on its way instead of passing it by. */
+export function whenAnswered(id: string): Promise<void> {
+  if (!snap.pending[id]) return Promise.resolve();
+  return new Promise((resolve) => {
+    const off = subscribe(() => {
+      if (snap.pending[id]) return;
+      off();
+      resolve();
+    });
+  });
+}
+
 export function useAi(): Snapshot {
   return useSyncExternalStore(subscribe, aiState, aiState);
 }
@@ -311,7 +323,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
-    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version);
+    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page));
   } catch {
     set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;

@@ -243,13 +243,14 @@ export function SocialLinks({ s, job }: { s: State; job?: DemoJob }) {
 export function SuggestionCard({ job, s }: { job: DemoJob; s: State }) {
   const open = (job.suggestions ?? []).filter((x) => x.state === 'open');
   const [edit, setEdit] = useState<Record<string, { min?: string; max?: string; years?: string }>>({});
+  const [wrong, setWrong] = useState<Record<string, string>>({});
   if (!open.length) return <p className="aj-muted m-0">No suggestion waiting.</p>;
   const ro = Boolean(s.reviewerAs);
   return (
     <div className="flex flex-col gap-3">
       {open.map((sg) => {
         const e = edit[sg.id];
-        const num = (v?: string) => (v === undefined || v.trim() === '' ? undefined : Number(v.replace(/[,\s]/g, '')));
+        const num = (v?: string) => (v === undefined ? undefined : v.trim() === '' ? NaN : Number(v.replace(/[,\s]/g, '')));
         return (
           <div key={sg.id} className="flex flex-col gap-1.5" role="group" aria-label={`Suggested ${sg.fact === 'salary' ? 'pay' : 'experience'}`}>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -274,7 +275,7 @@ export function SuggestionCard({ job, s }: { job: DemoJob; s: State }) {
             {e && sg.years !== undefined && <input style={{ ...inputStyle, minHeight: 32, width: 90 }} value={e.years ?? ''} onChange={(ev) => setEdit({ ...edit, [sg.id]: { ...e, years: ev.target.value } })} aria-label="Years of experience" />}
             {!ro && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <button type="button" className="aj-ink-btn" onClick={() => acceptSuggestion(job.id, sg.id, e ? { min: num(e.min), max: num(e.max), years: num(e.years) } : undefined)}>
+                <button type="button" className="aj-ink-btn" onClick={() => setWrong({ ...wrong, [sg.id]: acceptSuggestion(job.id, sg.id, e ? { min: num(e.min), max: num(e.max), years: num(e.years) } : undefined) ?? '' })}>
                   {e ? 'Accept as edited' : 'Accept'}
                 </button>
                 {!e && (
@@ -286,6 +287,11 @@ export function SuggestionCard({ job, s }: { job: DemoJob; s: State }) {
                   Reject
                 </button>
               </div>
+            )}
+            {wrong[sg.id] && (
+              <span role="alert" style={{ color: 'var(--amber)' }}>
+                {wrong[sg.id]}
+              </span>
             )}
           </div>
         );

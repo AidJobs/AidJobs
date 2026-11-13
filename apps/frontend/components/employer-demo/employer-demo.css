@@ -57,6 +57,18 @@
   animation: ej-reveal 900ms ease-out both;
 }
 
+.ej-reveal-text {
+  display: block;
+}
+
+/* High-contrast mode drops box shadows, so the focus rings above would vanish: there, a system-colour outline instead. */
+@media (forced-colors: active) {
+  .aj-root :focus-visible {
+    outline: 2px solid CanvasText !important;
+    outline-offset: 2px;
+  }
+}
+
 @keyframes ej-reveal {
   from {
     clip-path: inset(0 0 100% 0);

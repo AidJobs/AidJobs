@@ -6,7 +6,7 @@ import { acceptPageDraft, acceptSuggestion, checkSuggestion, extractDraft, payBa
 import { holdPage, pageFor } from '../../components/employer-demo/pageMemory';
 import { draftFromPage } from '../../components/employer-demo/pages';
 import { basicAdvertCheck } from '../../components/employer-demo/market';
-import { outlineOrder, titleSuggestions } from '../../components/employer-demo/engine';
+import { outlineOrder, placeIn, titleSuggestions } from '../../components/employer-demo/engine';
 import { FIXED_SECTIONS, nextStep } from '../../components/employer-demo/flow';
 import { getState, normalise, resetDemo, STORAGE_KEY, update } from '../../components/employer-demo/store';
 import { draftProblems } from '../employerDemoAi/quality';
@@ -107,8 +107,8 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     const extra = ['languages', 'competencies'].find((k) => !moved.includes(k))!;
     toggleSection('job-comms', extra);
     const after = job('job-comms').tags;
+    expect(after).toEqual(placeIn(moved, extra));
     expect(after[1]).toBe('apply');
-    expect(after.indexOf(extra)).toBeGreaterThan(after.indexOf('requirements') === -1 ? 0 : after.indexOf('requirements') - 1);
     expect(outlineOrder(after)).not.toEqual(after);
   });
 
@@ -164,17 +164,20 @@ describe('the open question, "Good", and the size of what is sent (section 19, p
     expect(job(id).walk?.approved).toContain('about');
     expect(JSON.stringify(job(id).sections.filter((x) => x.key === 'about'))).toBe(JSON.stringify(JSON.parse(before).filter((x: { key: string }) => x.key === 'about')));
     const next = nextStep(job(id), getState());
-    if (next?.kind !== 'approve') return;
-    const text = JSON.stringify(sec(id, next.section));
+    expect(next?.kind).toBe('approve');
+    const section = next?.kind === 'approve' ? next.section : '';
+    const text = JSON.stringify(sec(id, section));
     sendChat(id, 'hmm ok');
-    expect(job(id).walk?.approved).toContain(next.section);
+    expect(job(id).walk?.approved).toContain(section);
+    expect(JSON.stringify(sec(id, section))).toBe(text);
     const after = nextStep(job(id), getState());
-    if (after?.kind !== 'approve') return;
-    const t2 = JSON.stringify(sec(id, after.section));
+    expect(after?.kind).toBe('approve');
+    const third = after?.kind === 'approve' ? after.section : '';
+    const t2 = JSON.stringify(sec(id, third));
     sendChat(id, 'erm');
-    expect(JSON.stringify(sec(id, after.section))).toBe(t2);
+    expect(job(id).walk?.approved).not.toContain(third);
+    expect(JSON.stringify(sec(id, third))).toBe(t2);
     expect(job(id).chat.at(-1)?.text).toMatch(/^I didn't catch that\. Is \*\*.+\*\* good as it is, or what should change\?$/);
-    expect(text).toBeTruthy();
   });
 
   it('with the AI, "Good" adds nothing: a sentence written into the section being approved is refused', () => {
@@ -382,8 +385,8 @@ describe('context for the AI: pages, the context pack, suggestions, and the surv
   });
 
   it('experience is suggested only from the sample of similar jobs, with that number exactly', () => {
-    const y = yearsBasis(getState(), job('job-fin'));
-    if (!y) return expect(checkSuggestion(getState(), job('job-fin'), { fact: 'experience', years: 3, source: 'similar jobs in this place (sample)' })).toMatch(/differs from the sample/);
+    const y = yearsBasis(getState(), job('job-fin'))!;
+    expect(y).toMatchObject({ source: 'similar jobs in this place (sample)', years: expect.any(Number) });
     expect(checkSuggestion(getState(), job('job-fin'), { fact: 'experience', years: y.years + 2, source: y.source })).toMatch(/differs from the sample/);
     expect(checkSuggestion(getState(), job('job-fin'), { fact: 'experience', years: y.years, source: y.source })).toMatchObject({ fact: 'experience', years: y.years });
   });
@@ -398,13 +401,14 @@ describe('context for the AI: pages, the context pack, suggestions, and the surv
   });
 
   it('About us approved as it is: the website field is offered once, with it, and not again', () => {
-    const id = startJob("We're hiring a WASH Officer in Goma, fixed-term", undefined, [], true);
-    applyTemplate(id, job(id).format);
-    chooseStyle(id, ['Warm']);
-    setPace(id, 'step');
-    for (let i = 0; i < 6 && nextStep(job(id), getState())?.kind === 'ask'; i++) setFacts(id, { grade: 'C1' });
-    if (nextStep(job(id), getState())?.kind === 'approve') expect(job(id).chat.at(-1)).toMatchObject({ card: 'website' });
+    const id = atFirstApproval();
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
+    expect(getState().org.websiteAsked).toBeFalsy();
+    expect(job(id).chat.at(-1)).toMatchObject({ card: 'website' });
     approveSection(id, 'about');
     expect(getState().org.websiteAsked).toBe(true);
+    const id2 = atFirstApproval("We're hiring a Shelter Officer in Goma, fixed-term");
+    expect(nextStep(job(id2), getState())).toEqual({ kind: 'approve', section: 'about' });
+    expect(job(id2).chat.some((m) => m.card === 'website')).toBe(false);
   });
 });

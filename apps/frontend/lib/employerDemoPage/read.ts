@@ -17,9 +17,33 @@ export const UNREADABLE = 'this page could not be read';
 
 export type Address = { address: string; family: 4 | 6 };
 export type Lookup = (host: string) => Promise<Address[]>;
-export type Fetched = { status: number; headers: Record<string, string | undefined>; body: AsyncIterable<Uint8Array> };
-/** Connects to `address` only, asking for `url` with its own host name (for TLS and the Host header). */
-export type FetchAt = (url: URL, address: Address) => Promise<Fetched>;
+/** `close` ends the connection; the reader calls it on every way out, so a refused or unread response never stays open. */
+export type Fetched = { status: number; headers: Record<string, string | undefined>; body: AsyncIterable<Uint8Array>; close?: () => void };
+/** Connects to `address` only, asking for `url` with its own host name (for TLS and the Host header); `signal` ends it at the deadline. */
+export type FetchAt = (url: URL, address: Address, signal?: AbortSignal) => Promise<Fetched>;
+
+/** The whole read (every lookup, connection, redirect, and the page itself) ends by then, however slowly the server answers. */
+export const TIME_LIMIT_MS = 15_000;
+const LATE = 'it took too long';
+
+/** `p`, or a rejection once `signal` is aborted, whichever comes first. */
+function inTime<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new Error(LATE));
+  return new Promise<T>((resolve, reject) => {
+    const late = () => reject(new Error(LATE));
+    signal.addEventListener('abort', late, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener('abort', late);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener('abort', late);
+        reject(e);
+      },
+    );
+  });
+}
 
 export type PageResult = { ok: true; text: string; social: string[] } | { ok: false; reason: string; why: string };
 
@@ -125,8 +149,8 @@ async function resolveChecked(url: URL, lookup: Lookup): Promise<Address | strin
   let addresses: Address[];
   try {
     addresses = kind ? [{ address: host, family: kind === 6 ? 6 : 4 }] : await lookup(host);
-  } catch {
-    return 'the name does not resolve';
+  } catch (e) {
+    return e instanceof Error && e.message === LATE ? LATE : 'the name does not resolve';
   }
   if (!addresses.length) return 'the name does not resolve';
   if (addresses.some(blockedAddress)) return 'it resolves to an address that is not public';
@@ -208,15 +232,20 @@ function noRealText(html: string, text: string): boolean {
 }
 
 /** The page's first 500 KB at most: reading stops there, and the rest is never fetched into memory. */
-async function readBody(body: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
+async function readBody(body: AsyncIterable<Uint8Array>, signal: AbortSignal): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for await (const chunk of body) {
+  const it = body[Symbol.asyncIterator]();
+  while (size < MAX_BYTES) {
+    const next = await inTime(it.next(), signal);
+    if (next.done) break;
+    const chunk = next.value;
     const room = MAX_BYTES - size;
     chunks.push(chunk.byteLength > room ? chunk.slice(0, room) : chunk);
     size += Math.min(chunk.byteLength, room);
-    if (size >= MAX_BYTES) break;
   }
+  // Not awaited: a generator still waiting for data would hold this until the connection ends; the caller's close() ends it.
+  void it.return?.()?.catch(() => undefined);
   const out = new Uint8Array(size);
   let at = 0;
   for (const c of chunks) {
@@ -227,34 +256,50 @@ async function readBody(body: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
 }
 
 /** Reads one page under the rules above. `why` is for the route's own log as a short status, never the address or the text. */
-export async function readPage(raw: string, deps: { lookup: Lookup; fetchAt: FetchAt }): Promise<PageResult> {
+export async function readPage(raw: string, deps: { lookup: Lookup; fetchAt: FetchAt; timeLimitMs?: number }): Promise<PageResult> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), deps.timeLimitMs ?? TIME_LIMIT_MS);
+  try {
+    return await readWithin(raw, deps, stop.signal);
+  } catch {
+    return refuse(stop.signal.aborted ? LATE : 'the page stopped part way');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readWithin(raw: string, deps: { lookup: Lookup; fetchAt: FetchAt }, signal: AbortSignal): Promise<PageResult> {
   const start = checkUrl(raw);
   if (!start) return refuse('not an https address');
   let url: URL = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const target = await resolveChecked(url, deps.lookup);
+    const target = await resolveChecked(url, (host) => inTime(deps.lookup(host), signal));
     if (typeof target === 'string') return refuse(target);
     let res: Fetched;
     try {
-      res = await deps.fetchAt(url, target);
+      res = await inTime(deps.fetchAt(url, target, signal), signal);
     } catch {
-      return refuse('the connection failed');
+      return refuse(signal.aborted ? LATE : 'the connection failed');
     }
-    if (res.status >= 300 && res.status < 400) {
-      const next: URL | null = res.headers.location ? checkUrl(res.headers.location, url) : null;
-      if (!next) return refuse('a redirect that is not https');
-      if (hop === MAX_REDIRECTS) return refuse('too many redirects');
-      url = next;
-      continue;
+    try {
+      if (res.status >= 300 && res.status < 400) {
+        const next: URL | null = res.headers.location ? checkUrl(res.headers.location, url) : null;
+        if (!next) return refuse('a redirect that is not https');
+        if (hop === MAX_REDIRECTS) return refuse('too many redirects');
+        url = next;
+        continue;
+      }
+      if (res.status !== 200) return refuse(`status ${res.status}`);
+      const type = (res.headers['content-type'] ?? '').toLowerCase();
+      if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return refuse('not an html page');
+      const bytes = await readBody(res.body, signal);
+      const html = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      const text = visibleText(html);
+      if (noRealText(html, text)) return refuse('no real text');
+      return { ok: true, text, social: socialLinks(html) };
+    } finally {
+      res.close?.();
     }
-    if (res.status !== 200) return refuse(`status ${res.status}`);
-    const type = (res.headers['content-type'] ?? '').toLowerCase();
-    if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return refuse('not an html page');
-    const bytes = await readBody(res.body);
-    const html = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-    const text = visibleText(html);
-    if (noRealText(html, text)) return refuse('no real text');
-    return { ok: true, text, social: socialLinks(html) };
   }
   return refuse('too many redirects');
 }

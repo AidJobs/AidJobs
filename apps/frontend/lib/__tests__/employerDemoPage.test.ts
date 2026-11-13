@@ -137,6 +137,55 @@ describe('the page reader: one page, read safely', () => {
     expect(visibleText('<p>Kept</p><!-- gone --><nav>gone</nav><SCRIPT>gone</SCRIPT ><p>Also kept</p><style>left open')).toBe('Kept\nAlso kept');
   });
 
+  it('a connection that breaks part way is "could not be read", never an error (round 7 review)', async () => {
+    const lookup = lookupFrom({ 'riverstone.example.org': [[PUBLIC]] });
+    const close = jest.fn();
+    const broken: AsyncIterable<Uint8Array> = (async function* () {
+      yield new TextEncoder().encode('<p>Part of a page');
+      throw new Error('ECONNRESET');
+    })();
+    const out = await readPage('https://riverstone.example.org/', { lookup, fetchAt: async () => ({ status: 200, headers: { 'content-type': 'text/html' }, body: broken, close }) });
+    expect(out).toMatchObject({ ok: false, reason: UNREADABLE, why: 'the page stopped part way' });
+    expect(close).toHaveBeenCalled();
+  });
+
+  it('the whole read has one deadline: a slow name, a server that never answers, or a page that trickles in all end there (round 7 review)', async () => {
+    const never = <T>() => new Promise<T>(() => {});
+    const quick = { timeLimitMs: 40 };
+    expect(await readPage('https://slow.example.org/', { lookup: () => never(), fetchAt: async () => html(), ...quick })).toMatchObject({ ok: false, why: 'it took too long' });
+    const lookup = lookupFrom({ 'riverstone.example.org': [[PUBLIC]] });
+    let signal: AbortSignal | undefined;
+    expect(await readPage('https://riverstone.example.org/', { lookup, fetchAt: (_u, _a, s) => ((signal = s), never()), ...quick })).toMatchObject({ ok: false, why: 'it took too long' });
+    expect(signal?.aborted).toBe(true);
+    const close = jest.fn();
+    const trickle: AsyncIterable<Uint8Array> = (async function* () {
+      yield new TextEncoder().encode('<p>One');
+      await never();
+    })();
+    expect(await readPage('https://riverstone.example.org/', { lookup, fetchAt: async () => ({ status: 200, headers: { 'content-type': 'text/html' }, body: trickle, close }), ...quick })).toMatchObject({ ok: false, why: 'it took too long' });
+    expect(close).toHaveBeenCalled();
+  });
+
+  it('every response is closed, read or refused: a redirect, an error status, a PDF, and a page read (round 7 review)', async () => {
+    const lookup = lookupFrom({ 'riverstone.example.org': [[PUBLIC]] });
+    const closes: jest.Mock[] = [];
+    const answers: Fetched[] = [
+      { status: 301, headers: { location: 'https://riverstone.example.org/about' }, body: body('') },
+      { status: 404, headers: {}, body: body('') },
+    ];
+    const fetchAt = async () => {
+      const close = jest.fn();
+      closes.push(close);
+      return { ...(answers.shift() ?? html()), close };
+    };
+    expect(await readPage('https://riverstone.example.org/', { lookup, fetchAt })).toMatchObject({ ok: false, why: 'status 404' });
+    answers.push({ status: 200, headers: { 'content-type': 'application/pdf' }, body: body('%PDF') });
+    expect(await readPage('https://riverstone.example.org/', { lookup, fetchAt })).toMatchObject({ ok: false, why: 'not an html page' });
+    expect((await readPage('https://riverstone.example.org/', { lookup, fetchAt })).ok).toBe(true);
+    expect(closes).toHaveLength(4);
+    for (const c of closes) expect(c).toHaveBeenCalledTimes(1);
+  });
+
   it('connects to a checked IPv4 address when the name has both, as many networks cannot reach IPv6', async () => {
     const lookup = lookupFrom({ 'both.example.org': [[{ address: '2606:4700:4700::1111', family: 6 }, PUBLIC]] });
     const fetchAt = jest.fn<FetchAt>(async () => html());

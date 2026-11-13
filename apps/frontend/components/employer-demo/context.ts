@@ -1,6 +1,6 @@
 'use client';
 
-import { formatOf, goOn, headingOf, setFacts } from './actions';
+import { formatOf, goOn, headingOf, liveEdit, setFacts, subId, touched } from './actions';
 import { extractFacts, inOutlineOrder, longDate, placeIn, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
@@ -62,6 +62,19 @@ export function projectConflicts(j: DemoJob, text: string, today: number): Array
 const FACT_WORD = { country: 'country', donor: 'donor', deadline: 'closing date' } as const;
 
 /**
+ * The accepted text in the section it fills. About us replaces the section's lines. The project goes into a template's own Background
+ * section as its sub-section "About the project", so the role's background already written there stays; the section is replaced only
+ * when all it holds is the earlier project text.
+ */
+function intoSection(x: Section, kind: PageDraft['kind'], text: string[], earlier?: string): Section {
+  const own = x.lines.join('\n').trim();
+  if (kind === 'about' || !own || own === earlier?.trim()) return { ...x, lines: text, ai: true, edited: undefined };
+  const sub = x.subs?.find((y) => y.title === LABEL.project);
+  const subs = sub ? (x.subs ?? []).map((y) => (y.id === sub.id ? { ...y, lines: text } : y)) : [...(x.subs ?? []), { id: subId(), title: LABEL.project, lines: text }];
+  return { ...x, subs };
+}
+
+/**
  * The draft accepted (as it is, or edited): About us fills this job's About us; About the project fills its own section, added if the
  * template has none. Either goes into the context pack with its source. A project that replaces an earlier one marks the sections that
  * used it, and the chat offers to update them.
@@ -84,7 +97,7 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       const tags = placeIn(j.tags, key);
       const title = d.kind === 'project' && !j.tags.includes(key) ? LABEL.project : headingOf(s, j, key);
       const sec: Section = { key, title, lines: text, ai: true };
-      const sections = j.sections.some((x) => x.key === key) ? j.sections.map((x) => (x.key === key ? { ...x, lines: text, ai: true, edited: undefined } : x)) : inOutlineOrder([...j.sections, sec], tags);
+      const sections = j.sections.some((x) => x.key === key) ? j.sections.map((x) => (x.key === key ? intoSection(x, d.kind, text, earlier?.text) : x)) : inOutlineOrder([...j.sections, sec], tags);
       const pack: ContextPack = { ...j.pack, ...(d.kind === 'about' ? { about: { text: text.join('\n'), source } } : { project: { text: text.join('\n'), source, at: Date.now(), usedBy: [] } }) };
       const renamed = d.kind === 'project' && !j.tags.includes(key) ? { ...j.renamed, [key]: LABEL.project } : j.renamed;
       const walk = j.walk ? { ...j.walk, approved: Array.from(new Set([...j.walk.approved, key])) } : j.walk;
@@ -99,14 +112,14 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       ].filter(Boolean);
       const quick = used.length ? ['Update them', 'Keep them as they are'] : conflicts.length ? [`Keep ${conflicts[0].now}`, `Use ${conflicts[0].page}`] : undefined;
       return {
-        ...j,
+        ...touched(j),
+        ...liveEdit(j),
         tags,
         sections,
         renamed,
         pack,
         walk,
         pageDraft: undefined,
-        ...(j.status === 'live' ? { updatedAfterPublish: true, editedAt: Date.now() } : {}),
         versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${LABEL[d.kind]} from ${source}`, sections }],
         chat: [...j.chat, say(notes.join(' '), quick)],
       };
@@ -240,11 +253,8 @@ export function checkSuggestion(s: State, j: DemoJob, a: Record<string, unknown>
     const period = ['hour', 'day', 'month', 'year'].includes(String(a.period)) ? (String(a.period) as Period) : null;
     if (!Number.isFinite(min) || !Number.isFinite(max) || !currency || !period) return 'a pay suggestion without a figure';
     const value = `${currency} ${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')} a ${period}`;
-    if (source === 'your website' || source === 'the project page') {
-      const text = plain(`${j.pack?.about?.text ?? ''} ${j.pack?.project?.text ?? ''}`);
-      if (!text.includes(String(min)) || !text.includes(String(max))) return 'a pay suggestion that the accepted text does not give';
-      return { id, fact, value, source, reason: reason || `From ${source}.`, state: 'open', pay: { min, max, currency, period } };
-    }
+    // Pay is never copied from a page (section 19, phase 5, A; the user, 13 November 2026): only the scale or the labelled sample.
+    if (source === 'your website' || source === 'the project page') return 'a pay suggestion from a page: pay comes only from your salary scale or similar jobs';
     const basis = payBasis(s, j);
     if (!basis || basis.source !== source || basis.min !== min || basis.max !== max || basis.currency !== currency || basis.period !== period) return 'a pay suggestion that differs from the scale or the sample';
     return { id, fact, value, source, reason: basis.reason, state: 'open', pay: { min, max, currency, period } };
@@ -270,11 +280,13 @@ export function offerSuggestion(id: string, sg: Suggestion) {
  * Accepted (as it is, or edited): it becomes a fact the user gave, in the context pack with its source, and pay is set on the job. Its
  * numbers are then numbers the user gave, for the checks on what the AI writes.
  */
-export function acceptSuggestion(id: string, sgId: string, edited?: { min?: number; max?: number; years?: number }) {
+export function acceptSuggestion(id: string, sgId: string, edited?: { min?: number; max?: number; years?: number }): string | null {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   const sg = j?.suggestions?.find((x) => x.id === sgId && x.state === 'open');
-  if (!j || !sg || s.reviewerAs) return;
+  if (!j || !sg || s.reviewerAs) return null;
+  const wrong = editedWrong(sg, edited);
+  if (wrong) return wrong;
   const changed = edited && ((sg.pay && (edited.min !== sg.pay.min || edited.max !== sg.pay.max)) || (sg.years !== undefined && edited.years !== sg.years));
   const source: Source = changed ? 'you told us' : sg.source;
   const pay = sg.pay ? { ...sg.pay, min: edited?.min ?? sg.pay.min, max: edited?.max ?? sg.pay.max } : undefined;
@@ -289,6 +301,21 @@ export function acceptSuggestion(id: string, sgId: string, edited?: { min?: numb
     chat: [...x.chat, say(`${sg.fact === 'salary' ? 'Pay' : 'Experience'}: ${value}, from ${source}. It is on the job now.`)],
   }));
   goOn(id);
+  return null;
+}
+
+/** Why edited figures cannot go on the job: pay as whole amounts from 0, the lower first; experience as whole years up to 40. */
+export function editedWrong(sg: Suggestion, edited?: { min?: number; max?: number; years?: number }): string | null {
+  if (!edited) return null;
+  if (sg.pay) {
+    const min = edited.min ?? sg.pay.min;
+    const max = edited.max ?? sg.pay.max;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0) return 'Pay needs two amounts, as numbers from 0.';
+    if (min > max) return 'The lower amount comes first.';
+    return null;
+  }
+  const years = edited.years ?? sg.years;
+  return years === undefined || !Number.isInteger(years) || years < 0 || years > 40 ? 'Experience needs a whole number of years, up to 40.' : null;
 }
 
 export function rejectSuggestion(id: string, sgId: string) {

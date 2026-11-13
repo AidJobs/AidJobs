@@ -45,30 +45,35 @@ afterAll(() => {
 const TEXT = 'Here is The role, written from what you told me. It names the duty station and the team. Good, or change something?';
 
 describe('text appearing as it is written (section 19, phase 5, E)', () => {
-  it('reveals the text progressively; a screen reader has the finished message at once', () => {
+  it('wipes the message in on screen; the whole text is there once from the start, in one node that never changes, so a screen reader hears it once (found by the review)', () => {
     render(<Reveal id="m-1" text={TEXT} active render={(t) => <span>{t}</span>} />);
-    const hidden = container.querySelector('[aria-hidden="true"]');
-    expect(hidden?.textContent?.length).toBeLessThan(TEXT.length);
-    expect(container.querySelector('.sr-only')?.textContent).toBe(TEXT);
-    act(() => jest.advanceTimersByTime(2000));
-    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+    const node = container.querySelector('.ej-reveal-text');
+    expect(node?.classList.contains('ej-reveal')).toBe(true);
+    expect(container.textContent).toBe(TEXT);
+    expect(container.querySelector('.sr-only, [aria-hidden="true"]')).toBeNull();
+    act(() => node?.dispatchEvent(new Event('animationend', { bubbles: true })));
+    expect(container.querySelector('.ej-reveal-text')).toBe(node);
+    expect(node?.classList.contains('ej-reveal')).toBe(false);
     expect(container.textContent).toBe(TEXT);
   });
 
   it('with reduced motion the text appears at once', () => {
     reduced = true;
     render(<Reveal id="m-2" text={TEXT} active render={(t) => <span>{t}</span>} />);
-    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(container.querySelector('.ej-reveal')).toBeNull();
     expect(container.textContent).toBe(TEXT);
   });
 
   it('a new message finishes the reveal at once, and a message already revealed is never revealed again', () => {
     render(<Reveal id="m-3" text={TEXT} active render={(t) => <span>{t}</span>} />);
-    expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    expect(container.querySelector('.ej-reveal')).not.toBeNull();
     render(<Reveal id="m-3" text={TEXT} active={false} render={(t) => <span>{t}</span>} />);
+    expect(container.querySelector('.ej-reveal')).toBeNull();
     expect(container.textContent).toBe(TEXT);
+    act(() => root.unmount());
+    root = createRoot(container);
     render(<Reveal id="m-3" text={TEXT} active render={(t) => <span>{t}</span>} />);
-    expect(container.textContent).toBe(TEXT);
+    expect(container.querySelector('.ej-reveal')).toBeNull();
   });
 });
 
@@ -117,10 +122,17 @@ describe('the chat looks plain, and focus follows each control’s corners (sect
     expect(used.filter((v) => !defined.has(v))).toEqual([]);
   });
 
+  const forced = /@media \(forced-colors: active\) \{\s*([^{}]*\{[^}]*\}\s*)\}/;
+
   it('every focus rule draws a ring that follows the corners, not a square outline', () => {
-    const focus = Array.from(css.matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^}]*)\}/g));
+    const focus = Array.from(css.replace(forced, '').matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^}]*)\}/g));
     expect(focus.length).toBeGreaterThan(5);
     for (const [, selector, body] of focus) expect({ selector: selector.trim(), outline: /outline:\s*\d/.test(body) }).toEqual({ selector: selector.trim(), outline: false });
+  });
+
+  it('in high-contrast mode, where rings drawn with shadows vanish, focus shows a system-colour outline (found by the review)', () => {
+    const block = css.match(forced)?.[1] ?? '';
+    expect(block).toMatch(/\.aj-root :focus-visible \{[^}]*outline: 2px solid CanvasText !important/);
   });
 });
 

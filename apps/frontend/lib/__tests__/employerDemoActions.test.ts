@@ -994,11 +994,19 @@ describe('language versions', () => {
 });
 
 describe('languages included and paid (section 19, 8 and 12 November 2026)', () => {
+  /** Two reviewed versions; added after the job's approval, they reopen it (section 19, phase 5, C), so its reviewers approve again. */
   const twoVersions = (id: string) => {
     for (const l of ['fr', 'es'] as const) {
       addTranslation(id, l);
       reviewTranslation(id, l);
     }
+    expect(job(id).status).toBe('review');
+    for (const r of job(id).review.reviewers) {
+      update((s) => ({ ...s, reviewerAs: s.team.find((p) => p.name === r.name)?.id ?? null }));
+      reviewerDecision(id, 'approved', '');
+    }
+    update((s) => ({ ...s, reviewerAs: null }));
+    expect(job(id).status).toBe('approved');
   };
 
   it('a free job has its own language only: no version is public', () => {

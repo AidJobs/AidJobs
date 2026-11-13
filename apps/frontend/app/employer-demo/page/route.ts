@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
   }
   if (typeof body?.url !== 'string' || !body.url.trim() || body.url.length > 2000) return answer({ error: 'bad address' }, 400);
   if (!FIELDS.includes(body.field as (typeof FIELDS)[number])) return answer({ error: 'only from the website or the project field' }, 400);
-  const result = await readPage(body.url, { lookup, fetchAt });
+  let result: Awaited<ReturnType<typeof readPage>>;
+  try {
+    result = await readPage(body.url, { lookup, fetchAt });
+  } catch {
+    result = { ok: false, reason: UNREADABLE, why: 'an error in the reader' };
+  }
   if (!result.ok) {
     console.warn(`employer demo page: not read (${result.why})`);
     return answer({ ok: false, reason: UNREADABLE });

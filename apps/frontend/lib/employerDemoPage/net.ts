@@ -23,7 +23,7 @@ export const lookup: Lookup = async (host) => {
  * One GET to the address already checked, never another: the socket's own lookup is replaced by that address, and the host name stays
  * the URL's, so TLS checks the certificate for the name the user gave. No redirect is followed here; the reader checks each one.
  */
-export const fetchAt: FetchAt = (url: URL, address: Address) =>
+export const fetchAt: FetchAt = (url: URL, address: Address, signal?: AbortSignal) =>
   new Promise<Fetched>((resolve, reject) => {
     const req = request(
       {
@@ -40,11 +40,12 @@ export const fetchAt: FetchAt = (url: URL, address: Address) =>
           else (cb as (e: null, a: string, f: number) => void)(null, address.address, address.family);
         },
         timeout: TIMEOUT_MS,
+        ...(signal ? { signal } : {}),
       },
       (res) => {
         const headers: Record<string, string | undefined> = {};
         for (const [k, v] of Object.entries(res.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
-        resolve({ status: res.statusCode ?? 0, headers, body: limited(res, req) });
+        resolve({ status: res.statusCode ?? 0, headers, body: limited(res, req), close: () => req.destroy() });
       },
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));

@@ -18,7 +18,7 @@ import { KEEP_PROFILE_ABOUT, keepProfileAbout, projectConflicts, resolveConflict
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
-import { aiOn, askAi, GO_ON, probeAi, useAi, writeVersion } from './ai';
+import { aiOn, askAi, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
 import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, partOfStep, reachOpen, stepKey } from './flow';
 import { readJobFile } from './readFile';
 import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
@@ -623,8 +623,13 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
   const end = useRef<HTMLDivElement>(null);
   const ai = useAi();
   const waiting = ai.pending[job.id];
-  const thinking = Boolean(waiting) && !waiting?.first && !waiting?.silent;
+  // The first reply is "Reading your role…" while that shows, and "Thinking…" after, so the window never waits without saying so.
+  const thinking = Boolean(waiting) && !waiting?.silent && !(waiting?.first && reading);
   const busy = Boolean(waiting) || reading;
+  // Enter while busy says why nothing was sent, for that answer only: the note goes when the answer it waited for has come.
+  const busyWith: unknown = waiting ?? (reading ? 'reading' : null);
+  const [heldFor, setHeldFor] = useState<unknown>(null);
+  const held = busyWith !== null && heldFor === busyWith;
   const firstUser = job.chat.findIndex((m) => m.from === 'user');
   const shown = reading ? job.chat.slice(0, firstUser + 1) : job.chat;
   useEffect(() => {
@@ -683,9 +688,11 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
         )}
         {thinking && (
           <>
-            <div className="ej-bubble" data-from="user">
-              {waiting?.text}
-            </div>
+            {!waiting?.first && (
+              <div className="ej-bubble" data-from="user">
+                {waiting?.text}
+              </div>
+            )}
             <div className="ej-bubble ej-reading" data-from="ai" role="status">
               Thinking…
             </div>
@@ -716,12 +723,20 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
                 {ai.fallback[job.id]}
               </p>
             )}
+            {held && (
+              <p className="ej-ai-note m-0" role="status">
+                One moment: I am still answering. Your message stays in the box; send it when I am done.
+              </p>
+            )}
             <Composer
               ref={input}
               value={text}
               onChange={setText}
               onSend={(v) => {
-                if (busy) return;
+                if (busy) {
+                  setHeldFor(busyWith);
+                  return;
+                }
                 onSend(v);
                 setText('');
               }}
@@ -843,7 +858,8 @@ function JobWindow({ id }: { id: string }) {
     }, 900);
     void probeAi().then(async (on) => {
       const said = getState().jobs.find((x) => x.id === id)?.chat.find((m) => m.from === 'user')?.text;
-      if (on && said && !answered) await askAi(id, said, { first: true, open: (x) => openRef.current(x) });
+      // Run twice (React's development check), the second run waits for the first's answer rather than ending "Reading" early.
+      if (on && said && !answered && !(await askAi(id, said, { first: true, open: (x) => openRef.current(x) }))) await whenAnswered(id);
       answered = true;
       end();
     });
