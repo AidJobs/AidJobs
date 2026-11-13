@@ -10,21 +10,30 @@ Run on the user's machine; CI runs only `check` and the tests:
   python tools/survey/validation.py disagreements  # the items the coders answered differently, to settle
   python tools/survey/validation.py reconcile      # the reconciled set, frozen once made
   python tools/survey/validation.py score          # the script against the reconciled set -> broad-validation.csv
-  python tools/survey/validation.py check          # broad-validation.csv's form (CI)
+  python tools/survey/validation.py recheck        # an earlier round re-scored on today's rules (local only)
+  python tools/survey/validation.py check          # every round's committed file, its form (CI)
+
+Each command takes `--round N` (default 1). Round 1 (19.16) drew 100 adverts by seed 20261113 and
+validated the rules as they stood; round 2 (19.17) draws 100 fresh adverts by seed 20261114, never
+an earlier round's or the AI test set's, after the revised rules are frozen, and is coded on the same
+frozen guide (version 1.1) with no pilot.
 
 Two coders, read-only agents of different model families, code each advert's cleaned text (the text
 `adverts.py measure` read, site furniture removed) with the guide, never seeing the script's answers
 or each other's. Their answers, the guide, the packets and the reconciled set stay in
-survey-raw-archive/role-survey-reading/work/validation/; the committed file holds counts only.
+survey-raw-archive/role-survey-reading/work/validation/ (round 2: validation-2/); the committed files
+hold counts only.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import hashlib
+import io
 import json
 import random
 import re
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
@@ -33,6 +42,18 @@ from pathlib import Path
 import adverts
 import roles
 
+HERE = Path(__file__).resolve().parent
+ROUNDS = {1: {"seed": 20261113, "folder": "validation", "first_id": 1, "pilot": True, "batches": 4,
+              "output": "broad-validation.csv"},
+          2: {"seed": 20261114, "folder": "validation-2", "first_id": 101, "pilot": False, "batches": 5,
+              "output": "broad-validation-2.csv"}}
+ROUND1_COMMIT = "d62f97e"          # the commit whose broad-adverts.csv round 1 was drawn from
+FROZEN_GUIDE = "6e31517863d07cac8b21875401d973ddb17a06f8dab4045ffa61425d786ad3de"   # guide 1.1, as reconciled
+RULE_FILES = ("adverts.py", "advert_set.py", "roles.py")
+STRATA = ("advert_id", "held_out", "org_id", "source", "system", "language")
+CHUNK = 1500                       # characters per piece of a long line in a packet
+
+ROUND = 1
 VALID = adverts.WORK / "validation"
 PACKETS = VALID / "packets"
 ANSWERS = VALID / "answers"
@@ -42,6 +63,15 @@ SEED = 20261113
 SAMPLE, FRENCH_MIN, ORG_MAX = 100, 20, 3
 BIG_SYSTEM, SYSTEM_FLOOR = 50, 3   # every system with 50 or more adverts has at least 3 in the sample
 PILOT, BATCHES = 10, 4
+
+
+def use_round(n: int) -> None:
+    """Point the commands at round `n`: its seed, folder and committed file."""
+    global ROUND, VALID, PACKETS, ANSWERS, OUTPUT, SEED
+    cfg = ROUNDS[n]
+    ROUND, SEED = n, cfg["seed"]
+    VALID = adverts.WORK / cfg["folder"]
+    PACKETS, ANSWERS, OUTPUT = VALID / "packets", VALID / "answers", roles.ROLES / cfg["output"]
 MIN_POSITIVES = 15
 TARGET_PRECISION, TARGET_RECALL, TARGET_YEARS = 0.9, 0.85, 0.9
 
@@ -111,16 +141,21 @@ def allocate(sizes: dict, total: int) -> dict:
     return q
 
 
-def quotas(pool: list[dict], n: int = SAMPLE, french: int = FRENCH_MIN) -> dict:
+def big_systems(rows: list[dict]) -> set[str]:
+    return {s for s, v in Counter(r["system"] for r in rows).items() if v >= BIG_SYSTEM}
+
+
+def quotas(pool: list[dict], n: int = SAMPLE, french: int = FRENCH_MIN, big: set[str] | None = None) -> dict:
     """Places per cell (source, system, French or not): French cells share at least `french` places,
     the rest the others, each group in proportion; then every system with BIG_SYSTEM adverts or more
-    is raised to SYSTEM_FLOOR places, taken from the largest cell of the same language group."""
+    (in the pool, or the systems `big` names) is raised to SYSTEM_FLOOR places, taken from the largest
+    cell of the same language group."""
     sizes = Counter(cell_of(r) for r in pool)
     n_fr = max(french, round(n * sum(v for c, v in sizes.items() if c[2]) / max(len(pool), 1)))
     q = allocate({c: v for c, v in sizes.items() if c[2]}, n_fr)
     q |= allocate({c: v for c, v in sizes.items() if not c[2]}, n - n_fr)
     per_system = Counter(r["system"] for r in pool)
-    big = {s for s, v in per_system.items() if v >= BIG_SYSTEM}
+    big = big_systems(pool) if big is None else big & set(per_system)
 
     def system_total(s):
         return sum(v for c, v in q.items() if c[1] == s)
@@ -139,14 +174,17 @@ def quotas(pool: list[dict], n: int = SAMPLE, french: int = FRENCH_MIN) -> dict:
 
 
 def draw_sample(rows: list[dict], exclude: set[str], seed: int = SEED, n: int = SAMPLE,
-                french: int = FRENCH_MIN, org_max: int = ORG_MAX) -> list[dict]:
-    """The validation sample: evidence adverts only (never the AI test set), stratified by source,
-    system and language through `quotas`, and by organisation within each cell (the organisation
-    with the fewest adverts drawn so far goes first), at most `org_max` per organisation. A cell that
-    cannot fill its places passes them to the largest cells of its language group."""
-    pool = sorted((r for r in rows if r["held_out"] == "false" and r["advert_id"] not in exclude),
-                  key=lambda r: r["advert_id"])
-    q = quotas(pool, n, french)
+                french: int = FRENCH_MIN, org_max: int = ORG_MAX, earlier: set[str] = frozenset()) -> list[dict]:
+    """The validation sample: evidence adverts only (never the AI test set, `exclude`, nor an earlier
+    round's, `earlier`), stratified by source, system and language through `quotas`, and by
+    organisation within each cell (the organisation with the fewest adverts drawn so far goes
+    first), at most `org_max` per organisation. A cell that cannot fill its places passes them to the
+    largest cells of its language group. The systems with a floor are those of the whole evidence,
+    so every round has the same strata."""
+    evidence = [r for r in rows if r["held_out"] == "false" and r["advert_id"] not in exclude]
+    big = big_systems(evidence)
+    pool = sorted((r for r in evidence if r["advert_id"] not in earlier), key=lambda r: r["advert_id"])
+    q = quotas(pool, n, french, big)
     rng = random.Random(seed)
     order = {}
     for c in sorted(q, key=str):
@@ -179,21 +217,23 @@ def draw_sample(rows: list[dict], exclude: set[str], seed: int = SEED, n: int = 
             k -= take(c, k)
         if k:
             raise SystemExit(f"draw: {k} places could not be filled within the caps")
-    per_system, drawn = Counter(r["system"] for r in pool), Counter(r["system"] for r in chosen)
-    short_systems = [s for s, v in per_system.items() if v >= BIG_SYSTEM and drawn[s] < SYSTEM_FLOOR]
+    drawn = Counter(r["system"] for r in chosen)
+    short_systems = [s for s in big if drawn[s] < SYSTEM_FLOOR]
     if short_systems:
         raise SystemExit(f"draw: the organisation cap left {sorted(short_systems)} under {SYSTEM_FLOOR} adverts")
     return chosen
 
 
-def draw_problems(chosen: list[dict], rows: list[dict], exclude: set[str]) -> list[str]:
-    """What a draw must hold (19.3 as the user approved it on 13 November 2026)."""
+def draw_problems(chosen: list[dict], rows: list[dict], exclude: set[str], earlier: set[str] = frozenset()) -> list[str]:
+    """What a draw must hold (19.3 as the user approved it on 13 November 2026; for round 2, 19.17)."""
     problems = []
     by_id = {r["advert_id"]: r for r in rows}
     if len(chosen) != SAMPLE or len({r["advert_id"] for r in chosen}) != SAMPLE:
         problems.append(f"{len(chosen)} adverts drawn, not {SAMPLE} distinct ones")
     if any(by_id.get(r["advert_id"], {}).get("held_out") != "false" or r["advert_id"] in exclude for r in chosen):
         problems.append("an advert of the AI test set, or not in the evidence, was drawn")
+    if any(r["advert_id"] in earlier for r in chosen):
+        problems.append("an advert of an earlier round was drawn")
     if sum(1 for r in chosen if r["language"] == "fr") < FRENCH_MIN:
         problems.append(f"fewer than {FRENCH_MIN} French adverts")
     if max(Counter(r["org_id"] for r in chosen).values(), default=0) > ORG_MAX:
@@ -211,14 +251,15 @@ def test_set_ids() -> set[str]:
     return set(json.loads(p.read_text(encoding="utf-8")).get("test", [])) if p.exists() else set()
 
 
-def codes_for(chosen: list[dict], seed: int = SEED) -> dict[str, dict]:
-    """Neutral ids (V001 to V100) in a shuffled order, so a packet cannot be matched to the committed
-    rows; the pilot first (PILOT adverts at as many organisations, at least 2 of them French), then
-    the rest in BATCHES batches."""
+def codes_for(chosen: list[dict], seed: int = SEED, first: int = 1, pilot_size: int = PILOT,
+              batches: int = BATCHES) -> dict[str, dict]:
+    """Neutral ids (V001 to V100 in round 1, V101 to V200 in round 2) in a shuffled order, so a packet
+    cannot be matched to the committed rows; a pilot first where the round has one (`pilot_size`
+    adverts at as many organisations, at least 2 of them French), then the rest in `batches` batches."""
     order = sorted(chosen, key=lambda r: r["advert_id"])
     random.Random(seed + 1).shuffle(order)
     pilot = []
-    for french, size in ((True, 2), (False, PILOT)):
+    for french, size in ((True, min(2, pilot_size)), (False, pilot_size)):
         for r in order:
             if len(pilot) >= size:
                 break
@@ -228,52 +269,95 @@ def codes_for(chosen: list[dict], seed: int = SEED) -> dict[str, dict]:
     rest = [r for r in order if r not in pilot]
     out = {}
     for i, r in enumerate(pilot + rest, 1):
-        batch = "pilot" if i <= len(pilot) else f"batch-{1 + (i - len(pilot) - 1) * BATCHES // len(rest)}"
-        out[f"V{i:03d}"] = {"advert_id": r["advert_id"], "batch": batch, "org_id": r["org_id"],
-                            "source": r["source"], "system": r["system"], "french": r["language"] == "fr"}
+        batch = "pilot" if i <= len(pilot) else f"batch-{1 + (i - len(pilot) - 1) * batches // len(rest)}"
+        out[f"V{first + i - 1:03d}"] = {"advert_id": r["advert_id"], "batch": batch, "org_id": r["org_id"],
+                                        "source": r["source"], "system": r["system"], "french": r["language"] == "fr"}
     return out
 
 
-def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str]) -> list[str]:
-    """A frozen draw must still be the one made: its seed, the broad file it was drawn from, and every
-    rule of the draw."""
+def strata_hash(rows: list[dict]) -> str:
+    """What a draw depends on in broad-adverts.csv: each advert's id, evidence status, organisation,
+    source, system and language. A rebuild that changes only measures keeps it."""
+    text = "\n".join("\t".join(r[k] for k in STRATA) for r in sorted(rows, key=lambda r: r["advert_id"]))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def rules_hashes() -> dict[str, str]:
+    return {name: sha256(HERE / name) for name in RULE_FILES}
+
+
+def round1_strata() -> tuple[str, str] | None:
+    """The strata of the broad file round 1 was drawn from, read from git at ROUND1_COMMIT."""
+    try:
+        blob = subprocess.run(["git", "show", f"{ROUND1_COMMIT}:docs/architecture/role-survey/broad-adverts.csv"],
+                              cwd=HERE, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return strata_hash(list(csv.DictReader(io.StringIO(blob.decode("utf-8"))))), hashlib.sha256(blob).hexdigest()
+
+
+def earlier_ids(n: int | None = None) -> set[str]:
+    """The adverts drawn by every round before round `n` (default: the current one)."""
+    out = set()
+    for k in range(1, (ROUND if n is None else n)):
+        p = adverts.WORK / ROUNDS[k]["folder"] / "draw.json"
+        if not p.exists():
+            raise SystemExit(f"round {k}'s draw is missing, so round {n or ROUND} cannot leave it out")
+        out |= {c["advert_id"] for c in json.loads(p.read_text(encoding="utf-8"))["codes"].values()}
+    return out
+
+
+def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str], earlier: set[str] = frozenset()) -> list[str]:
+    """A frozen draw must still be the one made: its seed, its neutral ids, every rule of the draw,
+    the strata of the broad file it was drawn from, and (where recorded) the rules it was drawn
+    under, so the revised rules cannot change after a round is drawn."""
     by_id = {r["advert_id"]: r for r in rows}
     codes = saved.get("codes", {})
     missing = [c["advert_id"] for c in codes.values() if c["advert_id"] not in by_id]
     chosen = [by_id[c["advert_id"]] for c in codes.values() if c["advert_id"] in by_id]
-    problems = draw_problems(chosen, rows, exclude)
+    problems = draw_problems(chosen, rows, exclude, earlier)
     if missing:
         problems.append(f"{len(missing)} drawn adverts are not in broad-adverts.csv")
     if saved.get("seed") != SEED:
         problems.append(f"the draw's seed {saved.get('seed')} is not {SEED}")
-    if saved.get("drawn_from") != sha256(roles.ROLES / "broad-adverts.csv"):
-        problems.append("broad-adverts.csv has changed since the draw was made")
-    if sorted(codes) != [f"V{i:03d}" for i in range(1, SAMPLE + 1)]:
-        problems.append("the neutral ids are not V001 to V100")
+    if "strata" in saved:
+        if saved["strata"] != strata_hash(rows):
+            problems.append("broad-adverts.csv has changed since the draw was made (its adverts or strata)")
+    elif saved.get("drawn_from") != sha256(roles.ROLES / "broad-adverts.csv"):
+        old = round1_strata()           # round 1 recorded the whole file: compare its strata through git
+        if not old or old[1] != saved.get("drawn_from") or old[0] != strata_hash(rows):
+            problems.append("broad-adverts.csv has changed since the draw was made")
+    if "rules" in saved and saved["rules"] != rules_hashes():
+        problems.append("the rules (" + ", ".join(RULE_FILES) + ") have changed since the draw was made")
+    first = ROUNDS[ROUND]["first_id"]
+    if sorted(codes) != [f"V{i:03d}" for i in range(first, first + SAMPLE)]:
+        problems.append(f"the neutral ids are not V{first:03d} to V{first + SAMPLE - 1:03d}")
     return problems
 
 
 def draw(_args=None) -> int:
     rows = read_rows(roles.ROLES / "broad-adverts.csv")
-    exclude = test_set_ids()
+    exclude, earlier = test_set_ids(), earlier_ids()
     path = VALID / "draw.json"
     if path.exists():
         saved = json.loads(path.read_text(encoding="utf-8"))
-        problems = saved_draw_problems(saved, rows, exclude)
+        problems = saved_draw_problems(saved, rows, exclude, earlier)
         print(f"draw: frozen since {saved['made_at']}, kept as it is; {len(problems)} problems")
         for p in problems:
             print(p)
         return 1 if problems else 0
-    chosen = draw_sample(rows, exclude)
-    problems = draw_problems(chosen, rows, exclude)
+    chosen = draw_sample(rows, exclude, seed=SEED, earlier=earlier)
+    problems = draw_problems(chosen, rows, exclude, earlier)
     if problems:
         for p in problems:
             print(p)
         return 1
     VALID.mkdir(parents=True, exist_ok=True)
-    codes = codes_for(chosen)
-    path.write_text(json.dumps({"made_at": utc_now(), "seed": SEED, "drawn_from": sha256(roles.ROLES / "broad-adverts.csv"),
-                                "codes": codes}, indent=1), encoding="utf-8")
+    cfg = ROUNDS[ROUND]
+    codes = codes_for(chosen, SEED, cfg["first_id"], PILOT if cfg["pilot"] else 0, cfg["batches"])
+    path.write_text(json.dumps({"made_at": utc_now(), "round": ROUND, "seed": SEED,
+                                "drawn_from": sha256(roles.ROLES / "broad-adverts.csv"), "strata": strata_hash(rows),
+                                "rules": rules_hashes(), "codes": codes}, indent=1), encoding="utf-8")
     print(f"draw: {len(codes)} adverts at {len({c['org_id'] for c in codes.values()})} organisations; "
           f"French {sum(c['french'] for c in codes.values())}; by source {dict(Counter(c['source'] for c in codes.values()))}; "
           f"by system {dict(Counter(c['system'] for c in codes.values()))}")
@@ -281,9 +365,10 @@ def draw(_args=None) -> int:
 
 
 def load_draw() -> dict[str, dict]:
-    """The frozen draw, refused unless it still holds every rule and was drawn from today's file."""
+    """The frozen draw, refused unless it still holds every rule and was drawn from today's adverts
+    (and, for a round that recorded them, under today's rules)."""
     saved = json.loads((VALID / "draw.json").read_text(encoding="utf-8"))
-    problems = saved_draw_problems(saved, read_rows(roles.ROLES / "broad-adverts.csv"), test_set_ids())
+    problems = saved_draw_problems(saved, read_rows(roles.ROLES / "broad-adverts.csv"), test_set_ids(), earlier_ids())
     if problems:
         raise SystemExit("the frozen draw is refused: " + "; ".join(problems))
     return saved["codes"]
@@ -327,17 +412,32 @@ def board_bodies() -> dict[str, Path]:
     return out
 
 
-def packet_text(vid: str, ad: dict, posting: str) -> tuple[str, int]:
+def pieces(text: str, size: int = CHUNK) -> list[str]:
+    """A long line cut at spaces into pieces of at most about `size` characters."""
+    out, rest = [], text
+    while len(rest) > size:
+        cut = rest.rfind(" ", 0, size)
+        cut = cut if cut > size // 2 else size
+        out.append(rest[:cut].rstrip())
+        rest = rest[cut:].lstrip()
+    return out + [rest]
+
+
+def packet_text(vid: str, ad: dict, posting: str, chunk: int | None = None) -> tuple[str, int]:
     """One advert as the coders read it: its title, the job-posting data's values where the page had
     them, and its lines, numbered, '#' marking the page's main heading and '##' a line the page
-    formats as a heading."""
+    formats as a heading. With `chunk` (round 2), a line longer than that is given in pieces, each
+    after the first marked "N (continued)", so line numbers stay the advert's own: very long lines
+    stalled coders in round 1."""
     out = [f"=== {vid} ===", f"Title: {ad.get('title') or '(none found)'}"]
     if ad.get("method") == "jsonld":
         out.append(f"Job-posting data on the page: {posting or 'not readable'}")
     out.append("Lines:")
     for i, ln in enumerate(ad["lines"], 1):
         mark = "# " if ln.get("tag") == "h1" else "## " if ln.get("heading") else ""
-        out.append(f"{i} {mark}{ln['text']}")
+        parts = pieces(ln["text"], chunk) if chunk else [ln["text"]]
+        out.append(f"{i} {mark}{parts[0]}")
+        out += [f"{i} (continued) {p}" for p in parts[1:]]
     return "\n".join(out) + "\n", len(ad["lines"])
 
 
@@ -354,7 +454,7 @@ def packets(_args=None) -> int:
     for vid in sorted(codes):
         ad = measured[codes[vid]["advert_id"]]
         posting = posting_values(raw_html(ad, saved, boards)) if ad.get("method") == "jsonld" else ""
-        text, n = packet_text(vid, ad, posting)
+        text, n = packet_text(vid, ad, posting, None if ROUNDS[ROUND]["pilot"] else CHUNK)
         texts[codes[vid]["batch"]].append(text)
         index[vid] = {"batch": codes[vid]["batch"], "lines": n}
     for batch, parts in texts.items():
@@ -373,8 +473,22 @@ def guide_problems(text: str) -> list[str]:
     return [f"the guide does not define `{i}`" for i in dict.fromkeys(ids) if f"`{i}`" not in text]
 
 
+def frozen_guide_problems() -> list[str]:
+    """After round 1, every round is coded on guide 1.1 unchanged, the version round 1 reconciled."""
+    if ROUND == 1:
+        return []
+    path = VALID / "guide.md"
+    if not path.exists() or sha256(path) != FROZEN_GUIDE:
+        return [f"round {ROUND}'s guide.md is not guide 1.1 as frozen ({FROZEN_GUIDE[:12]}…)"]
+    return []
+
+
 def guide(_args=None) -> int:
-    problems = guide_problems((VALID / "guide.md").read_text(encoding="utf-8"))
+    if not (VALID / "guide.md").exists():
+        print(f"guide: {VALID / 'guide.md'} is missing")
+        return 1
+    problems = frozen_guide_problems()
+    problems += guide_problems((VALID / "guide.md").read_text(encoding="utf-8"))
     for p in problems:
         print(p)
     print(f"guide: {len(problems)} problems")
@@ -686,6 +800,7 @@ def reconcile(_args=None) -> int:
     if single:
         print(f"reconcile: {single} coded by one coder only; every item of theirs takes a decision")
     items, problems = reconciled_items(a, b, ids, read_rows(VALID / "disagreements.csv"))
+    problems = frozen_guide_problems() + problems
     for p in problems[:30]:
         print(p)
     if problems:
@@ -803,6 +918,20 @@ def error_rows(ids: list[str], script: list[dict], truth: list[dict], codes: dic
 
 
 def score(_args=None) -> int:
+    return score_to(OUTPUT, VALID / "errors.csv")
+
+
+def recheck(_args=None) -> int:
+    """An earlier round re-scored on today's rules, written locally beside its reconciled set and
+    never over its committed file: round 1's adverts are where the error patterns were found, so
+    this is a check of the revised rules, not a test of them (19.17)."""
+    if ROUND == max(ROUNDS):
+        print("recheck: only an earlier round is rechecked; the latest round is scored")
+        return 1
+    return score_to(VALID / "recheck.csv", VALID / "errors-recheck.csv", local=True)
+
+
+def score_to(output: Path, errors: Path, local: bool = False) -> int:
     path, seal = VALID / "reconciled.json", VALID / "reconciled.sha256"
     if not path.exists() or not seal.exists() or seal.read_text(encoding="utf-8").strip() != sha256(path):
         print("score: the reconciled set is not frozen with a matching seal; nothing scored")
@@ -819,9 +948,9 @@ def score(_args=None) -> int:
     a, b = coder_answers("a"), coder_answers("b")
     _pilot, main = pilot_and_main(codes)
     out = score_rows(script, truth, agreement_table([i for i in main if i in a and i in b], a, b))
-    adverts.write_dicts(OUTPUT, FIELDS, out)
-    adverts.write_local(VALID / "errors.csv", ["id", "advert_id", "measure", "script", "reconciled",
-                                               "reconciled_detail"], error_rows(ids, script, truth, codes))
+    (adverts.write_local if local else adverts.write_dicts)(output, FIELDS, out)
+    adverts.write_local(errors, ["id", "advert_id", "measure", "script", "reconciled", "reconciled_detail"],
+                        error_rows(ids, script, truth, codes))
     print(f"score: {dict(Counter(r['result'] for r in out))}")
     for r in out:
         print(f"{r['measure']:40} pos {r['positive_cases']:>3} script {r['script_positives']:>3} "
@@ -872,8 +1001,10 @@ def check_problems(path: Path) -> list[str]:
     return problems
 
 
-def check(_args=None, path: Path = OUTPUT) -> int:
-    problems = check_problems(path) if path.exists() else [f"{path.name} is missing"]
+def check(_args=None, path: Path | None = None) -> int:
+    """The committed file of every round (or only `path`): each must exist and pass its form."""
+    paths = [path] if path else [roles.ROLES / cfg["output"] for cfg in ROUNDS.values()]
+    problems = [q for p in paths for q in (check_problems(p) if p.exists() else [f"{p.name} is missing"])]
     for p in problems[:50]:
         print(p)
     print(f"check: {len(problems)} problems")
@@ -882,15 +1013,17 @@ def check(_args=None, path: Path = OUTPUT) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--round", type=int, default=1, choices=sorted(ROUNDS))
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name, func in (("draw", draw), ("packets", packets), ("guide", guide), ("agreement", agreement),
                        ("disagreements", disagreements), ("reconcile", reconcile), ("score", score),
-                       ("check", check)):
+                       ("recheck", recheck), ("check", check)):
         sub.add_parser(name).set_defaults(func=func)
     p = sub.add_parser("answers")
     p.add_argument("files", nargs="+")
     p.set_defaults(func=answers)
     args = parser.parse_args()
+    use_round(args.round)
     return args.func(args)
 
 

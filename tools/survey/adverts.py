@@ -43,6 +43,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
+import advert_set
 import roles
 from careers import read_csv, site_host, system_of
 
@@ -1098,13 +1099,19 @@ def _text(v) -> str:
 
 
 def posting_facts(p: dict) -> dict:
-    """The facts a JobPosting states, as flags (never its text)."""
+    """The facts a JobPosting states, as flags, and its employment type's value (kept locally only),
+    read by the coding guide's table (`employment_facts`). A closing date's time counts unless it
+    is 00:00, which systems add by default, and only with its offset."""
     sal = p.get("baseSalary") or p.get("estimatedSalary")
     loc = p.get("jobLocation") or p.get("applicantLocationRequirements")
+    until = re.search(r"T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})\b",
+                      re.sub(r"\s+", " ", _text(p.get("validThrough"))).strip() + " ")
     return {"title": bool(p.get("title")), "date_posted": bool(p.get("datePosted")),
             "closing_date": bool(p.get("validThrough")), "organisation": bool(p.get("hiringOrganization")),
             "place": bool(loc) or "TELECOMMUTE" in str(p.get("jobLocationType", "")).upper(),
             "employment_type": bool(p.get("employmentType")),
+            "employment_type_text": scrub(re.sub(r"\s+", " ", _text(p.get("employmentType"))).strip())[:80],
+            "closing_time": bool(until) and until.group(1, 2) != ("00", "00"),
             "pay": bool(sal) and bool(re.search(r"\d", _text(sal)))}
 
 
@@ -1471,24 +1478,139 @@ def section_type(heading: str) -> str:
     return "unclassified"
 
 
-def sections_of(lines: list[dict]) -> list[dict]:
+LABEL_LINE = re.compile(r"^\s*([^\W\d_][^:\n]{0,79}?)\s*(?::|\s[–—-]\s)\s*(\S.*)$")
+INLINE_LABEL = re.compile(r"(?:^|(?<=[.!?;:])\s+)([^\W\d_][^.!?:;\n]{1,60}?)\s*:\s+(?=\S)")
+LABEL_SENTENCE = 8      # words after a label that make it a heading rather than a one-value line
+SINGLE_LINE = 150       # words in the long line of an advert whose text comes as one to three lines
+SMALL_WORDS = {"of", "the", "and", "to", "for", "in", "on", "a", "an", "with", "at", "our", "your", "de", "du", "des",
+               "la", "le", "les", "et", "à", "au", "aux", "en", "pour", "vos", "votre", "d", "l"}
+FACT_LABEL = re.compile(r"^(?:job (?:title|id|type|category|family|reference)|position(?: title)?|title|grade|level|"
+                        r"band|location|duty station|country|city|region|department|division|unit|contract(?: type| "
+                        r"duration| length)?|type of contract|duration|hours|working hours|start date|closing date|"
+                        r"deadline|salary|reference|ref|requisition|vacancy (?:no|number|id)|posting date|reports? to|"
+                        r"lieu|type de contrat|dur[ée]e|date de (?:d[ée]but|cl[ôo]ture)|salaire|date limite)\b",
+                        re.IGNORECASE)
+
+
+def label_kind(label: str) -> str:
+    return section_type(label) if 1 <= words_of(label) <= 8 else "unclassified"
+
+
+def value_line(text: str) -> bool:
+    """A line giving one job fact ("Location: Goma"), which is not a heading (the coding guide)."""
+    m = LABEL_LINE.match(text)
+    return bool(m) and words_of(m.group(2)) <= 12 and bool(FACT_LABEL.match(m.group(1).strip()))
+
+
+def unmarked_heading(ln: dict, nxt: str) -> bool:
+    """A heading the page does not format as one: a short line in title case (five words or fewer,
+    no closing punctuation, not a list item or table cell) whose words name a section type, with
+    text after it."""
+    t = ln["text"].strip()
+    if ln["tag"] in ("li", "td", "dd") or not 1 <= words_of(t) <= 5 or re.search(r"[.,;!?]$", t) or ":" in t:
+        return False
+    words = re.findall(r"[^\W\d_][\w'’-]*", t)
+    if not words or not words[0][0].isupper() or not all(w[0].isupper() or w.lower() in SMALL_WORDS for w in words):
+        return False
+    return section_type(t) not in ("unclassified", "header_facts") and words_of(nxt) >= 3
+
+
+def is_section_h1(text: str, title: str) -> bool:
+    """A main heading about the employer, the programme or the team ("About us"), not the job's
+    title: a page may set such a heading as its main one."""
+    t, ti = text.strip().lower(), (title or "").strip().lower()
+    if not t or words_of(t) > 12 or (ti and (t in ti or ti in t)) or roles.classify(text).function:
+        return False
+    return section_type(text) in ("about_organisation", "context", "working_relationships")
+
+
+def inline_sections(text: str) -> list[tuple[str, str, str]]:
+    """The single line of a one-line advert cut at the headings it carries ("Responsibilities: …"),
+    as (section type or '', heading, text); a label with less than a sentence after it stays text."""
+    cuts = []
+    for m in INLINE_LABEL.finditer(text):
+        label = m.group(1).strip()
+        if label[:1].isupper() and label_kind(label) not in ("unclassified", "header_facts"):
+            cuts.append((m.start(1), m.end(), label_kind(label), label))
+    out, pos, kind, label = [], 0, "", ""
+    for start, end, k, lab in cuts + [(len(text), len(text), "", "")]:
+        nxt_start = next((c[0] for c in cuts if c[0] > start), len(text))
+        if k and words_of(text[end:nxt_start]) < LABEL_SENTENCE:
+            continue
+        out.append((kind, label, text[pos:start].strip()))
+        pos, kind, label = end, k, lab
+    return [o for o in out if o[0] or o[2]]
+
+
+def sections_of(lines: list[dict], title: str = "") -> list[dict]:
     """The advert's sections, in order: each recognised heading starts one; an unrecognised heading
     inside a section is read as its sub-heading; text before the first heading is the preamble.
-    Words per section."""
+    Words per section. Headings the page does not format are found as the coding guide defines them
+    (its part 1): a short title-case line naming a section type, followed by its text; a label
+    opening a line with a sentence after it; a main heading naming a section type that is not the
+    job's title; the headings inside the single line of a one-line advert; and, before any heading,
+    a run of two or more job-fact value lines, which is the header facts."""
     out = [{"type": "preamble", "heading": "", "lines": []}]
-    for ln in lines:
-        if ln["heading"] and words_of(ln["text"]) <= 12 and ln["tag"] != "h1" and re.search(r"[^\W\d_]", ln["text"]):
-            kind = section_type(ln["text"])
+
+    def start(kind: str, heading: str):
+        out.append({"type": kind, "heading": heading, "lines": []})
+
+    single = len(lines) <= 3
+    for i, ln in enumerate(lines):
+        text = ln["text"]
+        nxt = lines[i + 1]["text"] if i + 1 < len(lines) else ""
+        if ln["tag"] == "h1":
+            if is_section_h1(text, title):
+                start(section_type(text), text)
+            continue
+        if ln["heading"] and words_of(text) <= 12 and re.search(r"[^\W\d_]", text):
+            kind = section_type(text)
             if kind == "unclassified" and out[-1]["type"] != "preamble":
-                out[-1]["lines"].append(ln["text"])
+                out[-1]["lines"].append(text)
                 continue
-            out.append({"type": kind, "heading": ln["text"], "lines": []})
-        elif ln["tag"] != "h1":
-            out[-1]["lines"].append(ln["text"])
+            start(kind, text)
+            continue
+        if unmarked_heading(ln, nxt):
+            start(section_type(text), text)
+            continue
+        if single and words_of(text) >= SINGLE_LINE:
+            for kind, label, chunk in inline_sections(text):
+                if kind:
+                    start(kind, label)
+                if chunk:
+                    out[-1]["lines"].append(chunk)
+            continue
+        m = LABEL_LINE.match(text)
+        if m:
+            kind = label_kind(m.group(1))
+            if kind not in ("unclassified", "header_facts") and words_of(m.group(2)) >= LABEL_SENTENCE:
+                start(kind, m.group(1).strip())
+                out[-1]["lines"].append(m.group(2))
+                continue
+            if out[-1]["type"] == "preamble" and value_line(text) and value_line(nxt):
+                start("header_facts", "")
+        out[-1]["lines"].append(text)
     for s in out:
         s["words"] = sum(words_of(t) for t in s["lines"])
     return [s for s in out if s["words"] or s["type"] != "preamble"]
 
+
+MONTHS = (r"(?:jan(?:uary|vier)?|feb(?:ruary)?|f[ée]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|june?|juin|"
+          r"july?|juil(?:let)?|aug(?:ust)?|ao[ûu]t|sept?(?:ember|embre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|"
+          r"dec(?:ember)?|d[ée]c(?:embre)?)(?![a-zé])\.?")
+# A calendar date: "30 November 2026", "November 30, 2026", "30/11/2026", "2026-11-30".
+DATE = (r"(?:\d{1,2}(?:st|nd|rd|th|er)?\s*(?:of\s+)?" + MONTHS + r"(?:,?\s*\d{4})?|" + MONTHS +
+        r"\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})")
+ZONES = r"(?:gmt|utc|cet|cest|eat|wat|cat|bst|est|edt|pst|ist|eet|eest|sast)"
+LANG = (r"(?:english|french|arabic|spanish|portuguese|swahili|kiswahili|hausa|amharic|somali|russian|chinese|mandarin|"
+        r"hindi|urdu|bengali|bangla|dari|pashto|farsi|persian|ukrainian|turkish|german|italian|dutch|burmese|tigrinya|"
+        r"oromo|lingala|kinyarwanda|kirundi|sango|wolof|bambara|fula(?:ni)?|yoruba|igbo|tagalog|indonesian|thai|"
+        r"nepali|sinhala|tamil|anglais|fran[çc]ais|arabe|espagnol|portugais|allemand|russe|italien)")
+NUMW = r"(?:\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)"
+ROLE_PLURALS = (r"officers|assistants|coordinators|managers|drivers|team leaders|technicians|supervisors|accountants|"
+                r"engineers|advisers|advisors|nurses|teachers|agents|enumerators|interns|specialists|analysts|"
+                r"facilitators|clerks|guards|cleaners|storekeepers|logisticians|volunteers")
+STAFF_ROLES = "(?:" + ROLE_PLURALS + ")"
 
 FACTS: dict[str, re.Pattern] = {
     # Pay as section 5 asks: a figure or range with its currency, a salary word next to a figure, or a
@@ -1510,44 +1632,86 @@ FACTS: dict[str, re.Pattern] = {
                             r"\bsalaire (?:attractif|comp[ée]titif|selon)\b", re.IGNORECASE),
     "grade": re.compile(r"\b(?:grade|band|level|cat[ée]gorie|groupe)\s*:?\s*[A-Z]{0,3}-?\d|\b(?:P|D|G|GS|NO)-\s?[1-7A-E]\b|"
                         r"\bNO[A-E]\b|\b(?:SB|SC|ICS|LICA|IICA|NPSA|IPSA)-?\d", re.IGNORECASE),
+    # The type must be named (the coding guide): a bare "contrat" or a "contract type" label does not
+    # name one; "stage" is the French internship, "volunteer" a voluntary post, not working with volunteers.
     "contract_type": re.compile(r"\bfixed[- ]term\b|\bpermanent\b|\btemporary\b|\bconsultan(?:cy|t)\b|\bindividual "
-                                r"contract|\bcdd\b|\bcdi\b|\bcontrat\b|\bcontract type\b|\btype of contract\b|"
-                                r"\bfreelance\b|\binternship\b|\bstage\b|\bvolunteer\b|\bcasual\b|\bservice "
-                                r"contract\b|\btemporary appointment\b|\bcontinuing appointment\b", re.IGNORECASE),
+                                r"contract|\bcdd\b|\bcdi\b|\bcontrat (?:[àa] dur[ée]e|de travail|d'engagement|de "
+                                r"prestation|de service|local|de consultan)|\bfreelance\b|\binternship\b|"
+                                r"\b(?:un|de|du|en|offre de|convention de|contrat de) stage\b|\bstage (?:de|d'|r[ée]mun[ée]r)|"
+                                r"\bvolunteer (?:position|role|post|opportunity|assignment|placement|basis|contract)\b|"
+                                r"\b(?:unpaid|voluntary) (?:position|role|post)\b|\bcasual\b|\bservice "
+                                r"contract\b|\btemporary appointment\b|\bcontinuing appointment\b|\bsecondment\b|"
+                                r"\bopen[- ]ended\b", re.IGNORECASE),
     "contract_length": re.compile(r"\b(?:contract|duration|period|assignment|appointment|position|post|dur[ée]e|"
                                   r"contrat|mission|consultancy|engagement)\b[^.\n]{0,40}?\b\d{1,3}\s*(?:-|to|à)?\s*"
                                   r"\d{0,3}\s*(?:months?|mois|years?|ans|weeks?|semaines|working days|days|jours)\b|"
                                   r"\b\d{1,2}[- ](?:month|year|mois)s?\b[^.\n]{0,12}\b(?:fixed[- ]term|contract|"
                                   r"assignment|contrat|cdd|appointment)\b|\b(?:duration|dur[ée]e)\s*(?:of (?:the )?"
                                   r"(?:contract|assignment))?\s*:|\buntil \w+ \d{4}\b|\bend date\b|\bone[- ]year "
-                                  r"(?:contract|fixed|appointment)\b", re.IGNORECASE),
+                                  r"(?:contract|fixed|appointment)\b|"
+                                  # an end date written out: "until 31 March 2027", "from 1 May 2026 to 30 April 2027"
+                                  r"\b(?:until|till|through|jusqu'(?:au|[àa]))\s+(?:the\s+)?(?:\d{1,2}(?:st|nd|rd|th|er)?\s+" +
+                                  MONTHS + r"\s+\d{4}|\d{1,2}[/.]\d{1,2}[/.]\d{2,4})|\b(?:from\s+)?\d{1,2}(?:st|nd|rd|th)?\s+" +
+                                  MONTHS + r"\s+\d{4}\s*(?:-|–|to|until|au)\s*\d{1,2}(?:st|nd|rd|th)?\s+" + MONTHS +
+                                  r"\s+\d{4}\b|\bend(?:s|ing)?\s+(?:on|in)\s+(?:\d{1,2}\s+)?" + MONTHS + r"\s+\d{4}",
+                                  re.IGNORECASE),
     "hours": re.compile(r"\bfull[- ]time\b|\bpart[- ]time\b|\b\d{1,2}(?:\.\d)?\s*(?:hours|hrs|h)\s*(?:per|a|/)\s*"
                         r"week|\btemps (?:plein|partiel)\b|\b\d{2,3}\s?%\s*(?:fte|time|temps|of full[- ]time)\b|"
                         r"\bfte\b|\blevel of effort\b|(?<!outside )(?<!outside of )\bworking hours\b|"
                         r"\bheures (?:par|hebdomadaires)\b", re.IGNORECASE),
     "duty_station": re.compile(r"\bduty station\b|\blocation\s*:|(?<![\w-])based in\b|\blieu d'affectation\b|"
-                               r"\blieu de (?:travail|mission)\b|\blieu\s*:|(?<![\w-])based? (?:at|in)\b|\bplace of "
-                               r"(?:work|assignment|performance)\b|\boffice location\b|\blocalisation\s*:|"
-                               r"\bposte bas[ée]\b|\blocation of (?:the )?(?:post|position|assignment)\b", re.IGNORECASE),
+                               r"\blieu de (?:travail|mission|poste)\b|\blieu\s*:|(?<![\w-])based? (?:at|in|out of)\b|"
+                               r"\bplace of (?:work|assignment|performance|employment)\b|\b(?:office|duty|work|job|"
+                               r"working) location\b|\blocalisation\s*:|\bposte (?:bas[ée]|situ[ée])\b|\blocation of "
+                               r"(?:the )?(?:post|position|assignment|work|job)\b|\b(?:position|post|role|job) (?:is )?"
+                               r"(?:located|based)\b|\blocated in\b", re.IGNORECASE),
     "remote": re.compile(r"\bremote\b|\bhome[- ]based\b|\bwork from home\b|\bhybrid\b|\bt[ée]l[ée]travail\b|"
                          r"\bflexible (?:location|working)\b|\bteleworking\b", re.IGNORECASE),
-    "travel": re.compile(r"\btravel\b[^.\n]{0,40}\d{1,3}\s?%|\d{1,3}\s?%[^.\n]{0,30}\btravel|\bfrequent travel\b|"
-                         r"\btravel (?:to|within|required|up to)\b|\bd[ée]placements?\b|\broving\b|\bfield visits\b|"
-                         r"\bmissions? (?:fr[ée]quentes|sur le terrain)\b", re.IGNORECASE),
-    "reports_to": re.compile(r"\breport(?:s|ing)? (?:directly )?to\b|\bline manager\b|\bsupervisor\b|\bunder the "
-                             r"(?:direct |overall )?supervision\b|\bsous la (?:responsabilit[ée]|supervision)\b|"
-                             r"\brattach[ée]\b|\bsup[ée]rieur hi[ée]rarchique\b", re.IGNORECASE),
-    "direct_reports": re.compile(r"\b(?:supervis(?:e|es|ing)|line[- ]manag(?:e|es|ing)|manag(?:e|es|ing)) (?:a team "
-                                 r"of )?\d+|\bdirect reports?\b|\bteam of \d+|\bsupervises?\b|\bencadr(?:e|ement)\b|"
-                                 r"\bline management\b", re.IGNORECASE),
-    "budget": re.compile(r"\bbudget of\b|\bbudget\b[^.\n]{0,30}(?:\d[\d,.]*\s?(?:million|m\b|k\b)|usd|eur|\$|€|£)|"
-                         r"(?:usd|eur|\$|€|£)\s?\d[\d,.]*\s?(?:million|m\b)|\bportfolio of\b", re.IGNORECASE),
-    "closing_date": re.compile(r"\bclosing date\b|\bdeadline\b|\bdate limite\b|\bapply by\b|\bapplications? "
-                               r"(?:close|must be received|will close)\b|\bclosing\b|\bcl[ôo]ture\b|\bexpiry date\b|"
-                               r"\bopen until\b|\bavant le \d", re.IGNORECASE),
-    "closing_time": re.compile(r"\b\d{1,2}[:.h]\d{2}\s*(?:am|pm|h)?\s*(?:\(?\s*(?:gmt|utc|cet|cest|eat|wat|cat|"
-                               r"bst|est|edt|pst|ist|eet|heure)[^)]{0,12}\)?)|\bmidnight\b[^.\n]{0,20}(?:gmt|utc|cet|"
-                               r"eat|time)|\b(?:gmt|utc)\s?[+-]\s?\d", re.IGNORECASE),
+    # Travel with how much or where; field missions and visits to other sites count (the coding
+    # guide); "travel required" alone is vague.
+    "travel": re.compile(r"\btravel\b[^.\n]{0,40}\d{1,3}\s?%|\d{1,3}\s?%[^.\n]{0,30}\btravel|\b(?:frequent|occasional|"
+                         r"regular|extensive|international|domestic|minimal|no) travel\b|\btravel (?:to|within|up to|"
+                         r"across|between|around)\b|\bd[ée]placements?\b|\broving\b|\bfield (?:visits?|missions?|"
+                         r"trips?|work|deployments?)\b|\bfieldwork\b|\bmissions? (?:fr[ée]quentes|sur le terrain|de "
+                         r"terrain|to the field|in the field)\b|\bsite visits?\b|\bvisits? to (?:the )?(?:field|"
+                         r"projects?|programmes?|partners?|sites?|communities)\b", re.IGNORECASE),
+    # The post the job reports to, named; "reports to the line manager" or "a supervisor" alone is
+    # vague (`fact_counts` reads who follows).
+    "reports_to": re.compile(r"\breport(?:s|ing)?(?: directly)? to\b|\breporting line\s*:|\b(?:line manager|supervisor)"
+                             r"\s*:|\bunder the (?:direct |overall |general )?(?:supervision|guidance|leadership|"
+                             r"authority) of\b|\bsous la (?:responsabilit[ée]|supervision|direction|autorit[ée]) "
+                             r"(?:du|de la|de l'|de|des)\b|\brattach[ée]e? (?:au|[àa] la|[àa] l'|[àa])\b|"
+                             r"\b(?:sup[ée]rieur|responsable) hi[ée]rarchique\s*:", re.IGNORECASE),
+    # Whom or how many the job manages: a number or the roles; "supervises staff" or "line
+    # management responsibilities" alone is vague.
+    "direct_reports": re.compile(r"\b(?:supervis|line[- ]manag|manag|lead|oversee|encadr)\w*\s+(?:a team of\s+|a "
+                                 r"staff of\s+|the\s+)?(?:up to\s+)?" + NUMW + r"\b(?:\s*(?:-|to)\s*" + NUMW + r")?\s+"
+                                 r"(?:[\w-]+\s+){0,2}(?:staff|people|persons|personnel|employees|members|direct reports|"
+                                 r"team members|colleagues|" + ROLE_PLURALS + r")\b|\ba team of\s+(?:up to\s+)?" +
+                                 NUMW + r"\b|\b" + NUMW + r"\s+direct reports?\b|\bno direct reports?\b|\bdirect "
+                                 r"reports?\s*:\s*\S|\b(?:supervises|manages|line[- ]manages|oversees|leads)\s+(?:the\s+|"
+                                 r"a\s+|all\s+|" + NUMW + r"\s+)?(?:[\w-]+\s+){0,3}" + STAFF_ROLES + r"\b|\b[ée]quipe "
+                                 r"de\s+\d+|\bencadr\w*\s+(?:une [ée]quipe de\s+)?\d+", re.IGNORECASE),
+    # A budget or portfolio the job manages, with a figure ("portfolio of" alone is not one); the
+    # employer's own figures are left out by `facts_given`.
+    "budget": re.compile(r"\bbudgets? of\s+(?:about |around |over |more than |up to |approximately |some )?(?:usd|"
+                         r"us\$|eur|chf|gbp|\$|€|£)?\s?\d|\bbudget\b[^.\n]{0,30}(?:\d[\d,.]*\s?(?:million|m\b|k\b|bn\b|"
+                         r"billion)|(?:usd|eur|chf|gbp|\$|€|£)\s?\d)|(?:usd|eur|chf|gbp|\$|€|£)\s?\d[\d,.]*\s?(?:million|"
+                         r"m\b|k\b|bn\b)[^.\n]{0,30}\b(?:budget|portfolio|grants?)\b|\bportfolio\b[^.\n]{0,25}(?:(?:usd|"
+                         r"eur|chf|gbp|\$|€|£)\s?\d|\d[\d,.]*\s?(?:million|m\b|bn\b))", re.IGNORECASE),
+    # A calendar date for applications; "open until filled" or "rolling basis" is vague.
+    "closing_date": re.compile(r"\b(?:closing date|closing|deadline|date limite|apply by|apply before|applications? "
+                               r"(?:close|closes|must be received|will close|should (?:be )?(?:submitted|sent|received)|"
+                               r"are due|by)|cl[ôo]ture|expiry date|expires?|open until|accepted until|au plus tard "
+                               r"le|avant le|before|no later than)\b(?:[^.\n]{0,40}?|[^.\n]{0,15}\n\s*)" + DATE,
+                               re.IGNORECASE),
+    # A time of day with its zone, a city's local time included ("23 h 59 (Fiji time)").
+    "closing_time": re.compile(r"(?i:\b\d{1,2}\s?[:.h]\s?\d{2}\s*(?:am|pm|h|hrs)?\s*\(?\s*(?:" + ZONES + r"|heure)\b|"
+                               r"\b\d{1,2}\s?(?:am|pm)\s*\(?\s*" + ZONES + r"\b|\b(?:midnight|minuit|noon|midi)\b"
+                               r"[^.\n]{0,20}(?:" + ZONES + r"\b|time\b)|\b(?:gmt|utc)\s?[+-]\s?\d)|"
+                               r"(?i:\b(?:\d{1,2}\s?[:.h]\s?\d{2}|\d{1,2}\s?(?:am|pm)|midnight|minuit|noon|midi)\b)"
+                               r"[^.\n]{0,25}?(?:\b[A-Z][\w'’-]+(?:[ -][A-Z][\w'’-]+)?\s+(?i:(?:local\s+)?time)\b|"
+                               r"(?i:\blocal time\b|\bheure (?:locale|de [A-Z]\w+|d'[A-Z]\w+)\b))"),
     "start_date": re.compile(r"\bstart(?:ing)? date\b|\bdate de (?:d[ée]but|prise de (?:poste|fonction))\b|\bas soon "
                              r"as possible\b|\basap\b|\bd[èe]s que possible\b|\bprise de poste\b|\bto start\b|"
                              r"\bimmediate start\b|\bstart in \w+\b", re.IGNORECASE),
@@ -1557,20 +1721,47 @@ FACTS: dict[str, re.Pattern] = {
                             r"\b(?:english|french|arabic|spanish|portuguese|swahili|anglais|fran[çc]ais|arabe)\b"
                             r"[^.\n]{0,40}\b(?:required|essential|desirable|an asset|fluency|level|obligatoire|"
                             r"souhait[ée]|indispensable)\b|\blanguages?\s*:\s*(?:english|french|arabic|spanish|"
-                            r"portuguese|swahili|anglais|fran[çc]ais|arabe|espagnol)\b", re.IGNORECASE),
-    "selection_steps": re.compile(r"\bshortlist|\bwritten (?:test|assessment|exercise)\b|\binterview|\bassessment "
-                                  r"(?:centre|center)\b|\btechnical test\b|\bentretien|\btest [ée]crit\b|"
-                                  r"\bpresel|\bpr[ée]s[ée]lection\b|\bselection process\b|\brecruitment process\b", re.IGNORECASE),
-    "how_to_apply": re.compile(r"\bto apply\b|\bhow to apply\b|\bapply (?:online|via|through|here|now|at)\b|\bsubmit "
-                               r"(?:your|a|an)\b|\bsend (?:your|a)\b|\bpostuler\b|\bcandidature\b|\bapplication "
-                               r"(?:form|portal|link)\b|\bclick (?:here|on)\b|\bcv\b|\bcover(?:ing)? letter\b|"
-                               r"\blettre de motivation\b", re.IGNORECASE),
+                            r"portuguese|swahili|anglais|fran[çc]ais|arabe|espagnol)\b|"
+                            # a language named for the job without "fluent" or "required"
+                            r"\b(?:excellent|good|strong|very good|native|full|professional|advanced|fluent|working|"
+                            r"basic|sound|perfect|solid)\s+(?:(?:command|knowledge|proficiency|skills?|level|use|"
+                            r"mastery)\s+(?:of|in)\s+(?:the\s+)?)?(?:(?:written and (?:spoken|oral)|oral and written|"
+                            r"spoken and written|verbal and written)\s+)?" + LANG + r"\b|\b(?:speak|write|communicate)"
+                            r"\w*\s+(?:fluently\s+|confidently\s+)?(?:in\s+)?" + LANG + r"\b|\b" + LANG + r"\s+(?:language"
+                            r"\s+)?(?:skills|proficiency|fluency|speaker|courant|lu|parl[ée]|[ée]crit|obligatoire|"
+                            r"appr[ée]ci[ée]|un atout|est un (?:plus|atout))\b|\b(?:ma[îi]trise|connaissance|pratique)\s+"
+                            r"(?:courante\s+|parfaite\s+|excellente\s+|bonne\s+)?(?:de\s+l'|du\s+|de\s+la\s+langue\s+|"
+                            r"de\s+)?" + LANG + r"\b|(?m:^\s*(?:languages?|langues?|language requirements?|language "
+                            r"skills)\b[^\n]{0,15}?[:\-–]\s*[^\n]{0,40}?\b" + LANG + r"\b)", re.IGNORECASE),
+    # At least one assessment step; shortlisting alone ("only shortlisted candidates will be
+    # contacted") is vague, and `fact_counts` leaves out an interview inside that sentence.
+    "selection_steps": re.compile(r"(?<!guaranteed )\binterview(?:s|ed|ing)?\b|\bassessment (?:centre|center|day|"
+                                  r"exercise|task)s?\b|\b(?:written|technical|online|psychometric|aptitude|practical) "
+                                  r"(?:test|assessment|exercise|task)s?\b|\b(?:give|deliver|prepare|make) a (?:short )?"
+                                  r"presentation\b|\bentretiens?\b|\btests? (?:[ée]crits?|techniques?)\b|\b[ée]preuves? "
+                                  r"[ée]crites?\b|\bmise en situation\b", re.IGNORECASE),
+    # How to apply: a portal, link or button, an address, or the documents to send; "interested
+    # candidates should apply" alone is vague.
+    "how_to_apply": re.compile(r"\bapply (?:online|via|through|here|now|at|on|using|by (?:sending|email|submitting|"
+                               r"completing|clicking))\b|\bto apply,?\s+(?:please\s+)?(?:click|visit|go to|send|submit|"
+                               r"complete|fill|use|follow|email|upload)\b|\bsubmit (?:your|a|an|the)\b[^.\n]{0,40}\b(?:cv|"
+                               r"resume|r[ée]sum[ée]|application|cover|letter|form)|\bsend (?:your|a|an|the)\b[^.\n]{0,40}"
+                               r"\b(?:cv|resume|application|cover|letter)|\bapplication (?:form|portal|link)\b|\bclick "
+                               r"(?:here|on|the)\b|\bcv\b|\bresume\b|\bcover(?:ing)? letter\b|\bletter of motivation\b|"
+                               r"\blettre de motivation\b|\bpostuler (?:en ligne|via|sur|ici|par)\b|\bcandidatures? "
+                               r"(?:en ligne|via|par|doivent)\b|\bdossier de candidature\b|\benvoy(?:er|ez) (?:votre|"
+                               r"un|une|le|vos)\b", re.IGNORECASE),
     "no_fee_notice": re.compile(r"(?:not|never) (?:charge|request|ask for|require)[^.\n]{0,40}(?:fee|payment|money)|"
                                 r"\bno fees?\b|\bfree of charge\b|\bfraud(?:ulent)?\b|\bscam\b|\baucun frais\b|"
                                 r"\bne (?:demande|facture) (?:aucun|jamais)\b", re.IGNORECASE),
-    "safeguarding_checks": re.compile(r"\bsafeguarding\b|\bbackground (?:check|screening)|\breference checks?\b|"
-                                      r"\bcriminal record|\bdbs\b|\bpolice clearance\b|\bvetting\b|\bpsea\b|"
-                                      r"\bmisconduct disclosure\b|\bv[ée]rification des r[ée]f[ée]rences\b|"
+    # Checks made during recruitment; a safeguarding or PSEA commitment alone is vague.
+    "safeguarding_checks": re.compile(r"\bbackground (?:check|screening|verification)|\breference checks?\b|"
+                                      r"\breferences? (?:will be|are|is) (?:taken|requested|sought|checked|obtained|"
+                                      r"verified)\b|\bsubject to (?:satisfactory )?(?:references|checks|vetting|"
+                                      r"screening)\b|\bcriminal record|\bdbs\b|\bpolice (?:clearance|check|certificate)|"
+                                      r"\bvetting\b|\bmisconduct disclosure\b|\bsanctions? (?:screening|checks?|lists?)\b|"
+                                      r"\b(?:security|anti-terrorism|counter-terrorism|integrity) (?:checks?|screening|"
+                                      r"vetting)\b|\bv[ée]rification des (?:r[ée]f[ée]rences|ant[ée]c[ée]dents)\b|"
                                       r"\bcasier judiciaire\b", re.IGNORECASE),
     "accompanied": re.compile(r"\bnon[- ]family\b|\bfamily duty station\b|\baccompanied\b|\bunaccompanied\b|"
                               r"\bnon accompagn[ée]\b|\bfamily posting\b", re.IGNORECASE),
@@ -1580,28 +1771,147 @@ FACTS: dict[str, re.Pattern] = {
                           r"accommodation\b|\blogement\b|\bh[ée]bergement\b|\bcompound\b", re.IGNORECASE),
     "number_of_posts": re.compile(r"\bnumber of (?:posts|positions|vacancies)\b|\b\d+ (?:posts|positions)\b|"
                                   r"\bnombre de postes\b|\bvacancies:\s*\d", re.IGNORECASE),
+    # The post, its renewal or extension included, depends on funding.
     "funding_status": re.compile(r"\bsubject to (?:funding|donor approval|the availability)|\bcontingent (?:up)?on "
-                                 r"funding\b|\bpending funding\b|\bsous r[ée]serve de financement\b", re.IGNORECASE),
+                                 r"funding\b|\bpending funding\b|\bsous r[ée]serve de financement\b|\bsubject to "
+                                 r"(?:continued |further |the )?(?:availability of )?fund(?:s|ing)\b|\b(?:renew\w*|"
+                                 r"extension|extend\w*)\b[^.\n]{0,60}\b(?:subject to|depending on|dependent (?:on|upon)|"
+                                 r"based on|pending|contingent (?:up)?on)\b[^.\n]{0,40}\bfund|\bsous r[ée]serve (?:de|du) "
+                                 r"(?:financement|renouvellement)", re.IGNORECASE),
     "equal_opportunity": re.compile(r"\bequal opportunit|\bequal employment\b|\bdiversity\b|\bwithout regard to\b|"
                                     r"\bdoes not discriminate\b|\bnon-?discriminat|\b[ée]galit[ée] des chances\b|"
                                     r"\bdiversit[ée]\b|\binclusive (?:employer|workplace)\b", re.IGNORECASE),
+    # Adjustments or access support offered to applicants, or a guaranteed interview scheme.
     "adjustments": re.compile(r"\breasonable (?:adjustments?|accommodations?)\b|\baccess needs\b|\bdisability "
-                              r"confident\b|\bam[ée]nagements? raisonnables?\b", re.IGNORECASE),
+                              r"confident\b|\bam[ée]nagements? raisonnables?\b|\bguaranteed interview\b|\b(?:adjustments?|"
+                              r"accommodations?|additional support|any support you (?:may )?need)\b[^.\n]{0,60}\b(?:during|"
+                              r"in|for|throughout)\b[^.\n]{0,20}\b(?:the )?(?:recruitment|application|interview|selection|"
+                              r"hiring)\b|\baccess requirements\b|\baccessible formats?\b|\b(?:let us know|tell us|inform "
+                              r"us)\b[^.\n]{0,60}\b(?:adjustments?|accommodations?|access)\b", re.IGNORECASE),
     "reference_number": re.compile(r"\b(?:reference|ref\.?|vacancy|requisition|job|req)\s*(?:no\.?|number|id|#|code)"
                                    r"\s*:?\s*[A-Z0-9][A-Z0-9/_.-]{2,}|\br[ée]f[ée]rence\s*:", re.IGNORECASE),
 }
+def sentence_at(text: str, start: int, end: int) -> str:
+    left = max(text.rfind(c, 0, start) for c in ".!?\n") + 1
+    rights = [i for i in (text.find(c, end) for c in ".!?\n") if i >= 0]
+    return text[left:min(rights) if rights else len(text)]
+
+
+# Who a reporting line names, when it names no post (the coding guide: vague).
+GENERIC_BOSS = re.compile(r"^\s*:?\s*(?:the|a|an|his|her|their|its|his/her|his or her|du|de la|de l'|au|[àa] la|le|la)?\s*"
+                          r"(?:(?:direct|immediate|line|designated|assigned)\s+)?(?:line manager|manager|supervisor|"
+                          r"responsable(?: hi[ée]rarchique)?|sup[ée]rieure? hi[ée]rarchique|n\+1)?\s*(?:[,;.)]|$)",
+                          re.IGNORECASE)
+ONLY_SHORTLISTED = re.compile(r"\bonly (?:the )?short-?listed\b|\bshort-?listed (?:candidates|applicants) only\b|"
+                              r"\bseul(?:e)?s (?:les )?(?:candidat\w*|personnes) (?:pr[ée]s[ée]lectionn|retenu)",
+                              re.IGNORECASE)
+NOT_RECRUITMENT_INTERVIEW = re.compile(r"\b(?:key informant|household|beneficiar\w*|focus group|conduct\w*|exit|media|"
+                                       r"radio|survey|semi-structured|qualitative)\s*$", re.IGNORECASE)
+AT_TIMES = re.compile(r"\b(?:if needed|as needed|when (?:needed|required)|at times|occasionally|may (?:be (?:required|"
+                      r"asked) to )?(?:supervise|manage|lead))\b", re.IGNORECASE)
+CLOSING_WORDS = re.compile(r"\b(?:appl\w*|closing|deadline|cl[ôo]ture|date limite|submi\w*|candidat\w*|postul\w*|"
+                           r"due|no later than|before|avant|expir\w*|cv)\b", re.IGNORECASE)
+
+
+def fact_counts(kind: str, m: re.Match, text: str) -> bool:
+    """Whether one match of FACTS gives its fact, read with its surroundings (the coding guide's
+    `given` against `vague`)."""
+    after = text[m.end():m.end() + 60]
+    if kind == "contract_length":
+        if re.match(r"['’]?[ \t]*(?:of[ \t]+)?(?:[\w-]+[ \t]+){0,3}?exp[ée]rience", after, re.IGNORECASE):
+            return False                     # a duration followed by "experience" is years asked
+        if re.match(r"(?:until|till|through|jusqu)", m.group(0), re.IGNORECASE) and \
+                CLOSING_WORDS.search(sentence_at(text, m.start(), m.end())):
+            return False                     # "applications open until 30 November" is the closing date
+    if kind == "reports_to":
+        who = re.split(r"[.;(\n]", after.lstrip(" \t:\n"), maxsplit=1)[0]     # a label's post may be on the next line
+        return not GENERIC_BOSS.match(who)
+    if kind == "selection_steps":
+        if ONLY_SHORTLISTED.search(sentence_at(text, m.start(), m.end())):
+            return False
+        if NOT_RECRUITMENT_INTERVIEW.search(text[max(0, m.start() - 30):m.start()]):
+            return False                     # interviews the job conducts are duties, not selection
+    if kind == "direct_reports":
+        if AT_TIMES.search(sentence_at(text, m.start(), m.end())):
+            return False
+        if re.search(r"\b(?:our|join|we are|we're)\b[^.\n]{0,20}$", text[max(0, m.start() - 30):m.start()],
+                     re.IGNORECASE):
+            return False                     # "join our team of 70" is the employer, not the job
+    if kind == "closing_time":
+        return bool(CLOSING_WORDS.search(sentence_at(text, m.start(), m.end())))
+    return True
+
+
 def facts_of(text: str) -> set[str]:
-    """The facts an advert gives, by FACTS, each match checked: a duration followed by "experience"
-    is years asked, not the contract's length."""
+    """The facts an advert's text gives, by FACTS, each match checked by `fact_counts`."""
     found = set()
     for kind, pattern in FACTS.items():
         for m in pattern.finditer(text):
-            if kind == "contract_length" and re.match(r"['’]?[ \t]*(?:of[ \t]+)?(?:[\w-]+[ \t]+){0,3}?exp[ée]rience",
-                                                      text[m.end():m.end() + 60], re.IGNORECASE):
+            if not fact_counts(kind, m, text):
                 continue
             found.add(kind)
             break
     return found
+
+
+def employment_facts(value: str) -> set[str]:
+    """The facts a job-posting employment type gives, by the coding guide's table: FULL_TIME or
+    PART_TIME gives the hours; CONTRACTOR, TEMPORARY, INTERN or VOLUNTEER the contract type; any
+    other value (OTHER, PER_DIEM, a date) neither, unless its own words name one ("Permanent")."""
+    out = set()
+    if re.search(r"\b(?:FULL|PART)[\s_-]?TIME\b", value, re.IGNORECASE):
+        out.add("hours")
+    if re.search(r"\b(?:CONTRACTOR|TEMPORARY|INTERN(?:SHIP)?|VOLUNTEER)\b", value, re.IGNORECASE):
+        out.add("contract_type")
+    words = re.sub(r"\b[A-Z]+(?:_[A-Z]+)+\b", " ", value)
+    return out | (facts_of(words) & {"contract_type", "hours"})
+
+
+def title_country(title: str) -> bool:
+    """Whether a part of the title names a country ("Programme Officer – Kenya"), by the backend's
+    offline country lookup."""
+    if str(roles.HERE.parents[1] / "apps" / "backend") not in sys.path:
+        sys.path.insert(0, str(roles.HERE.parents[1] / "apps" / "backend"))
+    from contracts.countries import countries_named
+    return any(countries_named(p.strip(" .")) for p in roles.SEPARATORS.split(title or "") if p and p.strip(" ."))
+
+
+def title_reference(title: str) -> bool:
+    """A reference number in the title ("Fundraising Coordinator - 2025770"), never a year."""
+    return any(not re.fullmatch(r"(?:19|20)\d{2}", m.group(0).strip()) for m in roles.REFERENCE.finditer(title or ""))
+
+
+def facts_given(ad: dict, secs: list[dict]) -> set[str]:
+    """The facts an advert gives: its text by FACTS; a budget only outside the employer's own
+    description; any language named in a languages section; a country or a reference number in the
+    title; and the job-posting data's values by the coding guide's table."""
+    texts = [ln["text"] for ln in ad["lines"]]
+    given = facts_of("\n".join(texts))
+    own = {t for s in secs if s["type"] == "about_organisation" for t in s["lines"]}
+    if "budget" in given and own:
+        role_text = "\n".join(t for t in texts if t not in own)
+        if not any(fact_counts("budget", m, role_text) for m in FACTS["budget"].finditer(role_text)):
+            given.discard("budget")
+    if any(re.search(r"\b" + LANG + r"\b", "\n".join([s["heading"]] + s["lines"]), re.IGNORECASE)
+           for s in secs if s["type"] == "languages"):
+        given.add("languages")
+    title = ad.get("title", "")
+    if title_country(title):
+        given.add("duty_station")
+    if title_reference(title):
+        given.add("reference_number")
+    f = ad.get("facts") or {}
+    if f.get("pay"):
+        given.add("pay")
+    if f.get("closing_date"):
+        given.add("closing_date")
+    if f.get("closing_time"):
+        given.add("closing_time")
+    if f.get("place"):
+        given.add("duty_station")
+    if f.get("employment_type"):
+        given |= employment_facts(f.get("employment_type_text", ""))
+    return given
 
 
 DECISION_FACTS = ["pay", "contract_type", "contract_length", "hours", "duty_station", "travel", "closing_date",
@@ -1762,6 +2072,9 @@ BACHELOR = re.compile(r"\bbachelor'?s?\b|\bfirst[- ]level (?:university )?degree
                       r"\blicence de (?!conduire)|"
                       r"\bbac ?\+ ?[34]\b|\buniversity degree\b|\b(?:a|relevant|academic) degree in\b|\bhnd\b",
                       re.IGNORECASE)
+YEARS_IN = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?:\+|or more|plus)?\s*(?:full\s+)?years?(?:'|’)?\s+(?:of\s+)?"
+                      r"(?:[\w-]+\s+){0,2}?(?:in|with|managing|leading|working|as|within)\b|" + NUM +
+                      r"\s*(?:ans|ann[ée]es)\s+(?:dans|en|de|d')\b", re.IGNORECASE)
 YEAR_RANGE = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?:-|–|to|à|a)\s*" + NUM +
                         r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?(?=\s*(?:\+\s*)?(?:years?|ans|ann[ée]es)\b)", re.IGNORECASE)
 NOT_EXPERIENCE = re.compile(r"(?:under|below|aged?|children|age of|moins de|[âa]g[ée]e?s? de)\s*$", re.IGNORECASE)
@@ -1801,7 +2114,7 @@ def duty_lines(ad: dict) -> list[str]:
     """The lines of an advert's responsibilities sections, 5 to 60 words each; a line that asks for
     years of experience or a degree is a requirement in a mistyped section, not a duty."""
     out = []
-    for s in sections_of(ad["lines"]):
+    for s in sections_of(ad["lines"], ad.get("title", "")):
         if s["type"] in ("responsibilities", "deliverables"):
             out += [t for t in s["lines"] if 5 <= words_of(t) <= 60 and not years_asked(t)[0]
                     and not degree_asked(t)]
@@ -1812,14 +2125,16 @@ def _num(s: str) -> int:
     return int(s) if s.isdigit() else NUMBER_WORDS.get(s.lower(), 0)
 
 
-def years_asked(text: str) -> tuple[str, str]:
+def years_asked(text: str, largest: bool = False, requirements: bool = False) -> tuple[str, str]:
     """(minimum years, the alternative with a lower degree) asked; the UN's 'X years with a master's
-    or Y with a bachelor's' read as both."""
+    or Y with a bachelor's' read as both. Among other figures the smallest, or with `largest` the
+    largest (the coding guide: a candidate must meet them all). In a requirements section
+    (`requirements`), "5 years in finance" asks for experience without the word."""
     text = YEAR_RANGE.sub(lambda m: m.group(1), text)        # a range counts from its low end
 
     def numbers(chunk: str) -> list[int]:
         out = []
-        for pattern in (YEARS_EN, YEARS_FR):
+        for pattern in (YEARS_EN, YEARS_FR) + ((YEARS_IN,) if requirements else ()):
             pos = 0
             while m := pattern.search(chunk, pos):
                 idx = next((i for i in range(1, len(m.groups()) + 1) if m.group(i)), 0)
@@ -1842,9 +2157,57 @@ def years_asked(text: str) -> tuple[str, str]:
             nums = numbers(sent)
             if len(set(nums)) >= 2:
                 return str(min(nums)), str(max(nums))
-    low = min(found)
+    low = max(found) if largest else min(found)
     m = ADDITIONAL_YEARS.search(text)
     return str(low), (str(low + _num(m.group(1))) if m else "")
+
+
+MONTHS_ASKED = re.compile(NUM + r"\s*(?:\(\s*\d{1,2}\s*\)\s*)?\+?\s*months?(?:'|’)?\s+(?:of\s+)?(?:[\w-]+\s+){0,3}?"
+                          r"experience|\bexperience\s+of\s+(?:at least\s+)?" + NUM + r"\s*months?\b|" + NUM +
+                          r"\s*mois d'exp[ée]rience", re.IGNORECASE)
+EMPLOYER_CUE = re.compile(r"\b(?:we|our|nous|notre|founded|established|since)\b", re.IGNORECASE)
+
+
+def _years_text(n: float) -> str:
+    return str(int(n)) if n == int(n) else f"{n:g}"
+
+
+def years_required(secs: list[dict], text: str) -> tuple[str, str]:
+    """(minimum years, the alternative with a lower degree) asked, as the coding guide's part 3
+    reads them: from the essential requirements, a desirable figure only when it is the only one,
+    and otherwise the advert's other sentences (never the employer's own years); several
+    figures for different kinds of experience give the largest, which a candidate must meet; months
+    count as a share of a year; the UN's 'X years with a master's or Y with a bachelor's' gives both."""
+    def part(kinds):
+        return "\n".join("\n".join(s["lines"]) for s in secs if s["type"] in kinds)
+
+    rest = "\n".join(s for s in re.split(r"(?<=[.!?;])\s+|\n", text) if not EMPLOYER_CUE.search(s))
+    for chunk, in_requirements in ((part(("essential_requirements",)), True),
+                                   (part(("desirable_requirements",)), True), (rest, False)):
+        y_min, y_alt = years_asked(chunk, largest=True, requirements=in_requirements)
+        if y_min:
+            return y_min, y_alt
+        months = [_num(m.group(i)) for m in MONTHS_ASKED.finditer(chunk) for i in range(1, 4) if m.group(i)]
+        months = [n for n in months if 0 < n < 120]
+        if months:
+            return _years_text(round(max(months) / 12, 1)), ""
+    return "", ""
+
+
+GRADE_LABEL = re.compile(r"^\s*(?:grade|level|grade level|band|salary grade|post level|classe|cat[ée]gorie|niveau)\b"
+                         r"[^:\n]{0,20}[:\-–]?\s*(.{0,40})", re.IGNORECASE)
+
+
+def text_grade_level(lines: list[dict]) -> str:
+    """The level a labelled grade in the advert's text gives ("Grade: P-3"), when the title gives
+    none (the coding guide: the title first, then a grade)."""
+    for ln in lines:
+        m = GRADE_LABEL.match(ln["text"])
+        if m:
+            level = roles.GRADE_LEVEL.get(roles.normalise(m.group(1)).grade, "")
+            if level:
+                return level
+    return ""
 
 
 def degree_asked(text: str) -> str:
@@ -1974,15 +2337,16 @@ SHORT_STANDARD = re.compile(r"equal (?:opportunit|employment)|disability confide
 def carries_meaning(line: str) -> bool:
     """A short line the measures read is never site furniture, however often it recurs: a sentence of
     five words or more that carries a known standard text, an inclusion statement, a restriction or a
-    fact, or a "label: value" line with a fact. Menu items ("Apply now", "Remote jobs") are neither."""
-    if SHORT_STANDARD.search(line):
+    fact, or a "label: value" line with a     fact. Menu items ("Apply now", "Remote jobs") are neither. By the frozen patterns of `advert_set`."""
+    s = advert_set
+    if s.SHORT_STANDARD.search(line):
         return True
     if re.match(r"^[^:]{2,40}:\s*\S", line):
-        return any(p.search(line) for p in FACTS.values())
+        return any(p.search(line) for p in s.FACTS.values())
     if words_of(line) < 5:
         return False
-    return bool(KNOWN_STANDARD.search(line)) or any(p.search(line) for p in FACTS.values()) or \
-        any(p.search(line) for p in INCLUSION.values()) or any(p.search(line) for p in RESTRICTIONS.values())
+    return bool(s.KNOWN_STANDARD.search(line)) or any(p.search(line) for p in s.FACTS.values()) or \
+        any(p.search(line) for p in s.INCLUSION.values()) or any(p.search(line) for p in s.RESTRICTIONS.values())
 
 
 def chrome_lines(adverts: list[dict]) -> dict[str, set[str]]:
@@ -1994,7 +2358,7 @@ def chrome_lines(adverts: list[dict]) -> dict[str, set[str]]:
     for ad in adverts:
         if ad["method"] == "html":
             by_org[ad["org_id"]].append({ln["text"] for ln in ad["lines"] if words_of(ln["text"]) <= CHROME_WORDS
-                                         and not (ln["heading"] and section_type(ln["text"]) != "unclassified")
+                                         and not (ln["heading"] and advert_set.section_type(ln["text"]) != "unclassified")
                                          and not carries_meaning(ln["text"])})
     out = {}
     for o, pages in by_org.items():
@@ -2105,14 +2469,15 @@ def ai_test_set(adverts: list[dict], saved: dict | None = None) -> tuple[list[st
 
 
 def is_advert(ad: dict) -> bool:
+    """Whether a page is an advert, by the frozen patterns of `advert_set`, never the measures' own."""
     text = " ".join(ln["text"] for ln in ad["lines"])
     if words_of(text) < MIN_ADVERT_WORDS:
         return False
     if ad["source"] in ("feed", "step-f-feed"):
         return True                                 # an item of a job feed is an advert
     signals = sum(1 for k in ("how_to_apply", "closing_date", "contract_type", "reports_to", "duty_station")
-                  if FACTS[k].search(text))
-    secs = {section_type(ln["text"]) for ln in ad["lines"] if ln["heading"]}
+                  if advert_set.FACTS[k].search(text))
+    secs = {advert_set.section_type(ln["text"]) for ln in ad["lines"] if ln["heading"]}
     return signals >= 2 or bool(secs & {"responsibilities", "essential_requirements"})
 
 
@@ -2252,7 +2617,7 @@ def measure(_args=None) -> int:
     for ad in sorted(kept, key=lambda a: a["id"]):
         text = "\n".join(ln["text"] for ln in ad["lines"])
         role = roles.classify(ad.get("title", ""), title_decisions)
-        secs = sections_of(ad["lines"])
+        secs = sections_of(ad["lines"], ad.get("title", ""))
         sents = sentences_of(text)
         org_std = std.get(ad["org_id"], set())
         std_words = sum(words_of(s) for s in sents if norm_sentence(s) in org_std or KNOWN_STANDARD.search(s))
@@ -2260,20 +2625,12 @@ def measure(_args=None) -> int:
         std_section_words = sum(s["words"] for s in secs if s["type"] in STANDARD_SECTIONS)
         standard_share = min(1.0, max(std_words, std_section_words) / max(words_total, 1))
         words_role = max(0, words_total - max(std_words, std_section_words))
-        given = facts_of(text)
+        given = facts_given(ad, secs)
         f = ad.get("facts") or {}
-        if f.get("pay"):
-            given.add("pay")
-        if f.get("closing_date"):
-            given.add("closing_date")
-        if f.get("place"):
-            given.add("duty_station")
-        if f.get("employment_type"):
-            given |= {"contract_type", "hours"}
         missing = [k for k in DECISION_FACTS if k not in given]
         req_text = "\n".join("\n".join(s["lines"]) for s in secs if s["type"] in
                              ("essential_requirements", "desirable_requirements")) or text
-        y_min, y_alt = years_asked(req_text)
+        y_min, y_alt = years_required(secs, text)
         lang = language_of(text)
         med = statistics.median([words_of(s) for s in sents]) if sents else 0
         org_type = board_types.get(ad["org_id"]) or orgs.type_of(ad["org_id"])
@@ -2293,7 +2650,7 @@ def measure(_args=None) -> int:
             "advert_id": ad["id"], "org_id": ad["org_id"], "org_type": org_type,
             "org_type_basis": ad.get("org_type_basis", "rule"), "source": ad["source"], "batch": ad["batch"],
             "system": ad["system"], "family_id": role.family_id or "unplaced", "function": role.function or "unplaced",
-            "sector": role.sector, "level": role.level or "unknown", "grade": role.grade,
+            "sector": role.sector, "level": role.level or text_grade_level(ad["lines"]) or "unknown", "grade": role.grade,
             **{c: role.contexts[c] for c in roles.CONTEXT_FIELDS}, "language": lang, "extraction": ad["method"],
             "period": period, "words_total": words_total, "words_role": words_role, "sections": len(secs),
             "standard_share": f"{standard_share:.3f}",
