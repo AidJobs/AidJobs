@@ -184,6 +184,7 @@ def test_a_closing_date_needs_a_calendar_date():
     assert "closing_date" in adverts.facts_of("Deadline\n30/11/2026")
     # "before" and a date is a deadline for applications only when the sentence is about applying.
     assert "closing_date" not in adverts.facts_of("The project began before 1 March 2019 in two districts.")
+    assert "closing_date" not in adverts.facts_of("The post existed before 1 March 2019 in another unit.")
     assert "closing_date" in adverts.facts_of("Submit the form before 30 November 2026.")
 
 
@@ -196,7 +197,9 @@ def test_how_to_apply_needs_a_how():
         assert "how_to_apply" in adverts.facts_of(how), how
     assert "how_to_apply" not in adverts.facts_of("For questions about the role, write to [email].")
     assert "how_to_apply" not in adverts.facts_of("The officer will screen each CV received by the unit.")
+    assert "how_to_apply" not in adverts.facts_of("The duties include a review of each CV the unit gets.")
     assert "how_to_apply" in adverts.facts_of("Please attach a CV of two pages.")
+    assert "how_to_apply" in adverts.facts_of("Applications must hold a CV of two pages.")
 
 
 def test_direct_reports_keep_round_ones_rule():

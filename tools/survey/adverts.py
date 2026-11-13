@@ -1818,11 +1818,11 @@ NOT_RECRUITMENT_INTERVIEW = re.compile(r"\b(?:key informant|household|beneficiar
 CLOSING_WORDS = re.compile(r"\b(?:appl\w*|closing|deadline|cl[ôo]ture|date limite|submi\w*|candidat\w*|postul\w*|"
                            r"due|no later than|before|avant|expir\w*|cv|open until|accepted until)\b", re.IGNORECASE)
 APPLICATION_WORDS = re.compile(r"\b(?:appl\w*|submi\w*|candidat\w*|postul\w*|cv|r[ée]sum[ée]|resume|dossier|send|sent|"
-                               r"envoy\w*|recruit\w*|vacanc\w*|position|post|offre)\b", re.IGNORECASE)
+                               r"envoy\w*)\b", re.IGNORECASE)
 DOCUMENT_WORDS = re.compile(r"^(?:cv|resume|cover(?:ing)? letter|letter of motivation|lettre de motivation)$", re.IGNORECASE)
-APPLY_VERBS = re.compile(r"\b(?:send|sent|submit\w*|attach\w*|includ\w*|upload\w*|email\w*|e-mail\w*|enclos\w*|"
-                         r"provid\w*|apply\w*|application|appl(?:y|ying|icants?)|accompan\w*|together with|along with|"
-                         r"envoy\w*|joindre|adress\w*)\b|\[email\]", re.IGNORECASE)
+APPLY_VERBS = re.compile(r"\b(?:send|sent|submit\w*|attach\w*|upload\w*|email\w*|e-mail\w*|enclos\w*|provid\w*|"
+                         r"applications?|appl(?:y|ying|icants?)|accompan\w*|together with|along with|envoy\w*|joindre|"
+                         r"adress\w*|please include|include your)\b|\[email\]", re.IGNORECASE)
 
 
 def fact_counts(kind: str, m: re.Match, text: str) -> bool:
