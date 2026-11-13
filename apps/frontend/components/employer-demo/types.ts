@@ -73,6 +73,9 @@ export type Org = {
   fixedLangs?: string[];
   /** The website field was offered for About us, once, the first time a job is written (section 19, phase 5, A). */
   websiteAsked?: boolean;
+  /** The organisation's social links (section 19, phase 5, E): each job includes or leaves out each one. Offered once in the chat. */
+  social?: string[];
+  socialAsked?: boolean;
 };
 
 /** A job's facts and choices, saved automatically when it is published, for the next job like it (managed with the profiles page, later). */
@@ -187,7 +190,7 @@ export type ChatMsg = { id: string; from: 'user' | 'ai'; text: string; quick?: s
  * sends something to someone is done from a button that states the whole outcome, never by the chat on its own. `state`: the actions
  * section 17 allows for the job's state, each opening its own dialog (section 19, phase 4).
  */
-export type ChatCard = 'plan' | 'publish' | 'review' | 'live' | 'state' | 'website' | 'project' | 'page' | 'suggest';
+export type ChatCard = 'plan' | 'publish' | 'review' | 'live' | 'state' | 'website' | 'project' | 'page' | 'suggest' | 'social';
 
 /** "One section at a time", or "write it all, then I'll review". */
 export type Pace = 'step' | 'all';
@@ -406,6 +409,8 @@ export type DemoJob = {
   pageDraft?: PageDraft;
   /** Suggestions offered on this job; one rejected is not offered again. */
   suggestions?: Suggestion[];
+  /** The organisation's social links this job leaves out; the choice affects only this job. */
+  socialOff?: string[];
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

@@ -12,7 +12,8 @@ import { jobUrl } from './links';
 import { SkipDialog } from './Publish';
 import { LangsPart, LiveCard, FullPart, MarketPart, PaymentPanel, PlanChoice, PublishCard, ReviewPart, type Opener } from './PublishSteps';
 import { ReachEditor } from './Reach';
-import { PageDraftCard, PageField, SuggestionCard } from './ContextCards';
+import { PageDraftCard, PageField, SocialLinks, SuggestionCard } from './ContextCards';
+import { Reveal } from './Reveal';
 import { KEEP_PROFILE_ABOUT, keepProfileAbout, projectConflicts, resolveConflict } from './context';
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
@@ -365,7 +366,16 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
       </div>
     );
   else if (part === 's:about') body = <PageField job={job} s={s} kind="about" open={aiOpen} />;
-  else if (part === 'fixed') body = <Commitments job={job} s={s} />;
+  else if (part === 'fixed')
+    body = (
+      <div className="flex flex-col gap-3">
+        <Commitments job={job} s={s} />
+        <div className="flex flex-col gap-1.5 border-t pt-3 aj-hair">
+          <span className="ej-panel-label">Social links</span>
+          <SocialLinks s={s} job={job} />
+        </div>
+      </div>
+    );
   else if (part === 's:apply') body = <ApplyFields job={job} />;
   else if (part === 'check')
     body = (
@@ -539,7 +549,7 @@ function StateCard({ job, s, act }: { job: DemoJob; s: State; act: (a: StateActi
 
 /** A card under the chat's message (section 19, steps 8 and 9): the one place, with the part on the line, where it is published, paid, or sent. */
 function ChatCardView({ kind, job, s, open, act }: { kind: NonNullable<ChatMsg['card']>; job: DemoJob; s: State; open: Opener; act: (a: StateAction) => void }) {
-  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published', state: 'What you can do', website: 'Your organisation’s page', project: 'The project', page: 'Draft', suggest: 'Suggestion' }[kind];
+  const label = { plan: 'Free or Amplify', review: 'Send for review', publish: 'Publish', live: 'Published', state: 'What you can do', website: 'Your organisation’s page', project: 'The project', page: 'Draft', suggest: 'Suggestion', social: 'Social links' }[kind];
   const aiOpen = (t: OpenTarget) => open.part(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
   return (
     <section className="aj-card ej-chat-card mt-2 flex flex-col gap-2 p-3" aria-label={label}>
@@ -548,6 +558,7 @@ function ChatCardView({ kind, job, s, open, act }: { kind: NonNullable<ChatMsg['
       {kind === 'project' && <PageField job={job} s={s} kind="project" open={aiOpen} />}
       {kind === 'page' && <PageDraftCard job={job} s={s} />}
       {kind === 'suggest' && <SuggestionCard job={job} s={s} />}
+      {kind === 'social' && <SocialLinks s={s} job={job} />}
       {kind === 'plan' && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="aj-pill" onClick={() => open.part('plan')}>
@@ -604,8 +615,10 @@ function ReviewColumn({ job, s, on, onSection }: { job: DemoJob; s: State; on?: 
 
 function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open, act }: { job: DemoJob; s: State; reading: boolean; subject: string; onSend: (text: string) => void; onSkip: () => void; autoFocus: boolean; open: Opener; act: (a: StateAction) => void }) {
   const [text, setText] = useState('');
-  const [tapped, setTapped] = useState<string | null>(null);
+  const [tapped, setTapped] = useState<{ id: string; q: string } | null>(null);
   const [box, setBox] = useState(() => readNumber(BOX_KEY, 0));
+  // Messages already there when the window opened show at once; those that arrive while it is open are revealed as they are written.
+  const [born] = useState(() => new Set(job.chat.map((m) => m.id)));
   const input = useRef<ComposerHandle>(null);
   const end = useRef<HTMLDivElement>(null);
   const ai = useAi();
@@ -632,7 +645,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
         {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or open a part of it.</p>}
         {shown.map((m, i) => (
           <div key={m.id} className="ej-bubble" data-from={m.from}>
-            {rich(m.text)}
+            <Reveal id={m.id} text={m.text} active={m.from === 'ai' && m === last && !born.has(m.id)} render={rich} />
             {m.ai && m.by && (
               <span className="ej-ai-by">
                 <span className="sr-only">Written by </span>
@@ -645,11 +658,12 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
                   <button
                     key={q}
                     type="button"
-                    className="aj-pill"
+                    className="aj-pill ej-answer"
                     style={{ height: 30 }}
-                    disabled={i < lastUser || reviewing || busy || tapped === m.id}
+                    aria-pressed={(shown[i + 1]?.from === 'user' ? shown[i + 1].text : tapped?.id === m.id ? tapped.q : null) === q}
+                    disabled={i < lastUser || reviewing || busy || tapped?.id === m.id}
                     onClick={() => {
-                      setTapped(m.id);
+                      setTapped({ id: m.id, q });
                       onSend(q);
                     }}
                   >

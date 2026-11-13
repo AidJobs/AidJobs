@@ -955,12 +955,19 @@ export function setMethod(id: string, method: ApplySettings['method'], said: str
 
 /** A part of step 6 answered ("None of these", "Keep them", "No, thanks"). */
 function settle(id: string, what: string, said: string, reply?: string) {
+  socialOffered(what);
   updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, settled: Array.from(new Set([...j.walk.settled, what])) }, chat: [...j.chat, ...(said ? [msg('user', said)] : []), ...(reply ? [msg('ai', reply)] : [])] } : j));
+}
+
+/** The social links are offered once, with the fixed text, the first time a job is written (section 19, phase 5, E). */
+function socialOffered(what: string) {
+  if (what === 'fixed' && !getState().org.socialAsked) update((s) => ({ ...s, org: { ...s.org, socialAsked: true } }));
 }
 
 /** A question answered or declined in the AI chat ("there is no grade", "anyone can apply"). */
 export function settleQuestion(id: string, what: string) {
   if (!ownerOnly()) return;
+  socialOffered(what);
   updateJob(id, (j) => (j.walk && !j.walk.settled.includes(what) ? { ...j, walk: { ...j.walk, settled: [...j.walk.settled, what] } } : j));
 }
 

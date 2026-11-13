@@ -151,11 +151,11 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const starter = items.filter((i) => !i.own).map((i) => i.label);
       return [
         stepMsg(
-          `Then your organisation's fixed text, added word for word from your settings: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''}${jobLang(job) !== 'en' && !s.org.fixedLangs?.includes(jobLang(job)) ? ` This is the first ${langOf(jobLang(job)).label} job: confirming them here keeps them for every ${langOf(jobLang(job)).label} job (in the demo their wording stays as your settings have it).` : ''} Keep these for this job, or tell me which to leave out.`,
+          `Then your organisation's fixed text, added word for word from your settings: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''}${jobLang(job) !== 'en' && !s.org.fixedLangs?.includes(jobLang(job)) ? ` This is the first ${langOf(jobLang(job)).label} job: confirming them here keeps them for every ${langOf(jobLang(job)).label} job (in the demo their wording stays as your settings have it).` : ''} Keep these for this job, or tell me which to leave out.${s.org.socialAsked ? '' : " Your organisation's social links, if you want them on the job page, can be added below (optional)."}`,
           key,
           [KEEP_FIXED],
         ),
-      ];
+      ].map((m) => (s.org.socialAsked ? m : { ...m, card: 'social' as const }));
     }
     case 'suggest': {
       const list = step.sections.map((k) => `**${headingFor(k, format)}** (${SECTION_BY_KEY[k]?.hint.toLowerCase()})`);

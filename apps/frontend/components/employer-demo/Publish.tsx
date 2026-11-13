@@ -46,6 +46,7 @@ import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
 import { ArchivedBanner } from './Archive';
+import { socialLabel, socialOf } from './context';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
@@ -265,6 +266,18 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           ))}
         </section>
       ))}
+      {socialOf(s, job).length > 0 && (
+        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label={`${s.org.name} elsewhere`} lang="en">
+          <span className="aj-faint" style={{ fontSize: 12 }}>
+            Follow {s.org.short}:
+          </span>
+          {socialOf(s, job).map((u) => (
+            <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="ej-legal-link" style={{ fontSize: 12.5 }}>
+              {socialLabel(u)}
+            </a>
+          ))}
+        </nav>
+      )}
       {job.commitments.length > 0 && (
         <section>
           <h3>{say('Our commitments', 'commitments')}</h3>

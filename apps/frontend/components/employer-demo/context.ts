@@ -145,6 +145,54 @@ export function saveAboutForOrg(id: string) {
   update((st) => ({ ...st, org: { ...st.org, about }, notice: { text: "Saved as your organisation's About us. New jobs start from it." } }));
 }
 
+/** A social link the organisation keeps (section 19, phase 5, E): an https address of its own account, saved only when the user adds it. */
+export function socialUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw.trim().startsWith('http') ? raw.trim() : `https://${raw.trim()}`);
+    if (u.protocol !== 'https:' || !u.hostname.includes('.') || u.username || u.password) return null;
+    return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
+
+/** "LinkedIn", "X", "Facebook", "Instagram", "YouTube", or the address's own name. */
+export function socialLabel(url: string): string {
+  const host = (() => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  })();
+  const known: Record<string, string> = { 'linkedin.com': 'LinkedIn', 'x.com': 'X', 'twitter.com': 'X', 'facebook.com': 'Facebook', 'instagram.com': 'Instagram', 'youtube.com': 'YouTube' };
+  return known[host] ?? host;
+}
+
+export function addOrgSocial(raw: string): boolean {
+  const s = getState();
+  const url = socialUrl(raw);
+  if (!url || s.reviewerAs || (s.org.social ?? []).includes(url)) return false;
+  update((st) => ({ ...st, org: { ...st.org, social: [...(st.org.social ?? []), url], socialAsked: true } }));
+  return true;
+}
+
+export function removeOrgSocial(url: string) {
+  if (getState().reviewerAs) return;
+  update((st) => ({ ...st, org: { ...st.org, social: (st.org.social ?? []).filter((x) => x !== url) } }));
+}
+
+/** Includes or leaves out one of the organisation's links on this job only. */
+export function toggleJobSocial(id: string, url: string) {
+  if (getState().reviewerAs) return;
+  update((st) => ({ ...st, org: { ...st.org, socialAsked: true }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, socialOff: (j.socialOff ?? []).includes(url) ? (j.socialOff ?? []).filter((x) => x !== url) : [...(j.socialOff ?? []), url] } : j)) }));
+}
+
+/** The organisation's links this job shows: all of them but those it leaves out. */
+export function socialOf(s: State, j: DemoJob): string[] {
+  return (s.org.social ?? []).filter((u) => !(j.socialOff ?? []).includes(u));
+}
+
 /** An answer to a conflict between the project text and a fact: the job keeps its own, or takes the page's. */
 export function resolveConflict(id: string, fact: 'country' | 'donor' | 'deadline', value: string) {
   const j = getState().jobs.find((x) => x.id === id);

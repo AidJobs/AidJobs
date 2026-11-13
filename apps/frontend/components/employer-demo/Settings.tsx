@@ -9,6 +9,7 @@ import { nextId, update, useDemo } from './store';
 import { langOf } from './translate';
 import type { ApplySettings, ApprovalSetting, Format, JobLang, Org, OrgType, Person, Tone } from './types';
 import BasePrompt from './BasePrompt';
+import { SocialLinks } from './ContextCards';
 import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
 
@@ -357,6 +358,7 @@ function Verification({ org }: { org: Org }) {
 }
 
 function Basics({ org }: { org: Org }) {
+  const s = useDemo();
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Name">
@@ -384,6 +386,11 @@ function Basics({ org }: { org: Org }) {
       <Field label="Headquarters">
         <input style={inputStyle} value={org.hq} onChange={(e) => setOrg({ hq: e.target.value })} />
       </Field>
+      <div className="sm:col-span-2">
+        <Field label="Social links (optional)" hint="Shown as a row on each job page; any job can leave one out">
+          <SocialLinks s={s} />
+        </Field>
+      </div>
       <div className="sm:col-span-2">
         <Field label="Website (optional)" hint="One page of it, such as your About page, can be read to draft a job's About us; only when you ask, from a job's About us">
           <input style={inputStyle} value={org.website} onChange={(e) => setOrg({ website: e.target.value })} placeholder="https://your-organisation.org/about" inputMode="url" aria-label="Website" />

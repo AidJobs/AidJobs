@@ -113,7 +113,7 @@ export const OPEN_TARGETS = ['outline', 'templates', 'own', 'details', 'fixed', 
 /** The dialogs of section 17's actions (section 19, phase 4): the AI may open one the job's state allows, never act on its own. */
 export const STATE_DIALOGS: Record<string, StateAction> = { publish_now: 'publishNow', reschedule: 'reschedule', back_to_draft: 'backToDraft', extend: 'extend', share: 'share', filled: 'filled', withdraw: 'withdraw', reopen: 'reopen' };
 export type OpenTarget = (typeof OPEN_TARGETS)[number] | 'publish_now' | 'reschedule' | 'back_to_draft' | 'extend' | 'share' | 'filled' | 'withdraw' | 'reopen' | `section:${string}` | `lang:${string}`;
-const CARDS = ['plan', 'publish', 'review', 'live', 'state', 'website', 'project'] as const;
+const CARDS = ['plan', 'publish', 'review', 'live', 'state', 'website', 'project', 'social'] as const;
 const PACKAGE_KEYS = ['one', 'three', 'five', 'always'] as const;
 
 const ENGAGEMENT_KEYS: Engagement[] = ['job', 'consultancy', 'internship', 'volunteer'];

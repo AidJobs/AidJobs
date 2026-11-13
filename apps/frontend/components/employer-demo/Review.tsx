@@ -30,7 +30,9 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
   const named = preset?.length ? candidates.filter((p) => preset.some((n) => p.name.toLowerCase().startsWith(n.toLowerCase()))).map((p) => p.id) : [];
   const [picked, setPicked] = useState<string[]>(named.length ? named : candidates.filter((p) => p.role === 'reviewer').map((p) => p.id));
   const [outside, setOutside] = useState<string[]>([]);
-  const [due, setDue] = useState(3);
+  // Answer by (section 19, phase 5, E): a day two, three, or five days ahead, a date picked, or no date; the email names one only when chosen.
+  const [due, setDue] = useState<string | null>(() => addDays(s.today, 3));
+  const quick = [2, 3, 5].map((d) => addDays(s.today, d));
   const [rule, setRule] = useState<'any' | 'all'>(s.org.approvalRule);
   const [note, setNote] = useState('');
   const total = picked.length + outside.length;
@@ -48,13 +50,17 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
           </div>
         </Field>
         <RecipientInput label="Someone outside your team (private link, no account, expires in 7 days)" value={outside} onChange={setOutside} max={3} placeholder="name@example.org" />
-        <Field label="Answer by">
-          <div className="flex flex-wrap gap-1.5">
-            {[2, 3, 5].map((d) => (
-              <button key={d} type="button" className="aj-pill" data-active={due === d} onClick={() => setDue(d)}>
-                {shortDate(addDays(s.today, d))}
+        <Field label="Answer by (optional)">
+          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Answer by">
+            {quick.map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={due === d} className="aj-pill" data-active={due === d} onClick={() => setDue(d)}>
+                {shortDate(d)}
               </button>
             ))}
+            <button type="button" role="radio" aria-checked={due === null} className="aj-pill" data-active={due === null} onClick={() => setDue(null)}>
+              No date
+            </button>
+            <input type="date" style={{ ...inputStyle, minHeight: 32, width: 160 }} min={addDays(s.today, 1)} value={due && !quick.includes(due) ? due : ''} onChange={(e) => setDue(e.target.value || null)} aria-label="Pick a date to answer by" />
           </div>
         </Field>
         <Field label="Approval needs">
@@ -73,7 +79,8 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
         <div className="flex flex-col gap-1 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
           <span className="aj-faint">The email they get</span>
           <strong>
-            {s.me.name} asks you to review {job.facts.title || 'a job'} by {longDate(addDays(s.today, due))}
+            {s.me.name} asks you to review {job.facts.title || 'a job'}
+            {due ? ` by ${longDate(due)}` : ''}
           </strong>
           {note.trim() && <span className="aj-muted">&ldquo;{note.trim()}&rdquo;</span>}
           <span className="aj-muted">A link opens the job to read, comment, suggest changes, and approve or ask for changes{outside.length ? '; outside reviewers get a private link that expires in 7 days, with no account' : ''}.</span>
@@ -90,7 +97,7 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
             className="aj-ink-btn"
             disabled={total === 0}
             onClick={() => {
-              sendForReview(job.id, [...candidates.filter((p) => picked.includes(p.id)).map((p) => ({ name: p.name, email: p.email, outside: false })), ...outside.map((e) => ({ name: e, email: e, outside: true }))], addDays(s.today, due), rule, note);
+              sendForReview(job.id, [...candidates.filter((p) => picked.includes(p.id)).map((p) => ({ name: p.name, email: p.email, outside: false })), ...outside.map((e) => ({ name: e, email: e, outside: true }))], due ?? '', rule, note);
               onSent();
             }}
           >

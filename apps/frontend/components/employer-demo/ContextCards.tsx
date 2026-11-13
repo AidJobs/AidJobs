@@ -2,7 +2,7 @@
 
 import { FileUp, Link2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { acceptPageDraft, acceptSuggestion, rejectPageDraft, rejectSuggestion } from './context';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
 import { ACCEPTED, readJobFile } from './readFile';
 import type { OpenTarget } from './aiActions';
@@ -125,7 +125,26 @@ export function PageDraftCard({ job, s }: { job: DemoJob; s: State }) {
         Used: {d.used}
         {d.missing ? ` Not on the page: ${d.missing}` : ''}
       </span>
-      {d.social && d.social.length > 0 && <span className="aj-faint" style={{ fontSize: 12 }}>The page links to {d.social.length} social {d.social.length === 1 ? 'account' : 'accounts'}; they can be added in Organisation settings.</span>}
+      {d.social && d.social.length > 0 && !ro && (
+        <div className="flex flex-col gap-1">
+          <span className="aj-faint" style={{ fontSize: 12 }}>
+            The page links to these accounts. Add any to your organisation&apos;s social links (nothing is saved unless you add it):
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {d.social.map((u) =>
+              (s.org.social ?? []).includes(u) ? (
+                <span key={u} className="aj-chip">
+                  {socialLabel(u)} · added
+                </span>
+              ) : (
+                <button key={u} type="button" className="aj-pill" style={{ height: 28 }} onClick={() => addOrgSocial(u)}>
+                  Add {socialLabel(u)}
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+      )}
       {!ro && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" className="aj-ink-btn" disabled={!d.lines.length && !editing} onClick={() => acceptPageDraft(job.id, editing ? text.split('\n') : undefined)}>
@@ -147,6 +166,74 @@ export function PageDraftCard({ job, s }: { job: DemoJob; s: State }) {
             Reject
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Social links (section 19, phase 5, E): kept by the organisation, added here or in Organisation settings; on a job (`job`) each one is
+ * included or left out for that job only. Shown as a row on the public job page.
+ */
+export function SocialLinks({ s, job }: { s: State; job?: DemoJob }) {
+  const [url, setUrl] = useState('');
+  const [bad, setBad] = useState(false);
+  const ro = Boolean(s.reviewerAs);
+  const links = s.org.social ?? [];
+  const add = () => {
+    if (!url.trim()) return;
+    const ok = addOrgSocial(url);
+    setBad(!ok && !links.some((l) => l.includes(url.trim().replace(/^https?:\/\//, ''))));
+    if (ok) setUrl('');
+  };
+  return (
+    <div className="flex flex-col gap-1.5" role="group" aria-label="Social links">
+      {links.length === 0 && <span className="aj-faint">No social links yet. Optional: they show as a row on each job page.</span>}
+      {links.map((u) => (
+        <div key={u} className="flex flex-wrap items-center gap-2">
+          {job ? (
+            <label className="flex min-w-0 flex-1 items-center gap-2">
+              <input type="checkbox" checked={!(job.socialOff ?? []).includes(u)} disabled={ro} onChange={() => toggleJobSocial(job.id, u)} />
+              <span className="min-w-0 truncate">
+                <strong>{socialLabel(u)}</strong> <span className="aj-faint">{u.replace(/^https:\/\//, '')}</span>
+              </span>
+            </label>
+          ) : (
+            <span className="min-w-0 flex-1 truncate">
+              <strong>{socialLabel(u)}</strong> <span className="aj-faint">{u.replace(/^https:\/\//, '')}</span>
+            </span>
+          )}
+          {!job && !ro && (
+            <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={() => removeOrgSocial(u)} aria-label={`Remove ${socialLabel(u)}`}>
+              Remove
+            </button>
+          )}
+        </div>
+      ))}
+      {job && links.length > 0 && <span className="aj-faint" style={{ fontSize: 12 }}>Ticked links show on this job&apos;s page; leaving one out changes only this job.</span>}
+      {!ro && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            style={{ ...inputStyle, minHeight: 32, flex: 1, minWidth: 180 }}
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setBad(false);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            placeholder="https://www.linkedin.com/company/your-organisation"
+            aria-label="Add a social link"
+            inputMode="url"
+          />
+          <button type="button" className="aj-pill" style={{ height: 32 }} disabled={!url.trim()} onClick={add}>
+            Add
+          </button>
+        </div>
+      )}
+      {bad && (
+        <span role="alert" style={{ color: 'var(--amber)' }}>
+          That is not an https address.
+        </span>
       )}
     </div>
   );

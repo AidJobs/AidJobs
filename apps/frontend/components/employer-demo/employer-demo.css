@@ -25,18 +25,62 @@
   white-space: pre-wrap;
 }
 
+/*
+ * A plain chat (section 19, phase 5, E): both sides on the chat's own background, no dark box for the user's message and no box or
+ * outline for the reply; a faint "You" over the user's message tells them apart.
+ */
 .ej-bubble[data-from='user'] {
   margin-left: auto;
-  background: var(--ink);
-  color: var(--on-ink);
-  border-bottom-right-radius: 6px;
+  padding: 2px 0 2px 12px;
+  color: var(--text);
+  text-align: start;
+}
+
+.ej-bubble[data-from='user']::before {
+  content: 'You';
+  display: block;
+  margin-bottom: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3, var(--text-2));
+  opacity: 0.8;
 }
 
 .ej-bubble[data-from='ai'] {
-  background: var(--surface-2);
+  padding: 2px 0;
+  max-width: 100%;
   color: var(--text);
-  border: 1px solid var(--hair);
-  border-bottom-left-radius: 6px;
+}
+
+/* A section written by the AI or the rules while the window is open is wiped in from the top, once; at once with reduced motion. */
+.ej-reveal {
+  animation: ej-reveal 900ms ease-out both;
+}
+
+@keyframes ej-reveal {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ej-reveal {
+    animation: none;
+  }
+}
+
+/* Answer buttons: the same size, no fill until one is chosen; the chosen one keeps its selected state. */
+.aj-root .ej-bubble .ej-answer {
+  background: transparent;
+}
+
+.aj-root .ej-bubble .ej-answer[aria-pressed='true'] {
+  background: var(--sage-2, var(--surface-2));
+  border-color: var(--sage-6);
+  color: var(--text);
 }
 
 /* Focus: a light ring that follows each control's rounded corners, in place of the site's dark outline. */
@@ -65,9 +109,18 @@
   opacity: 0.45;
 }
 
+/*
+ * Focus (section 19, phase 5, E): every focused control shows a ring that follows its own corners, drawn as a box shadow (an outline
+ * can stay square on some controls); fields keep their soft ring. The surface-coloured gap keeps the ring visible on any background,
+ * in light and dark mode.
+ */
+.aj-root:has(.ej-app) {
+  --ej-ring-strong: color-mix(in srgb, var(--sage-6) 75%, transparent);
+}
+
 .aj-root:has(.ej-app) :focus-visible {
-  outline: 2px solid var(--ej-ring);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ej-ring-strong);
 }
 
 .aj-root:has(.ej-app) :is(input, select, textarea):focus-visible {
@@ -85,6 +138,7 @@
 
 .ej-composer:focus-within {
   border-color: var(--sage-5);
+  box-shadow: 0 0 0 3px var(--ej-ring-soft);
 }
 
 .aj-root .ej-composer textarea:focus-visible {
@@ -571,7 +625,7 @@ button.ej-step:hover {
 }
 
 .aj-root:has(.ej-app) .ej-tab:focus-visible {
-  outline-offset: -3px;
+  box-shadow: inset 0 0 0 2px var(--ej-ring-strong);
 }
 
 /* A language version edited in place: borderless like the document, a hairline on hover, a sage border on focus (like the chat box). */
@@ -1269,8 +1323,8 @@ button.ej-step:hover {
 }
 
 .aj-root label.aj-pill:focus-within {
-  outline: 2px solid var(--ej-ring);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ej-ring-strong);
 }
 
 .aj-root[data-theme='dark'] .ej-rail-badge,
@@ -1821,8 +1875,8 @@ button.ej-step:hover {
 }
 
 .aj-root .ej-pline .ej-line-part:focus-visible {
-  outline: 2px solid var(--sage-6);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ej-ring-strong);
 }
 
 .ej-pline-dot {
@@ -1941,7 +1995,7 @@ button.ej-step:hover {
 }
 
 .aj-root:has(.ej-app) .ej-w-tab:focus-visible {
-  outline-offset: -3px;
+  box-shadow: inset 0 0 0 2px var(--ej-ring-strong);
 }
 
 #ej-w-panel:focus {
@@ -2046,8 +2100,8 @@ button.ej-step:hover {
 }
 
 .ej-float:focus-visible {
-  outline: 2px solid var(--sage-6);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ej-ring-strong);
 }
 
 .ej-float-bar {
@@ -2122,7 +2176,8 @@ button.ej-step:hover {
 }
 
 .aj-root .ej-float-resize:focus-visible {
-  outline: 2px solid var(--sage-6);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ej-ring-strong);
 }
 
 .aj-root .ej-word {

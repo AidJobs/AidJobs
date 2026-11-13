@@ -10,6 +10,7 @@ import { saveAboutForOrg } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
+import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
@@ -201,11 +202,27 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number };
+
+/**
+ * A section's text revealed as it is written (section 19, phase 5, E): when the AI or the rules stored new text for it after the window
+ * opened (the latest version changed it), not when it was edited by hand. Its rich view (marks, placeholders) shows once it is all there.
+ */
+function SectionText({ job, sec, since, children }: { job: DemoJob; sec: Sec; since?: number; children: ReactNode }) {
+  const v = job.versions[job.versions.length - 1];
+  const before = job.versions[job.versions.length - 2]?.sections.find((x) => x.key === sec.key);
+  const fresh = Boolean(since && v && v.at >= since && !sec.edited && JSON.stringify(before?.lines) !== JSON.stringify(sec.lines));
+  const id = `${job.id}:${sec.key}:${v?.n ?? 0}`;
+  return (
+    <RevealBlock key={id} id={id} active={fresh}>
+      {children}
+    </RevealBlock>
+  );
+}
 
 const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits }: SectionProps) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since }: SectionProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
@@ -343,7 +360,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </span>
         </div>
       ) : (
-        <>
+        <SectionText job={job} sec={sec} since={since}>
           <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
           {sec.subs?.map((sb) => (
             <div key={sb.id} className="ej-subsection">
@@ -351,7 +368,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <Lines lines={sb.lines} job={job} section={sec.key} onFlag={onFlag} />
             </div>
           ))}
-        </>
+        </SectionText>
       )}
       {remarks.map((r) => (
         <div key={r.id} className="mt-1 flex flex-col gap-1 rounded-xl p-2.5" style={{ background: 'var(--amber-bg)' }}>
@@ -483,6 +500,7 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
 /** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits. */
 export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean }) {
   const [flag, setFlag] = useState<Flag | null>(null);
+  const [since] = useState(() => Date.now());
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
   const checks = quality(job.sections, job.facts, s.today, live);
   return (
@@ -500,7 +518,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
         {job.walk
           ? job.tags.map((k) => {
               const sec = job.sections.find((x) => x.key === k);
-              if (sec) return <SectionView key={k} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} />;
+              if (sec) return <SectionView key={k} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} />;
               return (
                 <section key={k} id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" aria-label={`${job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}, not written yet`} style={{ scrollMarginTop: 12 }}>
                   <h3 className="aj-faint">{job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}</h3>
@@ -511,7 +529,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
               );
             })
           : inOutlineOrder(job.sections, job.tags).map((sec) => (
-              <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} />
+              <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} since={since} />
             ))}
         {job.commitments.length > 0 && (
           <section className="rounded-2xl px-3 py-2" aria-label="Commitments">
