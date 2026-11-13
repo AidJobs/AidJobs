@@ -204,6 +204,8 @@ def answer(**kw) -> dict:
 def test_answers_in_the_guides_form_pass_and_others_are_named():
     assert v.answer_problems(answer(), 5) == []
     assert v.answer_problems(answer(note="a short note"), 5) == []
+    assert v.answer_problems(answer(headings=[[1, "role_purpose"], [1, "responsibilities"]]), 1) == []
+    assert v.answer_problems(answer(headings=[[1, "scope"], [1, "scope"]]), 1)
     cases = {
         "headings": answer(headings=[[9, "responsibilities"]]),
         "section type": answer(headings=[[2, "duties"]]),

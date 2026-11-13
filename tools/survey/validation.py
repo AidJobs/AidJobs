@@ -399,10 +399,11 @@ def answer_problems(a: dict, lines: int | None) -> list[str]:
         if not (isinstance(h, list) and len(h) == 2 and isinstance(h[0], int) and not isinstance(h[0], bool)
                 and h[1] in HEADING_TYPES):
             p.append(f"{vid}: heading {h!r} is not [line, section type]")
-        elif (lines is not None and not 1 <= h[0] <= lines) or h[0] in seen:
-            p.append(f"{vid}: heading line {h[0]} is outside the advert or given twice")
+        # One line may start several sections when an advert's text comes as a single line.
+        elif (lines is not None and not 1 <= h[0] <= lines) or tuple(h) in seen:
+            p.append(f"{vid}: heading {h!r} is outside the advert or given twice")
         else:
-            seen.add(h[0])
+            seen.add(tuple(h))
     for k in ("given", "vague", "restrictions"):
         allowed = set(RESTRICTION_IDS) if k == "restrictions" else set(FACT_IDS) - (NO_VAGUE if k == "vague" else set())
         if not isinstance(a[k], list) or not set(a[k]) <= allowed or len(set(a[k])) != len(a[k]):
@@ -426,7 +427,7 @@ def answer_problems(a: dict, lines: int | None) -> list[str]:
 
 def read_answers(path: Path) -> list[dict]:
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if line and not line.startswith("```"):
             out.append(json.loads(line))
