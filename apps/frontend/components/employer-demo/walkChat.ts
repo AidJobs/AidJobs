@@ -127,7 +127,7 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const quick = all ? [GOOD, ALL_GOOD] : [GOOD];
       const firstWritten = job.versions.find((v) => v.sections.some((x) => x.key === step.section && x.lines.length))?.sections.find((x) => x.key === step.section)?.lines;
       const edited = Boolean(firstWritten) && JSON.stringify(firstWritten) !== JSON.stringify(job.sections.find((x) => x.key === step.section)?.lines);
-      if (step.section === 'about') return [stepMsg(`${intro}**${name}** comes from your organisation profile, word for word. Good as it is?`, key, quick)];
+      if (step.section === 'about' && !edited && !job.sections.find((x) => x.key === 'about')?.ai) return [stepMsg(`${intro}**${name}** starts from your organisation's About us. Good as it is, or change it for this job?`, key, quick)];
       if (step.section === 'apply') return [stepMsg(`${intro}**${name}** is written from your application settings. Good, or change something?`, key, quick)];
       const text = edited ? `**${name}**: good now, or change something else?` : intro ? `${intro}First, **${name}**: good, or change something?` : `Here is **${name}**. Good, or change something?`;
       return [stepMsg(text, key, quick)];

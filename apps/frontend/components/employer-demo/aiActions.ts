@@ -43,11 +43,12 @@ import {
   startAsUsual,
   startFromProfile,
   writeVersionSection,
+  changeSub,
 } from './actions';
 import { approvalRequired } from './approval';
 import { canAmplifyFree } from './plans';
 import { profileFor } from './profiles';
-import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
+import { COMMITMENTS, CONTRACTS, crossesGroups, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { amplifying, ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, reachOpen, stepKey } from './flow';
 import { planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
@@ -129,6 +130,7 @@ const ORDER = [
   'reorder_sections',
   'rename_section',
   'write_section',
+  'sub',
   'approve_section',
   'fixed_text',
   'use_org_sdgs',
@@ -153,6 +155,9 @@ const ORDER = [
   'ask',
 ];
 const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
+
+/** The user asked to move or reorder something, so the AI may move a section across groups. */
+const MOVE_ASKED = /\b(move|put|place|before|after|order|first|last|top|bottom|above|below|swap|earlier|later|higher|lower)\b/i;
 
 const PAY = /(?:\b(?:USD|US\$|EUR|GBP|KES|UGX|TZS|ETB|NGN|ZAR|INR|BDT|PKR|AUD|CAD|CHF|SEK|NOK|DKK|XOF|XAF)|[$€£])\s?\d[\d,.]*\s?k?\b/gi;
 const CONTACT = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b|\bhttps?:\/\/[^\s)]+|\bwww\.[^\s)]+/gi;
@@ -442,8 +447,35 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'reorder_sections': {
         const order = Array.isArray(a.order) ? a.order.filter((k): k is string => typeof k === 'string') : [];
+        const queue = [...order];
+        const after = j.tags.map((t) => (order.includes(t) ? (queue.shift() ?? t) : t));
         if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => j.tags.includes(k))) refused.push('the new order');
+        // Across groups only when the user asked to move something (section 19, phase 5, B); within its group as before.
+        else if (crossesGroups(after) && !crossesGroups(j.tags) && !MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
         else reorderSections(id, order);
+        break;
+      }
+      case 'sub': {
+        const op = oneOf(a.op, ['add', 'rename', 'write', 'remove'] as const);
+        const sec = j.sections.find((x) => x.key === section);
+        const want = typeof a.sub === 'string' ? a.sub.toLowerCase() : '';
+        const sub = sec?.subs?.find((x) => x.id === a.sub || x.title.toLowerCase() === want);
+        if (!op || !sec || !isWritten(j, section)) refused.push(`a sub-section of ${name || 'a section'}: it is not written yet`);
+        else if (op === 'add') {
+          const heading = str(a.heading, 60);
+          if (!heading) refused.push('a sub-section without a heading');
+          else changeSub(id, section, { add: heading });
+        } else if (!sub) refused.push(`a sub-section ${name} does not have`);
+        else if (op === 'remove') changeSub(id, section, { remove: sub.id });
+        else if (op === 'rename') {
+          const heading = str(a.heading, 60);
+          if (!heading) refused.push('renaming a sub-section');
+          else changeSub(id, section, { rename: sub.id, title: heading });
+        } else {
+          const out = checkLines(a.lines, section, s, j, said ?? '');
+          if ('refused' in out) refused.push(out.refused);
+          else changeSub(id, section, { write: sub.id, lines: out.lines });
+        }
         break;
       }
       case 'rename_section': {

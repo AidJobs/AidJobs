@@ -3,9 +3,10 @@
 import { ChevronDown, GripHorizontal, MessagesSquare, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { applyOutline, createFormat, formatOf, headingOf, setFacts as changeFacts } from './actions';
+import { applyOutline, createFormat, formatOf, headingOf, setFacts as changeFacts, subId } from './actions';
 import DragList, { moveItem } from './DragList';
-import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, outlineOrder, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
+import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, outlineOrder, placeIn, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
+import { isWritten } from './flow';
 import MenuButton from './MenuButton';
 import { recommendation, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
@@ -42,7 +43,9 @@ export function refitPick(s: State, before: DemoJob, after: DemoJob, pick: Pick)
   const kept = pick.order.filter((o) => !gone.includes(o.key));
   const added = now.filter((n) => !was.some((o) => o.key === n.key) && !kept.some((o) => o.key === n.key));
   const all = [...kept, ...added];
-  return { ...pick, order: outlineOrder(all.map((o) => o.key)).map((k) => all.find((o) => o.key === k)!) };
+  // The user's own order stays; a section the new type brings goes in at its group.
+  const keys = added.reduce((order, a) => placeIn(order, a.key), kept.map((o) => o.key));
+  return { ...pick, order: keys.map((k) => all.find((o) => o.key === k)!) };
 }
 
 /** The headings the job description shows while choosing: the template's sections as adjusted, or the ones being created. */
@@ -94,7 +97,22 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
   const [seen, setSeen] = useState({ sig, keys, base: keys });
   if (seen.sig !== sig) setSeen({ sig, keys, base: seen.keys });
   const removed = seen.base.filter((k) => !keys.includes(k));
-  const sorted = outlineOrder(keys);
+  // In the group order the headings show by group; once a section was moved across groups, as one list in the user's order.
+  const grouped = outlineOrder(keys).join() === keys.join();
+  const row = (k: string) => {
+    const added = !seen.base.includes(k);
+    const entry = order.find((o) => o.key === k);
+    return (
+      <div key={k} className="ej-heading-row" data-added={added || undefined}>
+        <span style={{ fontWeight: 650 }}>{entry?.heading}</span>
+        <span className="aj-faint" style={{ fontSize: 12 }}>
+          {added && TYPE_REASONS[k] ? `${TYPE_REASONS[k]}. ` : ''}
+          {SECTION_BY_KEY[k]?.hint}
+        </span>
+        {entry?.subs?.length ? <span className="aj-faint" style={{ fontSize: 12 }}>Sub-sections: {entry.subs.map((sb) => sb.heading).join(' · ')}</span> : null}
+      </div>
+    );
+  };
   return (
     <article className="aj-card ej-headings flex flex-col gap-3 p-4 lg:p-5" aria-label={`${title}: its sections`}>
       <div className="flex flex-col gap-0.5">
@@ -103,29 +121,24 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
           {note}
         </span>
       </div>
-      {GROUPS.map((g) => {
-        const inGroup = sorted.filter((k) => SECTION_BY_KEY[k]?.group === g.key);
-        if (!inGroup.length) return null;
-        return (
-          <section key={g.key} className="flex flex-col gap-1.5" aria-label={g.label}>
-            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              {g.label}
-            </span>
-            {inGroup.map((k) => {
-              const added = !seen.base.includes(k);
-              return (
-                <div key={k} className="ej-heading-row" data-added={added || undefined}>
-                  <span style={{ fontWeight: 650 }}>{order.find((o) => o.key === k)?.heading}</span>
-                  <span className="aj-faint" style={{ fontSize: 12 }}>
-                    {added && TYPE_REASONS[k] ? `${TYPE_REASONS[k]}. ` : ''}
-                    {SECTION_BY_KEY[k]?.hint}
-                  </span>
-                </div>
-              );
-            })}
-          </section>
-        );
-      })}
+      {grouped ? (
+        GROUPS.map((g) => {
+          const inGroup = keys.filter((k) => SECTION_BY_KEY[k]?.group === g.key);
+          if (!inGroup.length) return null;
+          return (
+            <section key={g.key} className="flex flex-col gap-1.5" aria-label={g.label}>
+              <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                {g.label}
+              </span>
+              {inGroup.map(row)}
+            </section>
+          );
+        })
+      ) : (
+        <section className="flex flex-col gap-1.5" aria-label="In your order">
+          {keys.map(row)}
+        </section>
+      )}
       {removed.length > 0 && (
         <span className="aj-faint" style={{ fontSize: 12 }}>
           Not in this one: {removed.map((k) => SECTION_BY_KEY[k]?.label ?? k).join(', ')}.
@@ -160,64 +173,131 @@ function LazyHeading({ value, label, onCommit }: { value: string; label: string;
   );
 }
 
+/** A section's sub-sections in the outline (section 19, phase 5, B): one level, renamed, moved within the section, removed, or added. */
+function SubRows({ entry, onChange, lazy, disabled }: { entry: Format['order'][number]; onChange: (subs: NonNullable<Format['order'][number]['subs']>) => void; lazy: boolean; disabled?: string }) {
+  const subs = entry.subs ?? [];
+  const [adding, setAdding] = useState('');
+  const move = (i: number, by: -1 | 1) => {
+    const next = [...subs];
+    [next[i], next[i + by]] = [next[i + by], next[i]];
+    onChange(next);
+  };
+  return (
+    <div className="ej-subrows flex flex-col gap-1" role="group" aria-label={`Sub-sections of ${entry.heading}`}>
+      {subs.map((sb, i) => (
+        <div key={sb.id} className="ej-outline-row ej-subrow min-w-0">
+          {lazy ? (
+            <LazyHeading value={sb.heading} label={`Sub-heading ${i + 1} of ${entry.heading}`} onCommit={(v) => onChange(subs.map((x) => (x.id === sb.id ? { ...x, heading: v } : x)))} />
+          ) : (
+            <input className="ej-heading-input" value={sb.heading} onChange={(e) => onChange(subs.map((x) => (x.id === sb.id ? { ...x, heading: e.target.value } : x)))} aria-label={`Sub-heading ${i + 1} of ${entry.heading}`} />
+          )}
+          <span className="ej-row-tools">
+            <Tip label="Move up within the section">
+              <button type="button" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${sb.heading} up`}>
+                <ChevronDown size={12} strokeWidth={2} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+            </Tip>
+            <Tip label="Move down within the section">
+              <button type="button" disabled={i === subs.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${sb.heading} down`}>
+                <ChevronDown size={12} strokeWidth={2} />
+              </button>
+            </Tip>
+            <Tip label="Remove this sub-section">
+              <button type="button" onClick={() => onChange(subs.filter((x) => x.id !== sb.id))} aria-label={`Remove ${sb.heading}`}>
+                <X size={12} strokeWidth={2} />
+              </button>
+            </Tip>
+          </span>
+        </div>
+      ))}
+      {disabled ? (
+        <span className="aj-faint" style={{ fontSize: 11.5 }}>
+          {disabled}
+        </span>
+      ) : (
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!adding.trim()) return;
+            onChange([...subs, { id: subId(), heading: adding.trim() }]);
+            setAdding('');
+          }}
+        >
+          <input className="ej-heading-input ej-sub-add" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Sub-section" aria-label={`Add a sub-section to ${entry.heading}`} />
+          {adding.trim() && (
+            <button type="submit" className="aj-text-btn" style={{ height: 26 }}>
+              Add
+            </button>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
 /**
- * A template's sections: added, removed, renamed, and put in order within their group (the handle takes the arrow keys). `headingOf`
- * names a section added; `lazy` applies a rename only when its field is left.
+ * A template's sections: added, removed, renamed, and moved anywhere, across groups too (section 19, phase 5, B; the handle takes the
+ * arrow keys), each with its sub-sections. A section added goes in at its group. `headingOf` names a section added; `lazy` applies a
+ * rename only when its field is left; `subsOff`: why a section cannot have sub-sections yet.
  */
-export function HeadingsEditor({ order, onChange, recommended, headingOf: nameOf = (k) => SECTION_BY_KEY[k]?.label ?? k, lazy = false }: { order: Format['order']; onChange: (o: Format['order']) => void; recommended: string[]; headingOf?: (key: string) => string; lazy?: boolean }) {
-  const sorted = outlineOrder(order.map((o) => o.key));
+export function HeadingsEditor({ order, onChange, recommended, headingOf: nameOf = (k) => SECTION_BY_KEY[k]?.label ?? k, lazy = false, subsOff }: { order: Format['order']; onChange: (o: Format['order']) => void; recommended: string[]; headingOf?: (key: string) => string; lazy?: boolean; subsOff?: (key: string) => string | undefined }) {
+  const ids = order.map((o) => o.key);
+  const entry = (k: string) => order.find((o) => o.key === k)!;
   const rename = (key: string, heading: string) => onChange(order.map((o) => (o.key === key ? { ...o, heading } : o)));
+  const add = (key: string) => {
+    const keys = placeIn(ids, key);
+    onChange(keys.map((k) => (k === key ? { key, heading: nameOf(key) } : entry(k))));
+  };
   return (
     <div className="flex flex-col gap-3" aria-label="Sections of your template">
-      {GROUPS.map((g) => {
-        const ids = sorted.filter((k) => SECTION_BY_KEY[k]?.group === g.key);
-        const missing = SECTIONS.filter((d) => d.group === g.key && !ids.includes(d.key)).sort((a, b) => Number(recommended.includes(b.key)) - Number(recommended.includes(a.key)));
-        return (
-          <section key={g.key} className="flex flex-col gap-1.5" aria-label={g.label}>
-            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              {g.label}
-            </span>
-            {ids.length > 0 && (
-              <DragList
-                ids={ids}
-                label={(k) => order.find((o) => o.key === k)?.heading ?? k}
-                onMove={(from, to) => {
-                  const moved = moveItem(ids, from, to);
-                  const queue = [...moved];
-                  const keys = sorted.map((k) => (ids.includes(k) ? (queue.shift() ?? k) : k));
-                  onChange(keys.map((k) => order.find((o) => o.key === k)!));
-                }}
-              >
-                {(k) => (
-                  <div className="ej-outline-row min-w-0 flex-1">
-                    {lazy ? (
-                      <LazyHeading value={order.find((o) => o.key === k)?.heading ?? ''} label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} onCommit={(v) => rename(k, v)} />
-                    ) : (
-                      <input className="ej-heading-input" value={order.find((o) => o.key === k)?.heading ?? ''} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
-                    )}
-                    <span className="ej-row-tools">
-                      <Tip label="Remove this section">
-                        <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${order.find((o) => o.key === k)?.heading ?? k}`}>
-                          <X size={12} strokeWidth={2} />
-                        </button>
-                      </Tip>
-                    </span>
-                  </div>
+      <span className="aj-faint" style={{ fontSize: 11.5 }}>
+        Drag a section anywhere, even into another group; once moved, the job keeps your order.
+      </span>
+      {ids.length > 0 && (
+        <DragList ids={ids} label={(k) => entry(k).heading} onMove={(from, to) => onChange(moveItem(ids, from, to).map(entry))}>
+          {(k) => (
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="ej-outline-row min-w-0">
+                {lazy ? (
+                  <LazyHeading value={entry(k).heading} label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} onCommit={(v) => rename(k, v)} />
+                ) : (
+                  <input className="ej-heading-input" value={entry(k).heading} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
                 )}
-              </DragList>
-            )}
-            {missing.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {missing.map((d) => (
-                  <Tip key={d.key} label={`${d.hint}${recommended.includes(d.key) ? ' · recommended for this job' : ''}`}>
-                    <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => onChange([...order, { key: d.key, heading: nameOf(d.key) }])} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
-                      {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
-                      {d.label}
+                <span className="aj-faint shrink-0" style={{ fontSize: 10.5 }} title="Its group">
+                  {GROUPS.find((g) => g.key === SECTION_BY_KEY[k]?.group)?.label}
+                </span>
+                <span className="ej-row-tools">
+                  <Tip label="Remove this section">
+                    <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${entry(k).heading}`}>
+                      <X size={12} strokeWidth={2} />
                     </button>
                   </Tip>
-                ))}
+                </span>
               </div>
-            )}
+              <SubRows entry={entry(k)} lazy={lazy} disabled={subsOff?.(k)} onChange={(subs) => onChange(order.map((o) => (o.key === k ? { ...o, subs } : o)))} />
+            </div>
+          )}
+        </DragList>
+      )}
+      {GROUPS.map((g) => {
+        const missing = SECTIONS.filter((d) => d.group === g.key && !ids.includes(d.key)).sort((a, b) => Number(recommended.includes(b.key)) - Number(recommended.includes(a.key)));
+        if (!missing.length) return null;
+        return (
+          <section key={g.key} className="flex flex-col gap-1" aria-label={`Add to ${g.label}`}>
+            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+              Add · {g.label}
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {missing.map((d) => (
+                <Tip key={d.key} label={`${d.hint}${recommended.includes(d.key) ? ' · recommended for this job' : ''}`}>
+                  <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
+                    {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
+                    {d.label}
+                  </button>
+                </Tip>
+              ))}
+            </div>
           </section>
         );
       })}
@@ -323,7 +403,11 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
 
 /** This job's own sections, edited directly once a template is in use: each change applies at once, text written is kept. */
 function JobOutline({ s, job }: { s: State; job: DemoJob }) {
-  const order = job.tags.map((k) => ({ key: k, heading: headingOf(s, job, k) }));
+  const order = job.tags.map((k) => {
+    const written = isWritten(job, k) ? job.sections.find((x) => x.key === k)?.subs?.map((sb) => ({ id: sb.id, heading: sb.title })) : undefined;
+    const subs = written ?? job.subsPlan?.[k];
+    return { key: k, heading: headingOf(s, job, k), ...(subs ? { subs } : {}) };
+  });
   const ro = Boolean(s.reviewerAs);
   if (ro) return <HeadingsPreview order={order} title={formatOf(s, job.format).label} note="Read only for reviewers" />;
   return (
@@ -331,7 +415,13 @@ function JobOutline({ s, job }: { s: State; job: DemoJob }) {
       <span className="aj-faint" style={{ fontSize: 12 }}>
         Rename, remove, add, and drag this job&apos;s sections; each change applies at once, and text already written is kept where its section stays.
       </span>
-      <HeadingsEditor order={order} onChange={(next) => applyOutline(job.id, next)} recommended={recommendSections(formatOf(s, job.format), job.facts)} headingOf={(k) => headingFor(k, formatOf(s, job.format))} lazy />
+      <HeadingsEditor
+        order={order}
+        onChange={(next) => applyOutline(job.id, next)}
+        recommended={recommendSections(formatOf(s, job.format), job.facts)}
+        headingOf={(k) => headingFor(k, formatOf(s, job.format))}
+        lazy
+      />
     </div>
   );
 }

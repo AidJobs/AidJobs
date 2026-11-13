@@ -23,9 +23,12 @@ import {
   orderSections,
   parseIso,
   readPasted,
+  allLines,
+  crossesGroups,
   inOutlineOrder,
   lengthRequest,
   outlineOrder,
+  placeIn,
   recommendSections,
   suggestTitle,
   toneRequest,
@@ -76,6 +79,16 @@ function built(k: string, ctx: BuildContext, j: DemoJob): Section {
   return inLanguage(buildSection(k, ctx), ctx.facts, jobLang(j));
 }
 
+/**
+ * A section written for the first time takes its template's sub-sections (section 19, phase 5, B), each with a placeholder line that
+ * the basic check flags until it is written.
+ */
+function withTemplateSubs(s: State, j: DemoJob, sec: Section): Section {
+  if (sec.subs?.length) return sec;
+  const subs = j.subsPlan?.[sec.key] ?? formatOf(s, j.format).order.find((o) => o.key === sec.key)?.subs;
+  return subs?.length ? { ...sec, subs: subs.map((sb) => ({ id: sb.id, title: sb.heading, lines: [`[${sb.heading}]`] })) } : sec;
+}
+
 /** The rules' own English for a section they wrote, as the source of a version of a job in another language; null for text written by hand or by the AI. */
 function englishFor(s: State, j: DemoJob): (sec: Section) => Section | null {
   const ctx = ctxFor(s, j);
@@ -93,7 +106,8 @@ function rebuilt(s: State, j: DemoJob): DemoJob {
     const own = j.sections.find((x) => x.key === k && (x.edited || x.ai));
     if (own) return { ...own, lines: own.lines.map(fill) };
     const sec = built(k, ctx, j);
-    return j.renamed?.[k] ? { ...sec, title: j.renamed[k] } : sec;
+    const subs = j.sections.find((x) => x.key === k)?.subs;
+    return { ...sec, ...(j.renamed?.[k] ? { title: j.renamed[k] } : {}), ...(subs ? { subs } : {}) };
   }) };
 }
 
@@ -215,7 +229,7 @@ function writeByRules(id: string, keys: string[]) {
       const add = keys
         .filter((k) => x.tags.includes(k) && !isWritten(x, k))
         .map((k) => {
-          const sec = built(k, ctx, x);
+          const sec = withTemplateSubs(s, x, built(k, ctx, x));
           return x.renamed?.[k] ? { ...sec, title: x.renamed[k] } : sec;
         });
       if (!add.length) return x;
@@ -240,7 +254,7 @@ export function writeNow(id: string) {
 /** The live draft: once the role is known, the job description is written straight away and fills in as facts arrive. */
 function withLiveDraft(s: State, j: DemoJob): DemoJob {
   if (j.walk || j.setup || j.sections.length || !j.facts.title || j.tags.length < 3) return j;
-  const sections = buildSections(j.tags, ctxFor(s, j));
+  const sections = buildSections(j.tags, ctxFor(s, j)).map((sec) => withTemplateSubs(s, j, sec));
   return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
 }
 
@@ -491,8 +505,9 @@ export function applyTemplate(id: string, formatKey: string, said?: string, tags
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
-      const keys = outlineOrder(tags ?? orderSections(recommendSections(format, j.facts), format));
-      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, commitments: fixedFor(s, format), part: undefined };
+      // The sections as adjusted in the template panel keep the user's order, across groups too (section 19, phase 5, B).
+      const keys = tags ?? orderSections(recommendSections(format, j.facts), format);
+      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, ordered: crossesGroups(keys) || undefined, commitments: fixedFor(s, format), part: undefined };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
       const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
@@ -591,8 +606,8 @@ export function headingOf(s: State, j: DemoJob, key: string): string {
 
 /**
  * The job's outline as edited in the template panel (the user, 12 November 2026: any template can be adjusted, as in the earlier
- * outline editor): sections added, removed, put in order within their groups, and renamed for this job. Text already written is kept
- * where its section stays.
+ * outline editor): sections added, removed, put in order (across groups too, since phase 5), renamed for this job, and their
+ * sub-sections. Text already written is kept where its section, or sub-section, stays.
  */
 export function applyOutline(id: string, order: Format['order']) {
   if (!ownerOnly()) return;
@@ -607,7 +622,55 @@ export function applyOutline(id: string, order: Format['order']) {
     const j = job();
     const heading = o.heading.trim();
     if (j && heading && heading !== headingOf(getState(), j, o.key)) renameSection(id, o.key, heading);
+    if (o.subs) setSubs(id, o.key, o.subs);
   }
+}
+
+/** A section's sub-sections as the outline lists them: renamed, moved, added (empty, for the user or the AI to write), or removed. */
+function setSubs(id: string, key: string, want: Array<{ id: string; heading: string }>) {
+  updateJob(id, (j) => {
+    const sec = j.sections.find((x) => x.key === key);
+    if (!sec || !isWritten(j, key)) {
+      const plan = want.filter((w) => w.heading.trim());
+      if (JSON.stringify(plan) === JSON.stringify(j.subsPlan?.[key] ?? [])) return j;
+      return { ...j, subsPlan: { ...j.subsPlan, [key]: plan } };
+    }
+    const subs = want.filter((w) => w.heading.trim()).map((w) => {
+      const had = sec.subs?.find((x) => x.id === w.id);
+      return { id: w.id, title: w.heading.trim(), lines: had?.lines ?? [`[${w.heading.trim()}]`] };
+    });
+    if (JSON.stringify(subs) === JSON.stringify(sec.subs ?? [])) return j;
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, subs: subs.length ? subs : undefined } : x));
+    return { ...touched(j), sections, ...liveEdit(j), versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Sub-sections of ${sec.title}`, sections }] };
+  });
+}
+
+/** A new sub-section id. */
+export function subId(): string {
+  return `sub-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** A section's sub-sections, one change at a time (the outline, the section's editor, or the AI): add, rename, move, write, or remove. */
+export function changeSub(id: string, key: string, op: { add: string } | { rename: string; title: string } | { move: string; by: -1 | 1 } | { write: string; lines: string[] } | { remove: string }) {
+  if (!ownerOnly()) return;
+  const sec = getState().jobs.find((j) => j.id === id)?.sections.find((x) => x.key === key);
+  if (!sec) return;
+  const list = (sec.subs ?? []).map((x) => ({ id: x.id, heading: x.title }));
+  if ('add' in op) return op.add.trim() ? setSubs(id, key, [...list, { id: subId(), heading: op.add.trim() }]) : undefined;
+  if ('rename' in op) return setSubs(id, key, list.map((x) => (x.id === op.rename ? { ...x, heading: op.title } : x)));
+  if ('remove' in op) return setSubs(id, key, list.filter((x) => x.id !== op.remove));
+  if ('move' in op) {
+    const at = list.findIndex((x) => x.id === op.move);
+    const to = at + op.by;
+    if (at < 0 || to < 0 || to >= list.length) return;
+    const next = [...list];
+    [next[at], next[to]] = [next[to], next[at]];
+    return setSubs(id, key, next);
+  }
+  updateJob(id, (j) => {
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, subs: x.subs?.map((sb) => (sb.id === op.write ? { ...sb, lines: op.lines } : sb)) } : x));
+    return { ...touched(j), sections, ...liveEdit(j), versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited a sub-section of ${sec.title}`, sections }] };
+  });
 }
 
 /**
@@ -622,7 +685,7 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
       if (x.id !== id) return x;
       const base = x.walk || x.sections.length ? x.sections : buildSections(x.tags, ctxFor(s, x));
       const format = formatOf(s, x.format);
-      const fresh: Section[] = writes.filter((w) => x.tags.includes(w.key) && !base.some((b) => b.key === w.key)).map((w) => ({ key: w.key, title: x.renamed?.[w.key] ?? headingFor(w.key, format), lines: w.lines, ai: true }));
+      const fresh: Section[] = writes.filter((w) => x.tags.includes(w.key) && !base.some((b) => b.key === w.key)).map((w) => withTemplateSubs(s, x, { key: w.key, title: x.renamed?.[w.key] ?? headingFor(w.key, format), lines: w.lines, ai: true }));
       const sections = inOutlineOrder(
         [
           ...base.map((sec) => {
@@ -1488,7 +1551,8 @@ function undone(x: DemoJob): DemoJob {
 
 /** The job with an earlier version's text; the outline follows the text, so the two never disagree. */
 function atVersion(x: DemoJob, sections: DemoJob['sections'], note: string): DemoJob {
-  const tags = outlineOrder(sections.map((sec) => sec.key));
+  const keys = sections.map((sec) => sec.key);
+  const tags = x.ordered ? keys : outlineOrder(keys);
   return { ...touched(x), tags, sections: inOutlineOrder(sections, tags), versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note, sections }] };
 }
 
@@ -1525,25 +1589,28 @@ export function toggleSection(id: string, key: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
-      const tags = has ? j.tags.filter((t) => t !== key) : outlineOrder([...j.tags, key]);
+      const tags = has ? j.tags.filter((t) => t !== key) : placeIn(j.tags, key);
       const next = touched({ ...j, tags });
       if (!j.sections.length) return next;
-      const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, built(key, ctxFor(s, next), j)], tags);
+      const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, withTemplateSubs(s, j, built(key, ctxFor(s, next), j))], tags);
       const title = has ? j.sections.find((x) => x.key === key)?.title : sections.find((x) => x.key === key)?.title;
       return { ...next, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${has ? 'Removed' : 'Added'} ${title ?? key}`, sections }] };
     }),
   }));
 }
 
-/** Puts some of a job's sections in a new order, keeping the places the others hold. */
+/**
+ * Puts some of a job's sections in a new order, keeping the places the others hold. Any section may move anywhere (section 19, phase 5,
+ * B): once one moves out of the group order, the job keeps its own order from then on.
+ */
 export function reorderSections(id: string, keys: string[]) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const queue = [...keys];
-    const tags = outlineOrder(j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t)));
+    const tags = j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t));
     if (tags.join() === j.tags.join()) return j;
     const sections = inOutlineOrder(j.sections, tags);
-    return { ...touched(j), tags, sections: j.sections.length ? sections : j.sections };
+    return { ...touched(j), tags, ordered: j.ordered || crossesGroups(tags), sections: j.sections.length ? sections : j.sections };
   });
 }
 
@@ -1556,7 +1623,7 @@ export function applyFormat(id: string, formatKey: string) {
       const format = formatOf(s, formatKey);
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const tags = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      const next = { ...touched(j), renamed: undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      const next = { ...touched(j), renamed: undefined, ordered: undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));
@@ -1573,12 +1640,26 @@ export function markGenuine(id: string, hitKey: string, reason: string) {
 }
 
 /** `note`: in the window, the chat notices the hand edit and the edited section becomes the part in view. */
-export function editSection(id: string, key: string, text: string, note = false) {
+const linesOf = (text: string) => text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim());
+
+/**
+ * A section edited by hand: its text, and from the section's editor (section 19, phase 5, B) its heading (typed, or one of the suggested
+ * titles, applied only when saved) and its sub-sections' text.
+ */
+export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; text: string }> } = {}) {
   if (!ownerOnly()) return;
+  const heading = extra.title?.trim();
+  const was = getState().jobs.find((j) => j.id === id)?.sections.find((x) => x.key === key);
+  if (heading && was && heading !== was.title) renameSection(id, key, heading);
   updateJob(id, (j) => {
-    const lines = text.split('\n').map((l) => l.replace(/^[•*]\s*/, '- ')).filter((l) => l.trim());
-    if (JSON.stringify(lines) === JSON.stringify(j.sections.find((x) => x.key === key)?.lines)) return j;
-    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true } : x));
+    const lines = linesOf(text);
+    const old = j.sections.find((x) => x.key === key);
+    const subs = old?.subs?.map((sb) => {
+      const typed = extra.subs?.find((x) => x.id === sb.id);
+      return typed ? { ...sb, lines: linesOf(typed.text) } : sb;
+    });
+    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs) === JSON.stringify(old?.subs)) return j;
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true, ...(subs ? { subs } : {}) } : x));
     const title = j.sections.find((x) => x.key === key)?.title ?? key;
     const next: DemoJob = { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
     return note ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] } : next;
@@ -1919,7 +2000,7 @@ export function addTranslation(id: string, lang: JobLang) {
   const j0 = s.jobs.find((x) => x.id === id);
   if (!j0 || lang === jobLang(j0) || j0.translations?.[lang]) return;
   const english = englishFor(s, j0);
-  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang, english) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
+  updateJob(id, (j) => ({ ...j, translations: { ...j.translations, [lang]: draftTranslation(j, lang, english, s.org.about) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
 }
 
 /** "Update the French too": brings a version up to date with the job's own text, keeping the wording of lines whose source did not change. */
@@ -2865,7 +2946,7 @@ export function downloadCopy(j: DemoJob, orgName: string, say = false): boolean 
     if (say) notify(`${no}.`);
     return false;
   }
-  const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...s.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
+  const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...allLines(s).map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
   const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = href;
@@ -3009,7 +3090,7 @@ export function saveEditedBase(pattern: { count: number; sig: string }, order: F
 export function updateBaseFromJob(id: string) {
   if (!ownerOnly()) return;
   const j = getState().jobs.find((x) => x.id === id);
-  if (j?.sections.length) setBaseFormat(inOutlineOrder(j.sections, j.tags).map((x) => ({ key: x.key, heading: x.title })), `from "${j.facts.title || 'a job description'}"`, j.tone);
+  if (j?.sections.length) setBaseFormat(inOutlineOrder(j.sections, j.tags).map((x) => ({ key: x.key, heading: x.title, ...(x.subs?.length ? { subs: x.subs.map((sb) => ({ id: sb.id, heading: sb.title })) } : {}) })), `from "${j.facts.title || 'a job description'}"`, j.tone);
 }
 
 /** Forgets the base JD format: it stays as an ordinary saved format, and new jobs start from the closest standard JD format again. */

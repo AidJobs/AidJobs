@@ -257,6 +257,12 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
         <section key={sec.key}>
           <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? own : undefined}>{sec.title}</h3>
           <Lines lines={sec.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.lines : undefined} source={own} />
+          {sec.subs?.map((sb) => (
+            <div key={sb.id} className="ej-subsection">
+              <h4>{sb.title}</h4>
+              <Lines lines={sb.lines} english={version ? job.sections.find((x) => x.key === sec.key)?.subs?.find((x) => x.id === sb.id)?.lines : undefined} source={own} />
+            </div>
+          ))}
         </section>
       ))}
       {job.commitments.length > 0 && (

@@ -385,7 +385,7 @@ function Basics({ org }: { org: Org }) {
         <input style={inputStyle} value={org.hq} onChange={(e) => setOrg({ hq: e.target.value })} />
       </Field>
       <div className="sm:col-span-2">
-        <Field label="About" hint="Used in the About us section of every job">
+        <Field label="About" hint="Where each new job's About us starts; it can be changed on any job">
           <textarea style={{ ...inputStyle, minHeight: 80 }} value={org.about} onChange={(e) => setOrg({ about: e.target.value })} />
         </Field>
       </div>

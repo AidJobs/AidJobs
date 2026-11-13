@@ -33,7 +33,8 @@ export function normalise(s0: State): State {
   const s = purgeDeleted(goLive(rollBilling(freeBroughtForward(s0))));
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
-    const tags = outlineOrder(j0.tags);
+    // A job whose sections the user moved across groups keeps its own order (section 19, phase 5, B).
+    const tags = j0.ordered ? j0.tags : outlineOrder(j0.tags);
     const j1 = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
     // Saved before jobs kept a copy of what went live: today's text is the starting point for "changed since publishing".
     const j2 = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;

@@ -222,7 +222,16 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       canUndo: Boolean(j.lastChange),
       sections: j.tags.map((k) => {
         const sec = j.sections.find((x) => x.key === k);
-        return { key: k, heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format), fixed: FIXED_SECTIONS.includes(k), by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null, approved: j.walk ? j.walk.approved.includes(k) : null, text: sec ? sec.lines.join('\n') : null };
+        return {
+          key: k,
+          heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format),
+          group: SECTION_BY_KEY[k]?.group,
+          fixed: FIXED_SECTIONS.includes(k),
+          by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null,
+          approved: j.walk ? j.walk.approved.includes(k) : null,
+          text: sec ? sec.lines.join('\n') : null,
+          ...(sec?.subs?.length ? { subs: sec.subs.map((sb) => ({ id: sb.id, heading: sb.title, text: sb.lines.join('\n') })) } : {}),
+        };
       }),
     },
     walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,

@@ -18,7 +18,7 @@ export type Format = {
   family: Family | 'Your organisation';
   usedBy: string;
   tone: Tone;
-  order: Array<{ key: string; heading: string }>;
+  order: OutlineEntry[];
   commitments: string[];
 };
 
@@ -129,8 +129,17 @@ export type Facts = {
   keyPersonnel: boolean;
 };
 
-/** `ai`: written by the AI chat; like a hand edit, it is kept when the facts change rather than rebuilt by the rules. */
-export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean };
+/** A sub-heading inside a section with its own lines (section 19, phase 5, B): one level only. */
+export type Sub = { id: string; title: string; lines: string[] };
+
+/**
+ * `ai`: written by the AI chat; like a hand edit, it is kept when the facts change rather than rebuilt by the rules. `subs`: its
+ * sub-sections, after its own lines, kept when the rules rebuild the section.
+ */
+export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean; subs?: Sub[] };
+
+/** One section of a template or of a job's outline: its heading, and the headings of its sub-sections. */
+export type OutlineEntry = { key: string; heading: string; subs?: Array<{ id: string; heading: string }> };
 
 /** What the chat asks for, each just before the first section that uses it (employer-side plan, section 19, step 4). */
 export type AskKind = 'title' | 'place' | 'contract' | 'grade' | 'eligibility' | 'languages' | 'safeguarding' | 'salary' | 'deadline' | 'method';
@@ -353,6 +362,13 @@ export type DemoJob = {
   sdgsFrom?: 'org';
   /** Headings renamed for this job only, by section; kept when the rules rebuild a section, cleared when the template changes. */
   renamed?: Record<string, string>;
+  /**
+   * The user moved a section across the five groups (section 19, phase 5, B): the job keeps its own order through reloads, and a section
+   * added without a place goes in at its group. Unset, the job follows the group order.
+   */
+  ordered?: boolean;
+  /** Sub-sections set in the outline for sections not written yet; they join their section when it is written. */
+  subsPlan?: Record<string, Array<{ id: string; heading: string }>>;
   /** The last change asked for in the chat: shown on the changed sections, with Undo. */
   lastChange?: { keys: string[]; text: string; before: Section[]; beforeTags: string[]; beforeFacts: Facts; beforeTone: Tone };
 };

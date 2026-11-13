@@ -13,8 +13,11 @@ import type { AskKind, DemoJob, Format, GroupKey, JobLang, State, Walk } from '.
  * and when the AI is off the rules do both, in the same order.
  */
 
-/** Sections the rules write from the organisation's profile and its application settings; the AI never writes them. */
-export const FIXED_SECTIONS = ['about', 'apply'];
+/**
+ * Sections the rules write from the application settings; the AI never writes them. About us left this list in phase 5 (section 19, B):
+ * it is part of the job, started from the organisation's About us, and written or edited like any other section.
+ */
+export const FIXED_SECTIONS = ['apply'];
 
 /** The facts each group of sections needs, asked just before its first section. */
 export const FACTS_BEFORE: Record<GroupKey, AskKind[]> = {

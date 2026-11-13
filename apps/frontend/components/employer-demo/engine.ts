@@ -822,11 +822,55 @@ export function outlineOrder(keys: string[]): string[] {
     .map((x) => x.k);
 }
 
-/** Sections put in the outline's order; any section without a key in the list keeps its place at the end. */
+/**
+ * Sections put in the order of `keys`, which is the job's outline: the group order, or the user's own once they moved a section across
+ * groups (section 19, phase 5, B). Any section without a key in the list keeps its place at the end.
+ */
 export function inOutlineOrder<T extends { key: string }>(sections: T[], keys: string[]): T[] {
-  const order = outlineOrder(keys);
-  const listed = order.map((k) => sections.find((x) => x.key === k)).filter(Boolean) as T[];
-  return [...listed, ...sections.filter((x) => !order.includes(x.key))];
+  const listed = keys.map((k) => sections.find((x) => x.key === k)).filter(Boolean) as T[];
+  return [...listed, ...sections.filter((x) => !keys.includes(x.key))];
+}
+
+/** Whether an order moves a section out of the five groups' order. */
+export function crossesGroups(keys: string[]): boolean {
+  return outlineOrder(keys).join() !== keys.join();
+}
+
+/**
+ * A section added without a place: after the last section of its group, or of an earlier group, in the order as it stands; first when
+ * none comes before it. In a job that follows the group order this is the group order.
+ */
+export function placeIn(order: string[], key: string): string[] {
+  if (order.includes(key)) return order;
+  const rank = (k: string) => GROUPS.findIndex((g) => g.key === SECTION_BY_KEY[k]?.group);
+  const mine = rank(key);
+  let at = -1;
+  order.forEach((k, i) => {
+    if (rank(k) <= mine) at = i;
+  });
+  return [...order.slice(0, at + 1), key, ...order.slice(at + 1)];
+}
+
+/** A section's lines with its sub-sections after them, each sub-heading as a short label: for the checks, the AI, and copies. */
+export function allLines(sec: Section): string[] {
+  return [...sec.lines, ...(sec.subs ?? []).flatMap((sb) => [`${sb.title}:`, ...sb.lines])];
+}
+
+/**
+ * Two or three other titles for a section (section 19, phase 5, B): the headings other templates give it, and its plain name; never the
+ * one in use. A suggestion applies only when chosen.
+ */
+export function titleSuggestions(formats: Format[], key: string, current: string): string[] {
+  const seen = new Set([current.trim().toLowerCase()]);
+  const out: string[] = [];
+  for (const h of [...formats.flatMap((f) => f.order.filter((o) => o.key === key).map((o) => o.heading)), SECTION_BY_KEY[key]?.label ?? '']) {
+    const t = h.trim();
+    if (t && !seen.has(t.toLowerCase())) {
+      seen.add(t.toLowerCase());
+      out.push(t);
+    }
+  }
+  return out.slice(0, 3);
 }
 
 export function orderSections(keys: string[], format: Format): string[] {
@@ -1143,7 +1187,7 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   const t = text.toLowerCase();
   const target = sectionFrom(text, keys, ctx.format) ?? (focus && keys.includes(focus) ? focus : null);
   const role = roleByKey(ctx.roleKey);
-  const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited && !s.ai ? { ...buildSection(s.key, c), title: s.title } : s));
+  const rebuild = (ks: string[], c: BuildContext) => sections.map((s) => (ks.includes(s.key) && !s.edited && !s.ai ? { ...buildSection(s.key, c), title: s.title, ...(s.subs ? { subs: s.subs } : {}) } : s));
   let tone = ctx.tone;
   let facts = ctx.facts;
   const length = lengthRequest(t);
@@ -1175,9 +1219,10 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   const lang = LANGUAGES.find((l) => t.includes(l.toLowerCase()));
   if (lang && !facts.languages.includes(lang)) {
     facts = { ...facts, languages: facts.languages.length ? [...facts.languages, lang] : ['English', lang] };
-    const nextKeys = keys.includes('languages') ? keys : [...keys, 'languages'];
+    const nextKeys = placeIn(keys, 'languages');
     const c = { ...ctx, facts };
-    const merged = nextKeys.map((k) => (k === 'languages' ? buildSection(k, c) : (sections.find((s) => s.key === k) ?? buildSection(k, c))));
+    const had = sections.find((s) => s.key === 'languages');
+    const merged = nextKeys.map((k) => (k === 'languages' ? { ...buildSection(k, c), ...(had?.subs ? { subs: had.subs } : {}) } : (sections.find((s) => s.key === k) ?? buildSection(k, c))));
     return { sections: merged, tags: nextKeys, tone, facts, reply: `Added ${lang} as desirable.` };
   }
   const add = t.trim().match(/^(?:please\s+)?(?:can you\s+|could you\s+)?add\s+(?:a\s+|an\s+|the\s+)?(.+?)(?:\s+section)?(?:\s+please)?[.!?]?$/);
@@ -1185,7 +1230,7 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
     const named = add[1].trim();
     const def = SECTIONS.find((x) => [x.label, x.key, headingFor(x.key, ctx.format)].some((n) => n.toLowerCase() === named));
     if (def && !keys.includes(def.key)) {
-      const nextKeys = outlineOrder([...keys, def.key]);
+      const nextKeys = placeIn(keys, def.key);
       return { sections: inOutlineOrder([...sections, buildSection(def.key, ctx)], nextKeys), tags: nextKeys, tone, facts, reply: `Added ${headingFor(def.key, ctx.format)}.` };
     }
   }

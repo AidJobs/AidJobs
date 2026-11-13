@@ -59,7 +59,8 @@ describe('a returning employer: the usual template and one confirmation (section
     expect(job(id).walk?.pace).toBe('step');
     expect(getState().pace).toBe('step');
     expect(job(id).chat.some((m) => m.text.startsWith('Starting with your Riverstone format, written warmly'))).toBe(true);
-    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    // About us is part of the job since phase 5: it is written in its turn, not put in from the profile at the start.
+    expect(job(id).sections.map((x) => x.key)).toEqual(['apply']);
     expect(nextStep(job(id), getState())?.kind).not.toBe('setup');
   });
 

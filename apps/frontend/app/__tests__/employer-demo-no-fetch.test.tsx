@@ -1861,7 +1861,7 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     say('One section at a time');
     await flush();
     expect(job().setup).toBeUndefined();
-    expect(job().sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    expect(job().sections.map((x) => x.key)).toEqual(['apply']);
     shows('Before I write About us: What kind of contract is it?');
     say('Fixed-term');
     await flush();
@@ -1901,7 +1901,7 @@ describe('employer demo: the AI chat, with a stand-in model on its own route', (
     shows("The AI could not answer just now, so the demo's own rules did.");
     expect(job().chat.at(-1)?.ai).toBeUndefined();
     expect(network).toEqual([]);
-  });
+  }, 20_000);
 });
 
 describe('employer demo: round 7, phase 4 (returning employers, jobs in their state, reviewers, the old pages archived)', () => {

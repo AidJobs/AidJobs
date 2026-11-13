@@ -3,7 +3,7 @@
  * AidJobs collects, with its count shown; the demo uses a labelled sample of similar open jobs, generated the same way every time for a
  * role and a place. Where there are too few similar jobs, the check says so instead of guessing.
  */
-import { addDays, daysUntil, findInclusive, holiday, isoDay, longDate, parseIso, PLACES, placeOf, quality, roleByKey, salarySuggestion, weekend, type Place } from './engine';
+import { addDays, allLines, daysUntil, findInclusive, holiday, isoDay, longDate, parseIso, PLACES, placeOf, quality, roleByKey, salarySuggestion, weekend, type Place } from './engine';
 import type { DemoJob, Facts, State } from './types';
 
 /** Below this many similar open jobs, nothing is compared. */
@@ -217,7 +217,9 @@ export function fullAdvertCheck(job: DemoJob, s: State): { thin: boolean; points
 /** The basic advert check, for every job: clarity and inclusion. */
 export function basicAdvertCheck(job: DemoJob, s: State): Point[] {
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
-  const points: Point[] = quality(job.sections, job.facts, s.today, live)
+  // Sub-sections are checked with their section: a placeholder left in one is a point like any other.
+  const flat = job.sections.map((sec) => (sec.subs?.length ? { ...sec, lines: allLines(sec) } : sec));
+  const points: Point[] = quality(flat, job.facts, s.today, live)
     .filter((q) => q.level !== 'ok')
     .map((q) => ({ key: q.key, ok: false, title: q.text, section: q.section }));
   for (const sec of job.sections) {

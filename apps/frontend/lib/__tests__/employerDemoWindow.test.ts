@@ -212,7 +212,7 @@ describe('the window, revised: the template comes first, then the style, then th
     sendChat(id, 'One section at a time');
     expect(job(id).setup).toBeUndefined();
     expect(getState().pace).toBe('step');
-    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    expect(job(id).sections.map((x) => x.key)).toEqual(['apply']);
     expect(job(id).chat.at(-1)).toMatchObject({ text: 'Before I write **About us**: Where is the job based?', ask: 'place', step: 'ask:place' });
     const next = startJob('We are hiring a Health Officer', undefined, [], true);
     applyTemplate(next, job(next).format);
@@ -223,10 +223,14 @@ describe('the window, revised: the template comes first, then the style, then th
     expect(job(next).chat.some((m) => m.quick?.includes('Keep it for all jobs'))).toBe(false);
   });
 
-  it('a template the user built is applied with exactly its sections', () => {
+  it('a template the user built is applied with exactly its sections, in the user’s own order across groups (phase 5, B)', () => {
     const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
     applyTemplate(id, job(id).format, undefined, ['apply', 'about', 'responsibilities']);
-    expect(job(id).tags).toEqual(['about', 'responsibilities', 'apply']);
+    expect(job(id).tags).toEqual(['apply', 'about', 'responsibilities']);
+    expect(job(id).ordered).toBe(true);
+    const grouped = startJob('We are hiring a Health Officer', undefined, [], true);
+    applyTemplate(grouped, job(grouped).format, undefined, ['about', 'responsibilities', 'apply']);
+    expect(job(grouped).ordered).toBeUndefined();
   });
 
   it('reads the style in words, and turns it into the writer’s tone', () => {
@@ -259,7 +263,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(ask(id)).toBe('grade');
     sendChat(id, 'no grade');
     expect(step(id)).toEqual({ kind: 'approve', section: 'about' });
-    expect(job(id).chat.at(-1)?.text).toBe('**About us** comes from your organisation profile, word for word. Good as it is?');
+    expect(job(id).chat.at(-1)?.text).toBe("**About us** starts from your organisation's About us. Good as it is, or change it for this job?");
     sendChat(id, 'Good, next');
     expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'purpose', 'apply']);
     expect(job(id).chat.at(-1)?.text).toBe('Here is **The role**. Good, or change something?');
@@ -328,7 +332,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     sendChat(id, 'Goma');
     expect(JSON.stringify(job(id).sections)).not.toContain('[Duty station]');
     sendChat(id, 'no grade');
-    expect(job(id).chat.at(-1)?.text).toBe('**About us** comes from your organisation profile, word for word. Good as it is?');
+    expect(job(id).chat.at(-1)?.text).toBe("**About us** starts from your organisation's About us. Good as it is, or change it for this job?");
     expect(job(id).chat.at(-1)?.quick).toEqual(['Good, next', 'All good, approve the rest']);
     sendChat(id, 'All good, approve the rest');
     expect(job(id).walk?.approved).toEqual(job(id).tags);

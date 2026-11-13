@@ -97,7 +97,7 @@ describe('the AI chat: the demo carries out the actions', () => {
     expect(job(id).setup).toBeUndefined();
     expect(job(id).walk?.pace).toBe('step');
     expect(getState().pace).toBe('step');
-    expect(job(id).sections.map((x) => x.key)).toEqual(['about', 'apply']);
+    expect(job(id).sections.map((x) => x.key)).toEqual(['apply']);
     expect(nextStep(job(id), getState())).toEqual({ kind: 'ask', fact: 'contract', section: 'about' });
   });
 
@@ -113,7 +113,12 @@ describe('the AI chat: the demo carries out the actions', () => {
     resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
     applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }, { type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'step' }] }, open);
-    applyAiTurn(id, 'fixed-term, and there is no grade', { reply: 'Got it. About us comes from your profile: good as it is?', actions: [{ type: 'set_facts', facts: { contract: 'fixed-term' } }, { type: 'settle', fact: 'grade' }] }, open);
+    applyAiTurn(id, 'fixed-term, and there is no grade', { reply: 'Got it.', actions: [{ type: 'set_facts', facts: { contract: 'fixed-term' } }, { type: 'settle', fact: 'grade' }] }, open);
+    // About us is part of the job since phase 5: the AI writes it from the organisation's own text; How to apply is still refused.
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'write', sections: ['about'] });
+    applyAiTurn(id, '', { reply: 'Here is About us. Good, or change something?', actions: [{ type: 'write_section', section: 'about', lines: [getState().org.about] }, { type: 'write_section', section: 'apply', lines: ['Send your CV.'] }] }, open);
+    expect(job(id).sections.find((x) => x.key === 'about')).toMatchObject({ lines: [getState().org.about], ai: true });
+    expect(lastAi(id)?.text).toContain('Not done: How to apply: written from your settings');
     expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
     expect(lastAi(id)?.step).toBe('approve:about');
     applyAiTurn(id, 'yes', { reply: 'Here is The role. Good, or change something?', actions: [{ type: 'approve_section', section: 'about' }, { type: 'write_section', section: 'purpose', lines: ['The post holder runs nutrition screening in Juba.'] }] }, open);

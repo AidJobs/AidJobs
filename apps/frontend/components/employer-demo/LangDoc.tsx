@@ -132,6 +132,16 @@ export function LangDoc({ job, lang, readOnly = false }: { job: DemoJob; lang: J
                   </div>
                 );
               })}
+              {sec.subs?.map((sb) => (
+                <div key={sb.id} className="ej-subsection px-2">
+                  <h4>{sb.title}</h4>
+                  {sb.lines.map((l, i) => (
+                    <p key={i} className="m-0">
+                      {l.startsWith('- ') ? `• ${l.slice(2)}` : l}
+                    </p>
+                  ))}
+                </div>
+              ))}
             </section>
           );
         })}

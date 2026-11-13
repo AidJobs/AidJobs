@@ -7,7 +7,7 @@ import { addRemark, answerFact, approveSection, changedSinceLastRound, dismissCh
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import Composer, { type ComposerHandle } from './Composer';
-import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, type QualityItem } from './engine';
+import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
@@ -202,9 +202,20 @@ export function ApplyFields({ job }: { job: DemoJob }) {
 
 type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean };
 
+const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
+
 function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits }: SectionProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
+  const [title, setTitle] = useState('');
+  const [subs, setSubs] = useState<Array<{ id: string; title: string; text: string }>>([]);
+  const others = editing ? titleSuggestions(s.formats, sec.key, title) : [];
+  const startEdit = () => {
+    setText(asText(sec.lines));
+    setTitle(sec.title);
+    setSubs((sec.subs ?? []).map((sb) => ({ id: sb.id, title: sb.title, text: asText(sb.lines) })));
+    setEditing(true);
+  };
   const [remark, setRemark] = useState<'comment' | 'suggestion' | null>(null);
   const [remarkText, setRemarkText] = useState('');
   const [suggestText, setSuggestText] = useState('');
@@ -237,7 +248,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         )}
         {!reviewing && !editing && (
           <Tip label={`Edit ${sec.title}`}>
-            <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => { setText(sec.lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n')); setEditing(true); }} aria-label={`Edit ${sec.title}`}>
+            <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={startEdit} aria-label={`Edit ${sec.title}`}>
               <Pencil size={13} strokeWidth={1.8} />
             </button>
           </Tip>
@@ -279,18 +290,60 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
       ))}
       {editing ? (
         <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="aj-faint" style={{ fontSize: 11.5 }}>
+              Heading
+            </span>
+            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={`Heading of ${sec.title}`} />
+          </label>
+          {others.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Other titles">
+              <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                Other titles:
+              </span>
+              {others.map((t) => (
+                <button key={t} type="button" className="aj-pill" style={{ height: 26 }} onClick={() => setTitle(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
           <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus />
+          {subs.map((sb) => (
+            <label key={sb.id} className="flex flex-col gap-1">
+              <span style={{ fontWeight: 650, fontSize: 13 }}>{sb.title}</span>
+              <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title} text`} />
+            </label>
+          ))}
           <div className="flex gap-1.5">
-            <button type="button" className="aj-ink-btn" onClick={() => { editSection(job.id, sec.key, text, noteEdits); setEditing(false); }}>
+            <button
+              type="button"
+              className="aj-ink-btn"
+              onClick={() => {
+                editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, text: x.text })) });
+                setEditing(false);
+              }}
+            >
               Save
             </button>
             <button type="button" className="aj-pill" onClick={() => setEditing(false)}>
               Cancel
             </button>
           </div>
+          <span className="aj-faint" style={{ fontSize: 11.5 }}>
+            Sub-sections are added, renamed, moved, or removed from the template&apos;s name on the line, under This job&apos;s sections.
+          </span>
         </div>
       ) : (
-        <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
+        <>
+          <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
+          {sec.subs?.map((sb) => (
+            <div key={sb.id} className="ej-subsection">
+              <h4>{sb.title}</h4>
+              <Lines lines={sb.lines} job={job} section={sec.key} onFlag={onFlag} />
+            </div>
+          ))}
+        </>
       )}
       {remarks.map((r) => (
         <div key={r.id} className="mt-1 flex flex-col gap-1 rounded-xl p-2.5" style={{ background: 'var(--amber-bg)' }}>

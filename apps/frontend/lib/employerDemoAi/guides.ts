@@ -3,7 +3,7 @@ import { EXAMPLES } from './examples';
 /**
  * How each template is written, for the AI chat's drafts: structure, voice, length, and section rules, from the style study of real
  * adverts (employer-generator/style-study) and the third test round's instructions. Lengths count the text the AI writes, without
- * the organisation's fixed text, About us, or How to apply.
+ * the organisation's fixed text, or How to apply; About us is short and comes from the organisation's own text.
  */
 /** What the demo checks in each section after a draft: words, bullets, group labels, and lines. */
 export type SectionRule = { minWords?: number; bullets?: [number, number]; groups?: [number, number]; minLines?: number };

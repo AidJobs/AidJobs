@@ -462,13 +462,22 @@ function englishOf(job: DemoJob, sec: Section, english?: (sec: Section) => Secti
 /** One section drafted in the language: what the table covers is translated; every other line stays in the job's language, to translate while reviewing. */
 function draftSection(job: DemoJob, sec: Section, lang: JobLang, english?: (sec: Section) => Section | null): Section {
   const en = englishOf(job, sec, english);
-  if (lang === 'en') return { key: sec.key, title: en.title, lines: en.lines };
-  return { key: sec.key, title: HEADINGS[sec.key]?.[lang] ?? sec.title, lines: sec.lines.map((l, i) => translateLine(en.lines[i] ?? l, job.facts, lang) ?? l) };
+  // Sub-sections are translated with their section (section 19, phase 5, B): headings stay to translate while reviewing, lines by the table.
+  const subs = sec.subs?.map((sb) => ({ id: sb.id, title: sb.title, lines: lang === 'en' ? sb.lines : sb.lines.map((l) => translateLine(l, job.facts, lang) ?? l) }));
+  if (lang === 'en') return { key: sec.key, title: en.title, lines: en.lines, ...(subs ? { subs } : {}) };
+  return { key: sec.key, title: HEADINGS[sec.key]?.[lang] ?? sec.title, lines: sec.lines.map((l, i) => translateLine(en.lines[i] ?? l, job.facts, lang) ?? l), ...(subs ? { subs } : {}) };
 }
 
 /** A first draft of the job in the language, with the job's sections; from then on the version keeps its own sections. */
-export function draftTranslation(job: DemoJob, lang: JobLang, english?: (sec: Section) => Section | null): Translation {
-  return { sections: job.sections.map((sec) => draftSection(job, sec, lang, english)), reviewed: false, source: sourceOf(job), at: Date.now() };
+export function draftTranslation(job: DemoJob, lang: JobLang, english?: (sec: Section) => Section | null, orgAbout?: string): Translation {
+  const sections = job.sections.map((sec) => draftSection(job, sec, lang, english));
+  // A version translates the job's own About us (section 19, phase 5, B); the organisation's is used only when the job has none.
+  const own = job.sections.find((x) => x.key === 'about' && x.lines.length);
+  if (!own && orgAbout?.trim()) {
+    const about = draftSection(job, { key: 'about', title: 'About us', lines: [orgAbout.trim()] }, lang);
+    return { sections: [about, ...sections.filter((x) => x.key !== 'about')], reviewed: false, source: sourceOf(job), at: Date.now() };
+  }
+  return { sections, reviewed: false, source: sourceOf(job), at: Date.now() };
 }
 
 /** One section of the job drafted for a version that does not have it yet. */
@@ -478,7 +487,8 @@ export function draftVersionSection(job: DemoJob, key: string, lang: JobLang, en
 }
 
 function sourceOf(job: DemoJob): string {
-  return JSON.stringify(job.sections.map((sec) => [sec.key, sec.lines]));
+  // A section's sub-sections count only when it has some, so versions made before sub-sections existed are not marked behind.
+  return JSON.stringify(job.sections.map((sec) => (sec.subs?.length ? [sec.key, sec.lines, sec.subs.map((sb) => [sb.title, sb.lines])] : [sec.key, sec.lines])));
 }
 
 /** The sections of the job's own text that changed since the version was last brought up to date. */
