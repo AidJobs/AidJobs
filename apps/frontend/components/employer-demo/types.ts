@@ -144,7 +144,11 @@ export type Source = 'you told us' | 'your website' | 'the project page' | 'your
  */
 export type ContextPack = {
   about?: { text: string; source: Source };
-  project?: { text: string; source: Source; at: number; usedBy?: string[] };
+  /**
+   * `answered`: the facts the project text disagreed on that the user has settled (kept the job's, or took the project's). `redo`: the
+   * sections that used the project this one replaced, offered for updating once the disagreements are answered.
+   */
+  project?: { text: string; source: Source; at: number; usedBy?: string[]; answered?: Array<'country' | 'donor' | 'deadline'>; redo?: string[] };
   facts?: Array<{ fact: string; value: string; source: Source }>;
 };
 
@@ -344,6 +348,8 @@ export type DemoJob = {
   reachDismissed?: string[];
   /** When the field-post flyer was first shown for this job; out of date while review is open again (section 19, phase 5, C). */
   flyerMade?: number;
+  /** What the flyer was made from (`contentPrint`), so a later change marks it out of date. */
+  flyerOf?: string;
   chat: ChatMsg[];
   createdAt: number;
   publishedAt?: number;

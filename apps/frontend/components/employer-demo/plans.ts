@@ -140,10 +140,21 @@ export function freeSummary(s: State): string {
  */
 export function freeBroughtForward(s: State): State {
   if (s.free) return s;
-  const went = s.freeUses?.[0]?.jobId ?? s.jobs.find((j) => j.plan === 'free' && j.publishedAt)?.id;
+  // Used: the first free job that really went live (an old use whose job never did is not one), else any free job published.
+  const live = (j: State['jobs'][number]) => j.plan === 'free' && Boolean(j.publishedAt) && (j.status === 'live' || j.status === 'closed');
+  const went = s.freeUses?.map((u) => u.jobId).find((id) => s.jobs.some((j) => j.id === id && live(j))) ?? s.jobs.find(live)?.id;
+  // Scheduled free jobs beyond the one allowance (all of them when it is used) go back to drafts, so none goes live free as a second.
+  const scheduled = s.jobs.filter((j) => j.status === 'scheduled' && j.plan === 'free').sort((a, b) => (a.scheduledFor ?? '').localeCompare(b.scheduledFor ?? ''));
+  const keep = went ? undefined : scheduled[0]?.id;
+  const back = new Set(scheduled.filter((j) => j.id !== keep).map((j) => j.id));
   const { freeUses: _old, ...rest } = s;
   void _old;
-  return { ...rest, free: went ? { standard: went } : {} };
+  return {
+    ...rest,
+    free: went ? { standard: went } : {},
+    jobs: back.size ? s.jobs.map((j) => (back.has(j.id) ? { ...j, status: 'draft' as const, plan: null, scheduledFor: undefined, audit: [...j.audit, { at: s.today, who: 'AidJobs', what: 'Back to a draft: the free standard listing is now once per organisation, and another job has it' }] } : j)) : s.jobs,
+    ...(back.size ? { notice: { text: `${back.size === 1 ? 'One scheduled free job is' : `${back.size} scheduled free jobs are`} back to drafts: the free standard listing is now once per organisation. Publish ${back.size === 1 ? 'it' : 'them'} with Amplify or a package.` } } : {}),
+  };
 }
 
 /** Paid jobs on hand, the soonest to lapse first: a subscription's jobs for this month, then packs. */

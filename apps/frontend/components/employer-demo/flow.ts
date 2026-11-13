@@ -137,7 +137,17 @@ export function reachOpen(job: DemoJob, s: State): boolean {
 
 /** A flyer made before an edit or a request for changes: out of date until the job is approved again. */
 export function flyerStale(job: DemoJob, s: State): boolean {
-  return Boolean(job.flyerMade) && !isPublished(job) && !reviewDone(job, s);
+  if (!job.flyerMade || isPublished(job)) return false;
+  // Review open again, or the job changed since the flyer was made (round 7 review: also when review is optional and done).
+  return !reviewDone(job, s) || (job.flyerOf !== undefined && job.flyerOf !== contentPrint(job));
+}
+
+/** A short fingerprint of what a flyer shows: the job's facts and its text, in every language. */
+export function contentPrint(job: DemoJob): string {
+  const text = JSON.stringify([job.facts, job.sections, job.translations ?? null]);
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return `${text.length}:${(h >>> 0).toString(36)}`;
 }
 
 /** The market check's points still open, without those left as they are; none when there are too few similar jobs. */

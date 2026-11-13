@@ -2,7 +2,7 @@
 
 import { FileUp, Link2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { acceptPageDraft, acceptSuggestion, addOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
 import { ACCEPTED, readJobFile } from './readFile';
 import type { OpenTarget } from './aiActions';
@@ -125,7 +125,7 @@ export function PageDraftCard({ job, s }: { job: DemoJob; s: State }) {
         Used: {d.used}
         {d.missing ? ` Not on the page: ${d.missing}` : ''}
       </span>
-      {d.social && d.social.length > 0 && !ro && (
+      {d.social && d.social.length > 0 && canEditOrgSocial(s) && (
         <div className="flex flex-col gap-1">
           <span className="aj-faint" style={{ fontSize: 12 }}>
             The page links to these accounts. Add any to your organisation&apos;s social links (nothing is saved unless you add it):
@@ -179,6 +179,7 @@ export function SocialLinks({ s, job }: { s: State; job?: DemoJob }) {
   const [url, setUrl] = useState('');
   const [bad, setBad] = useState(false);
   const ro = Boolean(s.reviewerAs);
+  const owner = canEditOrgSocial(s);
   const links = s.org.social ?? [];
   const add = () => {
     if (!url.trim()) return;
@@ -203,7 +204,7 @@ export function SocialLinks({ s, job }: { s: State; job?: DemoJob }) {
               <strong>{socialLabel(u)}</strong> <span className="aj-faint">{u.replace(/^https:\/\//, '')}</span>
             </span>
           )}
-          {!job && !ro && (
+          {!job && owner && (
             <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={() => removeOrgSocial(u)} aria-label={`Remove ${socialLabel(u)}`}>
               Remove
             </button>
@@ -211,7 +212,8 @@ export function SocialLinks({ s, job }: { s: State; job?: DemoJob }) {
         </div>
       ))}
       {job && links.length > 0 && <span className="aj-faint" style={{ fontSize: 12 }}>Ticked links show on this job&apos;s page; leaving one out changes only this job.</span>}
-      {!ro && (
+      {!ro && !owner && <span className="aj-faint" style={{ fontSize: 12 }}>Only your organisation&apos;s owner adds or removes its links.</span>}
+      {owner && (
         <div className="flex flex-wrap items-center gap-1.5">
           <input
             style={{ ...inputStyle, minHeight: 32, flex: 1, minWidth: 180 }}

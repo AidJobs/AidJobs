@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -14,7 +14,7 @@ import { LangsPart, LiveCard, FullPart, MarketPart, PaymentPanel, PlanChoice, Pu
 import { ReachEditor } from './Reach';
 import { PageDraftCard, PageField, SocialLinks, SuggestionCard } from './ContextCards';
 import { Reveal } from './Reveal';
-import { KEEP_PROFILE_ABOUT, keepProfileAbout, projectConflicts, resolveConflict } from './context';
+import { conflictQuestion, KEEP_PROFILE_ABOUT, keepProfileAbout, openConflicts, redoQuestion, resolveConflict } from './context';
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
@@ -1127,15 +1127,20 @@ function JobWindow({ id }: { id: string }) {
     // Phase 5's context (section 19, A): the profile's About us kept, the project's conflicts, and the sections that used an earlier project.
     if (answer && text === KEEP_PROFILE_ABOUT) return keepProfileAbout(job.id, text);
     if (answer && (text.startsWith('Keep ') || text.startsWith('Use ')) && job.pack?.project) {
-      const hit = projectConflicts(job, job.pack.project.text, s.today).find((c) => text === `Use ${c.page}` || text === `Keep ${c.now}`);
+      const hit = openConflicts(job, s.today).find((c) => text === `Use ${c.page}` || text === `Keep ${c.now}`);
       if (hit) {
-        if (text.startsWith('Use ')) resolveConflict(job.id, hit.fact, hit.page);
-        return chatNote(job.id, text, text.startsWith('Use ') ? `Done: the job now says ${hit.page}.` : `Kept: the job still says ${hit.now}.`);
+        resolveConflict(job.id, hit.fact, text.startsWith('Use ') ? hit.page : null);
+        const after = getState().jobs.find((x) => x.id === job.id);
+        const next = after ? openConflicts(after, s.today)[0] : undefined;
+        const done = text.startsWith('Use ') ? `Done: the job now says ${hit.page}.` : `Kept: the job still says ${hit.now}.`;
+        const redo = after?.pack?.project?.redo ?? [];
+        const then = next ? conflictQuestion(next) : redo.length && after ? redoQuestion(redo.map((k) => headingOf(s, after, k))) : null;
+        return then ? chatNote(job.id, text, `${done} ${then.text}`, then.quick) : chatNote(job.id, text, done);
       }
     }
     if (answer && text === 'Keep them as they are') return chatNote(job.id, text, 'Kept as they are.');
     if (answer && text === 'Update them') {
-      const used = job.pack?.project?.usedBy ?? [];
+      const used = job.pack?.project?.redo ?? [];
       if (!aiOn()) return chatNote(job.id, text, `The AI is off here, so I can't rewrite them: edit ${used.length === 1 ? 'it' : 'them'} by hand with the pencil, using the new project.`);
     }
     if (text === SHOW_FLYER && reachOpen(job, s)) openTab('flyer');

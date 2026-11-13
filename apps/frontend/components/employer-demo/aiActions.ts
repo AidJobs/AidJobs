@@ -211,8 +211,33 @@ export function asksAhead(reply: string, askFact: AskKind | undefined, want: Ret
   if (want.kind === 'ask') return askFact ? askFact !== want.fact : !FACT_WORDS[want.fact].test(reply);
   // A reply in the turn that wrote the section being approved is about that section.
   if (want.kind === 'approve') return Boolean(askFact) || (!wrote.includes(want.section) && !reply.toLowerCase().includes(heading.toLowerCase()));
-  return false;
+  // Any later step (round 7 review): a question that names a step still to come, and nothing of the one open, asks ahead.
+  const now = want.kind === 'version' ? 'langs' : want.kind === 'waiting' ? 'review' : want.kind;
+  const at = STEP_ORDER.indexOf(now);
+  if (at < 0) return false;
+  if (askFact) return true;
+  if (STEP_WORDS[now]?.test(reply)) return false;
+  return STEP_ORDER.slice(at + 1).some((k) => STEP_WORDS[k]?.test(reply));
 }
+
+/** The window's steps after the sections, in order, and the words that name each in a reply. */
+const STEP_ORDER = ['details', 'sdgs', 'fixed', 'keep', 'suggest', 'check', 'plan', 'market', 'full', 'langs', 'review', 'reach', 'flyer', 'publish'];
+const STEP_WORDS: Record<string, RegExp> = {
+  details: SETTLE_WORDS.details,
+  sdgs: SETTLE_WORDS.sdgs,
+  fixed: SETTLE_WORDS.fixed,
+  keep: /\b(every (?:new )?job|for every|keep (?:it|them|these|this))\b/i,
+  suggest: /\b(suggest\w*|more sections?|add (?:a |any )?sections?)\b/i,
+  check: /\b(check|fill (?:it )?in|placeholder|still to fill)\b/i,
+  plan: /\b(free|amplify|plan)\b/i,
+  market: SETTLE_WORDS.market,
+  full: SETTLE_WORDS.full,
+  langs: SETTLE_WORDS.langs,
+  review: SETTLE_WORDS.review,
+  reach: SETTLE_WORDS.reach,
+  flyer: /\b(flyer|notice boards?|qr code)\b/i,
+  publish: /\b(publish|go(?:es)? live|schedul\w*)\b/i,
+};
 
 const FACT_WORDS: Record<AskKind, RegExp> = {
   title: /\btitle\b/i,

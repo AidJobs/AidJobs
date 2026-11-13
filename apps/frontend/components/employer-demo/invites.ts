@@ -99,6 +99,9 @@ export function goLive(s: State): State {
   const jobs = s.jobs.map((j) => {
     if (j.status !== 'scheduled' || !j.scheduledFor || j.scheduledFor > today) return j;
     changed = true;
+    // Never a second free listing: one whose allowance another job used goes back to a draft instead of live.
+    if ((j.plan === 'free' && free?.standard && free.standard !== j.id) || (j.plan === 'amplify' && j.paidVia === 'free' && free?.amplify && free.amplify !== j.id))
+      return { ...j, status: 'draft' as const, plan: null, scheduledFor: undefined, audit: [...j.audit, { at: s.today, who: 'AidJobs', what: 'Not published: the free listing was used by another job' }] };
     // A free listing held by a scheduled job is used on the day it goes live (section 19, phase 5, D).
     if (j.plan === 'free' && !free?.standard) free = { ...free, standard: j.id };
     if (j.plan === 'amplify' && j.paidVia === 'free' && !free?.amplify) free = { ...free, amplify: j.id };

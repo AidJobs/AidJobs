@@ -114,6 +114,11 @@ export function blockedV6(ip: string): boolean {
   if ((g[0] & 0xfe00) === 0xfc00) return true;
   if ((g[0] & 0xff00) === 0xff00) return true;
   if (g[0] === 0x2001 && g[1] === 0x0db8) return true;
+  // No public website needs these: IPv4-translated (::ffff:0:a.b.c.d), local-use NAT64 (64:ff9b:1::/48), Teredo (2001::/32), discard (100::/64).
+  if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0) return true;
+  if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return true;
+  if (g[0] === 0x2001 && g[1] === 0) return true;
+  if (g[0] === 0x100 && g.slice(1, 4).every((x) => x === 0)) return true;
   return false;
 }
 
@@ -137,7 +142,8 @@ export function checkUrl(raw: string, base?: URL): URL | null {
   if (url.port && url.port !== '443') return null;
   const host = url.hostname.replace(/^\[|\]$/g, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return null;
-  if (!isIP(host) && !host.includes('.')) return null;
+  // A host name, never an address typed as an IP: no organisation's page is given that way, and TLS checks a name.
+  if (isIP(host) || !host.includes('.')) return null;
   url.hash = '';
   return url;
 }
@@ -255,6 +261,23 @@ async function readBody(body: AsyncIterable<Uint8Array>, signal: AbortSignal): P
   return out;
 }
 
+/**
+ * The page as text, in the character set it declares: in its Content-Type, else in a meta tag near its top; UTF-8 when it declares
+ * none or one this runtime does not know, so an older site in windows-1252 or ISO-8859-1 reads as written.
+ */
+export function decodePage(bytes: Uint8Array, contentType = ''): string {
+  const head = new TextDecoder('latin1').decode(bytes.slice(0, 2048));
+  const label = contentType.match(/charset\s{0,3}=\s{0,3}["']?([\w.:-]{1,40})/i)?.[1] ?? head.match(/<meta\b[^<>]{0,200}?charset\s{0,3}=\s{0,3}["']?([\w.:-]{1,40})/i)?.[1];
+  if (label) {
+    try {
+      return new TextDecoder(label, { fatal: false }).decode(bytes);
+    } catch {
+      /* a label the runtime does not know: UTF-8 below */
+    }
+  }
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+}
+
 /** Reads one page under the rules above. `why` is for the route's own log as a short status, never the address or the text. */
 export async function readPage(raw: string, deps: { lookup: Lookup; fetchAt: FetchAt; timeLimitMs?: number }): Promise<PageResult> {
   const stop = new AbortController();
@@ -293,7 +316,7 @@ async function readWithin(raw: string, deps: { lookup: Lookup; fetchAt: FetchAt 
       const type = (res.headers['content-type'] ?? '').toLowerCase();
       if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return refuse('not an html page');
       const bytes = await readBody(res.body, signal);
-      const html = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      const html = decodePage(bytes, type);
       const text = visibleText(html);
       if (noRealText(html, text)) return refuse('no real text');
       return { ok: true, text, social: socialLinks(html) };

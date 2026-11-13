@@ -7,7 +7,7 @@ import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { statusLine } from './Home';
 import { update } from './store';
 import type { DemoJob, State } from './types';
-import { Dialog, Field, inputStyle, RecipientInput, scrollInside } from './ui';
+import { Dialog, Field, inputStyle, radioKeys, RecipientInput, scrollInside } from './ui';
 
 export function setReviewer(id: string | null) {
   update((s) => ({ ...s, reviewerAs: id }));
@@ -33,6 +33,8 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
   // Answer by (section 19, phase 5, E): a day two, three, or five days ahead, a date picked, or no date; the email names one only when chosen.
   const [due, setDue] = useState<string | null>(() => addDays(s.today, 3));
   const quick = [2, 3, 5].map((d) => addDays(s.today, d));
+  const tomorrow = addDays(s.today, 1);
+  const [past, setPast] = useState(false);
   const [rule, setRule] = useState<'any' | 'all'>(s.org.approvalRule);
   const [note, setNote] = useState('');
   const total = picked.length + outside.length;
@@ -51,17 +53,35 @@ export function ReviewForm({ job, s, onSent, preset }: { job: DemoJob; s: State;
         </Field>
         <RecipientInput label="Someone outside your team (private link, no account, expires in 7 days)" value={outside} onChange={setOutside} max={3} placeholder="name@example.org" />
         <Field label="Answer by (optional)">
-          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Answer by">
+          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Answer by" onKeyDown={radioKeys}>
             {quick.map((d) => (
-              <button key={d} type="button" role="radio" aria-checked={due === d} className="aj-pill" data-active={due === d} onClick={() => setDue(d)}>
+              <button key={d} type="button" role="radio" aria-checked={due === d} tabIndex={due === d ? 0 : -1} className="aj-pill" data-active={due === d} onClick={() => setDue(d)}>
                 {shortDate(d)}
               </button>
             ))}
-            <button type="button" role="radio" aria-checked={due === null} className="aj-pill" data-active={due === null} onClick={() => setDue(null)}>
+            <button type="button" role="radio" aria-checked={due === null} tabIndex={due === null || (due !== null && !quick.includes(due)) ? 0 : -1} className="aj-pill" data-active={due === null} onClick={() => setDue(null)}>
               No date
             </button>
-            <input type="date" style={{ ...inputStyle, minHeight: 32, width: 160 }} min={addDays(s.today, 1)} value={due && !quick.includes(due) ? due : ''} onChange={(e) => setDue(e.target.value || null)} aria-label="Pick a date to answer by" />
+            <input
+              type="date"
+              style={{ ...inputStyle, minHeight: 32, width: 160 }}
+              min={tomorrow}
+              value={due && !quick.includes(due) ? due : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                // A typed date can get past the picker's minimum: a day before tomorrow is not taken.
+                setPast(Boolean(v) && v < tomorrow);
+                if (!v || v >= tomorrow) setDue(v || null);
+              }}
+              aria-label="Pick a date to answer by"
+              aria-invalid={past || undefined}
+            />
           </div>
+          {past && (
+            <span role="alert" style={{ color: 'var(--amber)' }}>
+              Pick a day from tomorrow on.
+            </span>
+          )}
         </Field>
         <Field label="Approval needs">
           <div className="flex flex-wrap gap-1.5">

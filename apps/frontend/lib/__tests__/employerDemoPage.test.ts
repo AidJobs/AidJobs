@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { blockedAddress, blockedV4, blockedV6, checkUrl, MAX_BYTES, readPage, socialLinks, UNREADABLE, visibleText, type Address, type FetchAt, type Fetched, type Lookup } from '../employerDemoPage/read';
+import { blockedAddress, blockedV4, blockedV6, checkUrl, decodePage, MAX_BYTES, readPage, socialLinks, UNREADABLE, visibleText, type Address, type FetchAt, type Fetched, type Lookup } from '../employerDemoPage/read';
 
 const PAGE = `<html><head><title>Riverstone Aid</title><style>body{color:red}</style><script>alert("x")</script></head><body>
 <nav><a href="/jobs">Jobs</a> <a href="/donate">Donate</a></nav>
@@ -184,6 +184,23 @@ describe('the page reader: one page, read safely', () => {
     expect((await readPage('https://riverstone.example.org/', { lookup, fetchAt })).ok).toBe(true);
     expect(closes).toHaveLength(4);
     for (const c of closes) expect(c).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses rarer IPv6 ranges no public website needs, and an address typed as an IP (the review’s minor points)', () => {
+    for (const ip of ['::ffff:0:10.0.0.1', '::ffff:0:93.184.216.34', '64:ff9b:1::5db8:d822', '2001::1', '2001:0:4136:e378::1', '100::1']) expect({ ip, blocked: blockedV6(ip) }).toEqual({ ip, blocked: true });
+    expect(blockedV6('2606:4700:4700::1111')).toBe(false);
+    expect(checkUrl('https://93.184.216.34/about')).toBeNull();
+    expect(checkUrl('https://[2606:4700:4700::1111]/')).toBeNull();
+    expect(checkUrl('https://riverstone.example.org/')?.hostname).toBe('riverstone.example.org');
+  });
+
+  it('reads a page in the character set it declares, in its header or its meta tag; UTF-8 otherwise', () => {
+    const latin = Uint8Array.from([...Buffer.from('<p>Caf'), 0xe9, ...Buffer.from(' et r'), 0xe9, ...Buffer.from('seau</p>')]);
+    expect(decodePage(latin, 'text/html; charset=windows-1252')).toContain('Café et réseau');
+    const meta = Uint8Array.from([...Buffer.from('<html><head><meta charset="iso-8859-1"></head><body>Caf'), 0xe9, ...Buffer.from('</body></html>')]);
+    expect(decodePage(meta, 'text/html')).toContain('Café');
+    expect(decodePage(new TextEncoder().encode('<p>Café</p>'), 'text/html')).toContain('Café');
+    expect(decodePage(new TextEncoder().encode('<p>Café</p>'), 'text/html; charset=x-not-a-charset')).toContain('Café');
   });
 
   it('connects to a checked IPv4 address when the name has both, as many networks cannot reach IPv6', async () => {

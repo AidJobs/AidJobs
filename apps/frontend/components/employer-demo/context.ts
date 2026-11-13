@@ -1,7 +1,7 @@
 'use client';
 
 import { formatOf, goOn, headingOf, liveEdit, setFacts, subId, touched } from './actions';
-import { extractFacts, inOutlineOrder, longDate, placeIn, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
+import { extractFacts, inOutlineOrder, longDate, placeIn, PLACES, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
 import { wordsFor } from './setup';
@@ -98,19 +98,16 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       const title = d.kind === 'project' && !j.tags.includes(key) ? LABEL.project : headingOf(s, j, key);
       const sec: Section = { key, title, lines: text, ai: true };
       const sections = j.sections.some((x) => x.key === key) ? j.sections.map((x) => (x.key === key ? intoSection(x, d.kind, text, earlier?.text) : x)) : inOutlineOrder([...j.sections, sec], tags);
-      const pack: ContextPack = { ...j.pack, ...(d.kind === 'about' ? { about: { text: text.join('\n'), source } } : { project: { text: text.join('\n'), source, at: Date.now(), usedBy: [] } }) };
+      const used = earlier?.usedBy?.filter((k) => k !== key && j.tags.includes(k)) ?? [];
+      const pack: ContextPack = { ...j.pack, ...(d.kind === 'about' ? { about: { text: text.join('\n'), source } } : { project: { text: text.join('\n'), source, at: Date.now(), usedBy: [], ...(used.length ? { redo: used } : {}) } }) };
       const renamed = d.kind === 'project' && !j.tags.includes(key) ? { ...j.renamed, [key]: LABEL.project } : j.renamed;
       const walk = j.walk ? { ...j.walk, approved: Array.from(new Set([...j.walk.approved, key])) } : j.walk;
       const offerOrg = d.kind === 'about' && !s.org.about.trim() && s.me.role === 'owner';
-      const used = earlier?.usedBy?.filter((k) => k !== key && j.tags.includes(k)) ?? [];
       const conflicts = d.kind === 'project' ? projectConflicts(j, text.join('\n'), s.today) : [];
-      const notes = [
-        `**${LABEL[d.kind]}** is in the job, from ${source}.`,
-        offerOrg ? "Your organisation has no About us yet: keep this one as its About us for every job? (Save it as your organisation's About us, on the section.)" : '',
-        used.length ? `The project changed: ${used.map((k) => headingOf(s, j, k)).join(', ')} used the earlier one. Shall I update them?` : '',
-        ...conflicts.map((c) => `The project text gives the ${FACT_WORD[c.fact]} as ${c.page}; the job says ${c.now}. Which should the job keep?`),
-      ].filter(Boolean);
-      const quick = used.length ? ['Update them', 'Keep them as they are'] : conflicts.length ? [`Keep ${conflicts[0].now}`, `Use ${conflicts[0].page}`] : undefined;
+      // The facts first, one disagreement at a time with its own answers; then the offer to update the sections that used the old project.
+      const ask = conflicts.length ? conflictQuestion(conflicts[0]) : used.length ? redoQuestion(used.map((k) => headingOf(s, j, k))) : null;
+      const notes = [`**${LABEL[d.kind]}** is in the job, from ${source}.`, offerOrg ? "Your organisation has no About us yet: keep this one as its About us for every job? (Save it as your organisation's About us, on the section.)" : '', ask?.text ?? ''].filter(Boolean);
+      const quick = ask?.quick;
       return {
         ...touched(j),
         ...liveEdit(j),
@@ -182,23 +179,28 @@ export function socialLabel(url: string): string {
   return known[host] ?? host;
 }
 
+/** The organisation's links are its own settings: only the owner adds or removes them, as with About us and the texts kept for every job. */
+export function canEditOrgSocial(s: State): boolean {
+  return !s.reviewerAs && s.me.role === 'owner';
+}
+
 export function addOrgSocial(raw: string): boolean {
   const s = getState();
   const url = socialUrl(raw);
-  if (!url || s.reviewerAs || (s.org.social ?? []).includes(url)) return false;
+  if (!url || !canEditOrgSocial(s) || (s.org.social ?? []).includes(url)) return false;
   update((st) => ({ ...st, org: { ...st.org, social: [...(st.org.social ?? []), url], socialAsked: true } }));
   return true;
 }
 
 export function removeOrgSocial(url: string) {
-  if (getState().reviewerAs) return;
+  if (!canEditOrgSocial(getState())) return;
   update((st) => ({ ...st, org: { ...st.org, social: (st.org.social ?? []).filter((x) => x !== url) } }));
 }
 
-/** Includes or leaves out one of the organisation's links on this job only. */
+/** Includes or leaves out one of the organisation's links on this job only; a live job's page then says Updated. */
 export function toggleJobSocial(id: string, url: string) {
   if (getState().reviewerAs) return;
-  update((st) => ({ ...st, org: { ...st.org, socialAsked: true }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, socialOff: (j.socialOff ?? []).includes(url) ? (j.socialOff ?? []).filter((x) => x !== url) : [...(j.socialOff ?? []), url] } : j)) }));
+  update((st) => ({ ...st, org: { ...st.org, socialAsked: true }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, ...liveEdit(j), socialOff: (j.socialOff ?? []).includes(url) ? (j.socialOff ?? []).filter((x) => x !== url) : [...(j.socialOff ?? []), url] } : j)) }));
 }
 
 /** The organisation's links this job shows: all of them but those it leaves out. */
@@ -206,16 +208,43 @@ export function socialOf(s: State, j: DemoJob): string[] {
   return (s.org.social ?? []).filter((u) => !(j.socialOff ?? []).includes(u));
 }
 
-/** An answer to a conflict between the project text and a fact: the job keeps its own, or takes the page's. */
-export function resolveConflict(id: string, fact: 'country' | 'donor' | 'deadline', value: string) {
+/** The project's disagreements with the job still to answer, one at a time. */
+export function openConflicts(j: DemoJob, today: number): ReturnType<typeof projectConflicts> {
+  const p = j.pack?.project;
+  return p ? projectConflicts(j, p.text, today).filter((c) => !(p.answered ?? []).includes(c.fact)) : [];
+}
+
+/** The offer to update the sections written from the project this one replaced. */
+export function redoQuestion(headings: string[]): { text: string; quick: string[] } {
+  return { text: `The project changed: ${headings.join(', ')} used the earlier one. Shall I update them?`, quick: ['Update them', 'Keep them as they are'] };
+}
+
+/** The question for one disagreement, with its two answers. */
+export function conflictQuestion(c: ReturnType<typeof projectConflicts>[number]): { text: string; quick: string[] } {
+  return { text: `The project text gives the ${FACT_WORD[c.fact]} as ${c.page}; the job says ${c.now}. Which should the job keep?`, quick: [`Keep ${c.now}`, `Use ${c.page}`] };
+}
+
+/**
+ * An answer to a disagreement between the project text and a fact: the job keeps its own (`value` null), or takes the page's. A country
+ * taken from the page brings its place and country code with it, so the job never names one country and a place in another.
+ */
+export function resolveConflict(id: string, fact: 'country' | 'donor' | 'deadline', value: string | null) {
   const j = getState().jobs.find((x) => x.id === id);
-  if (!j) return;
-  if (fact === 'donor') setFacts(id, { donor: value });
-  else if (fact === 'country') setFacts(id, { country: value });
-  else {
-    const { facts } = extractFacts(value, getState().today);
-    if (facts.deadline) setFacts(id, { deadline: facts.deadline });
+  if (!j?.pack?.project) return;
+  if (value !== null) {
+    if (fact === 'donor') setFacts(id, { donor: value });
+    else if (fact === 'country') {
+      // The place the project text names in that country, else the country itself; its code and time zone from the demo's places.
+      const named = extractFacts(j.pack.project.text, getState().today).facts;
+      const place = PLACES.find((p) => p.country.toLowerCase() === value.toLowerCase());
+      const location = named.country === value && named.location ? named.location : value;
+      setFacts(id, { country: value, iso: place?.iso ?? named.iso ?? '', location, ...(place?.tz ? { timezone: place.tz } : {}) });
+    } else {
+      const { facts } = extractFacts(value, getState().today);
+      if (facts.deadline) setFacts(id, { deadline: facts.deadline });
+    }
   }
+  updateJob(id, (x) => (x.pack?.project ? { ...x, pack: { ...x.pack, project: { ...x.pack.project, answered: Array.from(new Set([...(x.pack.project.answered ?? []), fact])) } } } : x));
 }
 
 /** Pay a suggestion may name: the organisation's scale for this grade, or the labelled sample for this place; with why showing pay helps. */

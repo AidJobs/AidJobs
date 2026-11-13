@@ -161,6 +161,30 @@ describe('the review date is optional (section 19, phase 5, E)', () => {
     sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '', 'any', '');
     expect(job(id).review.due).toBe('');
   });
+
+  it('arrow keys move between the choices; a date typed in the past is refused, with a message (the review’s minor points)', () => {
+    const id = startJob('Hiring a Cook in Goma, closing in 6 weeks');
+    render(<ReviewForm job={job(id)} s={getState()} onSent={() => {}} />);
+    const group = container.querySelector('[role="radiogroup"][aria-label="Answer by"]') as HTMLElement;
+    const radios = () => Array.from(group.querySelectorAll('[role="radio"]')) as HTMLElement[];
+    const checked = () => radios().findIndex((r) => r.getAttribute('aria-checked') === 'true');
+    expect(checked()).toBe(1);
+    expect(radios().filter((r) => r.tabIndex === 0)).toHaveLength(1);
+    act(() => radios()[1].focus());
+    act(() => {
+      radios()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+    expect(checked()).toBe(2);
+    expect(document.activeElement).toBe(radios()[2]);
+    const input = container.querySelector('input[aria-label="Pick a date to answer by"]') as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '2020-01-01');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Pick a day from tomorrow on.');
+    expect(container.textContent).not.toContain('by 1 January 2020');
+    expect(checked()).toBe(2);
+  });
 });
 
 describe('social links (section 19, phase 5, E)', () => {

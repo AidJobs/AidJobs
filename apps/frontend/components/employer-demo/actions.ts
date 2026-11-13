@@ -44,7 +44,7 @@ import { canReopen, isPublished } from './lifecycle';
 import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
-import { aiWrites, ASKS, asksOf, checkPoints, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
+import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
@@ -1913,7 +1913,8 @@ export function sendForReview(id: string, reviewers: Array<{ name: string; email
   update((s) => {
     const j = s.jobs.find((x) => x.id === id);
     if (!j) return s;
-    const review: Review = { state: 'open', reviewers, due, round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined, sent: j.sections, before: j.review.sent };
+    // An answer-by date is a day ahead or none: a past or today's date is not kept.
+    const review: Review = { state: 'open', reviewers, due: due && due > isoDay(s.today) ? due : '', round: j.review.round + 1, rule, remarks: j.review.remarks.filter((r) => r.state === 'open'), approvedVersion: undefined, sent: j.sections, before: j.review.sent };
     return {
       ...s,
       jobs: s.jobs.map((x) => (x.id === id ? { ...x, status: 'review', review, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Sent for review to ${reviewers.map((r) => r.name).join(', ')}${note ? `: "${note}"` : ''}` }] } : x)),
@@ -2514,11 +2515,13 @@ export function completePayRequest(id: string): boolean {
   return true;
 }
 
-/** The flyer shown for the first time: it goes out of date if review opens again before publishing. */
+/** The flyer shown: made from the job as it is now. It goes out of date if review opens again, or the job changes, before publishing. */
 export function markFlyerMade(id: string) {
   const j = getState().jobs.find((x) => x.id === id);
-  if (!j || j.flyerMade || !ownerOnly()) return;
-  updateJob(id, (x) => ({ ...x, flyerMade: Date.now() }));
+  if (!j || !ownerOnly()) return;
+  const of = contentPrint(j);
+  if (j.flyerMade && j.flyerOf === of) return;
+  updateJob(id, (x) => ({ ...x, flyerMade: Date.now(), flyerOf: of }));
 }
 
 /** "Not now" on a reminder: it does not come back; the next moment still does. */
@@ -2635,6 +2638,7 @@ export function publishNow(id: string): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
+  if ((j.plan === 'free' && !canGoFree(s, j.id)) || (j.plan === 'amplify' && j.paidVia === 'free' && s.free?.amplify && s.free.amplify !== j.id)) return false;
   const waiting = waitingEmails(j);
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
   update((st0) => {
@@ -2959,9 +2963,14 @@ export function hireAgain(id: string, place?: string): string | null {
     reachDismissed: undefined,
     reachReminders: undefined,
     flyerMade: undefined,
+    flyerOf: undefined,
     scheduledFor: undefined,
     payRequest: undefined,
     lastChange: undefined,
+    // The copy keeps the text and the context it came from, not the old job's open cards; a variant for another place leaves its project.
+    pageDraft: undefined,
+    suggestions: undefined,
+    pack: place && j.pack ? { ...j.pack, project: undefined } : j.pack,
     audit: [{ at: Date.now(), who: s.me.name, what: place ? `Created from ${j.facts.title} (${j.facts.location})` : `Hired again from ${j.facts.title}` }],
   };
   copy.versions = [{ n: 1, at: Date.now(), note: place ? `Variant for ${facts.location}` : 'Hired again', sections: copy.sections }];

@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyFormat, applyTemplate, chooseStyle, editSection, editTranslation, goOn, greetState, removeTranslation, reorderSections, setFacts, setPace, startJob, toggleSection, writeVersionSection } from '../../components/employer-demo/actions';
-import { ALL_ASKED, applyAiTurn, MOVE_ASKED, type OpenTarget } from '../../components/employer-demo/aiActions';
+import { addTranslation, applyFormat, applyTemplate, chooseStyle, editSection, editTranslation, goOn, greetState, hireAgain, markFlyerMade, publishNow, removeTranslation, reorderSections, sendForReview, setFacts, setPace, startJob, toggleSection, writeVersionSection } from '../../components/employer-demo/actions';
+import { ALL_ASKED, applyAiTurn, asksAhead, MOVE_ASKED, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { askAi, resetAi, whenAnswered } from '../../components/employer-demo/ai';
-import { acceptPageDraft, acceptSuggestion, checkSuggestion, editedWrong, payBasis, showPageDraft } from '../../components/employer-demo/context';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, checkSuggestion, editedWrong, openConflicts, payBasis, removeOrgSocial, resolveConflict, showPageDraft, toggleJobSocial } from '../../components/employer-demo/context';
 import { holdPage } from '../../components/employer-demo/pageMemory';
 import { draftFromPage } from '../../components/employer-demo/pages';
-import { nextStep, stepKey } from '../../components/employer-demo/flow';
+import { flyerStale, nextStep, stepKey } from '../../components/employer-demo/flow';
+import { goLive } from '../../components/employer-demo/invites';
+import { freeBroughtForward } from '../../components/employer-demo/plans';
+import { addDays, isoDay } from '../../components/employer-demo/engine';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
+import type { State } from '../../components/employer-demo/types';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const sec = (id: string, key: string) => job(id).sections.find((x) => x.key === key)!;
@@ -235,5 +239,114 @@ describe('a second caller waits for the answer already on its way (round 7 revie
     await firstCall;
     await waiting;
     expect(done).toBe(true);
+  });
+});
+
+describe('the review’s minor points (the user, 14 November 2026)', () => {
+  it('Hire again leaves the old job’s open cards; a variant for another place also leaves its project', () => {
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) =>
+        j.id === 'job-comms'
+          ? {
+              ...j,
+              pageDraft: { kind: 'about', lines: ['x'], used: 'x', missing: '', source: 'your website', social: [] },
+              suggestions: [{ id: 'sg-1', fact: 'salary', value: 'x', source: 'your salary scale', reason: '', state: 'rejected' }],
+              pack: { about: { text: 'About us.', source: 'your website' }, project: { text: 'The project.', source: 'the project page', at: 1 } },
+            }
+          : j,
+      ),
+    }));
+    const same = job(hireAgain('job-comms')!);
+    expect(same.pageDraft).toBeUndefined();
+    expect(same.suggestions).toBeUndefined();
+    expect(same.pack).toMatchObject({ about: { text: 'About us.' }, project: { text: 'The project.' } });
+    const variant = job(hireAgain('job-comms', 'Gulu, Uganda')!);
+    expect(variant.pack?.about?.text).toBe('About us.');
+    expect(variant.pack?.project).toBeUndefined();
+  });
+
+  it('an old save: the free standard is the first free job that went live; scheduled free jobs beyond it go back to drafts', () => {
+    const s0 = getState();
+    const at = (id: string, patch: object) => s0.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j));
+    let jobs = at('job-comms', { status: 'draft', plan: 'free' });
+    jobs = jobs.map((j) => (j.id === 'job-meal' ? { ...j, plan: 'free' as const } : j.id === 'job-fin' ? { ...j, status: 'scheduled' as const, plan: 'free' as const, scheduledFor: addDays(s0.today, 4) } : j));
+    const old = { ...s0, jobs, free: undefined, freeUses: [{ jobId: 'job-comms', month: '2026-11' }, { jobId: 'job-meal', month: '2026-11' }] } as unknown as State;
+    const out = freeBroughtForward(old);
+    expect(out.free).toEqual({ standard: 'job-meal' });
+    expect(out.jobs.find((j) => j.id === 'job-fin')).toMatchObject({ status: 'draft', plan: null });
+    expect(out.notice?.text).toMatch(/^One scheduled free job is back to drafts/);
+    const two = { ...s0, free: undefined, freeUses: [], jobs: s0.jobs.map((j) => (j.id === 'job-fin' || j.id === 'job-comms' ? { ...j, status: 'scheduled' as const, plan: 'free' as const, scheduledFor: addDays(s0.today, j.id === 'job-fin' ? 6 : 3) } : j.plan === 'free' ? { ...j, plan: 'amplify' as const } : j)) } as unknown as State;
+    const out2 = freeBroughtForward(two);
+    expect(out2.free).toEqual({});
+    expect(out2.jobs.find((j) => j.id === 'job-comms')?.status).toBe('scheduled');
+    expect(out2.jobs.find((j) => j.id === 'job-fin')?.status).toBe('draft');
+  });
+
+  it('a scheduled free job never goes live free once another job has used the allowance, on its date or with Publish now', () => {
+    update((s) => ({ ...s, free: { standard: 'job-cps' }, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, status: 'scheduled' as const, plan: 'free' as const, scheduledFor: addDays(s.today, 2) } : j)) }));
+    expect(publishNow('job-fin')).toBe(false);
+    expect(job('job-fin').status).toBe('scheduled');
+    const due = { ...getState(), jobs: getState().jobs.map((j) => (j.id === 'job-fin' ? { ...j, scheduledFor: isoDay(getState().today) } : j)) };
+    expect(goLive(due).jobs.find((j) => j.id === 'job-fin')).toMatchObject({ status: 'draft', plan: null });
+  });
+
+  it('the project’s disagreements are asked one at a time; taking its country brings the place and code with it', () => {
+    setFacts('job-comms', { deadline: addDays(getState().today, 20) });
+    const { country, deadline } = job('job-comms').facts;
+    showPageDraft('job-comms', { kind: 'project', lines: ['The Clean Water for Gulu project runs in Gulu, Uganda, with applications closing 15 January 2027.'], used: 'x', missing: '', source: 'the project page', social: [] });
+    acceptPageDraft('job-comms');
+    expect(openConflicts(job('job-comms'), getState().today).map((c) => c.fact)).toEqual(['country', 'deadline']);
+    const asked = job('job-comms').chat.find((m) => m.text.includes('The project text gives'))!;
+    expect(asked.text).toContain(`gives the country as Uganda; the job says ${country}`);
+    expect(asked.text).not.toContain('closing date');
+    expect(asked.quick).toEqual([`Keep ${country}`, 'Use Uganda']);
+    resolveConflict('job-comms', 'country', 'Uganda');
+    expect(job('job-comms').facts).toMatchObject({ country: 'Uganda', iso: 'UG', location: 'Gulu, Uganda' });
+    expect(openConflicts(job('job-comms'), getState().today).map((c) => c.fact)).toEqual(['deadline']);
+    resolveConflict('job-comms', 'deadline', null);
+    expect(job('job-comms').facts.deadline).toBe(deadline);
+    expect(openConflicts(job('job-comms'), getState().today)).toEqual([]);
+  });
+
+  it('only the owner adds or removes the organisation’s social links; a member still chooses them per job, and a live job says Updated', () => {
+    expect(addOrgSocial('https://www.linkedin.com/company/riverstone-aid')).toBe(true);
+    update((s) => ({ ...s, me: { ...s.me, role: 'member' as const } }));
+    expect(addOrgSocial('https://x.com/riverstoneaid')).toBe(false);
+    removeOrgSocial('https://www.linkedin.com/company/riverstone-aid');
+    expect(getState().org.social).toEqual(['https://www.linkedin.com/company/riverstone-aid']);
+    toggleJobSocial('job-cps', 'https://www.linkedin.com/company/riverstone-aid');
+    expect(job('job-cps')).toMatchObject({ socialOff: ['https://www.linkedin.com/company/riverstone-aid'], updatedAfterPublish: true });
+  });
+
+  it('a review’s answer-by date in the past or today is not kept', () => {
+    sendForReview('job-comms', [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], isoDay(getState().today), 'any', '');
+    expect(job('job-comms').review.due).toBe('');
+    sendForReview('job-comms', [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], addDays(getState().today, 2), 'any', '');
+    expect(job('job-comms').review.due).toBe(addDays(getState().today, 2));
+  });
+
+  it('a question about a later step than the open one is followed by the open question, at any step', () => {
+    update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === 'job-fin' ? { ...j, choice: 'amplify' as const, walk: { ...j.walk!, settled: Array.from(new Set([...j.walk!.settled, 'plan', 'market', 'full'])) } } : j)) }));
+    const want = nextStep(job('job-fin'), getState());
+    expect(want?.kind).toBe('langs');
+    expect(asksAhead('Would you like a flyer for notice boards?', undefined, want, '')).toBe(true);
+    expect(asksAhead('Shall I prepare the Reach invitations?', undefined, want, '')).toBe(true);
+    expect(asksAhead('Which languages should I add? Review comes after.', undefined, want, '')).toBe(false);
+    expect(asksAhead('Shall I go on?', undefined, want, '')).toBe(false);
+    applyAiTurn('job-fin', 'ok', { reply: 'Would you like a flyer for notice boards?', actions: [] }, open);
+    expect(job('job-fin').chat.at(-1)).toMatchObject({ step: 'langs' });
+  });
+
+  it('a flyer goes out of date when the job changes after it was made, also with review optional and done; made again, it is current', () => {
+    const id = 'job-comms';
+    update((s) => ({ ...s, org: { ...s.org, approval: 'none' as State['org']['approval'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, choice: 'amplify' as const, review: { ...j.review, state: 'none' as const }, walk: { ...(j.walk ?? { pace: 'all' as const, approved: [], settled: [] }), settled: [...(j.walk?.settled ?? []), 'review'] } } : j)) }));
+    expect(job(id).sections.some((x) => x.key === 'purpose')).toBe(true);
+    markFlyerMade(id);
+    expect(flyerStale(job(id), getState())).toBe(false);
+    editSection(id, 'purpose', 'A new purpose for the role.');
+    expect(flyerStale(job(id), getState())).toBe(true);
+    markFlyerMade(id);
+    expect(flyerStale(job(id), getState())).toBe(false);
   });
 });
