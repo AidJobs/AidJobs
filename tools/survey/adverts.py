@@ -190,11 +190,13 @@ def _site_of(host: str) -> str:
 
 
 def plan_batch(batch: str, pages: list[dict], verdicts: RobotsVerdicts, done: set[str],
-               held: set[str] | frozenset = frozenset()) -> list[dict]:
+               held: set[str] | frozenset = frozenset(), asked: set[str] | frozenset = frozenset()) -> list[dict]:
     """R1: about 40 archived pages of the gap-filling sites and about 20 of the largest own sites,
     at random; R2: the broad sample, capped per organisation. Only pages R0 allows; pages already
-    saved (earlier batches) are not planned again; organisations in `held` are left out."""
+    saved (earlier batches) are not planned again, nor pages asked for before without an answer
+    kept (`asked`: never retried); organisations in `held` are left out."""
     allowed = [c for c in pages if in_wave_language(c["languages"]) and c["org_id"] not in held
+               and (c["page_id"] in done or c["page_id"] not in asked)
                and verdicts.verdict(c["url"]) == "allowed"]
     rng = random.Random(SEED + (1 if batch == "r1" else 2))
     if batch == "r1":
@@ -331,6 +333,25 @@ def write_local(path: Path, fields: list[str], rows: list[dict]) -> None:
 
 
 PLAN_FIELDS = ["page_id", "org_id", "system", "host", "crawl", "languages", "filename", "offset", "length", "url"]
+PLAN_KEPT = ("plan.csv", "held-hosts.txt", "held-orgs.txt")
+
+
+def keep_earlier_plan(folder: Path) -> None:
+    """Before a batch's plan is redone, its earlier plan moves to plan-<UTC time>/: the pages it
+    read keep their batch, crawl and languages (`extract`)."""
+    if not (folder / "plan.csv").exists():
+        return
+    kept = folder / f"plan-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    kept.mkdir()
+    for name in PLAN_KEPT:
+        if (folder / name).exists():
+            (folder / name).replace(kept / name)
+
+
+def plan_files(folder: Path) -> list[Path]:
+    """A batch's plans, the earlier ones kept by `keep_earlier_plan` first, the current one last."""
+    current = folder / "plan.csv"
+    return sorted(folder.glob("plan-*/plan.csv")) + ([current] if current.exists() else [])
 
 
 # The user's decision of 12 November 2026 (role-survey.md 19.12): UN pages are read for analysis, as
@@ -353,8 +374,10 @@ def plan(args) -> int:
     verdicts = RobotsVerdicts()
     done = set(saved_pages())
     held = held_organisations(pages, orgs)
-    chosen = plan_batch(args.batch, pages, verdicts, done, held)
+    asked = asked_pages(*(READING / b for b in ARCHIVE_PAGE_BATCHES))
+    chosen = plan_batch(args.batch, pages, verdicts, done, held, asked)
     (READING / args.batch).mkdir(parents=True, exist_ok=True)
+    keep_earlier_plan(READING / args.batch)
     (READING / args.batch / "held-hosts.txt").write_text(
         "\n".join(sorted({c["host"] for c in pages if c["org_id"] in held})) + "\n", encoding="utf-8")
     (READING / args.batch / "held-orgs.txt").write_text("\n".join(sorted(held)) + "\n", encoding="utf-8")
@@ -386,6 +409,21 @@ def requests_sent(folder: Path) -> int:
         return 0
     with p.open(encoding="utf-8") as handle:
         return sum(1 for line in handle if line.strip())
+
+
+ARCHIVE_PAGE_BATCHES = ("r1", "r2")
+ASKED_PAGE = re.compile(r"\tGET\t\S+ page ([0-9a-f]{16})$")
+
+
+def asked_pages(*folders: Path) -> set[str]:
+    """Page ids the archive batches in `folders` have asked for, in any run (their requests.log)."""
+    out = set()
+    for folder in folders:
+        p = folder / "requests.log"
+        if p.exists():
+            with p.open(encoding="utf-8") as handle:
+                out |= {m.group(1) for line in handle if (m := ASKED_PAGE.search(line.rstrip("\n")))}
+    return out
 
 
 def check_not_stopped(folder: Path) -> None:
@@ -515,6 +553,7 @@ def fetch_archive(args) -> int:
         return 1
     held_hosts = set((folder / "held-hosts.txt").read_text(encoding="utf-8").split())
     held_orgs = set((folder / "held-orgs.txt").read_text(encoding="utf-8").split())
+    asked = asked_pages(folder, *(READING / b for b in ARCHIVE_PAGE_BATCHES))
     reader = ArchiveReader(folder, cap)
     saved = failed = 0
     skipped = Counter()
@@ -523,7 +562,8 @@ def fetch_archive(args) -> int:
             target = out / f"{r['page_id']}.warc.gz"
             if target.exists():
                 continue
-            why = row_still_allowed(r, verdicts, held_hosts, held_orgs)
+            why = "asked before, never retried" if r["page_id"] in asked else \
+                row_still_allowed(r, verdicts, held_hosts, held_orgs)
             if why:
                 skipped[why] += 1
                 continue
@@ -1171,20 +1211,25 @@ def extract(_args=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     plans = {}
     for b in ("r1", "r2", "r6"):
-        p = READING / b / "plan.csv"
-        if p.exists():
+        for p in plan_files(READING / b):
             for r in read_csv(p):
                 plans[r["page_id"]] = dict(r, batch=b)
     n, kinds = 0, Counter()
+    verdicts = RobotsVerdicts()
     for pid, path in sorted(saved_pages().items()):
         try:
             uri, body, headers = http_body(path.read_bytes())
         except (OSError, EOFError, zlib.error):
             kinds["unreadable"] += 1
             continue
+        meta = plans.get(pid, {})
+        if not meta and verdicts.verdict(uri) != "allowed":
+            # A page read before R0 checked its host (section 18) counts only where R0 allows it (19.10).
+            (out / f"{pid}.json").unlink(missing_ok=True)
+            kinds["read before R0, not allowed by it"] += 1
+            continue
         html = body.decode(charset(headers, body), "replace")
         ad = advert_from_html(html, uri)
-        meta = plans.get(pid, {})
         ad.update(id=pid, source="archive", batch=meta.get("batch", "earlier"), system=system_of(uri) or "own site",
                   crawl=meta.get("crawl", ""), languages=meta.get("languages", ""))
         if meta.get("batch") == "r6":
@@ -2137,6 +2182,7 @@ def measure(_args=None) -> int:
     decisions = _decisions()
     orgs = roles.Organisations.load(decisions=decisions, pools=roles.pools_of())
     title_decisions = roles.decision_map(decisions)
+    decided_types = {d["key"] for d in decisions if d["action"] == "org-type"}
     names = org_names(orgs)
     adverts, dropped, board_types = [], Counter(), {}
     for ad in load_adverts():
@@ -2155,6 +2201,8 @@ def measure(_args=None) -> int:
             ad["org_type_basis"] = "rule"
         if ad["source"] == "feed" and not ad["org_id"]:
             ad["org_id"] = "feed:" + ad["system"].lower()
+        if ad["org_id"] in decided_types and ad["org_id"] not in board_types:
+            ad["org_type_basis"] = "decision"
         ad["org_name"] = orgs.rows.get(ad["org_id"], {}).get("name", "")
         if not ad["org_id"]:
             dropped["no organisation"] += 1
