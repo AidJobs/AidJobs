@@ -26,7 +26,7 @@ PAGE = """<html><head><title>Logistics Officer | Acme Relief</title></head><body
 <li>Manage a fleet of twelve vehicles and their drivers across three sites.</li></ul>
 <h2>Requirements</h2>
 <ul><li>A bachelor's degree in logistics or a related field.</li>
-<li>At least three (3) years of experience in humanitarian logistics.</li>
+<li>At least three (3) years of humanitarian logistics experience.</li>
 <li>Fluency in French and English is required.</li></ul>
 <p>Contact the team at jobs@acme.example or +243 812 345 678 for questions.</p>
 <h2>How to apply</h2><p>Submit your CV and a cover letter by the closing date, 30 November 2026, 23:59 (GMT+1).</p>
@@ -124,9 +124,9 @@ def test_facts_given_are_found_by_pattern():
 
 
 def test_years_of_experience_and_the_un_form():
-    assert adverts.years_asked("At least three (3) years of experience in logistics.") == ("3", "")
+    assert adverts.years_asked("At least three (3) years of logistics experience.") == ("3", "")
     assert adverts.years_asked("Minimum 5+ years of relevant experience.") == ("5", "")
-    un = ("A master's degree with seven years of relevant experience, or a bachelor's degree "
+    un = ("A master's degree with seven years of relevant experience, alternatively a bachelor's degree "
           "with nine years of relevant experience.")
     assert adverts.years_asked(un) == ("7", "9")
     assert adverts.years_asked("Au moins 4 ans d'expérience dans la gestion de projets.") == ("4", "")
@@ -149,7 +149,7 @@ def test_explicit_restrictions_are_found_and_inclusion_is_never_a_restriction():
     assert found("Open to Kenyan nationals only.") == {"nationality"}
     assert found("Please attach a recent passport-size photo.") == {"photo_appearance"}
     assert found("Women are strongly encouraged to apply.") == set()
-    assert found("Candidates must have the right to work in the UK.") == set()
+    assert found("Each candidate needs the right to work in the UK.") == set()
     assert found("Chargé de projet (H/F)") == set()
     inc = {k for k, p in adverts.INCLUSION.items() if p.search("Women are strongly encouraged to apply. (H/F)")}
     assert "women_encouraged" in inc
@@ -281,6 +281,26 @@ def warc_record(uri, http_head, body):
     return gzip.compress(warc + b"\r\n" + payload)
 
 
+def test_a_page_read_before_r0_is_extracted_only_where_r0_allows_it(tmp_path, monkeypatch):
+    earlier = tmp_path / "earlier"
+    earlier.mkdir()
+    head = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8"
+    for name, uri in (("01", "https://refuses.example/jobs/a-b-c"), ("02", "https://allows.example/jobs/a-b-c")):
+        (earlier / f"{name}.warc.gz").write_bytes(warc_record(uri, head, b"<html><body><p>Duties</p></body></html>"))
+    refused_id = adverts.page_id("https://refuses.example/jobs/a-b-c")
+    work = tmp_path / "work"
+    (work / "adverts").mkdir(parents=True)
+    (work / "adverts" / f"{refused_id}.json").write_text("{}", encoding="utf-8")   # from an earlier run
+    monkeypatch.setattr(adverts, "READING", tmp_path / "reading")
+    monkeypatch.setattr(adverts, "WORK", work)
+    monkeypatch.setattr(adverts, "EARLIER_PAGES", [earlier])
+    monkeypatch.setattr(adverts, "RobotsVerdicts", lambda: FakeVerdicts({"https://allows.example/jobs/a-b-c"}))
+    monkeypatch.setattr(adverts, "step_f_feed_adverts", list)
+    adverts.extract()
+    assert sorted(p.stem for p in (work / "adverts").glob("*.json")) == \
+        [adverts.page_id("https://allows.example/jobs/a-b-c")]
+
+
 def test_an_archived_record_is_decoded_chunked_and_gzipped():
     inner = gzip.compress(b"<html><body><p>hello archive</p></body></html>")
     chunked = hex(len(inner))[2:].encode() + b"\r\n" + inner + b"\r\n0\r\n\r\n"
@@ -312,6 +332,29 @@ def test_a_batch_plans_only_pages_r0_allowed_and_not_read_before():
     chosen = adverts.plan_batch("r2", pages, v, done={"p3"})
     assert [c["page_id"] for c in chosen] == ["p1"]       # p2 forbidden, p3 read before, p4 German
     assert adverts.plan_batch("r2", pages, v, done=set(), held={"a"}) == [pages[2]]
+    assert adverts.plan_batch("r2", pages, v, done={"p3"}, asked={"p1", "p3"}) == []   # p1 asked before
+
+
+def test_a_redone_plan_keeps_the_earlier_one_for_the_pages_it_read(tmp_path):
+    folder = tmp_path / "r2"
+    folder.mkdir()
+    adverts.write_local(folder / "plan.csv", adverts.PLAN_FIELDS, [{"page_id": "p1", "crawl": "CC-MAIN-2026-39"}])
+    (folder / "held-orgs.txt").write_text("un:1\n", encoding="utf-8")
+    adverts.keep_earlier_plan(folder)
+    assert not (folder / "plan.csv").exists() and not (folder / "held-orgs.txt").exists()
+    adverts.write_local(folder / "plan.csv", adverts.PLAN_FIELDS, [{"page_id": "p2"}])
+    files = adverts.plan_files(folder)
+    assert len(files) == 2 and files[-1] == folder / "plan.csv"
+    assert [r["page_id"] for f in files for r in adverts.read_csv(f)] == ["p1", "p2"]
+    assert (files[0].parent / "held-orgs.txt").read_text(encoding="utf-8") == "un:1\n"
+
+
+def test_pages_asked_before_are_read_from_the_requests_log(tmp_path):
+    (tmp_path / "r2").mkdir()
+    (tmp_path / "r2" / "requests.log").write_text(
+        "2026-11-12T07:53:09+00:00\tGET\tr2 page a7c2b4091b5b0c4b\n"
+        "2026-11-12T13:09:00+00:00\tGET\tr6 index CC-MAIN-2026-34 (3 blocks)\n", encoding="utf-8")
+    assert adverts.asked_pages(tmp_path / "r1", tmp_path / "r2") == {"a7c2b4091b5b0c4b"}
 
 
 def test_un_system_pages_are_held():
@@ -462,11 +505,11 @@ def test_years_ranges_additional_years_and_ages():
     assert adverts.years_asked("2-3 years of relevant experience") == ("2", "")
     assert adverts.years_asked("Experience with children under 5 years; 4 years of experience in nutrition.") == \
         ("4", "")
-    un = ("A minimum of five years of relevant experience. A first-level university degree in combination "
-          "with two additional years of qualifying experience may be accepted in lieu of the advanced degree.")
+    un = ("A minimum of five years of relevant experience. A first-level university degree plus two "
+          "additional years of qualifying experience may replace the advanced degree.")
     assert adverts.years_asked(un) == ("5", "7")
-    semi = ("A master's degree with seven years of relevant experience; or a bachelor's degree with nine years "
-            "of relevant experience.")
+    semi = ("A master's degree with seven years of relevant experience; alternatively a bachelor's degree with "
+            "nine years of relevant experience.")
     assert adverts.years_asked(semi) == ("7", "9")
 
 
@@ -491,7 +534,7 @@ def test_about_the_role_is_not_organisation_text():
 
 
 def test_site_furniture_removal_keeps_standard_sentences():
-    eo = "Acme Relief is an equal opportunity employer and does not charge any fee at any stage."
+    eo = "Acme Relief, an equal opportunity employer, never charges a fee at any stage of hiring."
     ads = [{"org_id": "o", "method": "html", "lines": [{"text": "Home", "heading": False, "tag": "a"},
                                                         {"text": eo, "heading": False, "tag": "p"},
                                                         {"text": f"Duty {i}", "heading": False, "tag": "p"}]}
@@ -968,6 +1011,27 @@ def test_fetch_archive_checks_each_row_again(tmp_path, monkeypatch):
     assert s.calls == 1 and (folder / "pages" / "p1.warc.gz").exists()   # p2 not allowed, p3 held
 
 
+def test_fetch_archive_never_asks_for_a_page_again(tmp_path, monkeypatch):
+    import argparse
+    folder = tmp_path / "r2"
+    folder.mkdir()
+    rows = [{"page_id": f"{i:016x}", "org_id": "seed:1", "system": "own site", "host": "a.example", "crawl": "",
+             "languages": "eng", "filename": "crawl-data/x", "offset": "0", "length": "1",
+             "url": f"https://a.example/jobs/x-y-{i}"} for i in (1, 2)]
+    adverts.write_local(folder / "plan.csv", adverts.PLAN_FIELDS, rows)
+    for name in ("held-hosts.txt", "held-orgs.txt"):
+        (folder / name).write_text("\n", encoding="utf-8")
+    (folder / "requests.log").write_text(f"2026-11-12T07:53:09+00:00\tGET\tr2 page {1:016x}\n", encoding="utf-8")
+    monkeypatch.setattr(adverts, "READING", tmp_path)
+    monkeypatch.setattr(adverts, "RobotsVerdicts", lambda: FakeVerdicts({r["url"] for r in rows}))
+    s = FakeSession([FakeResponse(206, b"x")] * 2)
+    real = adverts.ArchiveReader
+    monkeypatch.setattr(adverts, "ArchiveReader", lambda f, c: real(f, c, session=s, sleep=lambda x: None))
+    adverts.fetch_archive(argparse.Namespace(batch="r2", cap=0))
+    assert s.calls == 1 and (folder / "pages" / f"{2:016x}.warc.gz").exists()
+    assert not (folder / "pages" / f"{1:016x}.warc.gz").exists()          # asked on 12 November: not again
+
+
 def page_ad(i, host="acme.example", words=200):
     text = " ".join(f"duty{i}x{j}" for j in range(words))
     return {"id": f"{i:016x}", "source": "archive", "batch": "r2", "system": "own site", "crawl": "",
@@ -1007,6 +1071,23 @@ def test_measure_keeps_a_held_out_advert_over_its_copy(tmp_path, monkeypatch):
     adverts.measure()
     rows = list(csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8")))
     assert [(r["advert_id"], r["held_out"]) for r in rows] == [(held["id"], "true")]
+
+
+def test_a_recorded_type_decision_is_named_as_the_basis(tmp_path, monkeypatch):
+    work, docs = tmp_path / "work", tmp_path / "docs"
+    (work / "adverts").mkdir(parents=True)
+    for ad in (page_ad(1, host="jobs.itu.int"), page_ad(2)):
+        adverts._save_advert(work / "adverts", ad)
+    (work / "ai-test-set.json").write_text(json.dumps({"pilot": [], "test": []}), encoding="utf-8")
+    monkeypatch.setattr(adverts, "WORK", work)
+    monkeypatch.setattr(adverts, "ROLES_DIR", docs)
+    monkeypatch.setattr(adverts, "_decisions", lambda: [{"action": "org-type", "key": "site:jobs.itu.int",
+                                                         "value": "un_agency", "reason": "", "label": "Fact"}])
+    adverts.measure()
+    rows = {r["org_id"]: r for r in csv.DictReader((docs / "broad-adverts.csv").open(encoding="utf-8"))}
+    assert (rows["site:jobs.itu.int"]["org_type"], rows["site:jobs.itu.int"]["org_type_basis"]) == \
+        ("un_agency", "decision")
+    assert rows["site:acme.example"]["org_type_basis"] == "rule"
 
 
 def test_menu_lines_are_still_site_furniture():
