@@ -42,6 +42,8 @@ from contracts.persist import created_ids, observable_jobs, observe_known
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
+from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
+from contracts.reader import Response
 from app.log_safety import redact_exception, stored_text
 from app.search_projection import commit_and_schedule
 import httpx
@@ -421,6 +423,7 @@ class SimpleCrawler:
         jobs = self._extract_from_structured_data(soup, base_url)
         if jobs:
             logger.info(f"JSON-LD extraction found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('structured-first')
             return jobs
         
         if self.strategy_selector:
@@ -443,6 +446,7 @@ class SimpleCrawler:
                 if metadata.get('warnings'):
                     logger.warning(f"Validation warnings: {len(metadata['warnings'])} warnings")
                 
+                LISTING_STRATEGY.set(metadata.get('strategy_used') or 'none')
                 return jobs
             except Exception as e:
                 logger.warning(f"Strategy selector failed, falling back to sequential: {e}")
@@ -456,6 +460,7 @@ class SimpleCrawler:
         jobs = self._extract_from_tables(soup, base_url)
         if jobs:
             logger.info(f"Strategy 1 (tables) found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('sequential-tables')
             return jobs
         
         # Strategy 2: Div/list-based extraction (for UNDP-style sites)
@@ -463,6 +468,7 @@ class SimpleCrawler:
         jobs = self._extract_from_divs_lists(soup, base_url)
         if jobs:
             logger.info(f"Strategy 2 (divs/lists) found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('sequential-divs')
             return jobs
         
         # Strategy 3: Link-based extraction (for MSF-style sites)
@@ -470,6 +476,7 @@ class SimpleCrawler:
         jobs = self._extract_from_links(soup, base_url)
         if jobs:
             logger.info(f"Strategy 3 (links) found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('sequential-links')
             return jobs
         
         # Strategy 4: Structured data (JSON-LD, microdata)
@@ -477,6 +484,7 @@ class SimpleCrawler:
         jobs = self._extract_from_structured_data(soup, base_url)
         if jobs:
             logger.info(f"Strategy 4 (structured data) found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('sequential-structured')
             return jobs
         
         # Strategy 5: Generic fallback - extract any substantial links from main content
@@ -484,9 +492,11 @@ class SimpleCrawler:
         jobs = self._extract_generic_fallback(soup, base_url)
         if jobs:
             logger.info(f"Strategy 5 (generic fallback) found {len(jobs)} jobs")
+            LISTING_STRATEGY.set('sequential-generic')
             return jobs
         
         logger.warning("No extraction strategy found jobs")
+        LISTING_STRATEGY.set('none')
         return []
     
     def _extract_from_tables(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
@@ -2099,30 +2109,23 @@ class SimpleCrawler:
     async def _listing_jobs(
         self, html: str, careers_url: str
     ) -> Tuple[List[Dict], Optional[Dict]]:
-        """(jobs, listing report). A page of PageUp career-site job cards is read by that reader,
-        page by page; any other page goes to the rule-based reader, with no report. The reader is
+        """(jobs, listing report), from the first of the HTML readers (crawler_v2/readers.py)
+        that reads rows: PageUp's job cards and the Sites engine's, page by page, each with a
+        report; any other page goes to the rule-based reader, with no report. The reader is
         chosen by what the page shows, never by its address.
 
-        The report is returned, never stored on the crawler: one instance serves concurrent crawls.
+        The report is returned, never stored on the crawler: one instance serves concurrent
+        crawls. The reader's name and strategy go to this crawl's own context.
         """
-        try:
-            jobs, report = await self._pageup_listing_jobs(html, careers_url)
-            if jobs:
-                logger.info(f"PageUp career-site reader found {len(jobs)} jobs")
-                return jobs, report
-        except Exception as e:
-            logger.warning(f"PageUp career-site reader failed: {e}, falling back to rule-based")
-        try:
-            jobs, report = await self._sites_listing_jobs(html, careers_url)
-            if jobs:
-                logger.info(f"Sites career-site reader found {len(jobs)} jobs")
-                return jobs, report
-        except Exception as e:
-            logger.warning(f"Sites career-site reader failed: {e}, falling back to rule-based")
-        return self.extract_jobs_from_html(html, careers_url), None
+        result = await read_listing(
+            html_readers(self), Response(200, html), {"careers_url": careers_url}
+        )
+        LISTING_READER.set(result.reader)
+        LISTING_STRATEGY.set(result.strategy)
+        return result.jobs, result.report()
 
     async def _sites_listing_jobs(
-        self, first_html: str, careers_url: str
+        self, first_html: str, careers_url: str, fetch=None
     ) -> Tuple[List[Dict], Optional[Dict]]:
         """A "Sites" engine career site (W-55): page one's cards, then page one again at the
         reader's page size, then the site's own next-page links, one request at a time. All
@@ -2132,9 +2135,11 @@ class SimpleCrawler:
         total is page one's: if a later page states another, the listing changed during the walk
         (a job closed or opened, and the pages shifted), so the walk is partial. Only a walk
         that ran out of next-page links, followed every one it found, and read exactly the
-        stated total is complete; no stated total is partial.
+        stated total is complete; no stated total is partial. Later pages come from `fetch`
+        (url -> (status, html, stop)), or this crawler's `_fetch_listing_page` when None.
         """
         from crawler.plugins.sites_engine import SitesListingReader, resized_url
+        fetch_page = fetch or self._fetch_listing_page
         reader = SitesListingReader()
         first = reader.read_page(first_html, careers_url)
         if not first.is_sites or not first.jobs:
@@ -2154,7 +2159,7 @@ class SimpleCrawler:
             if pages >= _PAGEUP_PAGE_CAP:
                 stop = f'page cap {_PAGEUP_PAGE_CAP}'
                 break
-            status, page_html, page_stop = await self._fetch_listing_page(next_url)
+            status, page_html, page_stop = await fetch_page(next_url)
             if page_stop:
                 stop = f'{_stop_text(page_stop)} on {next_url}'
                 break
@@ -2197,7 +2202,7 @@ class SimpleCrawler:
         return jobs, report
 
     async def _pageup_listing_jobs(
-        self, first_html: str, careers_url: str
+        self, first_html: str, careers_url: str, fetch=None
     ) -> Tuple[List[Dict], Optional[Dict]]:
         """Read page one's job cards, ask for page one again at the reader's page size, then
         follow the More Jobs links page by page. All pages form one batch. ([], None) when the
@@ -2209,9 +2214,11 @@ class SimpleCrawler:
         counts 0 jobs left, which ends the listing.
         Returns the jobs and the walk's report. Only a walk that ran out of links and read at
         least the site's own total is complete: a site that ignores the page size but keeps it
-        in its links skips jobs while still running out of links.
+        in its links skips jobs while still running out of links. Later pages come from `fetch`
+        (url -> (status, html, stop)), or this crawler's `_fetch_listing_page` when None.
         """
         from crawler.plugins.pageup import PageUpListingReader
+        fetch_page = fetch or self._fetch_listing_page
         reader = PageUpListingReader()
         jobs = _first_row_per_link(reader.read_job_cards(first_html, careers_url))
         if not jobs:
@@ -2234,7 +2241,7 @@ class SimpleCrawler:
             if pages >= _PAGEUP_PAGE_CAP:
                 stop = f'page cap {_PAGEUP_PAGE_CAP}'
                 break
-            status, page_html, page_stop = await self._fetch_listing_page(next_url)
+            status, page_html, page_stop = await fetch_page(next_url)
             retried_here = False
             if status in _PAGEUP_RETRY_STATUSES and not page_stop and not retry_used:
                 # At most one retry in the whole crawl.
@@ -2244,7 +2251,7 @@ class SimpleCrawler:
                     status, next_url, _PAGEUP_RETRY_DELAY,
                 )
                 await _sleep(_PAGEUP_RETRY_DELAY)
-                status, page_html, page_stop = await self._fetch_listing_page(next_url)
+                status, page_html, page_stop = await fetch_page(next_url)
             if page_stop:
                 stop = f'{_stop_text(page_stop)} on {next_url}'
                 if retried_here:
@@ -2339,6 +2346,8 @@ class SimpleCrawler:
         careers_url = source['careers_url']
         source_type = source.get('source_type', 'html')
         _SOURCE_FOR_LOGS.set(source_id)
+        LISTING_READER.set("unknown")
+        LISTING_STRATEGY.set(None)
         listing_report = None
         detail_stop = ''
         
@@ -2580,6 +2589,10 @@ class SimpleCrawler:
                         extracted_fields['listing_expected'] = listing_report['expected']
                         extracted_fields['listing_complete'] = listing_report['complete']
                         extracted_fields['listing_stop'] = listing_report['stop']
+                    # Which reader read the listing (W-35): a diagnostic, never lifecycle evidence.
+                    extracted_fields['reader'] = LISTING_READER.get()
+                    if LISTING_STRATEGY.get():
+                        extracted_fields['strategy'] = LISTING_STRATEGY.get()
                     
                     await asyncio.to_thread(
                         self.extraction_logger.log_extraction,

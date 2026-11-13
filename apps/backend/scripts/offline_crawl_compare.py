@@ -20,8 +20,10 @@ secrets, at the places that store a crawl outcome or log a database failure:
 
 --passes 2 crawls every source a second time over what the first saved (the saved-jobs paths).
 
-compare prints every difference in sources, crawl_logs, jobs and failed_inserts, after leaving
-out ids and timestamps. A difference is "masked" only when the second file's value is the first's
+compare prints every difference in sources, crawl_logs, jobs, failed_inserts and (when both files
+have them) extraction_logs, after leaving out ids and timestamps. --new-fields names
+extracted_fields keys expected only in the second file (for example reader,strategy): each is
+counted as "added", with its values. A difference is "masked" only when the second file's value is the first's
 with each fake secret replaced by the redaction mark (cut at a stored limit at most); any other
 difference fails. It also counts the captured log messages and final log lines that hold a fake
 secret. Python sockets are closed to anything but loopback; name lookups are not blocked.
@@ -67,8 +69,14 @@ SOURCES = [
      200),
     ("UNICEF", "unicef-pagination/page1-items50.body",
      "https://jobs.unicef.org/en-us/listing/?page-items=50", 200),
+    # The Sites engine (W-55). Its two saved pages state 225 and 230 jobs, so the walk always
+    # stops at page one again at 50, partial, on "total changed".
+    ("UNICEF Sites", "jobs_unicef_org/2026-11-11/listing.html",
+     "https://jobs.unicef.org/jobs/search", 200),
 ]
 EXTRA_PAGES = {
+    "https://jobs.unicef.org/jobs/search?per_page=100":
+        "jobs_unicef_org/2026-11-11/search-per_page.html",
     "https://jobs.unicef.org/en-us/listing/?page=2&page-items=20": "unicef-pagination/page2.body",
     "https://jobs.unicef.org/en-us/listing/?page=7&page-items=20":
         "unicef-pagination/page7-direct.body",
@@ -122,6 +130,11 @@ def _failed_insert_order(row):
     """Fields both sides share; the error text is what may differ."""
     return (row.get("source_url") or "", row.get("operation") or "",
             json.dumps(row.get("payload"), sort_keys=True))
+
+
+def _extraction_log_order(row):
+    return (str(row.get("source") or ""), row.get("url") or "", row.get("status") or "",
+            row.get("reason") or "", json.dumps(row.get("extracted_fields"), sort_keys=True))
 
 
 def _volatile(key, value):
@@ -302,6 +315,8 @@ def run(args) -> None:
                        key=lambda r: (r.get("apply_url") or "", r.get("title") or "")),
         "failed_inserts": sorted(rows("SELECT row_to_json(f) FROM failed_inserts f"),
                                  key=_failed_insert_order),
+        "extraction_logs": sorted(rows("SELECT row_to_json(e) FROM extraction_logs e"),
+                                  key=_extraction_log_order),
         "locks": sql("SELECT count(*) FROM crawl_locks")[0][0],
         "log_messages_with_a_secret": [m for m in messages if any(f in m for f in FAKES)],
         "log_lines_with_a_secret": [line for line in lines if any(f in line for f in FAKES)],
@@ -316,13 +331,18 @@ def run(args) -> None:
           f"with one: {len(result['log_lines_with_a_secret'])}")
 
 
-def _diff(path, a, b, out):
+def _diff(path, a, b, out, added=frozenset()):
+    """added: keys of extracted_fields that may appear only on the second side."""
     if isinstance(a, dict) and isinstance(b, dict):
         for key in sorted(set(a) | set(b)):
-            _diff(f"{path}.{key}", a.get(key), b.get(key), out)
+            if (path.endswith(".extracted_fields") and key in added and key not in a
+                    and key in b):
+                out.append(("added", f"{path}.{key}", None, b[key]))
+                continue
+            _diff(f"{path}.{key}", a.get(key), b.get(key), out, added)
     elif isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
         for i, (x, y) in enumerate(zip(a, b)):
-            _diff(f"{path}[{i}]", x, y, out)
+            _diff(f"{path}[{i}]", x, y, out, added)
     elif a != b:
         out.append(("masked" if _only_masked(a, b) else "DIFFERENT", path, a, b))
 
@@ -340,16 +360,33 @@ def compare(args) -> int:
     before = json.loads(Path(args.before).read_text(encoding="utf-8"))
     after = json.loads(Path(args.after).read_text(encoding="utf-8"))
     found: list = []
+    added = frozenset(name for name in (args.new_fields or "").split(",") if name)
     for side in (before, after):
         side["failed_inserts"].sort(key=_failed_insert_order)
-    for key in ("sources", "crawl_logs", "jobs", "failed_inserts", "locks"):
-        _diff(key, before[key], after[key], found)
+        if "extraction_logs" in side:
+            # Sorted without the added fields, so rows line up on both sides.
+            side["extraction_logs"].sort(key=lambda row: _extraction_log_order({
+                **row, "extracted_fields": {
+                    k: v for k, v in (row.get("extracted_fields") or {}).items()
+                    if k not in added}}))
+    keys = ["sources", "crawl_logs", "jobs", "failed_inserts", "locks"]
+    if "extraction_logs" in before and "extraction_logs" in after:
+        keys.append("extraction_logs")
+    for key in keys:
+        _diff(key, before[key], after[key], found, added)
     for kind, path, a, b in found:
-        print(f"{kind}: {path}\n  before: {str(a)[:300]}\n  after:  {str(b)[:300]}")
+        if kind != "added":
+            print(f"{kind}: {path}\n  before: {str(a)[:300]}\n  after:  {str(b)[:300]}")
+    additions = [f for f in found if f[0] == "added"]
+    for name in sorted(added):
+        named = [f for f in additions if f[1].endswith(f".{name}")]
+        values = sorted({json.dumps(f[3]) for f in named})
+        print(f"added extracted_fields.{name}: {len(named)} rows, values {', '.join(values)}")
     unexpected = [f for f in found if f[0] == "DIFFERENT"]
+    masked = [f for f in found if f[0] == "masked"]
     print(f"{before['scenario']}: {len(before['jobs'])} jobs and {len(before['crawl_logs'])} runs"
           f" before, {len(after['jobs'])} and {len(after['crawl_logs'])} after; "
-          f"{len(found) - len(unexpected)} masked, {len(unexpected)} other differences; "
+          f"{len(masked)} masked, {len(additions)} added, {len(unexpected)} other differences; "
           f"log messages with a fake secret {len(before['log_messages_with_a_secret'])} -> "
           f"{len(after['log_messages_with_a_secret'])}; final log lines with one "
           f"{len(before['log_lines_with_a_secret'])} -> {len(after['log_lines_with_a_secret'])}")
@@ -370,6 +407,8 @@ def main() -> int:
     c = sub.add_parser("compare")
     c.add_argument("before")
     c.add_argument("after")
+    c.add_argument("--new-fields", default="",
+                   help="comma-separated extracted_fields keys expected only in the second run")
     args = parser.parse_args()
     if args.command == "run":
         run(args)
