@@ -2178,10 +2178,12 @@ def board_org(ad: dict, orgs: roles.Organisations, names: dict[str, str]) -> tup
             f"board-employer:unknown-{ad.get('system', 'board')}"), "board, employer not in the list"
 
 
-def measure(_args=None) -> int:
+def measured_adverts() -> dict:
+    """The adverts `measure` measures, as it reads them: each with its organisation, site furniture
+    removed, near-duplicates and adverts over the caps dropped, and the AI test set's frozen draw.
+    The validation sample's coders read this text (validation.py)."""
     decisions = _decisions()
     orgs = roles.Organisations.load(decisions=decisions, pools=roles.pools_of())
-    title_decisions = roles.decision_map(decisions)
     decided_types = {d["key"] for d in decisions if d["action"] == "org-type"}
     names = org_names(orgs)
     adverts, dropped, board_types = [], Counter(), {}
@@ -2229,13 +2231,22 @@ def measure(_args=None) -> int:
     kept = [a for a in kept if a["id"] not in dup]
     dropped["near-duplicate of another copy"] += len(dup)
     pilot, held = ai_test_set(kept, saved)
-    saved_path.write_text(json.dumps({"pilot": pilot, "test": sorted(held)}), encoding="utf-8")
     # The cap of 30 (French 60) counts evidence only; held-out adverts are kept beside it.
     evidence = [a for a in kept if a["id"] not in held]
     within = {a["page_id"] for a in capped([{"page_id": a["id"], "org_id": a["org_id"], "languages": (
         "fra" if language_of(" ".join(ln["text"] for ln in a["lines"])) == "fr" else "eng")} for a in evidence])}
     dropped["over the cap per organisation"] += sum(1 for a in evidence if a["id"] not in within)
     kept = [a for a in kept if a["id"] in within or a["id"] in held]
+    return {"adverts": kept, "pilot": pilot, "held": held, "dropped": dropped, "orgs": orgs, "std": std,
+            "board_types": board_types, "decisions": decisions}
+
+
+def measure(_args=None) -> int:
+    m = measured_adverts()
+    kept, held, dropped, orgs, std, board_types = (m["adverts"], m["held"], m["dropped"], m["orgs"], m["std"],
+                                                   m["board_types"])
+    (WORK / "ai-test-set.json").write_text(json.dumps({"pilot": m["pilot"], "test": sorted(held)}), encoding="utf-8")
+    title_decisions = roles.decision_map(m["decisions"])
     per_org = Counter(a["org_id"] for a in kept)
     rows, sec_rows = [], []
     for ad in sorted(kept, key=lambda a: a["id"]):
