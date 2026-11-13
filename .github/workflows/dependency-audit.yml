@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    # Fixed for the same reason as ci.yml's backend job.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -54,7 +55,7 @@ jobs:
           path: apps/backend/audit/
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
