@@ -67,6 +67,9 @@ def test_a_label_opening_a_line_is_a_heading_only_with_a_sentence_after_it():
     assert "role_purpose" in types([line("Purpose of the Job: " + DUTIES)])
     assert "pay_benefits" in types([line("Salary – the post is paid on the national scale with a medical allowance.")])
     assert types([line("Duration: 6 months"), line(DUTIES)]) == ["preamble"]
+    # A list of values is not a sentence, and a list item is never a heading (the coding guide).
+    assert "languages" not in types([line("Languages: English (fluent), French (good), Arabic (basic), Swahili (basic)")])
+    assert "role_purpose" not in types([line("Purpose of the Job: " + DUTIES, "li")])
 
 
 def test_an_about_heading_set_as_the_main_heading_starts_its_section():
@@ -127,11 +130,18 @@ def test_contract_type_needs_a_type_named():
     assert "contract_type" in adverts.facts_of("Un stage de six mois au siège.")
     assert "contract_type" in adverts.facts_of("This is a volunteer position based in the capital.")
     assert "contract_type" in adverts.facts_of("A secondment from a member agency.")
+    assert "contract_type" in adverts.facts_of("Type de contrat : durée déterminée")
 
 
-def test_supervising_activities_is_not_a_reporting_line_or_a_team():
-    found = adverts.facts_of("Supervise the distribution activities and keep the supervisor informed weekly.")
-    assert "direct_reports" not in found and "reports_to" not in found
+def test_a_title_that_names_the_engagement_gives_the_contract_type():
+    for title, named in (("Evaluation Consultant", True), ("Communications Intern", True),
+                         ("Volunteer Coordinator", False)):
+        ad = {"title": title, "lines": [line(DUTIES)]}
+        assert ("contract_type" in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))) is named, title
+
+
+def test_a_supervisor_alone_is_not_a_reporting_line():
+    assert "reports_to" not in adverts.facts_of("Supervise the distribution activities and keep the supervisor informed.")
 
 
 def test_a_reporting_line_needs_the_post_named():
@@ -173,14 +183,15 @@ def test_a_closing_date_needs_a_calendar_date():
 def test_how_to_apply_needs_a_how():
     assert "how_to_apply" not in adverts.facts_of("Interested people are encouraged to apply.")
     assert "how_to_apply" in adverts.facts_of("To apply, send a short letter and your CV.")
+    for how in ("Apply for this job", "Postuler", "Applications should be sent before Friday.",
+                "Please use the online portal.", "Those interested should submit their papers.",
+                "Send your papers by mail to [email]."):
+        assert "how_to_apply" in adverts.facts_of(how), how
+    assert "how_to_apply" not in adverts.facts_of("For questions about the role, write to [email].")
 
 
-def test_direct_reports_need_a_number_or_the_roles():
-    assert "direct_reports" not in adverts.facts_of("The role has line management responsibilities.")
-    assert "direct_reports" not in adverts.facts_of("Support, or lead if needed, a team of 2 to 10.")
-    assert "direct_reports" not in adverts.facts_of("Join our team of 70 staff in Nairobi.")
-    assert "direct_reports" in adverts.facts_of("You will manage a team of 6 in the field.")
-    assert "direct_reports" in adverts.facts_of("She line-manages the two finance officers.")
+def test_direct_reports_keep_round_ones_rule():
+    assert adverts.FACTS["direct_reports"].pattern == advert_set.FACTS["direct_reports"].pattern
 
 
 def test_travel_required_alone_is_vague():
@@ -216,8 +227,9 @@ def test_field_missions_are_travel():
 def test_a_reference_number_in_the_title_but_not_a_year():
     ad = {"title": "Fundraising Coordinator - 2025770", "lines": [line(DUTIES)]}
     assert "reference_number" in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))
-    ad = {"title": "Graduate Programme 2026", "lines": [line(DUTIES)]}
-    assert "reference_number" not in adverts.facts_given(ad, adverts.sections_of(ad["lines"]))
+    for title in ("Graduate Programme 2026", "Data Request Officer", "Job Details", "Driver #1"):
+        ad = {"title": title, "lines": [line(DUTIES)]}
+        assert "reference_number" not in adverts.facts_given(ad, adverts.sections_of(ad["lines"])), title
 
 
 def test_a_contract_length_written_as_an_end_date():
