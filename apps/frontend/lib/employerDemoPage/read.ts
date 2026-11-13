@@ -130,13 +130,14 @@ async function resolveChecked(url: URL, lookup: Lookup): Promise<Address | strin
   }
   if (!addresses.length) return 'the name does not resolve';
   if (addresses.some(blockedAddress)) return 'it resolves to an address that is not public';
-  return addresses[0];
+  // Every address was checked; an IPv4 one is preferred, as many networks cannot reach IPv6 (found on the real-page walk).
+  return addresses.find((a) => a.family === 4) ?? addresses[0];
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', hellip: '…' };
 
 function decode(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+  return text.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{1,10});/gi, (m, e: string) => {
     if (e[0] === '#') {
       const n = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
       return Number.isFinite(n) && n > 31 && n < 0x110000 ? String.fromCodePoint(n) : ' ';
@@ -150,7 +151,7 @@ const SOCIAL = /^https:\/\/(?:www\.)?(linkedin\.com\/(?:company|school|in)\/|x\.
 /** The organisation's social addresses among the page's links, offered later for Organisation settings, never saved by themselves. */
 export function socialLinks(html: string): string[] {
   const out = new Set<string>();
-  for (const m of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+  for (const m of html.matchAll(/href\s{0,5}=\s{0,5}["']([^"'<>]{1,2000})["']/gi)) {
     const hit = decode(m[1]).match(SOCIAL)?.[0];
     if (hit) out.add(hit.replace(/\/+$/, ''));
     if (out.size >= 6) break;
@@ -158,19 +159,41 @@ export function socialLinks(html: string): string[] {
   return Array.from(out);
 }
 
+const DROPPED = /<!--|<(script|style|noscript|template|svg|nav|header|footer|form|iframe|button|select)\b/gi;
+
+/**
+ * Comments and the parts that are not content cut out in one pass over the page; one left open runs to the end. Every pattern here
+ * runs in linear time, as a hostile page could otherwise hold the server for minutes.
+ */
+function dropBlocks(html: string): string {
+  const lower = html.toLowerCase();
+  let out = '';
+  let at = 0;
+  DROPPED.lastIndex = 0;
+  for (let m = DROPPED.exec(html); m; m = DROPPED.exec(html)) {
+    out += `${html.slice(at, m.index)} `;
+    const close = m[1] ? `</${m[1].toLowerCase()}` : '-->';
+    const end = lower.indexOf(close, m.index + m[0].length);
+    if (end < 0) return out;
+    const gt = m[1] ? lower.indexOf('>', end) : end + 2;
+    if (gt < 0) return out;
+    at = gt + 1;
+    DROPPED.lastIndex = at;
+  }
+  return out + html.slice(at);
+}
+
 /**
  * The page's visible text: script, style, navigation, and the other parts that are not content dropped; email addresses and phone
  * numbers removed; the first 8,000 characters kept.
  */
 export function visibleText(html: string): string {
-  const body = html
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|template|svg|nav|header|footer|form|iframe|button|select)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<\/(p|div|section|article|li|h[1-6]|tr|br|ul|ol|main|aside|blockquote)\s*>|<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ');
+  const body = dropBlocks(html)
+    .replace(/<\/(p|div|section|article|li|h[1-6]|tr|br|ul|ol|main|aside|blockquote)\s{0,5}>|<br\s{0,5}\/?>/gi, '\n')
+    .replace(/<[^<>]{0,2000}>/g, ' ');
   return decode(body)
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '')
-    .replace(/(?:\+|\b00)\d[\d\s().-]{6,}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{3,4}\b/g, '')
+    .replace(/[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,6}/g, '')
+    .replace(/(?:\+|\b00)\d[\d\s().-]{6,24}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{3,4}\b/g, '')
     .split('\n')
     .map((l) => l.replace(/[ \t\u00a0]+/g, ' ').trim())
     .filter((l) => l.length > 1)
@@ -180,17 +203,19 @@ export function visibleText(html: string): string {
 
 /** A login page, or a page with no real text to draft from. */
 function noRealText(html: string, text: string): boolean {
-  if (/<input[^>]+type\s*=\s*["']?password/i.test(html)) return true;
+  if (/<input\b[^<>]{0,1000}type\s{0,5}=\s{0,5}["']?password/i.test(html)) return true;
   return text.replace(/\s+/g, ' ').length < 200;
 }
 
-async function readBody(body: AsyncIterable<Uint8Array>): Promise<Uint8Array | null> {
+/** The page's first 500 KB at most: reading stops there, and the rest is never fetched into memory. */
+async function readBody(body: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of body) {
-    size += chunk.byteLength;
-    if (size > MAX_BYTES) return null;
-    chunks.push(chunk);
+    const room = MAX_BYTES - size;
+    chunks.push(chunk.byteLength > room ? chunk.slice(0, room) : chunk);
+    size += Math.min(chunk.byteLength, room);
+    if (size >= MAX_BYTES) break;
   }
   const out = new Uint8Array(size);
   let at = 0;
@@ -225,9 +250,7 @@ export async function readPage(raw: string, deps: { lookup: Lookup; fetchAt: Fet
     if (res.status !== 200) return refuse(`status ${res.status}`);
     const type = (res.headers['content-type'] ?? '').toLowerCase();
     if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) return refuse('not an html page');
-    if (Number(res.headers['content-length'] ?? 0) > MAX_BYTES) return refuse('larger than the limit');
     const bytes = await readBody(res.body);
-    if (!bytes) return refuse('larger than the limit');
     const html = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
     const text = visibleText(html);
     if (noRealText(html, text)) return refuse('no real text');

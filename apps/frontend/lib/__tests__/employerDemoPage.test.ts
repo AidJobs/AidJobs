@@ -107,12 +107,48 @@ describe('the page reader: one page, read safely', () => {
     expect(twice.mock.calls.map(([u]) => u.pathname)).toEqual(['/', '/step-1', '/step-2']);
   });
 
-  it('keeps HTML only: a PDF, a page over the size limit, a login page, or a page with no real text cannot be read', async () => {
+  it('reads at most about 500 KB: reading stops at the limit, and text further down is never seen (changed after the real-page walk)', async () => {
+    const lookup = lookupFrom({ 'riverstone.example.org': [[PUBLIC]] });
+    let pulled = 0;
+    const big = `${PAGE}<script>${'x'.repeat(MAX_BYTES)}</script><p>The sentence about zebra crossings lies past the limit.</p>`;
+    const bytes = new TextEncoder().encode(big);
+    const counted: AsyncIterable<Uint8Array> = (async function* () {
+      for (let i = 0; i < bytes.length; i += 4096) {
+        pulled += Math.min(4096, bytes.length - i);
+        yield bytes.slice(i, i + 4096);
+      }
+    })();
+    const out = await readPage('https://riverstone.example.org/', { lookup, fetchAt: async () => ({ status: 200, headers: { 'content-type': 'text/html', 'content-length': String(bytes.length) }, body: counted }) });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.text).toContain('Riverstone Aid is an international NGO');
+    expect(out.text).not.toContain('zebra crossings');
+    expect(pulled).toBeLessThanOrEqual(MAX_BYTES + 4096);
+  });
+
+  it('cleans a hostile 500 KB page in well under a second (no pattern can backtrack over the page; found on the real-page walk)', () => {
+    const hostile = ['a'.repeat(MAX_BYTES), '<a'.repeat(MAX_BYTES / 2), '<!--'.repeat(MAX_BYTES / 4), '<script'.repeat(MAX_BYTES / 7), `href="${'a'.repeat(MAX_BYTES)}`, '+0 '.repeat(MAX_BYTES / 3), `${'a.'.repeat(MAX_BYTES / 2)}@`, `<input ${' '.repeat(MAX_BYTES)}`];
+    for (const page of hostile) {
+      const start = Date.now();
+      visibleText(page);
+      socialLinks(page);
+      expect(Date.now() - start).toBeLessThan(1000);
+    }
+    expect(visibleText('<p>Kept</p><!-- gone --><nav>gone</nav><SCRIPT>gone</SCRIPT ><p>Also kept</p><style>left open')).toBe('Kept\nAlso kept');
+  });
+
+  it('connects to a checked IPv4 address when the name has both, as many networks cannot reach IPv6', async () => {
+    const lookup = lookupFrom({ 'both.example.org': [[{ address: '2606:4700:4700::1111', family: 6 }, PUBLIC]] });
+    const fetchAt = jest.fn<FetchAt>(async () => html());
+    expect((await readPage('https://both.example.org/', { lookup, fetchAt })).ok).toBe(true);
+    expect(fetchAt.mock.calls[0][1]).toEqual(PUBLIC);
+  });
+
+  it('keeps HTML only: a PDF, a login page, or a page with no real text cannot be read', async () => {
     const lookup = lookupFrom({ 'riverstone.example.org': [[PUBLIC]] });
     const read = (fetched: Fetched) => readPage('https://riverstone.example.org/', { lookup, fetchAt: async () => fetched });
     expect(await read({ status: 200, headers: { 'content-type': 'application/pdf' }, body: body('%PDF-1.7') })).toMatchObject({ ok: false, reason: UNREADABLE, why: 'not an html page' });
-    expect(await read(html(PAGE, { 'content-length': String(MAX_BYTES + 1) }))).toMatchObject({ ok: false, why: 'larger than the limit' });
-    expect(await read(html(`<p>${'a'.repeat(MAX_BYTES + 10)}</p>`))).toMatchObject({ ok: false, why: 'larger than the limit' });
+    expect(await read(html('<html><body><nav>Home Jobs Donate</nav><p>Welcome.</p></body></html>'))).toMatchObject({ ok: false, why: 'no real text' });
     expect(await read(html(`${PAGE}<form><input type="password" name="p"></form>`))).toMatchObject({ ok: false, why: 'no real text' });
     expect(await read(html('<html><body><div id="root"></div><script src="/app.js"></script></body></html>'))).toMatchObject({ ok: false, why: 'no real text' });
     expect(await read({ status: 404, headers: { 'content-type': 'text/html' }, body: body('Not found') })).toMatchObject({ ok: false, why: 'status 404' });

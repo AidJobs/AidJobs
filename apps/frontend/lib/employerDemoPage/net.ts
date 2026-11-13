@@ -4,6 +4,15 @@ import type { Address, Fetched, FetchAt, Lookup } from './read';
 
 const TIMEOUT_MS = 10_000;
 
+/** The response body, with the connection closed as soon as the reader stops (at the size limit), so the rest is never downloaded. */
+async function* limited(res: AsyncIterable<Uint8Array>, req: { destroy: () => void }): AsyncIterable<Uint8Array> {
+  try {
+    for await (const chunk of res) yield chunk;
+  } finally {
+    req.destroy();
+  }
+}
+
 /** One DNS lookup of the host, every address it gives. */
 export const lookup: Lookup = async (host) => {
   const all = await dnsLookup(host, { all: true, verbatim: true });
@@ -35,7 +44,7 @@ export const fetchAt: FetchAt = (url: URL, address: Address) =>
       (res) => {
         const headers: Record<string, string | undefined> = {};
         for (const [k, v] of Object.entries(res.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
-        resolve({ status: res.statusCode ?? 0, headers, body: res });
+        resolve({ status: res.statusCode ?? 0, headers, body: limited(res, req) });
       },
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));

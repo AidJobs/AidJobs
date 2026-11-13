@@ -79,7 +79,7 @@
 
 .aj-root .ej-bubble .ej-answer[aria-pressed='true'] {
   background: var(--sage-2, var(--surface-2));
-  border-color: var(--sage-6);
+  border-color: var(--sage-7);
   color: var(--text);
 }
 
@@ -115,7 +115,7 @@
  * in light and dark mode.
  */
 .aj-root:has(.ej-app) {
-  --ej-ring-strong: color-mix(in srgb, var(--sage-6) 75%, transparent);
+  --ej-ring-strong: color-mix(in srgb, var(--sage-7) 75%, transparent);
 }
 
 .aj-root:has(.ej-app) :focus-visible {
@@ -1891,8 +1891,8 @@ button.ej-step:hover {
 }
 
 [data-state='done'] > .ej-pline-dot {
-  border-color: var(--sage-6);
-  background: var(--sage-6);
+  border-color: var(--sage-7);
+  background: var(--sage-7);
 }
 
 [aria-current] > .ej-pline-dot {
@@ -1990,7 +1990,7 @@ button.ej-step:hover {
 }
 
 .aj-root .ej-w-tab[aria-selected='true'] {
-  border-bottom-color: var(--sage-6);
+  border-bottom-color: var(--sage-7);
   color: var(--text);
 }
 
@@ -2007,7 +2007,7 @@ button.ej-step:hover {
 }
 
 .ej-doc section[data-current] {
-  box-shadow: inset 3px 0 0 var(--sage-4);
+  box-shadow: inset 3px 0 0 var(--sage-5);
 }
 
 .ej-fact-rows {

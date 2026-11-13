@@ -110,6 +110,13 @@ describe('the chat looks plain, and focus follows each control’s corners (sect
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.ej-reveal \{\s*animation: none;/);
   });
 
+  it('every colour token the demo uses is defined by the site, so no rule falls back without a colour (found by the screen check)', () => {
+    const site = readFileSync(join(__dirname, '..', '..', 'components', 'site', 'site.css'), 'utf8');
+    const defined = new Set([...site.matchAll(/(--[\w-]+)\s*:/g), ...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+    const used = Array.from(new Set(Array.from(css.matchAll(/var\((--[\w-]+)\)/g)).map((m) => m[1])));
+    expect(used.filter((v) => !defined.has(v))).toEqual([]);
+  });
+
   it('every focus rule draws a ring that follows the corners, not a square outline', () => {
     const focus = Array.from(css.matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^}]*)\}/g));
     expect(focus.length).toBeGreaterThan(5);
