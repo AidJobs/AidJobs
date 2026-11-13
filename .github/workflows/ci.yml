@@ -3,7 +3,8 @@ name: CI backend
 # Branch work is checked through its pull request; pushes run only on main, after a merge.
 # Runs only when something it checks changes, to stay within GitHub's free Actions minutes
 # (decided by the user, 11 November 2026); the frontend is in ci-frontend.yml, and the secret
-# scan, which runs on every push, in secrets.yml.
+# scan, which runs on every push, in secrets.yml. Also weekly on main, so a change on GitHub's
+# side shows before a pull request needs CI (decided by the user, 13 November 2026).
 on:
   push:
     branches: [main]
@@ -28,6 +29,8 @@ on:
       - '.github/scripts/**'
       - '.github/audit-exceptions.json'
       - '.github/workflows/ci.yml'
+  schedule:
+    - cron: '17 4 * * 3'
   workflow_dispatch:
 
 permissions:
@@ -40,7 +43,9 @@ concurrency:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    # A fixed image: ubuntu-latest became 26.04 on 13 November 2026, which has no build of the
+    # Python in apps/backend/.python-version. Change it with that file, in a planned step.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/backend
