@@ -700,38 +700,109 @@ The 8-word copy check found 19 runs in `test_adverts.py`, also present before th
 
 **Next:** the validation sample of 100 (19.3); then Phase 0's guide and wave 1a's deep layer; the wave-1 families, proposed from the role map. R2 is finished; any further archived reading is a new batch, approved first.
 
-### 19.15 Batch R2's remaining pages and the UN organisations (13 November 2026)
+### 19.16 The broad layer's validation sample of 100 (13 and 14 November 2026)
 
-**Approved by the user on 13 November 2026:** R2's remaining requests, 540 of its approved 2,300, with the 7 UN organisations it had held (19.11), under the decision of 12 November 2026 (19.12); the plan redone first. Common Crawl's slow-down day (12 November, UTC) was over. Same rules as 19.11.
+**Approved by the user on 13 November 2026:** 19.3's method, made stricter. That meant a draw of 100, a written guide, two coders on different model families with a pilot and one guide revision, reconciliation frozen before the script's answers were read, and scoring by 19.3's targets. No request was made; everything was on disk. Advert text, the guide, the packets, the coders' answers and the reconciled set stay in `survey-raw-archive/role-survey-reading/work/validation/`. The committed result is `role-survey/broad-validation.csv`, holding counts and shares only.
 
-**The plan, redone (no request; Fact).** 371 pages at 64 organisations, within the 540 requests left:
-- 184 pages carried over from the 12 November plan's 206 unread pages. The other 22 were 8 pages asked for on 12 November without an answer kept (2 connection errors, 6 slow-down answers), not asked again, and 14 that the per-organisation draw replaced once the UN pages joined the pool. 21 replacement pages at the same organisations took their places, within the same caps.
-- 166 pages at 4 of the 7 UN organisations: ITU 60 (30 of them French), UNDP 41 (11 French), ILO 34 (4 French) and UNICEF 31 (1 French).
-- The other 3 stay out under R0's verdicts. UNFPA: its main site refused the survey's `robots.txt` request (253 pages), and its country sites were among the hosts R0 left out (fewer than 3 pages each). WFP: 2 pages in other languages and 1 on a host R0 did not read. WHO: 1 page on a host R0 did not read.
-- 71 of the 371 pages are French. The 12 November plan and its held lists are kept beside the batch (`r2/plan-20261112T025801Z/`).
+**The tools** (`tools/survey/validation.py`, 27 tests, in CI's Role survey step). They cover the draw, the coders' packets, the guide's form, agreement and kappa, reconciliation and its seal, and scoring with CI's form check. `adverts.py`'s `measure()` was split so the coders read exactly the text it measured. No rule changed, and a rebuild gave byte-identical broad files and AI test set. One review round before the code touched the sample (`role-survey/review-9.md`): approve with changes, 7 should-fix and 3 minor, no must-fix, all taken. Gemini 4 Hydrogen was not available, so the reviewer was Grok 4.7.
 
-**The reading (Fact; `survey-raw-archive/role-survey-reading/r2/`).** The stop of 12 November was lifted for the new day, with the reason logged in `resumed.log`, as for R1; its record is kept as `stopped-2026-11-12.txt`. 13 November, 10:09 to 11:12 UTC: 371 requests to `data.commoncrawl.org`, one byte-range GET per page, 10 seconds apart. 370 answered 206 and were saved, and 1 connection error was not retried. There was no slow-down answer. **R2 in all: 2,131 of its 2,300 requests; its plan is read in full, and the 169 requests left are not used.**
+**The draw** (seed 20261113, frozen):
+- 100 of the 1,294 evidence adverts, at 81 organisations; none of the AI test set.
+- 20 French, which is oversampled (13.5% of the evidence).
+- By source: archive 86, boards 8, step F's feeds 5, documented feeds 1.
+- By system: own sites 60, Greenhouse 17, MyJobMag 5, iCIMS 4, Teamtailor 4 (every system with 50 or more adverts has 4 or more), and 1 or 2 from each of six smaller systems.
+- At most 3 per organisation.
+- The French quota uses the script's own language measure, which the sample then validated at 1.00.
 
-**Script changes (`adverts.py`, 4 new tests, 179 in all; Fact).**
-1. A page an archive batch has asked for is never asked for again, at planning or at reading (it is found in the batches' request logs). Without this, the 8 pages of 12 November would have been asked for a second time.
-2. A redone plan keeps its predecessor (`plan-<UTC time>/`), and `extract` reads every plan of a batch. The first rebuild after the new plan lost the batch, crawl and language of the 878 pages read on 11 and 12 November (labelled "earlier", with no period). They are restored.
-3. A page read before R0 checked its host (section 18) is extracted only where R0 allows it. M1's sample page on `www.unfpa.org`, refused by R0 (19.10), had been kept out of the measures only by the UN hold. It is now dropped.
-4. An organisation typed by a recorded decision carries "decision" as its type basis. One decision is added (`role-decisions.csv`): ITU's recruitment site, which entered the survey from Common Crawl's index outside the organisation list, is typed as a UN agency rather than "other".
+**The coders** were Grok 4.7 (coder A) and Composer 2.5 (coder B). This was the user's choice on 13 November 2026, after Claude Opus 5.5, Claude Sonnet 5.5, GPT-5.6 Terra and GPT-5.6 Sol were each refused as not included in the account's usage. Each coder read only the guide and packets of adverts under neutral ids (V001 to V100). Both coded each batch, and its answers were saved only once both had returned.
 
-The 8-word copy check found 19 runs in `test_adverts.py`, also present before this change. They were stock recruitment wording written for the tests (the UN's degree-and-years form, "the right to work in the UK", a no-fee sentence), which the new UN adverts happen to share. The test strings are reworded, and they test the same forms.
+Eight coding runs (five of Composer's, three of Grok's) looped or stalled on very long lines and were split into smaller runs. Four adverts were given a reading copy that splits long lines into chunks, with line numbers unchanged. One advert, V057 (its whole text a single line of about 7,900 characters), defeated Composer five times. Grok coded it alone, and the reconciler decided all 63 of its items from the text. It is left out of the agreement figures.
 
-**The broad layer, rebuilt (every measure an Estimate until the validation sample, 19.3).** 2,499 pages and feed items extracted. Dropped: 1,040 not adverts, 92 near-duplicates, 33 over the caps, and 1 with no organisation. **1,324 adverts at 136 organisations, 30 held out as the AI test set (unchanged), 1,294 as evidence (1,107 before):** archive 1,103, boards 110, step F's feeds 64, R4's feeds 17; English 1,117, French 175. By organisation type: INGOs 656, research bodies 145, donors and government 119, domestic charities 119, national NGOs in the Global South 113, **UN agencies 64**, Red Cross 46, other 22, foundations 9, contractor 1.
-- **The UN pages:** 64 adverts from 166 pages: UNICEF 30 (its pages are full adverts), ITU 16, UNDP 14, ILO 4; 50 English and 14 French. Most of ILO's and ITU's archived pages are empty shells of their script-built recruitment system (ILO's median page holds 12 words), and most of UNDP's "job pages" are careers stories and information pages. In 25 of the 64 the title is not placed by the rules, and in 34 the level is unknown: UN titles carry a grade more often than a level word. 16 give pay as a figure or scale, and 8 a grade. The UN layer is thin. The UN Secretariat is still not read (19.8).
-- **Medians:** 1,018 words, 595 of them role content; standard text 34%.
-- **Facts given (share of adverts):** contract type 75%, how to apply 66%, duty station 64%, equal-opportunity statement 58%, closing date 50%, hours 49%, selection steps 47%, reporting line 46%, **pay as a figure or named scale 37%** (vague pay a further 15%), languages 36%, start date 23%, travel 22%, contract length 22%, no-fee notice 9%, closing time 5%.
-- **Years of experience asked (median, quartiles):** officer 4 (2.5 to 5), coordinator or manager 5 (3 to 7), head or adviser 7 (5 to 10). Degrees named: bachelor's 323, master's 252, none stated 630.
-- **Explicit restrictions:** 32 adverts, 16 of them national posts only (nationality 13, age 3, sex 2, national posts 16). Of these, 13 are UN adverts, mostly national-officer posts. Inclusion statements: equal opportunity 754, under-represented groups 161, adjustments 187.
-- **Automatic partial score (out of 40):** median 20, upper quartile 23.3, unchanged.
-- **Families with 30 or more adverts: 11** (9 before): programme management 108, communications and advocacy 88, finance 85, grants and partnerships 80, policy and research 75, MEAL 67, ICT 42, leadership 39, administration 37, **HR 35, climate and environment 30**. 12 more have 8 to 29 (WASH joins at 8), and 228 adverts (18%) have titles the rules do not place.
+The coders corrected their own form slips, form only: 2 by Grok, 15 by Composer. These were ids outside the guide's lists, line numbers of the file rather than of the advert, and a fact listed as both given and vague. Briefs after the first failures carried a reminder of the guide's ids.
 
-**The role map** (`role-counts.csv`, `title-variants.csv`, `role-map.csv`, rebuilt). 7,044 titles at 236 organisations (6,615 at 233 before), of which 5,943 are counted after one title per page; 83% are placed by the rules. 94 title variants are seen at two or more organisations (88 before). 22 unplaced titles are seen at two or more organisations, for review with the wave-1 families.
+**The pilot and guide version 1.1.** On the pilot of 10, the coders disagreed on 32 of 630 items (95% agreement), contract type lowest at 70%. 14 rules were added or clarified, each recorded in the guide:
+- Sections:
+  - a heading is coded by what most of its text is about;
+  - a label at the start of a line is a heading only when a sentence follows it;
+  - a one-value line is not a heading;
+  - several headings may share the line of a single-line advert;
+  - application questions are how to apply;
+  - a description of the work without duties is role purpose;
+  - competencies are behaviours and values, while skills and knowledge are essential requirements.
+- Pages that are not one job's advert are coded for what they say about the employer's jobs in general.
+- Facts:
+  - contract type must be named, so a length or end date alone gives the length only;
+  - field missions count as travel;
+  - a team only supported or led at times is vague for direct reports;
+  - renewal subject to funding counts as funding status;
+  - a closing time in the job-posting data counts unless it is 00:00;
+  - a number in the title is a reference number;
+  - explaining how a stated figure is set is not vague pay wording;
+  - a benefit for staff in general does not give the job's hours.
+- Family: the title decides the function.
 
-**Copy and form checks:** the 8-word check passes on every changed file, and `adverts.py check` finds no problem.
+**Coder agreement** (the 89 adverts coded with two coders on the frozen guide; percent agreement, Cohen's kappa):
+- Language 1.00. Years of experience within one year 0.98 (κ 0.99). Level 0.90 (κ 0.86).
+- Section types 0.82 to 0.99, κ mostly 0.5 to 0.9.
+- Facts 0.74 to 0.99.
+- Lowest: family 0.56 (κ 0.54), selection steps 0.74, direct reports 0.76, travel and budget 0.79, function 0.80.
 
-**Next:** the validation sample of 100 (19.3); then Phase 0's guide and wave 1a's deep layer; the wave-1 families, proposed from the role map. R2 is finished; any further archived reading is a new batch, approved first.
+**Reconciliation:** 585 disagreements in 97 adverts, each settled by the agent reading the advert, with a one-line reason. The set was frozen and sealed on 14 November 2026 at 00:25 IST, before any of the script's answers for the sample were read.
+
+**Results** (19.3's targets: precision 0.9 and recall 0.85 for section types, facts and degree; years within one year in 90% of adverts with a figure on either side; precision 0.9 for family, function, level, language and restrictions; fewer than 15 cases is "not validated"):
+- **Validated (8 measures; usable as measured):**
+  - language: overall, English and French, all 1.00;
+  - level: 0.96 precision, with officer 0.96 and coordinator or manager 0.94;
+  - the essential-requirements section: 0.99 precision, 0.86 recall;
+  - the languages section: 0.94 precision, 1.00 recall.
+- **Estimate (37):** everything else with enough cases. They are close to target, high in precision but missing cases, or far from target:
+  - **Near target:** pay (0.89, 0.84), closing date (0.84, 0.84), how to apply (0.85, 0.91), the equal-opportunity statement (0.87, 0.86).
+  - **High precision, low recall:** most section types (precision 0.82 to 1.00, recall 0.24 to 0.67). Also closing time (1.00, 0.12), languages (1.00, 0.62), reference number (1.00, 0.32), contract length (0.92, 0.62), degree named (0.98, 0.72).
+  - **Low precision:** contract type (0.56, 0.95), selection steps (0.48, 1.00), direct reports (0.59, 0.87), hours (0.69, 0.97), safeguarding checks (0.63, 0.68).
+  - **Years of experience:** within one year in 73.9% of the 69 adverts with a figure.
+  - **Family:** precision 0.65, recall 0.56, so the role map's families stay an Estimate. Function alone is 0.67.
+- **Not validated (30):** fewer than 15 cases. These include every restriction category, the alternative years, PhD and secondary degrees, field conditions and scope, and 8 rarer facts. Restrictions need a targeted sample: the script found 3 of the 18 adverts with a restriction (precision 1.00 on those 3, recall 0.17).
+
+With 15 to 90 cases, each share carries a 95% margin of roughly ±0.05 to ±0.15 (Estimate).
+
+**The script's main error patterns** (counts from the 100 adverts; the rules are not changed here):
+1. **Headings it cannot see**, the largest source of missed sections:
+   - unmarked heading lines ("Position Overview" *(std)* as plain text);
+   - labels opening a line ("Purpose of the Job" *(std)* followed by its text);
+   - an About heading the page sets as its main heading;
+   - feed adverts whose text is one line.
+   It also types headings by their words, not their text ("Job Description" *(std)* over an employer description).
+2. **The job-posting data's employment type** gives both contract type and hours. This accounts for 14 of the 32 contract-type and 9 of the 14 hours false positives: FULL_TIME is not a contract type, and odd values (OTHER, a date) still give hours.
+3. **Words in another sense:**
+   - French "stage" and "volunteer" for contract type;
+   - "supervise" and "supervisor" for direct reports and reporting lines;
+   - "portfolio of" and the employer's own budget figures for budget;
+   - a safeguarding commitment for safeguarding checks.
+4. **Boilerplate taken as given where the guide says vague:**
+   - selection steps (12 of 23 false positives are "only shortlisted candidates will be contacted" *(std)*);
+   - closing date (7 of 8 are rolling or open until filled);
+   - how to apply (6) and direct reports (6).
+5. **Facts it misses:**
+   - closing times (22: the job-posting data's time, and midnight or 23:59 given with a city's local time);
+   - languages named without "fluent" or "required" (20);
+   - places with no "Location:" label (20);
+   - field missions and visits (18);
+   - reference numbers in the title (15);
+   - contract lengths written as dates or "until" (15);
+   - renewal subject to funding (8);
+   - adjustments (8).
+6. **Years of experience,** 18 differences in all:
+   - 9 take a smaller figure among several, review 9's point 6 (for example 2 from "5 years, 2 of them managing staff");
+   - 8 find no figure;
+   - 1 gives a figure where none is asked.
+7. **Family,** 45 differences:
+   - 18 titles the rules leave unplaced;
+   - 21 placed in another function (for example communications for an internal-events post, programme management for a finance post);
+   - 5 careers or information pages given a family.
+   Level, with 19 differences, is mostly unknown (17) where a grade or the text gives it.
+8. **Restrictions,** 15 missed: 10 nationality, 3 religion, 2 age, 1 sex, 1 photograph, 1 national post (one advert can carry two). The nationality misses are mostly residence or location limits: a remote post limited to one coast or country, living within commuting distance, or applicants' location in the job-posting data.
+
+**Which broad measures may now be used as validated:** language, level, and the presence of the essential-requirements and languages sections. Every other measure in `broad-adverts.csv` and `broad-sections.csv` stays an Estimate, labelled so wherever it is used. That includes the facts given and missing, the section structure, years and degrees, the families, the partial score and the restriction frequencies.
+
+**Next:** a later step changes `adverts.py`'s rules for these patterns, re-scored on a fresh draw. Then Phase 0's guide and wave 1a's deep layer, and the wave-1 families, proposed from the role map.
 
