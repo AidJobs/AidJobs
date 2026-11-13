@@ -3,20 +3,27 @@
 import { Receipt as ReceiptIcon } from 'lucide-react';
 import { useState } from 'react';
 import { buy, cancelSubscription, resumeSubscription } from './actions';
-import { currentMonth, EXTRA_JOB, FREE_PER_MONTH, freeHolds, freeLeft, monthName, ONE_JOB, packageOf, PACKAGES, resetText, SUBSCRIPTION_JOBS, usd, type PackageKey } from './plans';
+import { allowance, allowanceText, EXTRA_JOB, ONE_JOB, packageOf, PACKAGES, SUBSCRIPTION_JOBS, usd, type FreeKind, type PackageKey } from './plans';
 import { daysUntil, longDate } from './engine';
-import { Checkout, FreeTerms } from './Pricing';
+import { Checkout, FreeAmplifyTerms, FreeTerms } from './Pricing';
 import { notify, useDemo } from './store';
 import { DemoMark, Section } from './ui';
 
-/** The month's free count and reset date, the package or subscription balance, receipts, and the refund policy. */
+/** The two free listings, each used or available, the package or subscription balance, receipts, and the refund policy. */
 export default function Billing() {
   const s = useDemo();
   const [checkout, setCheckout] = useState<PackageKey | null>(null);
-  const month = currentMonth(s);
-  const left = freeLeft(s, month);
-  const used = s.freeUses.filter((u) => u.month === month).map((u) => (s.jobs.find((j) => j.id === u.jobId) ?? s.deleted?.find((d) => d.job.id === u.jobId)?.job)?.facts.title || 'a deleted job');
-  const held = freeHolds(s, month).map((j) => `${j.facts.title || 'Untitled job'} (goes live on ${longDate(j.scheduledFor ?? '')})`);
+  const line = (kind: FreeKind, label: string) => {
+    const a = allowance(s, kind);
+    return (
+      <div className="flex flex-wrap items-baseline gap-x-2" data-allowance={kind} data-state={a.state}>
+        <span style={{ fontWeight: 650, fontSize: 15 }}>
+          {label}: {a.state === 'available' ? 'available' : a.state === 'held' ? 'held' : 'used'}
+        </span>
+        {a.state !== 'available' && <span className="aj-muted">{allowanceText(s, kind).replace(/^(used|held) by /, '')}</span>}
+      </div>
+    );
+  };
   const sub = s.subscription;
   const packs = s.packs.filter((p) => p.left > 0);
   const soon = (ends: string) => {
@@ -34,16 +41,19 @@ export default function Billing() {
         <DemoMark label="Demo · simulated payments, placeholder prices" />
       </div>
 
-      <Section title="Free jobs">
+      <Section title="Free listings">
         <div className="aj-card flex flex-col gap-2 p-4">
-          <div style={{ fontWeight: 650, fontSize: 15 }}>
-            {left} of {FREE_PER_MONTH} free jobs left in {monthName(month)}
-          </div>
-          <span className="aj-muted">Resets on {resetText(s)}.</span>
-          {used.length > 0 && <span className="aj-muted">Used this month: {used.join(', ')}.</span>}
-          {held.length > 0 && <span className="aj-muted">Held, used on the day it goes live: {held.join(', ')}. Taken back to a draft, its place is given back.</span>}
+          {line('standard', 'Free standard')}
           <FreeTerms s={s} />
         </div>
+        <div className="aj-card flex flex-col gap-2 p-4">
+          {line('amplify', 'Free Amplify')}
+          <FreeAmplifyTerms />
+          {!s.org.verified && <span style={{ color: 'var(--amber)' }}>Amplify, free or paid, is for verified organisations.</span>}
+        </div>
+        <span className="aj-faint" style={{ fontSize: 11.5 }}>
+          Each is used on the day its job goes live, never renewed. Scheduled, the job holds it; taken back to a draft, withdrawn, or deleted first, it is given back.
+        </span>
       </Section>
 
       <Section title="Package">
@@ -76,7 +86,7 @@ export default function Billing() {
             </div>
           ))}
           {!sub && !packs.length && (
-            <div className="aj-card aj-muted p-4">No package. Jobs beyond the free ones are paid one at a time, {usd(ONE_JOB)} each, when they are published.</div>
+            <div className="aj-card aj-muted p-4">No package. Beyond the two free listings, jobs are amplified one at a time, {usd(ONE_JOB)} each, when they are published.</div>
           )}
           <div className="aj-card flex flex-col p-1.5" role="list" aria-label="Packages">
             {PACKAGES.map((p) => (
@@ -105,7 +115,7 @@ export default function Billing() {
             ))}
           </div>
           <span className="aj-faint" style={{ fontSize: 11.5 }}>
-            Placeholder prices, the same for every type of organisation. A package job can also amplify a live free job; a free job once used stays used, and the free jobs come back each month.
+            Placeholder prices, the same for every type of organisation. A package job can also amplify a live free job; a free listing once used stays used. Paying uses neither free listing.
           </span>
         </div>
       </Section>

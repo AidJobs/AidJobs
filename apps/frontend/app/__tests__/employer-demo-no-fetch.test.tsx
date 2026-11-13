@@ -17,12 +17,11 @@ jest.mock('next/link', () => ({
 import EmployerDemo from '@/components/employer-demo/EmployerDemo';
 import { quality } from '@/components/employer-demo/engine';
 import { memoryPick, pickPhrase } from '@/components/employer-demo/answers';
-import { emptyFacts } from '@/components/employer-demo/engine';
+import { emptyFacts, isoDay } from '@/components/employer-demo/engine';
 import { addTranslation, formatOf, reorderSections, reviewerDecision, setReachPlan, toggleSection } from '@/components/employer-demo/actions';
 import { planFor } from '@/components/employer-demo/invites';
 import { answerFact, basePattern, forgetBase, notNowBase, setBaseFormat, importJobDescription, publish, readIntent, sendChat, sendForReview, setFacts, startJob, undoLastChange } from '@/components/employer-demo/actions';
 import DemoRecovery from '@/components/employer-demo/Recover';
-import { currentMonth } from '@/components/employer-demo/plans';
 import { getState, go, goBack, resetDemo, STORAGE_KEY, update } from '@/components/employer-demo/store';
 import SiteRoot from '@/components/site/SiteRoot';
 import { AI_ROUTE, resetAi } from '@/components/employer-demo/ai';
@@ -178,7 +177,8 @@ describe('employer demo: never calls the network', () => {
       shows('Actively hiring · promoted by employers');
       route('#billing');
       shows('Refund policy');
-      shows('free jobs left in');
+      shows('Free standard: available');
+      shows('Free Amplify: available');
       route('#public/org');
       shows('Riverstone Aid');
       route('#home');
@@ -206,10 +206,10 @@ describe('employer demo: never calls the network', () => {
       });
     }
     route(`#publish/${id}`);
-    shows('1 of 2 free jobs left in');
+    shows('Your one free standard listing, once for your organisation');
     for (const v of ['In Google', 'When shared', 'Job page']) click(v);
     click('Publish free');
-    shows('Free jobs: the terms');
+    shows('Your free standard listing: the terms');
     click('I understand · Publish free');
     shows('Live on AidJobs');
     expect(getState().jobs.find((j) => j.id === id)).toMatchObject({ status: 'live', plan: 'free' });
@@ -220,8 +220,8 @@ describe('employer demo: never calls the network', () => {
       paidId = startJob('Hiring a Shelter Officer in Goma, closing in 4 weeks, fixed-term');
     });
     route(`#publish/${paidId}`);
-    shows('Both free jobs for');
-    shows('create and publish it free then, or Amplify to publish it now');
+    shows('Your free standard listing is used by');
+    shows('Amplify, or a package job, publishes it.');
     expect(container.textContent).not.toContain('Schedule free for');
     click('Amplify and publish · US$28.40');
     click('Simulate a declined card');
@@ -239,10 +239,16 @@ describe('employer demo: never calls the network', () => {
     route(window.location.hash);
     expect(getState().jobs.find((j) => j.id === id)?.part).toBe('publish');
     shows('Amplified, it is listed 100 days from publishing');
-    click('Amplify this job · US$28.40');
-    click('Pay US$28.40');
-    expect(getState().jobs.find((j) => j.id === id)?.plan).toBe('amplify');
-    expect(getState().freeUses.some((u) => u.jobId === id)).toBe(true);
+    shows('With your free Amplify there is nothing to pay; it is used at once.');
+    expect(container.textContent).not.toContain('Ask someone else to pay');
+    const receipts = getState().receipts.length;
+    click('Amplify this job · your free Amplify');
+    expect(getState().jobs.find((j) => j.id === id)).toMatchObject({ plan: 'amplify', paidVia: 'free' });
+    expect(getState().receipts.length).toBe(receipts);
+    expect(getState().free).toEqual({ standard: id, amplify: id });
+    route('#billing');
+    shows('Free standard: used');
+    shows('Free Amplify: used');
 
     act(() => {
       const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
@@ -374,16 +380,15 @@ describe('employer demo: the conversation', () => {
     expect(JSON.stringify(job().sections)).toContain('30 November 2026');
   });
 
-  it('uses a free job only when it is published, not when it is written or sent for review', () => {
+  it('uses a free listing only when its job goes live, not when it is written or sent for review', () => {
     act(() => resetDemo());
-    const before = getState().freeUses.length;
     let id = '';
     act(() => {
       id = startJob('Hiring a Logistics Officer in Goma, closing in 3 weeks');
     });
-    expect(getState().freeUses.length).toBe(before);
+    expect(getState().free).toEqual({});
     act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
-    expect(getState().freeUses.length).toBe(before);
+    expect(getState().free).toEqual({});
   });
 });
 
@@ -584,7 +589,7 @@ describe('employer demo: approved, then a request for changes', () => {
     shows('Publish anyway?');
     const confirm = Array.from(container.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'Publish anyway') as HTMLElement;
     act(() => confirm.click());
-    shows('Free jobs: the terms');
+    shows('Your free standard listing: the terms');
     click('I understand · Publish free');
     shows('Live on AidJobs');
     expect(getState().jobs.find((j) => j.id === 'job-fin')?.audit.some((a) => a.what.startsWith("Published with Daniel's request for changes still open"))).toBe(true);
@@ -716,23 +721,21 @@ describe('employer demo: managing jobs', () => {
     expect(network).toEqual([]);
   });
 
-  it('a free job given a date next month shows the notice and offers Amplify', () => {
+  it('a free job may be scheduled more than a month ahead: no month limit since phase 5', () => {
     act(() => {
       resetDemo();
-      update((st) => ({ ...st, signedIn: true }));
+      update((st) => ({ ...st, signedIn: true, jobs: st.jobs.map((j) => (j.id === 'job-comms' ? { ...j, facts: { ...j.facts, deadline: isoDay(st.today + 90 * 86_400_000) } } : j)) }));
     });
     phone = false;
     render();
     route('#home');
     route('#publish/job-comms');
     click('Schedule');
-    const [y, m] = currentMonth(getState()).split('-').map(Number);
-    const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-02`;
-    type(container.querySelector('input[aria-label="Publish on"]') as HTMLInputElement, next);
-    shows('A free job goes live in its own month');
-    expect((Array.from(container.querySelectorAll('button')).find((b) => /^A free job goes live within/.test(b.textContent?.trim() ?? '')) as HTMLButtonElement).disabled).toBe(true);
-    click('Choose Amplify');
-    expect(container.textContent).not.toContain('A free job goes live in its own month');
+    const later = isoDay(getState().today + 40 * 86_400_000);
+    type(container.querySelector('input[aria-label="Publish on"]') as HTMLInputElement, later);
+    expect(container.textContent).not.toContain('goes live in its own month');
+    const button = Array.from(container.querySelectorAll('button')).find((b) => (b.textContent?.trim() ?? '').startsWith('Schedule free for')) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
     expect(network).toEqual([]);
   });
 
@@ -1455,7 +1458,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     act(() => update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, choice: 'free' } : j)) })));
     part('Publish');
     const main = () => container.querySelector('#ej-part-card .ej-main-cta') as HTMLButtonElement;
-    expect(main().textContent).toBe('Publish free');
+    expect(main().textContent).toBe('Publish free · your free standard listing');
     click('On a date');
     expect(job(id).publishOn).toBeDefined();
     expect(main().textContent).toMatch(/^Schedule free for /);
@@ -1553,7 +1556,8 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       applyTemplate(id, job(id).format);
       chooseStyle(id, ['Warm']);
       setPace(id, 'all');
-      update((st) => ({ ...st, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
+      // The organisation's free Amplify is already used, so this walk goes through the paid checkout.
+      update((st) => ({ ...st, free: { amplify: 'job-earlier' }, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
       const points = checkPoints(job(id), getState()).map((p) => p.key);
       update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
       goOn(id);

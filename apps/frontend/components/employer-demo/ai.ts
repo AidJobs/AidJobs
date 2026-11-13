@@ -6,7 +6,7 @@ import { approvalRequired, approvedFor } from './approval';
 import { planCount, planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { profileFor, profileName } from './profiles';
-import { canGoFree, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, monthFor, monthName, PACKAGES, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
+import { allowance, canAmplifyFree, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, PACKAGES, paidJobsLeft, singlePrice, usd, usesFreeAmplify, viaFor } from './plans';
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
@@ -167,7 +167,6 @@ function returningFor(s: State, j: DemoJob) {
  * are the rules' own; the AI words them and never works out a price, an allowance, or a date itself.
  */
 function publishingFor(s: State, j: DemoJob) {
-  const month = monthFor(s, j.publishOn ?? null);
   const via = viaFor(s, j);
   const onHand = paidJobsLeft(s);
   return {
@@ -175,8 +174,8 @@ function publishingFor(s: State, j: DemoJob) {
     published: isPublished(j) ? { plan: j.plan, status: j.status } : null,
     choice: j.choice ?? null,
     publishOn: j.publishOn ?? null,
-    free: { canGoFree: canGoFree(s, j.id, j.publishOn ?? null), left: freeLeft(s, month), month: monthName(month), listedDays: LISTED_DAYS.free },
-    amplify: { verified: s.org.verified, price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? 'one', packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
+    free: { canGoFree: canGoFree(s, j.id), standard: allowance(s, 'standard').state, listedDays: LISTED_DAYS.free },
+    amplify: { verified: s.org.verified, freeAmplify: allowance(s, 'amplify').state, usesFreeAmplify: usesFreeAmplify(s, j), price: usd(singlePrice(s).amount), packageJobsOnHand: onHand, listedDays: LISTED_DAYS.amplify, payWith: j.payWith ?? (canAmplifyFree(s, j.id) ? 'free' : 'one'), packages: PACKAGES.map((p) => ({ key: p.key, label: p.label, price: usd(p.price), perJob: usd(p.perJob) })) },
     versions: { included: LANGS_INCLUDED[via], extraPrice: usd(LANGUAGE_PRICE), toPay: langsToPay(j, 'amplify', via), list: versionsOf(j).map((k) => ({ key: k, label: langOf(k).label, reviewed: Boolean(j.translations?.[k]?.reviewed), behind: Boolean(j.translations?.[k] && stale(j, j.translations[k]!)), sections: j.translations?.[k]?.sections.map((x) => ({ key: x.key, heading: x.title, text: x.lines.join('\n') })) })) },
     review: { required: approvalRequired(s, j), approved: approvedFor(s, j), state: j.review.state, reviewers: j.review.reviewers.map((r) => ({ name: r.name, decision: r.decision ?? null, note: r.note ?? null })), team: s.team.filter((p) => p.id !== s.me.id).map((p) => ({ name: p.name, role: p.role })) },
     reach: (() => {

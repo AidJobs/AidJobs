@@ -1,5 +1,4 @@
 import { applyLines, defaultApply } from './apply';
-import { monthOf, orgZone } from './plans';
 import { defaultMessages } from './invites';
 import { addDays, buildSections, emptyFacts, FORMATS, holiday, orderSections, weekend } from './engine';
 import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } from './types';
@@ -246,12 +245,8 @@ export function initialState(today: number): State {
     jobs: sampleJobs(today),
     formats: allFormats(),
     inbox: sampleInbox(today),
-    // A free job went live this month and was later deleted, so one of the month's two free jobs stays used; the MEAL Coordinator used last month's, the Livelihoods Officer one in the month it went live.
-    freeUses: [
-      { jobId: 'job-deleted-sample', month: monthOf(today + 12 * 3_600_000, orgZone(SAMPLE_ORG).zone) },
-      { jobId: 'job-meal', month: monthOf(lastMonth(today), orgZone(SAMPLE_ORG).zone) },
-      { jobId: 'job-liv', month: monthOf(today - 55 * DAY, orgZone(SAMPLE_ORG).zone) },
-    ],
+    // The sample's jobs use neither free listing, so each offer can be seen once (section 19, phase 5, D).
+    free: {},
     packs: [],
     subscription: null,
     receipts: [],

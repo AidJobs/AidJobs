@@ -28,7 +28,7 @@ import {
 import Composer from './Composer';
 import { addDays, daysUntil, longDate, shortDate } from './engine';
 import { changeSummary, tellOffer } from './changes';
-import { currentMonth, delisted, FREE_PER_MONTH, freeLeft, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn, monthName } from './plans';
+import { delisted, freeSummary, LISTED_DAYS, listedUntil, listingEnd, listingEndsIn } from './plans';
 import { reachMoment } from './invites';
 import { go, READING_KEY, useDemo } from './store';
 import type { DemoJob, InboxItem, State } from './types';
@@ -276,9 +276,6 @@ export default function Home() {
   const [day, setDay] = useState<string | null>(null);
   const [allBrief, setAllBrief] = useState(false);
   const items = briefing(s);
-  const left = freeLeft(s);
-  const month = monthName(currentMonth(s));
-
   const active = s.jobs.filter((j) => j.status !== 'closed' || (j.closedAt && s.today - j.closedAt < 31 * DAY));
   const shown = day ? active.filter((j) => j.facts.deadline === day && (j.status === 'live' || j.status === 'scheduled')) : active;
   const groups: DayGroup[] = [];
@@ -357,7 +354,7 @@ export default function Home() {
           </ul>
         )}
 
-        <Section title="Ask AidJobs" action={<span className="aj-faint">{left} of {FREE_PER_MONTH} free jobs left in {month}</span>}>
+        <Section title="Ask AidJobs" action={<span className="aj-faint">{freeSummary(s)}</span>}>
           <Composer
             value={text}
             onChange={setText}
@@ -368,7 +365,7 @@ export default function Home() {
             compact
           />
           <p className="aj-faint" style={{ margin: 0, fontSize: 11.5 }}>
-            Every change is confirmed first and can be undone. {left === 0 ? `Both free jobs for ${month} are used; an amplified job does not use one.` : 'An amplified job does not use a free job.'}
+            Every change is confirmed first and can be undone. Your organisation has one free standard listing and one free Amplify, each once; paying uses neither.
           </p>
           {noMatch && (
             <div className="aj-card p-3 aj-muted" role="status">

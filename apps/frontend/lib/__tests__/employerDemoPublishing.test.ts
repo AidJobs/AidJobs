@@ -46,16 +46,19 @@ beforeEach(() => {
 });
 
 describe('step 8: free or Amplify (section 19)', () => {
-  it('after the check, the chat offers both, with the month’s free jobs and what Amplify includes', () => {
+  it('after the check, the chat offers both, with the free listings and what Amplify includes', () => {
     const id = toPlan();
     expect(step(id)).toEqual({ kind: 'plan' });
-    expect(last(id)?.text).toMatch(/1 of 2 free jobs left in \w+, used only when it goes live/);
-    expect(last(id)?.text).toContain('**Amplify** (US$28.40)');
+    expect(last(id)?.text).toContain('**Free**: your one free standard listing, once for your organisation');
+    expect(last(id)?.text).toContain('**Amplify** (free once for your organisation; after this, US$28.40 a job or part of a package)');
     expect(last(id)?.text).toContain('1 language version besides its own (more at US$5 each)');
     expect(last(id)?.quick).toEqual(['Publish free', 'Amplify']);
+    update((s) => ({ ...s, free: { amplify: 'job-x' } }));
+    const paid = toPlan("We're hiring a Driver in Goma, fixed-term, closing 30 December 2026");
+    expect(last(paid)?.text).toContain('**Amplify** (US$28.40)');
   });
 
-  it('Amplify only for a verified organisation; Free only while the month has a free job for it', () => {
+  it('Amplify only for a verified organisation; Free only while the free standard listing is unused', () => {
     const id = toPlan();
     update((s) => ({ ...s, org: { ...s.org, verified: false } }));
     expect(chooseBlock(getState(), job(id), 'amplify')).toMatch(/verified organisations/);
@@ -63,9 +66,9 @@ describe('step 8: free or Amplify (section 19)', () => {
     expect(job(id).choice).toBeUndefined();
     expect(job(id).chat.at(-2)?.text).toMatch(/^Amplify is for verified organisations/);
     expect(last(id)?.quick).toEqual(['Publish free']);
-    update((s) => ({ ...s, org: { ...s.org, verified: true }, freeUses: [...s.freeUses, { jobId: 'job-x', month: s.freeUses[0].month }] }));
+    update((s) => ({ ...s, org: { ...s.org, verified: true }, free: { standard: 'job-x' } }));
     expect(setChoice(id, 'free')).toBe(false);
-    expect(chooseBlock(getState(), job(id), 'free')).toMatch(/^Both free jobs for \w+ are used/);
+    expect(chooseBlock(getState(), job(id), 'free')).toMatch(/^Your free standard listing is used, once per organisation/);
   });
 });
 
@@ -211,15 +214,14 @@ describe('found on the real-AI walk (12 November 2026)', () => {
 });
 
 describe('a free job is used, and a job profile kept, only when it is published (section 19)', () => {
-  it('publishing free uses one free job and saves a job profile, with Undo', () => {
+  it('publishing free uses the free standard listing and saves a job profile, with Undo', () => {
     const id = toPlan();
     sendChat(id, 'Publish free');
     sendChat(id, 'No review');
-    const uses = getState().freeUses.length;
     expect(step(id)).toEqual({ kind: 'publish' });
-    expect(getState().freeUses.length).toBe(uses);
+    expect(getState().free).toEqual({});
     expect(publish(id, { plan: 'free', schedule: null })).toBe(true);
-    expect(getState().freeUses.length).toBe(uses + 1);
+    expect(getState().free).toEqual({ standard: id });
     const profile = getState().profiles?.[0];
     expect(profile).toMatchObject({ from: id, title: 'Logistics Officer', location: 'Goma, DR Congo' });
     expect(profile?.facts.deadline).toBeUndefined();

@@ -152,7 +152,7 @@ export default function Create({ id }: { id?: string }) {
   const reviewBadge = reviewing ? (job.review.reviewers.some((r) => r.name === reviewerName && !r.decision) ? 1 : 0) : job.review.remarks.filter((r) => r.state === 'open').length;
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
-  const checks = job.sections.length ? openPoints(job, s, Boolean(job.paidFor) || !canGoFree(s, job.id, null)) : [];
+  const checks = job.sections.length ? openPoints(job, s, Boolean(job.paidFor) || !canGoFree(s, job.id)) : [];
   const menu = !reviewing && job.status !== 'live' && job.status !== 'closed';
   const setPanel = (p: Panel) => {
     setPanelState(p);

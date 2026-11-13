@@ -31,7 +31,7 @@ import {
   toneRequest,
   type BuildContext,
 } from './engine';
-import { addMonths, canGoFree, countedFor, currentMonth, EXTRA_JOB, freeLeft, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, listingEnd, monthFor, monthName, nextPaidJob, packageOf, SUBSCRIPTION_JOBS, usd, viaFor, type PackageKey } from './plans';
+import { addMonths, canAmplifyFree, canGoFree, EXTRA_JOB, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, listingEnd, nextPaidJob, ONE_JOB, packageOf, SUBSCRIPTION_JOBS, takeAllowance, usd, usesFreeAmplify, viaFor, type PackageKey } from './plans';
 import { workingDay, type Fix } from './market';
 import { MARKET_SAMPLE } from './sample';
 import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from './store';
@@ -1726,21 +1726,14 @@ export function createFormat(label: string, order: Format['order'], tone: Tone):
   return key;
 }
 /**
- * A free job is used only when it goes live, against the month it goes live in (section 19, 8 November 2026, and the user, 12 November
- * 2026): writing, sending for review, and scheduling are free; a scheduled one only holds its month's place. One used in an earlier
- * month stays used there and does not carry over.
+ * A free listing is used only when its job goes live (section 19, phase 5, D): writing, sending for review, and scheduling use nothing;
+ * a scheduled job only holds it. `j` is the job as it goes live: a free job uses the free standard, one amplified with the free
+ * Amplify uses that.
  */
-function useFree(s: State, id: string, month = currentMonth(s)): State {
-  const j = s.jobs.find((x) => x.id === id);
-  if (!j || j.plan === 'amplify' || countedFor(s, id, month) || freeLeft(s, month) === 0) return s;
-  return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
-}
-
-/** A scheduled free job going live now: its hold becomes a use, in the month it goes live in. */
-function holdToUse(s: State, id: string, month = currentMonth(s)): State {
-  const j = s.jobs.find((x) => x.id === id);
-  if (!j || j.plan !== 'free' || s.freeUses.some((u) => u.jobId === id && u.month === month)) return s;
-  return { ...s, freeUses: [...s.freeUses, { jobId: id, month }] };
+function spendFreeAt(s: State, j: DemoJob): State {
+  if (j.plan === 'free') return takeAllowance(s, 'standard', j.id);
+  if (j.plan === 'amplify' && j.paidVia === 'free') return takeAllowance(s, 'amplify', j.id);
+  return s;
 }
 
 /** Uses one paid job on hand, the soonest to lapse first. */
@@ -2108,23 +2101,23 @@ function reviewOnPublish(x: DemoJob, me: string): { audit: DemoJob['audit']; not
 
 /**
  * How a paid job is paid for: `direct` when this job was just paid for at the checkout (one job, or an extra job on the subscription),
- * `onHand` to use a job from a pack or the subscription.
+ * `onHand` to use a job from a pack or the subscription, `free` with the organisation's one free Amplify (no payment).
  */
-export type Paid = 'direct' | 'onHand';
+export type Paid = 'direct' | 'onHand' | 'free';
 
 /** `langs`: language versions beyond those included, paid in the same checkout. */
 export type PublishOptions = { plan: Plan; schedule: string | null; paid?: Paid; langs?: number };
 
 /**
  * Free or Amplify, chosen before publishing (section 19, step 8), in the chat or from its part on the line. Amplify only for a verified
- * organisation; Free only while the month has a free job for it. Choosing Free after Amplify keeps Amplify's work, hidden until it is
- * chosen again. The reason when it cannot be chosen.
+ * organisation; Free only while the organisation's one free standard listing is unused. Choosing Free after Amplify keeps Amplify's
+ * work, hidden until it is chosen again. The reason when it cannot be chosen.
  */
 export function chooseBlock(s: State, j: DemoJob, plan: Plan): string | null {
   if (s.reviewerAs) return 'Reviewers cannot choose how it is published';
   if (plan === 'amplify' && !s.org.verified) return 'Amplify is for verified organisations: verify yours in Organisation settings';
   if (plan === 'free' && j.paidFor) return 'It is already paid for, so it goes out with Amplify';
-  if (plan === 'free' && !canGoFree(s, j.id, j.publishOn ?? null)) return `Both free jobs for ${monthName(monthFor(s, j.publishOn ?? null))} are used: Amplify, or a package job, publishes it now`;
+  if (plan === 'free' && !canGoFree(s, j.id)) return `Your free standard listing is used, once per organisation: Amplify (${usd(ONE_JOB)} a job), or a package job, publishes it`;
   return null;
 }
 
@@ -2140,9 +2133,14 @@ export function setChoice(id: string, plan: Plan, said?: string): boolean {
   updateJob(id, (x) => ({
     ...x,
     choice: plan,
-    ...(plan === 'free' && x.publishOn && freeMonthBlock(s, x.publishOn) ? { publishOn: undefined } : {}),
     walk: x.walk ? { ...x.walk, settled: Array.from(new Set([...x.walk.settled, 'plan'])) } : x.walk,
-    chat: said ? [...x.chat, msg('user', said), msg('ai', plan === 'free' ? "Free it is. A free job is used only when it goes live; scheduled, it holds its month's place until then." : "Amplify it is. Let's go through what it adds, one at a time.")] : x.chat,
+    chat: said
+      ? [
+          ...x.chat,
+          msg('user', said),
+          msg('ai', plan === 'free' ? 'Free it is: your one free standard listing, used only when it goes live; scheduled, it holds the place until then.' : `Amplify it is${usesFreeAmplify(s, x) ? ', with your one free Amplify' : ''}. Let's go through what it adds, one at a time.`),
+        ]
+      : x.chat,
   }));
   ensureAsk(id);
   return true;
@@ -2154,8 +2152,8 @@ export function setPublishOn(id: string, date: string | null) {
   updateJob(id, (j) => ({ ...j, publishOn: date ?? undefined }));
 }
 
-/** How Amplify is paid: one job, a pack, or the subscription. */
-export function setPayWith(id: string, key: PackageKey) {
+/** How Amplify is paid: the free Amplify while it is unused, one job, a pack, or the subscription. */
+export function setPayWith(id: string, key: PackageKey | 'free') {
   if (!ownerOnly()) return;
   updateJob(id, (j) => ({ ...j, payWith: key }));
 }
@@ -2220,9 +2218,9 @@ export function windowSays(id: string, said: string | null, reply: string) {
   ensureAsk(id);
 }
 
-/** A job paid directly is one job (one language version included); a pack or subscription job includes two. */
+/** A job paid directly is one job (one language version included), as is the free Amplify; a pack or subscription job includes two. */
 function viaOf(paid: Paid | undefined, j: DemoJob): DemoJob['paidVia'] {
-  return j.paidFor ? (j.paidVia ?? 'single') : paid === 'onHand' ? 'package' : 'single';
+  return j.paidFor ? (j.paidVia ?? 'single') : paid === 'onHand' ? 'package' : paid === 'free' ? 'free' : 'single';
 }
 
 /** A publishing date must be from tomorrow, and before the job closes; the date picker's limits alone can be typed past. */
@@ -2231,11 +2229,6 @@ export function scheduleBlock(s: State, j: DemoJob, schedule: string | null): st
   if (schedule <= isoDay(s.today)) return 'Choose a date from tomorrow';
   if (j.facts.deadline && schedule >= j.facts.deadline) return 'It would close before it goes live';
   return null;
-}
-
-/** A free job is published in its own month: scheduled for later this month at most (decided by the user, 7 November 2026). */
-export function freeMonthBlock(s: State, schedule: string | null): string | null {
-  return schedule && schedule.slice(0, 7) !== currentMonth(s) ? `A free job goes live within ${monthName(currentMonth(s))}` : null;
 }
 
 /** Whether the job can be published with these options; the reason when it cannot. */
@@ -2248,10 +2241,10 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   if (block) return block;
   if (o.plan === 'amplify' && !s.org.verified) return 'Verify your organisation to amplify';
   if (o.plan === 'free' && j.paidFor) return 'It is already paid for, so it goes out with Amplify';
-  if (o.plan === 'free' && freeMonthBlock(s, o.schedule)) return freeMonthBlock(s, o.schedule);
-  if (o.plan === 'free' && !canGoFree(s, id, o.schedule)) return 'No free job left for that month';
+  if (o.plan === 'free' && !canGoFree(s, id)) return 'Your free standard listing is used';
   if (o.plan === 'amplify' && j.paidFor) return null;
   if (o.plan === 'amplify' && !o.paid) return 'Not paid';
+  if (o.plan === 'amplify' && o.paid === 'free' && !canAmplifyFree(s, id)) return 'Your free Amplify is used';
   if (o.plan === 'amplify' && o.paid === 'onHand' && !nextPaidJob(s)) return 'No paid job on hand';
   return null;
 }
@@ -2277,10 +2270,12 @@ export function publish(id: string, o: PublishOptions): boolean {
   let told: string | undefined;
   update((s0) => {
     const prepaid = o.plan === 'amplify' && Boolean(s0.jobs.find((x) => x.id === id)?.paidFor);
-    // A free job scheduled holds its month's place (plans.freeHolds); it is used only when it goes live.
-    let s = o.plan === 'free' && !o.schedule ? useFree(s0, id) : s0;
+    let s = s0;
     if (o.plan === 'amplify' && o.paid === 'onHand' && !prepaid) s = takePaidJob(s);
-    const how = o.plan === 'amplify' ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : 'paid'}), listed ${LISTED_DAYS.amplify} days` : `Free, listed ${LISTED_DAYS.free} days`;
+    const how =
+      o.plan === 'amplify'
+        ? `Amplified (${prepaid ? 'already paid' : o.paid === 'onHand' ? 'a package job' : o.paid === 'free' ? 'the free Amplify' : 'paid'}), listed ${LISTED_DAYS.amplify} days`
+        : `Free (the free standard listing), listed ${LISTED_DAYS.free} days`;
     const jobs = s.jobs.map((x) => {
       if (x.id !== id) return x;
       const skipped = reviewOnPublish(x, s.me.name);
@@ -2305,6 +2300,8 @@ export function publish(id: string, o: PublishOptions): boolean {
     });
     const out = jobs.find((x) => x.id === id);
     if (!out) return { ...s, jobs };
+    // Scheduled, the job holds its free listing (plans.allowance); it is used only when it goes live.
+    if (!o.schedule) s = spendFreeAt(s, out);
     const profile = profileOf(out);
     const saved = `Saved as a job profile for next time: ${out.facts.title}${out.facts.location ? `, ${out.facts.location.split(',')[0]}` : ''}.`;
     return {
@@ -2404,26 +2401,31 @@ export function setReachReminders(id: string, on: boolean) {
   updateJob(id, (j) => ({ ...j, reachReminders: on }));
 }
 
-/** Amplifies a live or scheduled free job: listed 100 days from publishing, and featured. The free job it used stays used. */
+/**
+ * Amplifies a live or scheduled free job: listed 100 days from publishing, and featured. Paid, with a package job, or with the free
+ * Amplify (no payment): used at once on a live job, held until the date on a scheduled one. The free standard a live job used stays
+ * used; a scheduled one's is given back.
+ */
 export function amplifyLive(id: string, paid: Paid, langs = 0): boolean {
   const s0 = getState();
   const j = s0.jobs.find((x) => x.id === id);
   if (!j || s0.reviewerAs || !s0.org.verified || j.plan !== 'free' || (j.status !== 'live' && j.status !== 'scheduled')) return false;
   if (paid === 'onHand' && !nextPaidJob(s0)) return false;
+  if (paid === 'free' && !canAmplifyFree(s0, id)) return false;
   const sendsOn = j.status === 'scheduled' ? (j.scheduledFor ?? null) : null;
   let sending = false;
   update((s1) => {
     const s = paid === 'onHand' ? takePaidJob(s1) : s1;
-    return {
-      ...s,
-      jobs: s.jobs.map((x) => {
-        if (x.id !== id) return x;
-        const next: DemoJob = { ...x, plan: 'amplify', paidVia: viaOf(paid, x), langsPaid: (x.langsPaid ?? 0) + langs, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${paid === 'onHand' ? 'a package job' : 'paid'}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
-        const reach = reachAtGoLive(next, sendsOn);
-        sending = Boolean(reach.reach && !sendsOn);
-        return { ...next, ...reach };
-      }),
-    };
+    const how = paid === 'onHand' ? 'a package job' : paid === 'free' ? 'the free Amplify' : 'paid';
+    const jobs = s.jobs.map((x) => {
+      if (x.id !== id) return x;
+      const next: DemoJob = { ...x, plan: 'amplify', paidVia: viaOf(paid, x), langsPaid: (x.langsPaid ?? 0) + langs, payRequest: undefined, audit: [...x.audit, { at: Date.now(), who: s.me.name, what: `Amplified (${how}): listed ${LISTED_DAYS.amplify} days from publishing` }] };
+      const reach = reachAtGoLive(next, sendsOn);
+      sending = Boolean(reach.reach && !sendsOn);
+      return { ...next, ...reach };
+    });
+    const amplified = jobs.find((x) => x.id === id);
+    return amplified?.status === 'live' ? spendFreeAt({ ...s, jobs }, amplified) : { ...s, jobs };
   });
   if (sending) simulateDelivery(id);
   return true;
@@ -2506,7 +2508,7 @@ export function publishNow(id: string): boolean {
   const waiting = waitingEmails(j);
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';
   update((st0) => {
-    const st = holdToUse(st0, id);
+    const st = spendFreeAt(st0, j);
     const queue = (r: Recipient): Recipient => (r.status === 'waiting' ? { ...r, status: 'queued' } : r);
     return {
       ...st,
@@ -2530,11 +2532,11 @@ export function publishNow(id: string): boolean {
   return true;
 }
 
-/** Why a scheduled job cannot move to `date`: the same checks as scheduling; a free job stays within this month. */
+/** Why a scheduled job cannot move to `date`: the same checks as scheduling. */
 export function rescheduleBlock(s: State, j: DemoJob, date: string): string | null {
   if (!date) return 'Choose a date';
   if (date === j.scheduledFor) return 'Choose a new date';
-  return scheduleBlock(s, j, date) ?? (j.plan === 'free' ? freeMonthBlock(s, date) : null);
+  return scheduleBlock(s, j, date);
 }
 
 /** Moves a scheduled job to another date; Reach emails waiting for go-live move with it. */
@@ -2561,7 +2563,8 @@ export function reschedule(id: string, date: string): boolean {
 
 /**
  * A scheduled job as a draft again: no go-live; the Reach emails waiting for it go back to the prepared list, unsent, and their round is
- * dropped; a paid job stays paid; an open payment request is cancelled. Used by Back to draft and by restoring a deleted scheduled job.
+ * dropped; a paid job stays paid; a free listing it held is given back; an open payment request is cancelled. Used by Back to draft and
+ * by restoring a deleted scheduled job.
  */
 function asDraft(x: DemoJob, who: string, what: string): DemoJob {
   const r = x.reach;
@@ -2569,11 +2572,14 @@ function asDraft(x: DemoJob, who: string, what: string): DemoJob {
   const candidates = r?.candidates.filter(waiting).map((e) => e.email) ?? [];
   const team = r?.team.filter(waiting).map((e) => e.email) ?? [];
   const kept = r ? { ...r, candidates: r.candidates.filter((e) => !waiting(e)), team: r.team.filter((e) => !waiting(e)), rounds: r.rounds.filter((n) => !n.sendsOn) } : null;
+  const paid = x.plan === 'amplify' && x.paidVia !== 'free';
   return {
     ...x,
     status: hasApproval(x) ? 'approved' : 'draft',
-    plan: x.plan === 'amplify' ? 'amplify' : null,
-    paidFor: x.plan === 'amplify' ? true : undefined,
+    plan: paid ? 'amplify' : null,
+    paidFor: paid ? true : undefined,
+    paidVia: paid ? x.paidVia : undefined,
+    ...(x.plan === 'amplify' ? { choice: 'amplify' as const } : {}),
     scheduledFor: undefined,
     reach: kept && (kept.candidates.length || kept.team.length || kept.rounds.length) ? kept : null,
     reachPlan: r && (candidates.length || team.length) ? { candidates, team, candidateMsg: r.candidateMsg, teamMsg: r.teamMsg } : x.reachPlan,
@@ -2674,19 +2680,24 @@ export function reopen(id: string, deadline: string, amplify = false, paid?: Pai
   const j = s.jobs.find((x) => x.id === id);
   if (!j || reopenBlock(s, j, deadline, amplify)) return false;
   const upgrade = amplify && j.plan === 'free';
-  // Amplifying needs payment: a package job on hand, or paid just now at the simulated checkout (`direct`).
-  if (upgrade && (!paid || (paid === 'onHand' && !nextPaidJob(s)))) return false;
+  // Amplifying needs payment, a package job on hand, paid just now at the simulated checkout (`direct`), or the free Amplify.
+  if (upgrade && (!paid || (paid === 'onHand' && !nextPaidJob(s)) || (paid === 'free' && !canAmplifyFree(s, id)))) return false;
   const onHand = upgrade && paid === 'onHand';
-  const what = `Reopened, now closing ${longDate(deadline)}${upgrade ? `; amplified (${onHand ? 'a package job' : 'paid'})` : ''}. Reach was not sent again`;
-  const change = (st: State): State => ({
-    ...(onHand ? takePaidJob(st) : st),
-    jobs: st.jobs.map((x) =>
-      x.id === id
-        ? rebuilt(st, { ...x, status: 'live', closedAt: undefined, closeReason: undefined, plan: upgrade ? 'amplify' : x.plan, facts: { ...x.facts, deadline }, updatedAfterPublish: true, editedAt: Date.now(), audit: [...x.audit, { at: Date.now(), who: st.me.name, what }] })
-        : x,
-    ),
-    inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'removal' ? { ...i, done: true } : i)),
-  });
+  const what = `Reopened, now closing ${longDate(deadline)}${upgrade ? `; amplified (${onHand ? 'a package job' : paid === 'free' ? 'the free Amplify' : 'paid'})` : ''}. Reach was not sent again`;
+  const change = (st: State): State => {
+    const base = onHand ? takePaidJob(st) : st;
+    const next: State = {
+      ...base,
+      jobs: st.jobs.map((x) =>
+        x.id === id
+          ? rebuilt(st, { ...x, status: 'live', closedAt: undefined, closeReason: undefined, plan: upgrade ? 'amplify' : x.plan, ...(upgrade ? { paidVia: viaOf(paid, x) } : {}), facts: { ...x.facts, deadline }, updatedAfterPublish: true, editedAt: Date.now(), audit: [...x.audit, { at: Date.now(), who: st.me.name, what }] })
+          : x,
+      ),
+      inbox: st.inbox.map((i) => (i.jobId === id && i.kind === 'removal' ? { ...i, done: true } : i)),
+    };
+    const out = next.jobs.find((x) => x.id === id);
+    return upgrade && paid === 'free' && out ? spendFreeAt(next, out) : next;
+  };
   const text = `${j.facts.title} is open again until ${longDate(deadline)}, at the same address.`;
   if (upgrade) update((st) => ({ ...change(st), notice: { text } }));
   else changeWithUndo(text, change);
@@ -2723,7 +2734,7 @@ export type Tell = { reviewers?: boolean; payer?: boolean; reach?: boolean; team
 
 /**
  * Deletes a job at any stage (plan section 17, decision 2). It goes to Recently deleted for 14 days, without its pending payment request,
- * its emails waiting for go-live, and its inbox items. Receipts and the free job counted for its month stay; a job once published leaves
+ * its emails waiting for go-live, and its inbox items. Receipts and a free listing its going live used stay; a job once published leaves
  * a "no longer available" answer for links already shared; one line goes into the activity log; the people chosen are told (simulated).
  */
 export function deleteJob(id: string, tell: Tell = {}): boolean {

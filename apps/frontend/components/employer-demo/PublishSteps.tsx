@@ -15,7 +15,6 @@ import {
   changesAfterApproval,
   chooseBlock,
   downloadCopy,
-  freeMonthBlock,
   goOn,
   leaveAmplifyPoint,
   publish,
@@ -36,30 +35,29 @@ import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
 import { fullAdvertCheck, marketCheck, MIN_SIMILAR, type Point } from './market';
 import {
+  allowance,
+  allowanceText,
+  canAmplifyFree,
   canGoFree,
-  countedFor,
-  currentMonth,
-  FREE_PER_MONTH,
-  freeLeft,
   LANGS_INCLUDED,
   LANGUAGE_PRICE,
   langSlots,
   langsToPay,
   LISTED_DAYS,
   listedUntil,
-  monthFor,
-  monthName,
   nextPaidJob,
+  ONE_JOB,
   packageOf,
   PACKAGES,
   paidJobsLeft,
   priceLabel,
   singlePrice,
   usd,
+  usesFreeAmplify,
   viaFor,
   type PackageKey,
 } from './plans';
-import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
+import { AmplifyIncludes, Checkout, FreeAmplifyTerms, FreeTerms } from './Pricing';
 import { AskToPayDialog, ChangesNote, Choice, OverruleDialog, PayerDialog, SkipDialog, TermsDialog } from './Publish';
 import { ReviewPanel } from './Review';
 import { getState, go, notify } from './store';
@@ -73,19 +71,20 @@ export type Opener = { tab: (k: string) => void; part: (k: string) => void; prev
 const first = (name: string) => name.split(' ')[0];
 
 /**
- * Free or Amplify (section 19, step 8; section 16's rules): what each includes, the month's free jobs left, any package jobs on hand,
- * and the packages. In the chat's card and in its part on the line; the choice is the job's, so both show the same.
+ * Free or Amplify (section 19, step 8; section 16's rules and phase 5's free listings): what each includes, whether the free standard
+ * listing and the free Amplify are still available, any package jobs on hand, and the packages. In the chat's card and in its part on the
+ * line; the choice is the job's, so both show the same.
  */
 export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
   const [plansOpen, setPlansOpen] = useState(false);
   const owner = !s.reviewerAs;
-  const month = monthFor(s, job.publishOn ?? null);
-  const counted = countedFor(s, job.id, month);
-  const freeOk = canGoFree(s, job.id, job.publishOn ?? null);
+  const standard = allowance(s, 'standard');
+  const freeOk = canGoFree(s, job.id);
+  const freeAmp = usesFreeAmplify(s, job);
   const onHand = nextPaidJob(s);
   const onHandCount = paidJobsLeft(s);
   const single = singlePrice(s);
-  const pkg: PackageKey = job.payWith ?? 'one';
+  const pkg = job.payWith === 'free' || !job.payWith ? 'one' : job.payWith;
   const chosen = job.choice;
   const pick = (p: Plan) => {
     const no = chooseBlock(getState(), job, p);
@@ -95,18 +94,23 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
   return (
     <div className="flex flex-col gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Free or Amplify">
       {!job.paidFor && (
-        <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => pick('free')} disabled={!owner}>
+        <Choice on={chosen === 'free'} title="Free" price={freeOk ? 'US$0' : 'Used'} onSelect={() => pick('free')} disabled={!owner}>
           <span className="aj-muted" style={{ fontWeight: 600 }}>
-            {counted ? `It already has one of ${monthName(month)}'s free jobs, so publishing it free uses no other.` : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}; one is used only when the job goes live, and a scheduled one holds its place until then.`}
+            {standard.state === 'held' && standard.jobId === job.id
+              ? 'This job holds your free standard listing; it is used when the job goes live.'
+              : freeOk
+                ? `Free once for your organisation · after this, a job goes out with Amplify (${usd(ONE_JOB)} a job) or a package. Used only when it goes live.`
+                : `Your free standard listing is ${allowanceText(s, 'standard')}: once per organisation.`}
           </span>
           <FreeTerms s={s} />
-          {!freeOk && <span style={{ color: 'var(--amber)' }}>Both free jobs for {monthName(month)} are used: Amplify or a package job publishes it now.</span>}
         </Choice>
       )}
-      <Choice on={chosen === 'amplify'} title="Amplify" price={job.paidFor ? 'Paid' : onHand ? 'Package job' : `${usd(pkg === 'one' ? single.amount : packageOf(pkg).price)}${pkg === 'always' ? ' a month' : ''}`} onSelect={() => pick('amplify')} amplified disabled={!owner}>
+      <Choice on={chosen === 'amplify'} title="Amplify" price={job.paidFor ? 'Paid' : freeAmp ? 'Free once' : onHand ? 'Package job' : `${usd(pkg === 'one' ? single.amount : packageOf(pkg).price)}${pkg === 'always' ? ' a month' : ''}`} onSelect={() => pick('amplify')} amplified disabled={!owner}>
         {job.paidFor && <span className="aj-muted" style={{ fontWeight: 600 }}>Already paid: it was scheduled, then taken back to a draft. Publishing it again costs nothing.</span>}
+        {!job.paidFor && freeAmp && <FreeAmplifyTerms />}
+        {!job.paidFor && !freeAmp && canAmplifyFree(s, job.id) && <span className="aj-muted">Paid for this job; your free Amplify stays available for later.</span>}
         <AmplifyIncludes />
-        {job.paidFor ? null : onHand ? (
+        {job.paidFor ? null : onHand && !freeAmp ? (
           <span className="aj-muted" style={{ fontWeight: 600 }}>
             Uses 1 of your {onHandCount} package {onHandCount === 1 ? 'job' : 'jobs'}
             {onHand.kind === 'pack' ? `, to use by ${longDate(onHand.pack.ends)}.` : ', for this month of “Always hiring”.'}
@@ -114,7 +118,7 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
         ) : (
           <>
             <button type="button" className="aj-text-btn self-start" aria-expanded={plansOpen} onClick={() => setPlansOpen(!plansOpen)}>
-              Hiring more? Plan ahead and pay less per job
+              {freeAmp ? 'Keep the free Amplify for later, or plan ahead' : 'Hiring more? Plan ahead and pay less per job'}
             </button>
             {plansOpen && <Packages job={job} s={s} />}
           </>
@@ -133,12 +137,23 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
   );
 }
 
-/** The packages, for paying less per job; a package job includes two language versions. */
+/** The free Amplify while it is unused, then the packages, for paying less per job; a package job includes two language versions. */
 export function Packages({ job, s }: { job: DemoJob; s: State }) {
   const single = singlePrice(s);
-  const pkg: PackageKey = job.payWith ?? 'one';
+  const freeAmp = usesFreeAmplify(s, job);
+  const pkg: PackageKey | 'free' = freeAmp ? 'free' : job.payWith && job.payWith !== 'free' ? job.payWith : 'one';
   return (
     <div className="flex flex-col gap-1.5" role="radiogroup" onKeyDown={radioKeys} aria-label="Packages">
+      {canAmplifyFree(s, job.id) && (
+        <button type="button" role="radio" aria-checked={pkg === 'free'} className="aj-option" data-active={pkg === 'free'} disabled={Boolean(s.reviewerAs)} onClick={() => setPayWith(job.id, 'free')}>
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">{pkg === 'free' && <Check size={14} strokeWidth={2.4} />}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span style={{ fontWeight: 650 }}>Your free Amplify</span>
+            <span className="aj-faint">Free once for your organisation · {LANGS_INCLUDED.free} language version included</span>
+          </span>
+          <strong className="shrink-0">US$0</strong>
+        </button>
+      )}
       {PACKAGES.filter((p) => !(p.key === 'always' && s.subscription)).map((p) => {
         const extra = p.key === 'one' && single.key === 'extra';
         return (
@@ -161,7 +176,7 @@ export function Packages({ job, s }: { job: DemoJob; s: State }) {
         );
       })}
       <span className="aj-faint" style={{ fontSize: 11.5 }}>
-        The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job; a free job once used stays used.
+        The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job; a free listing once used stays used, and paying uses neither.
       </span>
     </div>
   );
@@ -252,7 +267,7 @@ export function LangsPart({ job, s, open }: { job: DemoJob; s: State; open: Open
   return (
     <div className="flex flex-col gap-2">
       <span className="aj-muted">
-        Written in {own.label}. Amplify includes {LANGS_INCLUDED[via]} language {LANGS_INCLUDED[via] === 1 ? 'version' : 'versions'} {via === 'package' ? 'with a package job' : 'with a job paid on its own'}; each further one is {usd(LANGUAGE_PRICE)}. Each version can have its own sections; the facts are shared.
+        Written in {own.label}. Amplify includes {LANGS_INCLUDED[via]} language {LANGS_INCLUDED[via] === 1 ? 'version' : 'versions'} {via === 'package' ? 'with a package job' : via === 'free' ? 'with the free Amplify' : 'with a job paid on its own'}; each further one is {usd(LANGUAGE_PRICE)}. Each version can have its own sections; the facts are shared.
       </span>
       <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {versionChoices(job).map((l) => {
@@ -347,14 +362,15 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
 
   const owner = !s.reviewerAs;
   const prepaid = Boolean(job.paidFor) && !upgrade;
-  const free = canGoFree(s, job.id, job.publishOn ?? null);
+  const free = canGoFree(s, job.id);
   const chosen: Plan = upgrade || prepaid ? 'amplify' : (job.choice ?? (free ? 'free' : 'amplify'));
   const schedule = upgrade ? null : (job.publishOn ?? null);
-  const onHand = nextPaidJob(s);
+  const freeAmp = chosen === 'amplify' && !prepaid && usesFreeAmplify(s, job);
+  const onHand = freeAmp ? null : nextPaidJob(s);
   const single = singlePrice(s);
-  const pkg: PackageKey = job.payWith ?? 'one';
+  const pkg: PackageKey = job.payWith && job.payWith !== 'free' ? job.payWith : 'one';
   const payKey: PackageKey | 'extra' = pkg === 'one' ? single.key : pkg;
-  const via = prepaid ? (job.paidVia ?? 'single') : onHand || pkg !== 'one' ? 'package' : 'single';
+  const via = prepaid ? (job.paidVia ?? 'single') : freeAmp ? 'free' : onHand || pkg !== 'one' ? 'package' : 'single';
   const langs = chosen === 'amplify' ? langsToPay(job, 'amplify', via) : 0;
   const langCost = langs * LANGUAGE_PRICE;
   const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
@@ -366,19 +382,17 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
       ? 'Waiting for approval'
       : dateBlock
         ? dateBlock
-        : chosen === 'free' && freeMonthBlock(s, schedule)
-          ? freeMonthBlock(s, schedule)
-          : chosen === 'free' && !free
-            ? `No free job left for ${monthName(monthFor(s, schedule))}`
-            : chosen === 'amplify' && !s.org.verified
-              ? 'Verify your organisation to amplify'
-              : null;
+        : chosen === 'free' && !free
+          ? 'Your free standard listing is used'
+          : chosen === 'amplify' && !s.org.verified
+            ? 'Verify your organisation to amplify'
+            : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
   const withLangs = langs ? ` + ${usd(langCost)} for ${langs} ${langs === 1 ? 'language' : 'languages'}` : '';
   const action = upgrade ? 'Amplify this job' : schedule ? `${chosen === 'free' ? 'Schedule free' : 'Amplify and schedule'}${when}` : chosen === 'free' ? 'Publish free' : 'Amplify and publish';
-  const cost = chosen === 'free' ? '' : prepaid ? ` · already paid${withLangs}` : onHand ? ` · uses 1 package job${withLangs}` : ` · ${priceLabel(payKey)}${withLangs}`;
+  const cost = chosen === 'free' ? ' · your free standard listing' : prepaid ? ` · already paid${withLangs}` : freeAmp ? ` · your free Amplify${withLangs}` : onHand ? ` · uses 1 package job${withLangs}` : ` · ${priceLabel(payKey)}${withLangs}`;
   const label = reason ?? `${action}${inviting}${cost}`;
   const checkoutItem = (key: PackageKey | 'extra' | 'langs') =>
     key === 'langs'
@@ -400,14 +414,14 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
       if (!getState().org.freeTermsAccepted) return setTerms(true);
       return finish(publish(job.id, { plan: 'free', schedule }));
     }
-    if (prepaid || onHand) return langs ? setCheckout('langs') : goLive(prepaid ? 'direct' : 'onHand');
+    if (prepaid || onHand || freeAmp) return langs ? setCheckout('langs') : goLive(prepaid ? 'direct' : freeAmp ? 'free' : 'onHand');
     setCheckout(payKey);
   };
   const paid = (key: PackageKey | 'extra' | 'langs') => {
     setCheckout(null);
     if (key === 'langs') {
       buyLanguages(job.id, langs, true);
-      return goLive(prepaid ? 'direct' : 'onHand');
+      return goLive(prepaid ? 'direct' : freeAmp ? 'free' : 'onHand');
     }
     buy(key, job.facts.title, langs);
     goLive(key === 'one' || key === 'extra' ? 'direct' : 'onHand');
@@ -475,10 +489,10 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
           </span>
           <span className="aj-muted">{upgrade ? 'The job stays free and live. Nothing was charged.' : 'The job is still a draft. Nothing was published or charged.'} (Simulated.)</span>
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" className="aj-ink-btn" onClick={() => setCheckout(prepaid || onHand ? 'langs' : payKey)}>
+            <button type="button" className="aj-ink-btn" onClick={() => setCheckout(prepaid || onHand || freeAmp ? 'langs' : payKey)}>
               Try again
             </button>
-            {!upgrade && canGoFree(s, job.id, null) && !job.paidFor && (
+            {!upgrade && canGoFree(s, job.id) && !job.paidFor && (
               <button
                 type="button"
                 className="aj-pill"
@@ -496,7 +510,9 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
       )}
       {upgrade && !compact && (
         <span className="aj-muted">
-          Free and {job.status === 'live' ? 'live' : `scheduled for ${longDate(job.scheduledFor ?? '')}`}, listed until {longDate(listedUntil(job, s.today))}. Amplified, it is listed {LISTED_DAYS.amplify} days from publishing, featured, with the market check, language versions, the flyer, and Reach. {job.status === 'live' ? 'The free job it used stays used.' : 'The free job it holds is given back.'}
+          Free and {job.status === 'live' ? 'live' : `scheduled for ${longDate(job.scheduledFor ?? '')}`}, listed until {longDate(listedUntil(job, s.today))}. Amplified, it is listed {LISTED_DAYS.amplify} days from publishing, featured, with the market check, language versions, the flyer, and Reach.{' '}
+          {job.status === 'live' ? 'The free standard listing it used stays used.' : 'The free standard listing it holds is given back.'}
+          {freeAmp ? ` With your free Amplify there is nothing to pay; it is used ${job.status === 'live' ? 'at once' : `when it goes live on ${longDate(job.scheduledFor ?? '')}`}.` : ''}
         </span>
       )}
       {payment && chosen === 'amplify' && !prepaid && !onHand && <Packages job={job} s={s} />}
@@ -512,17 +528,6 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
           {schedule && <input type="date" style={{ ...inputStyle, width: 170, minHeight: 34 }} value={schedule} min={addDays(s.today, 1)} onChange={(e) => setPublishOn(job.id, e.target.value || null)} aria-label="Publish on" />}
         </div>
       )}
-      {!upgrade && chosen === 'free' && freeMonthBlock(s, schedule) && (
-        <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--amber-bg)' }} role="status">
-          <span style={{ fontWeight: 650 }}>A free job goes live in its own month</span>
-          <span className="aj-muted">
-            To publish free in {monthName(monthFor(s, schedule))}, create and publish it then. To schedule it for {longDate(schedule ?? '')} now, choose Amplify.
-          </span>
-          <button type="button" className="aj-pill" onClick={() => setChoice(job.id, 'amplify')}>
-            Choose Amplify
-          </button>
-        </div>
-      )}
       {!compact && chosen === 'free' && !upgrade && job.facts.deadline && job.facts.deadline > listedUntil({ ...job, plan: 'free', publishedAt: undefined, scheduledFor: schedule ?? undefined }, s.today) && (
         <span style={{ color: 'var(--amber)' }}>
           A free job is listed {LISTED_DAYS.free} days, so this one leaves AidJobs before its closing date. Amplify lists it {LISTED_DAYS.amplify} days.
@@ -532,13 +537,13 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
         {label}
       </button>
       <span className="aj-faint text-center" style={{ fontSize: 11.5 }}>
-        {chosen === 'free' ? 'Nothing to pay.' : prepaid || onHand ? (langs ? `${usd(langCost)} for the extra languages, at a simulated checkout.` : 'Nothing to pay now.') : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
+        {chosen === 'free' ? 'Nothing to pay.' : prepaid || onHand || freeAmp ? (langs ? `${usd(langCost)} for the extra languages, at a simulated checkout.` : 'Nothing to pay now.') : 'Simulated checkout: no card is charged. Receipts are on the Billing page.'}
       </span>
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <button type="button" className="aj-text-btn" onClick={open.preview}>
           Preview it first
         </button>
-        {chosen === 'amplify' && !prepaid && !onHand && !reason && !request && owner && (
+        {chosen === 'amplify' && !prepaid && !onHand && !canAmplifyFree(s, job.id) && !reason && !request && owner && (
           <Tip label="For when someone else holds the card, such as finance or your director. They get a link to pay; the job publishes once they have paid, and the receipt goes to them.">
             <button type="button" className="aj-text-btn" onClick={() => setAsking(true)}>
               Ask someone else to pay

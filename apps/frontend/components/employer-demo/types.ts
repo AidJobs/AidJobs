@@ -324,9 +324,12 @@ export type DemoJob = {
    */
   choice?: Plan;
   publishOn?: string;
-  payWith?: 'one' | 'three' | 'five' | 'always';
-  /** How an amplified job was paid: as one job, or as a package or subscription job, which includes more language versions. */
-  paidVia?: 'single' | 'package';
+  payWith?: 'free' | 'one' | 'three' | 'five' | 'always';
+  /**
+   * How an amplified job was paid: as one job, as a package or subscription job, which includes more language versions, or with the
+   * organisation's one free Amplify, which includes what a job paid on its own does.
+   */
+  paidVia?: 'single' | 'package' | 'free';
   /** Language versions paid for beyond those included. */
   langsPaid?: number;
   /** The language the job is written in, read from the role as typed and changed only when the user asks; English when unset. */
@@ -358,8 +361,14 @@ export type InboxItem = { id: string; kind: InboxKind; jobId?: string; title: st
 
 export type Receipt = { id: string; at: number; item: string; amount: string };
 
-/** A free job counted against one calendar month's allowance, in the organisation's time zone. */
+/** Saved by earlier previews: a free job counted against one calendar month's allowance. Read once, to bring old saves forward. */
 export type FreeUse = { jobId: string; month: string };
+
+/**
+ * The free listings (section 19, phase 5, D): one standard and one Amplify, each once per organisation, ever. Each records the job that
+ * used it by going live; a scheduled job holding one is read from the job itself, so taking it back gives the place back.
+ */
+export type FreeRecord = { standard?: string; amplify?: string };
 
 /** Paid jobs bought ahead: unused ones lapse at the end date. */
 export type Pack = { id: string; jobs: number; left: number; ends: string; at: number };
@@ -386,7 +395,9 @@ export type State = {
   jobs: DemoJob[];
   formats: Format[];
   inbox: InboxItem[];
-  freeUses: FreeUse[];
+  free: FreeRecord;
+  /** Earlier previews' monthly count, brought forward into `free` when the demo loads. */
+  freeUses?: FreeUse[];
   packs: Pack[];
   subscription: Subscription | null;
   receipts: Receipt[];

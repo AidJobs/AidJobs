@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { LANGS_INCLUDED, rollBilling } from './plans';
+import { freeBroughtForward, LANGS_INCLUDED, rollBilling } from './plans';
 import { goLive } from './invites';
 import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
@@ -30,7 +30,7 @@ function save(s: State) {
 
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline; lapses and renews paid jobs. */
 export function normalise(s0: State): State {
-  const s = purgeDeleted(goLive(rollBilling(s0)));
+  const s = purgeDeleted(goLive(rollBilling(freeBroughtForward(s0))));
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
     const tags = outlineOrder(j0.tags);
@@ -50,13 +50,9 @@ export function normalise(s0: State): State {
     }
     return j;
   });
-  // Saved by earlier versions, which counted a free job when it was scheduled, sent for review, or downloaded: only a job that went
-  // live keeps its use; a scheduled one holds its place again, and the others give theirs back.
-  const neverLive = (id: string) => jobs.some((j) => j.id === id && !j.publishedAt && j.status !== 'live' && j.status !== 'closed');
-  const freeUses = s.freeUses.filter((u) => !neverLive(u.jobId));
   // Published before job profiles were saved (section 19, phase 4): each published job leaves the profile it would have saved.
   const profiles = s.profiles ?? profilesFromJobs(jobs);
-  if (freeUses.length !== s.freeUses.length || profiles !== s.profiles) return { ...s, jobs, freeUses, profiles };
+  if (profiles !== s.profiles) return { ...s, jobs, profiles };
   return changed ? { ...s, jobs } : s;
 }
 

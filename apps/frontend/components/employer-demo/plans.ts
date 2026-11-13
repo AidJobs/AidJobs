@@ -1,8 +1,7 @@
 import { addDays, daysUntil, isoDay, longDate, parseIso } from './engine';
-import type { DemoJob, Org, Pack, Plan, State } from './types';
+import type { DemoJob, Pack, Plan, State } from './types';
 
-/** Placeholder prices and terms (employer-side plan, section 16). */
-export const FREE_PER_MONTH = 2;
+/** Placeholder prices and terms (employer-side plan, section 16; the free listings of section 19, phase 5). */
 export const LISTED_DAYS: Record<Plan, number> = { free: 60, amplify: 100 };
 export const ONE_JOB = 28.4;
 export const EXTRA_JOB = 18;
@@ -19,10 +18,10 @@ export const PACKAGES: Array<{ key: PackageKey; label: string; rule: string; pri
 
 /**
  * Language versions besides the job's own language (placeholders; section 19, 8 November 2026): none for a free job, one with a job paid
- * on its own, two with a package or subscription job (the user, 12 November 2026); each further language is US$5.
+ * on its own or the free Amplify, two with a package or subscription job (the user, 12 November 2026); each further language is US$5.
  */
 export const LANGUAGE_PRICE = 5;
-export const LANGS_INCLUDED = { single: 1, package: 2 } as const;
+export const LANGS_INCLUDED = { single: 1, package: 2, free: 1 } as const;
 export type PaidVia = keyof typeof LANGS_INCLUDED;
 
 /** The versions a job may show: those included in how it is paid, and those bought on top; none unless amplified. */
@@ -30,10 +29,11 @@ export function langSlots(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia =
   return plan === 'amplify' ? LANGS_INCLUDED[via] + (j.langsPaid ?? 0) : 0;
 }
 
-/** How the job is, or will be, paid for: already paid, a package job on hand, or the package chosen; otherwise on its own. */
+/** How the job is, or will be, paid for: already paid, the free Amplify, a package job on hand, or the package chosen; otherwise on its own. */
 export function viaFor(s: State, j: DemoJob): PaidVia {
   if (j.plan === 'amplify' || j.paidFor) return j.paidVia ?? 'single';
-  return nextPaidJob(s) || (j.payWith && j.payWith !== 'one') ? 'package' : 'single';
+  if (usesFreeAmplify(s, j)) return 'free';
+  return nextPaidJob(s) || (j.payWith && j.payWith !== 'one' && j.payWith !== 'free') ? 'package' : 'single';
 }
 
 /** The versions beyond what is included and already paid for: added to the job's checkout, or bought on their own after publishing. */
@@ -61,106 +61,89 @@ export function priceLabel(key: PackageKey | 'extra'): string {
   return `${usd(p.price)} for ${p.jobs} jobs`;
 }
 
-const ZONES: Record<string, string> = {
-  Kenya: 'Africa/Nairobi',
-  Uganda: 'Africa/Kampala',
-  Ethiopia: 'Africa/Addis_Ababa',
-  'South Sudan': 'Africa/Juba',
-  Tanzania: 'Africa/Dar_es_Salaam',
-  Rwanda: 'Africa/Kigali',
-  Nigeria: 'Africa/Lagos',
-  'South Africa': 'Africa/Johannesburg',
-  Senegal: 'Africa/Dakar',
-  Jordan: 'Asia/Amman',
-  Lebanon: 'Asia/Beirut',
-  India: 'Asia/Kolkata',
-  Bangladesh: 'Asia/Dhaka',
-  Pakistan: 'Asia/Karachi',
-  Philippines: 'Asia/Manila',
-  Switzerland: 'Europe/Zurich',
-  'United Kingdom': 'Europe/London',
-  France: 'Europe/Paris',
-  Germany: 'Europe/Berlin',
-  Netherlands: 'Europe/Amsterdam',
-  Denmark: 'Europe/Copenhagen',
-  Norway: 'Europe/Oslo',
-  Italy: 'Europe/Rome',
-  Spain: 'Europe/Madrid',
-  'United States': 'America/New_York',
-  Canada: 'America/Toronto',
-  Australia: 'Australia/Sydney',
-};
-
-/** The organisation's time zone, from its headquarters; the free allowance runs by its calendar month. */
-export function orgZone(org: Org): { zone: string; city: string } {
-  const [city, country] = org.hq.split(',').map((x) => x.trim());
-  const zone = ZONES[country ?? ''] ?? 'UTC';
-  return { zone, city: zone === 'UTC' ? 'UTC' : city };
-}
-
-export function monthOf(ms: number, zone: string): string {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit' }).formatToParts(ms);
-  return `${parts.find((p) => p.type === 'year')?.value}-${parts.find((p) => p.type === 'month')?.value}`;
-}
-
-/** The month the demo's day falls in, at the organisation's headquarters (noon of the day, so the date never slips). */
-export function currentMonth(s: State): string {
-  return monthOf(s.today + 12 * 3_600_000, orgZone(s.org).zone);
-}
-
-export function monthName(key: string): string {
-  return new Date(parseIso(`${key}-01`)).toLocaleDateString('en-GB', { month: 'long' });
-}
-
-export function firstOfNextMonth(key: string): string {
-  const [y, m] = key.split('-').map(Number);
-  return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`;
-}
-
 export function addMonths(iso: string, n: number): string {
   const [y, m, d] = iso.split('-').map(Number);
   const last = new Date(y, m - 1 + n + 1, 0).getDate();
   return isoDay(new Date(y, m - 1 + n, Math.min(d, last)).getTime());
 }
 
-/** The month whose free allowance a job uses: this month, or the month it is scheduled for. */
-export function monthFor(s: State, schedule: string | null): string {
-  return schedule ? schedule.slice(0, 7) : currentMonth(s);
+export type FreeKind = 'standard' | 'amplify';
+
+/** One free listing: available, held by a scheduled job, or used by a job that went live. */
+export type Allowance = { state: 'available' } | { state: 'held' | 'used'; jobId: string };
+
+/** The scheduled job holding a free listing: a free job for the standard one, a job amplified with the free Amplify for the other. */
+function holder(s: State, kind: FreeKind): DemoJob | undefined {
+  return s.jobs.find((j) => j.status === 'scheduled' && (kind === 'standard' ? j.plan === 'free' : j.plan === 'amplify' && j.paidVia === 'free'));
 }
 
 /**
- * Free jobs held for a month (the user, 12 November 2026): a free job scheduled for that month holds a place, so the month is never
- * overbooked, but is used only on the day it goes live. Taken back to a draft, deleted, withdrawn, or amplified, it holds nothing.
+ * One standard listing free and one Amplify listing free, each once per organisation, ever, never renewed (section 19, phase 5, D). Used
+ * when its job goes live; scheduled, the job holds it, and taken back to a draft, withdrawn, deleted, or amplified first, it is given back.
  */
-export function freeHolds(s: State, month: string): DemoJob[] {
-  return s.jobs.filter((j) => j.status === 'scheduled' && j.plan === 'free' && j.scheduledFor?.slice(0, 7) === month && !s.freeUses.some((u) => u.jobId === j.id && u.month === month));
+export function allowance(s: State, kind: FreeKind): Allowance {
+  const used = s.free?.[kind];
+  if (used) return { state: 'used', jobId: used };
+  const h = holder(s, kind);
+  return h ? { state: 'held', jobId: h.id } : { state: 'available' };
 }
 
-/** The month's free jobs taken: used (gone live) and held (scheduled). */
-export function freeUsed(s: State, month: string): number {
-  return s.freeUses.filter((u) => u.month === month).length + freeHolds(s, month).length;
+/** Whether this job may take the listing: it is available, or this job already holds it. */
+function openTo(s: State, kind: FreeKind, jobId: string): boolean {
+  const a = allowance(s, kind);
+  return a.state === 'available' || (a.state === 'held' && a.jobId === jobId);
 }
 
-export function freeLeft(s: State, month = currentMonth(s)): number {
-  return Math.max(0, FREE_PER_MONTH - freeUsed(s, month));
+/** The free standard listing is available to this job. After it, a job is Amplify, a package job, or the subscription. */
+export function canGoFree(s: State, jobId: string): boolean {
+  return openTo(s, 'standard', jobId);
 }
 
-export function hasFreeUse(s: State, jobId: string): boolean {
-  return s.freeUses.some((u) => u.jobId === jobId);
-}
-
-/** Whether the job already takes one of `month`'s free jobs: it went live that month, or it is scheduled free for it. */
-export function countedFor(s: State, jobId: string, month: string): boolean {
-  return s.freeUses.some((u) => u.jobId === jobId && u.month === month) || freeHolds(s, month).some((j) => j.id === jobId);
+/** The free Amplify is available to this job: a verified organisation only, as for any Amplify. */
+export function canAmplifyFree(s: State, jobId: string): boolean {
+  return s.org.verified && openTo(s, 'amplify', jobId);
 }
 
 /**
- * A free job goes live in its own month (decided by the user, 7 November 2026): it can go free if it already counts against the month it
- * goes live in, or that month still has a free job. A count from an earlier month does not carry over; it stays used there.
+ * Whether amplifying this job uses the free Amplify: while it is available, unless the user chose to pay for this job and keep the
+ * free one for later. A job already paid for uses nothing more.
  */
-export function canGoFree(s: State, jobId: string, schedule: string | null): boolean {
-  const month = monthFor(s, schedule);
-  return countedFor(s, jobId, month) || freeLeft(s, month) > 0;
+export function usesFreeAmplify(s: State, j: DemoJob): boolean {
+  if (j.paidFor || j.plan === 'amplify') return j.paidVia === 'free';
+  return canAmplifyFree(s, j.id) && (j.payWith === undefined || j.payWith === 'free');
+}
+
+/** Records a listing as used by the job going live; once used it stays used, whatever the job becomes. */
+export function takeAllowance(s: State, kind: FreeKind, jobId: string): State {
+  if (s.free?.[kind] || !openTo(s, kind, jobId)) return s;
+  return { ...s, free: { ...s.free, [kind]: jobId } };
+}
+
+/** "Used by Finance Officer", "held by Finance Officer (goes live on 2 December 2026)", or "available". */
+export function allowanceText(s: State, kind: FreeKind): string {
+  const a = allowance(s, kind);
+  if (a.state === 'available') return 'available';
+  const j = s.jobs.find((x) => x.id === a.jobId) ?? s.deleted?.find((d) => d.job.id === a.jobId)?.job;
+  const title = j?.facts.title || (a.state === 'used' ? 'a deleted job' : 'an untitled job');
+  return a.state === 'used' ? `used by ${title}` : `held by ${title} (goes live on ${longDate(j?.scheduledFor ?? '')})`;
+}
+
+/** "Free standard: available · free Amplify: used", for the side menu and Overview. */
+export function freeSummary(s: State): string {
+  const word = (kind: FreeKind) => allowance(s, kind).state;
+  return `Free standard: ${word('standard')} · free Amplify: ${word('amplify')}`;
+}
+
+/**
+ * Saves from earlier previews counted free jobs by the month: if any free job went live, the free standard is used; a scheduled free job
+ * holds it only when none went live (read from the job, as always); no job amplified then uses the free Amplify.
+ */
+export function freeBroughtForward(s: State): State {
+  if (s.free) return s;
+  const went = s.freeUses?.[0]?.jobId ?? s.jobs.find((j) => j.plan === 'free' && j.publishedAt)?.id;
+  const { freeUses: _old, ...rest } = s;
+  void _old;
+  return { ...rest, free: went ? { standard: went } : {} };
 }
 
 /** Paid jobs on hand, the soonest to lapse first: a subscription's jobs for this month, then packs. */
@@ -217,9 +200,4 @@ export function delisted(j: DemoJob, today: number): boolean {
   if (j.status !== 'live' || j.plan !== 'free' || !j.facts.deadline) return false;
   const end = listingEnd(j, today);
   return j.facts.deadline > end && isoDay(today) > end;
-}
-
-/** "1 December 2026 (Nairobi time)": when the free allowance starts again. */
-export function resetText(s: State): string {
-  return `${longDate(firstOfNextMonth(currentMonth(s)))} (${orgZone(s.org).city} time)`;
 }

@@ -11,7 +11,7 @@ import { invitedCount, reachRoom } from './invites';
 import { jobUrl } from './links';
 import { isPublished, KEEP_DELETED_DAYS } from './lifecycle';
 import MenuButton, { type MenuAction } from './MenuButton';
-import { currentMonth, hasFreeUse, LISTED_DAYS, monthName } from './plans';
+import { allowance, LISTED_DAYS } from './plans';
 import { go } from './store';
 import type { DemoJob, State } from './types';
 import { DemoMark, Dialog, inputStyle } from './ui';
@@ -70,7 +70,9 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
   const title = job.facts.title || 'Untitled job';
   const confirmed = !published || typed.trim().toLowerCase() === title.trim().toLowerCase();
   const waiting = [...(job.reach?.candidates ?? []), ...(job.reach?.team ?? [])].filter((r) => r.status === 'waiting').length;
-  const freeMonth = s.freeUses.find((u) => u.jobId === job.id)?.month;
+  const usedFree = (['standard', 'amplify'] as const).find((k) => s.free[k] === job.id);
+  const heldFree = (['standard', 'amplify'] as const).find((k) => { const a = allowance(s, k); return a.state === 'held' && a.jobId === job.id; });
+  const freeName = { standard: 'free standard listing', amplify: 'free Amplify' } as const;
   const cancels = [
     job.status === 'scheduled' && job.scheduledFor ? `its go-live on ${longDate(job.scheduledFor)}` : '',
     waiting ? `${waiting} Reach ${waiting === 1 ? 'email' : 'emails'} waiting for go-live` : '',
@@ -121,8 +123,8 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
           <strong>Kept</strong>
           <ul className="aj-muted" style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
             <li>Receipts and invoices, which the law requires.</li>
-            {freeMonth && hasFreeUse(s, job.id) && <li>The free job it used still counts for {monthName(freeMonth)}.</li>}
-            {!freeMonth && job.status === 'scheduled' && job.plan === 'free' && job.scheduledFor && <li>Nothing else: the free job it held in {monthName(job.scheduledFor.slice(0, 7))} is given back.</li>}
+            {usedFree && <li>Your {freeName[usedFree]} stays used: it is once per organisation.</li>}
+            {heldFree && <li>Nothing else: the {freeName[heldFree]} it held is given back.</li>}
             <li>One line in your organisation&apos;s activity log: who deleted it, and when. Never public.</li>
             {published && <li>Links already shared open a page saying &ldquo;This vacancy is no longer available&rdquo;.</li>}
           </ul>
@@ -133,7 +135,7 @@ export function DeleteDialog({ job, s, onClose, onDeleted }: { job: DemoJob; s: 
             <span className="aj-muted">{cancels.join('; ').replace(/^./, (c) => c.toUpperCase())}.</span>
           </div>
         )}
-        {job.plan === 'amplify' && <span className="aj-muted">A paid job is not refunded.</span>}
+        {job.plan === 'amplify' && job.paidVia !== 'free' && <span className="aj-muted">A paid job is not refunded.</span>}
         {groups.length > 0 && (
           <fieldset className="flex flex-col gap-1.5" style={{ border: 'none', margin: 0, padding: 0 }}>
             <legend style={{ fontWeight: 650, padding: 0, marginBottom: 4 }}>Tell the people involved</legend>
@@ -264,8 +266,7 @@ export function RescheduleDialog({ job, s, onClose }: { job: DemoJob; s: State; 
           <input type="date" style={inputStyle} value={date} min={addDays(s.today, 1)} max={max} onChange={(e) => setDate(e.target.value)} />
         </label>
         <span className="aj-muted">
-          From tomorrow{job.facts.deadline ? `, and before it closes on ${longDate(job.facts.deadline)}` : ''}
-          {job.plan === 'free' ? `; a free job goes live within ${monthName(currentMonth(s))}` : ''}. Today is {longDate(isoDay(s.today))}.
+          From tomorrow{job.facts.deadline ? `, and before it closes on ${longDate(job.facts.deadline)}` : ''}. Today is {longDate(isoDay(s.today))}.
         </span>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} waiting for go-live move to the new date.</span>}
       </div>
@@ -282,7 +283,11 @@ export function BackToDraftDialog({ job, s, onClose }: { job: DemoJob; s: State;
         <p style={{ margin: 0 }}>It will not go live on {job.scheduledFor ? longDate(job.scheduledFor) : 'its date'}. You can edit it and publish it again at any time.</p>
         {waiting > 0 && <span className="aj-muted">The {emails(waiting)} stay prepared, unsent.</span>}
         {job.payRequest && <span className="aj-muted">The request to {job.payRequest.name} to pay {job.payRequest.amount} is cancelled.</span>}
-        <span className="aj-muted">{job.plan === 'amplify' ? 'It stays paid for: publishing it again costs nothing.' : `The free job it held${job.scheduledFor ? ` in ${monthName(job.scheduledFor.slice(0, 7))}` : ''} is given back: a free job is used only when it goes live.`}</span>
+        <span className="aj-muted">
+          {job.plan === 'amplify' && job.paidVia !== 'free'
+            ? 'It stays paid for: publishing it again costs nothing.'
+            : `The ${job.plan === 'amplify' ? 'free Amplify' : 'free standard listing'} it held is given back: a free listing is used only when its job goes live.`}
+        </span>
       </div>
     </Dialog>
   );

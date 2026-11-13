@@ -3,7 +3,7 @@ import { commitmentText, COMMITMENTS, extractFacts, headingFor, isoDay, LANGUAGE
 import { isWritten, type Step } from './flow';
 import { canReopen, graceEnds, stateActionsOf, type StateAction } from './lifecycle';
 import { marketCheck, workingDay } from './market';
-import { BADGE, canGoFree, FREE_PER_MONTH, freeLeft, LANGS_INCLUDED, LANGUAGE_PRICE, langSlots, LISTED_DAYS, monthFor, monthName, nextPaidJob, paidJobsLeft, singlePrice, usd, viaFor } from './plans';
+import { BADGE, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, langSlots, LISTED_DAYS, nextPaidJob, ONE_JOB, paidJobsLeft, singlePrice, usd, usesFreeAmplify, viaFor } from './plans';
 import { contentOf, describeStyle, proposedStyle, wordsFor } from './setup';
 import { jobLang, langOf, versionChoices, versionsOf } from './translate';
 import type { ApplySettings, AskKind, ChatCard, ChatMsg, DemoJob, Facts, Format, State } from './types';
@@ -193,9 +193,9 @@ export const SKIP_APPROVAL = 'Publish without approval';
 export const SHOW_PREVIEW = 'Show the preview';
 
 /** What Amplify adds, in a line, with how many language versions it includes. */
-export function amplifyLine(s: State): string {
-  const package_ = nextPaidJob(s);
-  return `listed ${LISTED_DAYS.amplify} days, featured with the “${BADGE}” badge, the market check, the full advert check, ${package_ ? LANGS_INCLUDED.package : LANGS_INCLUDED.single} language ${(package_ ? LANGS_INCLUDED.package : LANGS_INCLUDED.single) === 1 ? 'version' : 'versions'} besides its own (more at ${usd(LANGUAGE_PRICE)} each), a field-post flyer, and Reach emails when it goes live`;
+export function amplifyLine(s: State, freeAmp = false): string {
+  const n = !freeAmp && nextPaidJob(s) ? LANGS_INCLUDED.package : LANGS_INCLUDED.single;
+  return `listed ${LISTED_DAYS.amplify} days, featured with the “${BADGE}” badge, the market check, the full advert check, ${n} language ${n === 1 ? 'version' : 'versions'} besides its own (more at ${usd(LANGUAGE_PRICE)} each), a field-post flyer, and Reach emails when it goes live`;
 }
 
 /** Steps 8 and 9 (section 19): what the rules say when the AI is off or leaves a step unasked. */
@@ -203,14 +203,16 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
   const own = langOf(jobLang(job)).label;
   switch (step.kind) {
     case 'plan': {
-      const month = monthFor(s, job.publishOn ?? null);
-      const left = freeLeft(s, month);
       const onHand = paidJobsLeft(s);
-      const free = canGoFree(s, job.id, job.publishOn ?? null);
+      const free = canGoFree(s, job.id);
+      const freeAmp = usesFreeAmplify(s, job);
       const price = singlePrice(s);
-      const freeText = free ? `**Free**: listed ${LISTED_DAYS.free} days, standard placement, in ${own} only; ${left} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}, used only when it goes live.` : `Both free jobs for ${monthName(month)} are used, so it goes out with **Amplify** or a package job.`;
-      const ampText = s.org.verified ? `**Amplify** (${onHand ? `uses 1 of your ${onHand} package ${onHand === 1 ? 'job' : 'jobs'}` : usd(price.amount)}): ${amplifyLine(s)}.` : 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.';
-      const quick = [...(free ? [PUBLISH_FREE] : []), ...(s.org.verified ? [onHand ? USE_PACKAGE : AMPLIFY] : [])];
+      const freeText = free
+        ? `**Free**: your one free standard listing, once for your organisation; listed ${LISTED_DAYS.free} days, standard placement, in ${own} only, used only when it goes live.`
+        : `Your free standard listing is used (once per organisation), so it goes out with **Amplify** or a package job.`;
+      const cost = freeAmp ? `free once for your organisation; after this, ${usd(ONE_JOB)} a job or part of a package` : onHand ? `uses 1 of your ${onHand} package ${onHand === 1 ? 'job' : 'jobs'}` : usd(price.amount);
+      const ampText = s.org.verified ? `**Amplify** (${cost}): ${amplifyLine(s, freeAmp)}.` : 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.';
+      const quick = [...(free ? [PUBLISH_FREE] : []), ...(s.org.verified ? [onHand && !freeAmp ? USE_PACKAGE : AMPLIFY] : [])];
       return [stepMsg(`The job description is ready. Next, how it goes out.\n${freeText}\n${ampText}\nWhich one? Both are side by side in the panel, with the packages.`, key, quick)];
     }
     case 'market':
@@ -254,7 +256,7 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
     }
     case 'publish': {
       const free = job.choice !== 'amplify';
-      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ` A free job is used when it goes live; scheduled, it holds its month's place until then.` : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
+      return [{ ...stepMsg(`Ready to go out${free ? ' free' : ' with Amplify'}. Publish now, or choose a date; the button says exactly what happens.${free ? ' Your free standard listing is used when it goes live; scheduled, the job holds it until then.' : usesFreeAmplify(s, job) ? ' Your free Amplify is used when it goes live; scheduled, the job holds it until then.' : ''}`, key, [SHOW_PREVIEW]), card: 'publish' }];
     }
     case 'live':
       if (job.status === 'closed') return [stateMessage(s, job) ?? stepMsg('This job is closed.', key)];

@@ -6,7 +6,7 @@ import { chooseAiModel, probeAi, useAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Billing from './Billing';
 import ArchivedScreens from './Archive';
-import { currentMonth, FREE_PER_MONTH, freeLeft, monthName, paidJobsLeft } from './plans';
+import { freeSummary, paidJobsLeft } from './plans';
 import Create from './Create';
 import Home from './Home';
 import Tip from '@/components/site/Tip';
@@ -203,7 +203,7 @@ export default function EmployerDemo() {
             entries: [entry('billing', 'Billing', <CreditCard size={15} strokeWidth={1.8} />, paidJobsLeft(s) || undefined)],
             footer: (
               <div className="aj-faint px-2.5 pb-2" style={{ fontSize: 11 }}>
-                {freeLeft(s)} of {FREE_PER_MONTH} free jobs left in {monthName(currentMonth(s))}.{paidJobsLeft(s) ? ` ${paidJobsLeft(s)} paid ${paidJobsLeft(s) === 1 ? 'job' : 'jobs'} on hand.` : ''}
+                {freeSummary(s)}.{paidJobsLeft(s) ? ` ${paidJobsLeft(s)} paid ${paidJobsLeft(s) === 1 ? 'job' : 'jobs'} on hand.` : ''}
               </div>
             ),
           },

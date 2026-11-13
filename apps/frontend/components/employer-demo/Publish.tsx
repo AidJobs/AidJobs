@@ -21,24 +21,17 @@ import {
   pausedByChanges,
   publish,
   remindPayer,
-  freeMonthBlock,
   scheduleBlock,
   type Paid,
 } from './actions';
 import {
+  allowanceText,
   BADGE,
   BADGE_TIP,
   canGoFree,
-  currentMonth,
   delisted,
-  FREE_PER_MONTH,
-  firstOfNextMonth,
-  freeLeft,
-  countedFor,
   LISTED_DAYS,
   listedUntil,
-  monthFor,
-  monthName,
   nextPaidJob,
   packageOf,
   PACKAGES,
@@ -623,7 +616,7 @@ export function SkipDialog({ job, onDone, onClose }: { job: DemoJob; onDone: () 
 export function TermsDialog({ s, action, onAccept, onClose }: { s: State; action: string; onAccept: () => void; onClose: () => void }) {
   return (
     <Dialog
-      title="Free jobs: the terms"
+      title="Your free standard listing: the terms"
       onClose={onClose}
       half
       footer={
@@ -639,7 +632,7 @@ export function TermsDialog({ s, action, onAccept, onClose }: { s: State; action
     >
       <div className="flex flex-col gap-2">
         <FreeTerms s={s} />
-        <span className="aj-faint">Shown once, the first time your organisation publishes a free job. The terms are also on the Billing page.</span>
+        <span className="aj-faint">Shown once, before your organisation uses its free standard listing. The terms are also on the Billing page.</span>
       </div>
     </Dialog>
   );
@@ -880,7 +873,7 @@ export default function Publish({ id }: { id?: string }) {
 function PublishPage({ id }: { id?: string }) {
   const s = useDemo();
   const job = s.jobs.find((j) => j.id === id);
-  const [plan, setPlan] = useState<Plan>(() => (job && canGoFree(s, job.id, null) ? 'free' : 'amplify'));
+  const [plan, setPlan] = useState<Plan>(() => (job && canGoFree(s, job.id) ? 'free' : 'amplify'));
   const [row, setRow] = useState<RowKey | null>('advert');
   const [pkg, setPkg] = useState<PackageKey>('one');
   const [plansOpen, setPlansOpen] = useState(false);
@@ -927,12 +920,7 @@ function PublishPage({ id }: { id?: string }) {
 
   const prepaid = Boolean(job.paidFor) && !upgrade;
   const chosen: Plan = upgrade || prepaid ? 'amplify' : plan;
-  const nowMonth = currentMonth(s);
-  const month = monthFor(s, schedule);
-  const nextFirst = firstOfNextMonth(nowMonth);
-  const counted = countedFor(s, job.id, month);
-  const earlier = counted ? null : (s.freeUses.find((u) => u.jobId === job.id && u.month < month)?.month ?? null);
-  const freeOk = canGoFree(s, job.id, schedule);
+  const freeOk = canGoFree(s, job.id);
   const onHand = nextPaidJob(s);
   const onHandCount = paidJobsLeft(s);
   const single = singlePrice(s);
@@ -941,7 +929,7 @@ function PublishPage({ id }: { id?: string }) {
   const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
-  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && freeMonthBlock(s, schedule) ? freeMonthBlock(s, schedule) : chosen === 'free' && !freeOk ? `No free job left for ${monthName(month)}` : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && !freeOk ? 'Your free standard listing is used' : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
@@ -1107,7 +1095,7 @@ function PublishPage({ id }: { id?: string }) {
                 <button type="button" className="aj-ink-btn" onClick={() => setCheckout(payKey)}>
                   Try again
                 </button>
-                {!upgrade && canGoFree(s, job.id, null) && (
+                {!upgrade && canGoFree(s, job.id) && (
                   <button
                     type="button"
                     className="aj-pill"
@@ -1129,15 +1117,12 @@ function PublishPage({ id }: { id?: string }) {
             {!upgrade && !prepaid && (
               <Choice on={chosen === 'free'} title="Free" price="US$0" onSelect={() => setPlan('free')}>
                 <span className="aj-muted" style={{ fontWeight: 600 }}>
-                  {counted
-                    ? `This job already has one of ${monthName(month)}'s free jobs: it went live then.`
-                    : `${freeLeft(s, month)} of ${FREE_PER_MONTH} free jobs left in ${monthName(month)}${earlier ? `. It counted against ${monthName(earlier)}'s free jobs, which stays used; going live in ${monthName(month)} uses one of ${monthName(month)}'s` : ''}`}
+                  {freeOk ? 'Your one free standard listing, once for your organisation; used only when it goes live.' : `Your free standard listing is ${allowanceText(s, 'standard')}: once per organisation.`}
                 </span>
                 <FreeTerms s={s} />
                 {!freeOk && (
                   <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
-                    <span>Both free jobs for {monthName(month)} are used.</span>
-                    <span className="aj-muted">New free jobs come on {longDate(nextFirst)}: create and publish it free then, or Amplify to publish it now.</span>
+                    <span className="aj-muted">Amplify, or a package job, publishes it.</span>
                   </div>
                 )}
                 {chosen === 'free' && job.facts.deadline && job.facts.deadline > freeUntil && (
@@ -1203,7 +1188,7 @@ function PublishPage({ id }: { id?: string }) {
                           );
                         })}
                         <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                          The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job; a free job once used stays used.
+                          The same prices for every type of organisation; placeholders for now. Unused package jobs lapse, with reminders 2 weeks and 3 days before. A package job can also amplify a live free job; a free listing once used stays used.
                         </span>
                       </div>
                     )}
@@ -1235,18 +1220,6 @@ function PublishPage({ id }: { id?: string }) {
               {schedule && <input type="date" style={{ ...inputStyle, width: 170, minHeight: 34 }} value={schedule} min={addDays(s.today, 1)} onChange={(e) => setSchedule(e.target.value || null)} aria-label="Publish on" />}
             </div>
           )}
-          {!upgrade && chosen === 'free' && freeMonthBlock(s, schedule) && (
-            <div className="flex flex-col items-start gap-1.5 rounded-xl p-3" style={{ background: 'var(--amber-bg)' }} role="status">
-              <span style={{ fontWeight: 650 }}>A free job goes live in its own month</span>
-              <span className="aj-muted">
-                To publish free in {monthName(month)}, create and publish the job in {monthName(month)}. To schedule it for {longDate(schedule ?? '')} now, choose Amplify.
-              </span>
-              <button type="button" className="aj-pill" onClick={() => setPlan('amplify')}>
-                Choose Amplify
-              </button>
-            </div>
-          )}
-
           {!upgrade && (
             <p className="aj-faint text-center" style={{ margin: 0, fontSize: 12 }} aria-label="Where the job stands">
               {checkSummary(job, s, chosen === 'amplify').map((p, i) => (

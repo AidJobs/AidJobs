@@ -27,7 +27,6 @@ import {
   addVersionSection,
   applyFix,
   chooseBlock,
-  freeMonthBlock,
   keepForAll,
   keepTranslation,
   leaveAmplifyPoint,
@@ -46,6 +45,7 @@ import {
   writeVersionSection,
 } from './actions';
 import { approvalRequired } from './approval';
+import { canAmplifyFree } from './plans';
 import { profileFor } from './profiles';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, stepKey } from './flow';
@@ -513,14 +513,15 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       }
       case 'pay_with': {
-        const k = oneOf(a.package, PACKAGE_KEYS);
-        if (!k || j.paidFor || isPublished(j)) refused.push('how it is paid');
+        const k = oneOf(a.package, [...PACKAGE_KEYS, 'free'] as const);
+        if (!k || j.paidFor || (isPublished(j) && j.plan !== 'free')) refused.push('how it is paid');
+        else if (k === 'free' && !canAmplifyFree(s, j.id)) refused.push('the free Amplify: it is used, once per organisation');
         else setPayWith(id, k);
         break;
       }
       case 'publish_on': {
         const d = a.date === null ? null : typeof a.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.date) ? a.date : undefined;
-        const no = d === undefined ? 'the date' : d && (scheduleBlock(s, j, d) ?? (j.choice !== 'amplify' ? freeMonthBlock(s, d) : null));
+        const no = d === undefined ? 'the date' : d && scheduleBlock(s, j, d);
         if (no) refused.push(`publishing on that date: ${no.toString().toLowerCase()}`);
         else setPublishOn(id, d ?? null);
         break;
