@@ -12,6 +12,7 @@ from contracts.admission import admit_batch
 from contracts.identity import both_keys
 from contracts.refusal import refusal
 from crawler.plugins.pageup import PageUpListingReader
+from crawler_v2 import readers as readers_module
 from crawler_v2 import simple_crawler as simple_crawler_module
 from crawler_v2.simple_crawler import (
     SimpleCrawler,
@@ -216,6 +217,8 @@ def test_the_address_check_is_gone():
     assert not hasattr(simple_crawler_module, "_is_unicef_listing")
     source = inspect.getsource(SimpleCrawler._listing_jobs)
     assert "unicef" not in source.lower()
+    # The readers are chosen in crawler_v2/readers.py since W-35.
+    assert "unicef" not in inspect.getsource(readers_module).lower()
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("crawler.plugins.unicef")
 
@@ -226,7 +229,7 @@ def test_the_crawler_calls_no_ai_service_even_with_a_key_set(monkeypatch):
     crawler = SimpleCrawler("postgresql://example")
     for name in ("use_ai", "ai_extractor", "ai_normalizer"):
         assert not hasattr(crawler, name), name
-    source = inspect.getsource(SimpleCrawler)
+    source = inspect.getsource(SimpleCrawler) + inspect.getsource(readers_module)
     for marker in ("ai_extractor", "ai_normalizer", "_ai_listing_jobs", "openrouter"):
         assert marker not in source.lower(), marker
 
