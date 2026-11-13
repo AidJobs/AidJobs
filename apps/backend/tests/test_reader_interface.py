@@ -68,15 +68,44 @@ def test_a_result_without_a_report_gives_none():
     assert ListingResult("general", [{"title": "x"}]).report() is None
 
 
-def test_a_walks_report_comes_back_unchanged():
+@pytest.mark.parametrize("report", [
+    dict(_REPORT),
+    {},
+    {**_REPORT, "extra": 1},
+    {"pages": 1},
+    {"pages": 1, "expected": None, "complete": None, "stop": "x"},
+    ["not", "a", "dict"],
+])
+def test_a_walks_report_is_handed_on_as_it_is(report):
+    result = ListingResult.from_report("pageup", [{"title": "x"}], report)
+    assert result.report() is report
+
+
+def test_a_walks_report_fills_the_typed_fields():
     result = ListingResult.from_report("pageup", [], dict(_REPORT))
-    assert result.report() == _REPORT
-    assert list(result.report()) == ["pages", "expected", "complete", "stop"]
+    assert (result.reported, result.complete, result.expected, result.pages, result.stop) == (
+        True, True, 3, 2, "no More Jobs link"
+    )
+    assert ListingResult.from_report("pageup", [], {}).pages is None
 
 
-def test_a_report_whose_completeness_is_empty_is_still_a_report():
-    report = {"pages": 1, "expected": None, "complete": None, "stop": "x"}
-    assert ListingResult.from_report("pageup", [], report).report() == report
+def test_a_result_built_by_a_reader_gives_the_four_keys():
+    result = ListingResult("feed", [], reported=True, complete=False, expected=9, pages=1,
+                           stop="page cap")
+    assert result.report() == {"pages": 1, "expected": 9, "complete": False, "stop": "page cap"}
+
+
+@pytest.mark.parametrize("report", [{}, {**_REPORT, "extra": 1}, ["x"]])
+def test_the_listing_step_returns_the_walks_own_report(report):
+    crawler = _crawler()
+    rows = [{"title": "Officer", "apply_url": "https://jobs.example/job/1"}]
+
+    async def pageup(html, url):
+        return rows, report
+
+    crawler._pageup_listing_jobs = pageup
+    jobs, got = asyncio.run(crawler._listing_jobs("<html></html>", "https://jobs.example/"))
+    assert jobs is rows and got is report
 
 
 def test_a_reader_by_default_is_chosen_by_the_page_and_opens_no_job_page():
@@ -164,9 +193,48 @@ def test_a_reader_that_fails_or_reads_nothing_passes_the_page_on():
     crawler._pageup_listing_jobs = pageup
     crawler._sites_listing_jobs = sites
     crawler.extract_jobs_from_html = lambda html, url: general_rows
-    jobs, report = asyncio.run(crawler._listing_jobs(_first().body, _source()["careers_url"]))
-    assert jobs is general_rows and report is None
-    assert LISTING_READER.get() == "unknown"  # set inside the run's own context only
+
+    async def listing():
+        jobs, report = await crawler._listing_jobs(_first().body, _source()["careers_url"])
+        return jobs, report, LISTING_READER.get()
+
+    jobs, report, reader = asyncio.run(listing())
+    assert jobs is general_rows and report is None and reader == "general"
+
+
+@pytest.mark.parametrize("stop", [asyncio.CancelledError, KeyboardInterrupt])
+def test_a_cancelled_or_interrupted_reader_is_not_passed_on(stop):
+    crawler = _crawler()
+
+    async def pageup(html, url):
+        raise stop()
+
+    def general(html, url):
+        raise AssertionError("the general reader was asked")
+
+    crawler._pageup_listing_jobs = pageup
+    crawler.extract_jobs_from_html = general
+    with pytest.raises(stop):
+        asyncio.run(crawler._listing_jobs("<html></html>", "https://jobs.example/"))
+
+
+def test_the_fall_through_is_logged(caplog):
+    crawler = _crawler()
+    rows = [{"title": "Officer", "apply_url": "https://jobs.example/job/1"}]
+
+    async def pageup(html, url):
+        raise ValueError("broken cards")
+
+    async def sites(html, url):
+        return rows, None
+
+    crawler._pageup_listing_jobs = pageup
+    crawler._sites_listing_jobs = sites
+    with caplog.at_level("INFO", logger="crawler_v2.readers"):
+        asyncio.run(crawler._listing_jobs("<html></html>", "https://jobs.example/"))
+    assert "PageUp career-site reader failed: broken cards, falling back to rule-based" \
+        in caplog.text
+    assert "Sites career-site reader found 1 jobs" in caplog.text
 
 
 def test_the_general_readers_failure_fails_the_listing():
@@ -229,8 +297,8 @@ def test_a_fetch_handed_in_answers_the_walks_later_pages():
 # The reader recorded for each crawl ---------------------------------------------------------
 
 @pytest.mark.parametrize("folder, name, reader, strategy", [
-    ("general_reader", "icrc-listing", "general", "links"),
-    ("general_reader", "oxfam-listing", "general", "divs"),
+    ("general_reader", "icrc-listing", "general", "selector-links"),
+    ("general_reader", "oxfam-listing", "general", "selector-divs"),
     ("unicef_listing", "page1-items50", "pageup", None),
 ])
 def test_the_listing_step_names_its_reader_and_strategy(folder, name, reader, strategy):
@@ -263,6 +331,20 @@ def test_structured_data_found_first_is_named():
         return len(jobs), LISTING_READER.get(), LISTING_STRATEGY.get()
 
     assert asyncio.run(listing()) == (1, "general", "structured-first")
+
+
+def test_a_second_listing_in_one_crawl_starts_with_no_strategy():
+    icrc_html, icrc_record = _fixture("general_reader", "icrc-listing")
+    crawler = _crawler()
+
+    async def two_listings():
+        await crawler._listing_jobs(icrc_html, icrc_record["url"])
+        first = LISTING_STRATEGY.get()
+        crawler.extract_jobs_from_html = lambda html, url: []
+        await crawler._listing_jobs("<html></html>", icrc_record["url"])
+        return first, LISTING_STRATEGY.get()
+
+    assert asyncio.run(two_listings()) == ("selector-links", None)
 
 
 def test_concurrent_crawls_keep_their_own_reader():
@@ -357,7 +439,7 @@ def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
     html, record = _fixture("general_reader", "icrc-listing")
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
     assert result["message"] == "Found 32 jobs"
-    assert (fields["reader"], fields["strategy"]) == ("general", "links")
+    assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
     assert "listing_complete" not in fields
 
 
@@ -397,5 +479,5 @@ def test_each_crawl_starts_with_no_reader_named(monkeypatch):
 
     monkeypatch.setattr(simple_crawler, "fetch_url", fake_fetch_url)
     first, second = asyncio.run(two_crawls())
-    assert (first["reader"], first["strategy"]) == ("general", "links")
+    assert (first["reader"], first["strategy"]) == ("general", "selector-links")
     assert second["reader"] == "unknown" and "strategy" not in second

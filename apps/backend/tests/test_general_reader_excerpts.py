@@ -2,7 +2,8 @@
 
 Each excerpt is the saved page with scripts, styles, images, form controls, comments, unused
 attributes and colour classes removed, and, for Oxfam GB, every block whose removal left the rows
-unchanged. The expected rows were recorded once from `main` (2a125b0) on these excerpts. ICRC's
+unchanged. The expected rows were recorded once from `main` (2a125b0, whose crawler code
+`d62f97e` keeps) on these excerpts, before the reader interface (W-35). ICRC's
 page keeps all twelve job tiles with their desktop, tablet and phone copies: with fewer tiles, or
 without the copies, the strategy selector scores "divs" above "links" and reads other rows.
 """

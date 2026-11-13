@@ -446,7 +446,7 @@ class SimpleCrawler:
                 if metadata.get('warnings'):
                     logger.warning(f"Validation warnings: {len(metadata['warnings'])} warnings")
                 
-                LISTING_STRATEGY.set(metadata.get('strategy_used') or 'none')
+                LISTING_STRATEGY.set(f"selector-{metadata.get('strategy_used') or 'none'}")
                 return jobs
             except Exception as e:
                 logger.warning(f"Strategy selector failed, falling back to sequential: {e}")

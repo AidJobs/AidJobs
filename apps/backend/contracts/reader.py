@@ -8,7 +8,7 @@ the listing states. Readers are chosen by what a page or a system shows, never b
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Dict, FrozenSet, List, Optional
+from typing import Any, Awaitable, Callable, Dict, FrozenSet, List, Optional
 
 # The fields a reader may set on a candidate, by the names the save step reads. A field the
 # employer does not publish is left out, never set empty or guessed (contract §10).
@@ -66,7 +66,11 @@ Fetch = Callable[[Request], Awaitable[Response]]
 @dataclass
 class ListingResult:
     """A listing as one reader read it. `reported` is False for a reader that reports no
-    completeness, whose crawls never count as evidence of absence (contract §6)."""
+    completeness, whose crawls never count as evidence of absence (contract §6).
+
+    A paging walk's own report is kept as `raw_report` and handed on as it is, whatever keys it
+    holds; the typed fields are read from it for readers of the result.
+    """
 
     reader: str
     jobs: List[Dict] = field(default_factory=list)
@@ -76,9 +80,12 @@ class ListingResult:
     pages: Optional[int] = 1
     stop: Optional[str] = None
     strategy: Optional[str] = None
+    raw_report: Optional[Any] = None
 
-    def report(self) -> Optional[Dict]:
+    def report(self) -> Optional[Any]:
         """The listing report the crawl message and the run's finish read; None without one."""
+        if self.raw_report is not None:
+            return self.raw_report
         if not self.reported:
             return None
         return {
@@ -90,19 +97,21 @@ class ListingResult:
 
     @classmethod
     def from_report(
-        cls, reader: str, jobs: List[Dict], report: Optional[Dict], strategy: Optional[str] = None
+        cls, reader: str, jobs: List[Dict], report: Optional[Any], strategy: Optional[str] = None
     ) -> "ListingResult":
         if report is None:
             return cls(reader, jobs, strategy=strategy)
+        typed = report if isinstance(report, dict) else {}
         return cls(
             reader,
             jobs,
             reported=True,
-            complete=report.get("complete"),
-            expected=report.get("expected"),
-            pages=report.get("pages"),
-            stop=report.get("stop"),
+            complete=typed.get("complete"),
+            expected=typed.get("expected"),
+            pages=typed.get("pages"),
+            stop=typed.get("stop"),
             strategy=strategy,
+            raw_report=report,
         )
 
 
