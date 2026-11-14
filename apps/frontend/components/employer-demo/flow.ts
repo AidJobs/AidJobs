@@ -95,7 +95,7 @@ export type Step =
   | { kind: 'change' }
   | { kind: 'again' }
   | { kind: 'genuine'; point: string }
-  | { kind: 'ask'; fact: AskKind; section?: string }
+  | { kind: 'ask'; fact: AskKind; section?: string; essential?: boolean }
   | { kind: 'write'; sections: string[] }
   | { kind: 'approve'; section: string }
   | { kind: 'details' }
@@ -186,23 +186,83 @@ export function amplifying(job: DemoJob): boolean {
  */
 function afterCheck(job: DemoJob, s: State): Step {
   if (isPublished(job)) return { kind: 'live' };
-  if (!isSettled('plan', job)) return { kind: 'plan' };
+  const parked = (k: string) => Boolean(job.walk?.parked?.includes(k));
+  if (!isSettled('plan', job)) {
+    // Only the essentials come back (section 19, phase 6, A), here, before Free or Amplify; they wait to be answered.
+    const e = essentials(job)[0];
+    return e ? { kind: 'ask', fact: e, essential: true } : { kind: 'plan' };
+  }
   const amplify = job.choice === 'amplify';
   if (amplify) {
     const market = marketPoints(job, s)[0];
-    if (market && !isSettled('market', job)) return { kind: 'market', point: market };
+    if (market && !isSettled('market', job) && !parked('market')) return { kind: 'market', point: market };
     const full = fullPoints(job, s)[0];
-    if (full && !isSettled('full', job)) return { kind: 'full', point: full };
-    if (!isSettled('langs', job)) return { kind: 'langs' };
+    if (full && !isSettled('full', job) && !parked('full')) return { kind: 'full', point: full };
+    if (!isSettled('langs', job) && !parked('langs')) return { kind: 'langs' };
     const draft = versionsOf(job).find((k) => !job.translations?.[k]?.reviewed);
     if (draft) return { kind: 'version', lang: draft };
   }
   if (!reviewDone(job, s)) return job.review.state === 'none' ? { kind: 'review' } : { kind: 'waiting' };
   if (amplify) {
-    if (!isSettled('reach', job)) return { kind: 'reach' };
-    if (!isSettled('flyer', job)) return { kind: 'flyer' };
+    if (!isSettled('reach', job) && !parked('reach')) return { kind: 'reach' };
+    if (!isSettled('flyer', job) && !parked('flyer')) return { kind: 'flyer' };
   }
   return { kind: 'publish' };
+}
+
+/** What a job cannot go out without (section 19, phase 6, A): the title, the duty station, the closing date, the contract, and a way to apply that works. */
+export function essentials(job: DemoJob): AskKind[] {
+  const f = job.facts;
+  const out: AskKind[] = [];
+  if (!f.title) out.push('title');
+  if (!f.location && f.arrangement !== 'remote') out.push('place');
+  if (!f.deadline) out.push('deadline');
+  if (!f.contract && f.engagement === 'job') out.push('contract');
+  if (job.apply.method === 'email' && !job.apply.address.trim()) out.push('method');
+  return out;
+}
+
+export const ESSENTIAL_WORDS: Record<string, string> = { title: 'the job title', place: 'the duty station', deadline: 'the closing date', contract: 'the contract', method: 'an email address to apply to' };
+
+/**
+ * The key a question is parked under (section 19, phase 6, A), or null for one that waits instead: the setup, changed lines waiting for
+ * a yes, the reason for a genuine requirement, Free or Amplify, a required review, publishing, and the essentials once they come back.
+ */
+export function parkKey(step: Step | null): string | null {
+  if (!step) return null;
+  switch (step.kind) {
+    case 'ask':
+      return step.fact === 'title' || step.essential ? null : step.fact;
+    case 'approve':
+      return `approve:${step.section}`;
+    case 'check':
+      return `check:${step.point.key}`;
+    case 'details':
+    case 'sdgs':
+    case 'fixed':
+    case 'suggest':
+    case 'market':
+    case 'full':
+    case 'langs':
+    case 'reach':
+    case 'flyer':
+      return step.kind;
+    default:
+      return null;
+  }
+}
+
+/** The park keys a part of the progress line holds, un-parked when the part is opened (its count starts again). */
+export function parkedIn(part: string, job: DemoJob): string[] {
+  const parked = job.walk?.parked ?? [];
+  if (part === 'details') return parked.filter((k) => (ASKS as string[]).includes(k) || k === 'details' || k === 'sdgs');
+  if (part === 'check') return parked.filter((k) => k.startsWith('check:'));
+  if (part.startsWith('s:')) {
+    const key = part.slice(2);
+    const facts = FACTS_BEFORE[SECTION_BY_KEY[key]?.group ?? 'job'] as string[];
+    return parked.filter((k) => k === `approve:${key}` || facts.includes(k) || (key === 'apply' && k === 'method') || k === `check:${key}`);
+  }
+  return parked.filter((k) => k === part);
 }
 
 export function isWritten(job: DemoJob, key: string): boolean {
@@ -233,26 +293,30 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   // Hire again (section 19, phase 4): what changes comes first, then each section for a quick "keep as is".
   if (w.again && !w.settled.includes('again')) return { kind: 'again' };
   if (!isSettled('title', job)) return { kind: 'ask', fact: 'title' };
+  // A question left unanswered is skipped (section 19, phase 6, A); it keeps its "to do" mark on the line.
+  const parked = (k: string) => Boolean(w.parked?.includes(k));
   const unwritten = job.tags.filter((k) => !isWritten(job, k));
   const all = w.pace === 'all';
   if (all && unwritten.length && !job.tags.some((k) => !FIXED_SECTIONS.includes(k) && isWritten(job, k))) return { kind: 'write', sections: unwritten };
+  // The reading order, group by group; the facts asked before a section follow the section's own kind, wherever it is shown.
   for (const k of job.tags) {
     if (w.approved.includes(k) && isWritten(job, k)) continue;
-    const ask = FACTS_BEFORE[SECTION_BY_KEY[k]?.group ?? 'job'].find((f) => !isSettled(f, job));
+    const ask = FACTS_BEFORE[SECTION_BY_KEY[k]?.group ?? 'job'].find((f) => !isSettled(f, job) && !parked(f));
     if (ask) return { kind: 'ask', fact: ask, section: k };
     if (!isWritten(job, k)) return { kind: 'write', sections: all ? unwritten : [k] };
+    if (parked(`approve:${k}`)) continue;
     return { kind: 'approve', section: k };
   }
-  const ask = ASKS.find((f) => !isSettled(f, job));
+  const ask = ASKS.find((f) => !isSettled(f, job) && !parked(f));
   if (ask) return { kind: 'ask', fact: ask };
-  if (!isSettled('details', job)) return { kind: 'details' };
-  if (!isSettled('sdgs', job) && !job.sdgs && !inferSdgs(job).length && s.org.sdgs.length) return { kind: 'sdgs' };
-  if (!isSettled('fixed', job)) return { kind: 'fixed' };
+  if (!isSettled('details', job) && !parked('details')) return { kind: 'details' };
+  if (!isSettled('sdgs', job) && !parked('sdgs') && !job.sdgs && !inferSdgs(job).length && s.org.sdgs.length) return { kind: 'sdgs' };
+  if (!isSettled('fixed', job) && !parked('fixed')) return { kind: 'fixed' };
   const keep = keepToOffer(job, s);
   if (keep) return { kind: 'keep', what: keep };
   const offered = suggestionsFor(job, s);
-  if (!isSettled('suggest', job) && offered.length) return { kind: 'suggest', sections: offered };
-  const point = checkPoints(job, s)[0];
+  if (!isSettled('suggest', job) && !parked('suggest') && offered.length) return { kind: 'suggest', sections: offered };
+  const point = checkPoints(job, s).find((p) => !parked(`check:${p.key}`));
   if (point && !isPublished(job)) return { kind: 'check', point };
   return afterCheck(job, s);
 }

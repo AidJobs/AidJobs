@@ -4,8 +4,9 @@ import { useSyncExternalStore } from 'react';
 import { freeBroughtForward, LANGS_INCLUDED, rollBilling } from './plans';
 import { goLive } from './invites';
 import { purgeDeleted } from './lifecycle';
-import { daysUntil, inOutlineOrder, outlineOrder, startOfDay } from './engine';
+import { daysUntil, inOutlineOrder, startOfDay } from './engine';
 import { broughtForward } from './flow';
+import { formatForward, jobGrouped } from './outline';
 import { profilesFromJobs } from './profiles';
 import { initialState } from './sample';
 import type { DemoJob, Recipient, State } from './types';
@@ -30,12 +31,16 @@ function save(s: State) {
 
 /** Closes live jobs whose closing date has passed, as the real product would at the deadline; lapses and renews paid jobs. */
 export function normalise(s0: State): State {
-  const s = purgeDeleted(goLive(rollBilling(freeBroughtForward(s0))));
+  const s1 = purgeDeleted(goLive(rollBilling(freeBroughtForward(s0))));
+  // Templates saved by phase 5 with an order across groups, and the languages "confirmed" before Settings held wording per language.
+  const formats = s1.formats.map(formatForward);
+  const s2 = formats.some((f, i) => f !== s1.formats[i]) ? { ...s1, formats } : s1;
+  const s = s2.org.fixedLangs ? { ...s2, org: { ...s2.org, fixedLangs: undefined } } : s2;
   let changed = false;
   const jobs = s.jobs.map((j0): DemoJob => {
-    // A job whose sections the user moved across groups keeps its own order (section 19, phase 5, B).
-    const tags = j0.ordered ? j0.tags : outlineOrder(j0.tags);
-    const j1 = tags.join() === j0.tags.join() && j0.sections.every((x, i) => x.key === inOutlineOrder(j0.sections, tags)[i]?.key) ? j0 : { ...j0, tags, sections: inOutlineOrder(j0.sections, tags) };
+    // Each job reads group by group; one phase 5 saved in its own order keeps what it reads (section 19, phase 6, B).
+    const g = jobGrouped(j0);
+    const j1 = g.sections.every((x, i) => x.key === inOutlineOrder(g.sections, g.tags)[i]?.key) ? g : { ...g, sections: inOutlineOrder(g.sections, g.tags) };
     // Saved before jobs kept a copy of what went live: today's text is the starting point for "changed since publishing".
     const j2 = j1.status === 'live' && !j1.published ? { ...j1, published: { facts: j1.facts, sections: j1.sections, at: j1.publishedAt ?? s.today } } : j1;
     // A job still choosing its template or style when saved by an earlier version is written step by step from here.

@@ -107,10 +107,13 @@ describe('the chat looks plain, and focus follows each control’s corners (sect
   const css = readFileSync(join(__dirname, '..', '..', 'components', 'employer-demo', 'employer-demo.css'), 'utf8').replace(/\r\n/g, '\n');
   const rule = (selector: string) => css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
 
-  it("no dark box for the user's message, no box or outline for the reply; a faint “You” over the user's message", () => {
+  it("in the window the user's message has a soft tinted bubble, never dark; the reply no box or outline; no “You” label (phase 6, A)", () => {
+    const own = rule(".ej-wchat .ej-bubble[data-from='user']");
+    expect(own).toMatch(/background: color-mix\(in srgb, var\(--sage-5\) 1\d%, transparent\)/);
+    expect(own).not.toMatch(/var\(--(?:text|ink)\b|#000|black/);
     expect(rule(".ej-bubble[data-from='user']")).not.toMatch(/background|border/);
     expect(rule(".ej-bubble[data-from='ai']")).not.toMatch(/background|border/);
-    expect(rule(".ej-bubble[data-from='user']::before")).toMatch(/content: 'You'/);
+    expect(css).not.toMatch(/\.ej-bubble\[data-from='user'\]::before/);
     expect(rule('.aj-root .ej-bubble .ej-answer')).toMatch(/background: transparent/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.ej-reveal \{\s*animation: none;/);
   });

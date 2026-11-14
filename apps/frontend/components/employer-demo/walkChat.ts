@@ -21,7 +21,7 @@ export const CHANGE_NO = 'Keep the text as it is';
 export const NONE_OF_THESE = 'None of these';
 export const KEEP_FIXED = 'Keep them';
 export const NO_THANKS = 'No, thanks';
-export const LEAVE_IT = 'Leave it';
+export const LEAVE_IT = 'Leave it as it is';
 export const GENUINE = "It's a genuine requirement";
 export const OTHER_WORDING = 'Suggest other wording';
 export const OPEN_PUBLISH = 'Open Check and publish';
@@ -259,7 +259,7 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
     case 'flyer':
       return [stepMsg('A one-page flyer with a QR code to the job, for notice boards in field offices, clinics, and community centres, in any reviewed language. Shall I show it?', key, [SHOW_FLYER, NO_THANKS])];
     case 'reach':
-      return [stepMsg(`${standsNote(s, job)}Reach invites people by email when the job goes live: candidates you know, and your team to pass it on. Shall I prepare the invitations? You choose who gets them and edit both emails in their tab.`, key, [INVITE, NOT_NOW])];
+      return [stepMsg(`${standsNote(s, job)}Reach invites people by email when the job goes live: candidates you know, and your team to pass it on. Shall I prepare the invitations? You choose who gets them and edit both emails in their tab.`, key, [INVITE, NO_THANKS])];
     case 'review': {
       const after = job.choice === 'amplify' ? ' Reach and the flyer come after review, so they match what was approved.' : '';
       if (approvalRequired(s, job)) return [{ ...stepMsg(`Your organisation asks for approval on this job before it is published. Who should review it?${after}`, key), card: 'review' }];
@@ -376,7 +376,8 @@ function canSkip(s: State, j: DemoJob): boolean {
 export function readAnswer(kind: AskKind, text: string, s: State, job: DemoJob): { patch: Partial<Facts>; method?: ApplySettings['method']; address?: string } | null {
   const t = text.trim();
   const lower = t.toLowerCase();
-  const none = /^(no|none|nope|not needed|n\/a|no need|skip|nothing|not applicable)\b/.test(lower);
+  // "Skip" parks a question (section 19, phase 6, A); only these decline it.
+  const none = /^(no|none|nope|not needed|n\/a|no need|nothing|not applicable)\b/.test(lower);
   switch (kind) {
     case 'grade': {
       if (none || /\bno grade\b|\bnot graded\b|\bungraded\b/.test(lower)) return { patch: { grade: '' } };

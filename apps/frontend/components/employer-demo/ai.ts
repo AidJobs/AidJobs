@@ -265,7 +265,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
         };
       }),
     },
-    walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, next: stepFor(nextStep(j, s), j, s, format) } : null,
+    walk: j.walk ? { pace: j.walk.pace ?? s.pace ?? null, settled: j.walk.settled, parked: j.walk.parked ?? [], waiting: Boolean(j.walk.hold), next: stepFor(nextStep(j, s), j, s, format) } : null,
     pack: { about: j.pack?.about ?? null, project: j.pack?.project ? { text: j.pack.project.text, source: j.pack.project.source, usedBy: j.pack.project.usedBy ?? [] } : null, facts: j.pack?.facts ?? [] },
     card: surveyCard(s, j),
     suggestions: (j.suggestions ?? []).map((x) => ({ fact: x.fact, value: x.value, source: x.source, state: x.state })),

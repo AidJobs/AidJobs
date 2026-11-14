@@ -486,7 +486,7 @@ export function draftVersionSection(job: DemoJob, key: string, lang: JobLang, en
   return sec ? draftSection(job, sec, lang, english) : null;
 }
 
-function sourceOf(job: DemoJob): string {
+export function sourceOf(job: DemoJob): string {
   // A section's sub-sections count only when it has some, so versions made before sub-sections existed are not marked behind.
   return JSON.stringify(job.sections.map((sec) => (sec.subs?.length ? [sec.key, sec.lines, sec.subs.map((sb) => [sb.title, sb.lines])] : [sec.key, sec.lines])));
 }

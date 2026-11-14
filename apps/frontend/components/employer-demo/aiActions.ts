@@ -763,8 +763,10 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'approve_section': {
         // Only the section the window is on, unless the user approved them all (section 19, phase 5: the open question).
         const on = nextStep(j, s);
+        // A question left for later is answered whenever the user names it (section 19, phase 6, A).
+        const parked = Boolean(j.walk?.parked?.includes(`approve:${section}`));
         if (!j.walk || !j.tags.includes(section) || !isWritten(j, section)) refused.push(`approving ${name || 'a section'}: it is not written yet`);
-        else if (!(on?.kind === 'approve' && on.section === section) && !ALL_ASKED.test(said ?? '')) refused.push(`approving ${name}: the open question comes first`);
+        else if (!(on?.kind === 'approve' && on.section === section) && !parked && !ALL_ASKED.test(said ?? '')) refused.push(`approving ${name}: the open question comes first`);
         else approveSection(id, section);
         break;
       }
@@ -777,7 +779,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const later = ([...LEFT, ...LATER, 'again'] as string[]).includes(what) || ((DECLINABLE as string[]).includes(what) && what !== openFact);
         if (!j.walk || !([...DECLINABLE, ...LEFT, ...LATER, ...(j.walk.again ? ['again'] : [])] as string[]).includes(what) || what === 'plan' || (what === 'review' && approvalRequired(s, j))) refused.push(`settling "${what.slice(0, 30)}"${what === 'plan' ? ': Free or Amplify is settled by choosing one' : ''}`);
         // The AI may not settle a later question; only the user, by naming it, answers one early.
-        else if (later && what !== onKind && !(SETTLE_WORDS[what] ?? /$^/).test(said ?? '')) refused.push(`settling "${what}": the open question comes first`);
+        else if (later && what !== onKind && !j.walk.parked?.includes(what) && !(SETTLE_WORDS[what] ?? /$^/).test(said ?? '')) refused.push(`settling "${what}": the open question comes first`);
         else settleQuestion(id, what);
         break;
       }

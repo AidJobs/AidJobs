@@ -25,10 +25,7 @@
   white-space: pre-wrap;
 }
 
-/*
- * A plain chat (section 19, phase 5, E): both sides on the chat's own background, no dark box for the user's message and no box or
- * outline for the reply; a faint "You" over the user's message tells them apart.
- */
+/* The archived screens' chat: both sides on the chat's own background, the user's message on the right. */
 .ej-bubble[data-from='user'] {
   margin-left: auto;
   padding: 2px 0 2px 12px;
@@ -36,14 +33,14 @@
   text-align: start;
 }
 
-.ej-bubble[data-from='user']::before {
-  content: 'You';
-  display: block;
-  margin-bottom: 1px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-3, var(--text-2));
-  opacity: 0.8;
+/*
+ * In the window (section 19, phase 6, A): the user's own messages in a soft tinted bubble on the right, never dark, readable in
+ * either theme; the reply keeps no background and no outline.
+ */
+.ej-wchat .ej-bubble[data-from='user'] {
+  padding: 7px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: color-mix(in srgb, var(--sage-5) 16%, transparent);
 }
 
 .ej-bubble[data-from='ai'] {

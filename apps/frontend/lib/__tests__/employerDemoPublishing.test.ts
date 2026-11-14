@@ -80,7 +80,7 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
     const id = toPlan();
     sendChat(id, 'Amplify');
     expect(job(id).choice).toBe('amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     expect(step(id)).toEqual({ kind: 'langs' });
     expect(last(id)?.quick).toEqual(['Add French', 'Add Arabic', 'Add Spanish', 'Add Portuguese', 'No other languages']);
     sendChat(id, 'French and Spanish');
@@ -116,9 +116,9 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
   it('a short reply the rules cannot read is asked again, never added to the text', () => {
     const id = toPlan();
     sendChat(id, 'Amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     const before = JSON.stringify(job(id).sections);
-    sendChat(id, 'Leave it');
+    sendChat(id, 'Leave it as it is');
     expect(JSON.stringify(job(id).sections)).toBe(before);
     expect(last(id)?.text).toBe("I didn't catch that for this step. Pick an answer, or tell me in your own words.");
     expect(step(id)).toEqual({ kind: 'langs' });
@@ -157,7 +157,7 @@ describe('review before Reach and the flyer: each review state (section 19, phas
   const toReview = (text?: string) => {
     const id = toPlan(text);
     sendChat(id, 'Amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     sendChat(id, 'No other languages');
     return id;
   };
@@ -313,7 +313,7 @@ describe('found on the real-AI walk (12 November 2026)', () => {
   it('Reach: the addresses given in the chat are added, the organisation’s own to the team, and “can you publish it” shows the card', () => {
     const id = toPlan();
     sendChat(id, 'Amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     sendChat(id, 'No other languages');
     sendChat(id, 'No review');
     expect(step(id)).toEqual({ kind: 'reach' });
@@ -329,7 +329,7 @@ describe('found on the real-AI walk (12 November 2026)', () => {
   it('with a language version’s tab open, the rules leave the job’s own text alone', () => {
     const id = toPlan();
     sendChat(id, 'Amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     sendChat(id, 'Add French');
     sendChat(id, 'No other languages');
     const before = JSON.stringify(job(id).sections);
@@ -343,7 +343,7 @@ describe('found on the real-AI walk (12 November 2026)', () => {
   it('"that is all" ends the languages', () => {
     const id = toPlan();
     sendChat(id, 'Amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(step(id)?.kind ?? ''); i++) sendChat(id, 'Leave it as it is');
     sendChat(id, 'That is all for languages');
     expect(step(id)).toEqual({ kind: 'review' });
   });

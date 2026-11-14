@@ -313,7 +313,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(getState().org.keepOffered).toEqual(['fixed', 'apply']);
     expect(step(id)?.kind).toBe('suggest');
     sendChat(id, 'No, thanks');
-    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it as it is');
     expect(step(id)).toEqual({ kind: 'plan' });
     expect(job(id).chat.at(-1)).toMatchObject({ step: 'plan', quick: ['Publish free', 'Amplify'] });
     expect(partsOf(job(id), getState()).filter((p) => !['plan', 'review', 'publish'].includes(p.key)).every((p) => p.done)).toBe(true);
@@ -373,7 +373,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     const first = step(id);
     expect(first?.kind).toBe('check');
     expect(job(id).chat.at(-1)?.text).toMatch(/^From the basic check: \*\*“young” in What you will bring\*\*\./);
-    expect(job(id).chat.at(-1)?.quick).toEqual(["It's a genuine requirement", 'Leave it']);
+    expect(job(id).chat.at(-1)?.quick).toEqual(["It's a genuine requirement", 'Leave it as it is']);
     sendChat(id, "It's a genuine requirement");
     expect(job(id).chat.at(-1)?.text).toBe('In a line, why is “young” a genuine requirement of this job?');
     sendChat(id, 'A graduate scheme for people under 25');
@@ -381,7 +381,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     expect(job(id).chat.at(-1)?.text).toMatch(/^From the basic check: \*\*“native speaker”/);
     sendChat(id, 'Fluent in Arabic');
     expect(job(id).sections.find((x) => x.key === 'requirements')?.lines).toContain('- Fluent in Arabic');
-    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it');
+    for (let i = 0; i < 10 && step(id)?.kind === 'check'; i++) sendChat(id, 'Leave it as it is');
     expect(step(id)).toEqual({ kind: 'plan' });
   });
 

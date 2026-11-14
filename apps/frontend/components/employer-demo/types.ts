@@ -20,6 +20,8 @@ export type Format = {
   tone: Tone;
   order: OutlineEntry[];
   commitments: string[];
+  /** The order of the five groups, when the user changed it (section 19, phase 6, B); unset, the usual order. */
+  groupOrder?: GroupKey[];
 };
 
 export type OrgType = 'ingo' | 'ngo' | 'un' | 'charity' | 'donor' | 'contractor';
@@ -76,6 +78,11 @@ export type Org = {
   /** The organisation's social links (section 19, phase 5, E): each job includes or leaves out each one. Offered once in the chat. */
   social?: string[];
   socialAsked?: boolean;
+  /**
+   * The organisation's own wording of each fixed text in each language offered (section 19, phase 6, E), used word for word, without
+   * a mark; the language the organisation writes in is `standard`.
+   */
+  fixedWording?: Partial<Record<JobLang, Record<string, string>>>;
 };
 
 /** A job's facts and choices, saved automatically when it is published, for the next job like it (managed with the profiles page, later). */
@@ -176,8 +183,26 @@ export type Sub = { id: string; title: string; lines: string[] };
  */
 export type Section = { key: string; title: string; lines: string[]; edited?: boolean; ai?: boolean; subs?: Sub[] };
 
-/** One section of a template or of a job's outline: its heading, and the headings of its sub-sections. */
-export type OutlineEntry = { key: string; heading: string; subs?: Array<{ id: string; heading: string }> };
+/**
+ * One section of a template or of a job's outline: its heading, the headings inside it, and its group when the user moved it into
+ * another one (section 19, phase 6, B).
+ */
+export type OutlineEntry = { key: string; heading: string; subs?: Array<{ id: string; heading: string }>; group?: GroupKey };
+
+/**
+ * How a job's sections are grouped (section 19, phase 6, B): the order of the five groups, and the group of each section moved into
+ * another one. The order within each group is the order of the job's `tags` (or a version's sections), always read group by group.
+ */
+export type Grouping = { groupOrder?: GroupKey[]; groupOf?: Record<string, GroupKey> };
+
+/**
+ * A fixed text on one job, in one language (section 19, phase 6, D and E): a wording for this job only (the user's, or a machine
+ * translation, marked until approved).
+ */
+export type FixedOwn = { text?: string; machine?: boolean; approved?: boolean };
+
+/** A section that a linked change could not reach without the AI: marked "to update", with the language the change came from. */
+export type ToUpdate = Record<string, JobLang>;
 
 /** What the chat asks for, each just before the first section that uses it (employer-side plan, section 19, step 4). */
 export type AskKind = 'title' | 'place' | 'contract' | 'grade' | 'eligibility' | 'languages' | 'safeguarding' | 'salary' | 'deadline' | 'method';
@@ -215,6 +240,13 @@ export type Walk = {
   doc?: Section[];
   /** Hire again: the job this one copies ("Logistics Assistant, Kampala"); the chat asks first what changes. */
   again?: string;
+  /**
+   * Questions left unanswered (section 19, phase 6, A): parked, with their "to do" mark on the progress line; `askedAgain`: how often
+   * each was asked once more; `hold`: the question just parked, so the next waits until the user replies to the flow.
+   */
+  parked?: string[];
+  askedAgain?: Record<string, number>;
+  hold?: string;
 };
 
 export type Remark = {
@@ -313,7 +345,19 @@ export type JobLang = 'en' | Lang;
  * `source`: the job's own text it was last brought up to date with; `kept`: the job's text the user chose to keep this version against
  * ("Keep the French as it is"), so the update is not offered again for it.
  */
-export type Translation = { sections: Section[]; reviewed: boolean; source: string; at: number; kept?: string };
+export type Translation = {
+  sections: Section[];
+  reviewed: boolean;
+  source: string;
+  at: number;
+  kept?: string;
+  /** Each language independent (section 19, phase 6, E): its own grouping, its fixed texts in their order, and their wording. */
+  groupOrder?: GroupKey[];
+  groupOf?: Record<string, GroupKey>;
+  commitments?: string[];
+  fixed?: Record<string, FixedOwn>;
+  toUpdate?: ToUpdate;
+};
 
 /** Free, or Amplify: the paid offer (employer-side plan, section 16). */
 export type Plan = 'free' | 'amplify';
@@ -323,6 +367,38 @@ export type JobStatus = 'draft' | 'review' | 'approved' | 'scheduled' | 'live' |
 export type AuditEntry = { at: number; who: string; what: string };
 
 export type Snapshot = { facts: Facts; sections: Section[]; at: number };
+
+/**
+ * A job's content, as one Undo step keeps it (section 19, phase 6, C): the sections and their grouping, the fixed texts and their
+ * wording, the versions, and the links; not the facts, the review, or the chat.
+ */
+export type Content = Pick<DemoJob, 'tags' | 'sections' | 'groupOrder' | 'groupOf' | 'renamed' | 'subsPlan' | 'commitments' | 'fixed' | 'translations' | 'linked' | 'toUpdate'>;
+
+/**
+ * The last change made with the icons, the outline, or a version's editor: its note, where it was made (`tab`), the content before it,
+ * and, after an unlinked edit, the other languages offered once ("Also in …"). `removed`: a section removed, noted where it was.
+ */
+export type UndoStep = {
+  text: string;
+  tab: 'doc' | JobLang;
+  before: Content;
+  keys?: string[];
+  removed?: { key: string; title: string; after: string | null };
+  also?: { langs: JobLang[]; change: LinkedChange };
+  /** Changed Organisation settings too ("Use this wording for every job"), which Undo does not undo. */
+  settings?: boolean;
+  /** A linked text change still being written by the AI: Undo waits until it is done. */
+  writing?: boolean;
+};
+
+/** A change carried into other languages, linked or by "Also in …" (section 19, phase 6, E). */
+export type LinkedChange =
+  | { kind: 'text'; key: string; from: JobLang }
+  | { kind: 'add'; key: string; after: string | null; group: GroupKey; from: JobLang }
+  | { kind: 'remove'; key: string; from: JobLang }
+  | { kind: 'move'; key: string; after: string | null; group: GroupKey; from: JobLang }
+  | { kind: 'group'; order: GroupKey[]; from: JobLang }
+  | { kind: 'fixed'; key: string; op: 'edit' | 'reset' | 'leave' | 'bring' | 'order'; from: JobLang };
 
 export type DemoJob = {
   id: string;
@@ -402,11 +478,28 @@ export type DemoJob = {
   sdgsFrom?: 'org';
   /** Headings renamed for this job only, by section; kept when the rules rebuild a section, cleared when the template changes. */
   renamed?: Record<string, string>;
-  /**
-   * The user moved a section across the five groups (section 19, phase 5, B): the job keeps its own order through reloads, and a section
-   * added without a place goes in at its group. Unset, the job follows the group order.
-   */
+  /** Saved by phase 5, when a section was moved out of the group order; brought forward into `groupOrder` and `groupOf` on load. */
   ordered?: boolean;
+  /** The grouping of the job's own language (section 19, phase 6, B): the group order, and the sections moved into another group. */
+  groupOrder?: GroupKey[];
+  groupOf?: Record<string, GroupKey>;
+  /** The fixed texts in the job's own language: a wording for this job, a machine translation, approved or not (phase 6, D and E). */
+  fixed?: Record<string, FixedOwn>;
+  /** The languages linked to each other, the job's own included: a change in one follows into the others (phase 6, E). */
+  linked?: JobLang[];
+  /** Sections of the job's own language that a linked change could not reach without the AI. */
+  toUpdate?: ToUpdate;
+  /** The last change made with the icons, the outline, or a version's editor, with its Undo. */
+  undoStep?: UndoStep;
+  /** "Use this wording for every job?" after a fixed text was worded for this job, shown until answered or passed by twice. */
+  wordingOffer?: { key: string; lang: JobLang; left: number };
+  /** After a version with machine-translated fixed texts is approved, the owner is asked once to keep them for every job. */
+  wordingAsk?: JobLang;
+  /**
+   * The fixed texts' wording as it was published, by language (section 19, phase 6, D): a later change in Organisation settings
+   * reaches new jobs and drafts only.
+   */
+  fixedPublished?: Partial<Record<JobLang, Record<string, string>>>;
   /** Sub-sections set in the outline for sections not written yet; they join their section when it is written. */
   subsPlan?: Record<string, Array<{ id: string; heading: string }>>;
   /** What the AI is told for every later request (section 19, phase 5, A). */

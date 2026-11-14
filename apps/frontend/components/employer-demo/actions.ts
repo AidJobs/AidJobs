@@ -24,11 +24,9 @@ import {
   parseIso,
   readPasted,
   allLines,
-  crossesGroups,
   inOutlineOrder,
   lengthRequest,
   outlineOrder,
-  placeIn,
   recommendSections,
   suggestTitle,
   toneRequest,
@@ -41,13 +39,49 @@ import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from 
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, planFor, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
-import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, versionChoices, versionsOf } from './translate';
+import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
-import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, FIXED_SECTIONS, isSettled, isWritten, nextStep, stepKey } from './flow';
+import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import type { ApplySettings, AskKind, ChatMsg, DeletedJob, Delivery, DemoJob, Facts, Format, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation } from './types';
+import { addToGroup, formatGrouping, grouped, groupingFrom, groupOfKey, isGrouped } from './outline';
+import type { ApplySettings, AskKind, ChatMsg, Content, DeletedJob, Delivery, DemoJob, Facts, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+
+/** A job's or a version's grouping (section 19, phase 6, B). */
+export function groupingOf(x: Grouping): Grouping {
+  return { groupOrder: x.groupOrder, groupOf: x.groupOf };
+}
+
+/** A job or a version with a new grouping, its sections read group by group. */
+export function regrouped<T extends DemoJob>(j: T, g: Grouping, tags = j.tags): T {
+  const keys = grouped(tags, g);
+  return { ...j, tags: keys, groupOrder: g.groupOrder, groupOf: g.groupOf, sections: inOutlineOrder(j.sections, keys) };
+}
+
+/** A version's sections read group by group in its own grouping. */
+export function versionGrouped(t: Translation): Translation {
+  const keys = grouped(
+    t.sections.map((x) => x.key),
+    groupingOf(t),
+  );
+  return { ...t, sections: inOutlineOrder(t.sections, keys) };
+}
+
+/** The job's content, as one Undo step keeps it (section 19, phase 6, C). */
+export function contentSnap(j: DemoJob): Content {
+  return { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate };
+}
+
+/**
+ * A change made with the icons, the outline, or a version's editor: one Undo step, replacing the last one and the last chat change.
+ * Nothing is recorded when the content did not change.
+ */
+export function stepped(before: DemoJob, after: DemoJob, text: string, tab: UndoStep['tab'], extra: Partial<UndoStep> = {}): DemoJob {
+  if (JSON.stringify(contentSnap(before)) === JSON.stringify(contentSnap(after))) return after;
+  const offer = after.wordingOffer && !extra.settings ? (after.wordingOffer.left > 1 ? { ...after.wordingOffer, left: after.wordingOffer.left - 1 } : undefined) : after.wordingOffer;
+  return { ...after, lastChange: undefined, wordingOffer: offer, undoStep: { text, tab, before: contentSnap(before), ...extra } };
+}
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
   return { id: `m${Math.random().toString(36).slice(2, 9)}`, from, text, quick, ask };
@@ -194,11 +228,14 @@ function ensureAsk(id: string) {
  * unless the last message already asks it.
  */
 function ensurePrompt(id: string) {
+  tidyParked(id);
   for (let i = 0; i < 12; i++) {
     const s = getState();
     const j = s.jobs.find((x) => x.id === id);
     const step = j ? nextStep(j, s) : null;
     if (!j || !step || (step.kind === 'setup' && step.stage === 'template')) return;
+    // A question was just parked: the next waits until the user replies to the flow, with a quiet "Next question" meanwhile.
+    if (j.walk?.hold && !['change', 'genuine', 'live', 'setup'].includes(step.kind)) return offerNext(id);
     if (step.kind === 'write') {
       const fixed = step.sections.filter((k) => FIXED_SECTIONS.includes(k));
       if (fixed.length) {
@@ -213,10 +250,107 @@ function ensurePrompt(id: string) {
     const last = j.chat[j.chat.length - 1];
     // After publishing, the link is said once; a job opened later in its state has its own message (greetState).
     if (step.kind === 'live' ? j.chat.some((m) => m.step === 'live' || m.state) : last?.from === 'ai' && last.step === key) return;
+    // Asked again at most once (section 19, phase 6, A): after a request about something else; then it is parked. An offer passed by
+    // twice counts as "Not now". A change to the section being approved is about the question, not something else.
+    const pk = parkKey(step);
+    const before = step.kind !== 'live' && j.chat.some((m) => m.from === 'ai' && m.step === key);
+    const onTopic = step.kind === 'approve' && Boolean(j.lastChange?.keys.includes(step.section));
+    const counted = pk ?? (step.kind === 'keep' ? `keep:${step.what}` : null);
+    if (before && counted && !onTopic && j.walk) {
+      const n = j.walk.askedAgain?.[counted] ?? 0;
+      if (n >= 1 && step.kind === 'keep') {
+        update((st) => ({ ...st, org: { ...st.org, keepOffered: Array.from(new Set([...(st.org.keepOffered ?? []), step.what])) } }));
+        continue;
+      }
+      if (n >= 1 && pk) {
+        park(id, pk, true);
+        continue;
+      }
+      updateJob(id, (x) => (x.walk ? { ...x, walk: { ...x.walk, askedAgain: { ...x.walk.askedAgain, [counted]: n + 1 } } } : x));
+    }
     const prompts = promptFor(s, j, formatOf(s, j.format), step, key, aiWrites());
     if (prompts.length) updateJob(id, (x) => ({ ...x, chat: [...x.chat, ...prompts] }));
     return;
   }
+}
+
+export const NEXT_QUESTION = 'Next question';
+const SKIP = /^(?:please\s+)?(?:skip(?: it| this| that| this one| for now)?|(?:maybe |ask me |do it )?later|not now|leave it(?: for now| for later)?|come back to (?:it|this|that) later)[.!]?$/i;
+const FLOW = /^(?:ok|okay|next|go on|carry on|continue|yes|sure|move on|what'?s next|and then)[.!?]?$/i;
+
+/** A message the rules answer even with the AI on: a skip at a question, or a return to the flow while the next question waits. */
+export function parkingReply(j: DemoJob, s: State, text: string): boolean {
+  const t = text.trim();
+  if (!j.walk || isPublished(j)) return false;
+  if (t === NEXT_QUESTION || (j.walk.hold && FLOW.test(t))) return true;
+  return !j.walk.hold && Boolean(parkKey(nextStep(j, s))) && SKIP.test(t);
+}
+
+/**
+ * A question parked (section 19, phase 6, A): it keeps its "to do" mark on the line and can be answered at any time. `hold`: it was
+ * left unanswered rather than skipped, so the next question waits until the user replies to the flow.
+ */
+function park(id: string, key: string, hold: boolean, said?: string) {
+  const reply = hold ? "I'll leave that for now: it stays on the line as to do, to answer there or here whenever you like." : 'Left for later: it stays on the line as to do.';
+  updateJob(id, (x) =>
+    x.walk
+      ? {
+          ...x,
+          walk: { ...x.walk, parked: Array.from(new Set([...(x.walk.parked ?? []), key])), hold: hold ? key : undefined },
+          chat: [...x.chat, ...(said ? [msg('user', said)] : []), msg('ai', reply, hold ? [NEXT_QUESTION] : undefined)],
+        }
+      : x,
+  );
+}
+
+/** While the next question waits, the last reply offers "Next question". */
+function offerNext(id: string) {
+  updateJob(id, (x) => {
+    const last = x.chat[x.chat.length - 1];
+    if (last?.from !== 'ai' || last.quick?.includes(NEXT_QUESTION)) return x;
+    return { ...x, chat: [...x.chat.slice(0, -1), { ...last, quick: [...(last.quick ?? []), NEXT_QUESTION] }] };
+  });
+}
+
+/** Parked questions answered since by any route leave the list. */
+function tidyParked(id: string) {
+  const s = getState();
+  const j = s.jobs.find((x) => x.id === id);
+  const w = j?.walk;
+  if (!j || !w?.parked?.length) return;
+  const open = new Set(checkPoints(j, s).map((p) => `check:${p.key}`));
+  const still = w.parked.filter((k) => (k.startsWith('approve:') ? !w.approved.includes(k.slice(8)) : k.startsWith('check:') ? open.has(k) : !isSettled(k, j)));
+  if (still.length !== w.parked.length) updateJob(id, (x) => (x.walk ? { ...x, walk: { ...x.walk, parked: still.length ? still : undefined, hold: x.walk.hold && still.includes(x.walk.hold) ? x.walk.hold : undefined } } : x));
+}
+
+/** A part opened from the progress line: the questions it holds are un-parked, their count starting again, and the chat goes on. */
+export function unparkPart(id: string, part: string) {
+  const j = getState().jobs.find((x) => x.id === id);
+  const keys = j ? parkedIn(part, j) : [];
+  if (!j?.walk || !keys.length || !ownerOnly()) return;
+  updateJob(id, (x) => {
+    if (!x.walk) return x;
+    const parked = (x.walk.parked ?? []).filter((k) => !keys.includes(k));
+    // -1: the question asked on being un-parked is a first ask again, not a repeat.
+    const askedAgain = { ...x.walk.askedAgain, ...Object.fromEntries(keys.map((k) => [k, -1])) };
+    return { ...x, walk: { ...x.walk, parked: parked.length ? parked : undefined, askedAgain, hold: undefined } };
+  });
+  ensureAsk(id);
+}
+
+/**
+ * The rules ask the open question once more, with `reply`; asked again already, it is parked instead (a reply the rules cannot read
+ * counts as none fitting).
+ */
+function askAgain(j: DemoJob, step: Step, said: string, reply: ChatMsg): boolean {
+  const pk = parkKey(step);
+  const n = pk ? (j.walk?.askedAgain?.[pk] ?? 0) : 0;
+  if (pk && n >= 1) {
+    park(j.id, pk, true, said);
+    return true;
+  }
+  updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', said), reply], ...(pk && x.walk ? { walk: { ...x.walk, askedAgain: { ...x.walk.askedAgain, [pk]: n + 1 } } } : {}) }));
+  return true;
 }
 
 /** Sections written by the rules, in the job's order: the fixed ones as they are reached, and the others when the AI is off. */
@@ -418,8 +552,7 @@ export function startAsUsual(id: string, said?: string) {
       if (j.id !== id || j.setup !== 'template' || !j.walk) return j;
       const format = formatOf(s, usualTemplate(s, j.id)?.key ?? j.format);
       const style = proposedStyle(s);
-      const tags = outlineOrder(orderSections(recommendSections(format, j.facts), format));
-      const base: DemoJob = { ...j, format: format.key, tone: toneOf(style), style, tags, commitments: fixedFor(s, format), part: undefined, walk: { ...j.walk, pace } };
+      const base: DemoJob = { ...regrouped(j, formatGrouping(format), orderSections(recommendSections(format, j.facts), format)), format: format.key, tone: toneOf(style), style, commitments: fixedFor(s, format), part: undefined, walk: { ...j.walk, pace } };
       const reply = `Starting with your ${format.label}, written ${describeStyle(style)}, ${pace === 'step' ? 'one section at a time' : 'all of it first'}. Say "${pace === 'step' ? 'write it all' : 'one section at a time'}", or ask for another template, whenever you like.`;
       return { ...startWriting(s, base, pace), chat: [...j.chat, ...(said ? [msg('user', said)] : []), msg('ai', reply)] };
     }),
@@ -451,7 +584,10 @@ export function startFromProfile(id: string, profileId: string, said?: string) {
         facts,
         family: p.family,
         format: format.key,
+        // A job profile has no fields for the grouping (section 19, phase 6): it keeps only its sections.
         tags: outlineOrder(p.tags.filter((k) => SECTION_BY_KEY[k])),
+        groupOrder: undefined,
+        groupOf: undefined,
         style,
         tone: toneOf(style),
         apply: { ...p.apply },
@@ -497,17 +633,20 @@ export function setPace(id: string, pace: Pace, said?: string) {
   ensureAsk(id);
 }
 
-/** Puts the chosen template on a job that is waiting for one, and asks for the style. `tags`: the sections of a template the user built. */
-export function applyTemplate(id: string, formatKey: string, said?: string, tags?: string[]) {
+/**
+ * Puts the chosen template on a job that is waiting for one, and asks for the style. `tags`: the sections of a template the user built
+ * or adjusted, with its `grouping` (section 19, phase 6, B); a flat order without one is read as the grouping it shows.
+ */
+export function applyTemplate(id: string, formatKey: string, said?: string, tags?: string[], grouping?: Grouping) {
   if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
-      // The sections as adjusted in the template panel keep the user's order, across groups too (section 19, phase 5, B).
       const keys = tags ?? orderSections(recommendSections(format, j.facts), format);
-      const next: DemoJob = { ...j, format: format.key, tone: format.tone, tags: keys, ordered: crossesGroups(keys) || undefined, commitments: fixedFor(s, format), part: undefined };
+      const g = grouping ?? (tags && !isGrouped(tags, formatGrouping(format)) ? groupingFrom(tags) : formatGrouping(format));
+      const next: DemoJob = { ...regrouped({ ...j, ordered: undefined }, g, keys), format: format.key, tone: format.tone, commitments: fixedFor(s, format), part: undefined };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
       const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
@@ -609,7 +748,7 @@ export function headingOf(s: State, j: DemoJob, key: string): string {
  * outline editor): sections added, removed, put in order (across groups too, since phase 5), renamed for this job, and their
  * sub-sections. Text already written is kept where its section, or sub-section, stays.
  */
-export function applyOutline(id: string, order: Format['order']) {
+export function applyOutline(id: string, order: Format['order'], groupOrder?: Format['groupOrder']) {
   if (!ownerOnly()) return;
   const job = () => getState().jobs.find((x) => x.id === id);
   const start = job();
@@ -617,7 +756,11 @@ export function applyOutline(id: string, order: Format['order']) {
   const want = order.map((o) => o.key);
   for (const k of start.tags) if (!want.includes(k) && (job()?.tags.length ?? 0) > 1) toggleSection(id, k);
   for (const k of want) if (!job()?.tags.includes(k)) toggleSection(id, k);
-  reorderSections(id, want.filter((k) => job()?.tags.includes(k)));
+  const g = formatGrouping({ order, groupOrder });
+  updateJob(id, (j) => {
+    const next = regrouped(j, g, want.filter((k) => j.tags.includes(k)));
+    return next.tags.join() === j.tags.join() && JSON.stringify(groupingOf(next)) === JSON.stringify(groupingOf(j)) ? j : touched(next);
+  });
   for (const o of order) {
     const j = job();
     const heading = o.heading.trim();
@@ -1108,7 +1251,7 @@ export function setPart(id: string, part: string) {
 }
 
 const APPROVE = /^(?:yes|yep|yeah|ok|okay|good|great|fine|perfect|lovely|looks good|that'?s (?:good|fine|great)|that works|next|approve(?:d)?|done|all good|happy with (?:it|that)|move on|go on|continue)(?:[,.!\s]+(?:thanks|thank you|next|please|move on|go on|good))*[.!]?$/i;
-const NO_MORE = /^(?:none|no|nope|nothing|skip|not now|that'?s all|that is all|all done|no more|no,? thanks?)\b/i;
+const NO_MORE = /^(?:none|no|nope|nothing|not needed|that'?s all|that is all|all done|no more|no,? thanks?)\b/i;
 const POSITIVE = /\b(?:good|great|fine|perfect|lovely|nice|excellent|brilliant|ok|okay|yes|yep|yeah|sounds good|looks (?:good|great|fine|right)|happy|approve[ds]?|go ahead|next|all set|that works|no changes?|keep it)\b/i;
 const BUT = /\b(?:but|not|instead|except|however|change|rather|though|although|missing|wrong)\b/i;
 
@@ -1147,6 +1290,35 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     setPace(j.id, pace, text);
     return true;
   }
+  // The question just parked: the user comes back to the flow ("ok", "next"), or answers it; anything else is a request (section 19, phase 6, A).
+  const held = j.walk.hold;
+  const resume = () => updateJob(j.id, (x) => (x.walk ? { ...x, walk: { ...x.walk, hold: undefined } } : x));
+  if (t === NEXT_QUESTION || (held && FLOW.test(t))) {
+    resume();
+    updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text)] }));
+    return true;
+  }
+  if (held) {
+    const read = (ASKS as string[]).includes(held) ? readAnswer(held as AskKind, t, s, j) : null;
+    if (read) {
+      resume();
+      if (read.method) setMethod(j.id, read.method, text, read.address);
+      else answerFact(j.id, read.patch, text, held as AskKind);
+      return true;
+    }
+    if (held.startsWith('approve:') && isApprovalReply(t)) {
+      resume();
+      approveSection(j.id, held.slice(8), text);
+      return true;
+    }
+    return false;
+  }
+  // One way to skip, everywhere: "skip", "later", "not now", "leave it" park the question; "no" and "none" still decline it.
+  const pk = parkKey(step);
+  if (pk && SKIP.test(t)) {
+    park(j.id, pk, false, text);
+    return true;
+  }
   const format = formatOf(s, j.format);
   switch (step.kind) {
     case 'change':
@@ -1170,7 +1342,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       const read = readAnswer(step.fact, t, s, j);
       if (read?.method) setMethod(j.id, read.method, text, read.address);
       else if (read) answerFact(j.id, read.patch, text, step.fact);
-      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 6) updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', `I couldn't read that. ${WALK_ASK[step.fact]}`, undefined, step.fact), step: stepKey(step) }] }));
+      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 6) return askAgain(j, step, text, { ...msg('ai', `I couldn't read that. ${WALK_ASK[step.fact]}`, undefined, step.fact), step: stepKey(step) });
       else return false;
       return true;
     }
@@ -1178,8 +1350,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       if (t === ALL_GOOD || /\bapprove (?:all|the rest|everything)\b/i.test(t)) approveRest(j.id, text);
       else if (isApprovalReply(t)) approveSection(j.id, step.section, text);
       // A short reply that is neither an approval nor a change is asked again; it is never added to the text.
-      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 3)
-        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', `I didn't catch that. Is **${headingOf(s, x, step.section)}** good as it is, or what should change?`, [GOOD]), step: stepKey(step) }] }));
+      else if (!EDIT_WORDS.test(t) && !isRequest(t) && t.split(/\s+/).length <= 3) return askAgain(j, step, text, { ...msg('ai', `I didn't catch that. Is **${headingOf(s, j, step.section)}** good as it is, or what should change?`, [GOOD]), step: stepKey(step) });
       else return false;
       return true;
     case 'again':
@@ -1198,7 +1369,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     case 'sdgs':
       if (t === orgGoalsAnswer(s) || /^(?:yes|ok|okay|sure|please do|use (?:them|our|the organisation'?s|your))\b/i.test(t)) applyOrgSdgs(j.id, text);
       else if (t === CHOOSE_SDGS) updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', "Pick up to three in the dialog; I'll go on once they're set."), step: 'sdgs' }] }));
-      else if (t === NO_SDGS || /^(?:no|none|nope|skip|not now)\b/i.test(t)) settle(j.id, 'sdgs', text, 'Fine: no SDGs on this job. You can add them from Details at any time.');
+      else if (t === NO_SDGS || /^(?:no|none|nope)\b/i.test(t)) settle(j.id, 'sdgs', text, 'Fine: no SDGs on this job. You can add them from Details at any time.');
       else return false;
       return true;
     case 'fixed': {
@@ -1225,7 +1396,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     }
     case 'keep':
       if (t === KEEP_ALL || /^(?:yes|ok|okay|sure|keep (?:it|them)|every job|all jobs)\b/i.test(t)) keepForAll(j.id, step.what, true, text);
-      else if (t === THIS_JOB || /^(?:no|just this|only this|this job)\b/i.test(t)) keepForAll(j.id, step.what, false, text);
+      else if (t === THIS_JOB || /^(?:no|just this|only this|this job|not now)\b/i.test(t)) keepForAll(j.id, step.what, false, text);
       else return false;
       return true;
     case 'suggest': {
@@ -1243,7 +1414,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     }
     case 'check': {
       const p = step.point;
-      if (t === LEAVE_IT || /^(?:leave(?! out\b)|ignore|skip)\b|^(?:keep it|it'?s fine)\b/i.test(t)) {
+      if (t === LEAVE_IT || /^(?:leave it as it is|ignore)\b|^(?:keep it|it'?s fine)\b/i.test(t)) {
         leavePoint(j.id, p.key, text);
         return true;
       }
@@ -1363,8 +1534,7 @@ function unclear(j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, tex
   const t = text.trim();
   if (EDIT_WORDS.test(t) || isRequest(t) || t.split(/\s+/).length > 6) return false;
   const last = [...j.chat].reverse().find((m) => m.from === 'ai' && m.step === stepKey(step));
-  updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), { ...msg('ai', "I didn't catch that for this step. Pick an answer, or tell me in your own words.", last?.quick), step: stepKey(step), ...(last?.card ? { card: last.card } : {}) }] }));
-  return true;
+  return askAgain(j, step, text, { ...msg('ai', "I didn't catch that for this step. Pick an answer, or tell me in your own words.", last?.quick), step: stepKey(step), ...(last?.card ? { card: last.card } : {}) });
 }
 
 function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof nextStep>>, text: string): boolean {
@@ -1432,7 +1602,7 @@ function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof n
         return true;
       }
       if (t === INVITE || /^(?:yes|ok|okay|sure|invite)\b/i.test(t)) settle(j.id, 'reach', text, 'The invitations are in the Reach tab: add the people, check both emails, and save. They go when the job goes live.');
-      else if (t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
+      else if (t === NO_THANKS || t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
       else return false;
       return true;
     }
@@ -1554,7 +1724,8 @@ function chatTurn(id: string, text: string, focus?: string) {
     return;
   }
   const edit0 = applyEdit(text, j.tags, j.sections, ctxFor(s, j), s.today, focus);
-  const edit = { ...edit0, sections: edit0.sections.map((sec) => inLanguage(sec, edit0.facts, jobLang(j))) };
+  const tags0 = grouped(edit0.tags, groupingOf(j));
+  const edit = { ...edit0, tags: tags0, sections: inOutlineOrder(edit0.sections.map((sec) => inLanguage(sec, edit0.facts, jobLang(j))), tags0) };
   const factsChanged = JSON.stringify(edit.facts) !== JSON.stringify(j.facts);
   const result = factsChanged ? { ...edit, sections: rebuilt(s, { ...j, sections: edit.sections, tags: edit.tags, tone: edit.tone, facts: edit.facts }).sections } : edit;
   if (JSON.stringify([result.sections, result.tags, result.tone, result.facts]) === JSON.stringify([j.sections, j.tags, j.tone, j.facts])) {
@@ -1571,6 +1742,7 @@ function chatTurn(id: string, text: string, focus?: string) {
     versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: text.slice(0, 60), sections: result.sections }],
     chat: [...x.chat, userMsg, msg('ai', result.reply + (hasApproval(x) ? ' This changes the approved version, so the approval is reset.' : ''), result.quick)],
     lastChange: changedKeys(x.sections, result.sections).length ? { keys: changedKeys(x.sections, result.sections), text: result.reply, before: x.sections, beforeTags: x.tags, beforeFacts: x.facts, beforeTone: x.tone } : undefined,
+    undoStep: undefined,
   }));
 }
 /** Sections whose text is new or different after a change. */
@@ -1587,8 +1759,10 @@ function undone(x: DemoJob): DemoJob {
 
 /** The job with an earlier version's text; the outline follows the text, so the two never disagree. */
 function atVersion(x: DemoJob, sections: DemoJob['sections'], note: string): DemoJob {
-  const keys = sections.map((sec) => sec.key);
-  const tags = x.ordered ? keys : outlineOrder(keys);
+  const tags = grouped(
+    sections.map((sec) => sec.key),
+    groupingOf(x),
+  );
   return { ...touched(x), tags, sections: inOutlineOrder(sections, tags), versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note, sections }] };
 }
 
@@ -1600,7 +1774,22 @@ export function undoLastChange(id: string) {
 }
 
 export function dismissChange(id: string) {
-  updateJob(id, (x) => ({ ...x, lastChange: undefined }));
+  updateJob(id, (x) => ({ ...x, lastChange: undefined, undoStep: undefined }));
+}
+
+/**
+ * Undo for the last change made with the icons, the outline, or a version's editor (section 19, phase 6, C): the job's content comes
+ * back as it was, in every language, with the links; the facts, the review, and the chat stay. Organisation settings changed by "Use
+ * this wording for every job" stay too. It waits while a linked translation is still being written.
+ */
+export function undoStep(id: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (x) => {
+    const st = x.undoStep;
+    if (!st || st.writing) return x;
+    const back: DemoJob = { ...touched(x), ...st.before, ...liveEdit(x), undoStep: undefined, wordingOffer: undefined };
+    return { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
+  });
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
@@ -1625,8 +1814,9 @@ export function toggleSection(id: string, key: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
-      const tags = has ? j.tags.filter((t) => t !== key) : placeIn(j.tags, key);
-      const next = touched({ ...j, tags });
+      const added = has ? null : addToGroup(j.tags, groupingOf(j), key);
+      const tags = added ? added.keys : j.tags.filter((t) => t !== key);
+      const next = touched({ ...j, tags, ...(added ? groupingOf(added.grouping) : {}) });
       if (!j.sections.length) return next;
       const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, withTemplateSubs(s, j, built(key, ctxFor(s, next), j))], tags);
       const title = has ? j.sections.find((x) => x.key === key)?.title : sections.find((x) => x.key === key)?.title;
@@ -1636,17 +1826,19 @@ export function toggleSection(id: string, key: string) {
 }
 
 /**
- * Puts some of a job's sections in a new order, keeping the places the others hold. Any section may move anywhere (section 19, phase 5,
- * B): once one moves out of the group order, the job keeps its own order from then on.
+ * Puts some of a job's sections in a new order, keeping the places the others hold, always read group by group (section 19, phase 6,
+ * B): each section stays in its group; moving one into another group is `moveSection`.
  */
 export function reorderSections(id: string, keys: string[]) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const queue = [...keys];
-    const tags = j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t));
+    const tags = grouped(
+      j.tags.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t)),
+      groupingOf(j),
+    );
     if (tags.join() === j.tags.join()) return j;
-    const sections = inOutlineOrder(j.sections, tags);
-    return { ...touched(j), tags, ordered: j.ordered || crossesGroups(tags), sections: j.sections.length ? sections : j.sections };
+    return touched(regrouped(j, groupingOf(j), tags));
   });
 }
 
@@ -1659,9 +1851,12 @@ export function applyFormat(id: string, formatKey: string) {
       const format = formatOf(s, formatKey);
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const wanted = orderSections([...format.order.map((o) => o.key), ...extras], format);
-      // A job the user has put in their own order keeps it: its sections stay where they are, and the new template's go in by placeIn.
-      const tags = j.ordered ? wanted.filter((k) => !j.tags.includes(k)).reduce((acc, k) => placeIn(acc, k), j.tags.filter((k) => wanted.includes(k))) : wanted;
-      const next = { ...touched(j), renamed: undefined, ordered: (j.ordered && crossesGroups(tags)) || undefined, format: format.key, tone: format.tone, tags, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+      // A job the user has grouped in their own way keeps it: its sections stay where they are, and the new template's join their groups.
+      const own = Boolean(j.groupOrder || j.groupOf);
+      const placed = own
+        ? wanted.filter((k) => !j.tags.includes(k)).reduce((acc, k) => addToGroup(acc.keys, acc.grouping, k), { keys: j.tags.filter((k) => wanted.includes(k)), grouping: groupingOf(j) })
+        : { keys: grouped(wanted, formatGrouping(format)), grouping: formatGrouping(format) };
+      const next = { ...regrouped(touched(j), placed.grouping, placed.keys), renamed: undefined, ordered: undefined, format: format.key, tone: format.tone, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
       return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
     }),
   }));
@@ -2022,8 +2217,8 @@ export function applyFix(id: string, fix: Fix, label: string) {
       if (fix.kind === 'facts') return withFacts(st, x, { ...x.facts, ...fix.patch });
       if (fix.kind === 'language') {
         const langs = x.facts.languages.length ? x.facts.languages : ['English'];
-        const tags = x.tags.includes('languages') ? x.tags : outlineOrder([...x.tags, 'languages']);
-        const next = withFacts(st, { ...x, tags }, { ...x.facts, languages: langs.includes(fix.lang) ? langs : [...langs, fix.lang] });
+        const added = addToGroup(x.tags, groupingOf(x), 'languages');
+        const next = withFacts(st, { ...x, tags: added.keys, ...groupingOf(added.grouping) }, { ...x.facts, languages: langs.includes(fix.lang) ? langs : [...langs, fix.lang] });
         return { ...next, versions: [...next.versions, { n: next.versions.length + 1, at: Date.now(), note: label, sections: next.sections }] };
       }
       const sections = x.sections.map((sec) => (sec.key === fix.section ? { ...sec, lines: fix.lines, edited: true } : sec));
@@ -2039,7 +2234,7 @@ export function addTranslation(id: string, lang: JobLang) {
   const j0 = s.jobs.find((x) => x.id === id);
   if (!j0 || lang === jobLang(j0) || j0.translations?.[lang]) return;
   const english = englishFor(s, j0);
-  updateJob(id, (j) => ({ ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: draftTranslation(j, lang, english, s.org.about) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
+  updateJob(id, (j) => ({ ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: versionGrouped({ ...draftTranslation(j, lang, english, s.org.about), ...groupingOf(j), commitments: [...j.commitments] }) }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version drafted (simulated)` }] }));
 }
 
 /** "Update the French too": brings a version up to date with the job's own text, keeping the wording of lines whose source did not change. */
@@ -2101,7 +2296,17 @@ export function addVersionSection(id: string, lang: JobLang, key: string) {
   if (!j0 || !t0 || t0.sections.some((x) => x.key === key)) return;
   const drafted = draftVersionSection(j0, key, lang, englishFor(s, j0));
   const sec: Section = drafted ?? { key, title: headingIn(key, lang) ?? headingFor(key, formatOf(s, j0.format)), lines: [] };
-  updateJob(id, (j) => withVersion(j, lang, (t) => ({ ...t, sections: inOutlineOrder([...t.sections, sec], outlineOrder([...t.sections.map((x) => x.key), key])) })));
+  updateJob(id, (j) =>
+    withVersion(j, lang, (t) => {
+      const placed = addToGroup(
+        t.sections.map((x) => x.key),
+        groupingOf(t),
+        key,
+        j.tags.includes(key) ? groupOfKey(groupingOf(j), key) : undefined,
+      );
+      return { ...t, ...groupingOf(placed.grouping), sections: inOutlineOrder([...t.sections, sec], placed.keys) };
+    }),
+  );
 }
 
 export function removeVersionSection(id: string, lang: JobLang, key: string) {
@@ -2109,13 +2314,16 @@ export function removeVersionSection(id: string, lang: JobLang, key: string) {
   updateJob(id, (j) => withVersion(j, lang, (t) => (t.sections.length > 1 ? { ...t, sections: t.sections.filter((x) => x.key !== key) } : t)));
 }
 
-/** A version's sections in a new order, within their groups as in every JD format. */
+/** A version's sections in a new order, each within its group in the version's own grouping. */
 export function reorderVersionSections(id: string, lang: JobLang, keys: string[]) {
   if (!ownerOnly()) return;
   updateJob(id, (j) =>
     withVersion(j, lang, (t) => {
       const queue = [...keys];
-      const order = outlineOrder(t.sections.map((x) => (keys.includes(x.key) ? (queue.shift() ?? x.key) : x.key)));
+      const order = grouped(
+        t.sections.map((x) => (keys.includes(x.key) ? (queue.shift() ?? x.key) : x.key)),
+        groupingOf(t),
+      );
       return { ...t, sections: inOutlineOrder(t.sections, order) };
     }),
   );
@@ -2128,8 +2336,10 @@ export function writeVersionSection(id: string, lang: JobLang, key: string, line
 }
 
 /**
- * The job's own language, changed only when the user asks (section 19): the rules' sections are written again in it; text written by
- * hand or by the AI stays as it is, for the AI or the user to rewrite. A version in that language is no longer needed, so it goes.
+ * The job's own language, changed only when the user asks (section 19). With a version in that language, the two change places (phase
+ * 6): the version's text, grouping, and fixed texts become the job's own, and the old own language becomes a version with its own, so
+ * nothing written is lost. Without one, the rules' sections are written again in it; text written by hand or by the AI stays as it is,
+ * for the AI or the user to rewrite.
  */
 export function setJobLang(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
@@ -2138,8 +2348,17 @@ export function setJobLang(id: string, lang: JobLang) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id || jobLang(j) === lang) return j;
       const rest = { ...j.translations };
+      const swap = rest[lang];
       delete rest[lang];
-      const next: DemoJob = { ...touched(j), lang, translations: rest, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `Written in ${langOf(lang).label} from now on` }] };
+      const audit = [...j.audit, { at: Date.now(), who: s.me.name, what: `Written in ${langOf(lang).label} from now on` }];
+      if (swap) {
+        const keys = swap.sections.map((x) => x.key);
+        const own = regrouped({ ...touched(j), lang, audit, tags: keys, sections: swap.sections, commitments: swap.commitments ?? j.commitments, fixed: swap.fixed, toUpdate: swap.toUpdate }, groupingOf(swap), keys);
+        const old: Translation = { sections: j.sections, reviewed: swap.reviewed, source: sourceOf(own), at: swap.at, ...groupingOf(j), commitments: j.commitments, fixed: j.fixed, toUpdate: j.toUpdate };
+        return { ...own, translations: { ...rest, [jobLang(j)]: old } };
+      }
+      const fixed = Object.fromEntries(Object.entries(j.fixed ?? {}).filter(([, f]) => !f.machine));
+      const next: DemoJob = { ...touched(j), lang, translations: rest, audit, fixed: Object.keys(fixed).length ? fixed : undefined };
       return rebuilt(s, next);
     }),
   }));
@@ -2360,6 +2579,9 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs) return 'Only your organisation can publish';
   if (j.status === 'live' || j.status === 'scheduled' || j.status === 'closed') return 'Already published';
+  // What a job cannot go out without (section 19, phase 6, A), by every route: the card, the Publish part, and scheduling.
+  const missing = essentials(j);
+  if (missing.length) return `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}`;
   if (approvalRequired(s, j) && !approvedFor(s, j)) return 'Waiting for approval';
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
@@ -2967,6 +3189,13 @@ export function hireAgain(id: string, place?: string): string | null {
     scheduledFor: undefined,
     payRequest: undefined,
     lastChange: undefined,
+    // The grouping and the fixed texts' wording for the job are copied (section 19, phase 6); the link between languages is not.
+    linked: undefined,
+    toUpdate: undefined,
+    undoStep: undefined,
+    wordingOffer: undefined,
+    wordingAsk: undefined,
+    fixedPublished: undefined,
     // The copy keeps the text and the context it came from, not the old job's open cards; a variant for another place leaves its project.
     pageDraft: undefined,
     suggestions: undefined,

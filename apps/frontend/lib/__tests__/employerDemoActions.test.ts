@@ -71,7 +71,7 @@ import {
   setJobLang,
   writeVersionSection,
 } from '../../components/employer-demo/actions';
-import { article, daysUntil, isoDay, longDate, parseIso } from '../../components/employer-demo/engine';
+import { addDays, article, daysUntil, isoDay, longDate, parseIso } from '../../components/employer-demo/engine';
 import { jobUrl } from '../../components/employer-demo/links';
 import { needsYou, statusLine } from '../../components/employer-demo/Home';
 import { goLive, planFor, REACH_EMAILS, reachMoment, reachUsed, recipientsOf } from '../../components/employer-demo/invites';
@@ -84,6 +84,8 @@ import { getState, normalise, resetDemo, undo, update } from '../../components/e
 import type { DemoJob } from '../../components/employer-demo/types';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
+/** The sample draft has no closing date, which a job cannot go out without (section 19, phase 6, A). */
+const dated = (id: string) => setFacts(id, { deadline: addDays(getState().today, 30) });
 const blocked = (id: string) => approvalRequired(getState(), job(id)) && !isApproved(job(id));
 const outlineMatchesDocument = (id: string) => expect(job(id).sections.map((x) => x.key)).toEqual(job(id).tags);
 
@@ -456,9 +458,10 @@ describe('fixes from the round 5 review', () => {
   const waitingReach = () => ({ candidates: [{ email: 'a@example.org', status: 'waiting' as const, round: 1 }], team: [], rounds: [{ n: 1, at: Date.now(), why: 'At go-live', sendsOn: isoDay(getState().today + DAY) }], candidateMsg: { subject: 's', body: 'b', closing: 'c' }, teamMsg: { subject: 's', body: 'b', closing: 'c' } });
 
   it('1. the free standard listing is once per organisation: after one free job went live, another free job is refused (phase 5, D)', () => {
+    dated('job-comms');
     expect(publish('job-comms', { plan: 'free', schedule: null })).toBe(true);
     expect(getState().free.standard).toBe('job-comms');
-    const other = startJob('Hiring a Driver in Goma, closing in 3 weeks');
+    const other = startJob('Hiring a Driver in Goma, fixed-term, closing in 3 weeks');
     expect(publishBlock(getState(), other, { plan: 'free', schedule: null })).toBe('Your free standard listing is used');
     update((s) => ({ ...s, today: s.today + 400 * DAY }));
     expect(publishBlock(getState(), other, { plan: 'free', schedule: null })).toBe('Your free standard listing is used');
@@ -620,11 +623,11 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   it('the sample uses neither; one free job goes live, and any later free job is refused for good', () => {
     expect(state('standard')).toBe('available');
     expect(state('amplify')).toBe('available');
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(free(a)).toBe(true);
     expect(allowance(getState(), 'standard')).toEqual({ state: 'used', jobId: a });
     expect(state('amplify')).toBe('available');
-    const b = startJob('Hiring a Driver in Goma, closing in 3 weeks');
+    const b = startJob('Hiring a Driver in Goma, fixed-term, closing in 3 weeks');
     expect(canGoFree(getState(), b)).toBe(false);
     expect(publishBlock(getState(), b, { plan: 'free', schedule: null })).toBe('Your free standard listing is used');
     expect(free(b)).toBe(false);
@@ -632,18 +635,18 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('a free job may be scheduled for any day from tomorrow before it closes, with no month limit', () => {
-    const b = startJob('Hiring a Driver in Goma, closing in 10 weeks');
+    const b = startJob('Hiring a Driver in Goma, fixed-term, closing in 9 weeks');
     expect(publishBlock(getState(), b, { plan: 'free', schedule: day(40) })).toBeNull();
     expect(free(b, day(40))).toBe(true);
     expect(job(b).status).toBe('scheduled');
   });
 
   it('scheduled, a free job holds the free standard: given back when taken back, withdrawn, or deleted; used only when it goes live', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     expect(free(a, day(5))).toBe(true);
     expect(allowance(getState(), 'standard')).toEqual({ state: 'held', jobId: a });
     expect(getState().free.standard).toBeUndefined();
-    const b = startJob('Hiring a Driver in Goma, closing in 6 weeks');
+    const b = startJob('Hiring a Driver in Goma, fixed-term, closing in 6 weeks');
     expect(publishBlock(getState(), b, { plan: 'free', schedule: null })).toBe('Your free standard listing is used');
     expect(backToDraft(a)).toBe(true);
     expect(state('standard')).toBe('available');
@@ -653,7 +656,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
     expect(free(b, day(4))).toBe(true);
     expect(deleteJob(b)).toBe(true);
     expect(state('standard')).toBe('available');
-    const c = startJob('Hiring a Cook in Goma, closing in 6 weeks');
+    const c = startJob('Hiring a Cook in Goma, fixed-term, closing in 6 weeks');
     expect(free(c, day(5))).toBe(true);
     update((s) => goLive({ ...s, today: parseIso(day(5)) }));
     expect(job(c).status).toBe('live');
@@ -661,17 +664,18 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('a scheduled free job published now uses the free standard at once', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     free(a, day(3));
     expect(publishNow(a)).toBe(true);
     expect(getState().free.standard).toBe(a);
   });
 
   it('paying uses neither free listing, whatever is published first', () => {
+    dated('job-comms');
     buy('one', 'Communications Intern');
     expect(publish('job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe(true);
     buy('three');
-    const b = startJob('Hiring a Driver in Goma, closing in 6 weeks');
+    const b = startJob('Hiring a Driver in Goma, fixed-term, closing in 6 weeks');
     expect(publish(b, { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(true);
     expect(state('standard')).toBe('available');
     expect(state('amplify')).toBe('available');
@@ -679,7 +683,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('the free Amplify: everything a paid Amplify has, with no payment, once; a second Amplify job is paid', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     const receipts = getState().receipts.length;
     expect(usesFreeAmplify(getState(), job(a))).toBe(true);
     expect(publish(a, { plan: 'amplify', schedule: null, paid: 'free' })).toBe(true);
@@ -689,7 +693,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
     expect(getState().receipts.length).toBe(receipts);
     expect(allowance(getState(), 'amplify')).toEqual({ state: 'used', jobId: a });
     expect(state('standard')).toBe('available');
-    const b = startJob('Hiring a Driver in Goma, closing in 6 weeks');
+    const b = startJob('Hiring a Driver in Goma, fixed-term, closing in 6 weeks');
     expect(usesFreeAmplify(getState(), job(b))).toBe(false);
     expect(publishBlock(getState(), b, { plan: 'amplify', schedule: null, paid: 'free' })).toBe('Your free Amplify is used');
     expect(publishBlock(getState(), b, { plan: 'amplify', schedule: null, paid: 'direct' })).toBeNull();
@@ -697,7 +701,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
 
   it('the free Amplify needs a verified organisation, by every route', () => {
     update((s) => ({ ...s, org: { ...s.org, verified: false } }));
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     expect(canAmplifyFree(getState(), a)).toBe(false);
     expect(publishBlock(getState(), a, { plan: 'amplify', schedule: null, paid: 'free' })).toBe('Verify your organisation to amplify');
     expect(free(a)).toBe(true);
@@ -706,7 +710,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('a live free job is amplified with the free Amplify, without payment: used at once; the free standard stays used', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     expect(free(a)).toBe(true);
     const receipts = getState().receipts.length;
     expect(amplifyLive(a, 'free')).toBe(true);
@@ -716,7 +720,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('a scheduled free job amplified with the free Amplify holds it until its date and gives the free standard back; back to draft returns both', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     expect(free(a, day(5))).toBe(true);
     expect(amplifyLive(a, 'free')).toBe(true);
     expect(allowance(getState(), 'amplify')).toEqual({ state: 'held', jobId: a });
@@ -730,7 +734,7 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('once gone live, a free listing stays used: deleting, closing, or paying later gives nothing back', () => {
-    const a = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const a = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     free(a);
     buy('five');
     expect(amplifyLive(a, 'onHand')).toBe(true);
@@ -741,8 +745,10 @@ describe('free listings: one standard and one Amplify, each once per organisatio
   });
 
   it('an amplified job is listed 100 days, a free one 60, never past the closing date', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term');
     expect(job(id).facts.deadline).toBe('');
+    // A job cannot go out without a closing date (phase 6, A): one beyond both listing periods.
+    setFacts(id, { deadline: addDays(getState().today, 150) });
     free(id);
     const today = getState().today;
     expect(daysUntil(today, listedUntil(job(id), today))).toBe(60);
@@ -758,20 +764,20 @@ describe('packages and the subscription', () => {
     buy('three');
     expect(paidJobsLeft(getState())).toBe(3);
     expect(getState().packs[0].ends).toBe(addMonths(isoDay(getState().today), 2));
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(publish(id, { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(true);
     expect(paidJobsLeft(getState())).toBe(2);
     expect(getState().receipts[0].amount).toContain('US$66');
   });
 
   it('without a paid job on hand, "onHand" is refused', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(publish(id, { plan: 'amplify', schedule: null, paid: 'onHand' })).toBe(false);
     expect(amplifyLive('job-meal', 'onHand')).toBe(false);
   });
 
   it('a package job amplifies a live free job; the free standard it used stays used, and the free Amplify stays available', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     publish(id, { plan: 'free', schedule: null });
     expect(canGoFree(getState(), 'other')).toBe(false);
     buy('five');
@@ -807,7 +813,7 @@ describe('publishing without approval', () => {
   beforeEach(() => update((s) => ({ ...s, org: { ...s.org, approval: 'all' } })));
 
   it('needs approval first; the owner can skip it with a reason, kept in the history', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(publishBlock(getState(), id, { plan: 'free', schedule: null })).toBe('Waiting for approval');
     expect(canSkipApproval(getState(), job(id))).toBe(true);
     expect(overrideApproval(id, 'no')).toBe(false);
@@ -819,7 +825,7 @@ describe('publishing without approval', () => {
   });
 
   it('a skipped approval is reset by a later change, and is not "published" until it is', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     overrideApproval(id, 'The donor deadline is today');
     editSection(id, job(id).sections[1].key, 'Changed after skipping');
     expect(job(id).review.skipped).toBeUndefined();
@@ -828,7 +834,7 @@ describe('publishing without approval', () => {
 
   it('"Nobody can skip approval" removes the override', () => {
     update((s) => ({ ...s, org: { ...s.org, noSkip: true } }));
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(canSkipApproval(getState(), job(id))).toBe(false);
     expect(overrideApproval(id, 'The donor deadline is today')).toBe(false);
     expect(publish(id, { plan: 'free', schedule: null })).toBe(false);
@@ -836,7 +842,7 @@ describe('publishing without approval', () => {
 
   it('only the owner can skip it, never a member', () => {
     update((s) => ({ ...s, me: { ...s.me, role: 'member' } }));
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(overrideApproval(id, 'The donor deadline is today')).toBe(false);
   });
 });
@@ -854,7 +860,7 @@ describe('the market check', () => {
   });
 
   it('a short window gets a later closing date on a working day, and Undo puts it back', () => {
-    const id = startJob('Hiring a WASH Officer in Nairobi, closing in 1 week, fixed-term');
+    const id = startJob('Hiring a WASH Officer in Nairobi, fixed-term, closing in 1 week, fixed-term');
     const before = job(id).facts.deadline;
     const point = marketCheck(job(id), getState(), null).points.find((p) => p.key === 'window');
     expect(point?.ok).toBe(false);
@@ -880,7 +886,7 @@ describe('the market check', () => {
   });
 
   it('a language most similar jobs ask for is added as desirable, with its section', () => {
-    const id = startJob('Hiring a Programme Manager in Goma, closing in 5 weeks, fixed-term');
+    const id = startJob('Hiring a Programme Manager in Goma, fixed-term, closing in 5 weeks, fixed-term');
     const point = marketCheck(job(id), getState(), null).points.find((p) => p.key === 'language');
     expect(point?.fix?.label).toBe('Add French as desirable');
     applyFix(id, point!.fix!.fix, point!.fix!.label);
@@ -1155,14 +1161,14 @@ describe('Reach', () => {
   });
 
   it('a paid job sends at go-live; a free job sends nothing and keeps the plan', () => {
-    const paid = startJob('Hiring a Shelter Officer in Goma, closing in 4 weeks');
+    const paid = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 4 weeks');
     planned(paid, ['a@example.org', 'b@example.org'], ['grace@riverstone.example.org']);
     buy('one', 'Shelter Officer');
     publish(paid, { plan: 'amplify', schedule: null, paid: 'direct' });
     expect(job(paid).reach?.rounds).toEqual([expect.objectContaining({ n: 1, why: 'At go-live' })]);
     expect([...job(paid).reach!.candidates, ...job(paid).reach!.team].map((r) => r.status)).toEqual(['queued', 'queued', 'queued']);
     expect(job(paid).reachPlan).toBeUndefined();
-    const free = startJob('Hiring a Driver in Goma, closing in 4 weeks');
+    const free = startJob('Hiring a Driver in Goma, fixed-term, closing in 4 weeks');
     planned(free, ['c@example.org']);
     publish(free, { plan: 'free', schedule: null });
     expect(job(free).reach).toBeNull();
@@ -1170,7 +1176,7 @@ describe('Reach', () => {
   });
 
   it('a scheduled job sends on its date, when it goes live', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     planned(id, ['a@example.org']);
     buy('one', 'Shelter Officer');
     const date = isoDay(getState().today + 3 * 86_400_000);
@@ -1251,6 +1257,7 @@ describe('Ask to pay', () => {
   });
 
   it('it can amplify a live free job, and paying yourself closes the request', () => {
+    dated('job-comms');
     expect(askToPay('job-meal', { ...request, item: 'Amplify: MEAL Coordinator' })).toBe(true);
     expect(completePayRequest('job-meal')).toBe(true);
     expect(job('job-meal').plan).toBe('amplify');
@@ -1262,7 +1269,7 @@ describe('Ask to pay', () => {
 
   it('not while approval is still needed; cancelled, it is gone; reviewers cannot ask', () => {
     update((s) => ({ ...s, org: { ...s.org, approval: 'all' } }));
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     expect(askToPay(id, request)).toBe(false);
     askToPay('job-fin', request);
     cancelPayRequest('job-fin');
@@ -1281,6 +1288,7 @@ describe('fixes from the round 4 review', () => {
   };
 
   it('1. a reviewer answering after the job is published never takes it off the site', () => {
+    dated('job-comms');
     sendForReview('job-comms', amina, '2026-12-01', 'any', '');
     expect(publish('job-comms', { plan: 'free', schedule: null })).toBe(true);
     asReviewer('amina', () => reviewerDecision('job-comms', 'changes', 'Too late'));
@@ -1289,14 +1297,14 @@ describe('fixes from the round 4 review', () => {
   });
 
   it('2. a scheduled or live job is not sent for review', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 6 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 6 weeks');
     publish(id, { plan: 'free', schedule: isoDay(getState().today + 3 * 86_400_000) });
     sendForReview(id, amina, '2026-12-01', 'any', '');
     expect(job(id).status).toBe('scheduled');
   });
 
   it('3 and 5. a schedule date in the past, today, or on or after the closing date is refused', () => {
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 1 week');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 1 week');
     const day = (n: number) => isoDay(getState().today + n * 86_400_000);
     expect(publishBlock(getState(), id, { plan: 'free', schedule: day(-40) })).toBe('Choose a date from tomorrow');
     expect(publishBlock(getState(), id, { plan: 'free', schedule: day(0) })).toBe('Choose a date from tomorrow');
@@ -1363,6 +1371,7 @@ describe('fixes from the round 4 review', () => {
   });
 
   it('15. an unverified organisation cannot amplify, by any route', () => {
+    dated('job-comms');
     update((s) => ({ ...s, org: { ...s.org, verified: false } }));
     expect(publishBlock(getState(), 'job-comms', { plan: 'amplify', schedule: null, paid: 'direct' })).toBe('Verify your organisation to amplify');
     expect(amplifyLive('job-meal', 'direct')).toBe(false);
@@ -1375,7 +1384,7 @@ describe('fixes from the round 4 review', () => {
 
   it('re-review A. a reviewer answering after the owner skipped approval replaces the skip', () => {
     update((s) => ({ ...s, org: { ...s.org, approval: 'all' } }));
-    const id = startJob('Hiring a Shelter Officer in Goma, closing in 3 weeks');
+    const id = startJob('Hiring a Shelter Officer in Goma, fixed-term, closing in 3 weeks');
     sendForReview(id, amina, '2026-12-01', 'any', '');
     overrideApproval(id, 'The donor deadline is today');
     asReviewer('amina', () => reviewerDecision(id, 'approved', ''));
@@ -1385,6 +1394,7 @@ describe('fixes from the round 4 review', () => {
   });
 
   it('re-review B. a late request for changes on a published job leaves nothing waiting', () => {
+    dated('job-comms');
     sendForReview('job-comms', amina, '2026-12-01', 'any', '');
     publish('job-comms', { plan: 'free', schedule: null });
     asReviewer('amina', () => reviewerDecision('job-comms', 'changes', ''));

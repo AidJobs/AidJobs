@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, parkingReply, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -646,10 +646,11 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
       <button type="button" className="aj-pill sr-only focus:not-sr-only focus:m-2" onClick={onSkip}>
         Skip to the job description
       </button>
-      <div className="aj-scroll flex min-h-0 flex-1 flex-col gap-2 px-4 py-3" role="log" aria-label="Conversation with AidJobs" aria-live="polite">
+      <div className="ej-wchat aj-scroll flex min-h-0 flex-1 flex-col gap-2 px-4 py-3" role="log" aria-label="Conversation with AidJobs" aria-live="polite">
         {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or open a part of it.</p>}
         {shown.map((m, i) => (
           <div key={m.id} className="ej-bubble" data-from={m.from}>
+            {m.from === 'user' && <span className="sr-only">You said: </span>}
             <Reveal id={m.id} text={m.text} active={m.from === 'ai' && m === last && !born.has(m.id)} render={rich} />
             {m.ai && m.by && (
               <span className="ej-ai-by">
@@ -690,6 +691,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
           <>
             {!waiting?.first && (
               <div className="ej-bubble" data-from="user">
+                <span className="sr-only">You said: </span>
                 {waiting?.text}
               </div>
             )}
@@ -1009,6 +1011,7 @@ function JobWindow({ id }: { id: string }) {
   const goPart = (key: string) => {
     settleAsk(job.id);
     setPartsOpen(false);
+    if (!reviewing) unparkPart(job.id, key);
     // Reviewers read the outline in the job description itself; they cannot reorder it.
     if (key === 'outline' && reviewing) {
       if (phone) setView('job');
@@ -1174,6 +1177,7 @@ function JobWindow({ id }: { id: string }) {
       return chatNote(job.id, text, 'Choose who reviews it, by when, and under which rule; the email they get is shown before you send.', undefined, 'review');
     }
     if (text === CHOOSE_SDGS) setFact('sdgs');
+    if (parkingReply(job, s, text)) return byRules(text);
     const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
     if (aiOn() && !rulesAnswer) {
       void askAi(job.id, text, { focus: focus ?? undefined, version: inVersion, open: (x) => openRef.current(x) }).then((done) => {

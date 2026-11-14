@@ -261,7 +261,7 @@ describe('employer demo: never calls the network', () => {
     shows('Free Amplify: used');
 
     act(() => {
-      const id2 = startJob('Hiring a Finance Officer in Kampala, closing in 4 weeks');
+      const id2 = startJob('Hiring a Finance Officer in Kampala, fixed-term, closing in 4 weeks');
       const j2 = getState().jobs.find((j) => j.id === id2)!;
       setReachPlan(id2, { ...planFor(j2, getState().org), candidates: ['a@example.org'] });
       publish(id2, { plan: 'amplify', paid: 'direct', schedule: null });
@@ -394,7 +394,7 @@ describe('employer demo: the conversation', () => {
     act(() => resetDemo());
     let id = '';
     act(() => {
-      id = startJob('Hiring a Logistics Officer in Goma, closing in 3 weeks');
+      id = startJob('Hiring a Logistics Officer in Goma, fixed-term, closing in 3 weeks');
     });
     expect(getState().free).toEqual({});
     act(() => sendForReview(id, [{ name: 'Amina Yusuf', email: 'amina@riverstone.example.org', outside: false }], '2026-11-20', 'any', ''));
@@ -1584,7 +1584,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('#ej-part-card [role="radiogroup"][aria-label="Free or Amplify"]')).not.toBeNull();
     click('Amplify');
     expect(job(id).choice).toBe('amplify');
-    for (let i = 0; i < 10 && ['market', 'full'].includes(nextStep(job(id), getState())?.kind ?? ''); i++) click('Leave it');
+    for (let i = 0; i < 10 && ['market', 'full'].includes(nextStep(job(id), getState())?.kind ?? ''); i++) click('Leave it as it is');
     click('Add French');
     const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
     expect(tabs()).toContain('Français');

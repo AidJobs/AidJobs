@@ -201,7 +201,7 @@ function PointList({ job, points, kind, owner }: { job: DemoJob; points: Point[]
                 )}
                 {job.walk && (
                   <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => leaveAmplifyPoint(job.id, kind, p.key)}>
-                    Leave it
+                    Leave it as it is
                   </button>
                 )}
               </div>
