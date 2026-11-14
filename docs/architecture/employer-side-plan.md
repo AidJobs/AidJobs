@@ -422,7 +422,7 @@ Then one independent review of the round, its fixes, and the user's look on the 
 9. **Review, preview, payment, publishing**, all from the chat, under section 16's rules: send for review (the emails in a panel tab; the review rule, due date, outside reviewers' links, Remind; suggestions accepted or rejected by the author; changes since the last round marked). Where approval is required, publishing waits for it, with its override for the owner or an admin; "approved with a request for changes" offers Publish anyway as today. The Preview tab; payment in a panel tab, with "Ask someone to pay" (with Remind and Cancel, not while approval is needed); publish now or schedule; Reach prepared before and sent at go-live; afterwards the job's link with Copy, and for a free job "Amplify to invite people directly".
 10. **Kept for next time (the user's decision, 8 November 2026):**
     - **Organisation-wide text** (the fixed text, How to apply, the JD format and tone): the first time it comes up while writing a job, the chat offers it to edit, or to save for reuse. A note says it can be locked and reused with each job; once saved it is applied automatically to each new job of the organisation (jobs already published keep their text), and changed afterwards only on the Organisation settings page. Offered to people allowed to change the organisation's settings; for others it applies to this job only. The base JD format keeps section 15 G's rule: offered, never applied on its own, and "Not now" respected.
-    - **Job profiles** (the role's facts and choices): saved automatically, with a visible note and Undo. How they are managed is planned with the saved job profiles page, later.
+    - **Job profiles** (the role's facts and choices): saved automatically, with a visible note and Undo. How they are managed is Phase 7 (the saved job profiles page).
 
 ### A returning employer
 
@@ -498,7 +498,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
 - [x] **Phase 3, free or Amplify and everything after:** steps 8 and 9 (Amplify's parts, language tabs, review, preview, payment, Reach, publishing and scheduling) and step 10 (kept for next time). (Built 12 November 2026, the plan approved by the user the same day: `8ce8589`, `53f3869`, `fc4819c`, `f62832c`, and this record. **The user's decisions on the plan:** with the AI on, the AI writes the language versions (the demo's table when it is off); package and subscription jobs include two language versions (a placeholder). The steps were built as one commit rather than two, as they share the window's new cards and parts.
   **The rules of 8 November 2026, now built:** a free job is used only when it is published or scheduled (sending for review and downloading no longer count; the free terms say so); a copy can be downloaded once a free job is published or a paid job is paid, and otherwise the reason is given. Every job has its own language, read from the role as typed and shown and changed in Details ("Written in"); the rules' sections are put into it by the demo's table, and the AI writes in it. Versions are offered in every other language, English included; each keeps its own sections; a change to the job is not carried over, and the version offers "Update the changed lines" or "Keep it as it is", staying public until then. A free job has its own language only; Amplify includes one version (two with a package job), each further one US$5, in the job's payment or bought after publishing; only those paid for are public.
   **How it works:** after the basic check, the steps go on in `flow.ts`: Free or Amplify; with Amplify, the market check and the full advert check point by point, the languages and each version's review (its tab opens; with the AI on, the AI writes it), the flyer, and Reach; then review where it is asked for or required (waiting, Remind, the next round, publishing without approval for the owner); then publishing; then the link. Each is also its part on the line ("Free or Amplify", "Market check", "Full check", "Languages", "Flyer", "Reach", "Review", "Publish"), whose fields in the panel do the same without the chat. The panel's tabs open only when needed: each version, the flyer, the Reach emails, the review email, Payment. **Nothing is published, paid, or sent by the chat:** a card under the chat's message, and the Publish part, hold the one button that says exactly what happens ("Amplify and publish · US$66 for 3 jobs"); only the latest card is live. Publishing covers now or a date (a free job within its month, the one-time "I understand"), one job or a package, extra languages in the same payment, the simulated checkout and its failure path, Ask someone else to pay (Remind, Cancel, the payer's page), and afterwards the link with Copy, the Reach status, or "Amplify to invite people directly". Overview, Manage jobs, and the earlier workspace open the window at Publish (a live free job: to amplify it); the old Check and publish page is no longer linked and stays reachable by its address until phase 4.
-  **Step 10:** the first time, the owner is offered to keep the fixed text and the way to apply for every job; each new job then starts with them, changed only in Organisation settings ("Kept for every job"); others are not offered it. The fixed text is confirmed once per language (in the demo its wording stays as the settings have it). A job profile (the role's facts and choices, without its dates) is saved when a job is published, with a notice and Undo; how profiles are managed is planned with their page, later.
+  **Step 10:** the first time, the owner is offered to keep the fixed text and the way to apply for every job; each new job then starts with them, changed only in Organisation settings ("Kept for every job"); others are not offered it. The fixed text is confirmed once per language (in the demo its wording stays as the settings have it). A job profile (the role's facts and choices, without its dates) is saved when a job is published, with a notice and Undo; how profiles are managed is Phase 7.
   **The AI:** told each new step and the figures it needs (free jobs left, prices, packages, the versions included, approval, Reach's people and messages, whether a copy can be downloaded, the version in view); new checked actions: the plan, the package, the date, check points, language versions and their sections, Reach with only addresses the user gave and team emails on the organisation's domain, keeping for every job, the job's language, and showing a card. It has no action that publishes, pays, or sends. With a version's tab open, its section changes are carried out on that version.
   **Checks:** 936 tests pass (897 before); new tests for each rule, shown failing on the earlier code. Tests that drove the old page through its links were moved to the window (the Amplify button in Manage jobs, the earlier workspace's steps); none removed. The tests of the old order were rewritten to the new steps. Type check, lint, and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark, by a headless browser driven outside the repository; they found the Free or Amplify choice shown twice (the chat's cards are now compact), an old card showing the job as it is now (only the latest is live), the upgrade offered before it was asked for, and a stray reply added to the text and resetting an approval (a short reply the rules cannot read is now asked again).
   **Real-AI walk** (locally, with the demo key from the vault into the dev server only): GPT-6.1 Terra through steps 6 to 9 four times and a version written in full, and Claude Sonnet 5.5 through review and scheduling; about 35 calls answered, 2 to 10 seconds each. Spent: about US$0.40 by the earlier rounds' per-call costs (an estimate; OpenRouter's page has the exact figure). OpenRouter answered some calls with 429 (rate limited); the rules answered those, as designed, and the route's log now says why a call gave no text, without any text. The walk found, all fixed and tested: the AI adding the job's Languages section when asked for versions; the walk going on after publishing; "leave that one too" at the basic check added to the text; "that is all" not ending the languages; addresses typed at Reach not added by the rules; the AI unable to reword the invitation without its text; a request in a version's tab changing the job's own text when the rules answered.
@@ -530,7 +530,9 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **The AI:** new checked actions to move a section into a group and to move a group, only when the user asked to move something (reordering stays within groups); removing How to apply refused; `fixed_text` acts on the language in view and the linked ones, refuses a locked text, words a text for the job only with the user's own words, and translates only where the organisation has no wording; told what is parked and whether the next question waits, the group of each section, the fixed texts in view, and a linked change to carry; its changes follow the links, and it has no action for the link itself; its instructions name the four icons and the outline's controls. The context of a full job with versions and per-language data stays under 80,000 characters (tested).
   **Found while building, fixed and tested:** a template change dropped How to apply (a template without it) and the sections the user had added; the rules' chat removed How to apply when asked; the link list's words ran together; the Also-in note lacked its sentence break.
   **Checks:** 1,131 tests pass (1,070 before; 61 new). On the earlier code (`3cf77a5`) the two new test files cannot load, their modules not existing; with only the new pure modules left in place, every rule test fails there except four guards of what must not change (a job in the group order left as it was, what waits not parked, a change by the rules still marking a version behind, reviewers seeing no icons) and the new modules' own tests. Tests changed with this plan, none removed: the chat's look test; phase 5's five outline and order tests, now moves into a group, always grouped; the fixed-text tests (confirmed once per language, now the organisation's wording or a mark; a locked text left out, now refused; the Fixed text part's tick box); the walk tests' "Leave it", now "Leave it as it is"; the template panel's and the phone's outline tests (a heading renamed by clicking it); the reviewers' window test (the outline read only); and about 40 test jobs given a contract or a closing date, which publishing now needs. Type check, lint (no errors; no warnings in the demo), and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark (72), by a headless browser driven outside the repository: the chat's bubble, the draft's icons, a grip's menu, the outline panel and the phone's sheet, the fixed texts with the offer, the Also-in note, a linked version, the link list, and Organisation settings; no sideways scroll. Keyboard and screen reader: every icon labelled; Enter on a grip opens its menu with the focus inside, the arrow keys move through it, Escape gives the focus back; the arrow keys on a grip move its section and the move is announced; the + panel takes the focus and gives it back. **Not run:** the real-AI walk, as the AI is off in this working copy and the preview's OpenRouter account answers 402 (payment required); the AI's rules here are covered by tests.
-  **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
+  **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 7 (managing saved profiles), then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
+
+- [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with Undo, and Use for a new job through today's `startFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked (light fact edit; menu beside Organisation settings; carry grouping). No code in this step until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
 
@@ -565,7 +567,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
    - Their tests keep running; new tests check that every former link opens the window.
 5. **Checks as before:** tests for each rule (shown failing on the earlier code), type check, lint, a production build, screens at 1366, 412, 390, and 360 px in light and dark, a push for the preview, and this record and the ledger.
 
-**Later:** managing saved profiles (their page); the user's journey assessment of the whole demo, which waits until phase 5 and its review are done.
+**Later:** managing saved profiles (Phase 7); the user's journey assessment of the whole demo, which waits until the generator leftovers and their reviews are done.
 
 ### Phase 5 plan (approved by the user, 13 November 2026, rewritten after both reviews)
 
@@ -692,7 +694,7 @@ Tests for each rule, each shown failing on the earlier code, including: About us
 
 #### H. Not in this phase
 
-Managing saved profiles; a projects list in Organisation settings; replacing the role families with the survey's library; Hindi and other local languages; token allowances; vouching; reading more than one page of a site; a public title suggested for an internal code; the user's assessment of the whole demo, which follows this phase and its review.
+Managing saved profiles (Phase 7); a projects list in Organisation settings; replacing the role families with the survey's library; Hindi and other local languages; token allowances; vouching; reading more than one page of a site; a public title suggested for an internal code; the user's assessment of the whole demo, which follows the generator leftovers and their reviews.
 
 ### Phase 6 plan (the user's decisions of 14 November 2026, rewritten after two independent reviews; approved by the user)
 
@@ -904,7 +906,104 @@ Tests that change with this plan, each listed when changed: the chat's look test
 
 #### I. Not in this phase
 
-Sections with names of the user's own beyond the available ones (not wanted: the user, 14 November 2026); managing saved profiles; a projects list in Organisation settings; the user's assessment of the whole demo, which follows this phase and its review.
+Sections with names of the user's own beyond the available ones (not wanted: the user, 14 November 2026); managing saved profiles (Phase 7); a projects list in Organisation settings; the user's assessment of the whole demo, which follows Phase 7 and its review.
+
+### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026)
+
+**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. No code in this step. One independent review of this plan before the build (the project's rule); then the build on `demo/employer` in the order in section G. The merge rule does not apply: `demo/employer` is never merged.
+
+**What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
+
+**Design rule.** Maximum flexibility without confusion. One quiet list. Icons and tooltips, not a dashboard of cards. A profile is "how we hire this role," not another job draft.
+
+#### A. Where it lives
+
+A side-menu item **Job profiles**, with Organisation settings, Team, and JD formats — not inside the create window, and not a tab on Manage jobs. Manage jobs is live work; profiles are reuse for the next write. Mixing them would confuse Hire again with "Same as last time."
+
+Route: `#profiles` / `#profiles/<id>`. Owner and members who can create jobs may open it; reviewers must not reach or use it (same gate as creating and publishing a job: refuse when `reviewerAs` is set). The menu entry is hidden while viewing as a reviewer.
+
+#### B. The list
+
+Quiet two-line rows, hairlines, no card chrome — the Manage jobs language:
+
+- Line 1: the name the chat already uses (`Juba Finance Officer`), or the profile's display name when one has been set (section D).
+- Line 2: JD format · N sections · when saved (relative).
+
+Search (icon → field, like Manage jobs). Group only if it helps: by title, or All + search. No status chips, no lifelines.
+
+On each row: one quiet next step **Use for a new job**, and ⋯ → Rename, Delete. On phones, the same actions visible; no new gesture language.
+
+Empty state: one sentence — profiles appear when you publish; Hire again is for copying text.
+
+#### C. Opening one profile
+
+Same quiet panel language as Organisation settings / fixed texts — not the create window.
+
+Shows, read as facts (not a fake JD):
+
+- Name (editable in place, Enter or leave to save) — this is what the chat says next time
+- Place, format, style, section list (headings only)
+- Contract, grade, eligibility, languages, safeguarding, pay, how to apply, commitments
+- "From [job title]" with a link to that job if it still exists
+
+Actions: **Use for a new job** (primary), Delete (⋯ or quiet control). No Approve, no Publish, no language tabs.
+
+#### D. What you can change (and what you must not)
+
+| Action | Rule |
+|---|---|
+| Rename | Yes — a display name for the chat offer (an optional `name` on the profile; when unset, the chat still uses city + title as today). Renaming does not change the title+place match used when publishing replaces a profile. |
+| Delete | Yes — with Undo notice (same pattern as `unprofile`) |
+| Use for a new job | Yes — starts a new job in the window and runs today's `startFromProfile` |
+| Edit facts on the profile | Yes, lightly — same pickers as Details (contract, grade, pay, apply, commitments, and the other facts the profile already keeps). Saves the profile only; does not change past jobs |
+| Edit section **text** | No — that is Hire again |
+| Duplicate | No — publishing another job already creates or replaces |
+| Manual "Save as profile" from a draft | Not in this phase — keep automatic-on-publish; avoids two ways to save |
+
+**Overwrite rule stays:** publishing a job with the same title and place replaces that profile. The page always shows the newest. The notice after publish still offers Undo (forget).
+
+#### E. Bring forward from phase 6 (one small data fix)
+
+Today a profile keeps `tags` only, not grouping. After phase 6, "Same as last time" drops the arrangement.
+
+When saving (`profileOf` / publish), also keep `groupOrder` / `groupOf`, and restore them in `startFromProfile`. Section **text** still stays out. Older profiles without grouping behave as today (template / default grouping).
+
+#### F. The chat and the AI
+
+- Offer text unchanged in spirit; if the profile was renamed, the chat uses the new name (`profileName` prefers `name` when set).
+- From the page, "Use for a new job" is the same as accepting "Same as last time," after a new job is started for that profile's role.
+- AI: may open or start from a profile the user named; may not invent, delete, or rewrite profiles unasked. Delete only when the user asked.
+- Context: a short list of profile names and ids, not full fact dumps every turn.
+
+#### G. Build order
+
+1. Data: grouping on save and start; optional display name; rename; delete with Undo; bring-forward of old profiles unchanged.
+2. The list page (menu, search, rows, empty state, Use / Rename / Delete); hide from reviewers.
+3. The open profile (facts, light edit, link back to the source job).
+4. Wire "Use for a new job" through the existing start path; chat name follows rename.
+5. AI: instructions and refusals for this surface.
+6. Checks, push to `demo/employer` (never merge), plan record and W-51.
+
+One independent review of this plan before the build; one of the phase after.
+
+#### H. Checks (each with a test that fails on today's code)
+
+- Publish still saves; same title and place replaces; Undo forgets
+- List shows sample and published profiles; search; empty state
+- Rename changes the chat's "Same as your last …" name
+- Delete with Undo; a deleted profile is not offered
+- Use for a new job → window with facts and sections from the profile; dates still asked
+- Light fact edit on the profile does not change the source job
+- Grouping round-trips on a new save; an old profile without grouping still starts
+- Reviewers never reach the page
+- No AidJobs backend fetch
+
+Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard through the list and the open profile. Type check, lint, and a production build. Then the preview on `demo/employer`, never merged, and one independent review of the phase.
+
+#### I. Not in this phase
+
+A projects list in Organisation settings; replacing the role families with the survey's library; Hire again changes; saving profiles from drafts by hand; a profile that holds full JD text; the user's assessment of the whole demo and the real-AI walk (they follow this phase and its review).
+
 
 ### Phase 3, revised (the user's decisions, 12 November 2026)
 
