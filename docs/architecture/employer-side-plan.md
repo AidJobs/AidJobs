@@ -532,7 +532,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **Checks:** 1,131 tests pass (1,070 before; 61 new). On the earlier code (`3cf77a5`) the two new test files cannot load, their modules not existing; with only the new pure modules left in place, every rule test fails there except four guards of what must not change (a job in the group order left as it was, what waits not parked, a change by the rules still marking a version behind, reviewers seeing no icons) and the new modules' own tests. Tests changed with this plan, none removed: the chat's look test; phase 5's five outline and order tests, now moves into a group, always grouped; the fixed-text tests (confirmed once per language, now the organisation's wording or a mark; a locked text left out, now refused; the Fixed text part's tick box); the walk tests' "Leave it", now "Leave it as it is"; the template panel's and the phone's outline tests (a heading renamed by clicking it); the reviewers' window test (the outline read only); and about 40 test jobs given a contract or a closing date, which publishing now needs. Type check, lint (no errors; no warnings in the demo), and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark (72), by a headless browser driven outside the repository: the chat's bubble, the draft's icons, a grip's menu, the outline panel and the phone's sheet, the fixed texts with the offer, the Also-in note, a linked version, the link list, and Organisation settings; no sideways scroll. Keyboard and screen reader: every icon labelled; Enter on a grip opens its menu with the focus inside, the arrow keys move through it, Escape gives the focus back; the arrow keys on a grip move its section and the move is announced; the + panel takes the focus and gives it back. **Not run:** the real-AI walk, as the AI is off in this working copy and the preview's OpenRouter account answers 402 (payment required); the AI's rules here are covered by tests.
   **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 7 (managing saved profiles), then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
 
-- [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with Undo, and Use for a new job through today's `startFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked (light fact edit; menu beside Organisation settings; carry grouping). No code in this step until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
+- [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with restore Undo, and Use for a new job through `startJobFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked; rewritten the same day after the independent plan review (changes needed; every finding taken with the reviewer’s defaults). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
 
@@ -908,9 +908,9 @@ Tests that change with this plan, each listed when changed: the chat's look test
 
 Sections with names of the user's own beyond the available ones (not wanted: the user, 14 November 2026); managing saved profiles (Phase 7); a projects list in Organisation settings; the user's assessment of the whole demo, which follows Phase 7 and its review.
 
-### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026)
+### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. No code in this step. One independent review of this plan before the build (the project's rule); then the build on `demo/employer` in the order in section G. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. The merge rule does not apply: `demo/employer` is never merged.
 
 **What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
 
@@ -918,22 +918,24 @@ Sections with names of the user's own beyond the available ones (not wanted: the
 
 #### A. Where it lives
 
-A side-menu item **Job profiles**, with Organisation settings, Team, and JD formats — not inside the create window, and not a tab on Manage jobs. Manage jobs is live work; profiles are reuse for the next write. Mixing them would confuse Hire again with "Same as last time."
+A side-menu item **Job profiles**, inserted immediately before Organisation settings (with Team and JD formats) — not inside the create window, and not a tab on Manage jobs. Manage jobs is live work; profiles are reuse for the next write. Mixing them would confuse Hire again with "Same as last time."
 
-Route: `#profiles` / `#profiles/<id>`. Owner and members who can create jobs may open it; reviewers must not reach or use it (same gate as creating and publishing a job: refuse when `reviewerAs` is set). The menu entry is hidden while viewing as a reviewer.
+Route: `#profiles` / `#profiles/<id>`. Add `case 'profiles'` in `EmployerDemo` before `default`, and put `profiles` in the same scroll list as Manage jobs and Organisation settings. `#profiles` is the list; `#profiles/<id>` is the open profile when that id exists; an unknown id shows the list and one line that the profile is gone. The menu item stays active for both.
+
+**Reviewer gate.** Hide **Job profiles** when `reviewerAs` is set. A direct `#profiles` or `#profiles/<id>` while `reviewerAs` is set shows one refusal sentence and runs no list, edit, rename, delete, or start. Every new profile action returns immediately when `reviewerAs` is set. Do not copy Create a job's menu (Create stays visible today while viewing as a reviewer). Do not add a `me.role` check: the demo never switches `me` to a member; the only extra view is `reviewerAs`.
 
 #### B. The list
 
 Quiet two-line rows, hairlines, no card chrome — the Manage jobs language:
 
-- Line 1: the name the chat already uses (`Juba Finance Officer`), or the profile's display name when one has been set (section D).
-- Line 2: JD format · N sections · when saved (relative).
+- Line 1: the display name (`profileName`: the optional `name` when set, otherwise city + title as today).
+- Line 2: JD format · N sections (keys that will actually start) · when saved (a small local phrase: today, yesterday, or N days ago; no new dependency).
 
-Search (icon → field, like Manage jobs). Group only if it helps: by title, or All + search. No status chips, no lifelines.
+No groups and no status tabs. Search reuses the Manage jobs control (icon → field; Escape or the cross clears and returns focus to the icon). Placeholder: "Search by name, title, or place". Search matches display name, title, place, and format label.
 
-On each row: one quiet next step **Use for a new job**, and ⋯ → Rename, Delete. On phones, the same actions visible; no new gesture language.
+The row opens `#profiles/<id>`. **Use for a new job** is the row's next-step button; ⋯ is Rename and Delete, including at 390 px. No swipe. If the format key is no longer in `formats`, the row says so and **Use for a new job** is disabled (the chat already does not offer such a profile).
 
-Empty state: one sentence — profiles appear when you publish; Hire again is for copying text.
+Empty `profiles`: one sentence that profiles appear when you publish, and Hire again is for copying text. A search with no match: "No profile matches …".
 
 #### C. Opening one profile
 
@@ -941,64 +943,73 @@ Same quiet panel language as Organisation settings / fixed texts — not the cre
 
 Shows, read as facts (not a fake JD):
 
-- Name (editable in place, Enter or leave to save) — this is what the chat says next time
-- Place, format, style, section list (headings only)
-- Contract, grade, eligibility, languages, safeguarding, pay, how to apply, commitments
-- "From [job title]" with a link to that job if it still exists
+- Name (editable in place; Enter or blur saves; Escape cancels and leaves the previous name) — this is what the chat says next time
+- Place, format, style, section list (headings only: the format's headings for the saved keys), language when `lang` is set and is not English (read-only; no language tabs)
+- Contract, grade, eligibility, languages, safeguarding, pay, how to apply, commitments (editable as in D)
+- "From [job title]" with a link via `openJob` when that job is still in `jobs`; otherwise the line has no link
 
-Actions: **Use for a new job** (primary), Delete (⋯ or quiet control). No Approve, no Publish, no language tabs.
+Actions: **Use for a new job** (primary; disabled when the format is gone), Delete (⋯ or quiet control). No Approve, no Publish, no language tabs. Opening a profile moves focus into it; Back, close, and delete return focus to that row, or to the list heading if the row is gone.
 
 #### D. What you can change (and what you must not)
 
 | Action | Rule |
 |---|---|
-| Rename | Yes — a display name for the chat offer (an optional `name` on the profile; when unset, the chat still uses city + title as today). Renaming does not change the title+place match used when publishing replaces a profile. |
-| Delete | Yes — with Undo notice (same pattern as `unprofile`) |
-| Use for a new job | Yes — starts a new job in the window and runs today's `startFromProfile` |
-| Edit facts on the profile | Yes, lightly — same pickers as Details (contract, grade, pay, apply, commitments, and the other facts the profile already keeps). Saves the profile only; does not change past jobs |
+| Rename | Yes — an optional `name` string for the chat offer. Blank or whitespace clears it. `profileName` returns `name` when it has non-whitespace text, otherwise city + title as today. Renaming does not change id, title, location, `at`, or the title+place match used when publishing replaces a profile. |
+| Delete | Yes — with Undo that restores. Extend `Notice` with `restoreProfile` holding the removed profile. Delete removes it from `profiles`, shows one Undo notice, and does **not** set `unprofile` (`unprofile` still means forget a profile just saved on publish). Undo inserts that same object back (same id) unless a profile with the same title and place was saved in the meantime; then Undo does not overwrite it. After a successful Undo the profile is offered again. Deleting while a publish notice is open replaces that notice (one notice only). |
+| Use for a new job | Yes — through `startJobFromProfile(profileId)` (section D below), not by calling `startFromProfile` alone |
+| Edit facts on the profile | Yes, lightly — see the editable list below. Saves the profile only; does not change past jobs |
 | Edit section **text** | No — that is Hire again |
 | Duplicate | No — publishing another job already creates or replaces |
 | Manual "Save as profile" from a draft | Not in this phase — keep automatic-on-publish; avoids two ways to save |
 
-**Overwrite rule stays:** publishing a job with the same title and place replaces that profile. The page always shows the newest. The notice after publish still offers Undo (forget).
+**Read-only on the profile:** title, place, family, JD format, style, section headings, language, and the source job. Keep `facts.title` and `facts.location` equal to the match key (`title` + `location`).
+
+**Editable**, saved on that profile only, using the existing editors: contract, grade, eligibility, languages, safeguarding, pay, arrangement, hours, recruitment, duration, and the other non-date fields in `facts`; how to apply (`profile.apply` only); which commitment keys are included. A locked commitment cannot be removed. Editing never writes the source job, `org.keptApply`, `org.standard`, `org.fixedWording`, or per-job fixed wording. Each picker saves immediately. Rename and fact edit do not change `at`.
+
+**Overwrite rule stays:** publishing a job with the same title and place replaces that profile. When publish replaces, copy `name` from the profile being replaced onto the new one; fact edits and grouping on the old profile do not survive — the published job supplies those. The page always shows the newest. The notice after publish still offers Undo (`forgetProfile`), which still does not restore the profile it replaced.
+
+**`startJobFromProfile(profileId)`.** Refuses when `reviewerAs` is set, or when the format key is gone. Creates one window job (`setup: 'template'`, with `walk`) whose title, place, country, iso, and timezone come from that profile's match key (`title` + `location`), never from the display `name`. The chat has no typed user line and no "Same as last time?" question; the first reply is `startFromProfile`'s "Starting from…" line (after applying the profile). Deadline, closing time, start date, and positions stay empty, so the closing date is still asked in the walk and the number of positions is still asked at the details step (Phase 4). Do not call `hireAgain`. Do not copy section text.
 
 #### E. Bring forward from phase 6 (one small data fix)
 
-Today a profile keeps `tags` only, not grouping. After phase 6, "Same as last time" drops the arrangement.
+Today a profile keeps `tags` only, not grouping. After phase 6, "Same as last time" drops the arrangement. The Phase 6 build record and its "Saved data" sentence said a job profile keeps only its sections; this phase changes the grouping half and leaves section text out. When this phase is recorded, those two Phase 6 sentences (and the `startFromProfile` comment) are updated to: grouping is now stored and restored; section text, renamed headings, per-job fixed wording, and links stay off the profile. This does not reopen Phase 6's Hire again rule (Hire again still copies text and grouping; a profile still does not).
 
-When saving (`profileOf` / publish), also keep `groupOrder` / `groupOf`, and restore them in `startFromProfile`. Section **text** still stays out. Older profiles without grouping behave as today (template / default grouping).
+When saving (`profileOf` / publish), copy the job's own `groupOrder` and `groupOf` (not a version's). On start: drop tag keys that are not in `SECTION_BY_KEY`. If the profile has grouping, apply `cleanGrouping` and `regrouped` / `grouped`, and do not call `outlineOrder`. If it has none, keep today's `outlineOrder` path (template / default grouping). If the format key is no longer in `formats`, the row says so and **Use for a new job** is disabled; the chat still does not offer it (`profileFor` already hides those). Profiles already stored are not rewritten on load. `profilesFromJobs` uses the new `profileOf`, so a reset picks up grouping from the jobs. Section **text** still stays out.
 
 #### F. The chat and the AI
 
 - Offer text unchanged in spirit; if the profile was renamed, the chat uses the new name (`profileName` prefers `name` when set).
-- From the page, "Use for a new job" is the same as accepting "Same as last time," after a new job is started for that profile's role.
-- AI: may open or start from a profile the user named; may not invent, delete, or rewrite profiles unasked. Delete only when the user asked.
-- Context: a short list of profile names and ids, not full fact dumps every turn.
+- From the page, "Use for a new job" runs `startJobFromProfile` (section D); it is the same outcome as accepting "Same as last time," without re-asking that question.
+- Leave `use_profile` and `context.returning.profile` as they are (still only the one offered profile at setup).
+- Add a short `context.profiles` list, newest first, at most 20 entries of `{id, name}` where `name` is `profileName`, plus the total count if there are more. No fact bodies.
+- New actions, each refused unless the user asked, and refused for an id not in that list: open the list or one profile (`#profiles` / `#profiles/<id>`); start a job with `startJobFromProfile`; rename; delete (the same Undo as the button). No action creates a profile or edits its facts, sections, grouping, or commitment wording. The profiles page has no second chat. These actions stay inside the 80,000-character context limit.
 
 #### G. Build order
 
-1. Data: grouping on save and start; optional display name; rename; delete with Undo; bring-forward of old profiles unchanged.
-2. The list page (menu, search, rows, empty state, Use / Rename / Delete); hide from reviewers.
-3. The open profile (facts, light edit, link back to the source job).
-4. Wire "Use for a new job" through the existing start path; chat name follows rename.
-5. AI: instructions and refusals for this surface.
+1. Data: `groupOrder` / `groupOf` on `profileOf` and on start (section E); optional `name`; rename; `restoreProfile` delete Undo; publish copies `name` on replace; bring-forward of old profiles unchanged; update the Phase 6 sentences and the `startFromProfile` comment.
+2. The list page: menu (before Organisation settings), `case 'profiles'`, scroll list, search, rows, empty and no-match states, Use / Rename / Delete; hide and refuse for `reviewerAs`.
+3. The open profile (facts, light edit scope in D, link back to the source job, focus return).
+4. `startJobFromProfile`; chat name follows rename; disabled Use when the format is gone.
+5. AI: `context.profiles` and the new actions; `use_profile` unchanged; refusals as in F.
 6. Checks, push to `demo/employer` (never merge), plan record and W-51.
 
-One independent review of this plan before the build; one of the phase after.
+One independent review of the phase after the build.
 
-#### H. Checks (each with a test that fails on today's code)
+#### H. Checks
 
-- Publish still saves; same title and place replaces; Undo forgets
-- List shows sample and published profiles; search; empty state
-- Rename changes the chat's "Same as your last …" name
-- Delete with Undo; a deleted profile is not offered
-- Use for a new job → window with facts and sections from the profile; dates still asked
-- Light fact edit on the profile does not change the source job
-- Grouping round-trips on a new save; an old profile without grouping still starts
-- Reviewers never reach the page
+Existing publish / replace / forget tests stay and still pass; they are not rewritten as failing tests. Each new behaviour has a test that fails on today's code:
+
+- List shows sample and published profiles; search; empty state; no-match sentence
+- Rename changes the chat's "Same as your last …" name; blank clears `name`; publish replace keeps `name`
+- Delete with `restoreProfile` Undo; a deleted profile is not offered; Undo does not overwrite a newer same title+place
+- `startJobFromProfile` → window with facts, sections, and grouping from the profile; no "Same as last time?" question; closing date and number of positions still asked; section text not copied
+- Light fact edit on the profile does not change the source job; title and place stay the match key; a locked commitment cannot be removed
+- Grouping round-trip: a custom group order, one section moved into another group, and within-group order, on a new save; an old profile with neither field still starts as today
+- Reviewers never reach the page (menu hidden; direct hash refused; actions return)
+- Missing format disables Use; unknown `#profiles/<id>` shows the list and the gone line
 - No AidJobs backend fetch
 
-Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard through the list and the open profile. Type check, lint, and a production build. Then the preview on `demo/employer`, never merged, and one independent review of the phase.
+Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard: reuse `Tip` and `MenuButton`; the row is a button whose name is the display name; the rename field has a visible label (Enter saves, Escape cancels); opening a profile moves focus into it; Back, close, and delete return focus to that row or the list heading; search as in Manage jobs; icon buttons have tooltips and accessible names. Type check, lint, and a production build. Then the preview on `demo/employer`, never merged, and one independent review of the phase.
 
 #### I. Not in this phase
 
